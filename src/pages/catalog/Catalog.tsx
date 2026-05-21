@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
 import { useDispatch } from 'react-redux';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { toast } from 'sonner';
 import ProfileHeader from '../../components/catalog/ProfileHeader';
@@ -25,7 +26,7 @@ import { finalizeCollectionUploads } from '@/api/collectionUploads';
 import ProfileHeaderQuickEditModal from '../../components/profile/ProfileHeaderQuickEditModal';
 import type { BrandProfileDto, CollectionDto } from '../../types/profile';
 import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedFileUrl';
-import { getStoreStatus, type StoreStatusResponse } from '../../api/StoreApi';
+import type { StoreStatusResponse } from '../../api/StoreApi';
 import CatalogShopTab from '@/components/catalog/CatalogShopTab';
 import BrandQrModal from '@/components/qr/BrandQrModal';
 import { resolveBannerImageSource, resolveProfileImageSource } from '@/utils/profileImage';
@@ -43,6 +44,13 @@ import {
 } from '@/utils/publishTracker';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
 import { canManageCatalog, getActiveBrandId } from '@/lib/brandAccess';
+import {
+  fetchBrandCollectionsQuery,
+  fetchCollectionDetailQuery,
+  useBrandCollectionsQuery,
+  useBrandProfileQuery,
+  useStoreStatusQuery,
+} from '@/query/queries';
 
 import ComingSoon from '../placeholders/ComingSoon';
 
@@ -118,6 +126,7 @@ const ProfilePage: React.FC = () => {
   const isVisitorView = !isOwner && Boolean(normalizedRouteBrandId);
   
   const dispatch = useDispatch();
+  const queryClient = useQueryClient();
 
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -161,6 +170,7 @@ const ProfilePage: React.FC = () => {
   const [isStoreSetupNavigating, setIsStoreSetupNavigating] = useState(false);
   const [isHeaderQuickEditOpen, setIsHeaderQuickEditOpen] = useState(false);
   const [isSavingHeader, setIsSavingHeader] = useState(false);
+  const storeStatusQuery = useStoreStatusQuery({ enabled: isOwner });
 
   const publishTaskScope = useMemo(
     () => ({ ownerId: user?.id ?? undefined }),
@@ -366,6 +376,7 @@ const ProfilePage: React.FC = () => {
     const DISMISS_KEY = 'threadly.storeSetup.dismissedUntil';
     if (!isOwner) {
       setStoreStatus(null);
+      setStoreStatusLoading(false);
       setHasDismissedStoreSetup(false);
       return;
     }
@@ -373,24 +384,18 @@ const ProfilePage: React.FC = () => {
     const dismissedUntilRaw = localStorage.getItem(DISMISS_KEY);
     const dismissedUntil = dismissedUntilRaw ? Number(dismissedUntilRaw) : 0;
     setHasDismissedStoreSetup(Boolean(dismissedUntil && dismissedUntil > Date.now()));
-
-    let cancelled = false;
-    setStoreStatusLoading(true);
-    getStoreStatus()
-      .then((status) => {
-        if (!cancelled) setStoreStatus(status);
-      })
-      .catch(() => {
-        if (!cancelled) setStoreStatus(null);
-      })
-      .finally(() => {
-        if (!cancelled) setStoreStatusLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
   }, [isOwner]);
+
+  useEffect(() => {
+    if (!isOwner) return;
+    if (storeStatusQuery.data !== undefined) {
+      setStoreStatus(storeStatusQuery.data);
+    }
+    if (storeStatusQuery.error) {
+      setStoreStatus(null);
+    }
+    setStoreStatusLoading(storeStatusQuery.isLoading && !storeStatus);
+  }, [isOwner, storeStatus, storeStatusQuery.data, storeStatusQuery.error, storeStatusQuery.isLoading]);
 
   const showStoreSetupNudge = useMemo(() => {
     if (!isOwner) return false;
@@ -514,6 +519,13 @@ const ProfilePage: React.FC = () => {
   const [visitorCollections, setVisitorCollections] = useState<CollectionDto[]>([]);
   const [visitorLoading, setVisitorLoading] = useState<boolean>(() => Boolean(isVisitorView));
   const [visitorError, setVisitorError] = useState<string | null>(null);
+  const visitorProfileQuery = useBrandProfileQuery(normalizedRouteBrandId, {
+    enabled: Boolean(isVisitorView && normalizedRouteBrandId),
+  });
+  const visitorCollectionsQuery = useBrandCollectionsQuery(
+    { ownerId: normalizedRouteBrandId, visibility: 'all', scope: 'design' },
+    { enabled: Boolean(isVisitorView && normalizedRouteBrandId) },
+  );
   const {
     getPatched,
     isLoading: isPatchLoading,
@@ -526,28 +538,42 @@ const ProfilePage: React.FC = () => {
   const patchLoading = showPatchAction ? isPatchLoading(routeBrandId) : false;
 
   useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      if (!isVisitorView || !routeBrandId) return;
-      setVisitorLoading(true);
+    if (!isVisitorView || !normalizedRouteBrandId) {
+      setVisitorProfile(null);
+      setVisitorCollections([]);
+      setVisitorLoading(false);
       setVisitorError(null);
-      try {
-        const [p, cols] = await Promise.all([
-          brandApi.getBrandProfile(routeBrandId),
-          brandApi.getCollections(routeBrandId, { visibility: 'all' }),
-        ]);
-        if (!mounted) return;
-        setVisitorProfile(p ?? null);
-        setVisitorCollections(cols ?? []);
-      } catch {
-        if (mounted) setVisitorError('Failed to load profile data');
-      } finally {
-        if (mounted) setVisitorLoading(false);
-      }
-    };
-    void run();
-    return () => { mounted = false; };
-  }, [isVisitorView, routeBrandId]);
+      return;
+    }
+
+    if (visitorProfileQuery.data !== undefined) {
+      setVisitorProfile(visitorProfileQuery.data ?? null);
+    }
+    if (visitorCollectionsQuery.data) {
+      setVisitorCollections(visitorCollectionsQuery.data);
+    }
+    const hasCachedVisitorData = Boolean(visitorProfile || visitorCollections.length > 0);
+    setVisitorLoading(
+      !hasCachedVisitorData &&
+        (visitorProfileQuery.isLoading || visitorCollectionsQuery.isLoading),
+    );
+    if (visitorProfileQuery.error || visitorCollectionsQuery.error) {
+      setVisitorError('Failed to load profile data');
+    } else {
+      setVisitorError(null);
+    }
+  }, [
+    isVisitorView,
+    normalizedRouteBrandId,
+    visitorCollections.length,
+    visitorCollectionsQuery.data,
+    visitorCollectionsQuery.error,
+    visitorCollectionsQuery.isLoading,
+    visitorProfile,
+    visitorProfileQuery.data,
+    visitorProfileQuery.error,
+    visitorProfileQuery.isLoading,
+  ]);
 
   useEffect(() => {
     if (!showPatchAction || !routeBrandId) return;
@@ -667,7 +693,7 @@ const ProfilePage: React.FC = () => {
         if (!designId) continue;
         try {
           if (!isVisitorView && user?.id) {
-            await fetchCollections(user.id);
+            await fetchCollections(user.id, { forceRefresh: true });
           }
           const latest = !isVisitorView ? collections : visitorCollections;
           const isLive = latest.some((entry) => entry.id === designId || entry.id === legacyCollectionId);
@@ -1018,12 +1044,12 @@ const ProfilePage: React.FC = () => {
         },
       }));
 
-      const current = await brandApi.getCollectionDetail(targetCollectionId);
+      const current = await fetchCollectionDetailQuery(queryClient, targetCollectionId);
       if (current?.status !== 'PUBLISHED') {
         await finalizeCollectionUploads(targetCollectionId, [], true, { action: 'publish' });
       }
 
-      const refreshedDetail = await brandApi.getCollectionDetail(targetCollectionId);
+      const refreshedDetail = await fetchCollectionDetailQuery(queryClient, targetCollectionId, 'design', { forceRefresh: true });
       if (refreshedDetail?.status !== 'PUBLISHED') {
         setPublishingStates((prev) => ({
           ...prev,
@@ -1043,9 +1069,13 @@ const ProfilePage: React.FC = () => {
       }
 
       if (!isVisitorView && user?.id) {
-        await fetchCollections(user.id);
+        await fetchCollections(user.id, { forceRefresh: true });
       } else if (isVisitorView && routeBrandId) {
-        const cols = await brandApi.getCollections(routeBrandId, { visibility: 'all' });
+        const cols = await fetchBrandCollectionsQuery(
+          queryClient,
+          { ownerId: routeBrandId, visibility: 'all', scope: 'design' },
+          { forceRefresh: true },
+        );
         setVisitorCollections(cols ?? []);
       }
 
@@ -1089,7 +1119,7 @@ const ProfilePage: React.FC = () => {
         },
       }));
     }
-  }, [fetchCollections, isVisitorView, publishTaskScope, publishTasks, publishingStates, routeBrandId, user]);
+  }, [fetchCollections, isVisitorView, publishTaskScope, publishTasks, publishingStates, queryClient, routeBrandId, user]);
 
   // Poll publish status for any pending ids
   useEffect(() => {
@@ -1133,7 +1163,7 @@ const ProfilePage: React.FC = () => {
         }
 
         try {
-          const detail = await brandApi.getCollectionDetail(resolvedCollectionId);
+          const detail = await fetchCollectionDetailQuery(queryClient, resolvedCollectionId, 'design', { forceRefresh: true });
           if (detail?.status !== 'PUBLISHED') {
             const attempts = state.attempts + 1;
             const tookTooLong = Date.now() - state.startedAt > 90_000;
@@ -1152,9 +1182,13 @@ const ProfilePage: React.FC = () => {
           }
 
           if (!isVisitorView && user?.id) {
-            await fetchCollections(user.id);
+            await fetchCollections(user.id, { forceRefresh: true });
           } else if (isVisitorView && routeBrandId) {
-            const cols = await brandApi.getCollections(routeBrandId, { visibility: 'all' });
+            const cols = await fetchBrandCollectionsQuery(
+              queryClient,
+              { ownerId: routeBrandId, visibility: 'all', scope: 'design' },
+              { forceRefresh: true },
+            );
             setVisitorCollections(cols ?? []);
           }
 
@@ -1196,7 +1230,7 @@ const ProfilePage: React.FC = () => {
     void poll();
 
     return () => clearInterval(interval);
-  }, [fetchCollections, isVisitorView, publishTaskScope, publishTasks, publishingStates, routeBrandId, user]);
+  }, [fetchCollections, isVisitorView, publishTaskScope, publishTasks, publishingStates, queryClient, routeBrandId, user]);
 
   // Debug: track filtering pipeline when tab or lists change
   useEffect(() => {
@@ -1584,10 +1618,14 @@ const ProfilePage: React.FC = () => {
                     onPriceUpdated={async () => {
                       // Refresh collections to show updated prices on cards
                       if (isVisitorView && routeBrandId) {
-                        const cols = await brandApi.getCollections(routeBrandId);
+                        const cols = await fetchBrandCollectionsQuery(
+                          queryClient,
+                          { ownerId: routeBrandId, visibility: 'all', scope: 'design' },
+                          { forceRefresh: true },
+                        );
                         setVisitorCollections(cols ?? []);
                       } else if (user) {
-                        await fetchCollections(user.id);
+                        await fetchCollections(user.id, { forceRefresh: true });
                       }
                     }}
                   />
@@ -1932,7 +1970,7 @@ const ProfilePage: React.FC = () => {
           onClose={() => setIsAddOpen(false)}
           onCreate={async () => {
             setIsAddOpen(false);
-            if (user) await fetchCollections(user.id);
+            if (user) await fetchCollections(user.id, { forceRefresh: true });
           }}
         />
       )}
@@ -2010,7 +2048,7 @@ const ProfilePage: React.FC = () => {
                   .finally(() => setDraftsLoading(false));
               } else {
                 // Keep local list in sync with server-side counters and any eventual consistency updates.
-                void fetchCollections(user.id);
+                void fetchCollections(user.id, { forceRefresh: true });
                 void brandApi
                   .getCollections(user.id, {
                     scope: 'design',
@@ -2050,7 +2088,7 @@ const ProfilePage: React.FC = () => {
           }
           toast.success('Design restored');
           setDeletedDesigns((prev) => prev.filter((item) => item.id !== targetId));
-          void fetchCollections(user.id);
+          void fetchCollections(user.id, { forceRefresh: true });
         }}
       />
 

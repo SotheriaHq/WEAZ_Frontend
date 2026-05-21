@@ -1,5 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { configApi, type UploadLimits } from '@/api/ConfigApi';
+import { useUploadLimitsQuery } from '@/query/queries';
+import { queryKeys } from '@/query/queryKeys';
 
 /** Hardcoded fallbacks matching the backend defaults (2 MB). */
 const FALLBACK_LIMITS: UploadLimits = {
@@ -34,37 +37,10 @@ const UploadLimitsContext = createContext<UploadLimitsContextValue>({
   refresh: async () => {},
 });
 
-const CACHE_KEY = 'threadly_upload_limits';
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
 export const UploadLimitsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [limits, setLimits] = useState<UploadLimits>(() => {
-    try {
-      const cached = sessionStorage.getItem(CACHE_KEY);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed._ts && Date.now() - parsed._ts < CACHE_TTL) {
-          const { _ts, ...rest } = parsed;
-          return rest as UploadLimits;
-        }
-      }
-    } catch { /* ignore */ }
-    return FALLBACK_LIMITS;
-  });
-
-  const fetchLimits = async (options?: { forceRefresh?: boolean }) => {
-    try {
-      const data = await configApi.getUploadLimits(options);
-      setLimits(data);
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...data, _ts: Date.now() }));
-    } catch {
-      // Use fallback/cached values
-    }
-  };
-
-  useEffect(() => {
-    void fetchLimits();
-  }, []);
+  const queryClient = useQueryClient();
+  const limitsQuery = useUploadLimitsQuery();
+  const limits = limitsQuery.data ?? FALLBACK_LIMITS;
 
   const getLimitBytes = (key: string): number => {
     const val = limits[key];
@@ -78,7 +54,20 @@ export const UploadLimitsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   return (
-    <UploadLimitsContext.Provider value={{ limits, getLimitMB, getLimitBytes, refresh: () => fetchLimits({ forceRefresh: true }) }}>
+    <UploadLimitsContext.Provider
+      value={{
+        limits,
+        getLimitMB,
+        getLimitBytes,
+        refresh: async () => {
+          queryClient.removeQueries({ queryKey: queryKeys.config.uploadLimits(), exact: true });
+          await queryClient.fetchQuery({
+            queryKey: queryKeys.config.uploadLimits(),
+            queryFn: () => configApi.getUploadLimits({ forceRefresh: true }),
+          });
+        },
+      }}
+    >
       {children}
     </UploadLimitsContext.Provider>
   );

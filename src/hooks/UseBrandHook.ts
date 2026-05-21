@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSelector } from 'react-redux';
+import { useQueryClient } from '@tanstack/react-query';
 import type { ProductReviewResponse } from '../api/ReviewsApi';
 import type { RootState } from '../store';
 import { brandApi } from '../api/BrandApi';
@@ -12,6 +13,13 @@ import type { AuthUserDto } from '../types/auth';
 import { env } from '../config/env';
 import { useReviewRuntimeFlags } from './useReviewRuntimeFlags';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
+import {
+  fetchBrandCollectionsQuery,
+  fetchBrandProfileQuery,
+  useBrandCollectionsQuery,
+  useBrandProfileQuery,
+} from '@/query/queries';
+import { queryKeys } from '@/query/queryKeys';
 
 const areStringArraysEqual = (left: string[] | null | undefined, right: string[] | null | undefined) => {
   if (left === right) return true;
@@ -224,6 +232,7 @@ export const useBrandProfile = () => {
   const hasBrandMembership = hasActiveBrandMembership(user);
   const brandDetailEndpointsEnabled = env.featureFlags.brandDetailEndpoints;
   const { flags: reviewFlags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
+  const queryClient = useQueryClient();
 
   // Brand profile state
   const [brandProfile, setBrandProfile] = useState<BrandProfileDto | null>(null);
@@ -255,6 +264,13 @@ export const useBrandProfile = () => {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
   const [loadedReviewsBrandId, setLoadedReviewsBrandId] = useState<string | null>(null);
+  const ownerCollectionsQuery = useBrandCollectionsQuery(
+    { ownerId: ownerBrandId, visibility: 'all', scope: 'design' },
+    { enabled: Boolean(ownerBrandId) },
+  );
+  const ownerBrandProfileQuery = useBrandProfileQuery(ownerBrandId, {
+    enabled: Boolean(ownerBrandId && hasBrandMembership && brandDetailEndpointsEnabled),
+  });
 
   // Fetch brand profile
   const fetchBrandProfile = useCallback(async (brandId: string, options?: { forceRefresh?: boolean }) => {
@@ -269,7 +285,7 @@ export const useBrandProfile = () => {
 
     const request = (async () => {
       try {
-        const profile = await brandApi.getBrandProfile(brandId, {
+        const profile = await fetchBrandProfileQuery(queryClient, brandId, {
           forceRefresh: options?.forceRefresh,
         });
         if (profile) {
@@ -289,15 +305,15 @@ export const useBrandProfile = () => {
       brandProfileFetchPromiseRef.current = null;
     });
     return brandProfileFetchPromiseRef.current;
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     setBrandProfile((current) => syncBrandProfileWithUser(current, user));
   }, [user]);
 
   // Fetch collections
-  const fetchCollections = useCallback(async (ownerId: string) => {
-    if (collectionsFetchPromiseRef.current) {
+  const fetchCollections = useCallback(async (ownerId: string, options?: { forceRefresh?: boolean }) => {
+    if (collectionsFetchPromiseRef.current && !options?.forceRefresh) {
       return collectionsFetchPromiseRef.current;
     }
 
@@ -309,8 +325,11 @@ export const useBrandProfile = () => {
 
     const requestPromise = (async () => {
       try {
-        // Request both public and approved-private collections by default
-        const data = await brandApi.getCollections(ownerId, { visibility: 'all' });
+        const data = await fetchBrandCollectionsQuery(
+          queryClient,
+          { ownerId, visibility: 'all', scope: 'design' },
+          { forceRefresh: options?.forceRefresh },
+        );
         setCollections(data);
       } catch (error) {
         setCollectionsError('Failed to load collections');
@@ -325,7 +344,7 @@ export const useBrandProfile = () => {
     });
     collectionsFetchPromiseRef.current = trackedPromise;
     return trackedPromise;
-  }, []);
+  }, [queryClient]);
 
   // Fetch reviews
   const fetchReviews = useCallback(async (brandId: string) => {
@@ -366,7 +385,7 @@ export const useBrandProfile = () => {
   const createCollection = useCallback(async (data: { name: string; description?: string; isPublic?: boolean }) => {
     const result = await brandApi.createCollection(data);
     if (result && ownerBrandId) {
-      await fetchCollections(ownerBrandId);
+      await fetchCollections(ownerBrandId, { forceRefresh: true });
     }
     return result;
   }, [ownerBrandId, fetchCollections]);
@@ -375,19 +394,64 @@ export const useBrandProfile = () => {
   const updateCollection = useCallback(async (collectionId: string, data: Partial<CollectionDto>) => {
     const result = await brandApi.updateCollection(collectionId, data);
     if (result && ownerBrandId) {
-      await fetchCollections(ownerBrandId);
+      queryClient.invalidateQueries({ queryKey: queryKeys.brand.collectionDetail(collectionId) });
+      await fetchCollections(ownerBrandId, { forceRefresh: true });
     }
     return result;
-  }, [ownerBrandId, fetchCollections]);
+  }, [fetchCollections, ownerBrandId, queryClient]);
 
   // Delete collection
   const deleteCollection = useCallback(async (collectionId: string) => {
     const success = await brandApi.deleteCollection(collectionId);
     if (success) {
       setCollections(prev => prev.filter(c => c.id !== collectionId));
+      queryClient.setQueryData<CollectionDto[]>(
+        queryKeys.brand.collections(ownerBrandId, { visibility: 'all', scope: 'design' }),
+        (current) => (current ?? []).filter((collection) => collection.id !== collectionId),
+      );
+      queryClient.invalidateQueries({ queryKey: queryKeys.brand.collectionDetail(collectionId) });
     }
     return success;
-  }, []);
+  }, [ownerBrandId, queryClient]);
+
+  useEffect(() => {
+    if (!ownerBrandId) {
+      setCollections([]);
+      setCollectionsLoading(false);
+      setCollectionsError(null);
+      return;
+    }
+    if (ownerCollectionsQuery.data) {
+      setCollections(ownerCollectionsQuery.data);
+      setCollectionsError(null);
+    }
+    setCollectionsLoading(ownerCollectionsQuery.isLoading && collectionsRef.current.length === 0);
+    if (ownerCollectionsQuery.error) {
+      setCollectionsError('Failed to load collections');
+      console.error('Error fetching collections:', ownerCollectionsQuery.error);
+    }
+  }, [ownerBrandId, ownerCollectionsQuery.data, ownerCollectionsQuery.error, ownerCollectionsQuery.isLoading]);
+
+  useEffect(() => {
+    if (!ownerBrandId || !hasBrandMembership) {
+      return;
+    }
+    if (ownerBrandProfileQuery.data !== undefined) {
+      setBrandProfile(ownerBrandProfileQuery.data ?? null);
+      setBrandProfileError(ownerBrandProfileQuery.data ? null : 'Failed to load brand profile');
+    }
+    setBrandProfileLoading(ownerBrandProfileQuery.isLoading && !brandProfileRef.current);
+    if (ownerBrandProfileQuery.error) {
+      setBrandProfileError('An error occurred while loading brand profile');
+      console.error('Error fetching brand profile:', ownerBrandProfileQuery.error);
+    }
+  }, [
+    hasBrandMembership,
+    ownerBrandId,
+    ownerBrandProfileQuery.data,
+    ownerBrandProfileQuery.error,
+    ownerBrandProfileQuery.isLoading,
+  ]);
 
   useEffect(() => {
     if (!user?.id || !hasBrandMembership) {
@@ -396,26 +460,6 @@ export const useBrandProfile = () => {
       setBrandProfileLoading(false);
     }
   }, [user?.id, hasBrandMembership]);
-
-  // Initial data fetch
-  useEffect(() => {
-    if (!ownerBrandId) {
-      setCollectionsLoading(false);
-      return;
-    }
-
-    // Fetch collections for all users
-    void fetchCollections(ownerBrandId);
-
-  }, [ownerBrandId, fetchCollections]);
-
-  useEffect(() => {
-    if (!ownerBrandId || !hasBrandMembership || !brandDetailEndpointsEnabled) {
-      return;
-    }
-
-    void fetchBrandProfile(ownerBrandId);
-  }, [ownerBrandId, hasBrandMembership, brandDetailEndpointsEnabled, fetchBrandProfile]);
 
   useEffect(() => {
     if (!ownerBrandId || !hasBrandMembership || reviewFlagsLoading || !reviewFlags.readEnabled) {

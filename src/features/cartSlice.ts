@@ -3,6 +3,8 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { apiClient } from '../api/httpClient';
 import { BagApi } from '@/api/BagApi';
 import type { SizingMode } from '@/types/sizing';
+import { queryClient } from '@/query/queryClient';
+import { queryKeys } from '@/query/queryKeys';
 
 const CART_READ_TTL_MS = 30 * 1000;
 
@@ -133,8 +135,17 @@ export const fetchCart = createAsyncThunk<
     if (!args?.force && cart.lastFetchedAt > 0 && Date.now() - cart.lastFetchedAt < CART_READ_TTL_MS) {
       return { ...cart, isLoading: false, error: null };
     }
-    const response = await apiClient.get('/store/cart');
-    return unwrapResponse(response.data);
+    if (args?.force) {
+      queryClient.removeQueries({ queryKey: queryKeys.store.cart(), exact: true });
+    }
+    return await queryClient.fetchQuery({
+      queryKey: queryKeys.store.cart(),
+      queryFn: async () => {
+        const response = await apiClient.get('/store/cart');
+        return unwrapResponse(response.data);
+      },
+      staleTime: CART_READ_TTL_MS,
+    });
   } catch (error: any) {
     return rejectWithValue(error.response?.data?.message || 'Failed to fetch cart');
   }
@@ -156,7 +167,10 @@ export const addToCart = createAsyncThunk(
   ) => {
     try {
       const response = await apiClient.post('/store/cart', payload);
-      return unwrapResponse(response.data);
+      const data = unwrapResponse(response.data);
+      queryClient.setQueryData(queryKeys.store.cart(), data);
+      queryClient.invalidateQueries({ queryKey: queryKeys.store.bagCount() });
+      return data;
     } catch (error: any) {
       const serverMessage =
         error?.response?.data?.message ||
@@ -184,7 +198,10 @@ export const updateCartItem = createAsyncThunk(
       const response = await apiClient.patch(`/store/cart/${payload.itemId}`, {
         quantity: payload.quantity,
       });
-      return unwrapResponse(response.data);
+      const data = unwrapResponse(response.data);
+      queryClient.setQueryData(queryKeys.store.cart(), data);
+      queryClient.invalidateQueries({ queryKey: queryKeys.store.bagCount() });
+      return data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to update cart');
     }
@@ -196,7 +213,10 @@ export const removeFromCart = createAsyncThunk(
   async (itemId: string, { rejectWithValue }) => {
     try {
       const response = await apiClient.delete(`/store/cart/${itemId}`);
-      return unwrapResponse(response.data);
+      const data = unwrapResponse(response.data);
+      queryClient.setQueryData(queryKeys.store.cart(), data);
+      queryClient.invalidateQueries({ queryKey: queryKeys.store.bagCount() });
+      return data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to remove from cart');
     }
@@ -206,6 +226,8 @@ export const removeFromCart = createAsyncThunk(
 export const clearCart = createAsyncThunk('cart/clearCart', async (_, { rejectWithValue }) => {
   try {
     await apiClient.delete('/store/cart');
+    queryClient.setQueryData(queryKeys.store.cart(), initialState);
+    queryClient.invalidateQueries({ queryKey: queryKeys.store.bagCount() });
     return true;
   } catch (error: any) {
     return rejectWithValue(error.response?.data?.message || 'Failed to clear cart');
@@ -232,7 +254,14 @@ export const fetchCustomBagCount = createAsyncThunk<
           combinedCount: cart.totalQuantity + cart.customBagCount,
         };
       }
-      return await BagApi.getBagCount();
+      if (args?.force) {
+        queryClient.removeQueries({ queryKey: queryKeys.store.bagCount(), exact: true });
+      }
+      return await queryClient.fetchQuery({
+        queryKey: queryKeys.store.bagCount(),
+        queryFn: () => BagApi.getBagCount(),
+        staleTime: CART_READ_TTL_MS,
+      });
     } catch (error: any) {
       return rejectWithValue(
         error.response?.data?.message || 'Failed to fetch bag count',

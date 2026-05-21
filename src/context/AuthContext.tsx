@@ -13,6 +13,8 @@ import {
 } from '../api/httpClient';
 import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
+import { queryClient } from '@/query/queryClient';
+import { queryKeys } from '@/query/queryKeys';
 
 interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
@@ -27,8 +29,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   const fetchUserProfile = useCallback(async () => {
-    const response = await apiClient.get('/auth/profile');
-    const profilePayload = unwrapApiResponse<AuthProfileResponse | AuthUserDto>(response.data);
+    const profilePayload = await queryClient.fetchQuery({
+      queryKey: queryKeys.auth.profile(),
+      queryFn: async () => {
+        const response = await apiClient.get('/auth/profile');
+        return unwrapApiResponse<AuthProfileResponse | AuthUserDto>(response.data);
+      },
+    });
     const user =
       'user' in profilePayload
         ? (profilePayload as AuthProfileResponse).user
@@ -184,6 +191,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (accessToken) {
         persistAccessToken(accessToken);
       }
+      queryClient.removeQueries({ queryKey: queryKeys.auth.profile(), exact: true });
 
       if (user && user.id) {
         dispatch(setUser(user));
@@ -205,6 +213,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     void apiClient.post('/auth/logout').catch(() => undefined);
+    queryClient.removeQueries({ queryKey: queryKeys.auth.profile(), exact: true });
     dropStoredAccessToken();
     dispatch(clearUser());
     disconnectSocket();

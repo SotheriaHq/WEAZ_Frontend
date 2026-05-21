@@ -2,6 +2,8 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { apiClient } from '../api/httpClient';
 import { unwrapApiResponse } from '@/types/auth';
+import { queryClient } from '@/query/queryClient';
+import { queryKeys } from '@/query/queryKeys';
 
 const WISHLIST_READ_TTL_MS = 30 * 1000;
 
@@ -105,8 +107,17 @@ export const fetchWishlist = createAsyncThunk(
       ) {
         return { items: wishlist.items, total: wishlist.total };
       }
-      const response = await apiClient.get('/store/wishlist', { params });
-      return unwrapApiResponse(response.data);
+      if (params.force) {
+        queryClient.removeQueries({ queryKey: queryKeys.store.wishlist({ page: params.page ?? 1, limit: params.limit ?? null }), exact: true });
+      }
+      return await queryClient.fetchQuery({
+        queryKey: queryKeys.store.wishlist({ page: params.page ?? 1, limit: params.limit ?? null }),
+        queryFn: async () => {
+          const response = await apiClient.get('/store/wishlist', { params });
+          return unwrapApiResponse(response.data);
+        },
+        staleTime: WISHLIST_READ_TTL_MS,
+      });
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch wishlist');
     }
@@ -119,6 +130,7 @@ export const addToWishlist = createAsyncThunk(
     try {
       const response = await apiClient.post('/store/wishlist', { productId });
       const payload = unwrapApiResponse<Record<string, unknown>>(response.data);
+      queryClient.invalidateQueries({ queryKey: ['store', 'wishlist'] });
       return { productId, ...(payload ?? {}) };
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to add to wishlist');
@@ -131,9 +143,11 @@ export const removeFromWishlist = createAsyncThunk(
   async (productId: string, { rejectWithValue }) => {
     try {
       await apiClient.delete(`/store/wishlist/${productId}`);
+      queryClient.invalidateQueries({ queryKey: ['store', 'wishlist'] });
       return productId;
     } catch (error: any) {
       if (error?.response?.status === 404) {
+        queryClient.invalidateQueries({ queryKey: ['store', 'wishlist'] });
         return productId;
       }
       return rejectWithValue(error.response?.data?.message || 'Failed to remove from wishlist');

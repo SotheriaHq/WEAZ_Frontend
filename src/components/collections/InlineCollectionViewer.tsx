@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { brandApi } from '@/api/BrandApi';
 import AccessApi, { type AccessState } from '@/api/AccessApi';
 import { toast } from 'sonner';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import StackedCarousel, { type CarouselMediaItem } from '@/components/collections/StackedCarousel';
 import CollectionMetadata from '@/components/collections/CollectionMetadata';
 import { useDispatch, useSelector } from 'react-redux';
@@ -24,6 +25,13 @@ import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOr
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useBagging } from '@/hooks/useBagging';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import {
+  fetchCollectionDetailQuery,
+  setCollectionDetailQueryData,
+  useCollectionDetailQuery,
+} from '@/query/queries';
+import { THREADLY_QUERY_STALE_TIME_MS } from '@/query/queryClient';
+import { queryKeys } from '@/query/queryKeys';
 
 interface InlineCollectionViewerProps {
   collectionId: string;
@@ -39,6 +47,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   onPriceUpdated,
 }) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const highlightCommentId = searchParams.get('commentId');
   const [loading, setLoading] = useState(true);
@@ -66,6 +75,24 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const [customComposerOpen, setCustomComposerOpen] = useState(false);
   const [customConfigurationId, setCustomConfigurationId] = useState<string | null>(null);
   const [openingCustomComposer, setOpeningCustomComposer] = useState(false);
+  const detailQuery = useCollectionDetailQuery(collectionId, 'design', { enabled: Boolean(collectionId) });
+
+  const setDetailAndCache = useCallback((nextDetail: any | null) => {
+    setDetail(nextDetail);
+    if (nextDetail) {
+      setCollectionDetailQueryData(queryClient, collectionId, nextDetail, 'design');
+    }
+  }, [collectionId, queryClient]);
+
+  const patchDetailAndCache = useCallback((updater: (current: any | null) => any | null) => {
+    setDetail((current: any | null) => {
+      const nextDetail = updater(current);
+      if (nextDetail) {
+        setCollectionDetailQueryData(queryClient, collectionId, nextDetail, 'design');
+      }
+      return nextDetail;
+    });
+  }, [collectionId, queryClient]);
   /* showQr disabled — only brand profile QR codes active */
 
   useEffect(() => {
@@ -82,52 +109,50 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       if (!collectionId) return;
       const hasCurrentDetail = detailRef.current?.id === collectionId;
       if (!hasCurrentDetail) {
-        setLoading(true);
-        setDetail(null);
+        setDetailAndCache(null);
       }
       setLocked(false);
       setNotFound(false);
       setRequestState(null);
-      
-      try {
-        const d = await brandApi.getCollectionDetail(collectionId);
-        if (!mounted) return;
-        if (d) {
-          setDetail(d);
-          setIsThreaded(false);
+
+      if (detailQuery.error) {
+        const e: any = detailQuery.error;
+        const status = e?.response?.status;
+
+        if (status === 404 || status === 410) {
           setLocked(false);
+          setNotFound(true);
+          toast.error('Design not found.');
+          onBackRef.current();
+        } else if (status === 403 || status === 401) {
+          setLocked(true);
           setNotFound(false);
         } else {
-          setNotFound(true);
+          toast.error('Failed to load design');
+          onBackRef.current();
         }
-      } catch (e: any) {
-        if (mounted) {
-          // Check if it's a 404 or permission error
-          const status = e?.response?.status;
-          
-          if (status === 404 || status === 410) {
-            setLocked(false);
-            setNotFound(true);
-            toast.error('Design not found.');
-            onBackRef.current();
-          } else if (status === 403 || status === 401) {
-            setLocked(true);
-            setNotFound(false);
-          } else {
-            // Other error - show toast and go back
-            toast.error('Failed to load design');
-            onBackRef.current();
-          }
-        }
-      } finally {
-        if (mounted) setLoading(false);
+        setLoading(false);
+        return;
+      }
+
+      if (!detailQuery.data) {
+        setLoading(detailQuery.isLoading && !hasCurrentDetail);
+        return;
+      }
+
+      if (mounted) {
+        setDetailAndCache(detailQuery.data);
+        setIsThreaded(false);
+        setLocked(false);
+        setNotFound(false);
+        setLoading(false);
       }
     };
     void run();
     return () => {
       mounted = false;
     };
-  }, [collectionId, me?.id]);
+  }, [collectionId, detailQuery.data, detailQuery.error, detailQuery.isLoading, me?.id, setDetailAndCache]);
 
   const isOwner = useMemo(
     () => Boolean(me?.id && detail?.owner?.id && me.id === detail.owner.id),
@@ -193,8 +218,14 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       const items = await Promise.all(
         mediaItems.map(async (item) => {
           if (item.fileId) {
+            const fileId = item.fileId;
             try {
-              const url = await brandApi.getSignedFileUrl(item.fileId);
+              const url = await queryClient.fetchQuery({
+                queryKey: queryKeys.media.signedUrl(fileId),
+                queryFn: () => brandApi.getSignedFileUrl(fileId),
+                staleTime: THREADLY_QUERY_STALE_TIME_MS,
+                gcTime: THREADLY_QUERY_STALE_TIME_MS,
+              });
               return { ...item, url: url || item.url };
             } catch {
               return item;
@@ -209,7 +240,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
     return () => {
       mounted = false;
     };
-  }, [mediaItems]);
+  }, [mediaItems, queryClient]);
 
   const unifiedCommentsCount = useMemo(() => {
     const base = detail?.commentsCount ?? detail?._count?.comments ?? 0;
@@ -387,7 +418,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
         saleEndAt: null as any,
       });
       if (res) {
-        setDetail((d: any) => ({ ...(d ?? {}), saleMinPrice: null, saleMaxPrice: null, saleStartAt: null, saleEndAt: null }));
+        patchDetailAndCache((d: any) => ({ ...(d ?? {}), saleMinPrice: null, saleMaxPrice: null, saleStartAt: null, saleEndAt: null }));
         toast.success('Sale cancelled');
         if (onPriceUpdated) await onPriceUpdated();
       } else {
@@ -511,9 +542,9 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                           if (res.state === 'APPROVED') {
                             toast.success('Access approved! Reloading collection...');
                             // Reload the collection
-                            const d = await brandApi.getCollectionDetail(collectionId, { forceRefresh: true });
+                            const d = await fetchCollectionDetailQuery(queryClient, collectionId, 'design', { forceRefresh: true });
                             if (d) {
-                              setDetail(d);
+                              setDetailAndCache(d);
                               setLocked(false);
                             }
                           } else if (res.state === 'PENDING') {
@@ -600,7 +631,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                 try {
                   const res = await brandApi.updateCollection(collectionId, { coverMediaId: item.id } as any);
                   if (res) {
-                    setDetail((d: any) => ({ ...d, coverMediaId: item.id }));
+                    patchDetailAndCache((d: any) => ({ ...d, coverMediaId: item.id }));
                     toast.success('Cover updated');
                   }
                 } catch {
@@ -811,7 +842,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
           currentMax={detail?.maxPrice}
           currentTags={detail?.tags ?? []}
           onUpdated={async (p) => {
-            setDetail((prev: any) => ({ ...(prev ?? {}), minPrice: p.minPrice ?? prev?.minPrice, maxPrice: p.maxPrice ?? prev?.maxPrice, tags: p.tags ?? prev?.tags }));
+            patchDetailAndCache((prev: any) => ({ ...(prev ?? {}), minPrice: p.minPrice ?? prev?.minPrice, maxPrice: p.maxPrice ?? prev?.maxPrice, tags: p.tags ?? prev?.tags }));
             // Notify parent to refresh collections list so cards show updated prices
             if (onPriceUpdated) {
               await onPriceUpdated();
@@ -828,7 +859,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
           currentMin={detail?.minPrice}
           currentMax={detail?.maxPrice}
           onUpdated={async (p) => {
-            setDetail((prev: any) => ({
+            patchDetailAndCache((prev: any) => ({
               ...(prev ?? {}),
               saleMinPrice: p.saleMinPrice,
               saleMaxPrice: p.saleMaxPrice,

@@ -12,19 +12,22 @@ import { LanguageProvider } from './context/LanguageContext';
 import { UploadLimitsProvider } from './context/UploadLimitsContext';
 import { Provider } from 'react-redux';
 import { store } from './store';
+import { QueryProvider } from './query/QueryProvider';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Provider store={store}>
-      <RealtimeProvider>
-        <ThemeProvider>
-          <LanguageProvider>
-            <UploadLimitsProvider>
-              <App />
-            </UploadLimitsProvider>
-          </LanguageProvider>
-        </ThemeProvider>
-      </RealtimeProvider>
+      <QueryProvider>
+        <RealtimeProvider>
+          <ThemeProvider>
+            <LanguageProvider>
+              <UploadLimitsProvider>
+                <App />
+              </UploadLimitsProvider>
+            </LanguageProvider>
+          </ThemeProvider>
+        </RealtimeProvider>
+      </QueryProvider>
     </Provider>
   </React.StrictMode>
 );

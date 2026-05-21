@@ -1,12 +1,34 @@
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import { act, render } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import userReducer, { setUser } from '@/features/userSlice';
 import { brandApi } from '@/api/BrandApi';
 import { useBrandProfile } from '@/hooks/UseBrandHook';
 import type { AuthUserDto } from '@/types/auth';
 import type { BrandProfileDto } from '@/types/profile';
+
+const renderWithProviders = (store: ReturnType<typeof configureStore>, ui: ReactElement) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+      },
+    },
+  });
+
+  return render(
+    <Provider store={store}>
+      <QueryClientProvider client={queryClient}>
+        {ui}
+      </QueryClientProvider>
+    </Provider>,
+  );
+};
 
 vi.mock('@/api/BrandApi', () => ({
   brandApi: {
@@ -107,12 +129,15 @@ describe('useBrandProfile render isolation', () => {
       return null;
     };
 
-    render(
-      <Provider store={store}>
-        <Probe />
-      </Provider>,
-    );
+    renderWithProviders(store, <Probe />);
 
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(brandApi.getCollections).toHaveBeenCalled();
+    });
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -217,11 +242,7 @@ describe('useBrandProfile render isolation', () => {
       return null;
     };
 
-    render(
-      <Provider store={store}>
-        <Probe />
-      </Provider>,
-    );
+    renderWithProviders(store, <Probe />);
 
     await act(async () => {
       await Promise.resolve();

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
 import type { MarketItem } from '@/types/market';
@@ -29,6 +30,9 @@ import {
 } from '@/components/media/contentDisplayPresets';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
 import { buildDesignUrl } from '@/utils/publicUrlBuilder';
+import { fetchCollectionDetailQuery } from '@/query/queries';
+import { THREADLY_QUERY_STALE_TIME_MS } from '@/query/queryClient';
+import { queryKeys } from '@/query/queryKeys';
 
 type Props = {
   open: boolean;
@@ -64,6 +68,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   const currentUserId = authProfile?.id;
   const dialogRef = React.useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const bagFlow = useBagFlow();
 
   const fallbackMedia = React.useMemo<ModalMedia | null>(() => {
@@ -133,7 +138,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
       setLoadingMedia(true);
       try {
-        const detail = await brandApi.getCollectionDetail(item.collectionId, { scope: 'design' });
+        const detail = await fetchCollectionDetailQuery(queryClient, item.collectionId, 'design');
         const rawMedias = Array.isArray(detail?.medias) ? detail.medias : [];
 
         const parsed: ModalMedia[] = rawMedias
@@ -153,7 +158,11 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           parsed.map(async (m) => {
             if (!m.fileId) return m;
             try {
-              const signed = await brandApi.getSignedFileUrl(m.fileId);
+              const signed = await queryClient.fetchQuery({
+                queryKey: queryKeys.media.publicUrl(m.fileId),
+                queryFn: () => brandApi.getSignedFileUrl(String(m.fileId)),
+                staleTime: THREADLY_QUERY_STALE_TIME_MS,
+              });
               return { ...m, url: signed || m.url };
             } catch {
               return m;
@@ -185,7 +194,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     return () => {
       mounted = false;
     };
-  }, [open, item?.collectionId, item?.id, fallbackMedia]);
+  }, [open, item?.collectionId, item?.id, fallbackMedia, queryClient]);
 
   React.useEffect(() => {
     let mounted = true;

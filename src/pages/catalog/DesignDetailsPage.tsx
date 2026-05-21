@@ -1,21 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import DesignApi from '@/api/DesignApi';
-import { brandApi } from '@/api/BrandApi';
+import { useQueryClient } from '@tanstack/react-query';
 import DesignViewModal from '@/components/designs/DesignViewModal';
 import VLoader from '@/components/loaders/VLoader';
 import type { MarketItem } from '@/types/market';
 import { toDesignMarketItem } from '@/utils/designMarketItem';
+import { fetchCollectionDetailQuery, useDesignDetailQuery } from '@/query/queries';
 
 const DesignDetailsPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [detail, setDetail] = useState<unknown | null>(null);
   const [item, setItem] = useState<MarketItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const openMediaId = searchParams.get('openMedia');
+  const designQuery = useDesignDetailQuery(id, { enabled: Boolean(id) });
 
   useEffect(() => {
     if (!id) {
@@ -25,45 +27,43 @@ const DesignDetailsPage: React.FC = () => {
     }
 
     let mounted = true;
-    const loadDesign = async () => {
-      setLoading(true);
+    const applyDetail = (nextDetail: unknown) => {
+      const nextItem = toDesignMarketItem(nextDetail, openMediaId);
+      if (nextItem) {
+        setDetail(nextDetail);
+        setItem(nextItem);
+        setError(null);
+        return true;
+      }
+      return false;
+    };
+
+    const loadFallback = async () => {
       setError(null);
       try {
-        const nextDetail = await DesignApi.getDesignDetail(id);
-        const nextItem = toDesignMarketItem(nextDetail, null);
+        const legacyDetail = await fetchCollectionDetailQuery(queryClient, id, 'design');
         if (!mounted) return;
-        if (nextItem) {
-          setDetail(nextDetail);
-          setItem(nextItem);
-          return;
-        }
-        setError('This design does not have display media yet.');
+        if (!applyDetail(legacyDetail)) setError('This design does not have display media yet.');
       } catch {
-        try {
-          const legacyDetail = await brandApi.getCollectionDetail(id, { scope: 'design' });
-          const nextItem = toDesignMarketItem(legacyDetail, null);
-          if (!mounted) return;
-          if (nextItem) {
-            setDetail(legacyDetail);
-            setItem(nextItem);
-            return;
-          }
-          setError('This design does not have display media yet.');
-        } catch {
-          if (mounted) {
-            setError('Design not found.');
-          }
-        }
+        if (mounted) setError('Design not found.');
       } finally {
         if (mounted) setLoading(false);
       }
     };
 
-    void loadDesign();
+    if (designQuery.data !== undefined) {
+      if (!applyDetail(designQuery.data)) setError('This design does not have display media yet.');
+      setLoading(false);
+    } else if (designQuery.error) {
+      void loadFallback();
+    } else {
+      setLoading(designQuery.isLoading && !item);
+    }
+
     return () => {
       mounted = false;
     };
-  }, [id]);
+  }, [designQuery.data, designQuery.error, designQuery.isLoading, id, item, openMediaId, queryClient]);
 
   useEffect(() => {
     if (!detail) return;

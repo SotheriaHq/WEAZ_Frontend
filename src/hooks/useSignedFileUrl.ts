@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { brandApi } from '@/api/BrandApi';
+import { THREADLY_QUERY_STALE_TIME_MS } from '@/query/queryClient';
+import { queryKeys } from '@/query/queryKeys';
 
 // Re-use the same session-storage cache from ImageWithFallback
 const CACHE_KEY = 'threadly_signed_url_cache';
@@ -64,6 +67,7 @@ const isRawStorageKey = (value?: string | null) => {
  * Guarantees a stable url string or null, plus loading/error states.
  */
 export function useSignedFileUrl(fileId?: string | null, initial?: string | null) {
+  const queryClient = useQueryClient();
   const [url, setUrl] = useState<string | null>(() => {
     // Try cache first for instant render
     if (fileId) {
@@ -174,7 +178,14 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
     }
 
     setLoading(true);
-    dedup(fileId, () => brandApi.getSignedFileUrl(fileId)).then((signed) => {
+    dedup(fileId, () =>
+      queryClient.fetchQuery({
+        queryKey: queryKeys.media.signedUrl(fileId),
+        queryFn: () => brandApi.getSignedFileUrl(fileId),
+        staleTime: THREADLY_QUERY_STALE_TIME_MS,
+        gcTime: THREADLY_QUERY_STALE_TIME_MS,
+      }),
+    ).then((signed) => {
       if (!cancelled) {
         if (signed) {
           setUrl(signed);
@@ -186,8 +197,14 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
         retryTimer = setTimeout(() => {
           brandApi.invalidateSignedUrlCache(fileId);
           invalidateCachedUrl(fileId);
+          queryClient.removeQueries({ queryKey: queryKeys.media.signedUrl(fileId), exact: true });
           void dedup(fileId, () =>
-            brandApi.getSignedFileUrl(fileId, { forceRefresh: true }),
+            queryClient.fetchQuery({
+              queryKey: queryKeys.media.signedUrl(fileId),
+              queryFn: () => brandApi.getSignedFileUrl(fileId, { forceRefresh: true }),
+              staleTime: THREADLY_QUERY_STALE_TIME_MS,
+              gcTime: THREADLY_QUERY_STALE_TIME_MS,
+            }),
           ).then((retrySigned) => {
             if (!cancelled) {
               if (retrySigned) {
@@ -211,7 +228,7 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
         clearTimeout(retryTimer);
       }
     };
-  }, [fileId, initial]);
+  }, [fileId, initial, queryClient]);
 
   return { url, loading, error } as const;
 }
