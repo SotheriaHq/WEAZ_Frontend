@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { useRealtime } from '@/realtime';
 import { toast } from 'sonner';
-import { NotificationsApi } from '@/api/NotificationsApi';
+import { useNotificationSettingsQuery } from '@/query/queries';
 import {
   fetchNotifications,
   fetchUnreadCount,
@@ -24,6 +24,7 @@ export function useNotificationsBootstrap() {
   const initialized = useSelector((s: RootState) => s.notifications.initialized);
   const items = useSelector((s: RootState) => s.notifications.items);
   const realtime = useRealtime();
+  const notificationSettingsQuery = useNotificationSettingsQuery(userId, { enabled: Boolean(userId) });
   const lastFetchRef = useRef<number>(0);
   const pollTimerRef = useRef<number | null>(null);
   const preloadedRef = useRef<Set<string>>(new Set());
@@ -62,16 +63,6 @@ export function useNotificationsBootstrap() {
         dispatch(fetchNotifications({ limit: 30 }));
       }
       prevUserRef.current = userId;
-      void NotificationsApi.getSettings()
-        .then((settings) => {
-          messagingPrefsRef.current = {
-            desktop: settings?.messaging?.desktop !== false,
-            sound: Boolean(settings?.messaging?.sound),
-          };
-        })
-        .catch(() => {
-          messagingPrefsRef.current = { desktop: true, sound: false };
-        });
     } else {
       // User logged out; fully reset notifications state so next login re-fetches
       dispatch(resetState());
@@ -79,6 +70,15 @@ export function useNotificationsBootstrap() {
       messagingPrefsRef.current = { desktop: true, sound: false };
     }
   }, [userId, initialized, dispatch]);
+
+  useEffect(() => {
+    const settings = notificationSettingsQuery.data;
+    if (!settings) return;
+    messagingPrefsRef.current = {
+      desktop: settings?.messaging?.desktop !== false,
+      sound: Boolean(settings?.messaging?.sound),
+    };
+  }, [notificationSettingsQuery.data]);
 
   // Realtime subscription
   useEffect(() => {

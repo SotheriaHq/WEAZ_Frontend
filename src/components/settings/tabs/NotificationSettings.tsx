@@ -1,5 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSelector } from 'react-redux';
 import { NotificationsApi } from '@/api/NotificationsApi';
+import { useNotificationSettingsQuery } from '@/query/queries';
+import { queryKeys } from '@/query/queryKeys';
+import type { RootState } from '@/store';
 import { toast } from 'sonner';
 
 interface NotificationSettingsData {
@@ -56,39 +61,16 @@ interface NotificationSettingsData {
 }
 
 const NotificationSettings: React.FC = () => {
-  const [settings, setSettings] = useState<NotificationSettingsData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
-    const retryDelays = [1000, 3000];
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (attempt > 0) {
-        await new Promise<void>((resolve) => setTimeout(resolve, retryDelays[attempt - 1]));
-      }
-      try {
-        const data = await NotificationsApi.getSettings();
-        setSettings(data);
-        setLoading(false);
-        return;
-      } catch (error) {
-        console.warn('[background.notifications.load.failed]', error);
-        if (attempt === 2) {
-          toast.error('Failed to load settings');
-          setLoading(false);
-        }
-      }
-    }
-  };
+  const userId = useSelector((state: RootState) => state.user.profile?.id);
+  const queryClient = useQueryClient();
+  const settingsQuery = useNotificationSettingsQuery(userId, { enabled: Boolean(userId) });
+  const settings = settingsQuery.data as NotificationSettingsData | null | undefined;
+  const loading = settingsQuery.isLoading && !settings;
 
   const handleToggle = async (category: keyof NotificationSettingsData, key: string, value: boolean) => {
-    if (!settings) return;
+    if (!settings || !userId) return;
 
-    // Optimistic update
-    const previousSettings = { ...settings };
+    const previousSettings = settings;
     const newSettings = {
       ...settings,
       [category]: {
@@ -96,24 +78,41 @@ const NotificationSettings: React.FC = () => {
         [key]: value,
       },
     };
-    setSettings(newSettings);
+    const queryKey = queryKeys.notifications.settings(userId);
+    queryClient.setQueryData(queryKey, newSettings);
 
     try {
-      await NotificationsApi.updateSettings({
+      const updated = await NotificationsApi.updateSettings({
         [category]: {
           [key]: value,
         },
       });
+      queryClient.setQueryData(queryKey, updated);
       toast.success('Settings updated');
     } catch (error) {
       console.error('Failed to update settings', error);
       toast.error('Failed to update settings');
-      setSettings(previousSettings); // Revert on error
+      queryClient.setQueryData(queryKey, previousSettings);
     }
   };
 
   if (loading) {
     return <div className="p-8 text-center text-gray-500">Loading settings...</div>;
+  }
+
+  if (settingsQuery.error && !settings) {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        <p>Failed to load settings.</p>
+        <button
+          type="button"
+          className="mt-3 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700"
+          onClick={() => void settingsQuery.refetch()}
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
 
   if (!settings) return null;

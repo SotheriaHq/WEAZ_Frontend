@@ -20,12 +20,12 @@ import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { CollectionCartPreviewModal } from '@/components/collections/CollectionCartPreviewModal';
 import { getCollectionCartPreview, type CollectionCartPreviewResponse } from '@/api/collectionUploads';
 import { buildCollectionUrl, shareOrCopyLink } from '@/utils/publicLinks';
-import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
 import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useBagging } from '@/hooks/useBagging';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import {
+  fetchActiveCustomOrderConfigurationQuery,
   fetchCollectionDetailQuery,
   setCollectionDetailQueryData,
   useCollectionDetailQuery,
@@ -400,7 +400,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
       const activeConfiguration =
         (customConfigurationId
           ? { id: customConfigurationId }
-          : await customOrderConfigurationsApi.getActiveForDesign(collectionId)) ?? null;
+          : await fetchActiveCustomOrderConfigurationQuery(queryClient, 'DESIGN', collectionId)) ?? null;
       const resolvedConfigurationId = activeConfiguration?.id ?? null;
 
       if (!resolvedConfigurationId) {

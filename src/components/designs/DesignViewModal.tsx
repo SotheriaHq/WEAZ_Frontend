@@ -16,7 +16,6 @@ import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { formatPrice } from '@/utils/helpers';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import VLoader from '@/components/loaders/VLoader';
-import { customOrderConfigurationsApi } from '@/api/CustomOrderApi';
 import { BagApi } from '@/api/BagApi';
 import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
@@ -30,7 +29,11 @@ import {
 } from '@/components/media/contentDisplayPresets';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
 import { buildDesignUrl } from '@/utils/publicUrlBuilder';
-import { fetchCollectionDetailQuery, useSavedStatusQuery } from '@/query/queries';
+import {
+  fetchActiveCustomOrderConfigurationQuery,
+  fetchCollectionDetailQuery,
+  useSavedStatusQuery,
+} from '@/query/queries';
 import { THREADLY_QUERY_STALE_TIME_MS } from '@/query/queryClient';
 import { queryKeys } from '@/query/queryKeys';
 
@@ -227,7 +230,11 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
       setResolvingCustomConfiguration(true);
       try {
-        const activeConfiguration = await customOrderConfigurationsApi.getActiveForDesign(itemCollectionId);
+        const activeConfiguration = await fetchActiveCustomOrderConfigurationQuery(
+          queryClient,
+          'DESIGN',
+          itemCollectionId,
+        );
         if (!mounted) return;
         setCustomConfigurationId(activeConfiguration?.id ?? null);
       } catch {
@@ -245,7 +252,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     return () => {
       mounted = false;
     };
-  }, [open, itemCollectionId]);
+  }, [open, itemCollectionId, queryClient]);
 
   const onCommentCountChangeRef = React.useRef(onCommentCountChange);
   React.useEffect(() => {
@@ -406,7 +413,11 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
       let resolvedConfigurationId = sourceStatus.custom.configurationId || customConfigurationId;
       if (!resolvedConfigurationId) {
-        const activeConfiguration = await customOrderConfigurationsApi.getActiveForDesign(item.collectionId);
+        const activeConfiguration = await fetchActiveCustomOrderConfigurationQuery(
+          queryClient,
+          'DESIGN',
+          item.collectionId,
+        );
         resolvedConfigurationId = activeConfiguration?.id ?? null;
       }
       if (!resolvedConfigurationId) {

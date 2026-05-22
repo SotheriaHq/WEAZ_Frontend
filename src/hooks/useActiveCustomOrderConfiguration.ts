@@ -1,9 +1,6 @@
-import { useEffect, useState } from 'react';
-import {
-  customOrderConfigurationsApi,
-  type CustomOrderConfiguration,
-  type CustomOrderSourceType,
-} from '@/api/CustomOrderApi';
+import { useMemo } from 'react';
+import type { CustomOrderConfiguration, CustomOrderSourceType } from '@/api/CustomOrderApi';
+import { useActiveCustomOrderConfigurationQuery } from '@/query/queries';
 
 type ActiveCustomOrderConfigurationState = {
   configuration: CustomOrderConfiguration | null;
@@ -19,86 +16,56 @@ export const useActiveCustomOrderConfiguration = (params: {
   enabled?: boolean;
   unavailableReason?: string;
 }): ActiveCustomOrderConfigurationState => {
-  const [state, setState] = useState<ActiveCustomOrderConfigurationState>({
-    configuration: null,
-    configurationId: null,
-    isLoading: false,
-    isAvailable: false,
-    unavailableReason: null,
+  const shouldLoad = Boolean(params.enabled && params.sourceId);
+  const configurationQuery = useActiveCustomOrderConfigurationQuery(params.sourceType, params.sourceId, {
+    enabled: shouldLoad,
   });
 
-  useEffect(() => {
-    let active = true;
+  return useMemo<ActiveCustomOrderConfigurationState>(() => {
+    if (!shouldLoad) {
+      return {
+        configuration: null,
+        configurationId: null,
+        isLoading: false,
+        isAvailable: false,
+        unavailableReason: null,
+      };
+    }
 
-    const load = async () => {
-      if (!params.enabled || !params.sourceId) {
-        if (!active) return;
-        setState({
-          configuration: null,
-          configurationId: null,
-          isLoading: false,
-          isAvailable: false,
-          unavailableReason: null,
-        });
-        return;
-      }
-
-      setState({
+    if (configurationQuery.isFetching && !configurationQuery.data) {
+      return {
         configuration: null,
         configurationId: null,
         isLoading: true,
         isAvailable: false,
         unavailableReason: null,
-      });
+      };
+    }
 
-      try {
-        const configuration =
-          params.sourceType === 'PRODUCT'
-            ? await customOrderConfigurationsApi.getActiveForProduct(params.sourceId)
-            : await customOrderConfigurationsApi.getActiveForDesign(params.sourceId);
+    const configuration = configurationQuery.data ?? null;
+    if (configuration?.id) {
+      return {
+        configuration,
+        configurationId: configuration.id,
+        isLoading: false,
+        isAvailable: true,
+        unavailableReason: null,
+      };
+    }
 
-        if (!active) return;
-
-        if (configuration?.id) {
-          setState({
-            configuration,
-            configurationId: configuration.id,
-            isLoading: false,
-            isAvailable: true,
-            unavailableReason: null,
-          });
-          return;
-        }
-
-        setState({
-          configuration: null,
-          configurationId: null,
-          isLoading: false,
-          isAvailable: false,
-          unavailableReason:
-            params.unavailableReason ??
-            'This item is marked custom-order enabled, but it is not configured for custom bagging yet.',
-        });
-      } catch {
-        if (!active) return;
-        setState({
-          configuration: null,
-          configurationId: null,
-          isLoading: false,
-          isAvailable: false,
-          unavailableReason:
-            params.unavailableReason ??
-            'This item is marked custom-order enabled, but it is not configured for custom bagging yet.',
-        });
-      }
+    return {
+      configuration: null,
+      configurationId: null,
+      isLoading: false,
+      isAvailable: false,
+      unavailableReason:
+        params.unavailableReason ??
+        'This item is marked custom-order enabled, but it is not configured for custom bagging yet.',
     };
-
-    void load();
-
-    return () => {
-      active = false;
-    };
-  }, [params.enabled, params.sourceId, params.sourceType, params.unavailableReason]);
-
-  return state;
+  }, [
+    configurationQuery.data,
+    configurationQuery.isFetching,
+    params.unavailableReason,
+    shouldLoad,
+  ]);
 };

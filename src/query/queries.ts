@@ -1,17 +1,47 @@
 import { useQuery, useQueryClient, type QueryClient, type UseQueryOptions } from '@tanstack/react-query';
 
 import { brandApi, type CollectionScope } from '@/api/BrandApi';
+import { CommentsApi } from '@/api/CommentsApi';
 import { configApi } from '@/api/ConfigApi';
+import {
+  customOrderConfigurationsApi,
+  customOrdersBuyerApi,
+  type CustomOrderConfiguration,
+  type CustomOrderSourceType,
+} from '@/api/CustomOrderApi';
 import { apiClient } from '@/api/httpClient';
+import { NotificationsApi } from '@/api/NotificationsApi';
 import { ReactionsApi } from '@/api/ReactionsApi';
+import { SizeFitApi } from '@/api/SizeFitApi';
 import { getStoreStatus } from '@/api/StoreApi';
 import { DesignApi } from '@/api/DesignApi';
+import type { CommentTarget, CommentV2Dto, PageResult } from '@/types/comments';
 import type { BrandProfileDto, CollectionDto } from '@/types/profile';
 import { THREADLY_QUERY_STALE_TIME_MS } from './queryClient';
 import { queryKeys } from './queryKeys';
 
 type EnabledOption = { enabled?: boolean };
 type ThreadContentType = 'COLLECTION' | 'COLLECTION_MEDIA';
+const THREADLY_COMMENT_STALE_TIME_MS = 60 * 1000;
+const THREADLY_NOTIFICATION_SETTINGS_STALE_TIME_MS = 10 * 60 * 1000;
+const EMPTY_COMMENT_PAGE: PageResult<CommentV2Dto> = {
+  items: [],
+  hasNextPage: false,
+  endCursor: null,
+};
+
+const isHttpStatus = (error: unknown, status: number) => {
+  if (!error || typeof error !== 'object' || !('response' in error)) {
+    return false;
+  }
+
+  return (error as { response?: { status?: number } }).response?.status === status;
+};
+
+const emptyCommentPage = (): PageResult<CommentV2Dto> => ({
+  ...EMPTY_COMMENT_PAGE,
+  items: [],
+});
 type BrandPrivateAccessState = {
   collectionId: string;
   title: string;
@@ -70,6 +100,26 @@ export function usePublicUserProfileQuery(userId?: string | null, options?: Enab
       return response.data?.data ?? response.data ?? null;
     },
     enabled: isEnabled(userId, options?.enabled ?? true),
+  });
+}
+
+export async function fetchMyUserProfileQuery(
+  queryClient: QueryClient,
+  userId?: string | null,
+  options?: { forceRefresh?: boolean },
+) {
+  if (!userId) return null;
+  const key = queryKeys.user.meProfile(userId);
+  if (options?.forceRefresh) {
+    await queryClient.removeQueries({ queryKey: key, exact: true });
+  }
+  return queryClient.fetchQuery({
+    queryKey: key,
+    queryFn: async () => {
+      const response = await apiClient.get('/users/me/profile');
+      return response.data?.data ?? response.data ?? null;
+    },
+    staleTime: THREADLY_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -264,6 +314,15 @@ export function useStoreStatusQuery(options?: EnabledOption) {
   });
 }
 
+export function useNotificationSettingsQuery(userId?: string | null, options?: EnabledOption) {
+  return useQuery({
+    queryKey: queryKeys.notifications.settings(userId),
+    queryFn: () => NotificationsApi.getSettings(),
+    enabled: isEnabled(userId, options?.enabled ?? true),
+    staleTime: THREADLY_NOTIFICATION_SETTINGS_STALE_TIME_MS,
+  });
+}
+
 export function useUploadLimitsQuery(options?: EnabledOption) {
   return useQuery({
     queryKey: queryKeys.config.uploadLimits(),
@@ -346,6 +405,200 @@ export function useThreadedStatusQuery(
         ? ReactionsApi.getCollectionMediaIsThreaded(String(contentId))
         : ReactionsApi.getCollectionIsThreaded(String(contentId)),
     enabled: isEnabled(contentId, options?.enabled ?? true),
+    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+  });
+}
+
+export async function fetchCommentListQuery(
+  queryClient: QueryClient,
+  targetType: CommentTarget,
+  targetId?: string | null,
+  options?: { cursor?: string | null; limit?: number; forceRefresh?: boolean },
+) {
+  if (!targetId) return emptyCommentPage();
+  const cursor = options?.cursor ?? null;
+  const limit = options?.limit ?? 20;
+  const key = queryKeys.comments.list(targetType, targetId, { cursor, limit });
+  if (options?.forceRefresh) {
+    await queryClient.removeQueries({ queryKey: key, exact: true });
+  }
+  return queryClient.fetchQuery({
+    queryKey: key,
+    queryFn: async () => {
+      try {
+        return await CommentsApi.list(targetType, targetId, cursor ?? undefined, limit);
+      } catch (error) {
+        if (isHttpStatus(error, 404)) {
+          return emptyCommentPage();
+        }
+        throw error;
+      }
+    },
+    staleTime: THREADLY_COMMENT_STALE_TIME_MS,
+  });
+}
+
+export async function fetchUnifiedCollectionCommentsQuery(
+  queryClient: QueryClient,
+  collectionId?: string | null,
+  options?: { cursor?: string | null; limit?: number; forceRefresh?: boolean },
+) {
+  if (!collectionId) return emptyCommentPage();
+  const cursor = options?.cursor ?? null;
+  const limit = options?.limit ?? 20;
+  const key = queryKeys.comments.unifiedCollection(collectionId, { cursor, limit });
+  if (options?.forceRefresh) {
+    await queryClient.removeQueries({ queryKey: key, exact: true });
+  }
+  return queryClient.fetchQuery({
+    queryKey: key,
+    queryFn: async () => {
+      try {
+        return await CommentsApi.listUnifiedForCollection(collectionId, cursor ?? undefined, limit);
+      } catch (error) {
+        if (isHttpStatus(error, 404)) {
+          return emptyCommentPage();
+        }
+        throw error;
+      }
+    },
+    staleTime: THREADLY_COMMENT_STALE_TIME_MS,
+  });
+}
+
+export async function fetchCommentRepliesQuery(
+  queryClient: QueryClient,
+  commentId?: string | null,
+  options?: { cursor?: string | null; limit?: number; forceRefresh?: boolean },
+) {
+  if (!commentId) return emptyCommentPage();
+  const cursor = options?.cursor ?? null;
+  const limit = options?.limit ?? 20;
+  const key = queryKeys.comments.replies(commentId, { cursor, limit });
+  if (options?.forceRefresh) {
+    await queryClient.removeQueries({ queryKey: key, exact: true });
+  }
+  return queryClient.fetchQuery({
+    queryKey: key,
+    queryFn: async () => {
+      try {
+        return await CommentsApi.replies(commentId, cursor ?? undefined, limit);
+      } catch (error) {
+        if (isHttpStatus(error, 404)) {
+          return emptyCommentPage();
+        }
+        throw error;
+      }
+    },
+    staleTime: THREADLY_COMMENT_STALE_TIME_MS,
+  });
+}
+
+export function invalidateCommentListQueries(
+  queryClient: QueryClient,
+  targetType: CommentTarget,
+  targetId?: string | null,
+) {
+  if (!targetId) return;
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.comments.listRoot(targetType, targetId),
+  });
+}
+
+export function invalidateUnifiedCollectionCommentsQuery(
+  queryClient: QueryClient,
+  collectionId?: string | null,
+) {
+  if (!collectionId) return;
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.comments.unifiedCollectionRoot(collectionId),
+  });
+}
+
+export async function fetchMySizeFitProfileQuery(
+  queryClient: QueryClient,
+  userId?: string | null,
+  options?: { forceRefresh?: boolean },
+) {
+  if (!userId) return null;
+  const key = queryKeys.sizeFit.myProfile(userId);
+  if (options?.forceRefresh) {
+    await queryClient.removeQueries({ queryKey: key, exact: true });
+  }
+  return queryClient.fetchQuery({
+    queryKey: key,
+    queryFn: () => SizeFitApi.getMyProfile(),
+    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+  });
+}
+
+export async function fetchMySizeFitSharesQuery(
+  queryClient: QueryClient,
+  userId?: string | null,
+  options?: { forceRefresh?: boolean },
+) {
+  if (!userId) return null;
+  const key = queryKeys.sizeFit.shares(userId);
+  if (options?.forceRefresh) {
+    await queryClient.removeQueries({ queryKey: key, exact: true });
+  }
+  return queryClient.fetchQuery({
+    queryKey: key,
+    queryFn: () => SizeFitApi.getShares(),
+    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+  });
+}
+
+export async function fetchDisplayChartPreferenceQuery(
+  queryClient: QueryClient,
+  userId?: string | null,
+  options?: { forceRefresh?: boolean },
+) {
+  if (!userId) return null;
+  const key = queryKeys.customOrders.displayChartPreference(userId);
+  if (options?.forceRefresh) {
+    await queryClient.removeQueries({ queryKey: key, exact: true });
+  }
+  return queryClient.fetchQuery({
+    queryKey: key,
+    queryFn: () => customOrdersBuyerApi.getDisplayChartPreference(),
+    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+  });
+}
+
+export async function fetchActiveCustomOrderConfigurationQuery(
+  queryClient: QueryClient,
+  sourceType?: CustomOrderSourceType | null,
+  sourceId?: string | null,
+  options?: { forceRefresh?: boolean },
+): Promise<CustomOrderConfiguration | null> {
+  if (!sourceType || !sourceId) return null;
+  const key = queryKeys.customOrders.activeConfiguration(sourceType, sourceId);
+  if (options?.forceRefresh) {
+    await queryClient.removeQueries({ queryKey: key, exact: true });
+  }
+  return queryClient.fetchQuery({
+    queryKey: key,
+    queryFn: () =>
+      sourceType === 'PRODUCT'
+        ? customOrderConfigurationsApi.getActiveForProduct(sourceId)
+        : customOrderConfigurationsApi.getActiveForDesign(sourceId),
+    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+  });
+}
+
+export function useActiveCustomOrderConfigurationQuery(
+  sourceType?: CustomOrderSourceType | null,
+  sourceId?: string | null,
+  options?: EnabledOption,
+) {
+  return useQuery({
+    queryKey: queryKeys.customOrders.activeConfiguration(sourceType, sourceId),
+    queryFn: () =>
+      sourceType === 'PRODUCT'
+        ? customOrderConfigurationsApi.getActiveForProduct(sourceId as string)
+        : customOrderConfigurationsApi.getActiveForDesign(sourceId as string),
+    enabled: isEnabled(sourceType, options?.enabled ?? true) && isEnabled(sourceId, options?.enabled ?? true),
     staleTime: THREADLY_QUERY_STALE_TIME_MS,
   });
 }

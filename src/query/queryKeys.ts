@@ -30,6 +30,7 @@ export const queryKeys = {
   },
   user: {
     publicProfile: (userId?: string | null) => ['user', 'publicProfile', normalizeId(userId)] as const,
+    meProfile: (userId?: string | null) => ['user', 'meProfile', normalizeId(userId)] as const,
   },
   brand: {
     profile: (brandId?: string | null) => ['brand', 'profile', normalizeId(brandId)] as const,
@@ -92,9 +93,67 @@ export const queryKeys = {
   },
   notifications: {
     unreadCount: () => ['notifications', 'unreadCount'] as const,
+    settings: (userId?: string | null) => ['notifications', 'settings', normalizeId(userId)] as const,
   },
   messaging: {
     unreadCount: () => ['messaging', 'unreadCount'] as const,
+  },
+  comments: {
+    listRoot: (targetType?: string | null, targetId?: string | null) =>
+      ['comments', 'list', normalizeId(targetType), normalizeId(targetId)] as const,
+    list: (
+      targetType?: string | null,
+      targetId?: string | null,
+      params?: { cursor?: string | null; limit?: number | null },
+    ) =>
+      [
+        'comments',
+        'list',
+        normalizeId(targetType),
+        normalizeId(targetId),
+        normalizeRecord({
+          cursor: params?.cursor ?? null,
+          limit: params?.limit ?? 20,
+        }),
+      ] as const,
+    unifiedCollectionRoot: (collectionId?: string | null) =>
+      ['comments', 'unifiedCollection', normalizeId(collectionId)] as const,
+    unifiedCollection: (
+      collectionId?: string | null,
+      params?: { cursor?: string | null; limit?: number | null },
+    ) =>
+      [
+        'comments',
+        'unifiedCollection',
+        normalizeId(collectionId),
+        normalizeRecord({
+          cursor: params?.cursor ?? null,
+          limit: params?.limit ?? 20,
+        }),
+      ] as const,
+    replies: (
+      commentId?: string | null,
+      params?: { cursor?: string | null; limit?: number | null },
+    ) =>
+      [
+        'comments',
+        'replies',
+        normalizeId(commentId),
+        normalizeRecord({
+          cursor: params?.cursor ?? null,
+          limit: params?.limit ?? 20,
+        }),
+      ] as const,
+  },
+  sizeFit: {
+    myProfile: (userId?: string | null) => ['sizeFit', 'myProfile', normalizeId(userId)] as const,
+    shares: (userId?: string | null) => ['sizeFit', 'shares', normalizeId(userId)] as const,
+  },
+  customOrders: {
+    displayChartPreference: (userId?: string | null) =>
+      ['customOrders', 'displayChartPreference', normalizeId(userId)] as const,
+    activeConfiguration: (sourceType?: string | null, sourceId?: string | null) =>
+      ['customOrders', 'activeConfiguration', normalizeId(sourceType), normalizeId(sourceId)] as const,
   },
 };
 

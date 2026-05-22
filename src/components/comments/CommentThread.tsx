@@ -1,8 +1,13 @@
 import React from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { CommentTarget, CommentV2Dto } from '@/types/comments';
-import { CommentsApi } from '@/api/CommentsApi';
 import CommentComposer from './CommentComposer';
 import CommentItem from './CommentItem';
+import {
+  fetchCommentListQuery,
+  fetchCommentRepliesQuery,
+  invalidateCommentListQueries,
+} from '@/query/queries';
 import { useRealtime } from '@/realtime';
 import { toast } from 'sonner';
 
@@ -13,16 +18,21 @@ type Props = {
 };
 
 const CommentThread: React.FC<Props> = ({ targetType, targetId, className }) => {
+  const queryClient = useQueryClient();
   const [items, setItems] = React.useState<CommentV2Dto[]>([]);
   const [hasNext, setHasNext] = React.useState(false);
   const [cursor, setCursor] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
-  const load = async (reset = false) => {
+  const load = async (reset = false, forceRefresh = false) => {
     if (busy) return;
     setBusy(true);
     try {
-      const res = await CommentsApi.list(targetType, targetId, reset ? undefined : cursor ?? undefined, 20);
+      const res = await fetchCommentListQuery(queryClient, targetType, targetId, {
+        cursor: reset ? null : cursor,
+        limit: 20,
+        forceRefresh,
+      });
       if (reset) {
         setItems(res.items);
       } else {
@@ -49,12 +59,14 @@ const CommentThread: React.FC<Props> = ({ targetType, targetId, className }) => 
     else if (targetType === 'COLLECTION_MEDIA') joinCollectionMedia(targetId);
     const unsubscribeCreated = onComment(`${targetType}:${targetId}`, (p) => {
       if (p?.contentType === targetType && p?.contentId === targetId && p?.event !== 'comment.deleted') {
-        void load(true);
+        invalidateCommentListQueries(queryClient, targetType, targetId);
+        void load(true, true);
       }
     });
     const unsubscribeDeleted = onComment(`${targetType}:${targetId}`, (p) => {
       if (p?.contentType === targetType && p?.contentId === targetId && p?.event === 'comment.deleted') {
-        void load(true);
+        invalidateCommentListQueries(queryClient, targetType, targetId);
+        void load(true, true);
       }
     });
     return () => {
@@ -65,6 +77,7 @@ const CommentThread: React.FC<Props> = ({ targetType, targetId, className }) => 
   }, [targetType, targetId]);
 
   const applyCreated = (c: CommentV2Dto) => {
+    invalidateCommentListQueries(queryClient, c.targetType, c.targetId);
     setItems((prev) => [c, ...prev]);
   };
 
@@ -73,12 +86,13 @@ const CommentThread: React.FC<Props> = ({ targetType, targetId, className }) => 
   };
 
   const handleDelete = (commentId: string) => {
+    invalidateCommentListQueries(queryClient, targetType, targetId);
     setItems((prev) => prev.filter((c) => c.id !== commentId).map((c) => ({ ...c, children: c.children?.filter(r => r.id !== commentId) })));
   };
 
   const loadReplies = async (parentId: string) => {
     try {
-      const res = await CommentsApi.replies(parentId, undefined, 20);
+      const res = await fetchCommentRepliesQuery(queryClient, parentId, { limit: 20 });
       setItems((prev) => prev.map((c) => c.id === parentId ? { ...c, children: res.items } : c));
     } catch {}
   };

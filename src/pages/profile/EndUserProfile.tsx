@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDispatch, useSelector } from 'react-redux';
 import { SavedTab } from './tabs/SavedTab';
 import { PatchesTab } from './tabs/PatchesTab';
@@ -22,7 +23,14 @@ import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomO
 import { deriveSizeRecommendation, DISPLAY_CHART_OPTIONS } from '@/lib/sizeCharts';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
-import { usePublicUserProfileQuery } from '@/query/queries';
+import {
+  fetchDisplayChartPreferenceQuery,
+  fetchMySizeFitProfileQuery,
+  fetchMySizeFitSharesQuery,
+  fetchMyUserProfileQuery,
+  usePublicUserProfileQuery,
+} from '@/query/queries';
+import { queryKeys } from '@/query/queryKeys';
 
 interface UserProfile {
   id: string;
@@ -103,6 +111,7 @@ export const EndUserProfile: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((state: RootState) => state.user.profile);
+  const queryClient = useQueryClient();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -175,8 +184,8 @@ export const EndUserProfile: React.FC = () => {
           setError(null);
         }
 
-        const response = await apiClient.get('/users/me/profile');
-        const normalized = normalizeProfile(response.data);
+        const ownerProfilePayload = await fetchMyUserProfileQuery(queryClient, currentUser?.id ?? profileId);
+        const normalized = normalizeProfile(ownerProfilePayload);
         if (!normalized) throw new Error('Invalid profile payload');
         if (mounted) setProfile(normalized);
       } catch (err) {
@@ -211,7 +220,7 @@ export const EndUserProfile: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [profileId, isOwner, currentUser]);
+  }, [profileId, isOwner, currentUser, queryClient]);
 
   useEffect(() => {
     if (isOwner) return;
@@ -257,11 +266,14 @@ export const EndUserProfile: React.FC = () => {
     publicProfileQuery.isLoading,
   ]);
 
-  const loadSizeFit = useCallback(async () => {
-    if (!isOwner) return;
+  const loadSizeFit = useCallback(async (forceRefresh = false) => {
+    if (!isOwner || !currentUser?.id) return;
     setSizeFitLoading(true);
     try {
-      const [profileData, shareData] = await Promise.all([SizeFitApi.getMyProfile(), SizeFitApi.getShares()]);
+      const [profileData, shareData] = await Promise.all([
+        fetchMySizeFitProfileQuery(queryClient, currentUser.id, { forceRefresh }),
+        fetchMySizeFitSharesQuery(queryClient, currentUser.id, { forceRefresh }),
+      ]);
       setSizeFitProfile(profileData);
       setSizeFitShares(shareData);
     } catch (err) {
@@ -270,7 +282,7 @@ export const EndUserProfile: React.FC = () => {
     } finally {
       setSizeFitLoading(false);
     }
-  }, [isOwner]);
+  }, [currentUser?.id, isOwner, queryClient]);
 
   useEffect(() => {
     if (!isOwner) return;
@@ -279,14 +291,16 @@ export const EndUserProfile: React.FC = () => {
 
   useEffect(() => {
     let active = true;
-    if (!isOwner) return;
+    if (!isOwner || !currentUser?.id) return;
 
     const loadChartProfile = async () => {
       setChartLoading(true);
       try {
-        const preference = await customOrdersBuyerApi.getDisplayChartPreference();
+        const preference = await fetchDisplayChartPreferenceQuery(queryClient, currentUser.id);
         if (!active) return;
-        setDisplayChartFamily(preference.displayChartFamily);
+        if (preference) {
+          setDisplayChartFamily(preference.displayChartFamily);
+        }
       } catch (err) {
         if (active) {
           setComputedSize(null);
@@ -303,7 +317,7 @@ export const EndUserProfile: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [isOwner]);
+  }, [currentUser?.id, isOwner, queryClient]);
 
   useEffect(() => {
     if (!isOwner) return;
@@ -383,6 +397,7 @@ export const EndUserProfile: React.FC = () => {
 
         if (isOwner && updatedUser && typeof updatedUser === 'object') {
           dispatch(setUser(updatedUser));
+          queryClient.setQueryData(queryKeys.user.meProfile(profile.id), updatedUser);
         }
 
         toast.success('Profile updated');
@@ -394,7 +409,7 @@ export const EndUserProfile: React.FC = () => {
         setSavingQuickEdit(false);
       }
     },
-    [dispatch, isOwner, profile],
+    [dispatch, isOwner, profile, queryClient],
   );
 
   const handleSaveSizeFitMeasurements = useCallback(
@@ -408,6 +423,9 @@ export const EndUserProfile: React.FC = () => {
       try {
         const updated = await SizeFitApi.updateProfile(payload);
         setSizeFitProfile(updated);
+        if (currentUser?.id) {
+          queryClient.setQueryData(queryKeys.sizeFit.myProfile(currentUser.id), updated);
+        }
         toast.success('Size fitting profile updated.');
       } catch (err) {
         console.error('Failed to update size fitting profile', err);
@@ -416,7 +434,7 @@ export const EndUserProfile: React.FC = () => {
         setSizeFitSaving(false);
       }
     },
-    [],
+    [currentUser?.id, queryClient],
   );
 
   const handleSaveSizeFitSettings = useCallback(
@@ -430,6 +448,12 @@ export const EndUserProfile: React.FC = () => {
       try {
         const updated = await SizeFitApi.updateSettings(payload);
         setSizeFitProfile((prev) => (prev ? { ...prev, ...updated } : prev));
+        if (currentUser?.id) {
+          queryClient.setQueryData<SizeFitProfile | null>(
+            queryKeys.sizeFit.myProfile(currentUser.id),
+            (current) => (current ? { ...current, ...updated } : current),
+          );
+        }
         toast.success('Size fitting permissions updated.');
       } catch (err) {
         console.error('Failed to update size fitting settings', err);
@@ -438,7 +462,7 @@ export const EndUserProfile: React.FC = () => {
         setSizeFitSaving(false);
       }
     },
-    [],
+    [currentUser?.id, queryClient],
   );
 
   const handleShareSizeFit = useCallback(
@@ -447,7 +471,7 @@ export const EndUserProfile: React.FC = () => {
       try {
         const result = await SizeFitApi.share(payload);
         toast.success(result.requiresApproval ? 'Share request sent for approval.' : 'Size fitting profile shared.');
-        await loadSizeFit();
+        await loadSizeFit(true);
       } catch (err) {
         console.error('Failed to share size fitting profile', err);
         toast.error('Unable to process share request.');
@@ -470,7 +494,7 @@ export const EndUserProfile: React.FC = () => {
               ? 'Access revoked.'
               : 'Share request rejected.',
         );
-        await loadSizeFit();
+        await loadSizeFit(true);
       } catch (err) {
         console.error('Failed to respond to share request', err);
         toast.error('Unable to update share request.');
@@ -488,10 +512,13 @@ export const EndUserProfile: React.FC = () => {
       setDisplayChartFamily(next);
       setChartSaving(true);
       try {
-        await customOrdersBuyerApi.updateDisplayChartPreference({
+        const updated = await customOrdersBuyerApi.updateDisplayChartPreference({
           displayChartFamily: next,
           updatedAtMs: Date.now(),
         });
+        if (currentUser?.id) {
+          queryClient.setQueryData(queryKeys.customOrders.displayChartPreference(currentUser.id), updated);
+        }
         toast.success('Display chart updated.');
       } catch (err) {
         console.error('Failed to save display chart preference', err);
@@ -500,7 +527,7 @@ export const EndUserProfile: React.FC = () => {
         setChartSaving(false);
       }
     },
-    [displayChartFamily],
+    [currentUser?.id, displayChartFamily, queryClient],
   );
 
   const handleTriggerAvatarUpload = useCallback(() => {
@@ -569,6 +596,21 @@ export const EndUserProfile: React.FC = () => {
               : null,
           }),
         );
+        queryClient.setQueryData(queryKeys.user.meProfile(currentUser.id), (current: any) => ({
+          ...(current ?? currentUser),
+          profileImage: nextImage,
+          profileImageId: nextImageId,
+          profileImageFile: nextImage
+            ? {
+                id: nextImageId,
+                s3Url: nextImage,
+                fileName: uploaded?.fileName ?? file.name,
+                originalName: uploaded?.originalName ?? file.name,
+                createdAt: uploaded?.createdAt ?? new Date().toISOString(),
+                updatedAt: uploaded?.updatedAt ?? new Date().toISOString(),
+              }
+            : null,
+        }));
 
         setAvatarPreviewUrl((current) => {
           if (current) URL.revokeObjectURL(current);
@@ -586,7 +628,7 @@ export const EndUserProfile: React.FC = () => {
         setAvatarUploading(false);
       }
     },
-    [currentUser, dispatch],
+    [currentUser, dispatch, queryClient],
   );
 
   const handleRemoveAvatar = useCallback(async () => {
@@ -620,6 +662,12 @@ export const EndUserProfile: React.FC = () => {
           profileImageFile: null,
         }),
       );
+      queryClient.setQueryData(queryKeys.user.meProfile(currentUser.id), (current: any) => ({
+        ...(current ?? currentUser),
+        profileImage: null,
+        profileImageId: null,
+        profileImageFile: null,
+      }));
 
       toast.success('Profile image removed.');
     } catch (err) {
@@ -628,7 +676,7 @@ export const EndUserProfile: React.FC = () => {
     } finally {
       setAvatarUploading(false);
     }
-  }, [currentUser, dispatch]);
+  }, [currentUser, dispatch, queryClient]);
 
   const handleAvatarButtonClick = useCallback(() => {
     if (avatarUploading) return;

@@ -1,10 +1,17 @@
 import React from 'react';
 import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { CommentV2Dto } from '@/types/comments';
 import { CommentsApi } from '@/api/CommentsApi';
 import { OfflineComments } from '@/lib/offlineComments';
 import CommentItem from '@/components/comments/CommentItem';
 import CommentInput from '@/components/ui/CommentInput';
+import {
+  fetchCommentListQuery,
+  fetchCommentRepliesQuery,
+  invalidateCommentListQueries,
+  invalidateUnifiedCollectionCommentsQuery,
+} from '@/query/queries';
 import { useRealtime } from '@/realtime';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '@/store';
@@ -37,6 +44,7 @@ const DesignCommentsPanel: React.FC<Props> = ({
 }) => {
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const dispatch = useDispatch();
+  const queryClient = useQueryClient();
   const [items, setItems] = React.useState<CommentV2Dto[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [mediaCursor, setMediaCursor] = React.useState<string | null>(null);
@@ -74,14 +82,14 @@ const DesignCommentsPanel: React.FC<Props> = ({
     }));
   }, [dispatch, externalComment, items.length, joinComment, mediaId, onCommentAdded]);
 
-  const loadInitial = async () => {
+  const loadInitial = async (forceRefresh = false) => {
     setBusy(true);
     try {
       // Fetch sources independently so one failure doesn't blank the list
-      const mediaReq = CommentsApi.list('COLLECTION_MEDIA', mediaId, undefined, 20)
+      const mediaReq = fetchCommentListQuery(queryClient, 'COLLECTION_MEDIA', mediaId, { limit: 20, forceRefresh })
         .then((r) => ({ ok: true as const, r }))
         .catch((e) => ({ ok: false as const, e }));
-      const collReq = CommentsApi.list('COLLECTION', collectionId, undefined, 20)
+      const collReq = fetchCommentListQuery(queryClient, 'COLLECTION', collectionId, { limit: 20, forceRefresh })
         .then((r) => ({ ok: true as const, r }))
         .catch((e) => ({ ok: false as const, e }));
       const [mediaRes, collRes] = await Promise.all([mediaReq, collReq]);
@@ -131,10 +139,10 @@ const DesignCommentsPanel: React.FC<Props> = ({
     setBusy(true);
     try {
       const mediaReq = mediaHasNext
-        ? CommentsApi.list('COLLECTION_MEDIA', mediaId, mediaCursor ?? undefined, 20).then((r) => ({ ok: true as const, r })).catch(() => ({ ok: false as const }))
+        ? fetchCommentListQuery(queryClient, 'COLLECTION_MEDIA', mediaId, { cursor: mediaCursor, limit: 20 }).then((r) => ({ ok: true as const, r })).catch(() => ({ ok: false as const }))
         : Promise.resolve({ ok: false as const });
       const collReq = collHasNext
-        ? CommentsApi.list('COLLECTION', collectionId, collCursor ?? undefined, 20).then((r) => ({ ok: true as const, r })).catch(() => ({ ok: false as const }))
+        ? fetchCommentListQuery(queryClient, 'COLLECTION', collectionId, { cursor: collCursor, limit: 20 }).then((r) => ({ ok: true as const, r })).catch(() => ({ ok: false as const }))
         : Promise.resolve({ ok: false as const });
       const [mediaRes, collRes] = await Promise.all([mediaReq, collReq]);
   const moreMediaRaw = mediaRes.ok ? mediaRes.r.items : [];
@@ -160,6 +168,8 @@ const DesignCommentsPanel: React.FC<Props> = ({
     const unsubMedia = onComment(`COLLECTION_MEDIA:${mediaId}`, (p: any) => {
       // New comment created
       if (p.comment && p.commentId && p.targetType === 'COLLECTION_MEDIA' && p.targetId === mediaId) {
+        invalidateCommentListQueries(queryClient, 'COLLECTION_MEDIA', mediaId);
+        invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
         const isReply = !!p.comment.parentId;
         setItems((prev) => {
           if (prev.some((c) => c.id === p.commentId)) return prev;
@@ -179,6 +189,8 @@ const DesignCommentsPanel: React.FC<Props> = ({
           return next;
         });
       } else if (!p.comment && p.commentId && p.targetType === 'COLLECTION_MEDIA' && p.targetId === mediaId && (p.deleted || p.event === 'comment.deleted')) {
+        invalidateCommentListQueries(queryClient, 'COLLECTION_MEDIA', mediaId);
+        invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
         setItems((prev) => {
           const next = prev.filter((c) => c.id !== p.commentId);
           onCommentRemoved?.();
@@ -189,6 +201,8 @@ const DesignCommentsPanel: React.FC<Props> = ({
     });
     const unsubCollection = onComment(`COLLECTION:${collectionId}`, (p: any) => {
       if (p.comment && p.commentId && p.targetType === 'COLLECTION' && p.targetId === collectionId) {
+        invalidateCommentListQueries(queryClient, 'COLLECTION', collectionId);
+        invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
         const isReply = !!p.comment.parentId;
         setItems((prev) => {
           if (prev.some((c) => c.id === p.commentId)) return prev;
@@ -208,6 +222,8 @@ const DesignCommentsPanel: React.FC<Props> = ({
         });
       }
       if (!p.comment && p.commentId && p.targetType === 'COLLECTION' && p.targetId === collectionId && (p.deleted || p.event === 'comment.deleted')) {
+        invalidateCommentListQueries(queryClient, 'COLLECTION', collectionId);
+        invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
         setItems((prev) => {
           const next = prev.filter((c) => c.id !== p.commentId);
           onCommentRemoved?.();
@@ -224,7 +240,7 @@ const DesignCommentsPanel: React.FC<Props> = ({
   React.useEffect(() => {
     if (!degraded) return;
     const id = setInterval(() => {
-      void loadInitial();
+      void loadInitial(true);
     }, 20000);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -248,6 +264,8 @@ const DesignCommentsPanel: React.FC<Props> = ({
         setText('');
         setPostedOk(true);
         setTimeout(() => setPostedOk(false), 1200);
+        invalidateCommentListQueries(queryClient, 'COLLECTION_MEDIA', mediaId);
+        invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
         setItems((prev) => {
           const next = [created, ...prev];
           onCommentAdded?.();
@@ -261,7 +279,7 @@ const DesignCommentsPanel: React.FC<Props> = ({
 
   const loadReplies = async (parentId: string) => {
     try {
-      const res = await CommentsApi.replies(parentId, undefined, 20);
+      const res = await fetchCommentRepliesQuery(queryClient, parentId, { limit: 20 });
       setItems((prev) => prev.map((c) => c.id === parentId ? { ...c, children: res.items } : c));
     } catch {}
   };
@@ -297,6 +315,8 @@ const DesignCommentsPanel: React.FC<Props> = ({
                 enableReplyComposer
                 onCreateReply={async (parentId, content) => {
                   const created = await CommentsApi.create(c.targetType, c.targetId, content, parentId);
+                  invalidateCommentListQueries(queryClient, c.targetType, c.targetId);
+                  invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
                   // Insert reply locally under parent
                   setItems((prev) => prev.map((it) => it.id === parentId ? { ...it, children: [created, ...(it.children ?? [])], replyCount: (it.replyCount ?? 0) + 1 } : it));
                   // Auto-expand on posting

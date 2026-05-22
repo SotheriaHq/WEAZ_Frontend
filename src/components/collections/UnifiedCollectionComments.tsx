@@ -1,10 +1,16 @@
 import React from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { CommentsApi } from '@/api/CommentsApi';
 import type { CommentV2Dto } from '@/types/comments';
 import CommentInput from '@/components/ui/CommentInput';
 import { Smile } from 'lucide-react';
 import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
 import CommentItem from '@/components/comments/CommentItem';
+import {
+  fetchUnifiedCollectionCommentsQuery,
+  invalidateCommentListQueries,
+  invalidateUnifiedCollectionCommentsQuery,
+} from '@/query/queries';
 import { toast } from 'sonner';
 
 interface Props {
@@ -14,6 +20,7 @@ interface Props {
 }
 
 const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdded, highlightCommentId }) => {
+  const queryClient = useQueryClient();
   const [items, setItems] = React.useState<CommentV2Dto[]>([]);
   const [cursor, setCursor] = React.useState<string | null>(null);
   const [hasNext, setHasNext] = React.useState(false);
@@ -45,10 +52,10 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
     busyRef.current = true;
     setBusy(true);
     try {
-      const res = await CommentsApi.listUnifiedForCollection(
+      const res = await fetchUnifiedCollectionCommentsQuery(
+        queryClient,
         collectionId,
-        reset ? undefined : cursorRef.current ?? undefined,
-        20
+        { cursor: reset ? null : cursorRef.current, limit: 20 },
       );
       if (reset) setItems(res.items); else setItems((prev) => [...prev, ...res.items]);
       setHasNext(res.hasNextPage);
@@ -60,7 +67,7 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
       setBusy(false);
       busyRef.current = false;
     }
-  }, [collectionId]);
+  }, [collectionId, queryClient]);
 
   React.useEffect(() => {
     setItems([]);
@@ -100,9 +107,19 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
     };
   }, [showEmojiPicker]);
 
-  const applyCreated = (c: CommentV2Dto) => setItems((prev) => [c, ...prev]);
-  const handleThread = (commentId: string, threadCount: number) => setItems((prev) => prev.map((c) => c.id === commentId ? { ...c, threadCount } : { ...c, children: c.children?.map(r => r.id === commentId ? { ...r, threadCount } : r) }));
-  const handleDelete = (commentId: string) => setItems((prev) => prev.filter((c) => c.id !== commentId).map((c) => ({ ...c, children: c.children?.filter(r => r.id !== commentId) })));
+  const applyCreated = (c: CommentV2Dto) => {
+    invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
+    invalidateCommentListQueries(queryClient, c.targetType, c.targetId);
+    setItems((prev) => [c, ...prev]);
+  };
+  const handleThread = (commentId: string, threadCount: number) => {
+    invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
+    setItems((prev) => prev.map((c) => c.id === commentId ? { ...c, threadCount } : { ...c, children: c.children?.map(r => r.id === commentId ? { ...r, threadCount } : r) }));
+  };
+  const handleDelete = (commentId: string) => {
+    invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
+    setItems((prev) => prev.filter((c) => c.id !== commentId).map((c) => ({ ...c, children: c.children?.filter(r => r.id !== commentId) })));
+  };
   const toggleReplies = (parentId: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -195,6 +212,8 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
                     const targetType = c.targetType;
                     const targetId = c.targetId;
                     const created = await CommentsApi.create(targetType, targetId, content, parentId);
+                    invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
+                    invalidateCommentListQueries(queryClient, targetType, targetId);
                     setItems((prev) => prev.map((c) => {
                       if (c.id === parentId) {
                         return { ...c, children: [...(c.children || []), created] };
