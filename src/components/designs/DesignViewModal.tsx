@@ -30,7 +30,7 @@ import {
 } from '@/components/media/contentDisplayPresets';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
 import { buildDesignUrl } from '@/utils/publicUrlBuilder';
-import { fetchCollectionDetailQuery } from '@/query/queries';
+import { fetchCollectionDetailQuery, useSavedStatusQuery } from '@/query/queries';
 import { THREADLY_QUERY_STALE_TIME_MS } from '@/query/queryClient';
 import { queryKeys } from '@/query/queryKeys';
 
@@ -87,6 +87,9 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
   const activeMedia = mediaItems[activeMediaIndex] ?? fallbackMedia;
   const activeMediaId = activeMedia?.id ?? itemId;
+  const savedStatusQuery = useSavedStatusQuery('COLLECTION_MEDIA', activeMediaId, {
+    enabled: Boolean(open && activeMediaId && isAuth),
+  });
 
   const isRegularViewer = authProfile?.type === 'REGULAR';
   const brandId = item?.brandId ?? null;
@@ -269,34 +272,14 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   }, [open]);
 
   React.useEffect(() => {
-    let mounted = true;
-
-    const loadViewerState = async () => {
-      if (!open || !activeMediaId || !isAuth) {
-        if (mounted) {
-          setIsSaved(false);
-        }
-        return;
-      }
-
-      try {
-        const savedRes = await apiClient.get('/saved/check', {
-          params: { targetType: 'COLLECTION_MEDIA', targetId: activeMediaId },
-        });
-
-        if (!mounted) return;
-        setIsSaved(Boolean(savedRes.data?.isSaved));
-      } catch {
-        if (!mounted) return;
-        setIsSaved(false);
-      }
-    };
-
-    void loadViewerState();
-    return () => {
-      mounted = false;
-    };
-  }, [open, activeMediaId, isAuth]);
+    if (!open || !activeMediaId || !isAuth) {
+      setIsSaved((current) => (current ? false : current));
+      return;
+    }
+    if (typeof savedStatusQuery.data === 'boolean') {
+      setIsSaved((current) => (current === savedStatusQuery.data ? current : savedStatusQuery.data));
+    }
+  }, [activeMediaId, isAuth, open, savedStatusQuery.data]);
 
   React.useEffect(() => {
     if (!open || !canPatchBrand || !brandId) return;
@@ -483,10 +466,18 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           data: { targetType: 'COLLECTION_MEDIA', targetId: activeMediaId },
         });
         setIsSaved(false);
+        queryClient.setQueryData(
+          queryKeys.saved.status('COLLECTION_MEDIA', activeMediaId),
+          false,
+        );
         toast.success('Removed from saved.');
       } else {
         await apiClient.post('/saved', { targetType: 'COLLECTION_MEDIA', targetId: activeMediaId });
         setIsSaved(true);
+        queryClient.setQueryData(
+          queryKeys.saved.status('COLLECTION_MEDIA', activeMediaId),
+          true,
+        );
         toast.success('Saved to your saved items.');
       }
     } catch {

@@ -481,7 +481,13 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
         {!isDraft && !isDeleted && (
         <div className="absolute bottom-28 right-2 z-10 flex flex-col items-center gap-3">
           {/* Legacy thread targets are still collection-backed for design rows. */}
-          <ThreadButton contentType="COLLECTION" contentId={collection.id} initialCount={threadsCount} ownerId={collection.ownerId} />
+          <ThreadButton
+            contentType="COLLECTION"
+            contentId={collection.id}
+            initialCount={threadsCount}
+            initialThreaded={typeof collection.isThreaded === 'boolean' ? collection.isThreaded : undefined}
+            ownerId={collection.ownerId}
+          />
           <button
             type="button"
             className="flex flex-col items-center text-white hover:scale-110 transition-transform"

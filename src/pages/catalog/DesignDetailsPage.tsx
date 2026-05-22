@@ -7,6 +7,17 @@ import type { MarketItem } from '@/types/market';
 import { toDesignMarketItem } from '@/utils/designMarketItem';
 import { fetchCollectionDetailQuery, useDesignDetailQuery } from '@/query/queries';
 
+const areMarketItemsEquivalent = (left: MarketItem | null, right: MarketItem) =>
+  Boolean(
+    left &&
+      left.id === right.id &&
+      left.collectionId === right.collectionId &&
+      left.brandId === right.brandId &&
+      left.commentsCount === right.commentsCount &&
+      left.media?.url === right.media?.url &&
+      left.media?.type === right.media?.type,
+  );
+
 const DesignDetailsPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
@@ -31,7 +42,7 @@ const DesignDetailsPage: React.FC = () => {
       const nextItem = toDesignMarketItem(nextDetail, openMediaId);
       if (nextItem) {
         setDetail(nextDetail);
-        setItem(nextItem);
+        setItem((current) => (areMarketItemsEquivalent(current, nextItem) ? current : nextItem));
         setError(null);
         return true;
       }
@@ -57,13 +68,16 @@ const DesignDetailsPage: React.FC = () => {
     } else if (designQuery.error) {
       void loadFallback();
     } else {
-      setLoading(designQuery.isLoading && !item);
+      setLoading((current) => {
+        const nextLoading = designQuery.isLoading && designQuery.data === undefined;
+        return current === nextLoading ? current : nextLoading;
+      });
     }
 
     return () => {
       mounted = false;
     };
-  }, [designQuery.data, designQuery.error, designQuery.isLoading, id, item, openMediaId, queryClient]);
+  }, [designQuery.data, designQuery.error, designQuery.isLoading, id, openMediaId, queryClient]);
 
   useEffect(() => {
     if (!detail) return;

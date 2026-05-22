@@ -2,6 +2,8 @@ import { useQuery, useQueryClient, type QueryClient, type UseQueryOptions } from
 
 import { brandApi, type CollectionScope } from '@/api/BrandApi';
 import { configApi } from '@/api/ConfigApi';
+import { apiClient } from '@/api/httpClient';
+import { ReactionsApi } from '@/api/ReactionsApi';
 import { getStoreStatus } from '@/api/StoreApi';
 import { DesignApi } from '@/api/DesignApi';
 import type { BrandProfileDto, CollectionDto } from '@/types/profile';
@@ -9,6 +11,15 @@ import { THREADLY_QUERY_STALE_TIME_MS } from './queryClient';
 import { queryKeys } from './queryKeys';
 
 type EnabledOption = { enabled?: boolean };
+type ThreadContentType = 'COLLECTION' | 'COLLECTION_MEDIA';
+type BrandPrivateAccessState = {
+  collectionId: string;
+  title: string;
+  coverUrl?: string | null;
+  coverFileId?: string | null;
+  itemCount?: number;
+  state: 'APPROVED' | 'PENDING' | 'REVOKED' | 'NONE';
+};
 
 type BrandCollectionsArgs = {
   ownerId?: string | null;
@@ -19,6 +30,48 @@ type BrandCollectionsArgs = {
 };
 
 const isEnabled = (value: unknown, enabled = true) => Boolean(value) && enabled;
+const normalizeIdList = (values?: Array<string | null | undefined> | null) =>
+  Array.from(
+    new Set(
+      (values ?? [])
+        .map((value) => String(value ?? '').trim())
+        .filter(Boolean),
+    ),
+  ).sort();
+
+const toSavedStatusMap = (items: unknown) => {
+  const result: Record<string, boolean> = {};
+  if (!Array.isArray(items)) return result;
+  for (const item of items) {
+    const entry = item as { targetId?: unknown; isSaved?: unknown };
+    if (typeof entry.targetId === 'string' && entry.targetId.length > 0) {
+      result[entry.targetId] = Boolean(entry.isSaved);
+    }
+  }
+  return result;
+};
+
+export const getPublicProfileUserType = (payload: unknown): 'BRAND' | 'REGULAR' | null => {
+  const container = payload as { user?: unknown; profile?: unknown; type?: unknown; role?: unknown } | null | undefined;
+  const source = (container?.user ?? container?.profile ?? container) as
+    | { type?: unknown; role?: unknown }
+    | null
+    | undefined;
+  const rawType = typeof source?.type === 'string' ? source.type : undefined;
+  if (rawType === 'BRAND' || rawType === 'REGULAR') return rawType;
+  return source?.role === 'User' ? 'REGULAR' : null;
+};
+
+export function usePublicUserProfileQuery(userId?: string | null, options?: EnabledOption) {
+  return useQuery({
+    queryKey: queryKeys.user.publicProfile(userId),
+    queryFn: async () => {
+      const response = await apiClient.get(`/users/${String(userId)}/profile/public`);
+      return response.data?.data ?? response.data ?? null;
+    },
+    enabled: isEnabled(userId, options?.enabled ?? true),
+  });
+}
 
 export function useBrandProfileQuery(brandId?: string | null, options?: EnabledOption) {
   return useQuery({
@@ -51,6 +104,19 @@ export function useBrandCollectionsQuery(args: BrandCollectionsArgs, options?: E
     queryKey: queryKeys.brand.collections(ownerId, { scope, visibility, includeDeleted, onlyDeleted }),
     queryFn: () => brandApi.getCollections(String(ownerId), { scope, visibility, includeDeleted, onlyDeleted }),
     enabled: isEnabled(ownerId, options?.enabled ?? true),
+  });
+}
+
+export function useBrandPrivateAccessStatesQuery(
+  brandId?: string | null,
+  viewerId?: string | null,
+  options?: EnabledOption,
+) {
+  return useQuery({
+    queryKey: queryKeys.brandPrivateAccess.myStates(brandId, viewerId),
+    queryFn: (): Promise<BrandPrivateAccessState[]> => brandApi.getBrandPrivateStates(String(brandId)),
+    enabled: Boolean(brandId && viewerId && (options?.enabled ?? true)),
+    staleTime: THREADLY_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -222,6 +288,65 @@ export function useMediaSignedUrlQuery(fileId?: string | null, options?: Enabled
     enabled: isEnabled(fileId, options?.enabled ?? true),
     staleTime: THREADLY_QUERY_STALE_TIME_MS,
     gcTime: THREADLY_QUERY_STALE_TIME_MS,
+  });
+}
+
+export function useSavedBatchStatusQuery(
+  targetType: string,
+  targetIds?: Array<string | null | undefined> | null,
+  options?: EnabledOption,
+) {
+  const normalizedTargetIds = normalizeIdList(targetIds);
+  return useQuery({
+    queryKey: queryKeys.saved.batch(targetType, normalizedTargetIds),
+    queryFn: async () => {
+      const response = await apiClient.post('/saved/check/batch', {
+        targetType,
+        targetIds: normalizedTargetIds,
+      });
+      const items = response.data?.data?.items ?? response.data?.items ?? [];
+      return toSavedStatusMap(items);
+    },
+    enabled: normalizedTargetIds.length > 0 && (options?.enabled ?? true),
+    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+  });
+}
+
+export function useSavedStatusQuery(
+  targetType: string,
+  targetId?: string | null,
+  options?: EnabledOption,
+) {
+  return useQuery({
+    queryKey: queryKeys.saved.status(targetType, targetId),
+    queryFn: async () => {
+      const response = await apiClient.get('/saved/check', {
+        params: { targetType, targetId },
+      });
+      const payload = response.data?.data ?? response.data ?? {};
+      return Boolean((payload as { isSaved?: unknown }).isSaved);
+    },
+    enabled: isEnabled(targetId, options?.enabled ?? true),
+    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+  });
+}
+
+export function useThreadedStatusQuery(
+  contentType: ThreadContentType,
+  contentId?: string | null,
+  options?: EnabledOption,
+) {
+  return useQuery({
+    queryKey:
+      contentType === 'COLLECTION_MEDIA'
+        ? queryKeys.threaded.collectionMedia(contentId)
+        : queryKeys.threaded.collection(contentId),
+    queryFn: () =>
+      contentType === 'COLLECTION_MEDIA'
+        ? ReactionsApi.getCollectionMediaIsThreaded(String(contentId))
+        : ReactionsApi.getCollectionIsThreaded(String(contentId)),
+    enabled: isEnabled(contentId, options?.enabled ?? true),
+    staleTime: THREADLY_QUERY_STALE_TIME_MS,
   });
 }
 

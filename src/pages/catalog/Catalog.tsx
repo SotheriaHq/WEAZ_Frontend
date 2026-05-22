@@ -47,14 +47,44 @@ import { canManageCatalog, getActiveBrandId } from '@/lib/brandAccess';
 import {
   fetchBrandCollectionsQuery,
   fetchCollectionDetailQuery,
+  useBrandPrivateAccessStatesQuery,
   useBrandCollectionsQuery,
   useBrandProfileQuery,
   useStoreStatusQuery,
 } from '@/query/queries';
+import { queryKeys } from '@/query/queryKeys';
 
 import ComingSoon from '../placeholders/ComingSoon';
 
 type TabType = 'Content' | 'Store' | 'Reviews' | 'About' | 'Drafts';
+type PrivateAccessState = {
+  collectionId: string;
+  title: string;
+  coverUrl?: string | null;
+  coverFileId?: string | null;
+  itemCount?: number;
+  state: 'APPROVED' | 'PENDING' | 'REVOKED' | 'NONE';
+};
+
+const arePrivateAccessStatesEqual = (left: PrivateAccessState[], right: PrivateAccessState[]) => {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    const previous = left[index];
+    const next = right[index];
+    if (
+      previous.collectionId !== next.collectionId ||
+      previous.title !== next.title ||
+      previous.coverUrl !== next.coverUrl ||
+      previous.coverFileId !== next.coverFileId ||
+      previous.itemCount !== next.itemCount ||
+      previous.state !== next.state
+    ) {
+      return false;
+    }
+  }
+  return true;
+};
 // CollectionType removed — dropdown opens modal directly
 
 type CatalogTabNoticeProps = {
@@ -611,20 +641,22 @@ const ProfilePage: React.FC = () => {
     return Boolean(storeStatus?.profile);
   }, [isOwner, storeStatus?.profile, storeStatusLoading]);
 
-  // Visitor: fetch private access states for Private view
-  const [privateStates, setPrivateStates] = useState<Array<{ collectionId: string; title: string; coverUrl?: string | null; coverFileId?: string | null; itemCount?: number; state: 'APPROVED' | 'PENDING' | 'REVOKED' | 'NONE' }>>([]);
+  // Visitor private-access state is user-specific; keep it query-owned and non-persisted.
+  const [privateStates, setPrivateStates] = useState<PrivateAccessState[]>([]);
+  const privateStatesQuery = useBrandPrivateAccessStatesQuery(routeBrandId, user?.id, {
+    enabled: Boolean(isVisitorView && routeBrandId && user?.id),
+  });
   useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      if (!isVisitorView || !routeBrandId) return;
-      try {
-        const items = await brandApi.getBrandPrivateStates(routeBrandId);
-        if (mounted) setPrivateStates(items);
-      } catch {}
-    };
-    void run();
-    return () => { mounted = false; };
-  }, [isVisitorView, routeBrandId]);
+    if (!isVisitorView || !routeBrandId || !user?.id) {
+      setPrivateStates((current) => (current.length === 0 ? current : []));
+      return;
+    }
+    if (privateStatesQuery.data) {
+      setPrivateStates((current) =>
+        arePrivateAccessStatesEqual(current, privateStatesQuery.data) ? current : privateStatesQuery.data,
+      );
+    }
+  }, [isVisitorView, privateStatesQuery.data, routeBrandId, user?.id]);
 
   const activeCollections = useMemo(
     () => (isVisitorView ? visitorCollections : collections) ?? [],
@@ -2003,8 +2035,12 @@ const ProfilePage: React.FC = () => {
               toast.info(`Try again after ${label}`);
               return;
             }
-            setPrivateStates((prev) =>
-              prev.map((entry) => ({ ...entry, state: res.state })),
+            const applyAccessState = (current: PrivateAccessState[] = []) =>
+              current.map((entry) => ({ ...entry, state: res.state }));
+            setPrivateStates((prev) => applyAccessState(prev));
+            queryClient.setQueryData<PrivateAccessState[]>(
+              queryKeys.brandPrivateAccess.myStates(routeBrandId, user.id),
+              (current) => applyAccessState(current ?? []),
             );
             if (res.state === 'PENDING') {
               toast.success('Access requested');

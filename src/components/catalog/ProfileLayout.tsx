@@ -24,6 +24,7 @@ import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { setUser } from '@/features/userSlice';
 import { unwrapApiResponse } from '@/types/auth';
 import type { AuthProfileResponse, AuthUserDto } from '@/types/auth';
+import { getPublicProfileUserType, usePublicUserProfileQuery } from '@/query/queries';
 
 const Profile = lazy(() => import('../../pages/catalog/Catalog'));
 const PROFILE_MAIN_CLASS = `min-h-screen pt-16 transition-[margin] duration-300 ease-out ${ISLAND_BOTTOM_NAV_CLEARANCE_CLASS}`;
@@ -75,10 +76,20 @@ export const ProfileLayout: React.FC = () => {
   const { id: routeBrandId } = useParams<{ id?: string }>();
 
   const isVisitorRoute = Boolean(routeBrandId);
-  const [visitorType, setVisitorType] = useState<'BRAND' | 'REGULAR' | null>(null);
-  const [visitorLoading, setVisitorLoading] = useState(false);
   const [isResendingVerification, setIsResendingVerification] = useState(false);
   const [isCheckingVerification, setIsCheckingVerification] = useState(false);
+  const visitorProfileQuery = usePublicUserProfileQuery(routeBrandId, {
+    enabled: Boolean(isVisitorRoute && routeBrandId),
+  });
+  const visitorType = useMemo(
+    () => getPublicProfileUserType(visitorProfileQuery.data),
+    [visitorProfileQuery.data],
+  );
+  const visitorLoading = Boolean(
+    isVisitorRoute &&
+      !visitorProfileQuery.data &&
+      !visitorProfileQuery.error,
+  );
 
   const verificationPromptContext = searchParams.get('verifyEmailPrompt') ?? '';
 
@@ -97,39 +108,6 @@ export const ProfileLayout: React.FC = () => {
   useEffect(() => {
     dispatch(closeSidebar());
   }, [dispatch, location.pathname]);
-
-  useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      if (!isVisitorRoute || !routeBrandId) return;
-      try {
-        setVisitorLoading(true);
-        const res = await apiClient.get(`/users/${routeBrandId}/profile/public`);
-        const payload = res.data?.data ?? res.data;
-        const source = payload?.user ?? payload?.profile ?? payload;
-        const rawType = source?.type as string | undefined;
-        const type =
-          rawType === 'BRAND' || rawType === 'REGULAR'
-            ? rawType
-            : source?.role === 'User'
-              ? 'REGULAR'
-              : null;
-        if (mounted) {
-          setVisitorType(type ?? null);
-        }
-      } catch {
-        if (mounted) {
-          setVisitorType(null);
-        }
-      } finally {
-        if (mounted) {
-          setVisitorLoading(false);
-        }
-      }
-    };
-    void run();
-    return () => { mounted = false; };
-  }, [isVisitorRoute, routeBrandId]);
 
   const isRail = computedSidebarMode === 'RAIL';
   const mainMarginLeft = isRail ? '72px' : '0px';

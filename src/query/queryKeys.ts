@@ -2,6 +2,14 @@ export type CollectionScopeKey = 'design' | 'store' | 'all' | null | undefined;
 export type CollectionVisibilityKey = 'public' | 'private' | 'all' | null | undefined;
 
 const normalizeId = (value?: string | null) => String(value ?? '').trim();
+const normalizeIdList = (values?: Array<string | null | undefined> | null) =>
+  Array.from(
+    new Set(
+      (values ?? [])
+        .map((value) => normalizeId(value))
+        .filter(Boolean),
+    ),
+  ).sort();
 
 const normalizeRecord = (value?: Record<string, unknown> | null) => {
   if (!value) return {};
@@ -19,6 +27,9 @@ const normalizeRecord = (value?: Record<string, unknown> | null) => {
 export const queryKeys = {
   auth: {
     profile: () => ['auth', 'profile'] as const,
+  },
+  user: {
+    publicProfile: (userId?: string | null) => ['user', 'publicProfile', normalizeId(userId)] as const,
   },
   brand: {
     profile: (brandId?: string | null) => ['brand', 'profile', normalizeId(brandId)] as const,
@@ -45,6 +56,10 @@ export const queryKeys = {
     collectionDetail: (collectionId?: string | null, scope?: CollectionScopeKey) =>
       ['brand', 'collectionDetail', normalizeId(collectionId), scope ?? 'design'] as const,
   },
+  brandPrivateAccess: {
+    myStates: (brandId?: string | null, viewerId?: string | null) =>
+      ['brandPrivateAccess', 'myStates', normalizeId(brandId), normalizeId(viewerId)] as const,
+  },
   design: {
     detail: (designId?: string | null) => ['design', 'detail', normalizeId(designId)] as const,
   },
@@ -65,6 +80,16 @@ export const queryKeys = {
     publicUrl: (fileId?: string | null) => ['media', 'publicUrl', normalizeId(fileId)] as const,
     signedUrl: (fileId?: string | null) => ['media', 'signedUrl', normalizeId(fileId)] as const,
   },
+  saved: {
+    status: (targetType?: string | null, targetId?: string | null) =>
+      ['saved', 'status', normalizeId(targetType), normalizeId(targetId)] as const,
+    batch: (targetType?: string | null, targetIds?: Array<string | null | undefined> | null) =>
+      ['saved', 'batch', normalizeId(targetType), normalizeIdList(targetIds)] as const,
+  },
+  threaded: {
+    collection: (collectionId?: string | null) => ['threaded', 'collection', normalizeId(collectionId)] as const,
+    collectionMedia: (mediaId?: string | null) => ['threaded', 'collectionMedia', normalizeId(mediaId)] as const,
+  },
   notifications: {
     unreadCount: () => ['notifications', 'unreadCount'] as const,
   },
@@ -75,7 +100,10 @@ export const queryKeys = {
 
 export const isPersistableThreadlyQueryKey = (queryKey: readonly unknown[]) => {
   const [root, scope] = queryKey;
-  if (root === 'brand' || root === 'design' || root === 'designs' || root === 'config') {
+  if (root === 'brand') {
+    return scope === 'profile' || scope === 'collections' || scope === 'collectionDetail';
+  }
+  if (root === 'design' || root === 'designs' || root === 'config') {
     return true;
   }
   if (root === 'media') {

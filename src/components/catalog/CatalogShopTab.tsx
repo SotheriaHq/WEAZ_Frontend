@@ -22,6 +22,9 @@ import InlineStoreCollectionView from './InlineStoreCollectionView';
 import type { RootState } from '@/store';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import useDebounce from '@/hooks/useDebounce';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSavedBatchStatusQuery } from '@/query/queries';
+import { queryKeys } from '@/query/queryKeys';
 
 interface ProductsResponse {
   items: StoreProduct[];
@@ -44,6 +47,13 @@ const COLOR_HEX_MAP: Record<string, string> = {
   Black: '#000000', White: '#FFFFFF', Navy: '#1E3A5F', Red: '#DC2626',
   Green: '#16A34A', Blue: '#2563EB', Pink: '#EC4899', Brown: '#92400E',
   Gray: '#6B7280', Purple: '#9333EA', Yellow: '#EAB308', Orange: '#EA580C',
+};
+
+const areSavedMapsEqual = (left: Record<string, boolean>, right: Record<string, boolean>) => {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return leftKeys.every((key) => left[key] === right[key]);
 };
 
 interface ProductCategory {
@@ -128,6 +138,7 @@ export default function CatalogShopTab({
   ownerHasStoreProfile,
 }: CatalogShopTabProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [total, setTotal] = useState(0);
@@ -253,35 +264,21 @@ export default function CatalogShopTab({
     };
   }, [brandId]);
 
+  const savedStatusQuery = useSavedBatchStatusQuery('COLLECTION', collectionTargetIds, {
+    enabled: isAuth && collectionTargetIds.length > 0,
+  });
+
   useEffect(() => {
-    let mounted = true;
-    const loadSaved = async () => {
-      if (!isAuth || collectionTargetIds.length === 0) {
-        if (mounted) setSavedMap({});
-        return;
-      }
-      try {
-        const res = await apiClient.post('/saved/check/batch', {
-          targetType: 'COLLECTION',
-          targetIds: collectionTargetIds,
-        });
-        const items = res.data?.items ?? [];
-        if (mounted) {
-          const next: Record<string, boolean> = {};
-          for (const item of items) {
-            if (item?.targetId) next[item.targetId] = Boolean(item.isSaved);
-          }
-          setSavedMap(next);
-        }
-      } catch {
-        if (mounted) setSavedMap({});
-      }
-    };
-    void loadSaved();
-    return () => {
-      mounted = false;
-    };
-  }, [isAuth, collectionTargetIds, collectionTargetIdsKey]);
+    if (!isAuth || collectionTargetIds.length === 0) {
+      setSavedMap((current) => (Object.keys(current).length === 0 ? current : {}));
+      return;
+    }
+    if (savedStatusQuery.data) {
+      setSavedMap((current) =>
+        areSavedMapsEqual(current, savedStatusQuery.data) ? current : savedStatusQuery.data,
+      );
+    }
+  }, [collectionTargetIds.length, collectionTargetIdsKey, isAuth, savedStatusQuery.data]);
 
   // Click-outside handler for search field
   useEffect(() => {
@@ -548,6 +545,10 @@ export default function CatalogShopTab({
           await apiClient.post('/saved', { targetType: 'COLLECTION', targetId: collectionId });
         }
         setSavedMap((prev) => ({ ...prev, [collectionId]: !currentlySaved }));
+        queryClient.setQueryData<Record<string, boolean>>(
+          queryKeys.saved.batch('COLLECTION', collectionTargetIds),
+          (current) => ({ ...(current ?? {}), [collectionId]: !currentlySaved }),
+        );
         toast.success(currentlySaved ? 'Removed from saved.' : 'Saved for later.');
       } catch {
         toast.error('Unable to update saved items.');
@@ -559,7 +560,7 @@ export default function CatalogShopTab({
         });
       }
     },
-    [isAuth],
+    [collectionTargetIds, isAuth, queryClient],
   );
 
   const showProductsEmpty = !error && !loading && filteredProducts.length === 0;

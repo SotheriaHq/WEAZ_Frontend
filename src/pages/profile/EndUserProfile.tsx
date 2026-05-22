@@ -22,6 +22,7 @@ import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomO
 import { deriveSizeRecommendation, DISPLAY_CHART_OPTIONS } from '@/lib/sizeCharts';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
+import { usePublicUserProfileQuery } from '@/query/queries';
 
 interface UserProfile {
   id: string;
@@ -128,6 +129,9 @@ export const EndUserProfile: React.FC = () => {
 
   const isOwner = !id || currentUser?.id === id;
   const profileId = id ?? currentUser?.id;
+  const publicProfileQuery = usePublicUserProfileQuery(profileId, {
+    enabled: Boolean(!isOwner && profileId),
+  });
   const availableTabs = useMemo(() => (isOwner ? ['Saved', 'Patches', 'Orders'] : ['Patches']), [isOwner]);
   const tabParam = searchParams.get('tab');
   const derivedTab = (() => {
@@ -161,14 +165,17 @@ export const EndUserProfile: React.FC = () => {
         return;
       }
 
+      if (!isOwner) {
+        return;
+      }
+
       try {
         if (mounted) {
           setLoading(true);
           setError(null);
         }
 
-        const endpoint = isOwner ? '/users/me/profile' : `/users/${profileId}/profile/public`;
-        const response = await apiClient.get(endpoint);
+        const response = await apiClient.get('/users/me/profile');
         const normalized = normalizeProfile(response.data);
         if (!normalized) throw new Error('Invalid profile payload');
         if (mounted) setProfile(normalized);
@@ -205,6 +212,50 @@ export const EndUserProfile: React.FC = () => {
       mounted = false;
     };
   }, [profileId, isOwner, currentUser]);
+
+  useEffect(() => {
+    if (isOwner) return;
+
+    if (!profileId) {
+      setProfile(null);
+      setLoading(false);
+      setError('Failed to load profile');
+      return;
+    }
+
+    if (publicProfileQuery.isLoading && !publicProfileQuery.data) {
+      setLoading(true);
+      setError(null);
+      return;
+    }
+
+    if (publicProfileQuery.error) {
+      setProfile(null);
+      setLoading(false);
+      setError('Failed to load profile');
+      return;
+    }
+
+    if (!publicProfileQuery.data) return;
+
+    const normalized = normalizeProfile(publicProfileQuery.data);
+    if (!normalized) {
+      setProfile(null);
+      setLoading(false);
+      setError('Failed to load profile');
+      return;
+    }
+
+    setProfile(normalized);
+    setLoading(false);
+    setError(null);
+  }, [
+    isOwner,
+    profileId,
+    publicProfileQuery.data,
+    publicProfileQuery.error,
+    publicProfileQuery.isLoading,
+  ]);
 
   const loadSizeFit = useCallback(async () => {
     if (!isOwner) return;

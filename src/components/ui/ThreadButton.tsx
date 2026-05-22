@@ -14,6 +14,7 @@ import ThreadListModal from '@/components/engagement/ThreadListModal';
 import { OfflineThreads } from '@/lib/offlineThreads';
 import { toast } from 'sonner';
 import ThreadActivityIndicator, { type ThreadActivityIndicatorState } from './ThreadActivityIndicator';
+import { useThreadedStatusQuery } from '@/query/queries';
 
 import './ThreadButton.css';
 
@@ -79,6 +80,10 @@ const ThreadButton: React.FC<Props> = ({
       threadCount: initialCount,
     };
   }, [stateItem, initialThreaded, initialCount]);
+  const shouldFetchInitialThreadState = initialThreaded === undefined && isAuth && Boolean(contentId);
+  const threadStatusQuery = useThreadedStatusQuery(contentType, contentId, {
+    enabled: shouldFetchInitialThreadState,
+  });
 
   const currentThreadedRef = useRef(item.threadedByMe);
   const queuedDesiredRef = useRef<boolean | null>(null);
@@ -216,34 +221,29 @@ const ThreadButton: React.FC<Props> = ({
       );
       setInitializing(false);
     } else if (isAuth) {
-      setInitializing(true);
-      const fetchApi =
-        contentType === 'COLLECTION_MEDIA'
-          ? ReactionsApi.getCollectionMediaIsThreaded
-          : ReactionsApi.getCollectionIsThreaded;
-
-      fetchApi(contentId)
-        .then((threadStatus) => {
-          dispatch(
-            setThreadState({
-              contentType,
-              contentId,
-              threadedByMe: !!threadStatus.threaded,
-              threadCount: initialCount,
-            }),
-          );
-        })
-        .catch(() => {
-          dispatch(
-            setThreadState({
-              contentType,
-              contentId,
-              threadedByMe: false,
-              threadCount: initialCount,
-            }),
-          );
-        })
-        .finally(() => setInitializing(false));
+      if (threadStatusQuery.data) {
+        dispatch(
+          setThreadState({
+            contentType,
+            contentId,
+            threadedByMe: !!threadStatusQuery.data.threaded,
+            threadCount: initialCount,
+          }),
+        );
+        setInitializing(false);
+      } else if (threadStatusQuery.error) {
+        dispatch(
+          setThreadState({
+            contentType,
+            contentId,
+            threadedByMe: false,
+            threadCount: initialCount,
+          }),
+        );
+        setInitializing(false);
+      } else {
+        setInitializing(threadStatusQuery.isLoading);
+      }
     } else {
       dispatch(
         setThreadState({
@@ -270,7 +270,18 @@ const ThreadButton: React.FC<Props> = ({
       clearAnimationTimers();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentType, contentId, dispatch, isAuth, initialCount, initialThreaded, ownerId]);
+  }, [
+    contentType,
+    contentId,
+    dispatch,
+    isAuth,
+    initialCount,
+    initialThreaded,
+    ownerId,
+    threadStatusQuery.data?.threaded,
+    threadStatusQuery.error,
+    threadStatusQuery.isLoading,
+  ]);
 
   const runToggle = useCallback(
     async (desiredThreaded: boolean) => {

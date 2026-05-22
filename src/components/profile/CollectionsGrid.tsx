@@ -8,6 +8,9 @@ import { toast } from 'sonner';
 import type { RootState } from '@/store';
 import { resolveCatalogEntityType } from '@/utils/catalogEntity';
 import { mapCatalogTargetForLegacyApi } from '@/utils/catalogTarget';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSavedBatchStatusQuery } from '@/query/queries';
+import { queryKeys } from '@/query/queryKeys';
 
 interface CollectionsGridProps {
   collections: CollectionDto[];
@@ -21,6 +24,13 @@ interface CollectionsGridProps {
   onRetryPublish?: (id: string) => void;
 }
 
+const areSavedMapsEqual = (left: Record<string, boolean>, right: Record<string, boolean>) => {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return leftKeys.every((key) => left[key] === right[key]);
+};
+
 const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
   collections, 
   onEdit, 
@@ -33,6 +43,7 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
   onRetryPublish,
 }) => {
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const queryClient = useQueryClient();
   const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
 
@@ -50,33 +61,21 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
     [collectionIds],
   );
 
+  const savedStatusQuery = useSavedBatchStatusQuery('COLLECTION', collectionIds, {
+    enabled: isAuth && collectionIds.length > 0,
+  });
+
   useEffect(() => {
-    let mounted = true;
-    const loadSaved = async () => {
-      if (!isAuth || collectionIds.length === 0) {
-        if (mounted) setSavedMap({});
-        return;
-      }
-      try {
-        const res = await apiClient.post('/saved/check/batch', {
-          targetType: 'COLLECTION',
-          targetIds: collectionIds,
-        });
-        const items = res.data?.items ?? [];
-        if (mounted) {
-          const next: Record<string, boolean> = {};
-          for (const item of items) {
-            if (item?.targetId) next[item.targetId] = Boolean(item.isSaved);
-          }
-          setSavedMap(next);
-        }
-      } catch {
-        if (mounted) setSavedMap({});
-      }
-    };
-    void loadSaved();
-    return () => { mounted = false; };
-  }, [collectionIds, collectionIdsKey, isAuth]);
+    if (!isAuth || collectionIds.length === 0) {
+      setSavedMap((current) => (Object.keys(current).length === 0 ? current : {}));
+      return;
+    }
+    if (savedStatusQuery.data) {
+      setSavedMap((current) =>
+        areSavedMapsEqual(current, savedStatusQuery.data) ? current : savedStatusQuery.data,
+      );
+    }
+  }, [collectionIds.length, collectionIdsKey, isAuth, savedStatusQuery.data]);
 
   const handleToggleSave = async (collectionId: string) => {
     if (!isAuth) {
@@ -105,6 +104,10 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
         await apiClient.post('/saved', savedTarget);
       }
       setSavedMap((prev) => ({ ...prev, [collectionId]: !isSaved }));
+      queryClient.setQueryData<Record<string, boolean>>(
+        queryKeys.saved.batch('COLLECTION', collectionIds),
+        (current) => ({ ...(current ?? {}), [collectionId]: !isSaved }),
+      );
       toast.success(isSaved ? 'Removed from saved.' : 'Saved for later.');
     } catch {
       toast.error('Unable to update saved items.');
