@@ -169,20 +169,26 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           parsed.map(async (m) => {
             if (!m.fileId) return m;
             if (m.url && /^https?:\/\//i.test(m.url)) return m;
+            let publicUrl: string | null = null;
             try {
-              const publicUrl = await queryClient.fetchQuery({
+              publicUrl = await queryClient.fetchQuery({
                 queryKey: queryKeys.media.publicUrl(m.fileId),
                 queryFn: () => brandApi.getPublicFileUrl(String(m.fileId)),
                 staleTime: THREADLY_QUERY_STALE_TIME_MS,
+                retry: false,
               });
-              const signed =
-                publicUrl ??
-                (await queryClient.fetchQuery({
-                  queryKey: queryKeys.media.signedUrl(m.fileId),
-                  queryFn: () => brandApi.getPrivateSignedFileUrl(String(m.fileId)),
-                  staleTime: THREADLY_QUERY_STALE_TIME_MS,
-                  gcTime: THREADLY_QUERY_STALE_TIME_MS,
-                }));
+            } catch {
+              publicUrl = null;
+            }
+
+            try {
+              const signed = publicUrl ?? await queryClient.fetchQuery({
+                queryKey: queryKeys.media.signedUrl(m.fileId),
+                queryFn: () => brandApi.getPrivateSignedFileUrl(String(m.fileId)),
+                staleTime: THREADLY_QUERY_STALE_TIME_MS,
+                gcTime: THREADLY_QUERY_STALE_TIME_MS,
+                retry: false,
+              });
               return { ...m, url: signed || m.url };
             } catch {
               return m;
