@@ -247,6 +247,7 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
         queryKey: queryKeys.media.publicUrl(fileId),
         queryFn: () => brandApi.getPublicFileUrl(fileId),
         staleTime: THREADLY_QUERY_STALE_TIME_MS,
+        retry: false,
       }).then((publicUrl) => {
         if (publicUrl) return publicUrl;
         return queryClient.fetchQuery({
@@ -254,6 +255,7 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
           queryFn: () => brandApi.getPrivateSignedFileUrl(fileId),
           staleTime: THREADLY_QUERY_STALE_TIME_MS,
           gcTime: THREADLY_QUERY_STALE_TIME_MS,
+          retry: false,
         });
       }),
     ).then((signed) => {
@@ -275,6 +277,7 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
               queryKey: queryKeys.media.publicUrl(fileId),
               queryFn: () => brandApi.getPublicFileUrl(fileId, { forceRefresh: true }),
               staleTime: THREADLY_QUERY_STALE_TIME_MS,
+              retry: false,
             }).then((publicUrl) => {
               if (publicUrl) return publicUrl;
               return queryClient.fetchQuery({
@@ -282,6 +285,7 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
                 queryFn: () => brandApi.getPrivateSignedFileUrl(fileId, { forceRefresh: true }),
                 staleTime: THREADLY_QUERY_STALE_TIME_MS,
                 gcTime: THREADLY_QUERY_STALE_TIME_MS,
+                retry: false,
               });
             }),
           ).then((retrySigned) => {

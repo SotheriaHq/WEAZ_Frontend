@@ -17,7 +17,8 @@
     "test:e2e:bagging:seeded": "node scripts/run-bagging-e2e.cjs",
     "test:auth-link-route-contract": "node scripts/test-auth-link-route-contract.cjs",
     "test:watch": "vitest --watch",
-    "audit:theme": "node scripts/audit-theme-system.js"
+    "audit:theme": "node scripts/audit-theme-system.js",
+    "check:perf-regressions": "node scripts/check-perf-regressions.cjs"
   },
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",
