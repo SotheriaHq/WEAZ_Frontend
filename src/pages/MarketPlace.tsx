@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import { apiClient } from '@/api/httpClient';
-import { marketApi, type MarketSection, type MarketSectionItem } from '@/api/MarketApi';
+import { marketApi, type MarketSection, type MarketSectionItem, type MarketSignalEvent } from '@/api/MarketApi';
 import { unwrapApiResponse, type ApiSuccessPayload } from '@/types/auth';
 import type { AppDispatch, RootState } from '@/store';
 import ImageWithFallback from '@/components/ImageWithFallback';
@@ -21,6 +21,7 @@ import {
   type MarketplaceProduct,
   type RawProductsPayload,
 } from '@/utils/marketProductMapper';
+import { useMarketSignals } from '@/hooks/useMarketSignals';
 
 const BASE_FILTERS = ['FOR_YOU', 'MENSWEAR', 'WOMENSWEAR', 'EVERYBODY', 'ON_SALE'] as const;
 
@@ -204,14 +205,101 @@ const ProductCarousel: React.FC<{
   );
 };
 
+const getSectionItemTargetId = (item: MarketSectionItem) => {
+  return String(item.target?.id || item.sourceId || item.id || '').trim();
+};
+
+const getSectionItemSignalKey = (
+  sectionKey: string,
+  item: MarketSectionItem,
+  index: number,
+) => {
+  return `${sectionKey}:${item.entityType}:${getSectionItemTargetId(item)}:${index}`;
+};
+
 const MarketSectionPreviewRail: React.FC<{
   section: MarketSection;
   onViewProduct: (product: MarketplaceProduct) => void;
-}> = ({ section, onViewProduct }) => {
+  onTrackSignal: (event: MarketSignalEvent) => void;
+  onHideItem: (section: MarketSection, item: MarketSectionItem) => void;
+}> = ({ section, onViewProduct, onTrackSignal, onHideItem }) => {
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const observedKeysRef = useRef<Set<string>>(new Set());
+  const sectionObservedRef = useRef(false);
+
+  const itemsBySignalKey = useMemo(() => {
+    return new Map(
+      (section.items ?? []).map((item, index) => [
+        getSectionItemSignalKey(section.key, item, index),
+        { item, index },
+      ]),
+    );
+  }, [section.items, section.key]);
+
+  const setItemRef = useCallback((key: string, node: HTMLDivElement | null) => {
+    if (!node) {
+      itemRefs.current.delete(key);
+      return;
+    }
+    itemRefs.current.set(key, node);
+  }, []);
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+
+          if (entry.target === sectionRef.current && !sectionObservedRef.current) {
+            sectionObservedRef.current = true;
+            onTrackSignal({
+              targetType: 'SECTION',
+              targetId: section.key,
+              signalType: 'MARKET_SECTION_VIEW',
+              surface: 'MARKET_HOME',
+              sectionKey: section.key,
+            });
+            continue;
+          }
+
+          const signalKey = (entry.target as HTMLElement).dataset.marketSignalKey;
+          if (!signalKey || observedKeysRef.current.has(signalKey)) continue;
+          const payload = itemsBySignalKey.get(signalKey);
+          const targetId = payload ? getSectionItemTargetId(payload.item) : '';
+          if (!payload || !targetId) continue;
+
+          observedKeysRef.current.add(signalKey);
+          if (observedKeysRef.current.size > 300) {
+            observedKeysRef.current.clear();
+          }
+          onTrackSignal({
+            targetType: payload.item.entityType,
+            targetId,
+            signalType: 'IMPRESSION',
+            surface: 'MARKET_HOME',
+            sectionKey: section.key,
+            position: payload.index,
+          });
+        }
+      },
+      { threshold: 0.5 },
+    );
+
+    if (sectionRef.current) observer.observe(sectionRef.current);
+    for (const node of itemRefs.current.values()) {
+      observer.observe(node);
+    }
+
+    return () => observer.disconnect();
+  }, [itemsBySignalKey, onTrackSignal, section.key]);
+
   if (!section.items?.length) return null;
 
   return (
-    <section className="space-y-3">
+    <section ref={sectionRef} className="space-y-3">
       <div className="flex items-end justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">{section.title}</h2>
@@ -228,9 +316,11 @@ const MarketSectionPreviewRail: React.FC<{
 
       <div className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex gap-4">
-          {section.items.map((item) => {
+          {section.items.map((item, index) => {
             const product = mapSectionProductToMarketplaceProduct(item);
             const mediaUrl = item.media?.thumbnailUrl || item.media?.url || null;
+            const signalKey = getSectionItemSignalKey(section.key, item, index);
+            const targetId = getSectionItemTargetId(item);
             const priceLabel = item.price?.effectiveAmount
               ? new Intl.NumberFormat('en-NG', {
                   style: 'currency',
@@ -248,43 +338,76 @@ const MarketSectionPreviewRail: React.FC<{
                   : null;
 
             return (
-              <button
+              <div
                 key={`${section.key}-${item.sourceType}-${item.sourceId}`}
-                type="button"
-                disabled={!product}
-                onClick={() => {
-                  if (product) onViewProduct(product);
-                }}
-                className="group w-[260px] shrink-0 overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-gray-200/70 transition enabled:hover:-translate-y-0.5 enabled:hover:shadow-md disabled:cursor-default dark:bg-white/[0.04] dark:ring-white/10"
+                ref={(node) => setItemRef(signalKey, node)}
+                data-market-signal-key={signalKey}
+                className="group relative w-[260px] shrink-0 overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-gray-200/70 transition hover:-translate-y-0.5 hover:shadow-md dark:bg-white/[0.04] dark:ring-white/10"
               >
-                {mediaUrl ? (
-                  <ImageWithFallback
-                    src={mediaUrl}
-                    alt={item.media?.alt || item.title}
-                    fit="cover"
-                    rounded="none"
-                    containerClassName="h-40 w-full bg-gray-100 dark:bg-white/5"
-                    className="h-full w-full transition-transform duration-500 group-hover:scale-105"
-                    maxHeightClassName="max-h-full"
-                    fallbackName={item.title}
-                  />
-                ) : (
-                  <div className="flex h-40 w-full items-center justify-center bg-gray-100 text-3xl dark:bg-white/5">
-                    #
+                <button
+                  type="button"
+                  disabled={!product}
+                  onClick={() => {
+                    if (!product || !targetId) return;
+                    onTrackSignal({
+                      targetType: item.entityType,
+                      targetId,
+                      signalType: 'OPEN',
+                      surface: 'MARKET_HOME',
+                      sectionKey: section.key,
+                      position: index,
+                    });
+                    onViewProduct(product);
+                  }}
+                  className="block w-full text-left disabled:cursor-default"
+                >
+                  {mediaUrl ? (
+                    <ImageWithFallback
+                      src={mediaUrl}
+                      alt={item.media?.alt || item.title}
+                      fit="cover"
+                      rounded="none"
+                      containerClassName="h-40 w-full bg-gray-100 dark:bg-white/5"
+                      className="h-full w-full transition-transform duration-500 group-hover:scale-105"
+                      maxHeightClassName="max-h-full"
+                      fallbackName={item.title}
+                    />
+                  ) : (
+                    <div className="flex h-40 w-full items-center justify-center bg-gray-100 text-3xl dark:bg-white/5">
+                      #
+                    </div>
+                  )}
+                  <div className="space-y-1 p-3">
+                    <p className="line-clamp-1 text-sm font-bold text-gray-900 dark:text-white">{item.title}</p>
+                    {item.subtitle || item.brand?.name ? (
+                      <p className="line-clamp-1 text-xs text-gray-500 dark:text-gray-400">
+                        {item.subtitle || item.brand?.name}
+                      </p>
+                    ) : null}
+                    {priceLabel ? (
+                      <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">{priceLabel}</p>
+                    ) : null}
                   </div>
-                )}
-                <div className="space-y-1 p-3">
-                  <p className="line-clamp-1 text-sm font-bold text-gray-900 dark:text-white">{item.title}</p>
-                  {item.subtitle || item.brand?.name ? (
-                    <p className="line-clamp-1 text-xs text-gray-500 dark:text-gray-400">
-                      {item.subtitle || item.brand?.name}
-                    </p>
-                  ) : null}
-                  {priceLabel ? (
-                    <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">{priceLabel}</p>
-                  ) : null}
-                </div>
-              </button>
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onTrackSignal({
+                      targetType: item.entityType,
+                      targetId: targetId || item.sourceId || item.id,
+                      signalType: 'NOT_INTERESTED',
+                      surface: 'MARKET_HOME',
+                      sectionKey: section.key,
+                      position: index,
+                    });
+                    onHideItem(section, item);
+                  }}
+                  className="absolute right-2 top-2 rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-semibold text-white opacity-0 shadow-sm transition-opacity hover:bg-black/80 focus:opacity-100 group-hover:opacity-100"
+                >
+                  Not interested
+                </button>
+              </div>
             );
           })}
         </div>
@@ -314,6 +437,7 @@ const MarketPlace: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(18);
   const [heroIndex, setHeroIndex] = useState(0);
   const [marketClockMs, setMarketClockMs] = useState<number>(() => Date.now());
+  const { anonymousSessionId, flushMarketSignals, trackMarketSignal } = useMarketSignals('MARKET_HOME');
 
 
   const loadProducts = useCallback(async (signal?: AbortSignal) => {
@@ -322,7 +446,10 @@ const MarketPlace: React.FC = () => {
 
     try {
       try {
-        const sectionPayload = await marketApi.getMarketSections({ limit: 8 }, { signal });
+        const sectionPayload = await marketApi.getMarketSections(
+          { limit: 8, anonymousSessionId },
+          { signal },
+        );
         if (signal?.aborted) return;
 
         const sections = Array.isArray(sectionPayload.sections) ? sectionPayload.sections : [];
@@ -380,7 +507,7 @@ const MarketPlace: React.FC = () => {
         setLoading(false);
       }
     }
-  }, []);
+  }, [anonymousSessionId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -392,6 +519,93 @@ const MarketPlace: React.FC = () => {
     if (!isAuth) return;
     void dispatch(fetchWishlist({ page: 1, limit: 100 }));
   }, [dispatch, isAuth]);
+
+  const handleOpenProduct = useCallback(
+    (product: StoreProduct, metadata?: Record<string, unknown>) => {
+      const marketProduct = product as MarketplaceProduct;
+      if (marketProduct.id) {
+        trackMarketSignal({
+          targetType: 'PRODUCT',
+          targetId: marketProduct.id,
+          signalType: 'OPEN',
+          surface: 'MARKET_HOME',
+          metadata,
+        });
+      }
+      setSelectedProduct(marketProduct);
+      void flushMarketSignals();
+    },
+    [flushMarketSignals, trackMarketSignal],
+  );
+
+  const handleOpenSectionProduct = useCallback(
+    (product: MarketplaceProduct) => {
+      setSelectedProduct(product);
+      void flushMarketSignals();
+    },
+    [flushMarketSignals],
+  );
+
+  const handleHideMarketSectionItem = useCallback(
+    async (section: MarketSection, item: MarketSectionItem) => {
+      const targetId = getSectionItemTargetId(item);
+      if (!targetId) return;
+
+      const previousSections = marketSections;
+      const previousProducts = products;
+
+      setMarketSections((current) =>
+        current
+          .map((entry) =>
+            entry.key === section.key
+              ? {
+                  ...entry,
+                  items: (entry.items ?? []).filter(
+                    (existing) => getSectionItemTargetId(existing) !== targetId,
+                  ),
+                }
+              : entry,
+          )
+          .filter((entry) => entry.items?.length > 0),
+      );
+      if (item.entityType === 'PRODUCT') {
+        setProducts((current) =>
+          current.filter((product) => product.id !== targetId && product.id !== item.sourceId),
+        );
+      }
+
+      try {
+        const suppression = await marketApi.createMarketSuppression({
+          anonymousSessionId,
+          targetType: item.entityType,
+          targetId,
+          brandId: item.entityType === 'BRAND' ? item.brand?.id ?? targetId : undefined,
+          categoryId:
+            item.entityType === 'CATEGORY' ? item.category?.id ?? targetId : undefined,
+          sectionKey: section.key,
+          suppressionType: 'NOT_INTERESTED',
+          reason: 'market_section_card',
+        });
+        toast.success('Hidden from this market view.', {
+          action: {
+            label: 'Undo',
+            onClick: () => {
+              void marketApi
+                .deleteMarketSuppression(suppression.id, { anonymousSessionId })
+                .catch(() => undefined);
+              setMarketSections(previousSections);
+              setProducts(previousProducts);
+            },
+          },
+        });
+      } catch {
+        setMarketSections(previousSections);
+        setProducts(previousProducts);
+        toast.error('Could not hide that item. Try again.');
+      }
+    },
+    [anonymousSessionId, marketSections, products],
+  );
 
   useEffect(() => {
     const updateMarketClock = () => setMarketClockMs(Date.now());
@@ -553,7 +767,7 @@ const MarketPlace: React.FC = () => {
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => setSelectedProduct(activeHero)}
+                            onClick={() => handleOpenProduct(activeHero, { source: 'market_hero' })}
                             className="rounded-full bg-white px-4 py-1.5 text-xs font-semibold text-gray-900 transition-transform hover:scale-[1.02]"
                           >
                             👀 View product
@@ -582,7 +796,7 @@ const MarketPlace: React.FC = () => {
                 <button
                   key={product.id}
                   type="button"
-                  onClick={() => setSelectedProduct(product)}
+                  onClick={() => handleOpenProduct(product, { source: 'market_hero_secondary' })}
                   className="group relative h-[37px] overflow-hidden rounded-xl bg-gray-100 text-left ring-1 ring-gray-200/70 dark:bg-white/5 dark:ring-white/10 sm:h-[42px] lg:h-full"
                 >
                   <ImageWithFallback
@@ -611,7 +825,7 @@ const MarketPlace: React.FC = () => {
           filterType="PRODUCT"
           onViewProduct={(productId) => {
             const p = products.find((pr) => pr.id === productId);
-            if (p) setSelectedProduct(p);
+            if (p) handleOpenProduct(p, { source: 'featured_section' });
           }}
           onSeeAll={() => setGalleryOpen(true)}
         />
@@ -622,7 +836,9 @@ const MarketPlace: React.FC = () => {
               <MarketSectionPreviewRail
                 key={section.key}
                 section={section}
-                onViewProduct={setSelectedProduct}
+                onViewProduct={handleOpenSectionProduct}
+                onTrackSignal={trackMarketSignal}
+                onHideItem={handleHideMarketSectionItem}
               />
             ))}
           </div>
@@ -643,7 +859,7 @@ const MarketPlace: React.FC = () => {
           <ProductCarousel
             title="Fresh Drops"
             products={freshDropsForDisplay}
-            onViewProduct={setSelectedProduct}
+            onViewProduct={(product) => handleOpenProduct(product, { source: 'fresh_drops' })}
           />
         )}
 
@@ -743,7 +959,12 @@ const MarketPlace: React.FC = () => {
                         transition={{ duration: 0.2 }}
                         className="w-full"
                       >
-                        <StoreProductCard product={product} onViewProduct={setSelectedProduct} />
+                        <StoreProductCard
+                          product={product}
+                          onViewProduct={(selected) =>
+                            handleOpenProduct(selected, { source: 'market_grid' })
+                          }
+                        />
                       </motion.div>
                     ))}
                   </div>
@@ -783,7 +1004,14 @@ const MarketPlace: React.FC = () => {
                         transition={{ duration: 0.2 }}
                         className="w-full"
                       >
-                        <StoreProductCard product={product} onViewProduct={setSelectedProduct} />
+                        <StoreProductCard
+                          product={product}
+                          onViewProduct={(selected) =>
+                            handleOpenProduct(selected, {
+                              source: 'custom_order_out_of_stock',
+                            })
+                          }
+                        />
                       </motion.div>
                     ))}
                   </div>

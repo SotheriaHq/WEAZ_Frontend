@@ -130,11 +130,147 @@ export interface MarketSectionDetailResponse {
 
 export interface GetMarketSectionsParams {
   limit?: number;
+  anonymousSessionId?: string;
 }
 
 export interface GetMarketSectionDetailParams {
   cursor?: string | null;
   limit?: number;
+  anonymousSessionId?: string;
+}
+
+export type MarketSignalTargetType =
+  | 'PRODUCT'
+  | 'COLLECTION'
+  | 'DESIGN'
+  | 'BRAND'
+  | 'CATEGORY'
+  | 'SECTION'
+  | 'SUGGESTION_BLOCK';
+
+export type MarketSignalType =
+  | 'IMPRESSION'
+  | 'VIEW'
+  | 'CLICK'
+  | 'OPEN'
+  | 'VIEW_ALL_CLICK'
+  | 'HIDE'
+  | 'NOT_INTERESTED'
+  | 'DWELL_SHORT'
+  | 'DWELL_MEDIUM'
+  | 'DWELL_LONG'
+  | 'SCROLL_SKIP'
+  | 'LIKE'
+  | 'SAVE'
+  | 'COMMENT'
+  | 'THREAD'
+  | 'SHARE'
+  | 'PROFILE_TAP'
+  | 'PRODUCT_VIEW'
+  | 'ADD_TO_CART'
+  | 'WISHLIST'
+  | 'PURCHASE'
+  | 'MARKET_SECTION_VIEW'
+  | 'MARKET_SECTION_SCROLL'
+  | 'MARKET_SECTION_VIEW_ALL_CLICK'
+  | 'MARKET_SECTION_DETAIL_VIEW'
+  | 'MARKET_SECTION_DETAIL_SCROLL'
+  | 'MARKET_SECTION_DISMISS'
+  | 'MARKET_SECTION_BACK_TO_HOME'
+  | 'SUGGESTION_BLOCK_VIEW'
+  | 'SUGGESTION_ITEM_VIEW'
+  | 'SUGGESTION_ITEM_CLICK'
+  | 'SUGGESTION_ITEM_WISHLIST'
+  | 'SUGGESTION_ITEM_CART_ADD'
+  | 'SUGGESTION_ITEM_HIDE'
+  | 'SUGGESTION_BLOCK_HIDE'
+  | 'SUGGESTION_VIEW_ALL_CLICK';
+
+export type MarketSignalSurface =
+  | 'MARKET_HOME'
+  | 'MARKET_SECTION_DETAIL'
+  | 'DESIGN_FEED'
+  | 'PRODUCT_DETAIL'
+  | 'COLLECTION_DETAIL'
+  | 'BRAND_DETAIL'
+  | 'SEARCH'
+  | 'SUGGESTION_BLOCK';
+
+export type MarketSuppressionType =
+  | 'HIDE_ITEM'
+  | 'NOT_INTERESTED'
+  | 'HIDE_BRAND'
+  | 'HIDE_CATEGORY'
+  | 'HIDE_SECTION'
+  | 'HIDE_SUGGESTION_BLOCK'
+  | 'SHOW_LESS';
+
+export interface MarketSignalEvent {
+  targetType: MarketSignalTargetType;
+  targetId: string;
+  signalType: MarketSignalType;
+  surface: MarketSignalSurface;
+  value?: number | null;
+  sectionKey?: string | null;
+  suggestionBlockKey?: string | null;
+  screenContext?: string | null;
+  sessionId?: string | null;
+  position?: number | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface MarketSignalBatchRequest {
+  batchId?: string;
+  anonymousSessionId?: string;
+  sessionId?: string;
+  events: MarketSignalEvent[];
+}
+
+export interface MarketSignalBatchResponse {
+  accepted: boolean;
+  batchId?: string | null;
+  received: number;
+  persisted: {
+    userFeedSignals: number;
+    seenItems: number;
+    marketSectionSignals: number;
+    suggestionSignals: number;
+  };
+}
+
+export interface CreateMarketSuppressionRequest {
+  anonymousSessionId?: string;
+  targetType: MarketSignalTargetType;
+  targetId?: string | null;
+  brandId?: string | null;
+  categoryId?: string | null;
+  sectionKey?: string | null;
+  suggestionBlockKey?: string | null;
+  suppressionType: MarketSuppressionType;
+  reason?: string | null;
+  expiresAt?: string | null;
+}
+
+export interface MarketSuppression {
+  id: string;
+  userId?: string | null;
+  anonymousSessionId?: string | null;
+  targetType: MarketSignalTargetType;
+  targetId?: string | null;
+  brandId?: string | null;
+  categoryId?: string | null;
+  sectionKey?: string | null;
+  suggestionBlockKey?: string | null;
+  suppressionType: MarketSuppressionType;
+  reason?: string | null;
+  expiresAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ResetFeedPreferencesRequest {
+  resetType: 'FEED' | 'MARKET' | 'SUGGESTIONS' | 'ALL';
+  reason?: string | null;
 }
 
 const toMarketItem = (raw: RawMarketItem): MarketItem => {
@@ -357,6 +493,7 @@ export const marketApi = {
       params: {
         cursor: params?.cursor ?? undefined,
         limit: params?.limit,
+        anonymousSessionId: params?.anonymousSessionId,
       },
       signal: options?.signal,
     });
@@ -364,6 +501,48 @@ export const marketApi = {
     return payload && payload.section
       ? payload
       : (response.data as MarketSectionDetailResponse);
+  },
+
+  async sendMarketSignalBatch(
+    payload: MarketSignalBatchRequest,
+    options?: { signal?: AbortSignal },
+  ): Promise<MarketSignalBatchResponse> {
+    const response = await apiClient.post('/market/signals/batch', payload, {
+      signal: options?.signal,
+    });
+    return unwrapApiResponse<MarketSignalBatchResponse>(response.data) ?? response.data;
+  },
+
+  async createMarketSuppression(
+    payload: CreateMarketSuppressionRequest,
+    options?: { signal?: AbortSignal },
+  ): Promise<MarketSuppression> {
+    const response = await apiClient.post('/market/suppressions', payload, {
+      signal: options?.signal,
+    });
+    return unwrapApiResponse<MarketSuppression>(response.data) ?? response.data;
+  },
+
+  async deleteMarketSuppression(
+    id: string,
+    params?: { anonymousSessionId?: string },
+    options?: { signal?: AbortSignal },
+  ): Promise<{ deleted: boolean; id: string }> {
+    const response = await apiClient.delete(`/market/suppressions/${encodeURIComponent(id)}`, {
+      params,
+      signal: options?.signal,
+    });
+    return unwrapApiResponse<{ deleted: boolean; id: string }>(response.data) ?? response.data;
+  },
+
+  async resetFeedPreferences(
+    payload: ResetFeedPreferencesRequest,
+    options?: { signal?: AbortSignal },
+  ): Promise<unknown> {
+    const response = await apiClient.post('/user/preferences/feed/reset', payload, {
+      signal: options?.signal,
+    });
+    return unwrapApiResponse<unknown>(response.data) ?? response.data;
   },
 };
 
