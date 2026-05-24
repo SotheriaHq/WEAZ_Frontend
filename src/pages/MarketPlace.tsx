@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import { apiClient } from '@/api/httpClient';
+import { marketApi, type MarketSection, type MarketSectionItem } from '@/api/MarketApi';
 import { unwrapApiResponse, type ApiSuccessPayload } from '@/types/auth';
 import type { AppDispatch, RootState } from '@/store';
 import ImageWithFallback from '@/components/ImageWithFallback';
@@ -32,9 +33,7 @@ const FRESH_DROP_MAX_AGE_MS = 7 * FRESH_DROP_DAY_MS;
 const SYSTEM_FRESH_DROPS_LIMIT = 20;
 const ADMIN_FRESH_DROPS_LIMIT = 10;
 
-const MARKET_LOAD_PAGE_LIMIT = 120;
-const MARKET_LOAD_MAX_PAGES = 40;
-const MARKET_LOAD_MAX_ROWS = 4800;
+const MARKET_FALLBACK_PRODUCT_LIMIT = 24;
 
 const getUtcDayIndex = (nowMs: number): number => Math.floor(nowMs / FRESH_DROP_DAY_MS);
 
@@ -45,6 +44,68 @@ const selectDailyBatch = <T,>(items: T[], batchSize: number, utcDayIndex: number
   const batchIndex = safeDayIndex % batchCount;
   const start = batchIndex * batchSize;
   return items.slice(start, start + batchSize);
+};
+
+const isCanceledRequest = (err: unknown) => {
+  const error = err as { code?: string; name?: string; message?: string };
+  return (
+    error?.code === 'ERR_CANCELED' ||
+    error?.name === 'CanceledError' ||
+    error?.message === 'canceled'
+  );
+};
+
+const mapSectionProductToMarketplaceProduct = (
+  item: MarketSectionItem,
+): MarketplaceProduct | null => {
+  if (item.sourceType !== 'PRODUCT' || item.entityType !== 'PRODUCT') return null;
+  const id = String(item.sourceId || item.id || '').trim();
+  const mediaUrl = item.media?.url || item.media?.thumbnailUrl || null;
+  if (!id || !mediaUrl) return null;
+
+  return normalizeMarketProduct({
+    id,
+    entityType: 'PRODUCT',
+    name: item.title,
+    description: item.description ?? undefined,
+    price: item.price?.amount ?? item.price?.effectiveAmount ?? 0,
+    salePrice: item.price?.saleAmount ?? null,
+    currency: item.price?.currency ?? 'NGN',
+    thumbnail: item.media?.thumbnailUrl ?? mediaUrl,
+    images: [mediaUrl],
+    media: [{ id, url: mediaUrl, type: 'image', isPrimary: true }],
+    totalStock: item.availability?.totalStock ?? 0,
+    customOrderEnabled: Boolean(item.availability?.customOrderEnabled),
+    customAvailable: Boolean(item.availability?.customOrderEnabled),
+    tags: item.tags ?? [],
+    categoryId: item.category?.id ?? undefined,
+    createdAt: item.createdAt ?? undefined,
+    updatedAt: item.updatedAt ?? undefined,
+    viewsCount: item.stats?.views ?? 0,
+    threadsCount: item.stats?.threads ?? 0,
+    brandId: item.brand?.id ?? undefined,
+    brand: {
+      id: item.brand?.id ?? '',
+      brandName: item.brand?.name ?? 'Brand',
+      logoUrl: item.brand?.logoUrl ?? undefined,
+      currency: item.price?.currency ?? 'NGN',
+    },
+  });
+};
+
+const extractProductsFromSections = (sections: MarketSection[]) => {
+  const byId = new Map<string, MarketplaceProduct>();
+  for (const section of sections) {
+    for (const item of section.items ?? []) {
+      const product = mapSectionProductToMarketplaceProduct(item);
+      if (product && !byId.has(product.id)) {
+        byId.set(product.id, product);
+      }
+    }
+  }
+  return Array.from(byId.values()).sort(
+    (a, b) => getProductRecencyTimestamp(b) - getProductRecencyTimestamp(a),
+  );
 };
 
 const ProductCarousel: React.FC<{
@@ -143,6 +204,95 @@ const ProductCarousel: React.FC<{
   );
 };
 
+const MarketSectionPreviewRail: React.FC<{
+  section: MarketSection;
+  onViewProduct: (product: MarketplaceProduct) => void;
+}> = ({ section, onViewProduct }) => {
+  if (!section.items?.length) return null;
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{section.title}</h2>
+          {section.subtitle ? (
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{section.subtitle}</p>
+          ) : null}
+        </div>
+        {section.emotionalLabel ? (
+          <span className="hidden rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 dark:bg-white/10 dark:text-gray-300 sm:inline-flex">
+            {section.emotionalLabel}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex gap-4">
+          {section.items.map((item) => {
+            const product = mapSectionProductToMarketplaceProduct(item);
+            const mediaUrl = item.media?.thumbnailUrl || item.media?.url || null;
+            const priceLabel = item.price?.effectiveAmount
+              ? new Intl.NumberFormat('en-NG', {
+                  style: 'currency',
+                  currency: item.price.currency || 'NGN',
+                  maximumFractionDigits: 0,
+                }).format(item.price.effectiveAmount)
+              : item.priceRange?.min
+                ? `From ${new Intl.NumberFormat('en-NG', {
+                    style: 'currency',
+                    currency: item.priceRange.currency || 'NGN',
+                    maximumFractionDigits: 0,
+                  }).format(item.priceRange.min)}`
+                : item.stats?.products
+                  ? `${item.stats.products} item${item.stats.products === 1 ? '' : 's'}`
+                  : null;
+
+            return (
+              <button
+                key={`${section.key}-${item.sourceType}-${item.sourceId}`}
+                type="button"
+                disabled={!product}
+                onClick={() => {
+                  if (product) onViewProduct(product);
+                }}
+                className="group w-[260px] shrink-0 overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-gray-200/70 transition enabled:hover:-translate-y-0.5 enabled:hover:shadow-md disabled:cursor-default dark:bg-white/[0.04] dark:ring-white/10"
+              >
+                {mediaUrl ? (
+                  <ImageWithFallback
+                    src={mediaUrl}
+                    alt={item.media?.alt || item.title}
+                    fit="cover"
+                    rounded="none"
+                    containerClassName="h-40 w-full bg-gray-100 dark:bg-white/5"
+                    className="h-full w-full transition-transform duration-500 group-hover:scale-105"
+                    maxHeightClassName="max-h-full"
+                    fallbackName={item.title}
+                  />
+                ) : (
+                  <div className="flex h-40 w-full items-center justify-center bg-gray-100 text-3xl dark:bg-white/5">
+                    #
+                  </div>
+                )}
+                <div className="space-y-1 p-3">
+                  <p className="line-clamp-1 text-sm font-bold text-gray-900 dark:text-white">{item.title}</p>
+                  {item.subtitle || item.brand?.name ? (
+                    <p className="line-clamp-1 text-xs text-gray-500 dark:text-gray-400">
+                      {item.subtitle || item.brand?.name}
+                    </p>
+                  ) : null}
+                  {priceLabel ? (
+                    <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">{priceLabel}</p>
+                  ) : null}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const isOutOfStockCustomOrderProduct = (product: MarketplaceProduct) =>
   Boolean(
     product.isCustomOrderOnly ||
@@ -157,53 +307,51 @@ const MarketPlace: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
+  const [marketSections, setMarketSections] = useState<MarketSection[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<MarketplaceProduct | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<string>('FOR_YOU');
   const [visibleCount, setVisibleCount] = useState(18);
   const [heroIndex, setHeroIndex] = useState(0);
-  const [utcDayIndex, setUtcDayIndex] = useState<number>(() => getUtcDayIndex(Date.now()));
+  const [marketClockMs, setMarketClockMs] = useState<number>(() => Date.now());
 
 
-  const loadProducts = useCallback(async () => {
+  const loadProducts = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
 
     try {
-      const aggregatedRows: any[] = [];
-      let cursor: string | null | undefined = null;
-      let hasNextPage = true;
-      let pagesFetched = 0;
+      try {
+        const sectionPayload = await marketApi.getMarketSections({ limit: 8 }, { signal });
+        if (signal?.aborted) return;
 
-      while (
-        hasNextPage &&
-        pagesFetched < MARKET_LOAD_MAX_PAGES &&
-        aggregatedRows.length < MARKET_LOAD_MAX_ROWS
-      ) {
-        const response: { data: unknown } = await apiClient.get('/store/products/market', {
-          params: {
-            limit: MARKET_LOAD_PAGE_LIMIT,
-            sortBy: 'newest',
-            ...(cursor ? { cursor } : {}),
-          },
-        });
+        const sections = Array.isArray(sectionPayload.sections) ? sectionPayload.sections : [];
+        const sectionProducts = extractProductsFromSections(sections);
+        setMarketSections(sections);
 
-        const payload: RawProductsPayload = unwrapApiResponse<RawProductsPayload>(
-          response.data as ApiSuccessPayload<RawProductsPayload>,
-        );
-        const rows = Array.isArray(payload?.items) ? payload.items : [];
-        aggregatedRows.push(...rows);
-
-        hasNextPage = Boolean(payload?.hasNextPage);
-        cursor = payload?.nextCursor ?? null;
-        pagesFetched += 1;
-
-        if (!cursor || rows.length === 0) {
-          break;
+        if (sectionProducts.length > 0) {
+          setProducts(sectionProducts);
+          return;
         }
+      } catch (sectionError) {
+        if (isCanceledRequest(sectionError)) return;
+        setMarketSections([]);
       }
 
-      const mapped = aggregatedRows
+      const response: { data: unknown } = await apiClient.get('/store/products/market', {
+        params: {
+          limit: MARKET_FALLBACK_PRODUCT_LIMIT,
+          sortBy: 'newest',
+        },
+        signal,
+      });
+
+      if (signal?.aborted) return;
+      const payload: RawProductsPayload = unwrapApiResponse<RawProductsPayload>(
+        response.data as ApiSuccessPayload<RawProductsPayload>,
+      );
+      const rows = Array.isArray(payload?.items) ? payload.items : [];
+      const mapped = rows
         .map((row) => normalizeMarketProduct(row))
         .filter((p): p is MarketplaceProduct => Boolean(p));
 
@@ -220,6 +368,7 @@ const MarketPlace: React.FC = () => {
 
       setProducts(sorted);
     } catch (err: any) {
+      if (isCanceledRequest(err)) return;
       const message =
         err?.response?.data?.message ||
         err?.message ||
@@ -227,12 +376,16 @@ const MarketPlace: React.FC = () => {
       setError(message);
       toast.error(typeof message === 'string' ? message : 'Failed to load market.');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    void loadProducts();
+    const controller = new AbortController();
+    void loadProducts(controller.signal);
+    return () => controller.abort();
   }, [loadProducts]);
 
   useEffect(() => {
@@ -241,9 +394,9 @@ const MarketPlace: React.FC = () => {
   }, [dispatch, isAuth]);
 
   useEffect(() => {
-    const updateDayIndex = () => setUtcDayIndex(getUtcDayIndex(Date.now()));
-    updateDayIndex();
-    const interval = window.setInterval(updateDayIndex, 60_000);
+    const updateMarketClock = () => setMarketClockMs(Date.now());
+    updateMarketClock();
+    const interval = window.setInterval(updateMarketClock, 60_000);
     return () => window.clearInterval(interval);
   }, []);
 
@@ -260,13 +413,15 @@ const MarketPlace: React.FC = () => {
     [products],
   );
 
+  const utcDayIndex = useMemo(() => getUtcDayIndex(marketClockMs), [marketClockMs]);
+
   const weeklyEligibleProducts = useMemo(() => {
-    const nowMs = Date.now();
+    const nowMs = marketClockMs;
     return recencySortedProducts.filter((product) => {
       const recencyTs = getProductRecencyTimestamp(product);
       return recencyTs > 0 && nowMs - recencyTs <= FRESH_DROP_MAX_AGE_MS;
     });
-  }, [recencySortedProducts, utcDayIndex]);
+  }, [recencySortedProducts, marketClockMs]);
 
   const adminFeaturedFreshDrops = useMemo(
     () => weeklyEligibleProducts.filter((product) => product.isFeatured === true).slice(0, ADMIN_FRESH_DROPS_LIMIT),
@@ -287,6 +442,26 @@ const MarketPlace: React.FC = () => {
     const combined = [...adminFeaturedFreshDrops, ...systemFreshDrops];
     return combined.slice(0, SYSTEM_FRESH_DROPS_LIMIT + ADMIN_FRESH_DROPS_LIMIT);
   }, [adminFeaturedFreshDrops, systemFreshDrops]);
+
+  const sectionProductsByKey = useMemo(() => {
+    const byKey = new Map<string, MarketplaceProduct[]>();
+    for (const section of marketSections) {
+      const mapped = (section.items ?? [])
+        .map((item) => mapSectionProductToMarketplaceProduct(item))
+        .filter((product): product is MarketplaceProduct => Boolean(product));
+      if (mapped.length > 0) {
+        byKey.set(section.key, mapped);
+      }
+    }
+    return byKey;
+  }, [marketSections]);
+
+  const previewSections = useMemo(
+    () => marketSections.filter((section) => section.key !== 'fresh-drops' && section.items?.length > 0),
+    [marketSections],
+  );
+
+  const freshDropsForDisplay = sectionProductsByKey.get('fresh-drops') ?? freshDrops;
 
   const heroProducts = useMemo(() => recencySortedProducts.slice(0, 3), [recencySortedProducts]);
 
@@ -441,6 +616,18 @@ const MarketPlace: React.FC = () => {
           onSeeAll={() => setGalleryOpen(true)}
         />
 
+        {!loading && previewSections.length > 0 ? (
+          <div className="space-y-6">
+            {previewSections.map((section) => (
+              <MarketSectionPreviewRail
+                key={section.key}
+                section={section}
+                onViewProduct={setSelectedProduct}
+              />
+            ))}
+          </div>
+        ) : null}
+
         {loading ? (
           <section>
             <div className="mb-3 h-7 w-40 animate-pulse rounded-lg bg-gray-200/80 dark:bg-white/10" />
@@ -455,7 +642,7 @@ const MarketPlace: React.FC = () => {
         ) : (
           <ProductCarousel
             title="Fresh Drops"
-            products={freshDrops}
+            products={freshDropsForDisplay}
             onViewProduct={setSelectedProduct}
           />
         )}
@@ -491,7 +678,7 @@ const MarketPlace: React.FC = () => {
                         : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
                     }`}
                   >
-                    {filter === 'FOR_YOU' && 'For You'}
+                    {filter === 'FOR_YOU' && 'Discover'}
                     {filter === 'MENSWEAR' && 'Menswear'}
                     {filter === 'WOMENSWEAR' && 'Womenswear'}
                     {filter === 'EVERYBODY' && 'Everybody'}

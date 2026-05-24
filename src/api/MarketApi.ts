@@ -15,6 +15,128 @@ export interface GetMarketFeedParams {
 
 type RawMarketItem = Record<string, unknown>;
 
+export type MarketSectionSourceType =
+  | 'PRODUCT'
+  | 'COLLECTION'
+  | 'DESIGN'
+  | 'BRAND'
+  | 'MIXED';
+
+export type MarketSectionLayout =
+  | 'HORIZONTAL_RAIL'
+  | 'PRODUCT_GRID'
+  | 'COLLECTION_RAIL'
+  | 'CATEGORY_GRID'
+  | 'BRAND_RAIL';
+
+export interface MarketSectionItem {
+  id: string;
+  sourceId: string;
+  sourceType: MarketSectionSourceType;
+  entityType: 'PRODUCT' | 'COLLECTION' | 'DESIGN' | 'BRAND' | 'CATEGORY';
+  title: string;
+  subtitle?: string | null;
+  description?: string | null;
+  brand?: {
+    id?: string | null;
+    name?: string | null;
+    logoUrl?: string | null;
+  } | null;
+  media?: {
+    url?: string | null;
+    thumbnailUrl?: string | null;
+    type?: 'IMAGE' | 'VIDEO' | 'UNKNOWN';
+    alt?: string | null;
+  } | null;
+  price?: {
+    amount?: number | null;
+    saleAmount?: number | null;
+    effectiveAmount?: number | null;
+    currency?: string;
+  } | null;
+  priceRange?: {
+    min?: number | null;
+    max?: number | null;
+    currency?: string;
+  } | null;
+  availability?: {
+    totalStock?: number | null;
+    customOrderEnabled?: boolean;
+    standardCheckoutEnabled?: boolean;
+    isOnSale?: boolean;
+  } | null;
+  category?: {
+    id?: string | null;
+    slug?: string | null;
+    name?: string | null;
+  } | null;
+  tags?: string[];
+  stats?: {
+    views?: number | null;
+    threads?: number | null;
+    products?: number | null;
+  };
+  target?: {
+    type?: 'PRODUCT' | 'COLLECTION' | 'DESIGN' | 'BRAND' | 'CATEGORY';
+    id?: string | null;
+    key?: string | null;
+    route?: string | null;
+  };
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface MarketSection {
+  key: string;
+  title: string;
+  subtitle?: string | null;
+  emotionalLabel?: string | null;
+  layout: MarketSectionLayout;
+  sourceType: MarketSectionSourceType;
+  items: MarketSectionItem[];
+  viewAll?: {
+    enabled: boolean;
+    key: string;
+    route: string;
+    label: string;
+  };
+  pagination?: {
+    limit: number;
+    hasNextPage: boolean;
+    nextCursor: string | null;
+  };
+  metadata?: {
+    ranking: string;
+    personalization: string;
+    minimumItems: number;
+    previewItemLimit: number;
+  };
+}
+
+export interface MarketSectionsResponse {
+  generatedAt: string;
+  sections: MarketSection[];
+  metadata?: {
+    version: string;
+    personalization: string;
+    cachePolicy: string;
+  };
+}
+
+export interface MarketSectionDetailResponse {
+  generatedAt: string;
+  section: MarketSection;
+}
+
+export interface GetMarketSectionsParams {
+  limit?: number;
+}
+
+export interface GetMarketSectionDetailParams {
+  cursor?: string | null;
+  limit?: number;
+}
+
 const toMarketItem = (raw: RawMarketItem): MarketItem => {
   const collection = (raw.collection as Record<string, unknown>) ?? {};
   const owner = (collection.owner as Record<string, unknown>) ?? {};
@@ -210,6 +332,38 @@ export const marketApi = {
       hasNextPage: Boolean((data as MarketFeedResponse)?.hasNextPage ?? items.length > 0),
       nextCursor: (data as MarketFeedResponse)?.nextCursor ?? null,
     };
+  },
+
+  async getMarketSections(
+    params?: GetMarketSectionsParams,
+    options?: { signal?: AbortSignal },
+  ): Promise<MarketSectionsResponse> {
+    const response = await apiClient.get('/market/sections', {
+      params,
+      signal: options?.signal,
+    });
+    const payload = unwrapApiResponse<MarketSectionsResponse>(response.data);
+    return payload && Array.isArray(payload.sections)
+      ? payload
+      : (response.data as MarketSectionsResponse);
+  },
+
+  async getMarketSectionDetail(
+    key: string,
+    params?: GetMarketSectionDetailParams,
+    options?: { signal?: AbortSignal },
+  ): Promise<MarketSectionDetailResponse> {
+    const response = await apiClient.get(`/market/sections/${encodeURIComponent(key)}`, {
+      params: {
+        cursor: params?.cursor ?? undefined,
+        limit: params?.limit,
+      },
+      signal: options?.signal,
+    });
+    const payload = unwrapApiResponse<MarketSectionDetailResponse>(response.data);
+    return payload && payload.section
+      ? payload
+      : (response.data as MarketSectionDetailResponse);
   },
 };
 
