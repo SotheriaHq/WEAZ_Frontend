@@ -61,6 +61,7 @@ export const useMarketSignals = (screenContext: string) => {
 
       const normalized: MarketSignalEvent = {
         ...event,
+        clientEventId: event.clientEventId ?? createClientId('market_signal_event'),
         screenContext: event.screenContext ?? screenContext,
         sessionId: event.sessionId ?? sessionId,
       };

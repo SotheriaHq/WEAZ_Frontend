@@ -206,6 +206,7 @@ export type MarketSuppressionType =
   | 'SHOW_LESS';
 
 export interface MarketSignalEvent {
+  clientEventId?: string | null;
   targetType: MarketSignalTargetType;
   targetId: string;
   signalType: MarketSignalType;
@@ -228,13 +229,21 @@ export interface MarketSignalBatchRequest {
 
 export interface MarketSignalBatchResponse {
   accepted: boolean;
+  duplicate?: boolean;
   batchId?: string | null;
   received: number;
+  deduplicated?: number;
   persisted: {
     userFeedSignals: number;
     seenItems: number;
     marketSectionSignals: number;
     suggestionSignals: number;
+  };
+  aggregation?: {
+    mode?: string;
+    status?: string;
+    eventsAggregated?: number;
+    bucketsUpdated?: number;
   };
 }
 
