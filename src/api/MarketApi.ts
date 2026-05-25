@@ -29,6 +29,22 @@ export type MarketSectionLayout =
   | 'CATEGORY_GRID'
   | 'BRAND_RAIL';
 
+export type MarketSectionRanking = 'deterministic-v1' | 'aggregate-v1';
+export type MarketSectionPersonalization = 'disabled' | 'aggregate-contextual';
+export type MarketSectionRankingVersion = 'aggregate-v1';
+
+export interface MarketSectionMetadata {
+  ranking: MarketSectionRanking;
+  personalization: MarketSectionPersonalization;
+  fallbackUsed: boolean;
+  fallbackReason: string | null;
+  rankingVersion: MarketSectionRankingVersion | null;
+  shadowMode: boolean;
+  rankingEnabled: boolean;
+  minimumItems: number;
+  previewItemLimit: number;
+}
+
 export interface MarketSectionItem {
   id: string;
   sourceId: string;
@@ -105,12 +121,7 @@ export interface MarketSection {
     hasNextPage: boolean;
     nextCursor: string | null;
   };
-  metadata?: {
-    ranking: string;
-    personalization: string;
-    minimumItems: number;
-    previewItemLimit: number;
-  };
+  metadata?: MarketSectionMetadata;
 }
 
 export interface MarketSectionsResponse {
@@ -138,6 +149,53 @@ export interface GetMarketSectionDetailParams {
   limit?: number;
   anonymousSessionId?: string;
 }
+
+const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const normalizeFiniteNumber = (value: unknown, fallback: number) =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const normalizeMarketSectionMetadata = (metadata: unknown): MarketSectionMetadata | undefined => {
+  if (!isObjectRecord(metadata)) return undefined;
+
+  const ranking: MarketSectionRanking =
+    metadata.ranking === 'aggregate-v1' ? 'aggregate-v1' : 'deterministic-v1';
+  const personalization: MarketSectionPersonalization =
+    metadata.personalization === 'aggregate-contextual'
+      ? 'aggregate-contextual'
+      : 'disabled';
+
+  return {
+    ranking,
+    personalization,
+    fallbackUsed: metadata.fallbackUsed === true,
+    fallbackReason: typeof metadata.fallbackReason === 'string' ? metadata.fallbackReason : null,
+    rankingVersion: metadata.rankingVersion === 'aggregate-v1' ? 'aggregate-v1' : null,
+    shadowMode: metadata.shadowMode === true,
+    rankingEnabled: metadata.rankingEnabled === true,
+    minimumItems: normalizeFiniteNumber(metadata.minimumItems, 0),
+    previewItemLimit: normalizeFiniteNumber(metadata.previewItemLimit, 0),
+  };
+};
+
+const normalizeMarketSection = (section: MarketSection): MarketSection => ({
+  ...section,
+  items: Array.isArray(section.items) ? section.items : [],
+  metadata: normalizeMarketSectionMetadata(section.metadata),
+});
+
+const normalizeMarketSectionsResponse = (data: MarketSectionsResponse): MarketSectionsResponse => ({
+  ...data,
+  sections: Array.isArray(data.sections) ? data.sections.map(normalizeMarketSection) : [],
+});
+
+const normalizeMarketSectionDetailResponse = (
+  data: MarketSectionDetailResponse,
+): MarketSectionDetailResponse => ({
+  ...data,
+  section: normalizeMarketSection(data.section),
+});
 
 export type MarketSignalTargetType =
   | 'PRODUCT'
@@ -488,9 +546,10 @@ export const marketApi = {
       signal: options?.signal,
     });
     const payload = unwrapApiResponse<MarketSectionsResponse>(response.data);
-    return payload && Array.isArray(payload.sections)
+    const data = payload && Array.isArray(payload.sections)
       ? payload
       : (response.data as MarketSectionsResponse);
+    return normalizeMarketSectionsResponse(data);
   },
 
   async getMarketSectionDetail(
@@ -507,9 +566,10 @@ export const marketApi = {
       signal: options?.signal,
     });
     const payload = unwrapApiResponse<MarketSectionDetailResponse>(response.data);
-    return payload && payload.section
+    const data = payload && payload.section
       ? payload
       : (response.data as MarketSectionDetailResponse);
+    return normalizeMarketSectionDetailResponse(data);
   },
 
   async sendMarketSignalBatch(
