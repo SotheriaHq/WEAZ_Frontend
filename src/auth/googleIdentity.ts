@@ -33,9 +33,23 @@ declare global {
 
 const GOOGLE_IDENTITY_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 const GOOGLE_PROMPT_TIMEOUT_MS = 90_000;
+export const GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE =
+  'Google sign-in could not start. Check that VITE_GOOGLE_CLIENT_ID matches the Google Console Web client and that this origin is authorized.';
 
 let googleScriptPromise: Promise<void> | null = null;
 let cancelActivePrompt: (() => void) | null = null;
+
+const logGoogleClientDiagnostic = (reason: string) => {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return;
+
+  console.warn('[auth:google] Google sign-in could not start.', {
+    reason,
+    requiredEnvKey: 'VITE_GOOGLE_CLIENT_ID',
+    origin: window.location.origin,
+    guidance:
+      'The configured client ID must be the Google Console Web client where this exact origin is authorized.',
+  });
+};
 
 const loadGoogleIdentityScript = (): Promise<void> => {
   if (typeof window === 'undefined') {
@@ -89,11 +103,17 @@ export const requestGoogleIdToken = async ({
     throw new Error('Google sign-in is not configured for this environment.');
   }
 
-  await loadGoogleIdentityScript();
+  try {
+    await loadGoogleIdentityScript();
+  } catch {
+    logGoogleClientDiagnostic('google-identity-script-load-failed');
+    throw new Error(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE);
+  }
 
   const googleId = window.google?.accounts?.id;
   if (!googleId) {
-    throw new Error('Google sign-in is unavailable in this browser.');
+    logGoogleClientDiagnostic('google-identity-unavailable');
+    throw new Error(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE);
   }
 
   cancelActivePrompt?.();
@@ -147,10 +167,10 @@ export const requestGoogleIdToken = async ({
           notification.isDismissedMoment?.();
 
         if (unavailable) {
-          finish(() => reject(new Error('Google sign-in was cancelled or unavailable.')));
+          logGoogleClientDiagnostic('prompt-not-displayed-skipped-or-dismissed');
+          finish(() => reject(new Error(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE)));
         }
       }, 0);
     });
   });
 };
-

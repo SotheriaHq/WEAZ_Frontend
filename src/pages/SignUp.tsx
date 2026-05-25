@@ -19,6 +19,7 @@ import '../styles/auth.css';
 import VLoader from '@/components/loaders/VLoader';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
+import { AppleLogoIcon } from '@/components/auth/SocialAuthIcons';
 import { COMPANY_NAME } from '@/lib/brand';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { PASSWORD_POLICY_MIN_LENGTH, getPasswordPolicyErrorMessage } from '@/lib/passwordPolicy';
@@ -772,7 +773,7 @@ const SignUpPage = () => {
                   className="auth-social-btn flex items-center justify-center gap-3 py-3 rounded-xl text-sm font-medium group"
                   aria-label="Apple signup coming soon"
                 >
-                  <span className="text-lg" aria-hidden="true">🍎</span>
+                  <AppleLogoIcon />
                   <span className="group-hover:text-[#D4AF37] transition-colors">Apple</span>
                 </button>
               </div>

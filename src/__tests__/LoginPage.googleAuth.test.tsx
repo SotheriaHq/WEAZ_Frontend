@@ -79,6 +79,9 @@ vi.mock('@/components/ui/Modal', () => ({
 
 import LoginPage from '@/pages/Login';
 
+const GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE =
+  'Google sign-in could not start. Check that VITE_GOOGLE_CLIENT_ID matches the Google Console Web client and that this origin is authorized.';
+
 const renderLogin = () =>
   render(
     <MemoryRouter initialEntries={['/login']}>
@@ -228,5 +231,28 @@ describe('LoginPage Google progressive auth', () => {
       context: 'signin',
       loginHint: undefined,
     });
+  });
+
+  it('renders SVG social marks instead of emoji auth icons', () => {
+    const { container } = renderLogin();
+
+    const googleButton = screen.getByTestId('login-google-button');
+    const appleButton = screen.getByLabelText(/Apple sign-in coming soon/i);
+
+    expect(googleButton.querySelector('svg')).toBeInTheDocument();
+    expect(appleButton.querySelector('svg')).toBeInTheDocument();
+    expect(container).not.toHaveTextContent('🍎');
+  });
+
+  it('shows the Google client/origin diagnostic when Google Identity Services cannot start', async () => {
+    requestGoogleIdToken.mockRejectedValueOnce(new Error(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE));
+
+    renderLogin();
+    fireEvent.click(screen.getByTestId('login-google-button'));
+
+    await waitFor(() => {
+      expect(toastError).toHaveBeenCalledWith(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE);
+    });
+    expect(googleAuth).not.toHaveBeenCalled();
   });
 });

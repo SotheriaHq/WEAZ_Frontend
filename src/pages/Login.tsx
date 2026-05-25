@@ -25,6 +25,7 @@ import Modal from '@/components/ui/Modal';
 import VLoader from '@/components/loaders/VLoader';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
+import { AppleLogoIcon } from '@/components/auth/SocialAuthIcons';
 import '../styles/auth.css';
 
 const loginSchema = z.object({
@@ -978,7 +979,7 @@ const LoginPage = () => {
                   className="auth-social-btn flex items-center justify-center gap-3 py-3 rounded-xl text-sm font-medium group"
                   aria-label="Apple sign-in coming soon"
                 >
-                  <span className="text-lg" aria-hidden="true">🍎</span>
+                  <AppleLogoIcon />
                   <span>Apple</span>
                 </button>
               </div>

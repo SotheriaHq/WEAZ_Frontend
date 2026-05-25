@@ -27,6 +27,8 @@ function main() {
   const loginSource = read('src/pages/Login.tsx');
   const signupSource = read('src/pages/SignUp.tsx');
   const googleIdentitySource = read('src/auth/googleIdentity.ts');
+  const googleButtonSource = read('src/components/auth/GoogleSignInButton.tsx');
+  const socialIconsSource = read('src/components/auth/SocialAuthIcons.tsx');
   const envSource = read('.env.example');
 
   assertIncludes(appSource, "path: '/forgot-password'", 'Forgot-password route must be registered.');
@@ -228,8 +230,61 @@ function main() {
     'https://accounts.google.com/gsi/client',
     'Web Google auth must use Google Identity Services.',
   );
+  assertIncludes(
+    googleIdentitySource,
+    'VITE_GOOGLE_CLIENT_ID matches the Google Console Web client',
+    'Web Google auth must explain Google Console client ID mismatches.',
+  );
+  assertIncludes(
+    googleIdentitySource,
+    'window.location.origin',
+    'Web Google diagnostics must log the current origin in development.',
+  );
+  assertIncludes(
+    socialIconsSource,
+    'export function GoogleLogoIcon',
+    'Web auth social buttons must use a reusable Google SVG icon.',
+  );
+  assertIncludes(
+    socialIconsSource,
+    'export function AppleLogoIcon',
+    'Web auth social buttons must use a reusable Apple SVG icon.',
+  );
+  assertIncludes(
+    socialIconsSource,
+    'fill="#4285F4"',
+    'Web Google icon must use brand-color SVG paths.',
+  );
+  assertIncludes(
+    googleButtonSource,
+    '<GoogleLogoIcon />',
+    'Web Google button must render the proper Google SVG icon.',
+  );
+  assertIncludes(
+    loginSource,
+    '<AppleLogoIcon />',
+    'Web login Apple button must render an SVG icon, not emoji.',
+  );
+  assertIncludes(
+    signupSource,
+    '<AppleLogoIcon />',
+    'Web signup Apple button must render an SVG icon, not emoji.',
+  );
   assert.doesNotMatch(
-    [envSource, authApiSource, loginSource, signupSource, googleIdentitySource].join('\n'),
+    [loginSource, signupSource, googleButtonSource, socialIconsSource].join('\n'),
+    /\u{1F34E}/u,
+    'Web auth social buttons must not use the Apple emoji.',
+  );
+  assert.doesNotMatch(
+    [
+      envSource,
+      authApiSource,
+      loginSource,
+      signupSource,
+      googleIdentitySource,
+      googleButtonSource,
+      socialIconsSource,
+    ].join('\n'),
     /GOOGLE_CLIENT_SECRET|google-client-secret|client_secret/i,
     'Frontend source and env example must not contain a Google client secret.',
   );
