@@ -19,6 +19,7 @@ import type { CollectionDto } from '@/types/profile';
 import SearchField from '@/components/SearchField';
 import InlineProductDetail from './InlineProductDetail';
 import InlineStoreCollectionView from './InlineStoreCollectionView';
+import MarketSuggestionBlocks from '@/components/market/MarketSuggestionBlocks';
 import type { RootState } from '@/store';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import useDebounce from '@/hooks/useDebounce';
@@ -1047,6 +1048,16 @@ export default function CatalogShopTab({
                     Load more
                   </button>
                 </div>
+              ) : null}
+
+              {!isOwner && isStoreOpen !== false ? (
+                <MarketSuggestionBlocks
+                  context="BRAND_DETAIL"
+                  targetType="BRAND"
+                  targetId={brandId}
+                  limit={8}
+                  className="mt-10"
+                />
               ) : null}
             </>
           )}

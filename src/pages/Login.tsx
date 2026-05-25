@@ -50,6 +50,7 @@ type LoginStep =
   | 'email'
   | 'password'
   | 'google-only'
+  | 'code-login'
   | 'generic'
   | 'code'
   | 'password-setup'
@@ -146,6 +147,9 @@ const LoginPage = () => {
   const [flowError, setFlowError] = useState('');
   const [emailCode, setEmailCode] = useState('');
   const [emailCodeLoading, setEmailCodeLoading] = useState(false);
+  const [directLoginCode, setDirectLoginCode] = useState('');
+  const [directLoginSendLoading, setDirectLoginSendLoading] = useState(false);
+  const [directLoginConfirmLoading, setDirectLoginConfirmLoading] = useState(false);
   const [passwordSetupToken, setPasswordSetupToken] = useState('');
   const [setupPassword, setSetupPassword] = useState('');
   const [setupConfirmPassword, setSetupConfirmPassword] = useState('');
@@ -239,6 +243,7 @@ const LoginPage = () => {
     setLoginOptions(null);
     setFlowError('');
     setEmailCode('');
+    setDirectLoginCode('');
     setPasswordSetupToken('');
     setSetupPassword('');
     setSetupConfirmPassword('');
@@ -347,7 +352,8 @@ const LoginPage = () => {
       }
 
       if (options.methods.google || options.methods.passwordSetupAvailable) {
-        setLoginStep('google-only');
+        setLoginStep('code-login');
+        void sendDirectLoginCode(normalizedEmail, options.requestId);
         return;
       }
 
@@ -376,6 +382,36 @@ const LoginPage = () => {
 
   const handleGoogleError = (err: Error) => {
     toast.error(err.message || 'Google sign-in could not be completed.');
+  };
+
+  const sendDirectLoginCode = async (email: string, requestId?: string) => {
+    setDirectLoginSendLoading(true);
+    try {
+      await AuthApi.requestEmailLoginCode({ email, purpose: 'DIRECT_LOGIN', requestId });
+    } catch {
+      // Silently fail — user can resend manually
+    } finally {
+      setDirectLoginSendLoading(false);
+    }
+  };
+
+  const confirmDirectLoginCodeFn = async () => {
+    const normalizedEmail = (watchEmail ?? '').trim();
+    const code = directLoginCode.trim();
+    if (!code) {
+      setFlowError('Enter the code from your inbox.');
+      return;
+    }
+    setFlowError('');
+    setDirectLoginConfirmLoading(true);
+    try {
+      const result = await AuthApi.confirmDirectLoginCode(normalizedEmail, code);
+      completeLogin(result, result.user?.email || normalizedEmail);
+    } catch (error) {
+      setFlowError(getAuthFlowErrorMessage(error, 'Invalid or expired code.'));
+    } finally {
+      setDirectLoginConfirmLoading(false);
+    }
   };
 
   const handleAppleComingSoon = () => {
@@ -598,6 +634,7 @@ const LoginPage = () => {
   const canShowPasswordSetup =
     Boolean(loginOptions?.methods.passwordSetupAvailable) ||
     loginStep === 'code' ||
+    loginStep === 'code-login' ||
     loginStep === 'password-setup';
 
   return (
@@ -781,11 +818,43 @@ const LoginPage = () => {
                   </>
                 )}
 
-                {loginStep === 'google-only' && (
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-gray-300">
-                    <p className="font-medium text-white">This account is set up for Google sign-in.</p>
-                    <p className="mt-1 text-gray-400">
-                      Continue with Google, or verify your email to create a password for future email sign-in.
+                {loginStep === 'code-login' && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-gray-300 uppercase tracking-wider ml-1">
+                      Sign-in Code
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Mail className="h-4 w-4 text-gray-500" />
+                      </div>
+                      <input
+                        value={directLoginCode}
+                        onChange={(e) => {
+                          setDirectLoginCode(e.target.value);
+                          setFlowError('');
+                        }}
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        placeholder="Enter your code"
+                        className="auth-input w-full rounded-xl py-3.5 pl-11 pr-4 text-sm tracking-[0.2em]"
+                        autoFocus
+                      />
+                    </div>
+                    <p className="text-xs text-gray-400 ml-1">
+                      A one-time sign-in code was sent to your email.{' '}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void sendDirectLoginCode(
+                            (watchEmail ?? '').trim(),
+                            loginOptions?.requestId,
+                          )
+                        }
+                        disabled={directLoginSendLoading}
+                        className="text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)] underline disabled:opacity-60"
+                      >
+                        {directLoginSendLoading ? 'Sending...' : 'Resend'}
+                      </button>
                     </p>
                   </div>
                 )}
@@ -924,6 +993,22 @@ const LoginPage = () => {
                       'Sign In'
                     )}
                   </button>
+                ) : loginStep === 'code-login' ? (
+                  <button
+                    type="button"
+                    onClick={() => void confirmDirectLoginCodeFn()}
+                    disabled={directLoginConfirmLoading || directLoginSendLoading}
+                    className="auth-btn-primary w-full py-3.5 rounded-xl text-sm font-medium tracking-wide"
+                  >
+                    {directLoginConfirmLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <VLoader size={16} phase="loading" showLabel={false} />
+                        Signing In...
+                      </span>
+                    ) : (
+                      'Sign In'
+                    )}
+                  </button>
                 ) : null}
 
                 {loginStep !== 'email' && (
@@ -966,7 +1051,7 @@ const LoginPage = () => {
               {/* Social Login */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <GoogleSignInOverlayButton
-                  label={loginStep === 'google-only' ? 'Continue with Google' : 'Google'}
+                  label={loginStep === 'code-login' ? 'Continue with Google' : 'Google'}
                   loading={googleLoading}
                   context="signin"
                   onToken={(token) => void handleGoogleToken(token)}

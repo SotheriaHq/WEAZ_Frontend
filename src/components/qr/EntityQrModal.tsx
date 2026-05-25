@@ -87,7 +87,7 @@ export const EntityQrModal: React.FC<EntityQrModalProps> = ({
           aria-label="Close QR code modal"
         />
 
-        <section className="relative z-10 w-full max-w-md overflow-hidden rounded-[2rem] border border-gray-200/70 bg-white/95 p-5 shadow-2xl dark:border-white/10 dark:bg-zinc-950/95 sm:p-6">
+        <section className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[2rem] border border-gray-200/70 bg-white/95 p-5 shadow-2xl dark:border-white/10 dark:bg-zinc-950/95 sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">

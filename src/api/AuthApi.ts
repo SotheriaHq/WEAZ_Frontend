@@ -60,7 +60,7 @@ export type LoginOptionsResponse = {
   message: string;
 };
 
-export type EmailLoginCodePurpose = 'PASSWORD_SETUP';
+export type EmailLoginCodePurpose = 'PASSWORD_SETUP' | 'DIRECT_LOGIN';
 
 export type RequestEmailLoginCodePayload = {
   email: string;
@@ -117,6 +117,17 @@ export class AuthApi {
       payload,
     );
     return unwrapApiResponse<ConfirmEmailLoginCodeResponse>(response.data);
+  }
+
+  static async confirmDirectLoginCode(
+    email: string,
+    code: string,
+  ): Promise<AuthTokensResponse> {
+    const response = await apiClient.post<ApiSuccessPayload<AuthTokensResponse>>(
+      '/auth/email-login-code/confirm',
+      { email, code, purpose: 'DIRECT_LOGIN' },
+    );
+    return unwrapApiResponse<AuthTokensResponse>(response.data);
   }
 
   static async setupPassword(payload: PasswordSetupPayload): Promise<MessageResponse> {

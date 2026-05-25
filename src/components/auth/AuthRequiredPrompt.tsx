@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, LogIn, UserPlus, ShoppingBag, Heart, Sparkles, Lock } from 'lucide-react';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
-import { BAG_IT_EMOJI, MY_BAG_EMOJI } from '@/constants/bagging';
+import { MY_BAG_EMOJI } from '@/constants/bagging';
 
 interface AuthRequiredPromptProps {
   /** Whether the prompt is visible */
@@ -142,70 +142,37 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
                 </button>
 
                 {/* Content */}
-                <div className="p-8 pt-10 text-center">
-                {/* Icon with glow */}
-                <motion.div
-                  className="relative inline-block mb-6"
-                  animate={{ y: [0, -5, 0] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                >
-                  <div className="relative">
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 flex items-center justify-center text-purple-500 dark:text-purple-400">
-                      {content.icon}
-                    </div>
-                    <span className="absolute -top-2 -right-2 text-3xl">{content.emoji}</span>
+                <div className="p-5 pt-7 text-center">
+                {/* Icon */}
+                <div className="relative inline-block mb-4">
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 flex items-center justify-center text-purple-500 dark:text-purple-400">
+                    {content.icon}
                   </div>
-                  <div className="absolute inset-0 bg-purple-500/20 blur-2xl rounded-full -z-10" />
-                </motion.div>
+                  <div className="absolute inset-0 bg-purple-500/20 blur-xl rounded-full -z-10" />
+                </div>
 
                 {/* Title */}
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                   {displayTitle}
                 </h2>
 
                 {/* Description */}
-                <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
                   {displayDescription}
                 </p>
-
-                {/* Benefits list */}
-                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-4 mb-8">
-                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider">
-                    Why join Threadly?
-                  </h4>
-                  <ul className="space-y-2 text-left">
-                    {[
-                      `${BAG_IT_EMOJI} Shop exclusive African fashion`,
-                      '💜 Save favorites to your wishlist',
-                      '📦 Track your orders easily',
-                      '🎁 Get personalized recommendations',
-                    ].map((benefit, index) => (
-                      <motion.li
-                        key={benefit}
-                        className="flex items-center text-sm text-gray-700 dark:text-gray-300"
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.1 + index * 0.05 }}
-                      >
-                        <span className="mr-2">{benefit.split(' ')[0]}</span>
-                        <span>{benefit.split(' ').slice(1).join(' ')}</span>
-                      </motion.li>
-                    ))}
-                  </ul>
-                </div>
 
                 {/* Action buttons */}
                 <div className="space-y-3">
                   <button
                     onClick={handleSignIn}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
                   >
                     <LogIn className="w-5 h-5" />
                     Sign In
                   </button>
                   <button
                     onClick={handleSignUp}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold transition-all"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold transition-all"
                   >
                     <UserPlus className="w-5 h-5" />
                     Create Account
@@ -213,7 +180,7 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
                 </div>
 
                 {/* Footer */}
-                <p className="mt-6 text-xs text-gray-500 dark:text-gray-500">
+                <p className="mt-4 text-xs text-gray-500 dark:text-gray-500">
                   By continuing, you agree to our Terms of Service and Privacy Policy
                 </p>
                 </div>

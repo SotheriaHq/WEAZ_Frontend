@@ -159,8 +159,9 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
             const file = m?.file;
             const rawType = String(m?.mediaType ?? file?.mimeType ?? '').toUpperCase();
             const mediaType: 'POST_IMAGE' | 'POST_VIDEO' = rawType.includes('VIDEO') ? 'POST_VIDEO' : 'POST_IMAGE';
-            const url = String(file?.s3Url ?? file?.url ?? '');
             const fileId = typeof file?.id === 'string' ? file.id : null;
+            // Don't seed raw S3 URLs when fileId exists — they bypass API URL resolution at line 171
+            const url = fileId ? '' : String(file?.s3Url ?? file?.url ?? '');
             return { id: mediaId, type: mediaType, url, fileId };
           })
           .filter((m: ModalMedia | null): m is ModalMedia => Boolean(m));
