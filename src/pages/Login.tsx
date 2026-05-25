@@ -15,7 +15,7 @@ import { apiClient, persistAccessToken, dropStoredAccessToken } from '../api/htt
 import { AuthApi } from '@/api/AuthApi';
 import type { LoginOptionsResponse } from '@/api/AuthApi';
 import { env } from '@/config/env';
-import { requestGoogleIdToken } from '@/auth/googleIdentity';
+
 import {
   PASSWORD_POLICY_MIN_LENGTH,
   getPasswordLength,
@@ -24,7 +24,7 @@ import {
 import Modal from '@/components/ui/Modal';
 import VLoader from '@/components/loaders/VLoader';
 import BrandWordmark from '@/components/brand/BrandWordmark';
-import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
+import GoogleSignInOverlayButton from '@/components/auth/GoogleSignInOverlayButton';
 import { AppleLogoIcon } from '@/components/auth/SocialAuthIcons';
 import '../styles/auth.css';
 
@@ -359,16 +359,11 @@ const LoginPage = () => {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleToken = async (idToken: string) => {
     const normalizedEmail = (watchEmail ?? '').trim();
     setFlowError('');
     setGoogleLoading(true);
     try {
-      const idToken = await requestGoogleIdToken({
-        clientId: env.google.clientId,
-        context: 'signin',
-        loginHint: normalizedEmail || undefined,
-      });
       dropStoredAccessToken();
       const payload = await AuthApi.googleAuth({ idToken });
       completeLogin(payload, payload.user?.email || normalizedEmail);
@@ -377,6 +372,10 @@ const LoginPage = () => {
     } finally {
       setGoogleLoading(false);
     }
+  };
+
+  const handleGoogleError = (err: Error) => {
+    toast.error(err.message || 'Google sign-in could not be completed.');
   };
 
   const handleAppleComingSoon = () => {
@@ -966,11 +965,12 @@ const LoginPage = () => {
 
               {/* Social Login */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <GoogleSignInButton
+                <GoogleSignInOverlayButton
                   label={loginStep === 'google-only' ? 'Continue with Google' : 'Google'}
                   loading={googleLoading}
-                  disabled={!env.google.configured || googleLoading}
-                  onClick={() => void handleGoogleLogin()}
+                  context="signin"
+                  onToken={(token) => void handleGoogleToken(token)}
+                  onError={handleGoogleError}
                   testId="login-google-button"
                 />
                 <button

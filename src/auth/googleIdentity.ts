@@ -8,6 +8,15 @@ type GooglePromptMomentNotification = {
   isDismissedMoment?: () => boolean;
 };
 
+type GoogleRenderButtonOptions = {
+  type?: 'standard' | 'icon';
+  theme?: 'outline' | 'filled_blue' | 'filled_black';
+  size?: 'large' | 'medium' | 'small';
+  shape?: 'rectangular' | 'pill';
+  width?: number | string;
+  locale?: string;
+};
+
 type GoogleAccountsId = {
   initialize: (config: {
     client_id: string;
@@ -18,6 +27,7 @@ type GoogleAccountsId = {
     login_hint?: string;
   }) => void;
   prompt: (callback?: (notification: GooglePromptMomentNotification) => void) => void;
+  renderButton: (parent: HTMLElement, options: GoogleRenderButtonOptions) => void;
   cancel?: () => void;
 };
 
@@ -87,6 +97,58 @@ const loadGoogleIdentityScript = (): Promise<void> => {
   });
 
   return googleScriptPromise;
+};
+
+export const mountGoogleSignInButton = async (
+  container: HTMLElement,
+  clientId: string,
+  context: 'signin' | 'signup',
+  onToken: (idToken: string) => void,
+  onError?: (err: Error) => void,
+): Promise<() => void> => {
+  const normalizedClientId = clientId.trim();
+  if (!normalizedClientId || normalizedClientId.startsWith('<')) {
+    throw new Error('Google sign-in is not configured for this environment.');
+  }
+
+  try {
+    await loadGoogleIdentityScript();
+  } catch {
+    logGoogleClientDiagnostic('google-identity-script-load-failed');
+    throw new Error(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE);
+  }
+
+  const googleId = window.google?.accounts?.id;
+  if (!googleId) {
+    logGoogleClientDiagnostic('google-identity-unavailable');
+    throw new Error(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE);
+  }
+
+  googleId.initialize({
+    client_id: normalizedClientId,
+    context,
+    auto_select: false,
+    cancel_on_tap_outside: true,
+    callback: (response) => {
+      const credential = response.credential?.trim();
+      if (credential) {
+        onToken(credential);
+      } else {
+        onError?.(new Error('Google did not return an ID token.'));
+      }
+    },
+  });
+
+  googleId.renderButton(container, {
+    type: 'standard',
+    theme: 'outline',
+    size: 'large',
+    width: 500,
+  });
+
+  return () => {
+    googleId.cancel?.();
+  };
 };
 
 export const requestGoogleIdToken = async ({

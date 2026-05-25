@@ -14,11 +14,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import { apiClient, persistAccessToken, dropStoredAccessToken } from '../api/httpClient';
 import { AuthApi } from '@/api/AuthApi';
 import { env } from '@/config/env';
-import { requestGoogleIdToken } from '@/auth/googleIdentity';
+
 import '../styles/auth.css';
 import VLoader from '@/components/loaders/VLoader';
 import BrandWordmark from '@/components/brand/BrandWordmark';
-import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
+import GoogleSignInOverlayButton from '@/components/auth/GoogleSignInOverlayButton';
 import { AppleLogoIcon } from '@/components/auth/SocialAuthIcons';
 import { COMPANY_NAME } from '@/lib/brand';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
@@ -293,7 +293,7 @@ const SignUpPage = () => {
     }
   };
 
-  const handleGoogleSignup = async () => {
+  const handleGoogleToken = async (idToken: string) => {
     const selectedType = watchUserType;
     const brandFullName = (watch('brandFullName') ?? '').trim();
     const agreedToTerms = watch('agreeTerms');
@@ -319,10 +319,6 @@ const SignUpPage = () => {
     setGoogleLoading(true);
     try {
       dropStoredAccessToken();
-      const idToken = await requestGoogleIdToken({
-        clientId: env.google.clientId,
-        context: 'signup',
-      });
       const payload = await AuthApi.googleAuth({
         idToken,
         type: selectedType,
@@ -343,6 +339,10 @@ const SignUpPage = () => {
     } finally {
       setGoogleLoading(false);
     }
+  };
+
+  const handleGoogleError = (err: Error) => {
+    toast.error(err.message || 'Google signup could not be completed.');
   };
 
   const handleAppleComingSoon = () => {
@@ -760,11 +760,12 @@ const SignUpPage = () => {
 
               {/* Social Sign Up */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <GoogleSignInButton
+                <GoogleSignInOverlayButton
                   label="Google"
                   loading={googleLoading}
-                  disabled={!env.google.configured || googleLoading}
-                  onClick={() => void handleGoogleSignup()}
+                  context="signup"
+                  onToken={(token) => void handleGoogleToken(token)}
+                  onError={handleGoogleError}
                   testId="signup-google-button"
                 />
                 <button
