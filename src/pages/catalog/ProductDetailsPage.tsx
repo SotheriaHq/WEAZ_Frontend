@@ -30,6 +30,7 @@ import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagging } from '@/hooks/useBagging';
 import { BAG_IT_EMOJI, BAG_IT_LABEL } from '@/constants/bagging';
 import ProductReviewSection from '@/components/reviews/ProductReviewSection';
+import MarketSuggestionBlocks from '@/components/market/MarketSuggestionBlocks';
 import { normalizeSizingMode } from '@/types/sizing';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
 import {
@@ -1136,6 +1137,12 @@ export default function ProductDetailsPage() {
       <div className="mx-auto w-full max-w-[1440px] px-4 pb-10 md:px-8 lg:px-12">
         <ProductReviewSection productId={product.id} />
       </div>
+      <MarketSuggestionBlocks
+        context="PRODUCT_DETAIL"
+        targetType="PRODUCT"
+        targetId={product.id}
+        className="mx-auto w-full max-w-[1440px] px-4 pb-12 md:px-8 lg:px-12"
+      />
       {/* Product QR modal disabled — only brand profile QR codes active */}
     </div>
   );

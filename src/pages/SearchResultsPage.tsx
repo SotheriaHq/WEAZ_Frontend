@@ -5,6 +5,7 @@ import useSearch from '@/hooks/useSearch';
 import type { SearchEntityType, SearchHighlightOffset, SearchItem } from '@/types/search';
 import { resolveSearchIntent } from '@/lib/searchRouting';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import MarketSuggestionBlocks from '@/components/market/MarketSuggestionBlocks';
 
 const TABS: Array<{ key: SearchEntityType | 'all'; label: string }> = [
   { key: 'all', label: 'All' },
@@ -204,6 +205,15 @@ const SearchResultsPage: React.FC = () => {
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">No results for “{query}”</h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">Try broader terms or switch tabs to inspect a different entity type.</p>
           </div>
+        ) : null}
+
+        {!isLoading && !error && query.trim() && results?.items.length === 0 ? (
+          <MarketSuggestionBlocks
+            context="SEARCH_EMPTY"
+            targetType="QUERY"
+            query={query}
+            className="rounded-[2rem] bg-white/70 p-6 dark:bg-white/5 sm:p-8"
+          />
         ) : null}
 
         {!isLoading && !error && results?.items.length ? (

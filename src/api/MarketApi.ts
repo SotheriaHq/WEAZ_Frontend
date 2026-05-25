@@ -150,6 +150,81 @@ export interface GetMarketSectionDetailParams {
   anonymousSessionId?: string;
 }
 
+export type MarketSuggestionContext =
+  | 'PRODUCT_DETAIL'
+  | 'COLLECTION_DETAIL'
+  | 'BRAND_DETAIL'
+  | 'SEARCH_EMPTY'
+  | 'MARKET_SECTION_DETAIL';
+
+export type MarketSuggestionTargetType =
+  | 'PRODUCT'
+  | 'COLLECTION'
+  | 'BRAND'
+  | 'CATEGORY'
+  | 'SECTION'
+  | 'QUERY';
+
+export type MarketSuggestionLayout = MarketSectionLayout | 'COMPACT_RAIL' | 'MIXED_GRID';
+export type MarketSuggestionSourceType = MarketSectionSourceType;
+
+export interface MarketSuggestionPagination {
+  limit: number;
+  hasNextPage: boolean;
+  nextCursor: string | null;
+}
+
+export interface MarketSuggestionBlockMetadata {
+  strategy?: string;
+  fallbackUsed: boolean;
+  fallbackReason: string | null;
+  personalization: 'disabled';
+  ranking: 'deterministic-v1';
+}
+
+export interface MarketSuggestionResponseMetadata {
+  version?: string;
+  personalization: 'disabled';
+  cachePolicy: 'private-no-store';
+  fallbackUsed: boolean;
+  fallbackReason: string | null;
+  contextsDeferred?: MarketSuggestionContext[];
+}
+
+export interface MarketSuggestionBlock {
+  blockKey: string;
+  title: string;
+  subtitle?: string | null;
+  reason?: string | null;
+  layout: MarketSuggestionLayout;
+  sourceType: MarketSuggestionSourceType;
+  items: MarketSectionItem[];
+  pagination?: MarketSuggestionPagination;
+  metadata?: MarketSuggestionBlockMetadata;
+}
+
+export interface MarketSuggestionResponse {
+  generatedAt: string;
+  context: MarketSuggestionContext;
+  targetType: MarketSuggestionTargetType | null;
+  targetId: string | null;
+  sectionKey?: string | null;
+  query?: string | null;
+  blocks: MarketSuggestionBlock[];
+  metadata?: MarketSuggestionResponseMetadata;
+}
+
+export interface GetMarketSuggestionsParams {
+  context: MarketSuggestionContext;
+  targetType?: MarketSuggestionTargetType;
+  targetId?: string;
+  sectionKey?: string;
+  query?: string;
+  limit?: number;
+  cursor?: string | null;
+  anonymousSessionId?: string;
+}
+
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
@@ -195,6 +270,59 @@ const normalizeMarketSectionDetailResponse = (
 ): MarketSectionDetailResponse => ({
   ...data,
   section: normalizeMarketSection(data.section),
+});
+
+const normalizeSuggestionBlockMetadata = (
+  metadata: unknown,
+): MarketSuggestionBlockMetadata | undefined => {
+  if (!isObjectRecord(metadata)) return undefined;
+  return {
+    strategy: typeof metadata.strategy === 'string' ? metadata.strategy : undefined,
+    fallbackUsed: metadata.fallbackUsed === true,
+    fallbackReason: typeof metadata.fallbackReason === 'string' ? metadata.fallbackReason : null,
+    personalization: 'disabled',
+    ranking: 'deterministic-v1',
+  };
+};
+
+const normalizeMarketSuggestionResponse = (
+  data: MarketSuggestionResponse,
+): MarketSuggestionResponse => ({
+  ...data,
+  blocks: Array.isArray(data.blocks)
+    ? data.blocks.map((block) => ({
+        ...block,
+        items: Array.isArray(block.items) ? block.items : [],
+        metadata: normalizeSuggestionBlockMetadata(block.metadata),
+        pagination: block.pagination
+          ? {
+              limit: normalizeFiniteNumber(block.pagination.limit, 0),
+              hasNextPage: block.pagination.hasNextPage === true,
+              nextCursor:
+                typeof block.pagination.nextCursor === 'string'
+                  ? block.pagination.nextCursor
+                  : null,
+            }
+          : undefined,
+      }))
+    : [],
+  metadata: isObjectRecord(data.metadata)
+    ? {
+        version: typeof data.metadata.version === 'string' ? data.metadata.version : undefined,
+        personalization: 'disabled',
+        cachePolicy: 'private-no-store',
+        fallbackUsed: data.metadata.fallbackUsed === true,
+        fallbackReason:
+          typeof data.metadata.fallbackReason === 'string'
+            ? data.metadata.fallbackReason
+            : null,
+        contextsDeferred: Array.isArray(data.metadata.contextsDeferred)
+          ? data.metadata.contextsDeferred.filter(
+              (context): context is MarketSuggestionContext => typeof context === 'string',
+            )
+          : undefined,
+      }
+    : undefined,
 });
 
 export type MarketSignalTargetType =
@@ -570,6 +698,30 @@ export const marketApi = {
       ? payload
       : (response.data as MarketSectionDetailResponse);
     return normalizeMarketSectionDetailResponse(data);
+  },
+
+  async getMarketSuggestions(
+    params: GetMarketSuggestionsParams,
+    options?: { signal?: AbortSignal },
+  ): Promise<MarketSuggestionResponse> {
+    const response = await apiClient.get('/market/suggestions', {
+      params: {
+        context: params.context,
+        targetType: params.targetType,
+        targetId: params.targetId,
+        sectionKey: params.sectionKey,
+        query: params.query,
+        limit: params.limit,
+        cursor: params.cursor ?? undefined,
+        anonymousSessionId: params.anonymousSessionId,
+      },
+      signal: options?.signal,
+    });
+    const payload = unwrapApiResponse<MarketSuggestionResponse>(response.data);
+    const data = payload && Array.isArray(payload.blocks)
+      ? payload
+      : (response.data as MarketSuggestionResponse);
+    return normalizeMarketSuggestionResponse(data);
   },
 
   async sendMarketSignalBatch(

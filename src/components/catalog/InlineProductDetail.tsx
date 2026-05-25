@@ -23,6 +23,7 @@ import {
   isCustomOrderOnlyProduct,
   isStrictlyOutOfStockProduct,
 } from '@/lib/productAvailability';
+import MarketSuggestionBlocks from '@/components/market/MarketSuggestionBlocks';
 
 interface InlineProductDetailProps {
   product: StoreProduct;
@@ -809,6 +810,13 @@ export default function InlineProductDetail({
           </div>
         </div>
       </div>
+
+      <MarketSuggestionBlocks
+        context="PRODUCT_DETAIL"
+        targetType="PRODUCT"
+        targetId={product.id}
+        className="pt-6"
+      />
 
       {/* Lightbox */}
       {lightboxOpen && productImages.length > 0 && (

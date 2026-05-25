@@ -22,6 +22,7 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import ImageLightbox from './ImageLightbox';
 import { useNavigate } from 'react-router-dom';
 import { normalizeSizingMode, type SizingMode } from '@/types/sizing';
+import MarketSuggestionBlocks from '@/components/market/MarketSuggestionBlocks';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -553,6 +554,13 @@ const InlineStoreCollectionView: React.FC<InlineStoreCollectionViewProps> = ({
           )}
         </>
       )}
+
+      <MarketSuggestionBlocks
+        context="COLLECTION_DETAIL"
+        targetType="COLLECTION"
+        targetId={collectionId}
+        className="pt-4"
+      />
 
       {/* ============ Lightbox ============ */}
       {galleryOpen && allGalleryImages.length > 0 && (
