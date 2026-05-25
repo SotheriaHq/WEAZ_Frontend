@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { apiClient } from '@/api/httpClient';
 import { marketApi, type MarketSection, type MarketSectionItem, type MarketSignalEvent } from '@/api/MarketApi';
@@ -21,6 +22,11 @@ import {
   type MarketplaceProduct,
   type RawProductsPayload,
 } from '@/utils/marketProductMapper';
+import {
+  getSectionItemSignalKey,
+  getSectionItemTargetId,
+  mapSectionProductToMarketplaceProduct,
+} from '@/utils/marketSectionMapper';
 import { useMarketSignals } from '@/hooks/useMarketSignals';
 
 const BASE_FILTERS = ['FOR_YOU', 'MENSWEAR', 'WOMENSWEAR', 'EVERYBODY', 'ON_SALE'] as const;
@@ -54,44 +60,6 @@ const isCanceledRequest = (err: unknown) => {
     error?.name === 'CanceledError' ||
     error?.message === 'canceled'
   );
-};
-
-const mapSectionProductToMarketplaceProduct = (
-  item: MarketSectionItem,
-): MarketplaceProduct | null => {
-  if (item.sourceType !== 'PRODUCT' || item.entityType !== 'PRODUCT') return null;
-  const id = String(item.sourceId || item.id || '').trim();
-  const mediaUrl = item.media?.url || item.media?.thumbnailUrl || null;
-  if (!id || !mediaUrl) return null;
-
-  return normalizeMarketProduct({
-    id,
-    entityType: 'PRODUCT',
-    name: item.title,
-    description: item.description ?? undefined,
-    price: item.price?.amount ?? item.price?.effectiveAmount ?? 0,
-    salePrice: item.price?.saleAmount ?? null,
-    currency: item.price?.currency ?? 'NGN',
-    thumbnail: item.media?.thumbnailUrl ?? mediaUrl,
-    images: [mediaUrl],
-    media: [{ id, url: mediaUrl, type: 'image', isPrimary: true }],
-    totalStock: item.availability?.totalStock ?? 0,
-    customOrderEnabled: Boolean(item.availability?.customOrderEnabled),
-    customAvailable: Boolean(item.availability?.customOrderEnabled),
-    tags: item.tags ?? [],
-    categoryId: item.category?.id ?? undefined,
-    createdAt: item.createdAt ?? undefined,
-    updatedAt: item.updatedAt ?? undefined,
-    viewsCount: item.stats?.views ?? 0,
-    threadsCount: item.stats?.threads ?? 0,
-    brandId: item.brand?.id ?? undefined,
-    brand: {
-      id: item.brand?.id ?? '',
-      brandName: item.brand?.name ?? 'Brand',
-      logoUrl: item.brand?.logoUrl ?? undefined,
-      currency: item.price?.currency ?? 'NGN',
-    },
-  });
 };
 
 const extractProductsFromSections = (sections: MarketSection[]) => {
@@ -205,24 +173,13 @@ const ProductCarousel: React.FC<{
   );
 };
 
-const getSectionItemTargetId = (item: MarketSectionItem) => {
-  return String(item.target?.id || item.sourceId || item.id || '').trim();
-};
-
-const getSectionItemSignalKey = (
-  sectionKey: string,
-  item: MarketSectionItem,
-  index: number,
-) => {
-  return `${sectionKey}:${item.entityType}:${getSectionItemTargetId(item)}:${index}`;
-};
-
 const MarketSectionPreviewRail: React.FC<{
   section: MarketSection;
   onViewProduct: (product: MarketplaceProduct) => void;
   onTrackSignal: (event: MarketSignalEvent) => void;
   onHideItem: (section: MarketSection, item: MarketSectionItem) => void;
-}> = ({ section, onViewProduct, onTrackSignal, onHideItem }) => {
+  onViewAll: (section: MarketSection) => void;
+}> = ({ section, onViewProduct, onTrackSignal, onHideItem, onViewAll }) => {
   const sectionRef = useRef<HTMLElement | null>(null);
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const observedKeysRef = useRef<Set<string>>(new Set());
@@ -307,11 +264,22 @@ const MarketSectionPreviewRail: React.FC<{
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{section.subtitle}</p>
           ) : null}
         </div>
-        {section.emotionalLabel ? (
-          <span className="hidden rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 dark:bg-white/10 dark:text-gray-300 sm:inline-flex">
-            {section.emotionalLabel}
-          </span>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {section.emotionalLabel ? (
+            <span className="hidden rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 dark:bg-white/10 dark:text-gray-300 sm:inline-flex">
+              {section.emotionalLabel}
+            </span>
+          ) : null}
+          {section.viewAll?.enabled ? (
+            <button
+              type="button"
+              onClick={() => onViewAll(section)}
+              className="rounded-full border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 transition hover:bg-gray-100 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/10"
+            >
+              {section.viewAll.label || 'View all'}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -424,6 +392,7 @@ const isOutOfStockCustomOrderProduct = (product: MarketplaceProduct) =>
   );
 
 const MarketPlace: React.FC = () => {
+  const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const isAuth = useSelector((state: RootState) => state.user.isAuthenticated);
 
@@ -605,6 +574,27 @@ const MarketPlace: React.FC = () => {
       }
     },
     [anonymousSessionId, marketSections, products],
+  );
+
+  const handleViewAllSection = useCallback(
+    (section: MarketSection) => {
+      if (!section.viewAll?.enabled) return;
+      trackMarketSignal({
+        targetType: 'SECTION',
+        targetId: section.key,
+        signalType: 'VIEW_ALL_CLICK',
+        surface: 'MARKET_HOME',
+        sectionKey: section.key,
+      });
+      void flushMarketSignals();
+      navigate(`/market/sections/${encodeURIComponent(section.key)}`, {
+        state: {
+          title: section.title,
+          subtitle: section.subtitle ?? null,
+        },
+      });
+    },
+    [flushMarketSignals, navigate, trackMarketSignal],
   );
 
   useEffect(() => {
@@ -839,6 +829,7 @@ const MarketPlace: React.FC = () => {
                 onViewProduct={handleOpenSectionProduct}
                 onTrackSignal={trackMarketSignal}
                 onHideItem={handleHideMarketSectionItem}
+                onViewAll={handleViewAllSection}
               />
             ))}
           </div>

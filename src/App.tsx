@@ -59,6 +59,7 @@ const GlobalModalRouter = lazy(() =>
   })),
 );
 const MarketPlace = lazy(() => import('./pages/MarketPlace'));
+const MarketSectionPage = lazy(() => import('./pages/MarketSectionPage'));
 const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
 const Profile = lazy(() => import('./pages/catalog/Catalog'));
 const CreateDesignPage = lazy(() => import('./pages/catalog/CreateDesign'));
@@ -442,6 +443,7 @@ const router = createBrowserRouter([
           { index: true, element: withRouteFallback(<Market mode="designs" />) },
           { path: 'market', element: withRouteFallback(<Market mode="designs" />) },
           { path: 'market-place', element: withRouteFallback(<MarketPlace />) },
+          { path: 'market/sections/:sectionKey', element: withRouteFallback(<MarketSectionPage />) },
           { path: 'search', element: withRouteFallback(<SearchResultsPage />) },
           { path: 'subscriptions', element: <SubscriptionsPlaceholder /> },
           { path: 'history', element: <HistoryPlaceholder /> },
