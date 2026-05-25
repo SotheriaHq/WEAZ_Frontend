@@ -233,6 +233,42 @@ describe('LoginPage Google progressive auth', () => {
     });
   });
 
+  it('keeps the Google label and a contained loader while Google auth starts', async () => {
+    let resolveToken!: (token: string) => void;
+    requestGoogleIdToken.mockReturnValueOnce(
+      new Promise<string>((resolve) => {
+        resolveToken = resolve;
+      }),
+    );
+    googleAuth.mockResolvedValueOnce({
+      accessToken: 'access-token',
+      user: {
+        id: 'user-1',
+        email: 'ada@example.com',
+        role: 'User',
+        type: 'REGULAR',
+      },
+      message: 'Welcome Back',
+    });
+
+    renderLogin();
+    fireEvent.click(screen.getByTestId('login-google-button'));
+
+    const googleButton = screen.getByTestId('login-google-button');
+    await waitFor(() => {
+      expect(googleButton).toBeDisabled();
+    });
+
+    expect(googleButton).toHaveTextContent(/^Google$/i);
+    expect(screen.queryByText(/Opening Google/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId('google-button-loader')).toBeInTheDocument();
+
+    resolveToken('google-id-token');
+    await waitFor(() => {
+      expect(googleAuth).toHaveBeenCalledWith({ idToken: 'google-id-token' });
+    });
+  });
+
   it('renders SVG social marks instead of emoji auth icons', () => {
     const { container } = renderLogin();
 

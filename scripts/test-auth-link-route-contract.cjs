@@ -261,6 +261,16 @@ function main() {
     'Web Google button must render the proper Google SVG icon.',
   );
   assertIncludes(
+    googleButtonSource,
+    'data-testid="google-button-loader"',
+    'Web Google button must keep a contained loading spinner inside the button.',
+  );
+  assert.doesNotMatch(
+    googleButtonSource,
+    /Opening Google/i,
+    'Web Google button must keep the stable Google label while loading.',
+  );
+  assertIncludes(
     loginSource,
     '<AppleLogoIcon />',
     'Web login Apple button must render an SVG icon, not emoji.',
