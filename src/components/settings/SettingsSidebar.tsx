@@ -33,7 +33,7 @@ const sidebarGroups: SidebarGroup[] = [
       { key: 'profile-visibility', label: 'Profile Visibility', path: '/settings?tab=profile-visibility', icon: '👁️', description: 'Who can see your profile' },
       { key: 'location', label: 'Location', path: '/settings?tab=location', icon: '📍', description: 'Share location access' },
       { key: 'size-fits', label: 'Size & Fittings', path: '/settings?tab=size-fits', icon: '📏', description: 'Body measurements' },
-      { key: 'hidden-content', label: 'Hidden Content', path: '/settings?tab=hidden-content', icon: '🙈', description: 'Manage hidden items' },
+      { key: 'market-preferences', label: 'Market & Feed', path: '/settings?tab=market-preferences', icon: '🧵', description: 'Hidden content and reset' },
       { key: 'billing', label: 'Accounts', path: '/settings?tab=billing', icon: '🏦', description: 'Wallet, payout account, and payout history' },
     ],
   },
@@ -42,7 +42,7 @@ const sidebarGroups: SidebarGroup[] = [
     label: 'Brand',
     collapsible: true,
     items: [
-      { key: 'patches', label: 'Brand Patches', path: '/settings?tab=patches', icon: '✅', description: 'Manage patch followers' },
+      { key: 'patches', label: 'Brand Patches', path: '/settings?tab=patches', icon: '✅', description: 'Manage brand patches' },
       { key: 'subscriptions', label: 'Subscriptions', path: '/settings?tab=subscriptions', icon: '👥', description: 'Your subscribers' },
     ],
   },

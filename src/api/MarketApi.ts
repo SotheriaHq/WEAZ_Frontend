@@ -463,6 +463,10 @@ export interface MarketSuppression {
   updatedAt: string;
 }
 
+export interface GetMarketSuppressionsParams {
+  anonymousSessionId?: string;
+}
+
 export interface ResetFeedPreferencesRequest {
   resetType: 'FEED' | 'MARKET' | 'SUGGESTIONS' | 'ALL';
   reason?: string | null;
@@ -754,6 +758,22 @@ export const marketApi = {
       signal: options?.signal,
     });
     return unwrapApiResponse<{ deleted: boolean; id: string }>(response.data) ?? response.data;
+  },
+
+  async getMarketSuppressions(
+    params?: GetMarketSuppressionsParams,
+    options?: { signal?: AbortSignal },
+  ): Promise<MarketSuppression[]> {
+    const response = await apiClient.get('/market/suppressions', {
+      params,
+      signal: options?.signal,
+    });
+    const payload = unwrapApiResponse<MarketSuppression[]>(response.data);
+    return Array.isArray(payload)
+      ? payload
+      : Array.isArray(response.data)
+        ? (response.data as MarketSuppression[])
+        : [];
   },
 
   async resetFeedPreferences(

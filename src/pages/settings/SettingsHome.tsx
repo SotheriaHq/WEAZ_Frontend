@@ -147,6 +147,7 @@ const sections: Record<string, React.ReactNode> = {
   'profile-visibility': <ProfileVisibilitySettings />,
   location: <LocationSettings />,
   'size-fits': <SizeFitSettings />,
+  'market-preferences': <HiddenContentSettings />,
   'hidden-content': <HiddenContentSettings />,
   billing: (
     <ComingSoon
