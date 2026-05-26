@@ -361,7 +361,7 @@ const MessagingManagementPage: React.FC = () => {
   const surface: Surface = hasActiveBrandMembership(profile) ? 'BRAND' : 'BUYER';
   const [brandId, setBrandId] = useState<string | null>(null);
   const actorId = profile?.id;
-  const { onNotification } = useRealtime();
+  const { onNotification, onMessageEvent } = useRealtime();
 
   /* ---- Conversation state ---- */
   const [loading, setLoading] = useState(true);
@@ -719,11 +719,28 @@ const MessagingManagementPage: React.FC = () => {
   }, [activeConversation, refresh]);
 
   /* ---- Real-time ---- */
+  // Direct socket events — immediate, no worker dependency
+  useEffect(() => {
+    const handleMessageEvent = (payload: any) => {
+      const pThreadId = String(payload?.threadId ?? '');
+      void refreshInbox();
+      if (!activeConversation) return;
+      const contextId = getContextId(activeConversation);
+      const threadId = activeConversation.threadId;
+      if (pThreadId && (pThreadId === contextId || pThreadId === threadId)) {
+        void refresh();
+      }
+    };
+    const unsub1 = onMessageEvent('message.created', handleMessageEvent);
+    const unsub2 = onMessageEvent('thread.updated', handleMessageEvent);
+    return () => { unsub1(); unsub2(); };
+  }, [activeConversation, getContextId, onMessageEvent, refresh, refreshInbox]);
+
+  // notification.created — backup path via notification worker
   useEffect(() => {
     const unsubscribe = onNotification((payload: any) => {
       const type = String(payload?.type ?? '');
       if (type !== 'MESSAGE_RECEIVED' && type !== 'MESSAGE_MODERATED' && type !== 'MESSAGE_UNREAD_REMINDER' && type !== 'MESSAGE_THREAD_REOPENED') return;
-      // Always refresh the inbox list so unread counts update across all threads
       void refreshInbox();
       if (!activeConversation) return;
       const contextId = getContextId(activeConversation);

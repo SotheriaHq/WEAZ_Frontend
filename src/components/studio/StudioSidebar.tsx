@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import IslandBottomNav from '@/components/navigation/IslandBottomNav';
@@ -28,7 +28,13 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
   const isSetupLocked = storeSetupComplete === false;
   const groups = [{ title: 'Studio', items: ALL_ITEMS }];
   const [unreadMessages, setUnreadMessages] = useState(0);
-  const { onNotification } = useRealtime();
+  const { onNotification, onMessageEvent } = useRealtime();
+
+  const refreshUnreadCount = useCallback(() => {
+    messagingApi.getUnreadCount().then((res) => {
+      setUnreadMessages(Number(res?.unreadCount ?? 0));
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,17 +44,23 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
     return () => { cancelled = true; };
   }, []);
 
+  // Listen to direct socket events (immediate, no worker dependency)
+  useEffect(() => {
+    const unsub1 = onMessageEvent('message.created', refreshUnreadCount);
+    const unsub2 = onMessageEvent('thread.updated', refreshUnreadCount);
+    return () => { unsub1(); unsub2(); };
+  }, [onMessageEvent, refreshUnreadCount]);
+
+  // Also listen to notification.created as a fallback for missed events
   useEffect(() => {
     const unsub = onNotification((payload: any) => {
       const type = String(payload?.type ?? '');
-      if (type === 'MESSAGE_RECEIVED') {
-        messagingApi.getUnreadCount().then((res) => {
-          setUnreadMessages(Number(res?.unreadCount ?? 0));
-        }).catch(() => {});
+      if (type === 'MESSAGE_RECEIVED' || type === 'MESSAGE_UNREAD_REMINDER') {
+        refreshUnreadCount();
       }
     });
     return unsub;
-  }, [onNotification]);
+  }, [onNotification, refreshUnreadCount]);
 
   const handleSelect = (key: string, path: string) => {
     onSelect(key);
