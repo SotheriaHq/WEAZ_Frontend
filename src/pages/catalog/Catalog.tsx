@@ -56,7 +56,7 @@ import { queryKeys } from '@/query/queryKeys';
 
 import ComingSoon from '../placeholders/ComingSoon';
 
-type TabType = 'Content' | 'Store' | 'Reviews' | 'About' | 'Drafts';
+type TabType = 'Content' | 'Store' | 'Reviews' | 'Us' | 'Drafts';
 type PrivateAccessState = {
   collectionId: string;
   title: string;
@@ -170,7 +170,7 @@ const ProfilePage: React.FC = () => {
       setSelectedCollectionId(urlCollectionId);
     }
     const tab = searchParams.get('tab');
-    if (tab && ['Collections', 'Content', 'Shop', 'Store', 'Reviews', 'About'].includes(tab)) {
+    if (tab && ['Collections', 'Content', 'Shop', 'Store', 'Reviews', 'Us'].includes(tab)) {
       const normalized = tab === 'Collections' ? 'Content' : tab === 'Shop' ? 'Store' : tab;
       setActiveTab(normalized as TabType);
     }
@@ -1617,7 +1617,7 @@ const ProfilePage: React.FC = () => {
       <div className="w-full px-4 sm:px-6 pb-12">
         <div className="mt-6">
           <Tabs
-            tabs={['Content', 'Store', 'Reviews', 'About']}
+            tabs={['Content', 'Store', 'Reviews', 'Us']}
             activeTab={activeTab}
             onTabChange={(tab) => {
                 setActiveTab(tab as TabType);
@@ -1974,7 +1974,7 @@ const ProfilePage: React.FC = () => {
               )
             )}
 
-            {activeTab === 'About' && (
+            {activeTab === 'Us' && (
               brandProfileError ? (
                 <div className="relative h-[60vh] min-h-[400px] w-full rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800">
                   <ComingSoon

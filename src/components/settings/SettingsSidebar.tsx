@@ -11,6 +11,7 @@ interface SidebarItem {
   icon: string;
   danger?: boolean;
   description?: string;
+  nonAdmin?: boolean;
 }
 
 interface SidebarGroup {
@@ -30,9 +31,9 @@ const sidebarGroups: SidebarGroup[] = [
       { key: 'notifications', label: 'Notifications', path: '/settings?tab=notifications', icon: '🔔', description: 'Email & push alerts' },
       { key: 'email-preferences', label: 'Email Preferences', path: '/settings?tab=email-preferences', icon: '📧', description: 'Scenario-level email delivery' },
       { key: 'privacy', label: 'Privacy', path: '/settings?tab=privacy', icon: '🛡️', description: 'Data & visibility' },
-      { key: 'profile-visibility', label: 'Profile Visibility', path: '/settings?tab=profile-visibility', icon: '👁️', description: 'Who can see your profile' },
+      { key: 'profile-visibility', label: 'Profile Visibility', path: '/settings?tab=profile-visibility', icon: '👁️', description: 'Who can see your profile', nonAdmin: true },
       { key: 'location', label: 'Location', path: '/settings?tab=location', icon: '📍', description: 'Share location access' },
-      { key: 'size-fits', label: 'Size & Fittings', path: '/settings?tab=size-fits', icon: '📏', description: 'Body measurements' },
+      { key: 'size-fits', label: 'Size & Fittings', path: '/settings?tab=size-fits', icon: '📏', description: 'Body measurements', nonAdmin: true },
       { key: 'market-preferences', label: 'Market & Feed', path: '/settings?tab=market-preferences', icon: '🧵', description: 'Hidden content and reset' },
       { key: 'billing', label: 'Accounts', path: '/settings?tab=billing', icon: '🏦', description: 'Wallet, payout account, and payout history' },
     ],
@@ -83,6 +84,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
   const navigate = useNavigate();
   const me = useSelector((state: RootState) => state.user.profile);
   const isBrandUser = hasActiveBrandMembership(me);
+  const isAdmin = me?.role === 'SuperAdmin' || me?.role === 'Admin';
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -104,7 +106,12 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
     setMobileOpen(false);
   };
 
-  const visibleGroups = sidebarGroups.filter((group) => !group.brandOnly || isBrandUser);
+  const visibleGroups = sidebarGroups
+    .filter((group) => !group.brandOnly || isBrandUser)
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !isAdmin || !item.nonAdmin),
+    }));
 
   const renderGroup = (group: SidebarGroup) => {
     const isGroupActive = group.items.some((item) => item.key === active);

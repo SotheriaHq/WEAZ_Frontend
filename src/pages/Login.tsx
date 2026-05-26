@@ -773,6 +773,7 @@ const LoginPage = () => {
                     <label className="text-xs font-medium text-gray-300 uppercase tracking-wider">Password</label>
                     <Link
                       to="/forgot-password"
+                      tabIndex={-1}
                       className="text-xs text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)] transition-colors"
                     >
                       Forgot password?
