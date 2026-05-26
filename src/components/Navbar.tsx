@@ -86,13 +86,15 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
   const navigate = useNavigate();
   const userUid = user ? generateUserUid(user.id, user.firstName) : null;
 
+  const isAdmin = user?.role === 'SuperAdmin' || user?.role === 'Admin';
+
   React.useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isAdmin) {
       dispatch(fetchCart());
       dispatch(fetchCustomBagCount());
       dispatch(fetchWishlist({ page: 1, limit: 200 }));
     }
-  }, [dispatch, isAuthenticated]);
+  }, [dispatch, isAuthenticated, isAdmin]);
 
   React.useEffect(() => {
     if (!user && typeof window !== 'undefined') {
@@ -430,7 +432,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
             </button>
           ) : null}
 
-          {user ? (
+          {user && !isAdmin ? (
             <button
               type="button"
               onClick={() => dispatch(isWishlistOpen ? closeWishlistDrawer() : openWishlistDrawer())}
@@ -446,19 +448,21 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
             </button>
           ) : null}
 
-          <button
-            type="button"
-            onClick={() => dispatch(isCartOpen ? closeCartDrawer() : openCartDrawer())}
-            className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)] sm:flex"
-            aria-label={MY_BAG_LABEL}
-          >
-            <span aria-hidden="true" className="text-xl">{MY_BAG_EMOJI}</span>
-            {cartQuantity > 0 ? (
-              <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1 text-xs font-bold text-white">
-                {cartQuantity > 99 ? '99+' : cartQuantity}
-              </span>
-            ) : null}
-          </button>
+          {!isAdmin ? (
+            <button
+              type="button"
+              onClick={() => dispatch(isCartOpen ? closeCartDrawer() : openCartDrawer())}
+              className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)] sm:flex"
+              aria-label={MY_BAG_LABEL}
+            >
+              <span aria-hidden="true" className="text-xl">{MY_BAG_EMOJI}</span>
+              {cartQuantity > 0 ? (
+                <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1 text-xs font-bold text-white">
+                  {cartQuantity > 99 ? '99+' : cartQuantity}
+                </span>
+              ) : null}
+            </button>
+          ) : null}
 
           {user ? (
             <div className="relative">

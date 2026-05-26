@@ -12,18 +12,18 @@ type Tab = 'sla' | 'flags' | 'uploads' | 'dashboard' | 'messaging' | 'reviews';
 
 /** Human-readable labels for upload config keys */
 const UPLOAD_KEY_LABELS: Record<string, { label: string; hint: string }> = {
-  'upload.maxSize.profileImage':      { label: 'Profile Image',         hint: 'User avatar / profile picture' },
-  'upload.maxSize.bannerImage':       { label: 'Banner Image',          hint: 'Profile / brand banner' },
-  'upload.maxSize.postImage':         { label: 'Post Image',            hint: 'Collection & design images' },
-  'upload.maxSize.postVideo':         { label: 'Post Video',            hint: 'Design & collection videos' },
-  'upload.maxSize.reviewImage':       { label: 'Review Image',          hint: 'Product review photos' },
-  'upload.maxSize.reviewVideo':       { label: 'Review Video',          hint: 'Product review videos' },
-  'upload.maxSize.document':          { label: 'Document',              hint: 'PDFs and office documents' },
-  'upload.maxSize.brandVerification': { label: 'Brand Verification',    hint: 'Verification documents' },
-  'upload.maxSize.messageImage':      { label: 'Message Image',         hint: 'Chat/message image attachments' },
-  'upload.maxSize.messageDocument':   { label: 'Message Document',      hint: 'Chat/message PDF attachments' },
-  'upload.maxSize.productMedia':      { label: 'Product Media',         hint: 'Product images from store' },
-  'upload.maxSize.collectionBulk':    { label: 'Collection Bulk Upload',hint: 'CSV bulk upload file' },
+  'upload.maxSize.profileImage': { label: 'Profile Image', hint: 'User avatar / profile picture' },
+  'upload.maxSize.bannerImage': { label: 'Banner Image', hint: 'Profile / brand banner' },
+  'upload.maxSize.postImage': { label: 'Post Image', hint: 'Collection & design images' },
+  'upload.maxSize.postVideo': { label: 'Post Video', hint: 'Design & collection videos' },
+  'upload.maxSize.reviewImage': { label: 'Review Image', hint: 'Product review photos' },
+  'upload.maxSize.reviewVideo': { label: 'Review Video', hint: 'Product review videos' },
+  'upload.maxSize.document': { label: 'Document', hint: 'PDFs and office documents' },
+  'upload.maxSize.brandVerification': { label: 'Brand Verification', hint: 'Verification documents' },
+  'upload.maxSize.messageImage': { label: 'Message Image', hint: 'Chat/message image attachments' },
+  'upload.maxSize.messageDocument': { label: 'Message Document', hint: 'Chat/message PDF attachments' },
+  'upload.maxSize.productMedia': { label: 'Product Media', hint: 'Product images from store' },
+  'upload.maxSize.collectionBulk': { label: 'Collection Bulk Upload', hint: 'CSV bulk upload file' },
 };
 
 type SizeUnit = 'KB' | 'MB' | 'GB';
@@ -49,6 +49,27 @@ const REVIEW_FLAG_LABELS: Record<string, { label: string; hint: string }> = {
   'reviews.moderation.required': { label: 'Moderation required', hint: 'New reviews enter pending moderation before public display.' },
 };
 const REVIEW_EDIT_WINDOW_KEY = 'reviews.editWindowHours';
+
+/** Human-readable labels for known non-review feature flags. Extend as new flags are added. */
+const KNOWN_FLAG_LABELS: Record<string, { label: string; hint: string }> = {
+  ...REVIEW_FLAG_LABELS,
+  'feature.marketplace.enabled': { label: 'Marketplace', hint: 'Enable the public marketplace for buyers' },
+  'feature.customOrders.enabled': { label: 'Custom Orders', hint: 'Allow buyers to request custom orders from brands' },
+  'feature.brandVerification.enabled': { label: 'Brand Verification', hint: 'Require brands to verify their identity before selling' },
+  'feature.analytics.enabled': { label: 'Analytics Dashboard', hint: 'Show the analytics tab in the brand studio' },
+  'feature.finance.enabled': { label: 'Finance Dashboard', hint: 'Show the finance tab in the brand studio' },
+  'messaging.enabled': { label: 'Messaging', hint: 'Enable the in-app messaging system globally' },
+};
+
+/** Convert a dotted flag key to a human-readable label, with fallback for unknown keys. */
+const humanizeFlagKey = (key: string): { label: string; hint?: string } => {
+  if (KNOWN_FLAG_LABELS[key]) return KNOWN_FLAG_LABELS[key];
+  const label = key
+    .split('.')
+    .map((part) => part.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^(.)/, (c) => c.toUpperCase()))
+    .join(' › ');
+  return { label };
+};
 
 /** Pick the best human-readable unit for a byte value. */
 const bestUnit = (bytes: number): SizeUnit => {
@@ -93,8 +114,8 @@ const AdminSettingsPage: React.FC = () => {
       const slaPayload = unwrapApiResponse<AdminSlaConfig[] | { items?: AdminSlaConfig[] }>(slaRes.data as any);
       const flagsPayload = unwrapApiResponse<FeatureFlag[] | { items?: FeatureFlag[] }>(flagsRes.data as any);
       const configMap = Object.fromEntries((configEntries ?? []).map((entry) => [entry.key, entry.value]));
-      setSlaConfigs(Array.isArray(slaPayload) ? slaPayload : slaPayload?.items ?? []);
-      setFeatureFlags(Array.isArray(flagsPayload) ? flagsPayload : flagsPayload?.items ?? []);
+      setSlaConfigs(Array.isArray(slaPayload) ? slaPayload : (slaPayload?.items ?? []));
+      setFeatureFlags(Array.isArray(flagsPayload) ? flagsPayload : (flagsPayload?.items ?? []));
       setUploadLimits(limitsData);
       setSystemConfig(configMap);
       setReviewConfigDraft(configMap[REVIEW_EDIT_WINDOW_KEY] ?? '24');
@@ -121,11 +142,16 @@ const AdminSettingsPage: React.FC = () => {
   }, [fetchData]);
 
   const handleToggleFlag = async (flag: FeatureFlag) => {
+    // Optimistic update — flip immediately so UI responds without waiting for the network
+    setFeatureFlags((prev) => prev.map((f) => (f.id === flag.id ? { ...f, enabled: !f.enabled } : f)));
     try {
       await adminFeatureFlagsApi.toggle(flag.id);
-      toast.success(`Flag "${flag.key}" ${flag.enabled ? 'disabled' : 'enabled'}`);
-      fetchData();
+      const { label } = humanizeFlagKey(flag.key);
+      toast.success(`"${label}" ${flag.enabled ? 'disabled' : 'enabled'}`);
+      void fetchData(); // background sync to confirm server state
     } catch (err: any) {
+      // Revert on failure
+      setFeatureFlags((prev) => prev.map((f) => (f.id === flag.id ? { ...f, enabled: flag.enabled } : f)));
       toast.error(err?.response?.data?.message || 'Failed to toggle feature flag');
     }
   };
@@ -279,48 +305,51 @@ const AdminSettingsPage: React.FC = () => {
       <AdminBreadcrumb segments={[{ label: 'Settings' }]} />
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h1>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {TABS.map((t) => (
           <button
             key={t.value}
+            type="button"
             onClick={() => setTab(t.value)}
-            className={`px-4 py-2 text-sm rounded-lg transition ${tab === t.value ? 'bg-purple-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
+            className={`rounded-lg px-4 py-2 text-sm transition ${tab === t.value ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'}`}
           >
             {t.label}
           </button>
         ))}
       </div>
 
-      {error && <div className="text-red-500 text-sm">{error}</div>}
+      {error && <div className="text-sm text-red-500">{error}</div>}
 
       {loading ? (
-        <div className="text-gray-500 text-sm">Loading...</div>
+        <div className="text-sm text-gray-500">Loading...</div>
       ) : tab === 'sla' ? (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">SLA Configurations</h2>
           {slaConfigs.length === 0 ? (
-            <div className="text-gray-500 text-sm">No SLA configs defined. Create one to set response targets.</div>
+            <div className="text-sm text-gray-500">No SLA configs defined. Create one to set response targets.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-700 text-left text-gray-500">
-                    <th className="py-3 px-3">Area</th>
-                    <th className="py-3 px-3">Target Hours</th>
-                    <th className="py-3 px-3">Active</th>
-                    <th className="py-3 px-3">Created By</th>
-                    <th className="py-3 px-3">Actions</th>
+                  <tr className="border-b border-gray-200 text-left text-gray-500 dark:border-gray-700">
+                    <th className="px-3 py-3">Area</th>
+                    <th className="px-3 py-3">Target Hours</th>
+                    <th className="px-3 py-3">Active</th>
+                    <th className="px-3 py-3">Created By</th>
+                    <th className="px-3 py-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {slaConfigs.map((config) => (
                     <tr key={config.id} className="border-b border-gray-100 dark:border-gray-800">
-                      <td className="py-2.5 px-3 font-medium">{config.area}</td>
-                      <td className="py-2.5 px-3">{config.targetHours}h</td>
-                      <td className="py-2.5 px-3">{config.isActive ? 'Yes' : 'No'}</td>
-                      <td className="py-2.5 px-3 text-gray-500">{config.createdBy?.email ?? '—'}</td>
-                      <td className="py-2.5 px-3">
-                        <button className="text-purple-600 hover:underline text-xs">Edit</button>
+                      <td className="px-3 py-2.5 font-medium">{config.area}</td>
+                      <td className="px-3 py-2.5">{config.targetHours}h</td>
+                      <td className="px-3 py-2.5">{config.isActive ? 'Yes' : 'No'}</td>
+                      <td className="px-3 py-2.5 text-gray-500">{config.createdBy?.email ?? '—'}</td>
+                      <td className="px-3 py-2.5">
+                        <button type="button" className="text-xs text-purple-600 hover:underline">
+                          Edit
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -331,34 +360,45 @@ const AdminSettingsPage: React.FC = () => {
         </div>
       ) : tab === 'flags' ? (
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Feature Flags</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Feature Flags</h2>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              Toggle features on or off across the platform. Changes take effect immediately.
+            </p>
+          </div>
           {featureFlags.length === 0 ? (
-            <div className="text-gray-500 text-sm">No feature flags defined.</div>
+            <div className="text-sm text-gray-500">No feature flags defined.</div>
           ) : (
             <div className="space-y-2">
-              {featureFlags.map((flag) => (
-                <div
-                  key={flag.id}
-                  className="flex items-center justify-between p-3 rounded-lg border border-gray-200/50 dark:border-gray-700/50 bg-white/60 dark:bg-white/5"
-                >
-                  <div>
-                    <div className="font-mono text-sm font-medium text-gray-900 dark:text-white">{flag.key}</div>
-                    {flag.description && (
-                      <div className="text-xs text-gray-500 mt-0.5">{flag.description}</div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleToggleFlag(flag)}
-                    className={`px-3 py-1 text-xs rounded-full font-medium transition ${
-                      flag.enabled
-                        ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-500/20 dark:text-green-400'
-                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400'
-                    }`}
+              {featureFlags.map((flag) => {
+                const info = humanizeFlagKey(flag.key);
+                return (
+                  <div
+                    key={flag.id}
+                    className="flex items-center justify-between gap-4 rounded-xl border border-gray-200/60 bg-white/60 p-4 dark:border-white/10 dark:bg-white/[0.03]"
                   >
-                    {flag.enabled ? 'Enabled' : 'Disabled'}
-                  </button>
-                </div>
-              ))}
+                    <div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">{info.label}</div>
+                      {(info.hint || flag.description) && (
+                        <div className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                          {info.hint || flag.description}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleFlag(flag)}
+                      className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition ${
+                        flag.enabled
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-500/20 dark:text-green-400'
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400'
+                      }`}
+                    >
+                      {flag.enabled ? 'Enabled' : 'Disabled'}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -398,16 +438,16 @@ const AdminSettingsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Auto-Hide Message Rules</h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                Configure global rules that automatically hide messages matching certain criteria.
-                These rules are evaluated by the backend when messages are sent.
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                Configure global rules that automatically hide messages matching certain criteria. These rules are
+                evaluated by the backend when messages are sent.
               </p>
             </div>
             <button
               type="button"
               onClick={handleSaveMessagingRules}
               disabled={!hasMessagingChanges || saving}
-              className="shrink-0 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="shrink-0 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
@@ -454,7 +494,7 @@ const AdminSettingsPage: React.FC = () => {
                       step={1}
                       value={val || '24'}
                       onChange={(e) => setMessagingVal(rule.key, e.target.value)}
-                      className="w-20 shrink-0 rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm text-right font-mono outline-none focus:ring-1 focus:ring-purple-400/50"
+                      className="w-20 shrink-0 rounded-lg border border-gray-200/60 bg-white px-2.5 py-1.5 text-right font-mono text-sm outline-none focus:ring-1 focus:ring-purple-400/50 dark:border-white/10 dark:bg-white/5"
                     />
                   </div>
                 </div>
@@ -467,16 +507,16 @@ const AdminSettingsPage: React.FC = () => {
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Review Lifecycle Rules</h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                Control review capture, public display, moderation, and the buyer edit window.
-                Collection and design public review display should stay off unless the product decision changes.
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                Control review capture, public display, moderation, and the buyer edit window. Collection and design
+                public review display should stay off unless the product decision changes.
               </p>
             </div>
             <button
               type="button"
               onClick={handleSaveReviewRules}
               disabled={!hasReviewEditWindowChange || saving}
-              className="shrink-0 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="shrink-0 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {saving ? 'Saving...' : 'Save Rules'}
             </button>
@@ -487,7 +527,8 @@ const AdminSettingsPage: React.FC = () => {
               <div>
                 <div className="text-sm font-medium text-gray-900 dark:text-white">Edit window</div>
                 <div className="text-[11px] text-gray-500 dark:text-gray-400">
-                  Buyers can edit reviews only inside this many hours from original creation. Editing does not reset the timer.
+                  Buyers can edit reviews only inside this many hours from original creation. Editing does not reset the
+                  timer.
                 </div>
               </div>
               <input
@@ -497,7 +538,7 @@ const AdminSettingsPage: React.FC = () => {
                 step={1}
                 value={reviewConfigDraft}
                 onChange={(e) => setReviewConfigDraft(e.target.value)}
-                className="w-24 shrink-0 rounded-lg border border-gray-200/60 bg-white px-2.5 py-1.5 text-right text-sm font-mono outline-none focus:ring-1 focus:ring-purple-400/50 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                className="w-24 shrink-0 rounded-lg border border-gray-200/60 bg-white px-2.5 py-1.5 text-right font-mono text-sm outline-none focus:ring-1 focus:ring-purple-400/50 dark:border-white/10 dark:bg-white/5 dark:text-white"
                 aria-label="Review edit window hours"
               />
             </div>
@@ -551,7 +592,7 @@ const AdminSettingsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Upload Size Limits</h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                 Configure maximum file sizes for each upload type. Use the unit selector (KB / MB / GB) per entry.
                 Changes apply immediately across all upload screens.
               </p>
@@ -560,7 +601,7 @@ const AdminSettingsPage: React.FC = () => {
               type="button"
               onClick={handleSaveUploadLimits}
               disabled={!hasUploadChanges || saving}
-              className="shrink-0 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="shrink-0 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
@@ -581,16 +622,16 @@ const AdminSettingsPage: React.FC = () => {
                   className={`rounded-xl border p-3.5 transition-colors ${
                     changed
                       ? 'border-purple-300 bg-purple-50/50 dark:border-purple-500/30 dark:bg-purple-500/5'
-                      : 'border-gray-200/60 dark:border-white/8 bg-white/60 dark:bg-white/[0.02]'
+                      : 'border-gray-200/60 bg-white/60 dark:border-white/8 dark:bg-white/[0.02]'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="mb-2 flex items-start justify-between gap-2">
                     <div>
                       <p className="text-sm font-medium text-gray-900 dark:text-white">{info.label}</p>
                       <p className="text-[11px] text-gray-500 dark:text-gray-400">{info.hint}</p>
                     </div>
                     {changed && (
-                      <span className="shrink-0 text-[10px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-500/20 px-1.5 py-0.5 rounded">
+                      <span className="shrink-0 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-semibold text-purple-600 dark:bg-purple-500/20 dark:text-purple-400">
                         Changed
                       </span>
                     )}
@@ -602,7 +643,7 @@ const AdminSettingsPage: React.FC = () => {
                       step="any"
                       value={editedLimits[key] ?? ''}
                       onChange={(e) => setEditedLimits((prev) => ({ ...prev, [key]: e.target.value }))}
-                      className="flex-1 min-w-0 rounded-lg border border-gray-200/60 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm text-right font-mono outline-none focus:ring-1 focus:ring-purple-400/50 transition-shadow"
+                      className="min-w-0 flex-1 rounded-lg border border-gray-200/60 bg-white px-2.5 py-1.5 text-right font-mono text-sm outline-none transition-shadow focus:ring-1 focus:ring-purple-400/50 dark:border-white/10 dark:bg-white/5"
                     />
                     <UniversalSelect
                       value={unit}
@@ -619,10 +660,10 @@ const AdminSettingsPage: React.FC = () => {
                         setEditedUnits((prev) => ({ ...prev, [key]: nu }));
                       }}
                       options={UNIT_OPTIONS}
-                      className="w-20 shrink-0 [&_button]:!px-2 [&_button]:!py-1.5 [&_button]:!rounded-lg [&_button]:!text-xs"
+                      className="w-20 shrink-0 [&_button]:!rounded-lg [&_button]:!px-2 [&_button]:!py-1.5 [&_button]:!text-xs"
                     />
                   </div>
-                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1.5">
+                  <p className="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500">
                     Current: {formatBytes(currentBytes, bestUnit(currentBytes))}
                   </p>
                 </div>
