@@ -32,6 +32,12 @@ const PERMISSION_ALIASES: Record<string, string> = {
   MODERATION_READ: 'moderation.read',
   MODERATION_REVIEW: 'moderation.write',
   AUDIT_READ: 'audit.read',
+  MARKET_GOVERNANCE_READ: 'market.governance.read',
+  MARKET_GOVERNANCE_WRITE: 'market.governance.write',
+  MARKET_GOVERNANCE_RELEASE: 'market.governance.release',
+  MARKET_RANKING_FORMULA_WRITE: 'market.ranking.formula.write',
+  MARKET_RANKING_ROLLBACK: 'market.ranking.rollback',
+  MARKET_SUGGESTIONS_WRITE: 'market.suggestions.write',
   SYSTEM_SLA_READ: 'system.sla.read',
   SYSTEM_SLA_WRITE: 'system.sla.write',
 };

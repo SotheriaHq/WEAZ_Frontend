@@ -36,6 +36,19 @@ import type {
   AdminFinanceTransaction,
   AdminStalePaymentReconcileResult,
   AdminEscrowHold,
+  AdminMarketGovernanceAuditLogListResponse,
+  AdminMarketGovernanceListResponse,
+  AdminMarketGovernanceReleaseStatus,
+  AdminMarketGovernanceRollbackRehearsal,
+  AdminMarketGovernanceRollbackResult,
+  AdminMarketRankingFormulaCreate,
+  AdminMarketRankingFormulaVersion,
+  AdminMarketRankingProfile,
+  AdminMarketRankingProfileUpsert,
+  AdminMarketSectionConfig,
+  AdminMarketSectionConfigUpdate,
+  AdminMarketSuggestionBlockConfig,
+  AdminMarketSuggestionBlockUpsert,
 } from '../types/admin';
 import type {
   AdminVerificationDetails,
@@ -45,6 +58,7 @@ import type {
 } from '../types/verification';
 
 type Paginated<T> = { items: T[]; nextCursor?: string };
+type RequestOptions = { signal?: AbortSignal };
 
 export type AdminLifecycleReviewStatus = 'APPROVED' | 'PENDING_MODERATION' | 'HIDDEN' | 'FLAGGED' | 'DELETED';
 export type AdminLifecycleReviewTargetType = 'PRODUCT' | 'COLLECTION' | 'DESIGN' | 'CUSTOM_ORDER' | 'BRAND';
@@ -448,6 +462,124 @@ export const adminAuditApi = {
     apiClient.get<Paginated<AdminAuditLog>>('/admin/audit-logs', { params }),
 };
 
+// ── Market Governance ──
+export const adminMarketGovernanceApi = {
+  getReleaseStatus: (options?: RequestOptions) =>
+    apiClient.get<AdminMarketGovernanceReleaseStatus>(
+      '/admin/market-governance/release-status',
+      { signal: options?.signal },
+    ),
+  getSections: (options?: RequestOptions) =>
+    apiClient.get<AdminMarketGovernanceListResponse<AdminMarketSectionConfig>>(
+      '/admin/market-governance/sections',
+      { signal: options?.signal },
+    ),
+  updateSection: (
+    sectionKey: string,
+    data: AdminMarketSectionConfigUpdate,
+    options?: RequestOptions,
+  ) =>
+    apiClient.patch<AdminMarketSectionConfig>(
+      `/admin/market-governance/sections/${encodeURIComponent(sectionKey)}`,
+      data,
+      { signal: options?.signal },
+    ),
+  getRankingProfiles: (options?: RequestOptions) =>
+    apiClient.get<AdminMarketRankingProfile[]>(
+      '/admin/market-governance/ranking/profiles',
+      { signal: options?.signal },
+    ),
+  createRankingProfile: (
+    data: AdminMarketRankingProfileUpsert & { profileKey: string; name: string },
+    options?: RequestOptions,
+  ) =>
+    apiClient.post<AdminMarketRankingProfile>(
+      '/admin/market-governance/ranking/profiles',
+      data,
+      { signal: options?.signal },
+    ),
+  updateRankingProfile: (
+    profileKey: string,
+    data: AdminMarketRankingProfileUpsert,
+    options?: RequestOptions,
+  ) =>
+    apiClient.patch<AdminMarketRankingProfile>(
+      `/admin/market-governance/ranking/profiles/${encodeURIComponent(profileKey)}`,
+      data,
+      { signal: options?.signal },
+    ),
+  getRankingFormulas: (options?: RequestOptions) =>
+    apiClient.get<AdminMarketRankingFormulaVersion[]>(
+      '/admin/market-governance/ranking/formulas',
+      { signal: options?.signal },
+    ),
+  createRankingFormula: (
+    data: AdminMarketRankingFormulaCreate,
+    options?: RequestOptions,
+  ) =>
+    apiClient.post<AdminMarketRankingFormulaVersion>(
+      '/admin/market-governance/ranking/formulas',
+      data,
+      { signal: options?.signal },
+    ),
+  rollbackRanking: (data: { reason?: string }, options?: RequestOptions) =>
+    apiClient.post<AdminMarketGovernanceRollbackResult>(
+      '/admin/market-governance/ranking/rollback',
+      data,
+      { signal: options?.signal },
+    ),
+  rehearseRollback: (options?: RequestOptions) =>
+    apiClient.post<AdminMarketGovernanceRollbackRehearsal>(
+      '/admin/market-governance/rehearse-rollback',
+      {},
+      { signal: options?.signal },
+    ),
+  getSuggestionBlocks: (options?: RequestOptions) =>
+    apiClient.get<AdminMarketGovernanceListResponse<AdminMarketSuggestionBlockConfig>>(
+      '/admin/market-governance/suggestions/blocks',
+      { signal: options?.signal },
+    ),
+  createSuggestionBlock: (
+    data: AdminMarketSuggestionBlockUpsert & {
+      blockKey: string;
+      context: string;
+      targetType: string;
+      title: string;
+      sourceType: string;
+    },
+    options?: RequestOptions,
+  ) =>
+    apiClient.post<AdminMarketSuggestionBlockConfig>(
+      '/admin/market-governance/suggestions/blocks',
+      data,
+      { signal: options?.signal },
+    ),
+  updateSuggestionBlock: (
+    blockKey: string,
+    data: AdminMarketSuggestionBlockUpsert,
+    options?: RequestOptions,
+  ) =>
+    apiClient.patch<AdminMarketSuggestionBlockConfig>(
+      `/admin/market-governance/suggestions/blocks/${encodeURIComponent(blockKey)}`,
+      data,
+      { signal: options?.signal },
+    ),
+  getAuditLogs: (
+    params?: {
+      cursor?: string;
+      limit?: number;
+      action?: string;
+      targetType?: string;
+      targetId?: string;
+    },
+    options?: RequestOptions,
+  ) =>
+    apiClient.get<AdminMarketGovernanceAuditLogListResponse>(
+      '/admin/market-governance/audit-logs',
+      { params, signal: options?.signal },
+    ),
+};
+
 // ── SLA Config ──
 export const adminSlaApi = {
   list: () =>
@@ -652,4 +784,3 @@ export const adminEmailChangeApi = {
   rejectRequest: (id: string, reason?: string) =>
     apiClient.post<{ message: string }>(`/admin/email-change/requests/${id}/reject`, { reason }),
 };
-

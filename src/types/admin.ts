@@ -13,6 +13,8 @@ export type AdminPermissionCode =
   | 'DISPUTES_READ' | 'DISPUTES_RESOLVE'
   | 'FEATURED_MANAGE'
   | 'AUDIT_READ'
+  | 'MARKET_GOVERNANCE_READ' | 'MARKET_GOVERNANCE_WRITE' | 'MARKET_GOVERNANCE_RELEASE'
+  | 'MARKET_RANKING_FORMULA_WRITE' | 'MARKET_RANKING_ROLLBACK' | 'MARKET_SUGGESTIONS_WRITE'
   | 'SYSTEM_FEATURE_FLAGS' | 'SYSTEM_BREAK_GLASS' | 'SYSTEM_ROLE_ASSIGN'
   | 'SYSTEM_PERMISSION_ASSIGN' | 'SYSTEM_SLA_READ' | 'SYSTEM_SLA_WRITE'
   | 'SYSTEM_DATA_EXPORT' | 'SYSTEM_DATA_DELETE';
@@ -627,6 +629,227 @@ export interface AdminAuditLog {
   createdAt: string;
   actor?: { email: string; firstName: string; lastName: string };
 }
+
+export type AdminMarketSectionKey =
+  | 'fresh-drops'
+  | 'hot-right-now'
+  | 'latest-collections'
+  | 'shop-by-style'
+  | 'custom-ready'
+  | 'new-designers-to-watch';
+
+export type AdminMarketSuggestionContext =
+  | 'PRODUCT_DETAIL'
+  | 'COLLECTION_DETAIL'
+  | 'BRAND_DETAIL'
+  | 'SEARCH_EMPTY'
+  | 'MARKET_SECTION_DETAIL';
+
+export type AdminMarketSuggestionTargetType =
+  | 'PRODUCT'
+  | 'COLLECTION'
+  | 'BRAND'
+  | 'CATEGORY'
+  | 'SECTION'
+  | 'QUERY';
+
+export type AdminMarketSuggestionSourceType =
+  | 'PRODUCT'
+  | 'COLLECTION'
+  | 'BRAND'
+  | 'CATEGORY'
+  | 'MIXED';
+
+export type AdminMarketRankingFormulaStatus =
+  | 'DRAFT'
+  | 'ACTIVE'
+  | 'DEPRECATED'
+  | 'ROLLED_BACK';
+
+export type AdminMarketConfigSource = 'code-default' | 'db' | string;
+
+export interface AdminMarketGovernanceListResponse<T> {
+  items: T[];
+  nextCursor?: string | null;
+  configReadStatus?: string | null;
+}
+
+export type AdminMarketGovernanceAuditLogListResponse =
+  AdminMarketGovernanceListResponse<AdminAuditLog>;
+
+export interface AdminMarketSectionConfig {
+  id?: string;
+  sectionKey: AdminMarketSectionKey;
+  title: string;
+  subtitle: string | null;
+  enabled: boolean;
+  displayOrder: number;
+  previewItemLimit: number;
+  detailPageLimit: number;
+  minimumItems: number;
+  viewAllEnabled: boolean;
+  fallbackMode: string;
+  metadata: Record<string, unknown> | null;
+  source?: AdminMarketConfigSource;
+  createdById?: string | null;
+  updatedById?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface AdminMarketRankingFormulaVersion {
+  id: string;
+  versionKey: string;
+  name: string;
+  status: AdminMarketRankingFormulaStatus;
+  weights: Record<string, number>;
+  bounds: Record<string, unknown> | null;
+  notes: string | null;
+  createdById?: string | null;
+  createdAt: string;
+  activatedAt: string | null;
+  deprecatedAt: string | null;
+}
+
+export interface AdminMarketRankingProfile {
+  id: string;
+  profileKey: string;
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  shadowMode: boolean;
+  sectionKeys: AdminMarketSectionKey[] | string[];
+  formulaVersionId: string | null;
+  formulaVersion?: AdminMarketRankingFormulaVersion | null;
+  explorationPercent: number;
+  brandMaxShare: number;
+  aggregateTimeoutMs: number;
+  rolloutPercent: number;
+  fallbackDeterministic: boolean;
+  metadata: Record<string, unknown> | null;
+  createdById?: string | null;
+  updatedById?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminMarketSuggestionBlockConfig {
+  id?: string;
+  blockKey: string;
+  context: AdminMarketSuggestionContext;
+  targetType: AdminMarketSuggestionTargetType;
+  title: string;
+  subtitle: string | null;
+  enabled: boolean;
+  displayOrder: number;
+  sourceType: AdminMarketSuggestionSourceType | string;
+  fallbackSourceType: AdminMarketSuggestionSourceType | string | null;
+  itemLimit: number;
+  metadata: Record<string, unknown> | null;
+  source?: AdminMarketConfigSource;
+  createdById?: string | null;
+  updatedById?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface AdminMarketGovernanceReleaseStatus {
+  rankingEnabled: boolean;
+  rankingDefaultDisabled: boolean;
+  deterministicFallbackEnabled: boolean;
+  shadowMode: boolean;
+  activeRankingProfile: AdminMarketRankingProfile | null;
+  activeFormulaVersion: AdminMarketRankingFormulaVersion | null;
+  configReadStatus: string;
+  lastRollback: AdminAuditLog | null;
+  productionReady: boolean;
+  phase14Required: boolean;
+}
+
+export interface AdminMarketGovernanceRollbackResult {
+  rolledBack: boolean;
+  restoredFormulaVersion: AdminMarketRankingFormulaVersion;
+  rolledBackFormulaVersion: AdminMarketRankingFormulaVersion;
+  rankingProfileRollback: string;
+  historyPreserved: boolean;
+}
+
+export interface AdminMarketGovernanceRollbackRehearsal {
+  rehearsalOnly: boolean;
+  mutatesConfig: boolean;
+  deterministicFallbackAvailable: boolean;
+  canRollbackFormula: boolean;
+  activeFormulaVersion: AdminMarketRankingFormulaVersion | null;
+  candidatePriorFormulaVersion: AdminMarketRankingFormulaVersion | null;
+  rankingProfileRollback: string;
+  wouldMutate: string[];
+}
+
+export type AdminMarketSectionConfigUpdate = Partial<
+  Pick<
+    AdminMarketSectionConfig,
+    | 'title'
+    | 'subtitle'
+    | 'enabled'
+    | 'displayOrder'
+    | 'previewItemLimit'
+    | 'detailPageLimit'
+    | 'minimumItems'
+    | 'viewAllEnabled'
+    | 'fallbackMode'
+    | 'metadata'
+  >
+> & { reason?: string };
+
+export type AdminMarketRankingProfileUpsert = Partial<
+  Pick<
+    AdminMarketRankingProfile,
+    | 'name'
+    | 'description'
+    | 'enabled'
+    | 'shadowMode'
+    | 'sectionKeys'
+    | 'formulaVersionId'
+    | 'explorationPercent'
+    | 'brandMaxShare'
+    | 'aggregateTimeoutMs'
+    | 'rolloutPercent'
+    | 'fallbackDeterministic'
+    | 'metadata'
+  >
+> & {
+  profileKey?: string;
+  reason?: string;
+};
+
+export interface AdminMarketRankingFormulaCreate {
+  versionKey: string;
+  name: string;
+  status?: AdminMarketRankingFormulaStatus;
+  weights: Record<string, number>;
+  bounds?: Record<string, unknown>;
+  notes?: string;
+  reason?: string;
+}
+
+export type AdminMarketSuggestionBlockUpsert = Partial<
+  Pick<
+    AdminMarketSuggestionBlockConfig,
+    | 'context'
+    | 'targetType'
+    | 'title'
+    | 'subtitle'
+    | 'enabled'
+    | 'displayOrder'
+    | 'sourceType'
+    | 'fallbackSourceType'
+    | 'itemLimit'
+    | 'metadata'
+  >
+> & {
+  blockKey?: string;
+  reason?: string;
+};
 
 export interface AdminSlaConfig {
   id: string;
