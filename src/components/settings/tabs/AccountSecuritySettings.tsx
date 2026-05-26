@@ -166,7 +166,7 @@ interface AdminEmailSectionProps {
 const AdminEmailSection: React.FC<AdminEmailSectionProps> = ({ currentEmail }) => {
   const [step, setStep] = useState<AdminEmailStep>('request');
   const [pendingNewEmail, setPendingNewEmail] = useState<string | null>(null);
-  const [requestId, setRequestId] = useState<string | null>(null);
+  const [, setRequestId] = useState<string | null>(null);
   const [otpExpiresAt, setOtpExpiresAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -185,7 +185,7 @@ const AdminEmailSection: React.FC<AdminEmailSectionProps> = ({ currentEmail }) =
       .getMyRequest()
       .then((res) => {
         if (!active) return;
-        const data = res?.data?.data ?? res?.data ?? null;
+        const data = res?.data ?? null;
         if (data && data.status === 'PENDING_VERIFICATION') {
           setStep('otp');
           setPendingNewEmail(data.newEmail);
@@ -223,7 +223,7 @@ const AdminEmailSection: React.FC<AdminEmailSectionProps> = ({ currentEmail }) =
         newEmail: newEmail.trim(),
         currentPassword: password,
       });
-      const data = res?.data?.data ?? res?.data;
+      const data = res.data;
       setPendingNewEmail(data?.newEmail ?? newEmail.trim());
       toast.success(data?.message ?? 'Verification code sent');
       setNewEmail('');
@@ -243,7 +243,7 @@ const AdminEmailSection: React.FC<AdminEmailSectionProps> = ({ currentEmail }) =
     setBusy(true);
     try {
       const res = await adminEmailChangeApi.verifyOtp({ otp: otp.trim() });
-      const data = res?.data?.data ?? res?.data;
+      const data = res.data;
       toast.success(data?.message ?? 'Code verified — request submitted for approval');
       setOtp('');
       setStep('pending');

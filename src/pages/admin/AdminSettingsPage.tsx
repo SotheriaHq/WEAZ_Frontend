@@ -297,7 +297,7 @@ const AdminSettingsPage: React.FC = () => {
     setEmailChangeLoading(true);
     try {
       const res = await adminEmailChangeApi.listRequests({ page: 1, limit: 50 });
-      const payload = res?.data?.data ?? res?.data;
+      const payload = res.data;
       setEmailChangeRequests(payload?.items ?? []);
       setEmailChangeTotal(payload?.total ?? 0);
     } catch {
@@ -650,7 +650,7 @@ const AdminSettingsPage: React.FC = () => {
             )}
           </div>
         </div>
-      ) : (
+      ) : tab === 'uploads' ? (
         /* Upload Limits tab */
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -847,7 +847,7 @@ const AdminSettingsPage: React.FC = () => {
             </div>
           ) : null}
         </div>
-      )}
+      ) : null}
     </div>
   );
 };
