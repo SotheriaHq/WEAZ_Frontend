@@ -47,6 +47,7 @@ const toSignalTargetType = (item: MarketSectionItem): MarketSignalTargetType => 
 const resolveSuggestionRoute = (item: MarketSectionItem) => {
   const targetId = getSectionItemTargetId(item);
   const targetType = item.target?.type ?? item.entityType;
+  if (targetType === 'BRAND' && item.target?.route) return item.target.route;
   if (targetType === 'PRODUCT' && targetId) return `/products/${targetId}`;
   if (targetType === 'COLLECTION' && targetId) return `/collections/${targetId}`;
   if (targetType === 'BRAND' && targetId) return `/brand/${targetId}`;

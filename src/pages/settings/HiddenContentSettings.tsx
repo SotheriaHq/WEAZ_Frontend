@@ -146,7 +146,7 @@ export const HiddenContentSettings: React.FC = () => {
     const approved = await confirm({
       title: 'Reset market preferences?',
       message:
-        'This resets market, feed, and suggestion learning signals. It does not delete your account, orders, saved items, products, collections, or hidden content list.',
+        'This records a fresh baseline for your market preferences. It does not delete your account, orders, saved items, products, collections, profile data, or hidden content list. Visible suggestions may adjust as you continue browsing and interacting.',
       confirmText: 'Reset preferences',
       cancelText: 'Cancel',
       isDestructive: true,
@@ -159,7 +159,7 @@ export const HiddenContentSettings: React.FC = () => {
         resetType: 'ALL',
         reason: 'user_settings_reset',
       });
-      toast.success('Market preferences reset. Future recommendations will rebuild from new activity.');
+      toast.success('Fresh market preference baseline recorded.');
     } catch {
       toast.error('Could not reset market preferences. Try again.');
     } finally {
@@ -198,7 +198,7 @@ export const HiddenContentSettings: React.FC = () => {
           Market & Feed Preferences
         </h1>
         <p className="max-w-3xl text-gray-500 dark:text-gray-400">
-          Manage content you have hidden from market experiences and reset preference learning for market, feed, and suggestion recommendations.
+          Manage content you have hidden from market experiences and record a fresh baseline for future market preferences.
         </p>
       </div>
 
@@ -300,10 +300,10 @@ export const HiddenContentSettings: React.FC = () => {
               Reset market preferences
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-800 dark:text-amber-200">
-              This creates a fresh preference marker for market, feed, and suggestion learning. It does not delete your account, orders, saved items, products, collections, or hidden content list.
+              This records a fresh baseline for your market preferences. It does not delete your account, orders, saved items, products, collections, profile data, or hidden content list.
             </p>
             <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
-              Future recommendations may feel less tailored until new activity builds up.
+              Visible suggestions may adjust as you continue browsing and interacting.
             </p>
           </div>
           <button
