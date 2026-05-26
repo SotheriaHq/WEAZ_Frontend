@@ -7,6 +7,7 @@ import type { RootState } from '@/store';
 import { AuthApi } from '@/api/AuthApi';
 import { NotificationsApi } from '@/api/NotificationsApi';
 import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomOrderApi';
+import { adminEmailChangeApi } from '@/api/AdminApi';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { useAuth } from '@/context/AuthContext';
 
@@ -41,6 +42,21 @@ const SECURITY_ALERT_KEYS = [
   {
     key: 'auth.two_factor.disabled',
     label: 'Email me when 2FA is disabled',
+  },
+] as const;
+
+const ADMIN_NOTIFICATION_KEYS = [
+  {
+    key: 'admin.email_change.otp',
+    label: 'Receive the email verification code for admin email change requests',
+  },
+  {
+    key: 'admin.email_change.approved',
+    label: 'Notify me when a Super Admin approves my email change',
+  },
+  {
+    key: 'admin.email_change.rejected',
+    label: 'Notify me when a Super Admin rejects my email change',
   },
 ] as const;
 
@@ -139,11 +155,269 @@ const Toggle: React.FC<{
   </button>
 );
 
+// ── Admin Email Section ──────────────────────────────────────────────────────
+
+type AdminEmailStep = 'request' | 'otp' | 'pending';
+
+interface AdminEmailSectionProps {
+  currentEmail: string;
+}
+
+const AdminEmailSection: React.FC<AdminEmailSectionProps> = ({ currentEmail }) => {
+  const [step, setStep] = useState<AdminEmailStep>('request');
+  const [pendingNewEmail, setPendingNewEmail] = useState<string | null>(null);
+  const [requestId, setRequestId] = useState<string | null>(null);
+  const [otpExpiresAt, setOtpExpiresAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Form state
+  const [newEmail, setNewEmail] = useState('');
+  const [confirmNewEmail, setConfirmNewEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void adminEmailChangeApi
+      .getMyRequest()
+      .then((res) => {
+        if (!active) return;
+        const data = res?.data?.data ?? res?.data ?? null;
+        if (data && data.status === 'PENDING_VERIFICATION') {
+          setStep('otp');
+          setPendingNewEmail(data.newEmail);
+          setRequestId(data.id);
+          setOtpExpiresAt(data.otpExpiresAt ?? null);
+        } else if (data && data.status === 'PENDING_APPROVAL') {
+          setStep('pending');
+          setPendingNewEmail(data.newEmail);
+          setRequestId(data.id);
+        } else {
+          setStep('request');
+        }
+      })
+      .catch(() => {
+        if (active) setStep('request');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleRequestChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (newEmail.trim().toLowerCase() !== confirmNewEmail.trim().toLowerCase()) {
+      setError('Email addresses do not match.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await adminEmailChangeApi.requestChange({
+        newEmail: newEmail.trim(),
+        currentPassword: password,
+      });
+      const data = res?.data?.data ?? res?.data;
+      setPendingNewEmail(data?.newEmail ?? newEmail.trim());
+      toast.success(data?.message ?? 'Verification code sent');
+      setNewEmail('');
+      setConfirmNewEmail('');
+      setPassword('');
+      setStep('otp');
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Unable to initiate email change.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await adminEmailChangeApi.verifyOtp({ otp: otp.trim() });
+      const data = res?.data?.data ?? res?.data;
+      toast.success(data?.message ?? 'Code verified — request submitted for approval');
+      setOtp('');
+      setStep('pending');
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Invalid or expired code.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    setCancelBusy(true);
+    try {
+      await adminEmailChangeApi.cancelMyRequest();
+      toast.success('Email change request cancelled');
+      setStep('request');
+      setPendingNewEmail(null);
+      setRequestId(null);
+      setOtpExpiresAt(null);
+      setError(null);
+      setOtp('');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Unable to cancel request');
+    } finally {
+      setCancelBusy(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-gray-900">
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading email status...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-gray-900 space-y-4">
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-medium text-gray-900 dark:text-white">Current Email</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">{currentEmail}</p>
+      </div>
+
+      {step === 'request' && (
+        <form onSubmit={handleRequestChange} className="space-y-4 border-t border-gray-200 pt-4 dark:border-white/10">
+          <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+            As an admin, email changes require OTP verification and Super Admin approval.
+          </p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">New Email Address</span>
+              <input
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 outline-none ring-0 transition focus:border-primary dark:border-white/10 dark:bg-black/20"
+                required
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Confirm New Email</span>
+              <input
+                type="email"
+                value={confirmNewEmail}
+                onChange={(e) => setConfirmNewEmail(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 outline-none ring-0 transition focus:border-primary dark:border-white/10 dark:bg-black/20"
+                required
+              />
+            </label>
+          </div>
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Current Password</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 outline-none ring-0 transition focus:border-primary dark:border-white/10 dark:bg-black/20"
+              required
+            />
+          </label>
+          {error ? <p className="text-sm text-red-500">{error}</p> : null}
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy ? 'Sending code...' : 'Send Verification Code'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {step === 'otp' && (
+        <form onSubmit={handleVerifyOtp} className="space-y-4 border-t border-gray-200 pt-4 dark:border-white/10">
+          <p className="text-sm text-gray-700 dark:text-gray-300">
+            A 6-digit code was sent to{' '}
+            <strong className="text-gray-900 dark:text-white">{pendingNewEmail}</strong>.
+            Enter it below to verify ownership.
+          </p>
+          {otpExpiresAt ? (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Code expires at {formatDateTime(otpExpiresAt)}.
+            </p>
+          ) : null}
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Verification Code</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+              placeholder="000000"
+              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 font-mono text-xl tracking-widest outline-none ring-0 transition focus:border-primary dark:border-white/10 dark:bg-black/20"
+              required
+            />
+          </label>
+          {error ? <p className="text-sm text-red-500">{error}</p> : null}
+          <div className="flex justify-between gap-2">
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={cancelBusy}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium transition hover:bg-gray-100 disabled:opacity-60 dark:border-white/10 dark:hover:bg-white/5"
+            >
+              {cancelBusy ? 'Cancelling...' : 'Cancel'}
+            </button>
+            <button
+              type="submit"
+              disabled={busy || otp.length !== 6}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy ? 'Verifying...' : 'Verify Code'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {step === 'pending' && (
+        <div className="space-y-4 border-t border-gray-200 pt-4 dark:border-white/10">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/30 dark:bg-amber-900/10">
+            <p className="text-sm font-medium text-amber-900 dark:text-amber-200">Awaiting Super Admin Approval</p>
+            <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+              Your request to change your email to{' '}
+              <strong>{pendingNewEmail}</strong> has been verified and is pending approval.
+              You will be notified once a Super Admin reviews it.
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={cancelBusy}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:opacity-60 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5"
+            >
+              {cancelBusy ? 'Cancelling...' : 'Cancel Request'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Main Component ───────────────────────────────────────────────────────────
+
 const AccountSecuritySettings: React.FC = () => {
   const { profile } = useSelector((state: RootState) => state.user);
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const isAdmin = profile?.role === 'SuperAdmin' || profile?.role === 'Admin';
 
   const [displayChartFamily, setDisplayChartFamily] = useState<CustomOrderChartFamily>('UK');
   const [showEmailForm, setShowEmailForm] = useState(false);
@@ -241,6 +515,7 @@ const AccountSecuritySettings: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (isAdmin) return;
     const rawToken = searchParams.get('emailChangeToken');
     const token = rawToken?.trim() ?? '';
     if (!token) {
@@ -272,7 +547,7 @@ const AccountSecuritySettings: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, isAdmin]);
 
   if (!profile) {
     return null;
@@ -446,6 +721,10 @@ const AccountSecuritySettings: React.FC = () => {
     }
   };
 
+  const alertKeys = isAdmin
+    ? [...SECURITY_ALERT_KEYS, ...ADMIN_NOTIFICATION_KEYS]
+    : SECURITY_ALERT_KEYS;
+
   return (
     <div className="space-y-6">
       <div>
@@ -458,76 +737,81 @@ const AccountSecuritySettings: React.FC = () => {
       <div className="space-y-6 rounded-xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-gray-950">
         <section className="space-y-4">
           <h2 className="text-lg font-medium text-gray-900 dark:text-white">Email Address</h2>
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-gray-900">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">Current Email</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{profile.email}</p>
-                {emailPendingAddress ? (
-                  <p className="mt-1 text-sm text-emerald-600 dark:text-emerald-400">
-                    A confirmation link has been sent to {emailPendingAddress}. Your email will update once confirmed.
-                  </p>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowEmailForm((current) => !current);
-                  setEmailError(null);
-                }}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium transition hover:bg-gray-100 dark:border-white/10 dark:hover:bg-white/5"
-              >
-                {showEmailForm ? 'Cancel' : 'Change Email'}
-              </button>
-            </div>
 
-            {showEmailForm ? (
-              <form onSubmit={submitEmailChange} className="mt-4 grid gap-4 border-t border-gray-200 pt-4 dark:border-white/10">
-                <div className="grid gap-4 md:grid-cols-2">
+          {isAdmin ? (
+            <AdminEmailSection currentEmail={profile.email} />
+          ) : (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-gray-900">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">Current Email</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{profile.email}</p>
+                  {emailPendingAddress ? (
+                    <p className="mt-1 text-sm text-emerald-600 dark:text-emerald-400">
+                      A confirmation link has been sent to {emailPendingAddress}. Your email will update once confirmed.
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEmailForm((current) => !current);
+                    setEmailError(null);
+                  }}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium transition hover:bg-gray-100 dark:border-white/10 dark:hover:bg-white/5"
+                >
+                  {showEmailForm ? 'Cancel' : 'Change Email'}
+                </button>
+              </div>
+
+              {showEmailForm ? (
+                <form onSubmit={submitEmailChange} className="mt-4 grid gap-4 border-t border-gray-200 pt-4 dark:border-white/10">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">New Email Address</span>
+                      <input
+                        type="email"
+                        value={newEmail}
+                        onChange={(event) => setNewEmail(event.target.value)}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 outline-none ring-0 transition focus:border-primary dark:border-white/10 dark:bg-black/20"
+                        required
+                      />
+                    </label>
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Confirm New Email Address</span>
+                      <input
+                        type="email"
+                        value={confirmNewEmail}
+                        onChange={(event) => setConfirmNewEmail(event.target.value)}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 outline-none ring-0 transition focus:border-primary dark:border-white/10 dark:bg-black/20"
+                        required
+                      />
+                    </label>
+                  </div>
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">New Email Address</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Current Password</span>
                     <input
-                      type="email"
-                      value={newEmail}
-                      onChange={(event) => setNewEmail(event.target.value)}
+                      type="password"
+                      value={emailPassword}
+                      onChange={(event) => setEmailPassword(event.target.value)}
                       className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 outline-none ring-0 transition focus:border-primary dark:border-white/10 dark:bg-black/20"
                       required
                     />
                   </label>
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Confirm New Email Address</span>
-                    <input
-                      type="email"
-                      value={confirmNewEmail}
-                      onChange={(event) => setConfirmNewEmail(event.target.value)}
-                      className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 outline-none ring-0 transition focus:border-primary dark:border-white/10 dark:bg-black/20"
-                      required
-                    />
-                  </label>
-                </div>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Current Password</span>
-                  <input
-                    type="password"
-                    value={emailPassword}
-                    onChange={(event) => setEmailPassword(event.target.value)}
-                    className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 outline-none ring-0 transition focus:border-primary dark:border-white/10 dark:bg-black/20"
-                    required
-                  />
-                </label>
-                {emailError ? <p className="text-sm text-red-500">{emailError}</p> : null}
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={emailBusy}
-                    className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {emailBusy ? 'Updating...' : 'Update Email'}
-                  </button>
-                </div>
-              </form>
-            ) : null}
-          </div>
+                  {emailError ? <p className="text-sm text-red-500">{emailError}</p> : null}
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={emailBusy}
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {emailBusy ? 'Updating...' : 'Update Email'}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+            </div>
+          )}
         </section>
 
         <section className="space-y-4 border-t border-gray-200 pt-6 dark:border-white/10">
@@ -730,7 +1014,7 @@ const AccountSecuritySettings: React.FC = () => {
             </p>
           </div>
           <div className="space-y-3">
-            {SECURITY_ALERT_KEYS.map((item) => {
+            {alertKeys.map((item) => {
               const checked = emailSettings?.scenarios?.[item.key] ?? true;
               return (
                 <div
@@ -749,26 +1033,28 @@ const AccountSecuritySettings: React.FC = () => {
           </div>
         </section>
 
-        <section className="space-y-4 border-t border-gray-200 pt-6 dark:border-white/10">
-          <div>
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">Preferred Size Chart</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              This sets your preferred size chart labels used across custom-order composer and size-chart conversion views.
-            </p>
-          </div>
-          <UniversalSelect
-            label="Preferred chart"
-            value={displayChartFamily}
-            onChange={handleDisplayChartChange}
-            options={[
-              { value: 'UK', label: 'UK' },
-              { value: 'US', label: 'US' },
-              { value: 'NIGERIA', label: 'Nigeria' },
-              { value: 'ASIA', label: 'Asia' },
-            ]}
-            className="max-w-sm"
-          />
-        </section>
+        {!isAdmin && (
+          <section className="space-y-4 border-t border-gray-200 pt-6 dark:border-white/10">
+            <div>
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white">Preferred Size Chart</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                This sets your preferred size chart labels used across custom-order composer and size-chart conversion views.
+              </p>
+            </div>
+            <UniversalSelect
+              label="Preferred chart"
+              value={displayChartFamily}
+              onChange={handleDisplayChartChange}
+              options={[
+                { value: 'UK', label: 'UK' },
+                { value: 'US', label: 'US' },
+                { value: 'NIGERIA', label: 'Nigeria' },
+                { value: 'ASIA', label: 'Asia' },
+              ]}
+              className="max-w-sm"
+            />
+          </section>
+        )}
 
         <section className="space-y-4 border-t border-red-200 pt-6 dark:border-red-900/20">
           <div>

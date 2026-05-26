@@ -615,3 +615,41 @@ export const adminFinanceApi = {
   listBooks: (params?: Record<string, string>) =>
     apiClient.get<AdminLedgerTransaction[]>('/admin/ledger', { params }),
 };
+
+// ── Admin Email Change (admin self-service + super admin review) ──
+export type AdminEmailChangeStatus = 'PENDING_VERIFICATION' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+export interface AdminEmailChangeRequest {
+  id: string;
+  newEmail: string;
+  status: AdminEmailChangeStatus;
+  otpExpiresAt?: string | null;
+  createdAt: string;
+  admin?: {
+    id: string;
+    email: string;
+    role: string;
+    userProfile?: { displayName?: string | null; avatarUrl?: string | null } | null;
+  };
+}
+
+export const adminEmailChangeApi = {
+  requestChange: (data: { newEmail: string; currentPassword: string }) =>
+    apiClient.post<{ message: string; newEmail: string }>('/admin/email-change/request', data),
+  verifyOtp: (data: { otp: string }) =>
+    apiClient.post<{ message: string; status: string }>('/admin/email-change/verify-otp', data),
+  getMyRequest: () =>
+    apiClient.get<AdminEmailChangeRequest | null>('/admin/email-change/my-request'),
+  cancelMyRequest: () =>
+    apiClient.delete<{ message: string }>('/admin/email-change/my-request'),
+  listRequests: (params?: { page?: number; limit?: number }) =>
+    apiClient.get<{ items: AdminEmailChangeRequest[]; total: number; page: number; limit: number }>(
+      '/admin/email-change/requests',
+      { params },
+    ),
+  approveRequest: (id: string) =>
+    apiClient.post<{ message: string }>(`/admin/email-change/requests/${id}/approve`),
+  rejectRequest: (id: string, reason?: string) =>
+    apiClient.post<{ message: string }>(`/admin/email-change/requests/${id}/reject`, { reason }),
+};
+

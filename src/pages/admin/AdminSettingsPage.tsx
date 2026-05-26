@@ -1,14 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useSelector } from 'react-redux';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
-import { adminSlaApi, adminFeatureFlagsApi } from '@/api/AdminApi';
+import { adminSlaApi, adminFeatureFlagsApi, adminEmailChangeApi, type AdminEmailChangeRequest } from '@/api/AdminApi';
 import { configApi, type UploadLimits } from '@/api/ConfigApi';
 import type { AdminSlaConfig, FeatureFlag } from '@/types/admin';
 import { toast } from 'sonner';
 import { unwrapApiResponse } from '@/types/auth';
 import { useUploadLimits } from '@/context/UploadLimitsContext';
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import type { RootState } from '@/store';
 
-type Tab = 'sla' | 'flags' | 'uploads' | 'dashboard' | 'messaging' | 'reviews';
+type Tab = 'sla' | 'flags' | 'uploads' | 'dashboard' | 'messaging' | 'reviews' | 'email-changes';
 
 /** Human-readable labels for upload config keys */
 const UPLOAD_KEY_LABELS: Record<string, { label: string; hint: string }> = {
@@ -89,6 +91,9 @@ const formatBytes = (bytes: number, unit: SizeUnit) => {
 };
 
 const AdminSettingsPage: React.FC = () => {
+  const profile = useSelector((state: RootState) => state.user.profile);
+  const isSuperAdmin = profile?.role === 'SuperAdmin';
+
   const [slaConfigs, setSlaConfigs] = useState<AdminSlaConfig[]>([]);
   const [featureFlags, setFeatureFlags] = useState<FeatureFlag[]>([]);
   const [uploadLimits, setUploadLimits] = useState<UploadLimits>({});
@@ -100,6 +105,14 @@ const AdminSettingsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('sla');
   const { refresh: refreshGlobalLimits } = useUploadLimits();
+
+  // Email change requests (SuperAdmin only)
+  const [emailChangeRequests, setEmailChangeRequests] = useState<AdminEmailChangeRequest[]>([]);
+  const [emailChangeTotal, setEmailChangeTotal] = useState(0);
+  const [emailChangeLoading, setEmailChangeLoading] = useState(false);
+  const [rejectDialog, setRejectDialog] = useState<{ id: string; email: string } | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [reviewBusyId, setReviewBusyId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -206,6 +219,7 @@ const AdminSettingsPage: React.FC = () => {
     { value: 'dashboard', label: 'Dashboard' },
     { value: 'messaging', label: 'Messaging Rules' },
     { value: 'reviews', label: 'Review Rules' },
+    ...(isSuperAdmin ? [{ value: 'email-changes' as Tab, label: `Email Changes${emailChangeTotal > 0 ? ` (${emailChangeTotal})` : ''}` }] : []),
   ];
 
   const showDailySignupCount = (systemConfig['admin.dashboard.showDailySignupCount'] ?? 'true') === 'true';
@@ -275,6 +289,56 @@ const AdminSettingsPage: React.FC = () => {
       toast.error(err?.response?.data?.message || 'Failed to save review rules');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const fetchEmailChangeRequests = useCallback(async () => {
+    if (!isSuperAdmin) return;
+    setEmailChangeLoading(true);
+    try {
+      const res = await adminEmailChangeApi.listRequests({ page: 1, limit: 50 });
+      const payload = res?.data?.data ?? res?.data;
+      setEmailChangeRequests(payload?.items ?? []);
+      setEmailChangeTotal(payload?.total ?? 0);
+    } catch {
+      // silent — show empty state
+    } finally {
+      setEmailChangeLoading(false);
+    }
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    if (tab === 'email-changes') {
+      void fetchEmailChangeRequests();
+    }
+  }, [tab, fetchEmailChangeRequests]);
+
+  const handleApproveEmailChange = async (id: string) => {
+    setReviewBusyId(id);
+    try {
+      await adminEmailChangeApi.approveRequest(id);
+      toast.success('Email change approved');
+      void fetchEmailChangeRequests();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Failed to approve');
+    } finally {
+      setReviewBusyId(null);
+    }
+  };
+
+  const handleRejectEmailChange = async () => {
+    if (!rejectDialog) return;
+    setReviewBusyId(rejectDialog.id);
+    try {
+      await adminEmailChangeApi.rejectRequest(rejectDialog.id, rejectReason);
+      toast.success('Email change rejected');
+      setRejectDialog(null);
+      setRejectReason('');
+      void fetchEmailChangeRequests();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Failed to reject');
+    } finally {
+      setReviewBusyId(null);
     }
   };
 
@@ -670,6 +734,118 @@ const AdminSettingsPage: React.FC = () => {
               );
             })}
           </div>
+        </div>
+      ) : tab === 'email-changes' && isSuperAdmin ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Admin Email Change Requests</h2>
+            <button
+              type="button"
+              onClick={() => void fetchEmailChangeRequests()}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/5"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {emailChangeLoading ? (
+            <p className="text-sm text-gray-500">Loading...</p>
+          ) : emailChangeRequests.length === 0 ? (
+            <div className="rounded-xl border border-gray-200 p-8 text-center dark:border-white/10">
+              <p className="text-sm text-gray-500 dark:text-gray-400">No pending email change requests.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {emailChangeRequests.map((req) => (
+                <div
+                  key={req.id}
+                  className="rounded-xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-gray-950"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {req.admin?.userProfile?.displayName ?? req.admin?.email ?? 'Unknown admin'}
+                        </p>
+                        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                          {req.admin?.role ?? 'Admin'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        From: <strong className="text-gray-700 dark:text-gray-300">{req.admin?.email}</strong>
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        To: <strong className="text-gray-700 dark:text-gray-300">{req.newEmail}</strong>
+                      </p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">
+                        Requested {new Date(req.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleApproveEmailChange(req.id)}
+                        disabled={reviewBusyId === req.id}
+                        className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {reviewBusyId === req.id ? '...' : 'Approve'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRejectDialog({ id: req.id, email: req.newEmail });
+                          setRejectReason('');
+                        }}
+                        disabled={reviewBusyId === req.id}
+                        className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/30 dark:hover:bg-red-900/10"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {rejectDialog ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+              <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-900">
+                <h3 className="mb-1 text-lg font-semibold text-gray-900 dark:text-white">Reject Email Change</h3>
+                <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+                  Rejecting request to change to <strong>{rejectDialog.email}</strong>.
+                  Provide a reason for the rejection (optional).
+                </p>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  rows={3}
+                  placeholder="Reason for rejection..."
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-primary dark:border-white/10 dark:bg-gray-800"
+                />
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRejectDialog(null);
+                      setRejectReason('');
+                    }}
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium transition hover:bg-gray-100 dark:border-white/10 dark:hover:bg-white/5"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleRejectEmailChange()}
+                    disabled={!!reviewBusyId}
+                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+                  >
+                    {reviewBusyId ? 'Rejecting...' : 'Confirm Reject'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </div>
