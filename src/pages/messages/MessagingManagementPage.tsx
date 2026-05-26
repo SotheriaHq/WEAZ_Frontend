@@ -510,6 +510,15 @@ const MessagingManagementPage: React.FC = () => {
   }, []);
 
   /* ---- Load conversations ---- */
+  const refreshInbox = useCallback(async () => {
+    try {
+      const inbox = await messagingApi.getInbox({ limit: 100, contextType: 'all', filter: 'all' });
+      setConversations((inbox.items || []).map(mapInboxItem));
+    } catch {
+      /* silently ignore background inbox refresh errors */
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -711,19 +720,19 @@ const MessagingManagementPage: React.FC = () => {
 
   /* ---- Real-time ---- */
   useEffect(() => {
-    if (!activeConversation) return;
-    const contextId = getContextId(activeConversation);
-    const threadId = activeConversation.threadId;
-
     const unsubscribe = onNotification((payload: any) => {
       const type = String(payload?.type ?? '');
       if (type !== 'MESSAGE_RECEIVED' && type !== 'MESSAGE_MODERATED' && type !== 'MESSAGE_UNREAD_REMINDER' && type !== 'MESSAGE_THREAD_REOPENED') return;
+      // Always refresh the inbox list so unread counts update across all threads
+      void refreshInbox();
+      if (!activeConversation) return;
+      const contextId = getContextId(activeConversation);
+      const threadId = activeConversation.threadId;
       const pId = String(payload?.payload?.threadId ?? payload?.payload?.customOrderId ?? payload?.payload?.orderId ?? '');
-      if (pId !== contextId && pId !== threadId) return;
-      void refresh();
+      if (pId === contextId || pId === threadId) void refresh();
     });
     return unsubscribe;
-  }, [activeConversation, getContextId, onNotification, refresh]);
+  }, [activeConversation, getContextId, onNotification, refresh, refreshInbox]);
 
   /* ---- Highlight message ---- */
   useEffect(() => {

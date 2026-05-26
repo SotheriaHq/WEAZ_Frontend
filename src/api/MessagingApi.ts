@@ -46,6 +46,12 @@ export interface ThreadMessage {
     profileImage?: string | null;
   } | null;
   attachments: MessageAttachment[];
+  metadataJson?: {
+    contextDesignId?: string;
+    contextDesignTitle?: string;
+    contextDesignCoverFileId?: string;
+    [key: string]: unknown;
+  } | null;
 }
 
 export interface MessageListResponse {
@@ -526,7 +532,12 @@ export const messagingApi = {
     return unwrapApiResponse<{ items: ThreadOrderItem[] }>(response.data);
   },
 
-  async sendBrandMessage(brandId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[] }) {
+  async getUnreadCount() {
+    const response = await apiClient.get('/messaging/unread-count');
+    return unwrapApiResponse<{ unreadCount: number }>(response.data);
+  },
+
+  async sendBrandMessage(brandId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; contextDesignId?: string; contextDesignTitle?: string; contextDesignCoverFileId?: string }) {
     const response = await apiClient.post(
       `/messaging/brands/${brandId}/messages`,
       payload,

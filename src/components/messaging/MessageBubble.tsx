@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import type { ThreadMessage } from '@/api/MessagingApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import ImageWithFallback from '@/components/ImageWithFallback';
 
 interface MessageBubbleProps {
   message: ThreadMessage & { _optimistic?: 'sending' | 'failed' };
@@ -159,6 +160,23 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
             <p className="text-sm italic opacity-60">This message has been removed</p>
           ) : (
             <>
+              {message.metadataJson?.contextDesignTitle && (
+                <div className={`mb-2 rounded-lg overflow-hidden border ${isOwn ? 'border-white/20 bg-white/10' : 'border-purple-200/60 dark:border-purple-500/20 bg-purple-50/60 dark:bg-purple-500/5'}`}>
+                  {message.metadataJson.contextDesignCoverFileId && (
+                    <ImageWithFallback
+                      fileId={message.metadataJson.contextDesignCoverFileId as string}
+                      alt={String(message.metadataJson.contextDesignTitle)}
+                      fit="cover"
+                      rounded="none"
+                      containerClassName="w-full h-14"
+                      maxHeightClassName=""
+                    />
+                  )}
+                  <div className={`px-2 py-1.5 text-[11px] font-semibold truncate ${isOwn ? 'text-white/80' : 'text-purple-700 dark:text-purple-300'}`}>
+                    {String(message.metadataJson.contextDesignTitle)}
+                  </div>
+                </div>
+              )}
               {message.bodyText && (
                 <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{message.bodyText}</p>
               )}

@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import IslandBottomNav from '@/components/navigation/IslandBottomNav';
+import { messagingApi } from '@/api/MessagingApi';
+import { useRealtime } from '@/realtime/RealtimeProvider';
 
 interface StudioSidebarProps {
   active: string;
@@ -25,6 +27,28 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
   const storeSetupComplete = useStoreSetupStatus();
   const isSetupLocked = storeSetupComplete === false;
   const groups = [{ title: 'Studio', items: ALL_ITEMS }];
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const { onNotification } = useRealtime();
+
+  useEffect(() => {
+    let cancelled = false;
+    messagingApi.getUnreadCount().then((res) => {
+      if (!cancelled) setUnreadMessages(Number(res?.unreadCount ?? 0));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const unsub = onNotification((payload: any) => {
+      const type = String(payload?.type ?? '');
+      if (type === 'MESSAGE_RECEIVED') {
+        messagingApi.getUnreadCount().then((res) => {
+          setUnreadMessages(Number(res?.unreadCount ?? 0));
+        }).catch(() => {});
+      }
+    });
+    return unsub;
+  }, [onNotification]);
 
   const handleSelect = (key: string, path: string) => {
     onSelect(key);
@@ -69,7 +93,12 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
                         title={isLocked ? 'Complete store setup to unlock this section' : label}
                       >
                         <span className="text-base leading-none">{emoji}</span>
-                        <span className="text-sm truncate">{label}</span>
+                        <span className="text-sm truncate flex-1">{label}</span>
+                        {key === 'messages' && unreadMessages > 0 && (
+                          <span className="ml-auto min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
+                            {unreadMessages > 99 ? '99+' : unreadMessages}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -87,7 +116,14 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
           key,
           label,
           path,
-          emoji,
+          emoji: key === 'messages' && unreadMessages > 0 ? (
+            <span className="relative inline-flex">
+              <span>{emoji}</span>
+              <span className="absolute -top-1.5 -right-2 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5 leading-none">
+                {unreadMessages > 99 ? '99+' : unreadMessages}
+              </span>
+            </span>
+          ) : emoji,
           active: active === key,
           disabled: Boolean(isSetupLocked && requiresSetup),
         }))}

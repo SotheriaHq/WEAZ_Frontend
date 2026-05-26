@@ -563,6 +563,9 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                       clientMessageId: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
                         ? crypto.randomUUID()
                         : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                      contextDesignId: item.designId ?? undefined,
+                      contextDesignTitle: item.collectionTitle,
+                      contextDesignCoverFileId: item.coverMediaId ?? item.media.fileId ?? undefined,
                     });
                     setDirectMessageText('');
                     toast.success('Message sent');
