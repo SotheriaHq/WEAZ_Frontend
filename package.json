@@ -19,6 +19,7 @@
     "test:watch": "vitest --watch",
     "audit:theme": "node scripts/audit-theme-system.js",
     "check:perf-regressions": "node scripts/check-perf-regressions.cjs",
+    "check:security-headers": "node scripts/check-security-headers.cjs",
     "ci:phase8": "npm run build && npm run lint && npm test -- --run src/__tests__/RequireStoreSetup.test.tsx src/__tests__/useBrandProfile.renderIsolation.test.tsx src/__tests__/renderableMedia.test.ts && npm run check:perf-regressions"
   },
   "dependencies": {
