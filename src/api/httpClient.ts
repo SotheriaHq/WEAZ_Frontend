@@ -69,6 +69,14 @@ refreshClient.interceptors.response.use(
 
 let refreshPromise: Promise<string | null> | null = null;
 
+const dispatchAuthExpired = () => {
+  try {
+    window.dispatchEvent(new CustomEvent('auth:expired'));
+  } catch {
+    // Browser globals can be unavailable in tests or SSR-like contexts.
+  }
+};
+
 export const refreshAccessToken = async (): Promise<string | null> => {
   const now = Date.now();
   if (
@@ -87,18 +95,14 @@ export const refreshAccessToken = async (): Promise<string | null> => {
           persistAccessToken(token);
         } else {
           dropStoredAccessToken();
+          dispatchAuthExpired();
         }
         return token;
       } catch {
         consecutiveRefreshFailures += 1;
         lastRefreshFailureAt = Date.now();
         dropStoredAccessToken();
-        if (consecutiveRefreshFailures >= 3) {
-          try {
-            // Broadcast a global auth-expired signal for UI to react (toast, redirect, etc.)
-            window.dispatchEvent(new CustomEvent('auth:expired'));
-          } catch {}
-        }
+        dispatchAuthExpired();
         return null;
       } finally {
         refreshPromise = null;
@@ -158,11 +162,7 @@ apiClient.interceptors.response.use(
 
         return apiClient(originalRequest);
       } catch (refreshError) {
-        if (consecutiveRefreshFailures >= 3) {
-          try {
-            window.dispatchEvent(new CustomEvent('auth:expired'));
-          } catch {}
-        }
+        dispatchAuthExpired();
         return Promise.reject(refreshError);
       }
     }

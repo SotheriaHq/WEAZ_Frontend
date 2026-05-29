@@ -1804,6 +1804,7 @@ export const brandApi = {
     if (!key) {
       signedUrlCache.clear();
       signedUrlPending.clear();
+      signedUrlMissingCache.clear();
       return;
     }
 
