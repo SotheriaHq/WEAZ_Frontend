@@ -378,7 +378,7 @@ export const EndUserProfile: React.FC = () => {
       if (!profile) return;
       setSavingQuickEdit(true);
       try {
-        const response = await apiClient.patch(`/auth/update-profile/${profile.id}`, {
+        const response = await apiClient.patch('/users/me/profile', {
           firstName: values.firstName,
           lastName: values.lastName,
           username: profile.username,
