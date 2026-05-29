@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const dropStoredAccessTokenMock = vi.fn();
 const invalidateSignedUrlCacheMock = vi.fn();
 const disconnectSocketMock = vi.fn();
+const clearWebMarketSignalQueueMock = vi.fn();
 
 vi.mock('@/api/httpClient', () => ({
   dropStoredAccessToken: dropStoredAccessTokenMock,
@@ -19,6 +20,10 @@ vi.mock('@/api/BrandApi', () => ({
 
 vi.mock('@/lib/ws', () => ({
   disconnectSocket: disconnectSocketMock,
+}));
+
+vi.mock('@/services/marketSignalQueue', () => ({
+  clearWebMarketSignalQueue: clearWebMarketSignalQueueMock,
 }));
 
 const loadCleanupModule = async () => {
@@ -58,6 +63,7 @@ describe('clearWebPrivateSessionState', () => {
 
     expect(dropStoredAccessTokenMock).toHaveBeenCalledTimes(1);
     expect(invalidateSignedUrlCacheMock).toHaveBeenCalledTimes(1);
+    expect(clearWebMarketSignalQueueMock).toHaveBeenCalledTimes(1);
     expect(disconnectSocketMock).toHaveBeenCalledTimes(1);
     expect(client.getQueryData(['auth', 'profile'])).toBeUndefined();
     expect(client.getQueryData(['notifications', 'unreadCount'])).toBeUndefined();

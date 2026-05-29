@@ -18,6 +18,7 @@
     "test:admin-permission-contract": "node scripts/test-admin-permission-contract.cjs",
     "test:api-contract": "node scripts/test-api-contract.cjs",
     "test:auth-link-route-contract": "node scripts/test-auth-link-route-contract.cjs",
+    "test:market-signals-contract": "vitest run src/services/marketSignalQueue.test.ts src/auth/sessionCleanup.test.ts",
     "test:watch": "vitest --watch",
     "audit:theme": "node scripts/audit-theme-system.js",
     "check:perf-regressions": "node scripts/check-perf-regressions.cjs",

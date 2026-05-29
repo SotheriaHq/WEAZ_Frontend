@@ -7,6 +7,7 @@ import { clearSignedFileUrlSessionCache } from '@/hooks/useSignedFileUrl';
 import { ACTIVE_BRAND_STORAGE_KEY } from '@/lib/brandAccess';
 import { disconnectSocket } from '@/lib/ws';
 import { purgeWebPersistedQueryCache, THREADLY_QUERY_CACHE_STORAGE_KEY } from '@/query/queryPersistor';
+import { clearWebMarketSignalQueue } from '@/services/marketSignalQueue';
 
 const SIGNED_URL_SESSION_STORAGE_KEY = 'threadly_signed_url_cache';
 
@@ -75,6 +76,7 @@ export const clearWebPrivateSessionState = async ({
   purgeWebPersistedQueryCache();
   brandApi.invalidateSignedUrlCache();
   clearSignedFileUrlSessionCache();
+  clearWebMarketSignalQueue();
   clearWebRealtimeSession();
 
   removeLocalStorageKeys([
