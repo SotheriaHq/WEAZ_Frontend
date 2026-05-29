@@ -10,6 +10,11 @@ import ProfileHeader from './ProfileHeader';
 import ImageCropModal from '@/components/upload/ImageCropModal';
 import ProfileImageModal from '@/components/profile/ProfileImageModal';
 import { resolveBannerImageSource, resolveProfileImageSource } from '@/utils/profileImage';
+import {
+  WEB_UPLOAD_POLICIES,
+  assertValidUploadFile,
+  getUploadValidationMessage,
+} from '@/utils/uploadValidation';
 
 type OwnerHeaderProfileBase = {
   id: string;
@@ -237,6 +242,12 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    try {
+      assertValidUploadFile(file, WEB_UPLOAD_POLICIES.profileImage);
+    } catch (uploadError) {
+      toast.error(getUploadValidationMessage(uploadError));
+      return;
+    }
     setCropTask({ type: 'avatar', file });
   }, []);
 
@@ -244,6 +255,12 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    try {
+      assertValidUploadFile(file, WEB_UPLOAD_POLICIES.bannerImage);
+    } catch (uploadError) {
+      toast.error(getUploadValidationMessage(uploadError));
+      return;
+    }
     setCropTask({ type: 'banner', file });
   }, []);
 
