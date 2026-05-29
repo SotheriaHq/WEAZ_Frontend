@@ -3,6 +3,7 @@ import { createIdempotencyKey } from "./idempotency";
 import { unwrapApiResponse } from "../types/auth";
 import type { SizingMode } from '@/types/sizing';
 import { filterV1GarmentCategories } from '@/utils/v1Taxonomy';
+import { WEB_UPLOAD_POLICIES, assertValidUploadFile } from '@/utils/uploadValidation';
 
 // =====================
 // Types
@@ -680,6 +681,7 @@ export const productApi = {
     isPrimary = false,
   ): Promise<{ id: string; url: string }> {
     try {
+      assertValidUploadFile(file, WEB_UPLOAD_POLICIES.productMedia);
       const formData = new FormData();
       formData.append("file", file);
       formData.append("isPrimary", String(isPrimary));

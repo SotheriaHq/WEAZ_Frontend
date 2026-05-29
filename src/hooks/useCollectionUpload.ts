@@ -7,6 +7,7 @@ import {
   type CompletionDto,
   type PresignEntry,
 } from '../api/collectionUploads';
+import { WEB_UPLOAD_POLICIES, assertValidUploadFiles } from '@/utils/uploadValidation';
 
 const MAX_RETRY_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 750;
@@ -248,6 +249,7 @@ export function useCollectionUpload() {
     const resolvedFiles = parsed.items
       .map(resolveFile)
       .filter((file): file is File => file !== null);
+    assertValidUploadFiles(resolvedFiles, WEB_UPLOAD_POLICIES.collectionMedia);
 
     if (parsed.shouldPublish) {
       if (resolvedFiles.length === 0) {

@@ -21,6 +21,7 @@ import {
 } from '../utils/renderableMedia';
 import { resolveCatalogEntityType } from '../utils/catalogEntity';
 import { filterV1GarmentCategories } from '../utils/v1Taxonomy';
+import { WEB_UPLOAD_POLICIES, assertValidUploadFile } from '../utils/uploadValidation';
 
 export interface UpdateBrandProfilePayload {
   brandFullName?: string;
@@ -1501,6 +1502,7 @@ export const brandApi = {
 
   // Upload banner image
   async uploadBanner(_brandId: string, file: File): Promise<UploadAssetDto | null> {
+    assertValidUploadFile(file, WEB_UPLOAD_POLICIES.bannerImage);
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -1519,6 +1521,7 @@ export const brandApi = {
 
   // Upload logo image
   async uploadLogo(_brandId: string, file: File): Promise<UploadAssetDto | null> {
+    assertValidUploadFile(file, WEB_UPLOAD_POLICIES.profileImage);
     try {
       const formData = new FormData();
       formData.append('file', file);

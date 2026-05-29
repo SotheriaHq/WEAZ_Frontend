@@ -31,6 +31,11 @@ import {
   usePublicUserProfileQuery,
 } from '@/query/queries';
 import { queryKeys } from '@/query/queryKeys';
+import {
+  WEB_UPLOAD_POLICIES,
+  assertValidUploadFile,
+  getUploadValidationMessage,
+} from '@/utils/uploadValidation';
 
 interface UserProfile {
   id: string;
@@ -540,6 +545,13 @@ export const EndUserProfile: React.FC = () => {
       const file = event.target.files?.[0];
       event.target.value = '';
       if (!file || !currentUser) return;
+
+      try {
+        assertValidUploadFile(file, WEB_UPLOAD_POLICIES.profileImage);
+      } catch (uploadError) {
+        toast.error(getUploadValidationMessage(uploadError));
+        return;
+      }
 
       const nextPreviewUrl = URL.createObjectURL(file);
       setAvatarPreviewUrl((current) => {
