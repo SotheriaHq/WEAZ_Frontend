@@ -9,11 +9,20 @@ interface PendingFile {
   previewUrl: string | null;
 }
 
+export interface ReplyTo {
+  id: string;
+  bodyText?: string | null;
+  senderName: string;
+}
+
 interface ComposeAreaProps {
-  onSend: (bodyText: string, attachmentFileIds: string[]) => Promise<void>;
+  onSend: (bodyText: string, attachmentFileIds: string[], replyToMessageId?: string) => Promise<void>;
   disabled?: boolean;
   placeholder?: string;
   maxLength?: number;
+  /** When set, shows a reply preview above the input */
+  replyTo?: ReplyTo | null;
+  onCancelReply?: () => void;
 }
 
 const MAX_ATTACHMENTS = 5;
@@ -25,6 +34,8 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
   disabled = false,
   placeholder = 'Type a message…',
   maxLength = 4000,
+  replyTo = null,
+  onCancelReply,
 }) => {
   const [text, setText] = useState('');
   const [files, setFiles] = useState<PendingFile[]>([]);
@@ -175,19 +186,20 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
 
     setSending(true);
     try {
-      await onSend(body, attIds);
+      await onSend(body, attIds, replyTo?.id);
       setText('');
       for (const f of files) {
         if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
       }
       setFiles([]);
+      onCancelReply?.();
       textareaRef.current?.focus();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to send message');
     } finally {
       setSending(false);
     }
-  }, [canSend, text, files, onSend]);
+  }, [canSend, text, files, onSend, replyTo, onCancelReply]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -198,6 +210,25 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
 
   return (
     <div className="shrink-0 border-t border-gray-200/50 bg-white/60 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm dark:border-white/10 dark:bg-black/20">
+      {/* Reply preview */}
+      {replyTo && (
+        <div className="flex items-center gap-2 mb-2 rounded-xl border-l-4 border-purple-500 bg-purple-50/80 dark:bg-purple-500/10 px-3 py-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-semibold text-purple-700 dark:text-purple-300 mb-0.5">↩️ {replyTo.senderName}</p>
+            <p className="text-[11px] text-gray-600 dark:text-gray-400 truncate leading-snug">
+              {replyTo.bodyText || '📎 Attachment'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancelReply}
+            className="shrink-0 h-6 w-6 flex items-center justify-center rounded-full hover:bg-purple-100 dark:hover:bg-purple-500/20 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+            aria-label="Cancel reply"
+          >
+            <span aria-hidden="true" className="text-sm leading-none">✕</span>
+          </button>
+        </div>
+      )}
       {/* Pending attachments */}
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">

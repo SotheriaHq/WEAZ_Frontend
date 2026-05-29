@@ -237,13 +237,13 @@ const NotificationSettings: React.FC = () => {
         },
         {
           id: 'readReceipts',
-          label: 'Read Receipts',
-          description: 'Show blue ticks when your messages are read, and let others know when you read theirs. When off, no read receipts are shown or sent.',
+          label: 'Read Receipts (colored ✓✓)',
+          description: 'When on: your sent messages show colored double ticks when read, and others can see when you read their messages. When OFF: you see no colored ticks on your sent messages, AND others will not see colored ticks when you read theirs. This setting is mutual.',
         },
         {
           id: 'deliveryReceipts',
-          label: 'Delivery Receipts',
-          description: 'Show double ticks when messages are delivered. When off, all messages display a single tick only — both for you and people messaging you.',
+          label: 'Delivery Receipts (double ✓✓)',
+          description: 'When on: your sent messages show double ticks once delivered. When OFF: all your messages show a single tick only — you also won\'t see double ticks on others\' messages to you. This setting is mutual.',
         },
       ],
     },

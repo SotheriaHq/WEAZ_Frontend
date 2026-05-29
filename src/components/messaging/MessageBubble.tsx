@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useRef, useState } from 'react';
 import type { ThreadMessage } from '@/api/MessagingApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import ImageWithFallback from '@/components/ImageWithFallback';
@@ -10,6 +10,8 @@ interface MessageBubbleProps {
   showModerated?: boolean;
   /** Called when user clicks retry on a failed optimistic message */
   onRetry?: () => void;
+  /** Called when the user swipes to initiate a reply to this message */
+  onReply?: (message: ThreadMessage) => void;
 }
 
 const formatTime = (iso: string) => {
@@ -41,6 +43,10 @@ const senderName = (msg: ThreadMessage) => {
   }
 };
 
+/** True when value looks like a UUID file ID rather than a URL */
+const isFileId = (value?: string | null) =>
+  Boolean(value && !/^https?:/i.test(value) && /^[0-9a-f-]{30,}$/i.test(value));
+
 /** SVG tick icons matching WhatsApp style */
 const SingleTick: React.FC<{ className?: string }> = ({ className }) => (
   <svg viewBox="0 0 16 12" fill="none" className={className} width="16" height="12">
@@ -55,10 +61,41 @@ const DoubleTick: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, showModerated = false, onRetry }) => {
+const SWIPE_THRESHOLD = 52; // px required to trigger reply
+
+const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, showModerated = false, onRetry, onReply }) => {
   const isSystem = message.kind === 'SYSTEM' || message.kind === 'MODERATION_NOTICE';
   const isHidden = message.visibilityState === 'HIDDEN';
   const isRedacted = message.visibilityState === 'REDACTED';
+
+  // Swipe gesture state
+  const startXRef = useRef<number | null>(null);
+  const [swipeDelta, setSwipeDelta] = useState(0);
+  const [swiping, setSwiping] = useState(false);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (!onReply) return;
+    startXRef.current = e.clientX;
+    setSwiping(true);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!swiping || startXRef.current === null || !onReply) return;
+    const delta = e.clientX - startXRef.current;
+    // Only allow rightward swipe for both own and other messages (WhatsApp style)
+    const clamped = Math.max(0, Math.min(delta, 80));
+    setSwipeDelta(clamped);
+  };
+
+  const handlePointerUp = () => {
+    if (!swiping) return;
+    if (swipeDelta >= SWIPE_THRESHOLD && onReply) {
+      onReply(message);
+    }
+    setSwipeDelta(0);
+    setSwiping(false);
+    startXRef.current = null;
+  };
 
   // Non-admin views: strictly hide hidden messages, show placeholder for redacted
   if (isHidden && !showModerated) return null;
@@ -80,11 +117,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
   const optimistic = (message as any)._optimistic as 'sending' | 'failed' | undefined;
   const deliveryStatus = message.deliveryStatus ?? 'SENT';
 
-  // Determine tick display for own messages
+  // Design context card fields
+  const designTitle = message.metadataJson?.contextDesignTitle;
+  const designCoverUrl = message.metadataJson?.contextDesignCoverUrl as string | undefined;
+  const designCoverFileId = message.metadataJson?.contextDesignCoverFileId as string | undefined;
+  // Prefer direct URL; fall back to fileId resolution
+  const coverSrc = designCoverUrl || (!isFileId(designCoverFileId) ? designCoverFileId : undefined);
+  const coverFileId = !coverSrc && isFileId(designCoverFileId) ? designCoverFileId : undefined;
+  const hasDesignCard = Boolean(designTitle);
+
   const renderTicks = () => {
     if (!isOwn) return null;
-
-    // Optimistic sending state
     if (optimistic === 'sending') {
       return (
         <span className="inline-flex items-center" title="Sending...">
@@ -94,8 +137,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
         </span>
       );
     }
-
-    // Failed state
     if (optimistic === 'failed') {
       return (
         <button
@@ -113,40 +154,84 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
         </button>
       );
     }
-
-    // Delivered states from server
     if (deliveryStatus === 'READ') {
-      return (
-        <span className="inline-flex items-center" title="Read">
-          <DoubleTick className="text-sky-300" />
-        </span>
-      );
+      return <span className="inline-flex items-center" title="Read"><DoubleTick className="text-sky-300" /></span>;
     }
-
     if (deliveryStatus === 'DELIVERED') {
-      return (
-        <span className="inline-flex items-center" title="Delivered">
-          <DoubleTick className="text-white/60" />
-        </span>
-      );
+      return <span className="inline-flex items-center" title="Delivered"><DoubleTick className="text-white/60" /></span>;
     }
-
-    // SENT - single tick
-    return (
-      <span className="inline-flex items-center" title="Sent">
-        <SingleTick className="text-white/60" />
-      </span>
-    );
+    return <span className="inline-flex items-center" title="Sent"><SingleTick className="text-white/60" /></span>;
   };
 
+  // Reply indicator: appears when swiping right
+  const replyIconOpacity = Math.min(swipeDelta / SWIPE_THRESHOLD, 1);
+
   return (
-    <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-1.5 group ${isModerated && showModerated ? 'opacity-60' : ''}`}>
-      <div className={`max-w-[75%] min-w-[80px] ${isOwn ? 'order-1' : 'order-1'}`}>
+    <div
+      className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-1.5 group relative select-none ${isModerated && showModerated ? 'opacity-60' : ''}`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+    >
+      {/* Reply swipe indicator — appears on left for own msgs, right for others */}
+      {onReply && (
+        <div
+          aria-hidden="true"
+          className={`absolute top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-white/10 transition-none pointer-events-none ${isOwn ? 'left-0' : 'right-0'}`}
+          style={{ opacity: replyIconOpacity }}
+        >
+          <span className="text-base">↩️</span>
+        </div>
+      )}
+
+      <div
+        className="max-w-[75%] min-w-[80px] flex flex-col"
+        style={{ transform: `translateX(${swipeDelta}px)`, transition: swipeDelta === 0 && !swiping ? 'transform 0.2s ease' : 'none' }}
+      >
         {!isOwn && (
           <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 ml-3 mb-0.5 block">
             {senderName(message)}
           </span>
         )}
+
+        {/* Design context card — sits ABOVE the bubble, no background fill */}
+        {hasDesignCard && !isRedacted && (
+          <div className={`mb-1 rounded-xl overflow-hidden border border-gray-200/70 dark:border-white/12 bg-transparent`}>
+            {(coverSrc || coverFileId) && (
+              <div className="w-full h-[120px] bg-gray-100 dark:bg-white/5">
+                <ImageWithFallback
+                  src={coverSrc}
+                  fileId={coverFileId}
+                  alt={String(designTitle)}
+                  fit="cover"
+                  rounded="none"
+                  containerClassName="w-full h-[120px]"
+                  maxHeightClassName=""
+                />
+              </div>
+            )}
+            <div className="px-2.5 py-1.5 bg-white/80 dark:bg-black/30 backdrop-blur-sm">
+              <p className="text-[11px] font-semibold text-gray-800 dark:text-gray-100 truncate leading-snug">
+                🎨 {String(designTitle)}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Quoted message (reply reference) */}
+        {message.quotedMessage && !isRedacted && (
+          <div className={`mb-1 rounded-xl overflow-hidden border-l-4 ${isOwn ? 'border-white/40' : 'border-purple-400 dark:border-purple-500'} ${isOwn ? 'bg-white/15' : 'bg-purple-50/70 dark:bg-purple-500/10'} px-2.5 py-1.5`}>
+            <p className={`text-[10px] font-semibold mb-0.5 ${isOwn ? 'text-white/70' : 'text-purple-700 dark:text-purple-300'}`}>
+              {message.quotedMessage.senderName || message.quotedMessage.senderRole}
+            </p>
+            <p className={`text-[11px] line-clamp-2 leading-snug ${isOwn ? 'text-white/60' : 'text-gray-600 dark:text-gray-400'}`}>
+              {message.quotedMessage.bodyText || '📎 Attachment'}
+            </p>
+          </div>
+        )}
+
+        {/* Main bubble — text + ticks only */}
         <div
           className={`rounded-2xl px-3.5 py-2 ${
             isModerated && showModerated
@@ -160,23 +245,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
             <p className="text-sm italic opacity-60">This message has been removed</p>
           ) : (
             <>
-              {message.metadataJson?.contextDesignTitle && (
-                <div className={`mb-2 rounded-lg overflow-hidden border ${isOwn ? 'border-white/20 bg-white/10' : 'border-purple-200/60 dark:border-purple-500/20 bg-purple-50/60 dark:bg-purple-500/5'}`}>
-                  {message.metadataJson.contextDesignCoverFileId && (
-                    <ImageWithFallback
-                      fileId={message.metadataJson.contextDesignCoverFileId as string}
-                      alt={String(message.metadataJson.contextDesignTitle)}
-                      fit="cover"
-                      rounded="none"
-                      containerClassName="w-full h-14"
-                      maxHeightClassName=""
-                    />
-                  )}
-                  <div className={`px-2 py-1.5 text-[11px] font-semibold truncate ${isOwn ? 'text-white/80' : 'text-purple-700 dark:text-purple-300'}`}>
-                    {String(message.metadataJson.contextDesignTitle)}
-                  </div>
-                </div>
-              )}
               {message.bodyText && (
                 <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{message.bodyText}</p>
               )}

@@ -566,6 +566,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                       contextDesignId: item.designId ?? undefined,
                       contextDesignTitle: item.collectionTitle,
                       contextDesignCoverFileId: item.coverMediaId ?? item.media.fileId ?? undefined,
+                      contextDesignCoverUrl: item.media.url ?? item.media.previewUrl ?? undefined,
                     });
                     setDirectMessageText('');
                     toast.success('Message sent');

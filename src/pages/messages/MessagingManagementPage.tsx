@@ -9,7 +9,7 @@ import { getStoreStatus } from '@/api/StoreApi';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import MessageBubble, { formatDate } from '@/components/messaging/MessageBubble';
-import ComposeArea from '@/components/messaging/ComposeArea';
+import ComposeArea, { type ReplyTo } from '@/components/messaging/ComposeArea';
 import ChatContactSidebar from '@/components/messaging/ChatContactSidebar';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
@@ -379,6 +379,7 @@ const MessagingManagementPage: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<ActiveAction>(null);
   const [showContactDetails, setShowContactDetails] = useState(false);
+  const [replyToMessage, setReplyToMessage] = useState<ReplyTo | null>(null);
   const [orderFilter, setOrderFilter] = useState<'all' | 'active' | 'closed' | 'cancelled' | 'disputed'>('all');
   const [threadOrders, setThreadOrders] = useState<ThreadOrderItem[]>([]);
   const [selectedOrderKey, setSelectedOrderKey] = useState('');
@@ -694,6 +695,7 @@ const MessagingManagementPage: React.FC = () => {
     setActiveAction(null);
     setOrderFilter('all');
     setSelectedOrderKey('');
+    setReplyToMessage(null);
     void refresh();
   }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -827,12 +829,12 @@ const MessagingManagementPage: React.FC = () => {
     }));
   };
 
-  const handleSend = useCallback(async (bodyText: string, attachmentFileIds: string[]) => {
+  const handleSend = useCallback(async (bodyText: string, attachmentFileIds: string[], replyToMessageId?: string) => {
     if (!activeConversation) return;
     const contextId = getContextId(activeConversation);
     const threadId = activeConversation.threadId;
     const ct = activeConversation.contextType;
-    const payload = { bodyText: bodyText || undefined, clientMessageId: nextClientMessageId(), attachmentFileIds };
+    const payload = { bodyText: bodyText || undefined, clientMessageId: nextClientMessageId(), attachmentFileIds, replyToMessageId };
 
     if ((ct === 'INQUIRY' || useThreadTransport) && threadId) {
       await messagingApi.sendThreadMessage(threadId, payload);
@@ -846,6 +848,7 @@ const MessagingManagementPage: React.FC = () => {
       else await messagingApi.sendOrderMessage(contextId, payload);
     }
 
+    setReplyToMessage(null);
     await refresh();
 
     // Update conversation list card with latest message preview
@@ -1256,7 +1259,15 @@ const MessagingManagementPage: React.FC = () => {
                     </div>
                     {group.msgs.map((msg) => (
                       <div key={msg.id} ref={(node) => { messageNodeRefs.current[msg.id] = node; }}>
-                        <MessageBubble message={msg} isOwn={!!actorId && msg.senderUserId === actorId} />
+                        <MessageBubble
+                          message={msg}
+                          isOwn={!!actorId && msg.senderUserId === actorId}
+                          onReply={(m) => setReplyToMessage({
+                            id: m.id,
+                            bodyText: m.bodyText,
+                            senderName: m.sender?.firstName || m.sender?.username || (m.senderUserId === actorId ? 'You' : m.senderRole),
+                          })}
+                        />
                       </div>
                     ))}
                   </div>
@@ -1296,6 +1307,8 @@ const MessagingManagementPage: React.FC = () => {
               onSend={handleSend}
               disabled={messagesLoading || sending}
               placeholder="Type a message..."
+              replyTo={replyToMessage}
+              onCancelReply={() => setReplyToMessage(null)}
             />
           </>
         )}

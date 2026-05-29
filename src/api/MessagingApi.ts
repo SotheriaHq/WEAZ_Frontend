@@ -50,7 +50,15 @@ export interface ThreadMessage {
     contextDesignId?: string;
     contextDesignTitle?: string;
     contextDesignCoverFileId?: string;
+    contextDesignCoverUrl?: string;
     [key: string]: unknown;
+  } | null;
+  /** Quoted message for replies (set when replyToMessageId was provided on send) */
+  quotedMessage?: {
+    id: string;
+    bodyText?: string | null;
+    senderRole: string;
+    senderName?: string | null;
   } | null;
 }
 
@@ -247,7 +255,7 @@ export const messagingApi = {
     return unwrapApiResponse<any>(response.data);
   },
 
-  async sendCustomOrderMessage(orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[] }) {
+  async sendCustomOrderMessage(orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
     const response = await apiClient.post(
       `/custom-orders/${orderId}/messages`,
       payload,
@@ -257,7 +265,7 @@ export const messagingApi = {
     return unwrapApiResponse<any>(response.data);
   },
 
-  async sendCustomOrderMessageForBrand(brandId: string, orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[] }) {
+  async sendCustomOrderMessageForBrand(brandId: string, orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
     const response = await apiClient.post(
       `/brands/${brandId}/custom-orders/${orderId}/messages`,
       payload,
@@ -331,7 +339,7 @@ export const messagingApi = {
     return parseMessageList(response.data);
   },
 
-  async sendOrderMessage(orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[] }) {
+  async sendOrderMessage(orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
     const response = await apiClient.post(
       `/orders/${orderId}/messages`,
       payload,
@@ -341,7 +349,7 @@ export const messagingApi = {
     return unwrapApiResponse<any>(response.data);
   },
 
-  async sendOrderMessageForBrand(brandId: string, orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[] }) {
+  async sendOrderMessageForBrand(brandId: string, orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
     const response = await apiClient.post(
       `/brands/${brandId}/orders/${orderId}/messages`,
       payload,
@@ -537,7 +545,7 @@ export const messagingApi = {
     return unwrapApiResponse<{ unreadCount: number }>(response.data);
   },
 
-  async sendBrandMessage(brandId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; contextDesignId?: string; contextDesignTitle?: string; contextDesignCoverFileId?: string }) {
+  async sendBrandMessage(brandId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; contextDesignId?: string; contextDesignTitle?: string; contextDesignCoverFileId?: string; contextDesignCoverUrl?: string; replyToMessageId?: string }) {
     const response = await apiClient.post(
       `/messaging/brands/${brandId}/messages`,
       payload,
@@ -546,7 +554,7 @@ export const messagingApi = {
     return unwrapApiResponse<any>(response.data);
   },
 
-  async sendThreadMessage(threadId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[] }) {
+  async sendThreadMessage(threadId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
     const response = await apiClient.post(
       `/messaging/threads/${threadId}/messages`,
       payload,
