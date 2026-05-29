@@ -139,6 +139,16 @@ const UserManageModal: React.FC<Props> = ({ user, open, onClose, onUpdated }) =>
   const isSeededUser = SEEDED_USER_EMAILS.has(user.email.toLowerCase());
   const isDeleted = user.status === 'DEACTIVATED';
   const isAdminTarget = user.role === 'Admin';
+  const canChangeRoles =
+    isSuperAdmin &&
+    hasPermission('USERS_ROLE_ASSIGN_ADMIN') &&
+    hasPermission('USERS_ROLE_ASSIGN_USER');
+  const canUpdateSensitiveUserAccess =
+    isSuperAdmin && hasPermission('USERS_UPDATE');
+  const canManagePermissions =
+    isSuperAdmin && hasPermission('PERMISSIONS_MANAGE');
+  const canWipeUserData =
+    isSuperAdmin && hasPermission('USERS_DATA_WIPE');
 
   const handleStatusChange = (status: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED') => {
     const labels: Record<typeof status, string> = {
@@ -388,7 +398,7 @@ const UserManageModal: React.FC<Props> = ({ user, open, onClose, onUpdated }) =>
               Changes apply immediately and are audited.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {isSuperAdmin && isAdminTarget && isDeleted && (
+              {canWipeUserData && isAdminTarget && isDeleted && (
                 <>
                   <button
                     onClick={handleRestoreDeletedAdmin}
@@ -434,7 +444,7 @@ const UserManageModal: React.FC<Props> = ({ user, open, onClose, onUpdated }) =>
                   Deactivate
                 </button>
               )}
-              {isSuperAdmin && !isDeleted && (
+              {canChangeRoles && !isDeleted && (
                 <button
                   onClick={handleRoleChange}
                   className={`${actionButtonClass} bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-500/20 dark:text-violet-200 dark:hover:bg-violet-500/30`}
@@ -443,7 +453,7 @@ const UserManageModal: React.FC<Props> = ({ user, open, onClose, onUpdated }) =>
                   {user.role === 'SuperAdmin' ? 'Demote to Admin' : 'Promote to SuperAdmin'}
                 </button>
               )}
-              {isSuperAdmin && user.role === 'Admin' && !isDeleted && (
+              {canUpdateSensitiveUserAccess && user.role === 'Admin' && !isDeleted && (
                 <button
                   onClick={handleForcePasswordReset}
                   className={`${actionButtonClass} bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-200 dark:hover:bg-white/20`}
@@ -452,7 +462,7 @@ const UserManageModal: React.FC<Props> = ({ user, open, onClose, onUpdated }) =>
                   Force Password Reset
                 </button>
               )}
-              {isSuperAdmin && user.role === 'Admin' && !isDeleted && (
+              {canWipeUserData && user.role === 'Admin' && !isDeleted && (
                 <button
                   onClick={handleDeleteAdminUser}
                   className={`${actionButtonClass} bg-rose-600 text-white hover:bg-rose-700`}
@@ -464,7 +474,7 @@ const UserManageModal: React.FC<Props> = ({ user, open, onClose, onUpdated }) =>
             </div>
           </div>
 
-          {isSuperAdmin && user.role === 'Admin' && !isDeleted && (
+          {canUpdateSensitiveUserAccess && user.role === 'Admin' && !isDeleted && (
             <div className="rounded-2xl border border-gray-200/80 bg-white px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Temporary Password Reissue</h3>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -542,7 +552,7 @@ const UserManageModal: React.FC<Props> = ({ user, open, onClose, onUpdated }) =>
             </div>
           )}
 
-          {isSuperAdmin && isSeededUser && (
+          {canWipeUserData && isSeededUser && (
             <div className="rounded-2xl border border-rose-200/80 bg-rose-50/70 px-4 py-4 dark:border-rose-500/30 dark:bg-rose-500/10">
               <h3 className="text-sm font-semibold text-rose-700 dark:text-rose-300">
                 Seeded User Hard Delete
@@ -560,7 +570,7 @@ const UserManageModal: React.FC<Props> = ({ user, open, onClose, onUpdated }) =>
             </div>
           )}
 
-          {isSuperAdmin && user.role === 'Admin' && !isDeleted && (
+          {canManagePermissions && user.role === 'Admin' && !isDeleted && (
             <div className="rounded-2xl border border-gray-200/80 bg-white px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Permissions</h3>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">

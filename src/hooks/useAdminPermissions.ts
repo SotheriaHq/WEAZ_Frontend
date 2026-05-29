@@ -7,6 +7,10 @@ const PERMISSION_ALIASES: Record<string, string> = {
   USERS_READ: 'users.read',
   USERS_UPDATE: 'users.update',
   USERS_WRITE: 'users.update',
+  USERS_ROLE_ASSIGN_ADMIN: 'users.role.assign_admin',
+  USERS_ROLE_ASSIGN_USER: 'users.role.assign_user',
+  USERS_DATA_EXPORT: 'users.data_export',
+  USERS_DATA_WIPE: 'users.data_wipe',
   USERS_SUSPEND: 'users.deactivate',
   USERS_DEACTIVATE: 'users.deactivate',
   USERS_NOTIFY: 'notifications.send',
@@ -38,8 +42,16 @@ const PERMISSION_ALIASES: Record<string, string> = {
   MARKET_RANKING_FORMULA_WRITE: 'market.ranking.formula.write',
   MARKET_RANKING_ROLLBACK: 'market.ranking.rollback',
   MARKET_SUGGESTIONS_WRITE: 'market.suggestions.write',
+  MESSAGING_READ: 'messaging.read',
+  MESSAGING_MODERATE: 'messaging.moderate',
+  NOTIFICATIONS_SEND: 'notifications.send',
+  SYSTEM_SETTINGS_WRITE: 'system.settings.write',
   SYSTEM_SLA_READ: 'system.sla.read',
   SYSTEM_SLA_WRITE: 'system.sla.write',
+  SYSTEM_DATA_RETENTION_WRITE: 'system.data_retention.write',
+  SYSTEM_FEATURE_FLAGS_WRITE: 'system.feature_flags.write',
+  ADMIN_EMAIL_CHANGE: 'admin.email_change',
+  PERMISSIONS_MANAGE: 'permissions.manage',
 };
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {

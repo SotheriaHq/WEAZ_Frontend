@@ -164,6 +164,7 @@ const AdminUsersPage: React.FC = () => {
   } | null>(null);
   const { hasPermission, isSuperAdmin } = useAdminPermissions();
   const canReadUsers = hasPermission('USERS_READ');
+  const canCreateAdmin = isSuperAdmin && hasPermission('USERS_ROLE_ASSIGN_ADMIN');
   const reactivationFetchInFlightRef = useRef(false);
 
   // sortBy maps to backend sort param only for date-based sorts
@@ -300,7 +301,7 @@ const AdminUsersPage: React.FC = () => {
           >
             🔄 Refresh
           </button>
-          {isSuperAdmin && (
+          {canCreateAdmin && (
             <button
               onClick={() => setShowCreateModal(true)}
               className="rounded-xl bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700"

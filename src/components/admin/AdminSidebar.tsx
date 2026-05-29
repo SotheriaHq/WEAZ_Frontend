@@ -12,6 +12,7 @@ interface NavItem {
   path: string;
   emoji: string;
   permission?: string;
+  permissions?: string[];
   superAdminOnly?: boolean;
 }
 
@@ -21,7 +22,13 @@ const navItems: NavItem[] = [
   { key: 'users', label: 'Users', path: '/admin/users', emoji: '👤', permission: 'USERS_READ' },
   { key: 'brands', label: 'Brands', path: '/admin/brands', emoji: '🏷️', permission: 'BRANDS_READ' },
   { key: 'verification', label: 'Verification', path: '/admin/verification', emoji: '🪪', permission: 'BRANDS_VERIFY' },
-  { key: 'content', label: 'Content Management', path: '/admin/content', emoji: '🧰' },
+  {
+    key: 'content',
+    label: 'Content Management',
+    path: '/admin/content',
+    emoji: '🧰',
+    permissions: ['PRODUCTS_READ', 'COLLECTIONS_READ'],
+  },
   { key: 'taxonomy', label: 'Taxonomy', path: '/admin/taxonomy', emoji: '🧬', permission: 'TAXONOMY_READ' },
   { key: 'tags', label: 'Hashtag moderation', path: '/admin/tags', emoji: '🏷️', permission: 'TAGS_READ' },
   { key: 'finance', label: 'Finance', path: '/admin/finance', emoji: '🏦', permission: 'PAYOUTS_READ' },
@@ -45,6 +52,9 @@ const AdminSidebar: React.FC = () => {
   const visibleItems = navItems.filter((item) => {
     if (item.superAdminOnly && !isSuperAdmin) return false;
     if (item.permission && !hasPermission(item.permission)) return false;
+    if (item.permissions && !item.permissions.some((code) => hasPermission(code))) {
+      return false;
+    }
     return true;
   });
 

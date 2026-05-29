@@ -36,6 +36,7 @@ const AdminProductsPage: React.FC = () => {
   const { hasPermission, isSuperAdmin } = useAdminPermissions();
   const canModerate = hasPermission('PRODUCTS_MODERATE');
   const canFeatured = hasPermission('FEATURED_MANAGE');
+  const canViewFeaturedHistory = isSuperAdmin && canFeatured;
 
   const [activeTab, setActiveTab] = useState<PageTab>('products');
 
@@ -554,7 +555,7 @@ const AdminProductsPage: React.FC = () => {
                   >
                     ⭐ Active
                   </button>
-                  {isSuperAdmin && (
+                  {canViewFeaturedHistory && (
                     <button
                       type="button"
                       onClick={() => setFeaturedView('history')}
@@ -688,7 +689,7 @@ const AdminProductsPage: React.FC = () => {
           )}
 
           {/* History view (SuperAdmin) */}
-          {featuredView === 'history' && isSuperAdmin && (
+          {featuredView === 'history' && canViewFeaturedHistory && (
             <>
               {historyLoading ? (
                 <div className="space-y-2">

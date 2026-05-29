@@ -199,12 +199,30 @@ const AdminProfileRouteGuard: React.FC<{ children: React.ReactNode }> = ({ child
 };
 
 const RequireAdminPermission: React.FC<{
-  permission?: string;
+  permission?: string | string[];
+  requireAll?: boolean;
+  superAdminOnly?: boolean;
   children: React.ReactNode;
-}> = ({ permission, children }) => {
+}> = ({ permission, requireAll = false, superAdminOnly = false, children }) => {
   const { isSuperAdmin, hasPermission } = useAdminPermissions();
 
-  if (!permission || isSuperAdmin || hasPermission(permission)) {
+  if (superAdminOnly && !isSuperAdmin) {
+    return <Navigate to="/admin" replace />;
+  }
+
+  const required = Array.isArray(permission)
+    ? permission
+    : permission
+      ? [permission]
+      : [];
+  const allowed =
+    required.length === 0 ||
+    isSuperAdmin ||
+    (requireAll
+      ? required.every((code) => hasPermission(code))
+      : required.some((code) => hasPermission(code)));
+
+  if (allowed) {
     return <>{children}</>;
   }
 
@@ -853,7 +871,7 @@ const router = createBrowserRouter([
           { path: 'brands', element: <RequireAdminPermission permission="BRANDS_READ"><AdminBrandsPage /></RequireAdminPermission> },
           { path: 'verification', element: <RequireAdminPermission permission="BRANDS_VERIFY"><AdminVerificationQueuePage /></RequireAdminPermission> },
           { path: 'brands/:id/verification-review', element: <RequireAdminPermission permission="BRANDS_VERIFY"><AdminBrandVerificationReviewPage /></RequireAdminPermission> },
-          { path: 'content', element: <AdminContentManagementPage /> },
+          { path: 'content', element: <RequireAdminPermission permission={['PRODUCTS_READ', 'COLLECTIONS_READ']}><AdminContentManagementPage /></RequireAdminPermission> },
           { path: 'products', element: <Navigate to="/admin/content?tab=products" replace /> },
           { path: 'collections', element: <Navigate to="/admin/content?tab=collections" replace /> },
           { path: 'taxonomy', element: <RequireAdminPermission permission="TAXONOMY_READ"><AdminTaxonomyPage /></RequireAdminPermission> },
@@ -871,8 +889,8 @@ const router = createBrowserRouter([
           { path: 'reviews', element: <RequireAdminPermission permission="MODERATION_READ"><AdminReviewsPage /></RequireAdminPermission> },
           { path: 'audit', element: <RequireAdminPermission permission="AUDIT_READ"><AdminAuditPage /></RequireAdminPermission> },
           { path: 'market-governance', element: <RequireAdminPermission permission="MARKET_GOVERNANCE_READ"><AdminMarketGovernancePage /></RequireAdminPermission> },
-          { path: 'settings', element: <RequireAdminPermission permission="SYSTEM_SLA_READ"><AdminSettingsPage /></RequireAdminPermission> },
-          { path: 'settings/sla', element: <RequireAdminPermission permission="SYSTEM_SLA_READ"><AdminSettingsPage /></RequireAdminPermission> },
+          { path: 'settings', element: <RequireAdminPermission superAdminOnly permission={['SYSTEM_SLA_READ', 'SYSTEM_FEATURE_FLAGS_WRITE', 'SYSTEM_SETTINGS_WRITE']}><AdminSettingsPage /></RequireAdminPermission> },
+          { path: 'settings/sla', element: <RequireAdminPermission superAdminOnly permission={['SYSTEM_SLA_READ', 'SYSTEM_FEATURE_FLAGS_WRITE', 'SYSTEM_SETTINGS_WRITE']}><AdminSettingsPage /></RequireAdminPermission> },
         ],
       },
       // Catch-all 404 route - must be last
