@@ -32,6 +32,15 @@ const setCachedUrl = (key: string, url: string) => {
   try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch { /* full */ }
 };
 
+export const clearSignedFileUrlSessionCache = () => {
+  inflight.clear();
+  try {
+    sessionStorage.removeItem(CACHE_KEY);
+  } catch {
+    // Session storage may be unavailable.
+  }
+};
+
 // In-flight dedup map (shared module-level singleton)
 const inflight = new Map<string, Promise<string | null>>();
 

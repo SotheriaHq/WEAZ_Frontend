@@ -1,11 +1,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { disconnectSocket } from '../lib/ws';
 import type { ReactNode } from 'react';
 import { unwrapApiResponse } from '../types/auth';
 import type { AuthUserDto, AuthProfileResponse, AuthTokensResponse } from '../types/auth';
 import { useDispatch } from 'react-redux';
 import { env } from '../config/env';
 import { setUser, setUserFromStorage, clearUser } from '../features/userSlice';
+import { resetAdminState } from '../features/adminSlice';
+import { resetCartState } from '../features/cartSlice';
+import { resetState as resetNotificationsState } from '../features/notificationsSlice';
+import { resetWishlistState } from '../features/wishlistSlice';
 import {
   apiClient,
   dropStoredAccessToken,
@@ -15,6 +18,7 @@ import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
 import { queryClient } from '@/query/queryClient';
 import { queryKeys } from '@/query/queryKeys';
+import { clearWebPrivateSessionState } from '@/auth/sessionCleanup';
 
 interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
@@ -102,6 +106,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const hasInitialisedRef = useRef(false);
 
+  const clearPrivateSession = useCallback(async () => {
+    await clearWebPrivateSessionState({ client: queryClient });
+    dispatch(clearUser());
+    dispatch(resetNotificationsState());
+    dispatch(resetCartState());
+    dispatch(resetWishlistState());
+    dispatch(resetAdminState());
+  }, [dispatch]);
+
   useEffect(() => {
     if (hasInitialisedRef.current) {
       return;
@@ -111,8 +124,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let isMounted = true;
 
     const onAuthExpired = () => {
-      dropStoredAccessToken();
-      dispatch(clearUser());
+      void clearPrivateSession();
       try { toast.info('Session expired. Please sign in again.'); } catch {}
     };
     if (typeof window !== 'undefined') {
@@ -165,7 +177,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         window.removeEventListener('storage', onUserStorage);
       }
     };
-  }, [dispatch, fetchUserProfile, handleProfileError]);
+  }, [dispatch, fetchUserProfile, handleProfileError, clearPrivateSession]);
 
   const login = async (email: string, password: string) => {
     setLoading(true);
@@ -213,10 +225,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     void apiClient.post('/auth/logout').catch(() => undefined);
-    queryClient.removeQueries({ queryKey: queryKeys.auth.profile(), exact: true });
-    dropStoredAccessToken();
-    dispatch(clearUser());
-    disconnectSocket();
+    void clearPrivateSession();
   };
 
   return (
