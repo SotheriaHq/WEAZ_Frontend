@@ -9,8 +9,8 @@ describe('checkoutStatusCopy', () => {
     const returnCopy = getCheckoutStatusCopy('return', 'PAID');
     const confirmationCopy = getCheckoutStatusCopy('confirmation', 'PAID');
 
-    expect(returnCopy.headline).toBe('Payment confirmed');
-    expect(confirmationCopy.headline).toBe('Payment confirmed');
+    expect(returnCopy.headline).toBe('Your order is placed successfully');
+    expect(confirmationCopy.headline).toBe('Your order is placed successfully');
     expect(returnCopy.description).not.toBe(confirmationCopy.description);
     expect(returnCopy.emoji).toBe('✅');
     expect(confirmationCopy.emoji).toBe('✅');
