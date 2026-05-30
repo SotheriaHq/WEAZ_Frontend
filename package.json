@@ -35,7 +35,7 @@
     "@tanstack/react-query-devtools": "^5.100.11",
     "@tanstack/react-query-persist-client": "^5.100.11",
     "@types/qrcode.react": "^1.0.5",
-    "axios": "^1.15.2",
+    "axios": "^1.16.1",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
     "emoji-mart": "^5.6.0",
