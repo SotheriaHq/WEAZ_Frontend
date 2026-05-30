@@ -74,7 +74,9 @@ const initialState: CartState = {
 };
 
 type FetchCartArgs = { force?: boolean } | undefined;
-type CartRootState = { cart: CartState };
+type LifecycleRootState = { cart: CartState; user?: { profile?: { id?: string | null } | null } };
+
+const selectLifecycleUserId = (state: LifecycleRootState) => state.user?.profile?.id ?? null;
 
 const normalizeCartPayload = (payload: Partial<CartState> | null | undefined): CartState => {
   const items = Array.isArray(payload?.items) ? payload!.items : [];
@@ -128,18 +130,20 @@ const unwrapResponse = (responseData: any) => responseData?.data ?? responseData
 export const fetchCart = createAsyncThunk<
   CartState,
   FetchCartArgs,
-  { state: CartRootState; rejectValue: string }
+  { state: LifecycleRootState; rejectValue: string }
 >('cart/fetchCart', async (args, { getState, rejectWithValue }) => {
   try {
     const cart = getState().cart;
+    const userId = selectLifecycleUserId(getState());
+    const cartQueryKey = queryKeys.store.cart(userId);
     if (!args?.force && cart.lastFetchedAt > 0 && Date.now() - cart.lastFetchedAt < CART_READ_TTL_MS) {
       return { ...cart, isLoading: false, error: null };
     }
     if (args?.force) {
-      queryClient.removeQueries({ queryKey: queryKeys.store.cart(), exact: true });
+      queryClient.removeQueries({ queryKey: cartQueryKey, exact: true });
     }
     return await queryClient.fetchQuery({
-      queryKey: queryKeys.store.cart(),
+      queryKey: cartQueryKey,
       queryFn: async () => {
         const response = await apiClient.get('/store/cart');
         return unwrapResponse(response.data);
@@ -164,13 +168,15 @@ export const addToCart = createAsyncThunk(
       requiredMeasurementKeys?: string[];
       measurementOverrideAccepted?: boolean;
     },
-    { rejectWithValue }
+    { getState, rejectWithValue }
   ) => {
     try {
+      const userId = selectLifecycleUserId(getState() as LifecycleRootState);
+      const cartQueryKey = queryKeys.store.cart(userId);
       const response = await apiClient.post('/store/cart', payload);
       const data = unwrapResponse(response.data);
-      queryClient.setQueryData(queryKeys.store.cart(), data);
-      queryClient.invalidateQueries({ queryKey: queryKeys.store.bagCount() });
+      queryClient.setQueryData(cartQueryKey, data);
+      queryClient.invalidateQueries({ queryKey: queryKeys.store.bagCount(userId) });
       return data;
     } catch (error: any) {
       const serverMessage =
@@ -194,14 +200,16 @@ export const addToCart = createAsyncThunk(
 
 export const updateCartItem = createAsyncThunk(
   'cart/updateCartItem',
-  async (payload: { itemId: string; quantity: number }, { rejectWithValue }) => {
+  async (payload: { itemId: string; quantity: number }, { getState, rejectWithValue }) => {
     try {
+      const userId = selectLifecycleUserId(getState() as LifecycleRootState);
+      const cartQueryKey = queryKeys.store.cart(userId);
       const response = await apiClient.patch(`/store/cart/${payload.itemId}`, {
         quantity: payload.quantity,
       });
       const data = unwrapResponse(response.data);
-      queryClient.setQueryData(queryKeys.store.cart(), data);
-      queryClient.invalidateQueries({ queryKey: queryKeys.store.bagCount() });
+      queryClient.setQueryData(cartQueryKey, data);
+      queryClient.invalidateQueries({ queryKey: queryKeys.store.bagCount(userId) });
       return data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to update cart');
@@ -211,12 +219,14 @@ export const updateCartItem = createAsyncThunk(
 
 export const removeFromCart = createAsyncThunk(
   'cart/removeFromCart',
-  async (itemId: string, { rejectWithValue }) => {
+  async (itemId: string, { getState, rejectWithValue }) => {
     try {
+      const userId = selectLifecycleUserId(getState() as LifecycleRootState);
+      const cartQueryKey = queryKeys.store.cart(userId);
       const response = await apiClient.delete(`/store/cart/${itemId}`);
       const data = unwrapResponse(response.data);
-      queryClient.setQueryData(queryKeys.store.cart(), data);
-      queryClient.invalidateQueries({ queryKey: queryKeys.store.bagCount() });
+      queryClient.setQueryData(cartQueryKey, data);
+      queryClient.invalidateQueries({ queryKey: queryKeys.store.bagCount(userId) });
       return data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to remove from cart');
@@ -224,11 +234,12 @@ export const removeFromCart = createAsyncThunk(
   }
 );
 
-export const clearCart = createAsyncThunk('cart/clearCart', async (_, { rejectWithValue }) => {
+export const clearCart = createAsyncThunk('cart/clearCart', async (_, { getState, rejectWithValue }) => {
   try {
+    const userId = selectLifecycleUserId(getState() as LifecycleRootState);
     await apiClient.delete('/store/cart');
-    queryClient.setQueryData(queryKeys.store.cart(), initialState);
-    queryClient.invalidateQueries({ queryKey: queryKeys.store.bagCount() });
+    queryClient.setQueryData(queryKeys.store.cart(userId), initialState);
+    queryClient.invalidateQueries({ queryKey: queryKeys.store.bagCount(userId) });
     return true;
   } catch (error: any) {
     return rejectWithValue(error.response?.data?.message || 'Failed to clear cart');
@@ -238,12 +249,15 @@ export const clearCart = createAsyncThunk('cart/clearCart', async (_, { rejectWi
 export const fetchCustomBagCount = createAsyncThunk<
   { standardQuantity: number; customLineCount: number; combinedCount: number },
   { force?: boolean } | undefined,
-  { state: CartRootState; rejectValue: string }
+  { state: LifecycleRootState; rejectValue: string }
 >(
   'cart/fetchCustomBagCount',
   async (args, { getState, rejectWithValue }) => {
     try {
-      const cart = (getState() as CartRootState).cart;
+      const state = getState() as LifecycleRootState;
+      const cart = state.cart;
+      const userId = selectLifecycleUserId(state);
+      const bagCountQueryKey = queryKeys.store.bagCount(userId);
       if (
         !args?.force &&
         cart.customBagCountFetchedAt > 0 &&
@@ -256,10 +270,10 @@ export const fetchCustomBagCount = createAsyncThunk<
         };
       }
       if (args?.force) {
-        queryClient.removeQueries({ queryKey: queryKeys.store.bagCount(), exact: true });
+        queryClient.removeQueries({ queryKey: bagCountQueryKey, exact: true });
       }
       return await queryClient.fetchQuery({
-        queryKey: queryKeys.store.bagCount(),
+        queryKey: bagCountQueryKey,
         queryFn: () => BagApi.getBagCount(),
         staleTime: CART_READ_TTL_MS,
       });

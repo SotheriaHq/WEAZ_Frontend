@@ -10,6 +10,8 @@ import { purgeWebPersistedQueryCache, THREADLY_QUERY_CACHE_STORAGE_KEY } from '@
 import { clearWebMarketSignalQueue } from '@/services/marketSignalQueue';
 
 const SIGNED_URL_SESSION_STORAGE_KEY = 'threadly_signed_url_cache';
+const PENDING_BAG_ACTION_SESSION_STORAGE_KEY = 'threadly.pendingBagAction.v1';
+const UNIFIED_CHECKOUT_QUEUE_SESSION_STORAGE_KEY = 'threadly.unifiedCheckout.queue.v1';
 
 const PRIVATE_QUERY_ROOTS = new Set([
   'auth',
@@ -85,5 +87,9 @@ export const clearWebPrivateSessionState = async ({
     ACTIVE_BRAND_STORAGE_KEY,
     THREADLY_QUERY_CACHE_STORAGE_KEY,
   ]);
-  removeSessionStorageKeys([SIGNED_URL_SESSION_STORAGE_KEY]);
+  removeSessionStorageKeys([
+    SIGNED_URL_SESSION_STORAGE_KEY,
+    PENDING_BAG_ACTION_SESSION_STORAGE_KEY,
+    UNIFIED_CHECKOUT_QUEUE_SESSION_STORAGE_KEY,
+  ]);
 };

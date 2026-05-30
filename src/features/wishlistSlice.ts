@@ -84,7 +84,12 @@ const initialState: WishlistState = {
 };
 
 type FetchWishlistArgs = { page?: number; limit?: number; force?: boolean };
-type WishlistRootState = { wishlist: WishlistState };
+type LifecycleRootState = {
+  wishlist: WishlistState;
+  user?: { profile?: { id?: string | null } | null };
+};
+
+const selectLifecycleUserId = (state: LifecycleRootState) => state.user?.profile?.id ?? null;
 
 const getWishlistFetchKey = (params: FetchWishlistArgs = {}) =>
   JSON.stringify({
@@ -97,8 +102,11 @@ export const fetchWishlist = createAsyncThunk(
   'wishlist/fetchWishlist',
   async (params: FetchWishlistArgs = {}, { getState, rejectWithValue }) => {
     try {
-      const wishlist = (getState() as WishlistRootState).wishlist;
+      const state = getState() as LifecycleRootState;
+      const wishlist = state.wishlist;
+      const userId = selectLifecycleUserId(state);
       const requestKey = getWishlistFetchKey(params);
+      const wishlistQueryKey = queryKeys.store.wishlist(userId, { page: params.page ?? 1, limit: params.limit ?? null });
       if (
         !params.force &&
         wishlist.lastFetchKey === requestKey &&
@@ -108,10 +116,10 @@ export const fetchWishlist = createAsyncThunk(
         return { items: wishlist.items, total: wishlist.total };
       }
       if (params.force) {
-        queryClient.removeQueries({ queryKey: queryKeys.store.wishlist({ page: params.page ?? 1, limit: params.limit ?? null }), exact: true });
+        queryClient.removeQueries({ queryKey: wishlistQueryKey, exact: true });
       }
       return await queryClient.fetchQuery({
-        queryKey: queryKeys.store.wishlist({ page: params.page ?? 1, limit: params.limit ?? null }),
+        queryKey: wishlistQueryKey,
         queryFn: async () => {
           const response = await apiClient.get('/store/wishlist', { params });
           return unwrapApiResponse(response.data);
@@ -126,11 +134,12 @@ export const fetchWishlist = createAsyncThunk(
 
 export const addToWishlist = createAsyncThunk(
   'wishlist/addToWishlist',
-  async (productId: string, { rejectWithValue }) => {
+  async (productId: string, { getState, rejectWithValue }) => {
     try {
+      const userId = selectLifecycleUserId(getState() as LifecycleRootState);
       const response = await apiClient.post('/store/wishlist', { productId });
       const payload = unwrapApiResponse<Record<string, unknown>>(response.data);
-      queryClient.invalidateQueries({ queryKey: ['store', 'wishlist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.store.wishlistRoot(userId) });
       return { productId, ...(payload ?? {}) };
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to add to wishlist');
@@ -140,14 +149,15 @@ export const addToWishlist = createAsyncThunk(
 
 export const removeFromWishlist = createAsyncThunk(
   'wishlist/removeFromWishlist',
-  async (productId: string, { rejectWithValue }) => {
+  async (productId: string, { getState, rejectWithValue }) => {
+    const userId = selectLifecycleUserId(getState() as LifecycleRootState);
     try {
       await apiClient.delete(`/store/wishlist/${productId}`);
-      queryClient.invalidateQueries({ queryKey: ['store', 'wishlist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.store.wishlistRoot(userId) });
       return productId;
     } catch (error: any) {
       if (error?.response?.status === 404) {
-        queryClient.invalidateQueries({ queryKey: ['store', 'wishlist'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.store.wishlistRoot(userId) });
         return productId;
       }
       return rejectWithValue(error.response?.data?.message || 'Failed to remove from wishlist');

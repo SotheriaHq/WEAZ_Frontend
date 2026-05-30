@@ -182,7 +182,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      dropStoredAccessToken();
+      await clearPrivateSession();
       const response = await apiClient.post('/auth/login', { email, password });
       const loginPayload = unwrapApiResponse<AuthTokensResponse | AuthUserDto>(response.data);
 

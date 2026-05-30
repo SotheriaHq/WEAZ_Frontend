@@ -48,8 +48,8 @@ describe('clearWebPrivateSessionState', () => {
     client.setQueryData(['auth', 'profile'], { id: 'previous-user' });
     client.setQueryData(['notifications', 'unreadCount'], { count: 4 });
     client.setQueryData(['messaging', 'unreadCount'], { unreadCount: 2 });
-    client.setQueryData(['store', 'cart'], { items: ['private-cart'] });
-    client.setQueryData(['saved', 'batch', 'PRODUCT', ['product-1']], { isSaved: true });
+    client.setQueryData(['store', 'cart', 'previous-user'], { items: ['private-cart'] });
+    client.setQueryData(['saved', 'batch', 'previous-user', 'PRODUCT', ['product-1']], { isSaved: true });
     client.setQueryData(['media', 'signedUrl', 'private-file'], 'https://signed.example/private');
     client.setQueryData(['config', 'uploadLimits'], { maxBytes: 1_000_000 });
 
@@ -58,6 +58,8 @@ describe('clearWebPrivateSessionState', () => {
     localStorage.setItem('THREADLY_QUERY_CACHE_V1', JSON.stringify({ private: true }));
     localStorage.setItem('threadly.activeBrandId', 'brand-1');
     sessionStorage.setItem('threadly_signed_url_cache', JSON.stringify({ file: 'signed-url' }));
+    sessionStorage.setItem('threadly.pendingBagAction.v1', JSON.stringify({ productId: 'product-1' }));
+    sessionStorage.setItem('threadly.unifiedCheckout.queue.v1', JSON.stringify({ lines: [] }));
 
     await clearWebPrivateSessionState({ client });
 
@@ -68,8 +70,8 @@ describe('clearWebPrivateSessionState', () => {
     expect(client.getQueryData(['auth', 'profile'])).toBeUndefined();
     expect(client.getQueryData(['notifications', 'unreadCount'])).toBeUndefined();
     expect(client.getQueryData(['messaging', 'unreadCount'])).toBeUndefined();
-    expect(client.getQueryData(['store', 'cart'])).toBeUndefined();
-    expect(client.getQueryData(['saved', 'batch', 'PRODUCT', ['product-1']])).toBeUndefined();
+    expect(client.getQueryData(['store', 'cart', 'previous-user'])).toBeUndefined();
+    expect(client.getQueryData(['saved', 'batch', 'previous-user', 'PRODUCT', ['product-1']])).toBeUndefined();
     expect(client.getQueryData(['media', 'signedUrl', 'private-file'])).toBeUndefined();
     expect(client.getQueryData(['config', 'uploadLimits'])).toEqual({ maxBytes: 1_000_000 });
     expect(localStorage.getItem('THREADLY_ACCESS_TOKEN')).toBeNull();
@@ -77,6 +79,8 @@ describe('clearWebPrivateSessionState', () => {
     expect(localStorage.getItem('THREADLY_QUERY_CACHE_V1')).toBeNull();
     expect(localStorage.getItem('threadly.activeBrandId')).toBeNull();
     expect(sessionStorage.getItem('threadly_signed_url_cache')).toBeNull();
+    expect(sessionStorage.getItem('threadly.pendingBagAction.v1')).toBeNull();
+    expect(sessionStorage.getItem('threadly.unifiedCheckout.queue.v1')).toBeNull();
   });
 
   it('uses the same cleanup function for failed refresh/auth-expired wiring', async () => {

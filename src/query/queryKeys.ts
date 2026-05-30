@@ -24,6 +24,26 @@ const normalizeRecord = (value?: Record<string, unknown> | null) => {
     }, {});
 };
 
+type WishlistParams = Record<string, unknown> | null | undefined;
+
+const resolveWishlistArgs = (
+  userIdOrParams?: string | null | WishlistParams,
+  params?: WishlistParams,
+) => {
+  if (
+    userIdOrParams &&
+    typeof userIdOrParams === 'object' &&
+    !Array.isArray(userIdOrParams)
+  ) {
+    return { userId: '', params: userIdOrParams };
+  }
+
+  return {
+    userId: normalizeId(userIdOrParams as string | null | undefined),
+    params,
+  };
+};
+
 export const queryKeys = {
   auth: {
     profile: () => ['auth', 'profile'] as const,
@@ -70,9 +90,13 @@ export const queryKeys = {
   },
   store: {
     status: () => ['store', 'status'] as const,
-    cart: () => ['store', 'cart'] as const,
-    wishlist: (params?: Record<string, unknown> | null) => ['store', 'wishlist', normalizeRecord(params)] as const,
-    bagCount: () => ['store', 'bagCount'] as const,
+    cart: (userId?: string | null) => ['store', 'cart', normalizeId(userId)] as const,
+    wishlistRoot: (userId?: string | null) => ['store', 'wishlist', normalizeId(userId)] as const,
+    wishlist: (userIdOrParams?: string | null | WishlistParams, params?: WishlistParams) => {
+      const resolved = resolveWishlistArgs(userIdOrParams, params);
+      return ['store', 'wishlist', resolved.userId, normalizeRecord(resolved.params)] as const;
+    },
+    bagCount: (userId?: string | null) => ['store', 'bagCount', normalizeId(userId)] as const,
   },
   config: {
     uploadLimits: () => ['config', 'uploadLimits'] as const,
