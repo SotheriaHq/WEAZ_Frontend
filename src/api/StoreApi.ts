@@ -78,7 +78,7 @@ export interface Product {
 
 export type BagMode = 'STANDARD' | 'CUSTOM' | 'STANDARD_OR_CUSTOM' | 'UNAVAILABLE';
 export type BagFittingState = 'COMPLETE' | 'PARTIAL' | 'MISSING' | 'NOT_REQUIRED';
-export type BagFreshnessState = 'FRESH' | 'STALE' | 'MISSING' | 'PARTIAL' | 'NOT_REQUIRED';
+export type BagFreshnessState = 'FRESH' | 'STALE' | 'VERY_STALE' | 'MISSING' | 'PARTIAL' | 'NOT_REQUIRED';
 export type BagStockState = 'IN_STOCK' | 'OUT_OF_STOCK' | 'CUSTOM_ONLY' | 'UNAVAILABLE';
 export type BagPulseStatus =
   | 'not_bagged'
@@ -130,9 +130,13 @@ export interface BagStatus {
     fittingState: BagFittingState;
     freshnessState?: BagFreshnessState;
     missingMeasurementKeys: string[];
+    staleMeasurementKeys?: string[];
+    veryStaleMeasurementKeys?: string[];
     measurementUpdatedAt?: string | null;
     staleAfterDays?: number;
     staleAt?: string | null;
+    veryStaleAfterDays?: number;
+    veryStaleAt?: string | null;
     requiresStaleConfirmation?: boolean;
   };
   customOrder?: {
@@ -146,9 +150,13 @@ export interface BagStatus {
     fittingsComplete: boolean;
     freshnessState?: BagFreshnessState;
     missingMeasurementKeys: string[];
+    staleMeasurementKeys?: string[];
+    veryStaleMeasurementKeys?: string[];
     measurementUpdatedAt?: string | null;
     staleAfterDays?: number;
     staleAt?: string | null;
+    veryStaleAfterDays?: number;
+    veryStaleAt?: string | null;
     requiresStaleConfirmation?: boolean;
   };
   duplicateState?: {

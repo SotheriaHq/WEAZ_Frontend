@@ -39,6 +39,7 @@ type StandardBagOptions = {
   sizingMode?: SizingMode;
   requiredMeasurementKeys?: string[];
   sizeFitData?: Record<string, unknown>;
+  measurementOverrideAccepted?: boolean;
   suppressAuthPrompt?: boolean;
 };
 
@@ -55,8 +56,10 @@ const isFittingsIncomplete = (status: BagStatus) =>
 const requiresStaleConfirmation = (status: BagStatus) =>
   status.ui.defaultAction === 'CONFIRM_STALE_FITTINGS' ||
   status.custom.freshnessState === 'STALE' ||
+  status.custom.freshnessState === 'VERY_STALE' ||
   status.custom.requiresStaleConfirmation === true ||
   status.customOrder?.freshnessState === 'STALE' ||
+  status.customOrder?.freshnessState === 'VERY_STALE' ||
   status.customOrder?.requiresStaleConfirmation === true;
 
 const duplicateClasses = (status: BagStatus) => status.duplicateState?.classifications ?? [];
@@ -150,6 +153,7 @@ export function useBagging() {
             sizingMode: options.sizingMode,
             requiredMeasurementKeys: options.requiredMeasurementKeys,
             sizeFitData: options.sizeFitData,
+            measurementOverrideAccepted: options.measurementOverrideAccepted,
           }),
         ).unwrap();
         await refreshBagCounts();

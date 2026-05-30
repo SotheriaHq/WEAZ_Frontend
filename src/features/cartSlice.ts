@@ -162,6 +162,7 @@ export const addToCart = createAsyncThunk(
       sizingMode?: SizingMode;
       sizeFitData?: Record<string, any>;
       requiredMeasurementKeys?: string[];
+      measurementOverrideAccepted?: boolean;
     },
     { rejectWithValue }
   ) => {

@@ -46,6 +46,25 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
     () => status?.custom.missingMeasurementKeys ?? [],
     [status?.custom.missingMeasurementKeys],
   );
+  const staleMeasurements = useMemo(() => {
+    const custom = status?.custom;
+    if (!custom) return [];
+    if (Array.isArray(custom.veryStaleMeasurementKeys) && custom.veryStaleMeasurementKeys.length > 0) {
+      return custom.veryStaleMeasurementKeys;
+    }
+    if (Array.isArray(custom.staleMeasurementKeys) && custom.staleMeasurementKeys.length > 0) {
+      return custom.staleMeasurementKeys;
+    }
+    return custom.freshnessState === 'STALE' || custom.freshnessState === 'VERY_STALE'
+      ? custom.requiredMeasurementKeys
+      : [];
+  }, [status?.custom]);
+  const measurementsToEdit = useMemo(
+    () => (missingMeasurements.length > 0 ? missingMeasurements : staleMeasurements),
+    [missingMeasurements, staleMeasurements],
+  );
+  const isRefreshingStaleMeasurements =
+    missingMeasurements.length === 0 && staleMeasurements.length > 0;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -61,8 +80,13 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
             ? (profile.measurements as Record<string, unknown>)
             : {};
         setValues(
-          missingMeasurements.reduce<Record<string, string>>((acc, key) => {
-            const parsed = Number(measurements[key]);
+          measurementsToEdit.reduce<Record<string, string>>((acc, key) => {
+            const raw = measurements[key];
+            const value =
+              raw && typeof raw === 'object' && 'value' in (raw as Record<string, unknown>)
+                ? (raw as Record<string, unknown>).value
+                : raw;
+            const parsed = Number(value);
             acc[key] = Number.isFinite(parsed) && parsed > 0 ? String(parsed) : '';
             return acc;
           }, {}),
@@ -78,15 +102,15 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
     return () => {
       active = false;
     };
-  }, [isOpen, missingMeasurements]);
+  }, [isOpen, measurementsToEdit]);
 
   const unresolvedMeasurements = useMemo(
     () =>
-      missingMeasurements.filter((key) => {
+      measurementsToEdit.filter((key) => {
         const parsed = Number(values[key]);
         return !(Number.isFinite(parsed) && parsed > 0);
       }),
-    [missingMeasurements, values],
+    [measurementsToEdit, values],
   );
 
   const handleSave = async () => {
@@ -106,7 +130,7 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
           : {};
       const normalised = {
         ...currentMeasurements,
-        ...missingMeasurements.reduce<Record<string, { value: number; unit: 'CM' }>>((acc, key) => {
+        ...measurementsToEdit.reduce<Record<string, { value: number; unit: 'CM' }>>((acc, key) => {
           acc[key] = { value: Number(values[key]), unit: 'CM' };
           return acc;
         }, {}),
@@ -179,19 +203,21 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
                       Finish the measurements for {product.name || 'this item'}
                     </h2>
                     <p className="text-sm text-slate-600 dark:text-slate-400">
-                      Add the missing measurements before this custom request can move forward.
+                      {isRefreshingStaleMeasurements
+                        ? 'Refresh only the stale measurements needed for this request.'
+                        : 'Add the missing measurements before this request can move forward.'}
                     </p>
                   </div>
 
                   <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                      Missing measurements
+                      {isRefreshingStaleMeasurements ? 'Measurements to refresh' : 'Missing measurements'}
                     </p>
                     {loading ? (
                       <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">Loading fittings...</p>
-                    ) : missingMeasurements.length > 0 ? (
+                    ) : measurementsToEdit.length > 0 ? (
                       <div className="mt-3 space-y-3">
-                        {missingMeasurements.map((measurement) => (
+                        {measurementsToEdit.map((measurement) => (
                           <label key={measurement} className="block space-y-1">
                             <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                               {formatMeasurementLabel(measurement)} (cm)
@@ -212,7 +238,7 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
                       </div>
                     ) : (
                       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                        No measurements are missing, but this request still needs the custom order step.
+                        No measurements are missing, but this request still needs the next bagging step.
                       </p>
                     )}
                   </div>

@@ -27,6 +27,9 @@ type BagProductInput = {
   name?: string;
   sourceType?: BagSourceType;
   sourceId?: string;
+  selectedSize?: string | null;
+  selectedColor?: string | null;
+  quantity?: number;
 };
 
 type BagFlowTarget = {
@@ -196,7 +199,11 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
           setFittingsTarget({ product, status });
           return;
         }
-        if (status.custom.requiresStaleConfirmation || status.custom.freshnessState === 'STALE') {
+        if (
+          status.custom.requiresStaleConfirmation ||
+          status.custom.freshnessState === 'STALE' ||
+          status.custom.freshnessState === 'VERY_STALE'
+        ) {
           setStaleTarget({ product, status });
           return;
         }
@@ -262,7 +269,11 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
       setFittingsTarget({ product, status });
       return;
     }
-    if (status.custom.requiresStaleConfirmation || status.custom.freshnessState === 'STALE') {
+    if (
+      status.custom.requiresStaleConfirmation ||
+      status.custom.freshnessState === 'STALE' ||
+      status.custom.freshnessState === 'VERY_STALE'
+    ) {
       setStaleTarget({ product, status });
       return;
     }
@@ -361,6 +372,14 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
         product={selectorTarget?.product ?? null}
         status={selectorTarget?.status ?? null}
         onClose={closeActiveFlow}
+        onRequireFittings={(product, status) => {
+          setSelectorTarget(null);
+          setFittingsTarget({ product, status });
+        }}
+        onRequireStaleConfirmation={(product, status) => {
+          setSelectorTarget(null);
+          setStaleTarget({ product, status });
+        }}
       />
 
       <BagFittingsModal
@@ -370,7 +389,7 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
         onClose={closeActiveFlow}
         onResolved={(nextStatus) => {
           if (!fittingsTarget) return;
-          openCustomFlow(fittingsTarget.product, nextStatus);
+          void routeResolvedStatus(fittingsTarget.product, nextStatus);
         }}
       />
 
@@ -387,6 +406,33 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
           if (!staleTarget) return;
           const target = staleTarget;
           setStaleTarget(null);
+          if (target.status.standard.available && !target.status.custom.configurationId) {
+            void dispatch(
+              addToCart({
+                productId: target.product.id,
+                quantity: target.product.quantity ?? 1,
+                selectedSize: target.product.selectedSize ?? undefined,
+                selectedColor: target.product.selectedColor ?? undefined,
+                measurementOverrideAccepted: true,
+              }),
+            )
+              .unwrap()
+              .then(async () => {
+                await Promise.allSettled([
+                  dispatch(fetchCart({ force: true })).unwrap(),
+                  dispatch(fetchCustomBagCount({ force: true })).unwrap(),
+                ]);
+                dispatch(openCartDrawer());
+              })
+              .catch((error) => {
+                toast.error(
+                  typeof error === 'string' && error.trim()
+                    ? error
+                    : 'Unable to bag with saved fittings.',
+                );
+              });
+            return;
+          }
           setCustomTarget(target);
         }}
       />

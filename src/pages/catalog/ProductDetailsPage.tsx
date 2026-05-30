@@ -545,8 +545,12 @@ export default function ProductDetailsPage() {
   const handleModalSaveAndAdd = async () => {
     // Build normalised values from modal inputs
     const normalised: Record<string, { value: number; unit: 'CM' }> = {};
+    const combinedMeasurementValues = {
+      ...measurementValues,
+      ...modalMeasurementValues,
+    };
     requiredMeasurementKeys.forEach((key) => {
-      const parsed = Number(modalMeasurementValues[key]);
+      const parsed = Number(combinedMeasurementValues[key]);
       if (Number.isFinite(parsed) && parsed > 0) {
         normalised[key] = { value: parsed, unit: 'CM' };
       }
@@ -645,7 +649,7 @@ export default function ProductDetailsPage() {
                   <p className="text-xs text-slate-600 dark:text-slate-400">
                     This product requires custom measurements. Fill in the values below to add it to your bag.
                   </p>
-                  {requiredMeasurementKeys.map((key) => {
+                  {missingMeasurementKeys.map((key) => {
                     const isMissing = missingMeasurementKeys.includes(key);
                     return (
                       <label key={key} className="flex flex-col gap-1">

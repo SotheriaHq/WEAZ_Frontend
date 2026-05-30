@@ -252,7 +252,8 @@ export const DesignCard: React.FC<DesignCardProps> = ({
       if (
         status.ui.defaultAction === 'CONFIRM_STALE_FITTINGS' ||
         status.custom.requiresStaleConfirmation ||
-        status.custom.freshnessState === 'STALE'
+        status.custom.freshnessState === 'STALE' ||
+        status.custom.freshnessState === 'VERY_STALE'
       ) {
         bagFlow.openStaleConfirmation(designBagTarget, status);
         return;

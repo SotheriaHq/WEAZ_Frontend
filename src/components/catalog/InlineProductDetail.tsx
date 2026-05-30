@@ -454,7 +454,10 @@ export default function InlineProductDetail({
   };
 
   const handleModalSaveAndAdd = async () => {
-    const normalized = normalizeMeasurements(modalMeasurementValues);
+    const normalized = normalizeMeasurements({
+      ...measurementValues,
+      ...modalMeasurementValues,
+    });
     const missing = requiredMeasurementKeys.filter((key) => !normalized[key]);
     if (missing.length > 0) {
       toast.error(`Please fill in all ${missing.length} missing measurement(s)`);
@@ -866,7 +869,7 @@ export default function InlineProductDetail({
                   <p className="text-xs text-slate-600 dark:text-slate-400">
                     This product needs custom measurements. Add only the required points below to buy now.
                   </p>
-                  {requiredMeasurementKeys.map((key) => {
+                  {missingMeasurementKeys.map((key) => {
                     const isMissing = missingMeasurementKeys.includes(key);
                     return (
                       <label key={key} className="flex flex-col gap-1">

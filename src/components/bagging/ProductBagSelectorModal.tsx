@@ -8,6 +8,9 @@ import type { BagStatus } from '@/api/StoreApi';
 type BagProductInput = {
   id: string;
   name?: string;
+  selectedSize?: string | null;
+  selectedColor?: string | null;
+  quantity?: number;
 };
 
 type ProductBagSelectorModalProps = {
@@ -15,6 +18,8 @@ type ProductBagSelectorModalProps = {
   product: BagProductInput | null;
   status: BagStatus | null;
   onClose: () => void;
+  onRequireFittings?: (product: BagProductInput, status: BagStatus) => void;
+  onRequireStaleConfirmation?: (product: BagProductInput, status: BagStatus) => void;
 };
 
 const ProductBagSelectorModal: React.FC<ProductBagSelectorModalProps> = ({
@@ -22,6 +27,8 @@ const ProductBagSelectorModal: React.FC<ProductBagSelectorModalProps> = ({
   product,
   status,
   onClose,
+  onRequireFittings,
+  onRequireStaleConfirmation,
 }) => {
   const dialogRef = React.useRef<HTMLDivElement>(null);
   const { addStandard, loadingByProductId } = useBagging();
@@ -56,6 +63,21 @@ const ProductBagSelectorModal: React.FC<ProductBagSelectorModalProps> = ({
 
   const handleSubmit = async () => {
     if (!product || !status) return;
+    if (status.custom.fittingState === 'MISSING' || status.custom.fittingState === 'PARTIAL') {
+      onRequireFittings?.(product, status);
+      return;
+    }
+    if (
+      status.custom.requiresStaleConfirmation ||
+      status.custom.freshnessState === 'STALE' ||
+      status.custom.freshnessState === 'VERY_STALE'
+    ) {
+      onRequireStaleConfirmation?.(
+        { ...product, selectedSize, selectedColor, quantity },
+        status,
+      );
+      return;
+    }
     await addStandard(product.id, {
       size: selectedSize,
       color: selectedColor,

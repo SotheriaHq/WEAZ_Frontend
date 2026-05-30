@@ -35,6 +35,7 @@ export type StandardBagPayload = {
   sizeFitData?: Record<string, unknown>;
   sizeRecommendationSnapshot?: SizeRecommendationSnapshot | Record<string, unknown>;
   manualOverrideReason?: string;
+  measurementOverrideAccepted?: boolean;
 };
 
 export type StandardBag = {

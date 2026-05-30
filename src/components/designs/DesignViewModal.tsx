@@ -412,7 +412,8 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
       if (
         sourceStatus.ui.defaultAction === 'CONFIRM_STALE_FITTINGS' ||
         sourceStatus.custom.requiresStaleConfirmation ||
-        sourceStatus.custom.freshnessState === 'STALE'
+        sourceStatus.custom.freshnessState === 'STALE' ||
+        sourceStatus.custom.freshnessState === 'VERY_STALE'
       ) {
         bagFlow?.openStaleConfirmation(designTarget, sourceStatus);
         return;
