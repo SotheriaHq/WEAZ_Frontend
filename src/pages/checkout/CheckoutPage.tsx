@@ -21,7 +21,7 @@ import {
 } from '@/features/cartSlice';
 import type { CartItem } from '@/features/cartSlice';
 import { toast } from 'sonner';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import ImageWithFallback from '@/components/ImageWithFallback';
@@ -289,19 +289,19 @@ const CheckoutPanel: React.FC<{
 interface CheckoutPageProps {
   embedded?: boolean;
   onClose?: () => void;
-  initialPromoCode?: string;
 }
+
+const PROMO_CODES_UNAVAILABLE_MESSAGE =
+  'Promo codes are not available during MVP checkout. Final totals are calculated securely by Threadly at payment time.';
 
 /* ─── Component ─── */
 
 const CheckoutPage: React.FC<CheckoutPageProps> = ({
   embedded = false,
   onClose,
-  initialPromoCode,
 }) => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const location = useLocation();
   const cart = useSelector((s: RootState) => s.cart);
   const priceChangeNotices = useSelector(selectCartPriceChangeNotices);
   const removedItemNotices = useSelector(selectCartRemovedItemNotices);
@@ -339,8 +339,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const [savedCards, setSavedCards] = useState<SavedPaymentCardSummary[]>([]);
   const [savedCardsLoading, setSavedCardsLoading] = useState(false);
   const [savedCardsError, setSavedCardsError] = useState<string | null>(null);
-  const [promoCode, setPromoCode] = useState('');
-  const [promoApplied, setPromoApplied] = useState(false);
   const [checkoutProgressMessage, setCheckoutProgressMessage] = useState<string | null>(null);
   const [checkoutProgressStage, setCheckoutProgressStage] =
     useState<CheckoutProgressStage>('IDLE');
@@ -358,9 +356,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const [customBagItems, setCustomBagItems] = useState<CustomOrderCheckoutBagLine[]>([]);
   const [customBagLoading, setCustomBagLoading] = useState(true);
   const [customBagError, setCustomBagError] = useState<string | null>(null);
-
-  const checkoutEntryState =
-    (location.state as { promoCode?: string } | null) ?? null;
 
   useEffect(() => {
     let active = true;
@@ -503,15 +498,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   }, [savedCards]);
 
   useEffect(() => {
-    const incomingPromo =
-      checkoutEntryState?.promoCode?.trim() ||
-      initialPromoCode?.trim();
-    if (!incomingPromo) return;
-    setPromoCode(incomingPromo.toUpperCase());
-    setPromoApplied(true);
-  }, [checkoutEntryState?.promoCode, initialPromoCode]);
-
-  useEffect(() => {
     if (!cartLoading && !customBagLoading && !cart.items.length && customBagItems.length === 0) {
       toast.error('Your bag is empty');
       if (embedded) {
@@ -636,7 +622,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   );
 
   const shippingCost = address.state ? getShippingCost(address.state) : 0;
-  const discountAmount = promoApplied ? Math.round(cart.subtotal * 0.1) : 0; // scaffold: 10% off
+  const discountAmount = 0;
   const customSubtotal = payableCustomBagItems.reduce(
     (sum, item) => sum + Number(item.buyerPriceSummary?.grandTotal ?? 0),
     0,
@@ -667,7 +653,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
   useEffect(() => {
     paymentInitIdempotencyKeyRef.current = null;
-  }, [activePaymentData, address, cart.items, paymentMethod, promoApplied, promoCode]);
+  }, [activePaymentData, address, cart.items, paymentMethod]);
 
   useEffect(() => {
     setCardValidationSession(null);
@@ -932,14 +918,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     },
     [applySavedAddress, editingAddressId, handleStartNewAddress, user?.id],
   );
-
-  /* ── Promo code (scaffold) ── */
-  const handleApplyPromo = useCallback(() => {
-    if (!promoCode.trim()) return;
-    // Scaffold: any non-empty code works for 10% off
-    setPromoApplied(true);
-    toast.success('Promo code applied — 10% discount');
-  }, [promoCode]);
 
   const updateSelectedPaymentData = useCallback((updater: (current: PaystackPaymentData) => PaystackPaymentData) => {
     const selectedPaymentMethod = paymentMethod;
@@ -1594,31 +1572,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
                   Promo Code
                 </label>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Input
-                    value={promoCode}
-                    onChange={(e) => {
-                      setPromoCode(e.target.value);
-                      if (promoApplied) setPromoApplied(false);
-                    }}
-                    placeholder="Enter code"
-                    disabled={promoApplied}
-                    className="[&_input]:rounded-2xl [&_input]:border-white/60 [&_input]:bg-white/80 [&_input]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&_input]:border-white/10 dark:[&_input]:bg-white/[0.03]"
-                  />
-                  <Button
-                    type="button"
-                    variant={promoApplied ? 'secondary' : 'primary'}
-                    onClick={promoApplied ? () => { setPromoApplied(false); setPromoCode(''); } : handleApplyPromo}
-                    className="flex-shrink-0 rounded-2xl"
-                  >
-                    {promoApplied ? 'Remove' : 'Apply'}
-                  </Button>
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                  {PROMO_CODES_UNAVAILABLE_MESSAGE}
                 </div>
-                {promoApplied && (
-                  <p className="mt-1.5 text-xs text-green-600 dark:text-green-400">
-                    ✅ 10% discount applied
-                  </p>
-                )}
               </div>
 
               <div className="flex flex-col gap-4 border-t border-slate-200/70 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
@@ -1705,11 +1661,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                       <p key={line}>{line}</p>
                     ))}
                   </div>
-                )}
-                {promoApplied && (
-                  <p className="text-sm text-green-600 dark:text-green-400 mt-1">
-                    🎟️ Promo: {promoCode} (−{formatPrice(discountAmount)})
-                  </p>
                 )}
               </div>
 
