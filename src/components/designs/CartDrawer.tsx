@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { X, Minus, Plus, Trash2, ShoppingBag, Lock, ArrowLeft, Tag, Check, AlertCircle } from 'lucide-react';
+import { X, Minus, Plus, Trash2, ShoppingBag, Lock, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { AppDispatch, RootState } from '@/store';
 import {
@@ -33,20 +33,8 @@ import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { MY_BAG_EMOJI } from '@/constants/bagging';
 
-// Promo code type
-interface PromoCode {
-  code: string;
-  discountPercent?: number;
-  discountAmount?: number;
-  minOrderAmount?: number;
-}
-
-// Mock promo codes - in production these would come from the backend
-const VALID_PROMO_CODES: Record<string, PromoCode> = {
-  'SAVE20': { code: 'SAVE20', discountPercent: 20, minOrderAmount: 50000 },
-  'FIRST10': { code: 'FIRST10', discountPercent: 10 },
-  'FLAT5000': { code: 'FLAT5000', discountAmount: 5000, minOrderAmount: 30000 },
-};
+const PROMO_CODES_UNAVAILABLE_MESSAGE =
+  'Promo codes are not available during MVP checkout. Final totals are calculated securely by Threadly at payment time.';
 
 // Small component to handle signed URL resolution for cart thumbnails
 const CartItemThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
@@ -131,12 +119,6 @@ const CartDrawer: React.FC = () => {
     }
   }, [isAuthenticated, isOpen, refreshCustomBag]);
 
-  // Promo code state
-  const [promoInput, setPromoInput] = useState('');
-  const [appliedPromo, setAppliedPromo] = useState<PromoCode | null>(null);
-  const [promoError, setPromoError] = useState<string | null>(null);
-  const [applyingPromo, setApplyingPromo] = useState(false);
-
   const formatPrice = (price: number, preferredCurrency?: string) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
@@ -146,72 +128,17 @@ const CartDrawer: React.FC = () => {
     }).format(price);
   };
 
-  // Calculate discount
-  const calculateDiscount = (): number => {
-    if (!appliedPromo) return 0;
-    
-    if (appliedPromo.discountPercent) {
-      return Math.round(subtotal * (appliedPromo.discountPercent / 100));
-    }
-    
-    if (appliedPromo.discountAmount) {
-      return appliedPromo.discountAmount;
-    }
-    
-    return 0;
-  };
-
   const customSubtotal = customBagItems.reduce(
     (sum, item) => sum + Number(item?.buyerPriceSummary?.grandTotal ?? 0),
     0,
   );
   const combinedSubtotal = subtotal + customSubtotal;
-  const discount = calculateDiscount();
-  const total = Math.max(0, combinedSubtotal - discount);
+  const total = combinedSubtotal;
   const combinedQuantity = totalQuantity + customBagItems.length;
   const hasBagItems = combinedQuantity > 0;
   const blockedCustomCount = customBagItems.filter(
     (item) => !item.canProceedToPayment,
   ).length;
-
-  const handleApplyPromo = async () => {
-    const code = promoInput.trim().toUpperCase();
-    
-    if (!code) {
-      setPromoError('Please enter a promo code');
-      return;
-    }
-
-    setApplyingPromo(true);
-    setPromoError(null);
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const promo = VALID_PROMO_CODES[code];
-    
-    if (!promo) {
-      setPromoError('Invalid promo code');
-      setApplyingPromo(false);
-      return;
-    }
-
-    if (promo.minOrderAmount && subtotal < promo.minOrderAmount) {
-      setPromoError(`Minimum order of ${formatPrice(promo.minOrderAmount)} required`);
-      setApplyingPromo(false);
-      return;
-    }
-
-    setAppliedPromo(promo);
-    setPromoInput('');
-    toast.success(`Promo code ${code} applied!`);
-    setApplyingPromo(false);
-  };
-
-  const handleRemovePromo = () => {
-    setAppliedPromo(null);
-    setPromoError(null);
-  };
 
   const handleQuantityChange = async (itemId: string, newQuantity: number) => {
     if (newQuantity < 1) return;
@@ -386,7 +313,6 @@ const CartDrawer: React.FC = () => {
                 <div className="h-full overflow-y-auto">
                   <CheckoutPage
                     embedded
-                    initialPromoCode={appliedPromo?.code}
                     onClose={() => setDrawerView('bag')}
                   />
                 </div>
@@ -716,61 +642,12 @@ const CartDrawer: React.FC = () => {
                 <div className="border-t border-gray-200/60 dark:border-gray-800/60 bg-white/40 dark:bg-gray-950/40 backdrop-blur-2xl px-3 py-1.5">
                   {/* Promo Code Section */}
                   <div className="mb-1.5">
-                    {appliedPromo ? (
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/40">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
-                            <Check size={12} className="text-green-600 dark:text-green-400" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold text-green-700 dark:text-green-300 leading-tight">
-                              {appliedPromo.code} applied
-                            </p>
-                            <p className="text-[10px] text-green-600 dark:text-green-400 leading-tight">
-                              -{formatPrice(discount)} off
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={handleRemovePromo}
-                          className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-xs font-medium"
-                        >
-                          Remove
-                        </button>
+                    <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[10px] leading-relaxed text-amber-800 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
+                      <div className="flex gap-1.5">
+                        <span aria-hidden="true">🎟️</span>
+                        <span>{PROMO_CODES_UNAVAILABLE_MESSAGE}</span>
                       </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <div className="flex gap-1.5">
-                          <div className="relative flex-1">
-                            <Tag size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input
-                              type="text"
-                              value={promoInput}
-                              onChange={(e) => {
-                                setPromoInput(e.target.value.toUpperCase());
-                                setPromoError(null);
-                              }}
-                              placeholder="Promo code"
-                              className="w-full h-7 pl-8 pr-3 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-[11px] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                              onKeyDown={(e) => e.key === 'Enter' && handleApplyPromo()}
-                            />
-                          </div>
-                          <button
-                            onClick={handleApplyPromo}
-                            disabled={applyingPromo || !promoInput.trim()}
-                            className="px-2.5 h-7 rounded-md bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-semibold text-[11px] hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          >
-                            {applyingPromo ? '...' : 'Apply'}
-                          </button>
-                        </div>
-                        {promoError && (
-                          <div className="flex items-center gap-1 text-red-500 text-[10px]">
-                            <AlertCircle size={10} />
-                            {promoError}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    </div>
                   </div>
 
                   {/* Order Summary */}
@@ -784,13 +661,6 @@ const CartDrawer: React.FC = () => {
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-gray-700 dark:text-gray-300">Custom requests</span>
                         <span className="font-medium text-gray-900 dark:text-white">{formatPrice(customSubtotal)}</span>
-                      </div>
-                    )}
-                    
-                    {appliedPromo && discount > 0 && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-700 dark:text-gray-300">Discount</span>
-                        <span className="font-medium text-green-600 dark:text-green-400">-{formatPrice(discount)}</span>
                       </div>
                     )}
                     
