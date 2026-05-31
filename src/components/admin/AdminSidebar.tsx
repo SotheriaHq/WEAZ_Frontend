@@ -40,6 +40,7 @@ const navItems: NavItem[] = [
   { key: 'reviews', label: 'Reviews', path: '/admin/reviews', emoji: '⭐', permission: 'MODERATION_READ' },
   { key: 'audit', label: 'Audit', path: '/admin/audit', emoji: '📋', permission: 'AUDIT_READ' },
   { key: 'settings', label: 'Settings', path: '/admin/settings', emoji: '⚙️', superAdminOnly: true },
+  { key: 'monitoring', label: 'Monitoring', path: '/admin/monitoring', emoji: 'MON', permission: 'ALERTS_READ' },
   { key: 'market-governance', label: 'Market Governance', path: '/admin/market-governance', emoji: 'MG', permission: 'MARKET_GOVERNANCE_READ' },
 ];
 

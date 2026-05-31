@@ -70,6 +70,13 @@ const paymentApi = read('src/api/PaymentApi.ts');
 assertIncludes(paymentApi, "'/payment/initialize-unified'", 'payment initialize');
 assertIncludes(paymentApi, "'/payment/verify'", 'payment verify');
 
+const adminApi = read('src/api/AdminApi.ts');
+assertIncludes(adminApi, "'/admin/alerts'", 'admin alert list');
+assertIncludes(adminApi, "'/admin/alerts/summary'", 'admin alert summary');
+assertIncludes(adminApi, '/acknowledge', 'admin alert acknowledge');
+assertIncludes(adminApi, '/resolve', 'admin alert resolve');
+assertIncludes(adminApi, '/ignore', 'admin alert ignore');
+
 const marketApi = read('src/api/MarketApi.ts');
 assertIncludes(marketApi, "'/market/signals/batch'", 'market signal batch');
 

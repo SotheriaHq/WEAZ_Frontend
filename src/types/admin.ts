@@ -12,12 +12,71 @@ export type AdminPermissionCode =
   | 'PAYOUTS_READ' | 'PAYOUTS_PROCESS'
   | 'DISPUTES_READ' | 'DISPUTES_RESOLVE'
   | 'FEATURED_MANAGE'
-  | 'AUDIT_READ'
+  | 'AUDIT_READ' | 'ALERTS_READ' | 'ALERTS_MANAGE'
   | 'MARKET_GOVERNANCE_READ' | 'MARKET_GOVERNANCE_WRITE' | 'MARKET_GOVERNANCE_RELEASE'
   | 'MARKET_RANKING_FORMULA_WRITE' | 'MARKET_RANKING_ROLLBACK' | 'MARKET_SUGGESTIONS_WRITE'
   | 'SYSTEM_FEATURE_FLAGS' | 'SYSTEM_BREAK_GLASS' | 'SYSTEM_ROLE_ASSIGN'
   | 'SYSTEM_PERMISSION_ASSIGN' | 'SYSTEM_SLA_READ' | 'SYSTEM_SLA_WRITE'
   | 'SYSTEM_DATA_EXPORT' | 'SYSTEM_DATA_DELETE';
+
+export type AdminOperationalAlertSeverity = 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
+export type AdminOperationalAlertCategory =
+  | 'AUTH'
+  | 'PAYMENT'
+  | 'WEBHOOK'
+  | 'UPLOAD'
+  | 'ADMIN'
+  | 'RANKING'
+  | 'QUEUE'
+  | 'MIGRATION'
+  | 'SECURITY'
+  | 'SYSTEM';
+export type AdminOperationalAlertStatus = 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' | 'IGNORED';
+
+export interface AdminOperationalAlert {
+  id: string;
+  category: AdminOperationalAlertCategory;
+  severity: AdminOperationalAlertSeverity;
+  event: string;
+  title?: string | null;
+  message: string;
+  status: AdminOperationalAlertStatus;
+  actorId?: string | null;
+  userId?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  correlationId?: string | null;
+  metadata?: Record<string, unknown> | null;
+  dedupeKey?: string | null;
+  occurrenceCount: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  createdAt: string;
+  acknowledgedAt?: string | null;
+  acknowledgedBy?: string | null;
+  resolvedAt?: string | null;
+  resolvedBy?: string | null;
+  ignoredAt?: string | null;
+  ignoredBy?: string | null;
+  notificationQueuedAt?: string | null;
+  emailQueuedAt?: string | null;
+}
+
+export interface AdminOperationalAlertListResponse {
+  items: AdminOperationalAlert[];
+  nextCursor?: string | null;
+}
+
+export interface AdminOperationalAlertSummary {
+  open: number;
+  acknowledged: number;
+  resolved: number;
+  ignored: number;
+  critical: number;
+  paymentWebhook: number;
+  ranking: number;
+  uploadSecurity: number;
+}
 
 export interface AdminUser {
   id: string;

@@ -106,6 +106,7 @@ const AdminDisputesPage = lazy(() => import('./pages/admin/AdminDisputesPage'));
 const AdminModerationPage = lazy(() => import('./pages/admin/AdminModerationPage'));
 const AdminReviewsPage = lazy(() => import('./pages/admin/AdminReviewsPage'));
 const AdminAuditPage = lazy(() => import('./pages/admin/AdminAuditPage'));
+const AdminMonitoringPage = lazy(() => import('./pages/admin/AdminMonitoringPage'));
 const AdminMarketGovernancePage = lazy(() => import('./pages/admin/AdminMarketGovernancePage'));
 const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'));
 const AdminForceResetPasswordPage = lazy(() => import('./pages/admin/AdminForceResetPasswordPage'));
@@ -888,6 +889,8 @@ const router = createBrowserRouter([
           { path: 'moderation', element: <RequireAdminPermission permission="MODERATION_READ"><AdminModerationPage /></RequireAdminPermission> },
           { path: 'reviews', element: <RequireAdminPermission permission="MODERATION_READ"><AdminReviewsPage /></RequireAdminPermission> },
           { path: 'audit', element: <RequireAdminPermission permission="AUDIT_READ"><AdminAuditPage /></RequireAdminPermission> },
+          { path: 'monitoring', element: <RequireAdminPermission permission="ALERTS_READ"><AdminMonitoringPage /></RequireAdminPermission> },
+          { path: 'alerts', element: <Navigate to="/admin/monitoring" replace /> },
           { path: 'market-governance', element: <RequireAdminPermission permission="MARKET_GOVERNANCE_READ"><AdminMarketGovernancePage /></RequireAdminPermission> },
           { path: 'settings', element: <RequireAdminPermission superAdminOnly permission={['SYSTEM_SLA_READ', 'SYSTEM_FEATURE_FLAGS_WRITE', 'SYSTEM_SETTINGS_WRITE']}><AdminSettingsPage /></RequireAdminPermission> },
           { path: 'settings/sla', element: <RequireAdminPermission superAdminOnly permission={['SYSTEM_SLA_READ', 'SYSTEM_FEATURE_FLAGS_WRITE', 'SYSTEM_SETTINGS_WRITE']}><AdminSettingsPage /></RequireAdminPermission> },

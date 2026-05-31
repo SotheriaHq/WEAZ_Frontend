@@ -36,6 +36,8 @@ const PERMISSION_ALIASES: Record<string, string> = {
   MODERATION_READ: 'moderation.read',
   MODERATION_REVIEW: 'moderation.write',
   AUDIT_READ: 'audit.read',
+  ALERTS_READ: 'alerts.read',
+  ALERTS_MANAGE: 'alerts.manage',
   MARKET_GOVERNANCE_READ: 'market.governance.read',
   MARKET_GOVERNANCE_WRITE: 'market.governance.write',
   MARKET_GOVERNANCE_RELEASE: 'market.governance.release',

@@ -36,6 +36,9 @@ import type {
   AdminFinanceTransaction,
   AdminStalePaymentReconcileResult,
   AdminEscrowHold,
+  AdminOperationalAlert,
+  AdminOperationalAlertListResponse,
+  AdminOperationalAlertSummary,
   AdminMarketGovernanceAuditLogListResponse,
   AdminMarketGovernanceListResponse,
   AdminMarketGovernanceReleaseStatus,
@@ -59,6 +62,19 @@ import type {
 
 type Paginated<T> = { items: T[]; nextCursor?: string };
 type RequestOptions = { signal?: AbortSignal };
+type AdminAlertListParams = {
+  cursor?: string;
+  limit?: number | string;
+  category?: string;
+  severity?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+  search?: string;
+  entityType?: string;
+  entityId?: string;
+  correlationId?: string;
+};
 
 export type AdminLifecycleReviewStatus = 'APPROVED' | 'PENDING_MODERATION' | 'HIDDEN' | 'FLAGGED' | 'DELETED';
 export type AdminLifecycleReviewTargetType = 'PRODUCT' | 'COLLECTION' | 'DESIGN' | 'CUSTOM_ORDER' | 'BRAND';
@@ -463,6 +479,40 @@ export const adminAuditApi = {
 };
 
 // ── Market Governance ──
+export const adminAlertsApi = {
+  list: (params?: AdminAlertListParams, options?: RequestOptions) =>
+    apiClient.get<AdminOperationalAlertListResponse>('/admin/alerts', {
+      params,
+      signal: options?.signal,
+    }),
+  summary: (options?: RequestOptions) =>
+    apiClient.get<AdminOperationalAlertSummary>('/admin/alerts/summary', {
+      signal: options?.signal,
+    }),
+  getById: (id: string, options?: RequestOptions) =>
+    apiClient.get<AdminOperationalAlert>(`/admin/alerts/${id}`, {
+      signal: options?.signal,
+    }),
+  acknowledge: (id: string, options?: RequestOptions) =>
+    apiClient.patch<AdminOperationalAlert>(
+      `/admin/alerts/${id}/acknowledge`,
+      {},
+      { signal: options?.signal },
+    ),
+  resolve: (id: string, options?: RequestOptions) =>
+    apiClient.patch<AdminOperationalAlert>(
+      `/admin/alerts/${id}/resolve`,
+      {},
+      { signal: options?.signal },
+    ),
+  ignore: (id: string, options?: RequestOptions) =>
+    apiClient.patch<AdminOperationalAlert>(
+      `/admin/alerts/${id}/ignore`,
+      {},
+      { signal: options?.signal },
+    ),
+};
+
 export const adminMarketGovernanceApi = {
   getReleaseStatus: (options?: RequestOptions) =>
     apiClient.get<AdminMarketGovernanceReleaseStatus>(
