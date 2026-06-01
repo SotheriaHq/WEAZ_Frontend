@@ -52,6 +52,15 @@ import type {
   AdminMarketSectionConfigUpdate,
   AdminMarketSuggestionBlockConfig,
   AdminMarketSuggestionBlockUpsert,
+  AdminContentReport,
+  AdminContentReportListResponse,
+  AdminContentReviewListResponse,
+  AdminContentSubmission,
+  ContentReportReasonCode,
+  ContentReportStatus,
+  ContentReportTargetType,
+  ContentReasonOption,
+  ContentReviewReasonCode,
 } from '../types/admin';
 import type {
   AdminVerificationDetails,
@@ -317,6 +326,82 @@ export const adminDesignsApi = {
     apiClient.get<Paginated<AdminDesign>>('/admin/designs', { params }),
   moderate: (id: string, data: { status?: string; action?: 'UNPUBLISH' | 'REPUBLISH' | 'HARD_DELETE'; reason?: string }) =>
     apiClient.patch(`/admin/designs/${id}/moderate`, data),
+};
+
+export const adminContentReviewApi = {
+  getReasonCodes: () =>
+    apiClient.get<ContentReasonOption<ContentReviewReasonCode>[]>(
+      '/admin/content-review/reason-codes',
+    ),
+  getReportReasonCodes: () =>
+    apiClient.get<ContentReasonOption<ContentReportReasonCode>[]>(
+      '/admin/content-review/report-reason-codes',
+    ),
+  listSubmissions: (params?: Record<string, string>) =>
+    apiClient.get<AdminContentReviewListResponse>(
+      '/admin/content-review/submissions',
+      { params },
+    ),
+  getSubmission: (id: string) =>
+    apiClient.get<AdminContentSubmission>(
+      `/admin/content-review/submissions/${id}`,
+    ),
+  approveSubmission: (id: string) =>
+    apiClient.patch<AdminContentSubmission>(
+      `/admin/content-review/submissions/${id}/approve`,
+      {},
+    ),
+  rejectSubmission: (
+    id: string,
+    data: { reasonCode: ContentReviewReasonCode; reasonNote?: string },
+  ) =>
+    apiClient.patch<AdminContentSubmission>(
+      `/admin/content-review/submissions/${id}/reject`,
+      data,
+    ),
+  requestChanges: (
+    id: string,
+    data: { reasonCode: ContentReviewReasonCode; reasonNote?: string },
+  ) =>
+    apiClient.patch<AdminContentSubmission>(
+      `/admin/content-review/submissions/${id}/request-changes`,
+      data,
+    ),
+  listReports: (params?: Record<string, string>) =>
+    apiClient.get<AdminContentReportListResponse>(
+      '/admin/content-review/reports',
+      { params },
+    ),
+  getReport: (id: string) =>
+    apiClient.get<AdminContentReport>(`/admin/content-review/reports/${id}`),
+  resolveReport: (
+    id: string,
+    data: { status: Exclude<ContentReportStatus, 'OPEN'>; resolution?: string },
+  ) =>
+    apiClient.patch<AdminContentReport>(
+      `/admin/content-review/reports/${id}/resolve`,
+      data,
+    ),
+};
+
+export const contentIntegrityApi = {
+  getReviewReasonCodes: () =>
+    apiClient.get<ContentReasonOption<ContentReviewReasonCode>[]>(
+      '/content-integrity/review-reason-codes',
+    ),
+  getReportReasonCodes: () =>
+    apiClient.get<ContentReasonOption<ContentReportReasonCode>[]>(
+      '/content-integrity/report-reason-codes',
+    ),
+  getMySubmission: (id: string) =>
+    apiClient.get<AdminContentSubmission>(`/content-integrity/submissions/${id}`),
+  reportContent: (data: {
+    targetType: ContentReportTargetType;
+    targetId: string;
+    mediaId?: string;
+    reasonCode: ContentReportReasonCode;
+    note?: string;
+  }) => apiClient.post<AdminContentReport>('/content-integrity/reports', data),
 };
 
 // ── Taxonomy ──

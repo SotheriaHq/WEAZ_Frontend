@@ -20,6 +20,7 @@ import {
   getContentStatusTone,
   type ContentPublicationStatus,
 } from '@/utils/contentIntegrity';
+import ContentReviewDecisionModal from '@/components/content-integrity/ContentReviewDecisionModal';
 
 export interface StoreProduct {
   id: string;
@@ -134,6 +135,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const [failedGalleryKeys, setFailedGalleryKeys] = useState<string[]>([]);
   const [resolvedGalleryImages, setResolvedGalleryImages] = useState<ResolvedGalleryImage[]>([]);
   const [activeImage, setActiveImage] = useState<ResolvedGalleryImage | null>(null);
+  const [reviewDecisionOpen, setReviewDecisionOpen] = useState(false);
 
   const isOwnProduct = Boolean(currentUser?.id && product.brandId === currentUser.id);
   const redHeartEmoji = String.fromCodePoint(0x2764, 0xfe0f);
@@ -179,6 +181,11 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     }
     return { emoji: '✅', label: 'Published', className: 'bg-emerald-500/90 text-white' };
   })();
+  const productReviewStatus = String(product.publicationStatus ?? '').toUpperCase();
+  const needsReviewDecision =
+    isOwnerView &&
+    (productReviewStatus === 'CHANGES_REQUESTED' ||
+      productReviewStatus === 'REJECTED');
 
   const isProductWishlisted = wishlistedIds.has(product.id);
 
@@ -465,6 +472,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   }, [galleryImages.length, hoverGalleryEnabled]);
 
   return (
+    <>
     <article
       data-entity-type={product.entityType ?? 'PRODUCT'}
       data-card-branch="product"
@@ -560,13 +568,20 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 
         <div className="absolute left-2.5 top-2.5 z-10 flex flex-col gap-1.5">
           {ownerStatus ? (
-            <span
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold leading-none shadow-sm ${ownerStatus.className}`}
-              title={ownerStatus.label}
+            <button
+              type="button"
+              onClick={(event) => {
+                if (!needsReviewDecision) return;
+                event.preventDefault();
+                event.stopPropagation();
+                setReviewDecisionOpen(true);
+              }}
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold leading-none shadow-sm ${ownerStatus.className} ${needsReviewDecision ? 'cursor-pointer ring-1 ring-white/50' : 'cursor-default'}`}
+              title={needsReviewDecision ? 'View reviewer feedback' : ownerStatus.label}
             >
               {ownerStatus.emoji}
               <span>{ownerStatus.label}</span>
-            </span>
+            </button>
           ) : null}
           {product.isOnSale && product.discountPercent ? (
             <span className="rounded-full bg-rose-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm">
@@ -750,6 +765,15 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         </div>
       </div>
     </article>
+    <ContentReviewDecisionModal
+      open={reviewDecisionOpen}
+      onClose={() => setReviewDecisionOpen(false)}
+      submissionId={product.submissionId}
+      status={product.publicationStatus}
+      title={product.name}
+      onEdit={onEdit ? () => onEdit(product) : undefined}
+    />
+    </>
   );
 };
 

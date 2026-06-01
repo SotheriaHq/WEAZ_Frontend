@@ -33,6 +33,7 @@ import ProductReviewSection from '@/components/reviews/ProductReviewSection';
 import MarketSuggestionBlocks from '@/components/market/MarketSuggestionBlocks';
 import { normalizeSizingMode } from '@/types/sizing';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
+import ReportContentButton from '@/components/content-integrity/ReportContentButton';
 import {
   isCustomOrderOnlyProduct,
   isStrictlyOutOfStockProduct,
@@ -1048,6 +1049,12 @@ export default function ProductDetailsPage() {
                     <span aria-hidden="true">🔗</span>
                     Share
                   </button>
+                  <ReportContentButton
+                    targetType="PRODUCT"
+                    targetId={product.id}
+                    label="Report"
+                    className="flex-1 h-10 rounded-full border border-black/10 dark:border-white/15 text-sm text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center gap-2"
+                  />
                   {/* Product QR button disabled — only brand profile QR codes active */}
                   {sourceCollectionId ? (
                     <button

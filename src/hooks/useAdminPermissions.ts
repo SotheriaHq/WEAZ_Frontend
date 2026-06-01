@@ -33,6 +33,8 @@ const PERMISSION_ALIASES: Record<string, string> = {
   DISPUTES_READ: 'disputes.read',
   DISPUTES_RESOLVE: 'disputes.resolve',
   FEATURED_MANAGE: 'featured.manage',
+  CONTENT_REVIEW_READ: 'contentReview.read',
+  CONTENT_REVIEW_MANAGE: 'contentReview.manage',
   MODERATION_READ: 'moderation.read',
   MODERATION_REVIEW: 'moderation.write',
   AUDIT_READ: 'audit.read',

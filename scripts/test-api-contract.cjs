@@ -76,6 +76,13 @@ assertIncludes(adminApi, "'/admin/alerts/summary'", 'admin alert summary');
 assertIncludes(adminApi, '/acknowledge', 'admin alert acknowledge');
 assertIncludes(adminApi, '/resolve', 'admin alert resolve');
 assertIncludes(adminApi, '/ignore', 'admin alert ignore');
+assertIncludes(adminApi, "'/admin/content-review/submissions'", 'admin content review queue');
+assertIncludes(adminApi, '/admin/content-review/submissions/${id}/approve', 'admin content approve');
+assertIncludes(adminApi, '/admin/content-review/submissions/${id}/reject', 'admin content reject');
+assertIncludes(adminApi, '/admin/content-review/submissions/${id}/request-changes', 'admin content request changes');
+assertIncludes(adminApi, "'/admin/content-review/reports'", 'admin content reports');
+assertIncludes(adminApi, '/content-integrity/reports', 'content report endpoint');
+assertIncludes(adminApi, '/content-integrity/submissions/${id}', 'owner content review reason endpoint');
 
 const marketApi = read('src/api/MarketApi.ts');
 assertIncludes(marketApi, "'/market/signals/batch'", 'market signal batch');

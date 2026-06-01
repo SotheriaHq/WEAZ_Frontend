@@ -29,6 +29,13 @@ const navItems: NavItem[] = [
     emoji: '🧰',
     permissions: ['PRODUCTS_READ', 'COLLECTIONS_READ'],
   },
+  {
+    key: 'content-review',
+    label: 'Content Review',
+    path: '/admin/content-review',
+    emoji: 'CR',
+    permission: 'CONTENT_REVIEW_READ',
+  },
   { key: 'taxonomy', label: 'Taxonomy', path: '/admin/taxonomy', emoji: '🧬', permission: 'TAXONOMY_READ' },
   { key: 'tags', label: 'Hashtag moderation', path: '/admin/tags', emoji: '🏷️', permission: 'TAGS_READ' },
   { key: 'finance', label: 'Finance', path: '/admin/finance', emoji: '🏦', permission: 'PAYOUTS_READ' },

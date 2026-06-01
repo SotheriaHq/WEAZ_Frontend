@@ -17,6 +17,7 @@ import { getCatalogEntityCardCopy, resolveCatalogEntityCardBranch } from './cata
 import { mapCatalogTargetForLegacyApi } from '@/utils/catalogTarget';
 import { getCompactPublishTaskStatusLabel } from '@/utils/publishTracker';
 import { getContentStatusLabel, getContentStatusTone } from '@/utils/contentIntegrity';
+import ContentReviewDecisionModal from '@/components/content-integrity/ContentReviewDecisionModal';
 
 export interface CollectionCardProps {
   collection: CollectionDto;
@@ -224,6 +225,9 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
   const displaySrc = resolvedHoverSrc || resolvedCover;
   const resolvedDisplaySrc = displaySrc || (isPublishing ? clientPreviewUrl : undefined);
   const [accessOpen, setAccessOpen] = useState(false);
+  const [reviewDecisionOpen, setReviewDecisionOpen] = useState(false);
+  const needsReviewDecision =
+    backendStatus === 'CHANGES_REQUESTED' || backendStatus === 'REJECTED';
 
   // Compute compact price bands (align with MarketCard)
   const baseBand = (() => {
@@ -625,9 +629,16 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
                 {(backendStatus === 'CHANGES_REQUESTED' || backendStatus === 'REJECTED' || backendStatus === 'FAILED') && (
                   <button
                     className="shrink-0 px-3 py-1.5 rounded-md bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[11px] font-medium hover:from-purple-600 hover:to-indigo-600 transition-all shadow-md"
-                    onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (needsReviewDecision) {
+                        setReviewDecisionOpen(true);
+                      } else {
+                        onClick?.();
+                      }
+                    }}
                   >
-                    Edit
+                    {needsReviewDecision ? 'Review Note' : 'Edit'}
                   </button>
                 )}
               </>
@@ -658,6 +669,14 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
     {!isDeleted && (
       <ManageAccessModal open={accessOpen} collectionId={collection.id} onClose={() => setAccessOpen(false)} />
     )}
+    <ContentReviewDecisionModal
+      open={reviewDecisionOpen}
+      onClose={() => setReviewDecisionOpen(false)}
+      submissionId={collection.submissionId}
+      status={backendStatus}
+      title={displayTitle}
+      onEdit={onEdit ? () => onEdit(collection.id) : onClick}
+    />
     </>
   );
 };

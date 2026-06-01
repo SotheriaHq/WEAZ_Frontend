@@ -95,6 +95,7 @@ const AdminBrandsPage = lazy(() => import('./pages/admin/AdminBrandsPage'));
 const AdminVerificationQueuePage = lazy(() => import('./pages/admin/AdminVerificationQueuePage'));
 const AdminBrandVerificationReviewPage = lazy(() => import('./pages/admin/AdminBrandVerificationReviewPage'));
 const AdminContentManagementPage = lazy(() => import('./pages/admin/AdminContentManagementPage'));
+const AdminContentReviewPage = lazy(() => import('./pages/admin/AdminContentReviewPage'));
 const AdminTaxonomyPage = lazy(() => import('./pages/admin/AdminTaxonomyPage'));
 const AdminTagsPage = lazy(() => import('./pages/admin/AdminTagsPage'));
 const AdminFinancePage = lazy(() => import('./pages/admin/AdminFinancePage'));
@@ -873,6 +874,7 @@ const router = createBrowserRouter([
           { path: 'verification', element: <RequireAdminPermission permission="BRANDS_VERIFY"><AdminVerificationQueuePage /></RequireAdminPermission> },
           { path: 'brands/:id/verification-review', element: <RequireAdminPermission permission="BRANDS_VERIFY"><AdminBrandVerificationReviewPage /></RequireAdminPermission> },
           { path: 'content', element: <RequireAdminPermission permission={['PRODUCTS_READ', 'COLLECTIONS_READ']}><AdminContentManagementPage /></RequireAdminPermission> },
+          { path: 'content-review', element: <RequireAdminPermission permission="CONTENT_REVIEW_READ"><AdminContentReviewPage /></RequireAdminPermission> },
           { path: 'products', element: <Navigate to="/admin/content?tab=products" replace /> },
           { path: 'collections', element: <Navigate to="/admin/content?tab=collections" replace /> },
           { path: 'taxonomy', element: <RequireAdminPermission permission="TAXONOMY_READ"><AdminTaxonomyPage /></RequireAdminPermission> },

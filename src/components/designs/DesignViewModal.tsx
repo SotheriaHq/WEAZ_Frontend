@@ -36,6 +36,7 @@ import {
 } from '@/query/queries';
 import { THREADLY_QUERY_STALE_TIME_MS } from '@/query/queryClient';
 import { queryKeys } from '@/query/queryKeys';
+import ReportContentButton from '@/components/content-integrity/ReportContentButton';
 
 type Props = {
   open: boolean;
@@ -733,6 +734,14 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     <span aria-hidden="true">🔗</span>
                     Share
                   </button>
+                  {item ? (
+                    <ReportContentButton
+                      targetType={item.designId ? 'DESIGN' : 'COLLECTION'}
+                      targetId={item.designId ?? item.collectionId ?? item.id}
+                      label="Report"
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+                    />
+                  ) : null}
                   <button
                     type="button"
                     onClick={handleOpenBrandCatalog}

@@ -12,6 +12,7 @@ export type AdminPermissionCode =
   | 'PAYOUTS_READ' | 'PAYOUTS_PROCESS'
   | 'DISPUTES_READ' | 'DISPUTES_RESOLVE'
   | 'FEATURED_MANAGE'
+  | 'CONTENT_REVIEW_READ' | 'CONTENT_REVIEW_MANAGE'
   | 'AUDIT_READ' | 'ALERTS_READ' | 'ALERTS_MANAGE'
   | 'MARKET_GOVERNANCE_READ' | 'MARKET_GOVERNANCE_WRITE' | 'MARKET_GOVERNANCE_RELEASE'
   | 'MARKET_RANKING_FORMULA_WRITE' | 'MARKET_RANKING_ROLLBACK' | 'MARKET_SUGGESTIONS_WRITE'
@@ -470,6 +471,174 @@ export interface AdminDesign {
   createdAt: string;
   updatedAt: string;
   owner?: { id: string; email: string; firstName: string; lastName: string };
+}
+
+export type ContentEntityType = 'PRODUCT' | 'DESIGN';
+export type ContentSubmissionStatus =
+  | 'IN_REVIEW'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'CHANGES_REQUESTED'
+  | 'CANCELLED';
+export type ContentMediaViewSlot =
+  | 'FRONT'
+  | 'BACK'
+  | 'LEFT_SIDE'
+  | 'RIGHT_SIDE'
+  | 'DETAIL'
+  | 'ON_MODEL'
+  | 'FABRIC_DETAIL'
+  | 'OTHER';
+export type ContentReviewReasonCode =
+  | 'POOR_IMAGE_QUALITY'
+  | 'MISSING_REQUIRED_VIEW'
+  | 'DUPLICATE_ANGLE'
+  | 'MODEL_FABRIC_MISMATCH'
+  | 'PROHIBITED_CONTENT'
+  | 'AI_OR_MANIPULATED_IMAGE_SUSPECTED'
+  | 'WRONG_CATEGORY_OR_METADATA_MISMATCH'
+  | 'UNSAFE_OR_FALSE_CLAIM'
+  | 'INTELLECTUAL_PROPERTY_OR_BRAND_MISUSE'
+  | 'NOT_A_PRODUCT_OR_DESIGN_LISTING'
+  | 'OTHER';
+export type ContentReportTargetType = 'PRODUCT' | 'DESIGN' | 'COLLECTION' | 'MEDIA' | 'BRAND';
+export type ContentReportReasonCode =
+  | 'WRONG_OR_UNRELATED_IMAGE'
+  | 'MISLEADING_MEDIA'
+  | 'STOLEN_OR_COPYRIGHTED_IMAGE'
+  | 'OFFENSIVE_OR_UNSAFE_MEDIA'
+  | 'FAKE_OR_SCAM_LISTING'
+  | 'DETAILS_DO_NOT_MATCH_MEDIA'
+  | 'OTHER';
+export type ContentReportStatus = 'OPEN' | 'REVIEWED' | 'RESOLVED' | 'DISMISSED';
+
+export interface ContentReasonOption<TCode extends string = string> {
+  code: TCode;
+  label: string;
+}
+
+export interface ContentReviewMediaItem {
+  id: string;
+  fileId: string | null;
+  mediaType: string | null;
+  mimeType: string | null;
+  slot: ContentMediaViewSlot;
+  slotLabel: string;
+  mediaPurpose: string;
+  reviewStatus: string;
+  reviewReasonCode?: ContentReviewReasonCode | null;
+  reviewReasonLabel?: string | null;
+  reviewReason?: string | null;
+  orderIndex: number;
+  canPreview: boolean;
+  previewUrl?: string | null;
+}
+
+export interface ContentReviewSlotChecklistItem {
+  slot: ContentMediaViewSlot;
+  label: string;
+  present: boolean;
+  mediaId: string | null;
+  reviewStatus: string | null;
+}
+
+export interface AdminContentReport {
+  id: string;
+  reporter?: { id: string; username: string } | null;
+  targetType: ContentReportTargetType;
+  targetId: string;
+  mediaId?: string | null;
+  target?: {
+    id: string;
+    type: string;
+    title?: string | null;
+    brandId?: string | null;
+    status?: string | null;
+  } | null;
+  reasonCode: ContentReportReasonCode;
+  reasonLabel: string;
+  note?: string | null;
+  status: ContentReportStatus;
+  reviewedBy?: { id: string; username: string } | null;
+  reviewedAt?: string | null;
+  resolution?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  duplicate?: boolean;
+}
+
+export interface AdminContentSubmission {
+  id: string;
+  entityType: ContentEntityType;
+  status: ContentSubmissionStatus;
+  previousStatus?: string | null;
+  targetStatus?: string | null;
+  reasonCode?: ContentReviewReasonCode | null;
+  reasonLabel?: string | null;
+  reasonNote?: string | null;
+  submittedAt: string;
+  reviewedAt?: string | null;
+  target: {
+    id: string;
+    type: ContentEntityType;
+    reportTargetType?: ContentReportTargetType;
+    title?: string | null;
+    description?: string | null;
+    brandId?: string | null;
+    status?: string | null;
+    isActive?: boolean;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  };
+  brand?: {
+    id: string;
+    name: string;
+    trustTier?: string | null;
+    reviewMode?: string | null;
+    latestTrustEvent?: string | null;
+    latestTrustEventAt?: string | null;
+  } | null;
+  submittedBy?: { id: string; username: string } | null;
+  reviewedBy?: { id: string; username: string } | null;
+  media: ContentReviewMediaItem[];
+  requiredSlotChecklist: ContentReviewSlotChecklistItem[];
+  slotCompleteness: {
+    required: number;
+    present: number;
+    missing: ContentMediaViewSlot[];
+  };
+  reviewHistory: Array<{
+    id: string;
+    status: ContentSubmissionStatus;
+    reasonCode?: ContentReviewReasonCode | null;
+    reasonLabel?: string | null;
+    reasonNote?: string | null;
+    submittedAt: string;
+    reviewedAt?: string | null;
+    reviewedById?: string | null;
+  }>;
+  reports: AdminContentReport[];
+}
+
+export interface AdminContentReviewListResponse {
+  items: AdminContentSubmission[];
+  summary: {
+    pending: number;
+    changesRequested: number;
+    rejected: number;
+    approvedPublished: number;
+  };
+  nextCursor?: string | null;
+}
+
+export interface AdminContentReportListResponse {
+  items: AdminContentReport[];
+  summary: {
+    open: number;
+    reviewed: number;
+    resolved: number;
+    dismissed: number;
+  };
 }
 
 export interface AdminCategory {

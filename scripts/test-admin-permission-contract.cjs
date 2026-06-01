@@ -33,6 +33,8 @@ const assertNotContains = (label, source, unexpected) => {
   'SYSTEM_SETTINGS_WRITE',
   'ADMIN_EMAIL_CHANGE',
   'PERMISSIONS_MANAGE',
+  'CONTENT_REVIEW_READ',
+  'CONTENT_REVIEW_MANAGE',
   'ALERTS_READ',
   'ALERTS_MANAGE',
 ].forEach((code) => {
@@ -44,6 +46,11 @@ assertContains(
   app,
   "permission={['PRODUCTS_READ', 'COLLECTIONS_READ']}",
 );
+assertContains(
+  'admin content review route',
+  app,
+  'permission="CONTENT_REVIEW_READ"><AdminContentReviewPage',
+);
 assertContains('admin settings route', app, '<RequireAdminPermission superAdminOnly');
 assertContains(
   'admin monitoring route',
@@ -54,6 +61,11 @@ assertContains(
   'admin sidebar content guard',
   sidebar,
   "permissions: ['PRODUCTS_READ', 'COLLECTIONS_READ']",
+);
+assertContains(
+  'admin sidebar content review guard',
+  sidebar,
+  "permission: 'CONTENT_REVIEW_READ'",
 );
 assertContains(
   'admin sidebar monitoring guard',
