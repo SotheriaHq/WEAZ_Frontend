@@ -1,8 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ProductReviewSection from '@/components/reviews/ProductReviewSection';
-import { clearReviewRuntimeFlagsCache } from '@/hooks/useReviewRuntimeFlags';
-import { reviewsApi } from '@/api/ReviewsApi';
+import reviewApi from '@/api/ReviewApi';
 
 vi.mock('react-redux', () => ({
   useSelector: vi.fn((selector: (state: { user: { isAuthenticated: boolean } }) => boolean) =>
@@ -18,53 +17,47 @@ vi.mock('@/components/media/MediaRenderer', () => ({
   default: () => <div data-testid="media-renderer" />,
 }));
 
-vi.mock('@/api/ReviewsApi', async () => {
-  const actual = await vi.importActual<typeof import('@/api/ReviewsApi')>('@/api/ReviewsApi');
+vi.mock('@/api/ReviewApi', async () => {
+  const actual = await vi.importActual<typeof import('@/api/ReviewApi')>('@/api/ReviewApi');
   return {
     ...actual,
-    reviewsApi: {
-      getRuntimeFlags: vi.fn(),
+    default: {
       getProductReviews: vi.fn(),
-      addHelpfulVote: vi.fn(),
-      removeHelpfulVote: vi.fn(),
-      reportReview: vi.fn(),
+      updateReview: vi.fn(),
+      deleteReview: vi.fn(),
     },
   };
 });
 
 describe('ProductReviewSection', () => {
   beforeEach(() => {
-    clearReviewRuntimeFlagsCache();
     vi.clearAllMocks();
   });
 
-  it('does not fetch or render reviews when read access is disabled at runtime', async () => {
-    vi.mocked(reviewsApi.getRuntimeFlags).mockResolvedValue({
-      readEnabled: false,
-      writeEnabled: true,
-      brandRepliesEnabled: true,
-    });
+  it('does not render reviews when read access is denied', async () => {
+    vi.mocked(reviewApi.getProductReviews).mockRejectedValue({ status: 403 });
 
     render(<ProductReviewSection productId="product-1" />);
 
     await waitFor(() => {
-      expect(reviewsApi.getRuntimeFlags).toHaveBeenCalledTimes(1);
+      expect(reviewApi.getProductReviews).toHaveBeenCalledTimes(1);
     });
 
-    expect(reviewsApi.getProductReviews).not.toHaveBeenCalled();
-    expect(screen.queryByText('Buyer feedback that stays tied to delivered orders.')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText('Verified buyer feedback')).not.toBeInTheDocument();
+    });
   });
 
-  it('fails closed when the runtime flag request fails', async () => {
-    vi.mocked(reviewsApi.getRuntimeFlags).mockRejectedValue(new Error('network down'));
+  it('shows a recoverable error when the reviews request fails', async () => {
+    vi.mocked(reviewApi.getProductReviews).mockRejectedValue(new Error('network down'));
 
     render(<ProductReviewSection productId="product-1" />);
 
     await waitFor(() => {
-      expect(reviewsApi.getRuntimeFlags).toHaveBeenCalledTimes(1);
+      expect(reviewApi.getProductReviews).toHaveBeenCalledTimes(1);
     });
 
-    expect(reviewsApi.getProductReviews).not.toHaveBeenCalled();
-    expect(screen.queryByText('Buyer feedback that stays tied to delivered orders.')).not.toBeInTheDocument();
+    expect(await screen.findByText('Reviews are unavailable')).toBeInTheDocument();
+    expect(screen.getByText('network down')).toBeInTheDocument();
   });
 });

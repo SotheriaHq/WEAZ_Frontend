@@ -4,6 +4,10 @@ import { unwrapApiResponse } from "../types/auth";
 import type { SizingMode } from '@/types/sizing';
 import { filterV1GarmentCategories } from '@/utils/v1Taxonomy';
 import { WEB_UPLOAD_POLICIES, assertValidUploadFile } from '@/utils/uploadValidation';
+import {
+  type MediaViewSlot,
+  toBackendMediaViewSlot,
+} from '@/utils/contentIntegrity';
 
 // =====================
 // Types
@@ -18,6 +22,12 @@ export interface ProductVariant {
   price?: number;
   stock: number;
   lowStock?: boolean;
+}
+
+export interface ProductMediaSlotInput {
+  fileUploadId: string;
+  viewSlot: MediaViewSlot;
+  orderIndex?: number;
 }
 
 function buildStoreProductPayload(data: Partial<ProductCreateDto>) {
@@ -148,6 +158,20 @@ function buildStoreProductPayload(data: Partial<ProductCreateDto>) {
   if ((data as any).images !== undefined) payload.images = (data as any).images;
   if ((data as any).thumbnail !== undefined)
     payload.thumbnail = (data as any).thumbnail;
+  if (Array.isArray((data as any).media)) {
+    payload.media = (data as any).media
+      .map((entry: Partial<ProductMediaSlotInput>, index: number) => {
+        const fileUploadId = String(entry.fileUploadId ?? '').trim();
+        if (!fileUploadId) return null;
+        return {
+          fileUploadId,
+          viewSlot: toBackendMediaViewSlot(entry.viewSlot, index),
+          orderIndex:
+            typeof entry.orderIndex === 'number' ? entry.orderIndex : index,
+        };
+      })
+      .filter(Boolean);
+  }
 
   // Status mapping
   if (data.status !== undefined) payload.isActive = data.status === "ACTIVE";
@@ -183,6 +207,7 @@ export interface ProductCreateDto {
   lowStockThreshold?: number;
   status?: "DRAFT" | "ACTIVE" | "ARCHIVED";
   mediaIds?: string[];
+  media?: ProductMediaSlotInput[];
   variants?: ProductVariant[];
   isPhysicalProduct?: boolean;
   customsRegion?: string;
@@ -240,6 +265,9 @@ export interface ProductDto {
   totalStock?: number;
   lowStockThreshold?: number;
   status: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  publicationStatus?: string | null;
+  reviewMode?: string | null;
+  submissionId?: string | null;
   metaTitle?: string;
   metaDescription?: string;
   publishAt?: string;
@@ -248,7 +276,15 @@ export interface ProductDto {
   colorImages?: Record<string, string>;
   colorHexCodes?: Record<string, string>;
   mediaIds?: string[];
-  media?: Array<{ id: string; url: string; type: string; isPrimary?: boolean }>;
+  media?: Array<{
+    id: string;
+    fileUploadId?: string | null;
+    url: string;
+    type: string;
+    isPrimary?: boolean;
+    viewSlot?: MediaViewSlot | string | null;
+    reviewStatus?: string | null;
+  }>;
   variants?: ProductVariant[];
   sizes?: string[];
   sizingMode?: SizingMode;
@@ -679,22 +715,26 @@ export const productApi = {
     productId: string,
     file: File,
     isPrimary = false,
-  ): Promise<{ id: string; url: string }> {
+    viewSlot?: MediaViewSlot | string | null,
+  ): Promise<{ id: string; url: string; viewSlot?: string | null }> {
     try {
       assertValidUploadFile(file, WEB_UPLOAD_POLICIES.productMedia);
       const formData = new FormData();
       formData.append("file", file);
       formData.append("isPrimary", String(isPrimary));
+      if (viewSlot) {
+        formData.append("viewSlot", toBackendMediaViewSlot(viewSlot));
+      }
 
       const response = await apiClient.post<{
         status: string;
-        data: { id: string; url: string };
+        data: { id: string; url: string; viewSlot?: string | null };
       }>(`/products/${productId}/media`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       return (
         response.data?.data ??
-        (response.data as unknown as { id: string; url: string })
+        (response.data as unknown as { id: string; url: string; viewSlot?: string | null })
       );
     } catch (error) {
       console.error("Failed to upload product media", error);
@@ -739,6 +779,28 @@ export const productApi = {
       await apiClient.patch(`/products/${productId}/media/${mediaId}/primary`);
     } catch (error) {
       console.error("Failed to set primary media", error);
+      throw error;
+    }
+  },
+
+  async acknowledgeContentPolicy(): Promise<void> {
+    try {
+      await apiClient.post("/store/content-policy/acknowledge");
+    } catch (error) {
+      console.error("Failed to acknowledge content policy", error);
+      throw error;
+    }
+  },
+
+  async submitProductForReview(productId: string): Promise<ProductDto> {
+    try {
+      const response = await apiClient.post<{
+        status: string;
+        data: ProductDto;
+      }>(`/products/${productId}/submit`);
+      return response.data?.data ?? (response.data as unknown as ProductDto);
+    } catch (error) {
+      console.error("Failed to submit product for review", error);
       throw error;
     }
   },

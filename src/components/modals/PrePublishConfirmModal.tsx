@@ -383,6 +383,12 @@ const ConfirmContent: React.FC<{
       </div>
     )}
 
+    <div className="mt-4 rounded-xl border border-sky-500/20 bg-sky-500/10 p-3">
+      <p className="text-sm text-sky-700 dark:text-sky-200">
+        By going live, you confirm these images belong to this {entityLabel.toLowerCase()} and match the selected views.
+      </p>
+    </div>
+
     {/* Description preview */}
     {truncatedDescription && (
       <div className="mt-4">

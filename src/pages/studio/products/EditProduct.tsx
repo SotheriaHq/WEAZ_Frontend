@@ -86,6 +86,16 @@ import {
   mapCreatorMetadataError,
   normalizeHashtagLabel,
 } from "@/utils/creatorMetadata";
+import {
+  MEDIA_VIEW_SLOT_OPTIONS,
+  getContentStatusLabel,
+  getContentStatusTone,
+  getMediaViewSlotLabel,
+  getMissingRequiredMediaSlots,
+  normalizeMediaViewSlot,
+  toBackendMediaViewSlot,
+  type MediaViewSlot,
+} from "@/utils/contentIntegrity";
 
 function toSkuToken(input: string): string {
   const cleaned = input
@@ -334,6 +344,14 @@ interface FormState {
   customOrderEnabled: boolean;
 }
 
+type ProductMediaPreview = {
+  id: string;
+  url: string;
+  isPrimary?: boolean;
+  fileUploadId?: string | null;
+  viewSlot?: MediaViewSlot | string | null;
+};
+
 const defaultFormState: FormState = {
   title: "",
   description: "",
@@ -468,6 +486,7 @@ const EditProduct: React.FC = () => {
 
   // State
   const [form, setForm] = useState<FormState>(defaultFormState);
+  const [contentStatus, setContentStatus] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [collectionCategoryById, setCollectionCategoryById] = useState<
     Record<string, string>
@@ -536,11 +555,10 @@ const EditProduct: React.FC = () => {
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
 
   // Media state (simplified - using URLs for display)
-  const [mediaUrls, setMediaUrls] = useState<
-    Array<{ id: string; url: string; isPrimary?: boolean }>
-  >([]);
+  const [mediaUrls, setMediaUrls] = useState<ProductMediaPreview[]>([]);
 
   const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingUploadSlotRef = useRef<MediaViewSlot | null>(null);
   const [pendingMediaFiles, setPendingMediaFiles] = useState<
     Array<{
       id: string;
@@ -548,6 +566,7 @@ const EditProduct: React.FC = () => {
       file: File;
       previewUrl: string;
       isPrimary: boolean;
+      viewSlot: MediaViewSlot;
     }>
   >([]);
   const pendingPreviewUrlsRef = useRef<Map<string, string>>(new Map());
@@ -579,6 +598,46 @@ const EditProduct: React.FC = () => {
     () => mediaUrls.some((m) => m.isPrimary),
     [mediaUrls],
   );
+  const missingRequiredProductMediaSlots = useMemo(
+    () => getMissingRequiredMediaSlots(mediaUrls),
+    [mediaUrls],
+  );
+  const productMediaSlotOptions = useMemo(
+    () =>
+      MEDIA_VIEW_SLOT_OPTIONS.slice(0, maxMediaCount).map((option) => ({
+        value: option.value,
+        label: option.required ? `${option.label} *` : option.label,
+      })),
+    [maxMediaCount],
+  );
+  const mediaBySlot = useMemo(() => {
+    const next = new Map<MediaViewSlot, ProductMediaPreview>();
+    mediaUrls.forEach((item, index) => {
+      next.set(normalizeMediaViewSlot(item.viewSlot, index), item);
+    });
+    return next;
+  }, [mediaUrls]);
+
+  const buildStructuredMediaPayload = useCallback(
+    () =>
+      mediaUrls
+        .map((item, index) => ({
+          fileUploadId: String(item.fileUploadId || item.id || "").trim(),
+          viewSlot: toBackendMediaViewSlot(item.viewSlot, index),
+          orderIndex: index,
+        }))
+        .filter(
+          (entry) =>
+            entry.fileUploadId.length > 0 &&
+            !entry.fileUploadId.startsWith("pending-"),
+        ),
+    [mediaUrls],
+  );
+
+  const openMediaPickerForSlot = useCallback((slot: MediaViewSlot) => {
+    pendingUploadSlotRef.current = slot;
+    mediaFileInputRef.current?.click();
+  }, []);
 
   // Calculate profit margin
   const profitMargin = useMemo(() => {
@@ -907,6 +966,9 @@ const EditProduct: React.FC = () => {
           if ((product as any).archivedAt) return "ARCHIVED";
           return (product as any).isActive === false ? "DRAFT" : "ACTIVE";
         })();
+        setContentStatus(
+          String((product as any).publicationStatus || (product as any).status || resolvedStatus),
+        );
 
         // Track original price for change detection
         setOriginalPrice(product.price || 0);
@@ -989,23 +1051,31 @@ const EditProduct: React.FC = () => {
         // Set media for display - resolve signed URLs
         if (product.media?.length) {
           const mediaWithSignedUrls = await Promise.all(
-            product.media.map(async (m) => {
+            product.media.map(async (m, index) => {
               let signedUrl = m.url;
               // Check if URL needs signing (S3 reference without query params)
+              const remoteFileId = m.fileUploadId || m.id;
               if (
-                m.id &&
+                remoteFileId &&
                 m.url &&
                 !m.url.includes("?") &&
                 (m.url.includes("s3") || !m.url.startsWith("http"))
               ) {
                 try {
-                  const signed = await brandApi.getSignedFileUrl(m.id);
+                  const signed = await brandApi.getSignedFileUrl(remoteFileId);
                   if (signed) signedUrl = signed;
                 } catch (e) {
-                  console.warn("Failed to sign URL for media", m.id, e);
+                  console.warn("Failed to sign URL for media", remoteFileId, e);
                 }
               }
-              return { id: m.id, url: signedUrl, isPrimary: m.isPrimary };
+              const fileUploadId = remoteFileId;
+              return {
+                id: fileUploadId,
+                fileUploadId,
+                url: signedUrl,
+                isPrimary: m.isPrimary,
+                viewSlot: normalizeMediaViewSlot(m.viewSlot, index),
+              };
             }),
           );
           setMediaUrls(normalizePrimary(mediaWithSignedUrls));
@@ -1014,6 +1084,7 @@ const EditProduct: React.FC = () => {
             id: `img-${i}`,
             url,
             isPrimary: product.thumbnail ? url === product.thumbnail : i === 0,
+            viewSlot: normalizeMediaViewSlot(null, i),
           }));
           setMediaUrls(normalizePrimary(mapped));
         }
@@ -1231,10 +1302,12 @@ const EditProduct: React.FC = () => {
   );
 
   const syncPersistedMediaIds = useCallback(
-    (items: Array<{ id: string }>) => {
+    (items: ProductMediaPreview[]) => {
       updateForm(
         "mediaIds",
-        items.map((item) => item.id).filter((id) => !id.startsWith("pending-")),
+        items
+          .map((item) => item.fileUploadId || item.id)
+          .filter((id) => id && !id.startsWith("pending-")),
       );
     },
     [updateForm],
@@ -1567,16 +1640,18 @@ const EditProduct: React.FC = () => {
         return;
       }
 
-      const mediaValidation = validateMedia(
-        mediaUrls,
-        maxMediaCount,
-        minRequiredMediaCount,
-      );
-      if (!mediaValidation.ok) {
-        toast.error(
-          mediaValidation.error || "Please review your media selection",
+      if (shouldValidatePublish) {
+        const mediaValidation = validateMedia(
+          mediaUrls,
+          maxMediaCount,
+          minRequiredMediaCount,
         );
-        return;
+        if (!mediaValidation.ok) {
+          toast.error(
+            mediaValidation.error || "Please review your media selection",
+          );
+          return;
+        }
       }
 
       // Check if price changed in edit mode - show preview before saving
@@ -1629,6 +1704,9 @@ const EditProduct: React.FC = () => {
         form.customOrderEnabled
           ? customOrderEditorRef.current?.buildConfigurationDraft() ?? null
           : null;
+      const structuredMediaPayload = shouldValidatePublish
+        ? buildStructuredMediaPayload()
+        : undefined;
 
       if (shouldValidatePublish && form.customOrderEnabled && !pendingCustomOrderDraft) {
         toast.error('Save the custom-order setup before this product goes live.');
@@ -1637,6 +1715,9 @@ const EditProduct: React.FC = () => {
 
       setSaving(true);
       try {
+        if (shouldValidatePublish && !isCollectionFlow) {
+          await productApi.acknowledgeContentPolicy();
+        }
         const resolvedCustomsRegion = await syncShippingRegions({
           // Collection flow should not block on store policy updates.
           persistPolicy: !isCollectionContext,
@@ -1704,6 +1785,10 @@ const EditProduct: React.FC = () => {
           customsRegion: resolvedCustomsRegion,
           customOrderEnabled: form.customOrderEnabled,
           mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
+          media:
+            structuredMediaPayload && structuredMediaPayload.length > 0
+              ? structuredMediaPayload
+              : undefined,
           sizingMode: normalizeSizingMode(form.sizingMode),
           rtwSizeSystem:
             isRtwSizingMode(form.sizingMode)
@@ -1739,7 +1824,10 @@ const EditProduct: React.FC = () => {
             }
           }
 
-          await productApi.updateProduct(productId, payload);
+          const updated = await productApi.updateProduct(productId, payload);
+          setContentStatus(
+            String((updated as any).publicationStatus || (updated as any).status || finalStatus),
+          );
           notifyProductStudioSync("product-updated", productId);
           toast.success(
             isCollectionContext
@@ -1762,7 +1850,11 @@ const EditProduct: React.FC = () => {
 
           try {
             // Build media upload list after product creation.
-            let pendingUploads: Array<{ file: File; isPrimary: boolean }> = [];
+            let pendingUploads: Array<{
+              file: File;
+              isPrimary: boolean;
+              viewSlot: MediaViewSlot;
+            }> = [];
             if (pendingMediaFiles.length > 0) {
               const pendingById = new Map(
                 pendingMediaFiles.map((p) => [p.tempId, p]),
@@ -1777,6 +1869,7 @@ const EditProduct: React.FC = () => {
                     file: File;
                     previewUrl: string;
                     isPrimary: boolean;
+                    viewSlot: MediaViewSlot;
                   }),
                   id:
                     (p as { id: string }).id || (p as { tempId: string }).tempId,
@@ -1800,6 +1893,7 @@ const EditProduct: React.FC = () => {
                           created.id,
                           upload.file,
                           upload.isPrimary,
+                          upload.viewSlot,
                         ),
                       ),
                     )
@@ -1819,10 +1913,26 @@ const EditProduct: React.FC = () => {
             }
 
             if (shouldCreateAsDraftForUploads) {
-              await productApi.updateProduct(created.id, {
+              const uploadedMedia = (
+                mediaUploadResult.status === "fulfilled"
+                  ? mediaUploadResult.value
+                  : []
+              ).map((item, index) => ({
+                fileUploadId: item.id,
+                viewSlot: toBackendMediaViewSlot(
+                  pendingUploads[index]?.viewSlot,
+                  index,
+                ),
+                orderIndex: index,
+              }));
+              const updated = await productApi.updateProduct(created.id, {
                 ...payload,
                 status: finalStatus,
+                media: uploadedMedia,
               });
+              setContentStatus(
+                String((updated as any).publicationStatus || (updated as any).status || finalStatus),
+              );
             }
           } catch (createError: any) {
             await rollbackCreatedProduct(created.id);
@@ -1896,6 +2006,7 @@ const EditProduct: React.FC = () => {
       returnTo,
       syncShippingRegions,
       user,
+      buildStructuredMediaPayload,
     ],
   );
 
@@ -1920,6 +2031,8 @@ const EditProduct: React.FC = () => {
         : pendingSaveDraft;
       const statusToPersist =
         normalizedPendingStatus ?? (effectiveDraft ? "DRAFT" : form.status);
+      const structuredMediaPayload =
+        statusToPersist === "ACTIVE" ? buildStructuredMediaPayload() : undefined;
       const ensuredSku =
         form.sku?.trim() ||
         buildBaseSku({
@@ -1989,6 +2102,10 @@ const EditProduct: React.FC = () => {
         customsRegion: resolvedCustomsRegion,
         customOrderEnabled: form.customOrderEnabled,
         mediaIds: form.mediaIds.length > 0 ? form.mediaIds : undefined,
+        media:
+          structuredMediaPayload && structuredMediaPayload.length > 0
+            ? structuredMediaPayload
+            : undefined,
         sizingMode: normalizeSizingMode(form.sizingMode),
         rtwSizeSystem:
           isRtwSizingMode(form.sizingMode)
@@ -2002,6 +2119,9 @@ const EditProduct: React.FC = () => {
       };
 
       if (productId) {
+        if (statusToPersist === "ACTIVE" && !isCollectionFlow) {
+          await productApi.acknowledgeContentPolicy();
+        }
         if (form.customOrderEnabled) {
           let saved = false;
           try {
@@ -2022,7 +2142,10 @@ const EditProduct: React.FC = () => {
           }
         }
 
-        await productApi.updateProduct(productId, payload);
+        const updated = await productApi.updateProduct(productId, payload);
+        setContentStatus(
+          String((updated as any).publicationStatus || (updated as any).status || statusToPersist),
+        );
       } else {
         const created = await productApi.createProduct(payload);
         try {
@@ -2090,6 +2213,7 @@ const EditProduct: React.FC = () => {
     syncShippingRegions,
     notifyProductStudioSync,
     rollbackCreatedProduct,
+    buildStructuredMediaPayload,
   ]);
 
   const triggerSave = useCallback(
@@ -2154,6 +2278,7 @@ const EditProduct: React.FC = () => {
         file: File;
         previewUrl: string;
         isPrimary: boolean;
+        viewSlot: MediaViewSlot;
       }>,
     ) => {
       return normalizePrimary(items);
@@ -2171,6 +2296,7 @@ const EditProduct: React.FC = () => {
       file: File;
       previewUrl: string;
       isPrimary: boolean;
+      viewSlot: MediaViewSlot;
     }> => {
       if (!files.length) return [];
 
@@ -2182,15 +2308,28 @@ const EditProduct: React.FC = () => {
       }
 
       const now = Date.now();
+      const requestedSlot = pendingUploadSlotRef.current;
+      pendingUploadSlotRef.current = null;
+      const occupiedSlots = new Set(
+        mediaUrls.map((item, index) => normalizeMediaViewSlot(item.viewSlot, index)),
+      );
+      const availableSlots = MEDIA_VIEW_SLOT_OPTIONS.slice(0, maxMediaCount)
+        .map((option) => option.value)
+        .filter((slot) => !occupiedSlots.has(slot));
       const nextPending = toAdd.map((file, idx) => {
         const previewUrl = URL.createObjectURL(file);
         const tempId = `pending-${now}-${idx}-${Math.random().toString(16).slice(2)}`;
+        const viewSlot =
+          idx === 0 && requestedSlot
+            ? requestedSlot
+            : availableSlots[idx] ?? normalizeMediaViewSlot(null, mediaUrls.length + idx);
         return {
           id: tempId,
           tempId,
           file,
           previewUrl,
           isPrimary: false,
+          viewSlot,
         };
       });
 
@@ -2212,6 +2351,7 @@ const EditProduct: React.FC = () => {
           id: m.tempId,
           url: m.previewUrl,
           isPrimary: false,
+          viewSlot: m.viewSlot,
         }));
         const next = [...prev, ...mapped];
         if (makePrimary && mapped[0]) {
@@ -2222,7 +2362,7 @@ const EditProduct: React.FC = () => {
 
       return nextPending;
     },
-    [mediaUrls.length, normalizePending],
+    [mediaUrls, maxMediaCount, normalizePending],
   );
 
   const preprocessProductMediaFiles = useCallback(async (files: File[]) => {
@@ -2293,6 +2433,7 @@ const EditProduct: React.FC = () => {
               productId,
               pending.file,
               pending.isPrimary,
+              pending.viewSlot,
             );
 
             setMediaUrls((prev) => {
@@ -2300,8 +2441,13 @@ const EditProduct: React.FC = () => {
                 item.id === pending.tempId
                   ? {
                       id: uploaded.id,
+                      fileUploadId: uploaded.id,
                       url: uploaded.url,
                       isPrimary: item.isPrimary,
+                      viewSlot:
+                        normalizeMediaViewSlot(
+                          uploaded.viewSlot ?? pending.viewSlot,
+                        ),
                     }
                   : item,
               );
@@ -2359,6 +2505,38 @@ const EditProduct: React.FC = () => {
     const makePrimary = !hasPrimaryMedia;
     pushMediaPreviews(files, { makePrimary });
   };
+
+  const handleMediaSlotChange = useCallback(
+    (mediaId: string, slotValue: string) => {
+      const nextSlot = normalizeMediaViewSlot(slotValue);
+      const duplicate = mediaUrls.find(
+        (item, index) =>
+          item.id !== mediaId &&
+          normalizeMediaViewSlot(item.viewSlot, index) === nextSlot,
+      );
+      if (duplicate) {
+        toast.error(`${getMediaViewSlotLabel(nextSlot)} is already assigned.`);
+        return;
+      }
+
+      setMediaUrls((prev) =>
+        normalizePrimary(
+          prev.map((item) =>
+            item.id === mediaId ? { ...item, viewSlot: nextSlot } : item,
+          ),
+        ),
+      );
+      setPendingMediaFiles((prev) =>
+        normalizePending(
+          prev.map((item) =>
+            item.tempId === mediaId ? { ...item, viewSlot: nextSlot } : item,
+          ),
+        ),
+      );
+      setHasChanges(true);
+    },
+    [mediaUrls, normalizePending],
+  );
 
   const handleSetCover = useCallback(
     async (mediaId: string) => {
@@ -2624,28 +2802,10 @@ const EditProduct: React.FC = () => {
               {isEditMode && (
                 <div className="relative group">
                   <button
-                    className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      form.status === "ACTIVE"
-                        ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 hover:bg-green-500/20"
-                        : form.status === "DRAFT"
-                          ? "bg-gray-500/10 text-theme-secondary border-gray-500/20 hover:bg-gray-500/20"
-                          : "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20 hover:bg-orange-500/20"
-                    }`}
+                    className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${getContentStatusTone(contentStatus ?? form.status)}`}
                   >
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        form.status === "ACTIVE"
-                          ? "bg-green-500"
-                          : form.status === "DRAFT"
-                            ? "bg-gray-400"
-                            : "bg-orange-500"
-                      }`}
-                    />
-                    {form.status === "ACTIVE"
-                      ? "Active"
-                      : form.status === "DRAFT"
-                        ? "Draft"
-                        : "Archived"}
+                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                    {getContentStatusLabel(contentStatus ?? form.status)}
                     <ChevronDown className="w-3 h-3" />
                   </button>
                 </div>
@@ -2711,7 +2871,12 @@ const EditProduct: React.FC = () => {
                             </span>
                           )}
                           <span className="px-2 py-1 bg-black/60 backdrop-blur-sm rounded text-[10px] font-medium text-white/90">
-                            {carouselIndex + 1}. {['Front', 'Left Side', 'Right Side', 'Back Side', 'Cover', 'Extra'][carouselIndex] ?? `Image ${carouselIndex + 1}`}
+                            {carouselIndex + 1}. {getMediaViewSlotLabel(
+                              normalizeMediaViewSlot(
+                                mediaUrls[carouselIndex].viewSlot,
+                                carouselIndex,
+                              ),
+                            )}
                           </span>
                         </div>
 
@@ -2854,11 +3019,78 @@ const EditProduct: React.FC = () => {
                 </button>
               )}
 
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                {MEDIA_VIEW_SLOT_OPTIONS.slice(0, maxMediaCount).map((slotOption, index) => {
+                  const assigned = mediaBySlot.get(slotOption.value);
+                  const isMissing =
+                    slotOption.required &&
+                    missingRequiredProductMediaSlots.includes(slotOption.value);
+                  return (
+                    <div
+                      key={slotOption.value}
+                      className={`rounded-xl border p-2 ${
+                        isMissing
+                          ? "border-amber-400/50 bg-amber-500/10"
+                          : "border-theme surface-subtle"
+                      }`}
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-semibold text-theme">
+                          {slotOption.label}
+                        </span>
+                        {slotOption.required && (
+                          <span className="text-[10px] font-medium text-amber-500">
+                            Required
+                          </span>
+                        )}
+                      </div>
+                      {assigned ? (
+                        <div className="space-y-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCarouselIndex(
+                                Math.max(0, mediaUrls.findIndex((item) => item.id === assigned.id)),
+                              )
+                            }
+                            className="h-20 w-full overflow-hidden rounded-lg bg-black/5 dark:bg-white/5"
+                          >
+                            <MediaRenderer
+                              kind="image"
+                              src={assigned.url}
+                              alt={`${slotOption.label} media`}
+                              fit="cover"
+                              className="h-full w-full"
+                              mediaClassName="h-full w-full object-cover"
+                            />
+                          </button>
+                          <UniversalSelect
+                            value={normalizeMediaViewSlot(assigned.viewSlot, index)}
+                            onChange={(value) => handleMediaSlotChange(assigned.id, value)}
+                            options={productMediaSlotOptions}
+                            className="text-xs"
+                            optionCompact
+                          />
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openMediaPickerForSlot(slotOption.value)}
+                          disabled={!canAddMoreMedia}
+                          className="flex h-20 w-full items-center justify-center rounded-lg border border-dashed border-theme text-xs font-semibold text-theme-secondary transition hover:text-theme disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Add {slotOption.label}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
               {mediaUrls.length > 0 &&
-                mediaUrls.length < minRequiredMediaCount && (
+                missingRequiredProductMediaSlots.length > 0 && (
                 <p className="mt-3 text-xs text-orange-500">
-                  Upload all 4 required views before saving: front, left,
-                  right, and back.
+                  Add {missingRequiredProductMediaSlots.map(getMediaViewSlotLabel).join(", ")} media before going live.
                 </p>
               )}
 

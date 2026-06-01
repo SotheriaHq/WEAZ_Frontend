@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import type { MediaItem, MediaItemKind } from '../types/media';
+import { normalizeMediaViewSlot } from '@/utils/contentIntegrity';
 
 type State = { items: MediaItem[] };
 
@@ -29,11 +30,11 @@ function detectKind(file: File): MediaItemKind {
   return 'image';
 }
 
-function createItemFromFile(f: File): MediaItem {
+function createItemFromFile(f: File, index = 0): MediaItem {
   const id = genId();
   const previewUrl = URL.createObjectURL(f);
   const kind = detectKind(f);
-  return { id, file: f, previewUrl, kind };
+  return { id, file: f, previewUrl, kind, viewSlot: normalizeMediaViewSlot(null, index) };
 }
 
 function reducer(state: State, action: Action): State {
@@ -43,7 +44,9 @@ function reducer(state: State, action: Action): State {
         typeof action.maxItems === 'number'
           ? Math.max(0, action.maxItems - state.items.length)
           : action.files.length;
-      const newItems = action.files.slice(0, remaining).map(createItemFromFile);
+      const newItems = action.files
+        .slice(0, remaining)
+        .map((file, index) => createItemFromFile(file, state.items.length + index));
       return { items: [...state.items, ...newItems] };
     }
     case 'remove':

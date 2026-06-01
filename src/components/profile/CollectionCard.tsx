@@ -16,6 +16,7 @@ import VLoader from '@/components/loaders/VLoader';
 import { getCatalogEntityCardCopy, resolveCatalogEntityCardBranch } from './catalogEntityCardModel';
 import { mapCatalogTargetForLegacyApi } from '@/utils/catalogTarget';
 import { getCompactPublishTaskStatusLabel } from '@/utils/publishTracker';
+import { getContentStatusLabel, getContentStatusTone } from '@/utils/contentIntegrity';
 
 export interface CollectionCardProps {
   collection: CollectionDto;
@@ -100,6 +101,17 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
     kind: collection.clientStatusMeta?.kind,
     progress: publishProgress,
   });
+  const backendStatus = String(collection.publicationStatus ?? collection.status ?? '').toUpperCase();
+  const reviewStatusLabel =
+    backendStatus === 'IN_REVIEW' ||
+    backendStatus === 'CHANGES_REQUESTED' ||
+    backendStatus === 'REJECTED' ||
+    backendStatus === 'FAILED'
+      ? getContentStatusLabel(backendStatus)
+      : null;
+  const reviewStatusClassName = reviewStatusLabel
+    ? getContentStatusTone(backendStatus)
+    : 'bg-sky-500/90 text-white';
   const clientPreviewUrl = collection.clientStatusMeta?.previewUrl;
   const hasPersistedCollectionId = !collection.id.startsWith('publish_');
 
@@ -601,6 +613,23 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
                 >
                   {copy.continueLabel}
                 </button>
+              </>
+            ) : reviewStatusLabel ? (
+              <>
+                <div className="flex-1 min-w-0">
+                  <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md border backdrop-blur-sm ${reviewStatusClassName}`}>
+                    <div className="w-2 h-2 rounded-full bg-current" />
+                    <span className="text-[10px] font-medium">{reviewStatusLabel}</span>
+                  </div>
+                </div>
+                {(backendStatus === 'CHANGES_REQUESTED' || backendStatus === 'REJECTED' || backendStatus === 'FAILED') && (
+                  <button
+                    className="shrink-0 px-3 py-1.5 rounded-md bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[11px] font-medium hover:from-purple-600 hover:to-indigo-600 transition-all shadow-md"
+                    onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+                  >
+                    Edit
+                  </button>
+                )}
               </>
             ) : (
               /* Normal entity footer with comment input */

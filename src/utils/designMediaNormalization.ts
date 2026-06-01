@@ -6,6 +6,7 @@ export type NormalizedDesignMedia = {
   fileId?: string;
   previewUrl?: string;
   kind: MediaItemKind;
+  viewSlot?: string;
 };
 
 const asRecord = (value: unknown): Record<string, unknown> =>
@@ -81,6 +82,7 @@ export function normalizeDesignMediaResponse(source: unknown): NormalizedDesignM
         fileId,
         previewUrl,
         kind: resolveKind(media, file),
+        viewSlot: firstString(media.viewSlot, media.view_slot),
       };
     })
     .filter((item): item is NormalizedDesignMedia => Boolean(item));

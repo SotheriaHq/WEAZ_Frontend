@@ -57,6 +57,29 @@ import { queryKeys } from '@/query/queryKeys';
 import ComingSoon from '../placeholders/ComingSoon';
 
 type TabType = 'Content' | 'Store' | 'Reviews' | 'Us' | 'Drafts';
+type VisibilityFilter =
+  | 'Public'
+  | 'Private'
+  | 'Drafts'
+  | 'In Review'
+  | 'Changes Requested'
+  | 'Rejected'
+  | 'Deleted';
+const VISIBILITY_FILTERS: VisibilityFilter[] = ['Public', 'Private'];
+const OWNER_VISIBILITY_FILTERS: VisibilityFilter[] = [
+  'Public',
+  'Private',
+  'Drafts',
+  'In Review',
+  'Changes Requested',
+  'Rejected',
+  'Deleted',
+];
+const REVIEW_VISIBILITY_STATUS: Partial<Record<VisibilityFilter, string>> = {
+  'In Review': 'IN_REVIEW',
+  'Changes Requested': 'CHANGES_REQUESTED',
+  Rejected: 'REJECTED',
+};
 type PrivateAccessState = {
   collectionId: string;
   title: string;
@@ -176,13 +199,13 @@ const ProfilePage: React.FC = () => {
     }
     // Handle visibility filter from URL (e.g., after draft save redirect)
     const visibility = searchParams.get('visibility');
-    if (visibility && ['Public', 'Private', 'Drafts', 'Deleted'].includes(visibility)) {
-      setVisibilityFilter(visibility as 'Public' | 'Private' | 'Drafts' | 'Deleted');
+    if (visibility && OWNER_VISIBILITY_FILTERS.includes(visibility as VisibilityFilter)) {
+      setVisibilityFilter(visibility as VisibilityFilter);
     }
   }, [searchParams]);
 
   const [activeTab, setActiveTab] = useState<TabType>('Content');
-  const [visibilityFilter, setVisibilityFilter] = useState<'Public' | 'Private' | 'Drafts' | 'Deleted'>('Public');
+  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>('Public');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [pendingAccessConfirm, setPendingAccessConfirm] = useState<string | null>(null);
   const [collectionToDelete, setCollectionToDelete] = useState<string | null>(null);
@@ -859,10 +882,25 @@ const ProfilePage: React.FC = () => {
     displayCollections = drafts;
   } else if (visibilityFilter === 'Deleted') {
     displayCollections = deletedDesigns;
+  } else if (REVIEW_VISIBILITY_STATUS[visibilityFilter]) {
+    const targetStatus = REVIEW_VISIBILITY_STATUS[visibilityFilter];
+    displayCollections = activeCollections.filter((c) => {
+      const status = String(c.publicationStatus ?? c.status ?? '').toUpperCase();
+      return status === targetStatus;
+    });
   } else {
-    displayCollections = activeCollections.filter((c) =>
-      visibilityFilter === 'Public' ? (c.isPublic || c.visibility === 'PUBLIC') : (!c.isPublic || c.visibility === 'PRIVATE')
-    );
+    displayCollections = activeCollections.filter((c) => {
+      const status = String(c.publicationStatus ?? c.status ?? '').toUpperCase();
+      const isReviewStatus =
+        status === 'IN_REVIEW' ||
+        status === 'CHANGES_REQUESTED' ||
+        status === 'REJECTED' ||
+        status === 'FAILED';
+      if (isReviewStatus) return false;
+      return visibilityFilter === 'Public'
+        ? c.isPublic || c.visibility === 'PUBLIC'
+        : !c.isPublic || c.visibility === 'PRIVATE';
+    });
   }
   displayCollections = displayCollections.filter((collection) => !locallyRemovedCollectionIds.has(collection.id));
 
@@ -989,18 +1027,21 @@ const ProfilePage: React.FC = () => {
         : collectionsLoading && !hasPendingLiveTask;
   const isDraftVisibility = visibilityFilter === 'Drafts';
   const isDeletedVisibility = visibilityFilter === 'Deleted';
+  const isReviewVisibility = Boolean(REVIEW_VISIBILITY_STATUS[visibilityFilter]);
 
   const ownerEmptyStateDescription = isDraftVisibility
     ? "You don't have any unfinished designs."
     : isDeletedVisibility
       ? 'Deleted designs will appear here until permanently removed.'
+      : isReviewVisibility
+        ? `No designs are currently marked ${visibilityFilter.toLowerCase()}.`
       : requiresProfileSetup
         ? 'Complete your brand profile so buyers understand your story, then publish your first design.'
         : (showStoreSetupNudge || showStoreSetupChip)
           ? 'Your design feed is empty. Continue store setup so new designs are ready for storefront publishing.'
           : 'Create your first design to showcase your work.';
 
-  const ownerEmptyStateCta = isDraftVisibility || isDeletedVisibility
+  const ownerEmptyStateCta = isDraftVisibility || isDeletedVisibility || isReviewVisibility
     ? null
     : requiresProfileSetup
       ? (
@@ -1697,11 +1738,7 @@ const ProfilePage: React.FC = () => {
                     {/* Visibility filter chips */}
                     <div className="mb-6">
                       <div className="flex gap-5 overflow-x-auto border-b border-gray-200/80 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10">
-                        {([
-                            'Public',
-                            'Private',
-                            ...(isOwner ? ['Drafts', 'Deleted'] : []),
-                          ] as const).map((opt) => (
+                        {(isOwner ? OWNER_VISIBILITY_FILTERS : VISIBILITY_FILTERS).map((opt) => (
                           <button
                             key={opt}
                             onClick={() => setVisibilityFilter(opt as any)}
@@ -1714,12 +1751,18 @@ const ProfilePage: React.FC = () => {
                           >
                             <span>
                               {opt === 'Public'
-                                ? '🌍'
-                                : opt === 'Private'
-                                  ? '🔒'
-                                  : opt === 'Drafts'
-                                    ? '📝'
-                                    : '🗑️'}
+                                  ? '🌍'
+                                  : opt === 'Private'
+                                    ? '🔒'
+                                    : opt === 'Drafts'
+                                      ? '📝'
+                                      : opt === 'In Review'
+                                        ? 'R'
+                                        : opt === 'Changes Requested'
+                                          ? '!'
+                                          : opt === 'Rejected'
+                                            ? 'X'
+                                            : '🗑️'}
                             </span>
                             {opt}
                             <span
@@ -2174,4 +2217,3 @@ const ProfilePage: React.FC = () => {
 };
 
 export default ProfilePage;
-

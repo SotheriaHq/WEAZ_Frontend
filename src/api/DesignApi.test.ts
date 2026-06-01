@@ -89,6 +89,44 @@ describe('DesignApi', () => {
     expect(payload).not.toHaveProperty('collectionMetadata');
   });
 
+  it('serializes design media view slots for initialize and finalize', async () => {
+    mockedApiClient.post
+      .mockResolvedValueOnce({ data: { data: { designId: 'design-1', uploads: [] } } })
+      .mockResolvedValueOnce({ data: { data: { id: 'design-1' } } });
+
+    await initializeDesignUploads({
+      title: 'Slot design',
+      files: [{ name: 'front.jpg', type: 'image/jpeg', size: 123, viewSlot: 'FRONT' }],
+    });
+    await finalizeDesignUploads(
+      'design-1',
+      [{
+        fileId: 'file-1',
+        s3Key: 'designs/front.jpg',
+        actualSize: 123,
+        actualMimeType: 'image/jpeg',
+        viewSlot: 'INSPIRATION',
+      }],
+      true,
+    );
+
+    expect(mockedApiClient.post).toHaveBeenNthCalledWith(
+      1,
+      '/designs/initialize',
+      expect.objectContaining({
+        files: [expect.objectContaining({ viewSlot: 'FRONT' })],
+      }),
+    );
+    expect(mockedApiClient.post).toHaveBeenNthCalledWith(
+      2,
+      '/designs/design-1/finalize',
+      expect.objectContaining({
+        completions: [expect.objectContaining({ viewSlot: 'OTHER' })],
+      }),
+      expect.any(Object),
+    );
+  });
+
   it('resolves design identifiers before legacy collection identifiers', () => {
     expect(
       resolveDesignId({

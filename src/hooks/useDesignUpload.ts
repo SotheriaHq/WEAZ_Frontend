@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type { SizingMode } from '@/types/sizing';
 import type { MediaItem } from '../types/media';
+import { normalizeMediaViewSlot } from '@/utils/contentIntegrity';
 import {
   finalizeDesignUploads,
   initializeDesignUploads,
@@ -73,6 +74,13 @@ const resolveFile = (item: UploadSource): File | null => {
   }
 
   return null;
+};
+
+const resolveViewSlot = (item: UploadSource, index: number) => {
+  if (item instanceof File) {
+    return normalizeMediaViewSlot(null, index);
+  }
+  return normalizeMediaViewSlot(item.viewSlot, index);
 };
 
 const computeAggregateProgress = (
@@ -284,16 +292,26 @@ export function useDesignUpload() {
     setError(null);
 
     try {
+      const uploadItems = parsed.items
+        .map((item, index) => {
+          const file = resolveFile(item);
+          return file ? { file, viewSlot: resolveViewSlot(item, index) } : null;
+        })
+        .filter(
+          (entry): entry is { file: File; viewSlot: ReturnType<typeof normalizeMediaViewSlot> } =>
+            entry !== null,
+        );
       const initResp = await initializeDesignUploads({
         title: normalizeString(parsed.title),
         description: optionalString(parsed.description),
         minPrice: parsed.minPrice,
         maxPrice: parsed.maxPrice,
         tags: parsed.tags,
-        files: resolvedFiles.map((file) => ({
+        files: uploadItems.map(({ file, viewSlot }) => ({
           name: file.name,
           type: file.type,
           size: file.size,
+          viewSlot,
         })),
         draftOnly: !parsed.shouldPublish,
         categoryId: optionalString(parsed.options.categoryId),
@@ -359,12 +377,13 @@ export function useDesignUpload() {
                 updateFileProgress(entry.fileId, value),
                 activeXhrsRef,
               );
-              completions.push({
-                fileId: entry.fileId,
-                s3Key: entry.expectedKey,
-                actualSize: file.size,
-                actualMimeType: file.type,
-              });
+          completions.push({
+            fileId: entry.fileId,
+            s3Key: entry.expectedKey,
+            actualSize: file.size,
+            actualMimeType: file.type,
+            viewSlot: entry.viewSlot ?? uploadItems[index]?.viewSlot,
+          });
               updateFileProgress(entry.fileId, 100);
               break;
             } catch (uploadError) {

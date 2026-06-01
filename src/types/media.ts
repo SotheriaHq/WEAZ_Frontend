@@ -6,4 +6,5 @@ export interface MediaItem {
   previewUrl: string;
   kind: MediaItemKind;
   remoteId?: string;
+  viewSlot?: string | null;
 }

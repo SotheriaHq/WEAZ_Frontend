@@ -15,6 +15,11 @@ import {
   isStrictlyOutOfStockProduct,
 } from '@/lib/productAvailability';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import {
+  getContentStatusLabel,
+  getContentStatusTone,
+  type ContentPublicationStatus,
+} from '@/utils/contentIntegrity';
 
 export interface StoreProduct {
   id: string;
@@ -55,6 +60,9 @@ export interface StoreProduct {
   isOutOfStock: boolean;
   isFeatured: boolean;
   isActive?: boolean;
+  publicationStatus?: ContentPublicationStatus | string | null;
+  reviewMode?: string | null;
+  submissionId?: string | null;
   archivedAt?: string | null;
   deletedAt?: string | null;
   publishAt?: string | null;
@@ -144,6 +152,22 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     }
     if (product.archivedAt) {
       return { emoji: '📦', label: 'Archived', className: 'bg-gray-500/90 text-white' };
+    }
+    const publicationStatus = String(product.publicationStatus ?? '').toUpperCase();
+    if (
+      publicationStatus === 'IN_REVIEW' ||
+      publicationStatus === 'CHANGES_REQUESTED' ||
+      publicationStatus === 'REJECTED' ||
+      publicationStatus === 'FAILED'
+    ) {
+      return {
+        emoji: publicationStatus === 'CHANGES_REQUESTED' ? '!' : publicationStatus === 'REJECTED' ? 'X' : 'R',
+        label: getContentStatusLabel(publicationStatus),
+        className: getContentStatusTone(publicationStatus),
+      };
+    }
+    if (publicationStatus === 'DRAFT') {
+      return { emoji: '📝', label: 'Draft', className: 'bg-amber-500/90 text-white' };
     }
     const publishAtTs = product.publishAt ? new Date(product.publishAt).getTime() : null;
     const isScheduled = typeof publishAtTs === 'number' && Number.isFinite(publishAtTs) && publishAtTs > Date.now();
@@ -537,13 +561,11 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         <div className="absolute left-2.5 top-2.5 z-10 flex flex-col gap-1.5">
           {ownerStatus ? (
             <span
-              className="group/badge relative cursor-default text-base leading-none drop-shadow-md"
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold leading-none shadow-sm ${ownerStatus.className}`}
               title={ownerStatus.label}
             >
               {ownerStatus.emoji}
-              <span className="pointer-events-none absolute left-full top-1/2 ml-1.5 -translate-y-1/2 whitespace-nowrap rounded bg-gray-900/90 px-2 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover/badge:opacity-100">
-                {ownerStatus.label}
-              </span>
+              <span>{ownerStatus.label}</span>
             </span>
           ) : null}
           {product.isOnSale && product.discountPercent ? (

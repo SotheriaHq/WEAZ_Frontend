@@ -3,9 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiPlay, FiStar, FiPlus } from 'react-icons/fi';
 import type { MediaItem, MediaItemKind } from '../../types/media';
 import MediaRenderer from '../media/MediaRenderer';
-
-/** Slot labels shown beneath each thumbnail to guide upload ordering */
-const SLOT_LABELS = ['Front', 'Left', 'Right', 'Back', 'Cover', 'Extra'];
+import { getMediaViewSlotLabel, normalizeMediaViewSlot } from '@/utils/contentIntegrity';
 
 interface ThumbnailStripProps {
   items: MediaItem[];
@@ -27,6 +25,7 @@ interface PreviewFile {
   url: string;
   id?: string;
   kind: MediaItemKind;
+  viewSlot?: string | null;
 }
 
 /**
@@ -69,7 +68,13 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
           urlMap.current.set(it.id, url);
         }
       }
-      arr.push({ file: it.file, url: url!, id: it.id, kind: it.kind });
+      arr.push({
+        file: it.file,
+        url: url!,
+        id: it.id,
+        kind: it.kind,
+        viewSlot: it.viewSlot,
+      });
     }
     return arr;
   }, [items]);
@@ -194,10 +199,10 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
                 )}
 
                 {/* Slot label */}
-                {showSlotLabels && idx < SLOT_LABELS.length && (
+                {showSlotLabels && (
                   <div className="absolute bottom-0 inset-x-0 bg-black/50 backdrop-blur-sm text-center py-0.5">
                     <span className="text-[9px] font-semibold text-white/90 uppercase tracking-wide">
-                      {SLOT_LABELS[idx]}
+                      {getMediaViewSlotLabel(normalizeMediaViewSlot(pf.viewSlot, idx))}
                     </span>
                   </div>
                 )}

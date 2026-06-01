@@ -1,10 +1,14 @@
 import type { CatalogEntityType } from '@/constants/catalogDomain';
+import type { ContentPublicationStatus } from '@/utils/contentIntegrity';
 
 // Collection Types
 export interface CollectionDto {
   id: string;
   entityType?: CatalogEntityType;
-  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  status?: ContentPublicationStatus | 'ARCHIVED' | 'REMOVED' | string;
+  publicationStatus?: ContentPublicationStatus | string | null;
+  reviewMode?: string | null;
+  submissionId?: string | null;
   name: string;
   description?: string;
   ownerId: string;

@@ -36,10 +36,28 @@ import {
 } from '@/lib/productAvailability';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
+import { getContentStatusLabel, type ContentPublicationStatus } from '@/utils/contentIntegrity';
 
-type StudioStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'DELETED';
+type StudioStatus =
+  | 'ACTIVE'
+  | 'DRAFT'
+  | 'IN_REVIEW'
+  | 'CHANGES_REQUESTED'
+  | 'REJECTED'
+  | 'FAILED'
+  | 'ARCHIVED'
+  | 'DELETED';
 type OutletView = 'products' | 'collections';
-type ProductStatusFilter = 'all' | 'active' | 'draft' | 'featured' | 'archived' | 'deleted';
+type ProductStatusFilter =
+  | 'all'
+  | 'active'
+  | 'draft'
+  | 'in_review'
+  | 'changes_requested'
+  | 'rejected'
+  | 'featured'
+  | 'archived'
+  | 'deleted';
 type ProductSortBy = 'newest' | 'price_asc' | 'price_desc' | 'popular';
 type CollectionStatusFilter = 'all' | 'published' | 'draft' | 'archived';
 type CollectionSortBy = 'newest' | 'oldest' | 'title_asc' | 'title_desc' | 'items_desc';
@@ -57,6 +75,22 @@ const PRODUCT_STATUS_OPTIONS: Array<{
   { value: 'deleted', label: 'Deleted', icon: '🗑️' },
 ];
 
+const PRODUCT_REVIEW_STATUS_OPTIONS: Array<{
+  value: ProductStatusFilter;
+  label: string;
+  icon: string;
+}> = [
+  { value: 'in_review', label: 'In Review', icon: 'R' },
+  { value: 'changes_requested', label: 'Changes Requested', icon: '!' },
+  { value: 'rejected', label: 'Rejected', icon: 'X' },
+];
+
+const PRODUCT_FILTER_OPTIONS = [
+  ...PRODUCT_STATUS_OPTIONS.slice(0, 3),
+  ...PRODUCT_REVIEW_STATUS_OPTIONS,
+  ...PRODUCT_STATUS_OPTIONS.slice(3),
+];
+
 const PRODUCT_SORT_OPTIONS: Array<{
   value: ProductSortBy;
   label: string;
@@ -68,7 +102,7 @@ const PRODUCT_SORT_OPTIONS: Array<{
 ];
 
 const PRODUCT_STATUS_FILTER_VALUES = new Set<ProductStatusFilter>(
-  PRODUCT_STATUS_OPTIONS.map((option) => option.value),
+  PRODUCT_FILTER_OPTIONS.map((option) => option.value),
 );
 const COLLECTION_STATUS_FILTER_VALUES = new Set<CollectionStatusFilter>([
   'all',
@@ -85,6 +119,9 @@ interface BackendProduct {
   salePrice?: number | null;
   totalStock: number;
   isActive: boolean;
+  publicationStatus?: string | null;
+  reviewMode?: string | null;
+  submissionId?: string | null;
   isFeatured?: boolean;
   customAvailable?: boolean;
   customOrderEnabled?: boolean;
@@ -116,7 +153,7 @@ interface CollectionOption {
   id: string;
   name: string;
   description?: string;
-  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  status?: ContentPublicationStatus | string;
   deletedAt?: string | null;
   deleteExpiresAt?: string | null;
   isAvailableInStore?: boolean;
@@ -148,6 +185,16 @@ interface StoreProductsPanelProps {
 const resolveProductStatus = (product: BackendProduct): StudioStatus => {
   if (product.deletedAt) return 'DELETED';
   if (product.archivedAt) return 'ARCHIVED';
+
+  const publicationStatus = String((product as any).publicationStatus || '').toUpperCase();
+  if (publicationStatus === 'PUBLISHED') return 'ACTIVE';
+  if (publicationStatus === 'IN_REVIEW') return 'IN_REVIEW';
+  if (publicationStatus === 'CHANGES_REQUESTED') return 'CHANGES_REQUESTED';
+  if (publicationStatus === 'REJECTED') return 'REJECTED';
+  if (publicationStatus === 'FAILED') return 'FAILED';
+  if (publicationStatus === 'ARCHIVED') return 'ARCHIVED';
+  if (publicationStatus === 'REMOVED') return 'DELETED';
+  if (publicationStatus === 'DRAFT') return 'DRAFT';
 
   const rawStatus = String((product as any).status || '').toUpperCase();
   if (rawStatus === 'ARCHIVED') return 'ARCHIVED';
@@ -395,6 +442,12 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         items = items.filter((p) => resolveProductStatus(p) === 'ACTIVE');
       } else if (filterStatus === 'draft') {
         items = items.filter((p) => resolveProductStatus(p) === 'DRAFT');
+      } else if (filterStatus === 'in_review') {
+        items = items.filter((p) => resolveProductStatus(p) === 'IN_REVIEW');
+      } else if (filterStatus === 'changes_requested') {
+        items = items.filter((p) => resolveProductStatus(p) === 'CHANGES_REQUESTED');
+      } else if (filterStatus === 'rejected') {
+        items = items.filter((p) => resolveProductStatus(p) === 'REJECTED');
       } else if (filterStatus === 'featured') {
         items = items.filter((p) => p.isFeatured === true);
       }
@@ -1946,16 +1999,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4.25rem)] z-50 max-h-[min(70vh,26rem)] overflow-y-auto rounded-xl border border-gray-200/90 bg-white/98 p-2.5 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#12121a]/98 sm:absolute sm:inset-x-auto sm:right-4 sm:top-[64px] sm:w-[min(92vw,520px)] sm:p-3 lg:hidden"
             >
               <div className="mb-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
-                {(
-                  [
-                    { value: 'all', label: 'All', icon: '📦' },
-                    { value: 'active', label: 'Published', icon: '✨' },
-                    { value: 'draft', label: 'Product Drafts', icon: '📝' },
-                    { value: 'featured', label: 'Featured', icon: '⭐' },
-                    { value: 'archived', label: 'Archived', icon: '📁' },
-                    { value: 'deleted', label: 'Deleted', icon: '🗑️' },
-                  ] as const
-                ).map((opt) => (
+                {PRODUCT_FILTER_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
@@ -2005,7 +2049,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         {/* Desktop status filter buttons */}
         <div className="hidden border-t border-gray-200/80 bg-white/92 px-5 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 lg:sticky lg:top-24 lg:z-20 lg:block">
           <div className="flex flex-wrap items-center gap-2">
-            {PRODUCT_STATUS_OPTIONS.map((opt) => (
+            {PRODUCT_FILTER_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
@@ -2685,6 +2729,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               
               // Determine status for badge
               const productStatus = resolveProductStatus(product);
+              const productStatusValue =
+                product.publicationStatus ||
+                (productStatus === 'ACTIVE' ? 'PUBLISHED' : productStatus);
 
               return (
                 <div
@@ -2847,7 +2894,13 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         ? 'bg-rose-500/90 text-white'
                         : productStatus === 'ARCHIVED'
                           ? 'bg-gray-500/90 text-white'
-                          : productStatus === 'DRAFT' 
+                          : productStatus === 'IN_REVIEW' || productStatus === 'FAILED'
+                            ? 'bg-sky-500/90 text-white'
+                          : productStatus === 'CHANGES_REQUESTED'
+                            ? 'bg-amber-500/90 text-white'
+                          : productStatus === 'REJECTED'
+                            ? 'bg-rose-500/90 text-white'
+                          : productStatus === 'DRAFT'
                             ? 'bg-amber-500/90 text-white' 
                             : 'bg-emerald-500/90 text-white'
                     }`}>
@@ -2857,6 +2910,11 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           ? '📦 Archived'
                           : productStatus === 'DRAFT'
                             ? '📝 Draft'
+                            : productStatus === 'IN_REVIEW' ||
+                                productStatus === 'CHANGES_REQUESTED' ||
+                                productStatus === 'REJECTED' ||
+                                productStatus === 'FAILED'
+                              ? getContentStatusLabel(productStatusValue)
                             : '✅ Published'}
                     </span>
                   </div>

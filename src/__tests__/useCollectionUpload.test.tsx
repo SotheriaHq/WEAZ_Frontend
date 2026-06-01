@@ -97,7 +97,12 @@ afterEach(() => {
         undefined,
         false,
         ['evening'],
-        { categoryId: 'category-1', subCategoryId: 'subcategory-1' },
+        {
+          categoryId: 'category-1',
+          subCategoryId: 'subcategory-1',
+          type: 'EVERYBODY',
+          filterValueIds: ['filter-1'],
+        },
       );
       await flushPromises();
     });
@@ -108,6 +113,8 @@ afterEach(() => {
         tags: ['evening'],
         categoryId: 'category-1',
         subCategoryId: 'subcategory-1',
+        type: 'EVERYBODY',
+        filterValueIds: ['filter-1'],
       }),
     );
 
@@ -185,7 +192,12 @@ afterEach(() => {
         undefined,
         false,
         ['resort'],
-        { categoryId: 'category-1', subCategoryId: 'subcategory-1' },
+        {
+          categoryId: 'category-1',
+          subCategoryId: 'subcategory-1',
+          type: 'EVERYBODY',
+          filterValueIds: ['filter-1'],
+        },
       );
       await flushPromises();
     });
@@ -196,6 +208,8 @@ afterEach(() => {
         tags: ['resort'],
         categoryId: 'category-1',
         subCategoryId: 'subcategory-1',
+        type: 'EVERYBODY',
+        filterValueIds: ['filter-1'],
       }),
     );
 

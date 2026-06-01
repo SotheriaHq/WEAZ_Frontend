@@ -1,6 +1,10 @@
 import type { SizingMode } from '@/types/sizing';
 import { apiClient } from './httpClient';
 import { createIdempotencyKey } from './idempotency';
+import {
+  type MediaViewSlot,
+  toBackendMediaViewSlot,
+} from '@/utils/contentIntegrity';
 
 const DESIGN_DETAIL_TTL_MS = 30 * 1000;
 const designDetailCache = new Map<string, { data: unknown; expiresAt: number }>();
@@ -27,6 +31,7 @@ export type PresignEntry = {
   uploadUrl: string;
   uploadFields?: Record<string, string> | null;
   method?: 'POST' | 'PUT';
+  viewSlot?: MediaViewSlot | string | null;
 };
 
 export type CompletionDto = {
@@ -34,6 +39,7 @@ export type CompletionDto = {
   s3Key: string;
   actualSize: number;
   actualMimeType: string;
+  viewSlot?: MediaViewSlot | string | null;
 };
 
 export type DesignMetadata = {
@@ -62,7 +68,7 @@ export type DesignMetadata = {
 };
 
 export type InitializeDesignUploadsDto = DesignMetadata & {
-  files: { name: string; type: string; size: number }[];
+  files: { name: string; type: string; size: number; viewSlot?: MediaViewSlot | string | null }[];
   draftOnly?: boolean;
 };
 
@@ -135,7 +141,13 @@ const normalizeInitializeDesignResponse = (payload: unknown): InitializeDesignRe
 export async function initializeDesignUploads(
   dto: InitializeDesignUploadsDto,
 ): Promise<InitializeDesignResponse> {
-  const response = await apiClient.post('/designs/initialize', dto);
+  const response = await apiClient.post('/designs/initialize', {
+    ...dto,
+    files: dto.files.map((file, index) => ({
+      ...file,
+      viewSlot: toBackendMediaViewSlot(file.viewSlot, index),
+    })),
+  });
   return normalizeInitializeDesignResponse(response.data);
 }
 
@@ -155,7 +167,12 @@ export async function finalizeDesignUploads(
   const response = await apiClient.post(
     `/designs/${designId}/finalize`,
     {
-      completions,
+      completions: completions.map((completion, index) => ({
+        ...completion,
+        viewSlot: completion.viewSlot
+          ? toBackendMediaViewSlot(completion.viewSlot, index)
+          : undefined,
+      })),
       shouldPublish,
       action: options?.action,
       designMetadata: options?.designMetadata,
@@ -224,9 +241,22 @@ export async function initializeDesignMediaUploads(
   files: InitializeDesignUploadsDto['files'],
 ): Promise<InitializeDesignResponse> {
   const response = await apiClient.post(`/designs/${designId}/media/initialize`, {
-    files,
+    files: files.map((file, index) => ({
+      ...file,
+      viewSlot: toBackendMediaViewSlot(file.viewSlot, index),
+    })),
   });
   return normalizeInitializeDesignResponse(response.data);
+}
+
+export async function submitDesignForReview(designId: string) {
+  const response = await apiClient.post(`/designs/${designId}/submit`);
+  clearDesignDetailCache(designId);
+  return unwrapData<unknown>(response.data);
+}
+
+export async function acknowledgeContentPolicy() {
+  await apiClient.post('/store/content-policy/acknowledge');
 }
 
 export async function reorderDesignMedia(designId: string, mediaIds: string[]) {
@@ -265,6 +295,8 @@ export const DesignApi = {
   getDesignDetail,
   updateDesign,
   initializeDesignMediaUploads,
+  submitDesignForReview,
+  acknowledgeContentPolicy,
   reorderDesignMedia,
   deleteDesignMedia,
   startDesignDraftSession,

@@ -83,6 +83,11 @@ import {
   filterDesignCategoryTypesForAudience,
 } from '@/utils/designAudienceApplicability';
 import { normalizeDesignMediaResponse } from '@/utils/designMediaNormalization';
+import {
+  getMediaViewSlotLabel,
+  getMissingRequiredMediaSlots,
+  normalizeMediaViewSlot,
+} from '@/utils/contentIntegrity';
 import { TourOverlay, type TourStep } from '@/components/ui/TourOverlay';
 // ============================================================================
 
@@ -423,7 +428,7 @@ const CreateDesignInner: React.FC = () => {
         const normalizedMedia = normalizeDesignMediaResponse(d);
         if (normalizedMedia.length > 0) {
           const mediaResults = await Promise.all(
-            normalizedMedia.map(async (m) => {
+            normalizedMedia.map(async (m, index) => {
               if (m.remoteId) {
                 originalItemIds.current.add(m.remoteId);
               }
@@ -438,6 +443,7 @@ const CreateDesignInner: React.FC = () => {
                 previewUrl,
                 kind: m.kind,
                 remoteId: m.remoteId,
+                viewSlot: normalizeMediaViewSlot(m.viewSlot, index),
               } as MediaItem;
             }),
           );
@@ -513,9 +519,13 @@ const CreateDesignInner: React.FC = () => {
   );
 
   // Validation
+  const missingRequiredMediaSlots = useMemo(
+    () => getMissingRequiredMediaSlots(files),
+    [files],
+  );
   const isValid =
     title.trim().length > 0 &&
-    files.length >= DESIGN_REQUIRED_MEDIA_COUNT &&
+    missingRequiredMediaSlots.length === 0 &&
     files.length <= DESIGN_MAX_MEDIA_COUNT &&
     selectedTags.length > 0 &&
     getSelectedFilterValueIds().length > 0 &&
@@ -875,21 +885,7 @@ const CreateDesignInner: React.FC = () => {
         message: 'Saving draft...',
       });
 
-      navigate("/profile?tab=Content&visibility=Drafts", {
-        replace: true,
-        state: {
-          publishingTaskId: draftTask.id,
-          publishingTitle: draftTitle,
-          publishingStartedAt: draftTask.startedAt,
-          publishingVisibility: 'PRIVATE',
-          publishingKind: 'draft',
-        },
-      });
-      toast.info("Saving draft in the background. You can keep browsing your drafts.");
-      setIsSubmitting(false);
-      setSubmitIntent(null);
-
-      void (async () => {
+      await (async () => {
         let savedDesignId: string | undefined;
         try {
           const previewDataUrl = await buildCoverPreviewDataUrl(
@@ -974,6 +970,16 @@ const CreateDesignInner: React.FC = () => {
           );
 
           toast.success("Draft saved");
+          navigate("/profile?tab=Content&visibility=Drafts", {
+            replace: true,
+            state: {
+              publishingTaskId: draftTask.id,
+              publishingTitle: draftTitle,
+              publishingStartedAt: draftTask.startedAt,
+              publishingVisibility: 'PRIVATE',
+              publishingKind: 'draft',
+            },
+          });
           window.setTimeout(() => removePublishTask(draftTask.id, publishTaskScope), 60_000);
         } catch (error) {
           const errMsg =
@@ -1001,10 +1007,8 @@ const CreateDesignInner: React.FC = () => {
       setIsSubmitting(false);
       setSubmitIntent(null);
     } finally {
-      if (isEditMode) {
-        setIsSubmitting(false);
-        setSubmitIntent(null);
-      }
+      setIsSubmitting(false);
+      setSubmitIntent(null);
     }
   };
 
@@ -1012,9 +1016,9 @@ const CreateDesignInner: React.FC = () => {
     if (!isValid) {
       const reasons: string[] = [];
       if (title.trim().length === 0) reasons.push("Add a title.");
-      if (files.length < DESIGN_REQUIRED_MEDIA_COUNT)
+      if (missingRequiredMediaSlots.length > 0)
         reasons.push(
-          `Add the required ${DESIGN_REQUIRED_MEDIA_COUNT} media slots (${DESIGN_MEDIA_SLOTS.slice(0, DESIGN_REQUIRED_MEDIA_COUNT).join(', ')}).`,
+          `Add ${missingRequiredMediaSlots.map(getMediaViewSlotLabel).join(', ')} media before going live.`,
         );
       if (files.length > DESIGN_MAX_MEDIA_COUNT)
         reasons.push(`Use no more than ${DESIGN_MAX_MEDIA_COUNT} media assets.`);
@@ -1068,6 +1072,7 @@ const CreateDesignInner: React.FC = () => {
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
       const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
       const finalTags = selectedTags.slice(0, 10);
+      await DesignApi.acknowledgeContentPolicy();
 
       if (isEditMode && id) {
         // Build a preview URL from the existing cover
@@ -1089,19 +1094,8 @@ const CreateDesignInner: React.FC = () => {
         });
 
         setShowPublishModal(false);
-        navigate(`/profile?tab=Content&visibility=${visibility === 'PRIVATE' ? 'Private' : 'Public'}`, {
-          replace: true,
-          state: {
-            publishingTaskId: task.id,
-            publishingTitle: title,
-            publishingStartedAt: task.startedAt,
-            publishingVisibility: visibility,
-          },
-        });
 
-        toast.info('Going live in the background. You can keep browsing your profile.');
-
-        void (async () => {
+        await (async () => {
           try {
             updatePublishTask(task.id, { progress: 10, message: 'Updating metadata...' }, publishTaskScope);
 
@@ -1177,6 +1171,15 @@ const CreateDesignInner: React.FC = () => {
               message: 'Live',
             }, publishTaskScope);
             toast.success('Design is live');
+            navigate(`/profile?tab=Content&visibility=${visibility === 'PRIVATE' ? 'Private' : 'Public'}`, {
+              replace: true,
+              state: {
+                publishingTaskId: task.id,
+                publishingTitle: title,
+                publishingStartedAt: task.startedAt,
+                publishingVisibility: visibility,
+              },
+            });
             window.setTimeout(() => removePublishTask(task.id, publishTaskScope), 30_000);
           } catch (backgroundError) {
             const rawErrMsg =
@@ -1221,18 +1224,8 @@ const CreateDesignInner: React.FC = () => {
         });
 
         setShowPublishModal(false);
-        navigate(`/profile?tab=Content&visibility=${visibility === 'PRIVATE' ? 'Private' : 'Public'}`, {
-          replace: true,
-          state: {
-            publishingTaskId: task.id,
-            publishingTitle: title,
-            publishingStartedAt: task.startedAt,
-            publishingVisibility: visibility,
-          },
-        });
-        toast.info('Going live in the background. You can keep browsing your profile.');
 
-        void (async () => {
+        await (async () => {
           let uploadedDesignId: string | undefined;
           try {
             const response = await uploadDesign(
@@ -1343,6 +1336,15 @@ const CreateDesignInner: React.FC = () => {
             }, publishTaskScope);
 
             toast.success('Design is live');
+            navigate(`/profile?tab=Content&visibility=${visibility === 'PRIVATE' ? 'Private' : 'Public'}`, {
+              replace: true,
+              state: {
+                publishingTaskId: task.id,
+                publishingTitle: title,
+                publishingStartedAt: task.startedAt,
+                publishingVisibility: visibility,
+              },
+            });
             window.setTimeout(() => removePublishTask(task.id, publishTaskScope), 30_000);
           } catch (backgroundError) {
             const rawErrMsg =
@@ -1569,7 +1571,9 @@ const CreateDesignInner: React.FC = () => {
                   {selectedIndex < 6 && (
                     <div className="absolute top-3 left-3 z-10 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm">
                       <span className="text-[10px] font-bold text-white/90 uppercase tracking-wide">
-                        {DESIGN_MEDIA_SLOTS[selectedIndex]}
+                        {getMediaViewSlotLabel(
+                          normalizeMediaViewSlot(selectedFile?.viewSlot, selectedIndex),
+                        )}
                       </span>
                     </div>
                   )}

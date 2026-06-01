@@ -63,4 +63,31 @@ describe('productApi payload mapping', () => {
       expect.any(Object),
     );
   });
+
+  it('sends structured media slots instead of raw publish images', async () => {
+    vi.mocked(apiClient.post).mockResolvedValueOnce({
+      data: { data: { id: 'product-1', title: 'Slot product', price: 1000, currency: 'NGN', status: 'ACTIVE' } },
+    });
+
+    await productApi.createProduct({
+      title: 'Slot product',
+      price: 1000,
+      status: 'ACTIVE',
+      media: [
+        { fileUploadId: 'file-front', viewSlot: 'FRONT' },
+        { fileUploadId: 'file-inspiration', viewSlot: 'INSPIRATION' },
+      ],
+    });
+
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/products',
+      expect.objectContaining({
+        media: [
+          expect.objectContaining({ fileUploadId: 'file-front', viewSlot: 'FRONT' }),
+          expect.objectContaining({ fileUploadId: 'file-inspiration', viewSlot: 'OTHER' }),
+        ],
+      }),
+      expect.any(Object),
+    );
+  });
 });

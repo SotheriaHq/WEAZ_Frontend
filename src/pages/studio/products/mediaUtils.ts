@@ -1,6 +1,12 @@
+import {
+  getMediaViewSlotLabel,
+  getMissingRequiredMediaSlots,
+} from '@/utils/contentIntegrity';
+
 export interface MediaItem {
   id: string;
   isPrimary?: boolean;
+  viewSlot?: string | null;
 }
 
 export const normalizePrimary = <T extends MediaItem>(items: T[]): Array<T & { isPrimary: boolean }> => {
@@ -36,6 +42,13 @@ export const validateMedia = (
     return {
       ok: false,
       error: `Upload at least ${minRequired} images: front, left, right, and back`,
+    };
+  }
+  const missingSlots = getMissingRequiredMediaSlots(items);
+  if (items.length > 0 && missingSlots.length > 0) {
+    return {
+      ok: false,
+      error: `Add ${missingSlots.map(getMediaViewSlotLabel).join(', ')} media before publishing.`,
     };
   }
   if (items.length > 0 && !items.some((item) => item.isPrimary)) {

@@ -1035,9 +1035,20 @@ export const brandApi = {
           ((backendItem as any).visibility as any) ??
           (backendItem.status === 'PUBLISHED' ? 'PUBLIC' : 'PRIVATE');
         const rawStatus = typeof backendItem.status === 'string' ? backendItem.status.toUpperCase() : '';
+        const rawPublicationStatus =
+          typeof (backendItem as any).publicationStatus === 'string'
+            ? String((backendItem as any).publicationStatus).toUpperCase()
+            : rawStatus;
         const status =
-          rawStatus === 'DRAFT' || rawStatus === 'PUBLISHED' || rawStatus === 'ARCHIVED'
-            ? (rawStatus as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED')
+          rawStatus === 'DRAFT' ||
+          rawStatus === 'PUBLISHED' ||
+          rawStatus === 'ARCHIVED' ||
+          rawStatus === 'IN_REVIEW' ||
+          rawStatus === 'CHANGES_REQUESTED' ||
+          rawStatus === 'REJECTED' ||
+          rawStatus === 'FAILED' ||
+          rawStatus === 'REMOVED'
+            ? rawStatus
             : undefined;
 
         const rawStoreAvailability = (backendItem as any).isAvailableInStore;
@@ -1052,6 +1063,15 @@ export const brandApi = {
               isAvailableInStore ? 'COLLECTION' : 'DESIGN',
             ) ?? (isAvailableInStore ? 'COLLECTION' : 'DESIGN'),
           status,
+          publicationStatus: rawPublicationStatus || status,
+          reviewMode:
+            typeof (backendItem as any).reviewMode === 'string'
+              ? String((backendItem as any).reviewMode)
+              : null,
+          submissionId:
+            typeof (backendItem as any).submissionId === 'string'
+              ? String((backendItem as any).submissionId)
+              : null,
           name: (backendItem.title as string) || '',
           title: (backendItem.title as string) || '',
           description: (backendItem.description as string) || '',
