@@ -9,6 +9,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 
 type ModerationTab = 'queue' | 'reviews' | 'reports';
+type QueueModerationAction = 'approve' | 'reject';
 type ReviewModerationAction = 'KEEP' | 'HIDE' | 'RESTORE' | 'DELETE';
 
 type GenericQueueItem = {
@@ -197,14 +198,16 @@ const AdminModerationPage: React.FC = () => {
     [genericQueue.length, reviewQueue.length, reviewReports.length],
   );
 
-  const handleQueueReview = (id: string, action: string) => {
+  const handleQueueReview = (id: string, action: QueueModerationAction) => {
+    const actionLabel = action === 'approve' ? 'Approve' : 'Reject';
+    const actionPastTense = action === 'approve' ? 'approved' : 'rejected';
     setConfirmAction({
-      title: `${action === 'APPROVE' ? 'Approve' : 'Reject'} this item?`,
-      message: `This moderation item will be marked as ${action.toLowerCase()}.`,
-      isDestructive: action === 'REJECT',
+      title: `${actionLabel} this item?`,
+      message: `This moderation item will be marked as ${action}.`,
+      isDestructive: action === 'reject',
       action: async () => {
         await adminModerationApi.reviewItem(id, { action });
-        toast.success(`Item ${action.toLowerCase()}d`);
+        toast.success(`Item ${actionPastTense}`);
         await loadActiveTab();
       },
     });
@@ -326,13 +329,13 @@ const AdminModerationPage: React.FC = () => {
                   {canReview ? (
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleQueueReview(item.id, 'APPROVE')}
+                        onClick={() => handleQueueReview(item.id, 'approve')}
                         className="rounded-lg bg-green-100 px-3 py-1 text-xs text-green-700 transition hover:bg-green-200"
                       >
                         ✅ Approve
                       </button>
                       <button
-                        onClick={() => handleQueueReview(item.id, 'REJECT')}
+                        onClick={() => handleQueueReview(item.id, 'reject')}
                         className="rounded-lg bg-red-100 px-3 py-1 text-xs text-red-700 transition hover:bg-red-200"
                       >
                         ❌ Reject
