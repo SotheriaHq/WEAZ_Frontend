@@ -27,6 +27,9 @@ function main() {
   const loginSource = read('src/pages/Login.tsx');
   const signupSource = read('src/pages/SignUp.tsx');
   const googleIdentitySource = read('src/auth/googleIdentity.ts');
+  const googleOverlayButtonSource = read(
+    'src/components/auth/GoogleSignInOverlayButton.tsx',
+  );
   const googleButtonSource = read('src/components/auth/GoogleSignInButton.tsx');
   const socialIconsSource = read('src/components/auth/SocialAuthIcons.tsx');
   const envSource = read('.env.example');
@@ -212,8 +215,18 @@ function main() {
   );
   assertIncludes(
     loginSource,
-    'requestGoogleIdToken',
-    'Login must request a Google ID token before backend Google auth.',
+    'GoogleSignInOverlayButton',
+    'Login must mount the Google Identity overlay before backend Google auth.',
+  );
+  assertIncludes(
+    googleOverlayButtonSource,
+    'mountGoogleSignInButton',
+    'Google overlay must request a Google ID token before backend Google auth.',
+  );
+  assertIncludes(
+    googleOverlayButtonSource,
+    'onToken',
+    'Google overlay must pass the Google ID token back to Login.',
   );
   assertIncludes(
     signupSource,
