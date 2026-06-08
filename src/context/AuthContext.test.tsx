@@ -1,5 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { Provider } from 'react-redux';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -80,20 +81,22 @@ function AuthStatusProbe() {
   return <div>{loading ? 'auth loading' : 'auth ready'}</div>;
 }
 
-const renderAuthProvider = () => {
+const renderAuthProvider = ({ strict = false }: { strict?: boolean } = {}) => {
   const store = configureStore({
     reducer: {
       user: userReducer,
     },
   });
 
-  return render(
+  const authTree = (
     <Provider store={store}>
       <AuthProvider>
         <AuthStatusProbe />
       </AuthProvider>
-    </Provider>,
+    </Provider>
   );
+
+  return render(strict ? <StrictMode>{authTree}</StrictMode> : authTree);
 };
 
 describe('AuthProvider profile bootstrap', () => {
@@ -124,6 +127,23 @@ describe('AuthProvider profile bootstrap', () => {
           'Cache-Control': 'no-cache',
           Pragma: 'no-cache',
         }),
+        params: expect.objectContaining({
+          _authProfileTs: expect.any(String),
+        }),
+      }),
+    );
+  });
+
+  it('finishes auth bootstrap under React StrictMode double effects', async () => {
+    renderAuthProvider({ strict: true });
+
+    await waitFor(() => {
+      expect(screen.getByText('auth ready')).toBeInTheDocument();
+    });
+
+    expect(apiGet).toHaveBeenCalledWith(
+      '/auth/profile',
+      expect.objectContaining({
         params: expect.objectContaining({
           _authProfileTs: expect.any(String),
         }),

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { unwrapApiResponse } from '../types/auth';
 import type { AuthUserDto, AuthProfileResponse, AuthTokensResponse } from '../types/auth';
@@ -114,8 +114,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     [dispatch],
   );
 
-  const hasInitialisedRef = useRef(false);
-
   const clearPrivateSession = useCallback(async () => {
     await clearWebPrivateSessionState({ client: queryClient });
     dispatch(clearUser());
@@ -126,11 +124,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [dispatch]);
 
   useEffect(() => {
-    if (hasInitialisedRef.current) {
-      return;
-    }
-    hasInitialisedRef.current = true;
-
     let isMounted = true;
 
     const onAuthExpired = () => {
