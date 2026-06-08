@@ -11,23 +11,46 @@ const {
   setupPassword,
   googleAuth,
   requestGoogleIdToken,
+  mountGoogleSignInButton,
+  googleMountState,
   persistAccessToken,
   dropStoredAccessToken,
   toastError,
   toastSuccess,
-} = vi.hoisted(() => ({
-  dispatchMock: vi.fn(),
-  getLoginOptions: vi.fn(),
-  requestEmailLoginCode: vi.fn(),
-  confirmEmailLoginCode: vi.fn(),
-  setupPassword: vi.fn(),
-  googleAuth: vi.fn(),
-  requestGoogleIdToken: vi.fn(),
-  persistAccessToken: vi.fn(),
-  dropStoredAccessToken: vi.fn(),
-  toastError: vi.fn(),
-  toastSuccess: vi.fn(),
-}));
+} = vi.hoisted(() => {
+  const mountState: {
+    onToken?: (idToken: string) => void;
+    onError?: (error: Error) => void;
+  } = {};
+
+  return {
+    dispatchMock: vi.fn(),
+    getLoginOptions: vi.fn(),
+    requestEmailLoginCode: vi.fn(),
+    confirmEmailLoginCode: vi.fn(),
+    setupPassword: vi.fn(),
+    googleAuth: vi.fn(),
+    requestGoogleIdToken: vi.fn(),
+    googleMountState: mountState,
+    mountGoogleSignInButton: vi.fn(
+      (
+        _container: HTMLElement,
+        _clientId: string,
+        _context: 'signin' | 'signup',
+        onToken: (idToken: string) => void,
+        onError?: (error: Error) => void,
+      ) => {
+        mountState.onToken = onToken;
+        mountState.onError = onError;
+        return Promise.resolve(() => {});
+      },
+    ),
+    persistAccessToken: vi.fn(),
+    dropStoredAccessToken: vi.fn(),
+    toastError: vi.fn(),
+    toastSuccess: vi.fn(),
+  };
+});
 
 vi.mock('react-redux', () => ({
   useDispatch: () => dispatchMock,
@@ -61,6 +84,7 @@ vi.mock('@/api/AuthApi', () => ({
 
 vi.mock('@/auth/googleIdentity', () => ({
   requestGoogleIdToken,
+  mountGoogleSignInButton,
 }));
 
 vi.mock('@/config/env', () => ({
@@ -117,6 +141,21 @@ describe('LoginPage Google progressive auth', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    googleMountState.onToken = undefined;
+    googleMountState.onError = undefined;
+    mountGoogleSignInButton.mockImplementation(
+      (
+        _container: HTMLElement,
+        _clientId: string,
+        _context: 'signin' | 'signup',
+        onToken: (idToken: string) => void,
+        onError?: (error: Error) => void,
+      ) => {
+        googleMountState.onToken = onToken;
+        googleMountState.onError = onError;
+        return Promise.resolve(() => {});
+      },
+    );
   });
 
   it('starts with email first and does not render the password field initially', () => {
@@ -147,7 +186,9 @@ describe('LoginPage Google progressive auth', () => {
       passwordSetupAvailable: true,
     });
 
-    expect(screen.getByText(/set up for Google sign-in/i)).toBeInTheDocument();
+    const signInCodeInput = screen.getByPlaceholderText(/enter your code/i);
+    expect(signInCodeInput).toHaveAttribute('type', 'password');
+    expect(screen.getByRole('button', { name: /show sign-in code/i })).toBeInTheDocument();
     expect(screen.queryByText(/^password$/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /create a password with email code/i })).toBeInTheDocument();
   });
@@ -174,7 +215,12 @@ describe('LoginPage Google progressive auth', () => {
       });
     });
 
-    fireEvent.change(screen.getByPlaceholderText(/verification code/i), {
+    const verificationInput = screen.getByPlaceholderText(/verification code/i);
+    expect(verificationInput).toHaveAttribute('type', 'password');
+    fireEvent.click(screen.getByRole('button', { name: /show verification code/i }));
+    expect(verificationInput).toHaveAttribute('type', 'text');
+
+    fireEvent.change(verificationInput, {
       target: { value: '123456' },
     });
     fireEvent.click(screen.getByRole('button', { name: /verify code/i }));
@@ -208,7 +254,6 @@ describe('LoginPage Google progressive auth', () => {
   });
 
   it('sends only the Google ID token to the backend for Google login', async () => {
-    requestGoogleIdToken.mockResolvedValueOnce('google-id-token');
     googleAuth.mockResolvedValueOnce({
       accessToken: 'access-token',
       user: {
@@ -221,38 +266,48 @@ describe('LoginPage Google progressive auth', () => {
     });
 
     renderLogin();
-    fireEvent.click(screen.getByTestId('login-google-button'));
+    await waitFor(() => {
+      expect(mountGoogleSignInButton).toHaveBeenCalledWith(
+        expect.any(HTMLElement),
+        'google-web-client-id.apps.googleusercontent.com',
+        'signin',
+        expect.any(Function),
+        expect.any(Function),
+      );
+    });
+
+    googleMountState.onToken?.('google-id-token');
 
     await waitFor(() => {
       expect(googleAuth).toHaveBeenCalledWith({ idToken: 'google-id-token' });
     });
-    expect(requestGoogleIdToken).toHaveBeenCalledWith({
-      clientId: 'google-web-client-id.apps.googleusercontent.com',
-      context: 'signin',
-      loginHint: undefined,
-    });
+    expect(requestGoogleIdToken).not.toHaveBeenCalled();
   });
 
   it('keeps the Google label and a contained loader while Google auth starts', async () => {
-    let resolveToken!: (token: string) => void;
-    requestGoogleIdToken.mockReturnValueOnce(
-      new Promise<string>((resolve) => {
-        resolveToken = resolve;
+    let resolveAuth!: () => void;
+    googleAuth.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveAuth = () =>
+          resolve({
+            accessToken: 'access-token',
+            user: {
+              id: 'user-1',
+              email: 'ada@example.com',
+              role: 'User',
+              type: 'REGULAR',
+            },
+            message: 'Welcome Back',
+          });
       }),
     );
-    googleAuth.mockResolvedValueOnce({
-      accessToken: 'access-token',
-      user: {
-        id: 'user-1',
-        email: 'ada@example.com',
-        role: 'User',
-        type: 'REGULAR',
-      },
-      message: 'Welcome Back',
-    });
 
     renderLogin();
-    fireEvent.click(screen.getByTestId('login-google-button'));
+    await waitFor(() => {
+      expect(mountGoogleSignInButton).toHaveBeenCalled();
+    });
+
+    googleMountState.onToken?.('google-id-token');
 
     const googleButton = screen.getByTestId('login-google-button');
     await waitFor(() => {
@@ -263,7 +318,7 @@ describe('LoginPage Google progressive auth', () => {
     expect(screen.queryByText(/Opening Google/i)).not.toBeInTheDocument();
     expect(screen.getByTestId('google-button-loader')).toBeInTheDocument();
 
-    resolveToken('google-id-token');
+    resolveAuth();
     await waitFor(() => {
       expect(googleAuth).toHaveBeenCalledWith({ idToken: 'google-id-token' });
     });
@@ -281,10 +336,9 @@ describe('LoginPage Google progressive auth', () => {
   });
 
   it('shows the Google client/origin diagnostic when Google Identity Services cannot start', async () => {
-    requestGoogleIdToken.mockRejectedValueOnce(new Error(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE));
+    mountGoogleSignInButton.mockRejectedValueOnce(new Error(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE));
 
     renderLogin();
-    fireEvent.click(screen.getByTestId('login-google-button'));
 
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE);

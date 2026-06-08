@@ -148,6 +148,8 @@ const LoginPage = () => {
   const [emailCode, setEmailCode] = useState('');
   const [emailCodeLoading, setEmailCodeLoading] = useState(false);
   const [directLoginCode, setDirectLoginCode] = useState('');
+  const [showDirectLoginCode, setShowDirectLoginCode] = useState(false);
+  const [showEmailCode, setShowEmailCode] = useState(false);
   const [directLoginSendLoading, setDirectLoginSendLoading] = useState(false);
   const [directLoginConfirmLoading, setDirectLoginConfirmLoading] = useState(false);
   const [passwordSetupToken, setPasswordSetupToken] = useState('');
@@ -244,6 +246,8 @@ const LoginPage = () => {
     setFlowError('');
     setEmailCode('');
     setDirectLoginCode('');
+    setShowDirectLoginCode(false);
+    setShowEmailCode(false);
     setPasswordSetupToken('');
     setSetupPassword('');
     setSetupConfirmPassword('');
@@ -352,6 +356,8 @@ const LoginPage = () => {
       }
 
       if (options.methods.google || options.methods.passwordSetupAvailable) {
+        setDirectLoginCode('');
+        setShowDirectLoginCode(false);
         setLoginStep('code-login');
         void sendDirectLoginCode(normalizedEmail, options.requestId);
         return;
@@ -434,6 +440,7 @@ const LoginPage = () => {
         requestId: loginOptions?.requestId,
       });
       setEmailCode('');
+      setShowEmailCode(false);
       setLoginStep('code');
       toast.success('If eligible, a password setup code has been sent.');
     } catch (error) {
@@ -461,6 +468,7 @@ const LoginPage = () => {
       });
       setPasswordSetupToken(result.passwordSetupToken);
       setEmailCode('');
+      setShowEmailCode(false);
       setLoginStep('password-setup');
     } catch (error) {
       setFlowError(getAuthFlowErrorMessage(error, 'Invalid or expired verification code.'));
@@ -829,6 +837,7 @@ const LoginPage = () => {
                         <Mail className="h-4 w-4 text-gray-500" />
                       </div>
                       <input
+                        type={showDirectLoginCode ? 'text' : 'password'}
                         value={directLoginCode}
                         onChange={(e) => {
                           setDirectLoginCode(e.target.value);
@@ -836,10 +845,24 @@ const LoginPage = () => {
                         }}
                         inputMode="numeric"
                         autoComplete="one-time-code"
+                        aria-label="Sign-in code"
                         placeholder="Enter your code"
-                        className="auth-input w-full rounded-xl py-3.5 pl-11 pr-4 text-sm tracking-[0.2em]"
+                        className="auth-input w-full rounded-xl py-3.5 pl-11 pr-12 text-sm tracking-[0.2em]"
                         autoFocus
                       />
+                      <button
+                        type="button"
+                        aria-label={showDirectLoginCode ? 'Hide sign-in code' : 'Show sign-in code'}
+                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-white transition-colors"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => setShowDirectLoginCode((visible) => !visible)}
+                      >
+                        {showDirectLoginCode ? (
+                          <EyeOff className="h-4 w-4" aria-hidden="true" />
+                        ) : (
+                          <Eye className="h-4 w-4" aria-hidden="true" />
+                        )}
+                      </button>
                     </div>
                     <p className="text-xs text-gray-400 ml-1">
                       A one-time sign-in code was sent to your email.{' '}
@@ -877,16 +900,34 @@ const LoginPage = () => {
                         Use the code sent to your inbox to create your first password.
                       </p>
                     </div>
-                    <input
-                      value={emailCode}
-                      onChange={(event) => {
-                        setEmailCode(event.target.value);
-                        setFlowError('');
-                      }}
-                      inputMode="numeric"
-                      placeholder="Verification code"
-                      className="auth-input w-full rounded-xl px-4 py-3.5 text-sm tracking-[0.25em]"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showEmailCode ? 'text' : 'password'}
+                        value={emailCode}
+                        onChange={(event) => {
+                          setEmailCode(event.target.value);
+                          setFlowError('');
+                        }}
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        aria-label="Verification code"
+                        placeholder="Verification code"
+                        className="auth-input w-full rounded-xl px-4 py-3.5 pr-12 text-sm tracking-[0.25em]"
+                      />
+                      <button
+                        type="button"
+                        aria-label={showEmailCode ? 'Hide verification code' : 'Show verification code'}
+                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-white transition-colors"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => setShowEmailCode((visible) => !visible)}
+                      >
+                        {showEmailCode ? (
+                          <EyeOff className="h-4 w-4" aria-hidden="true" />
+                        ) : (
+                          <Eye className="h-4 w-4" aria-hidden="true" />
+                        )}
+                      </button>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"

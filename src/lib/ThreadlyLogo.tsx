@@ -3,6 +3,8 @@ import React from 'react';
 import { COMPANY_LOGO_PATH, COMPANY_NAME } from '@/lib/brand';
 import MediaRenderer from '@/components/media/MediaRenderer';
 
+const WEAZ_MARK_ASPECT_RATIO = 64 / 96;
+
 type ThreadlyLogoProps = {
   size?: number;
   className?: string;
@@ -20,13 +22,13 @@ const ThreadlyLogo: React.FC<ThreadlyLogoProps> = ({
       src={COMPANY_LOGO_PATH}
       alt={decorative ? '' : `${COMPANY_NAME} logo`}
       className={`block shrink-0 ${className}`.trim()}
-      mediaClassName="h-full w-full"
+      mediaClassName="h-auto w-full"
       maxHeightClassName=""
       maxWidthClassName=""
       loading="eager"
       imgRef={(node) => {
         if (node) {
-          node.width = size;
+          node.width = Math.round(size * WEAZ_MARK_ASPECT_RATIO);
           node.height = size;
         }
       }}
