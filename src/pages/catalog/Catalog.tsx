@@ -1398,13 +1398,13 @@ const ProfilePage: React.FC = () => {
     fallbackProfileUrl;
 
   const handleShareProfile = useCallback(async () => {
-    const shareBrandName = viewDisplayData.brandName || 'Threadly';
+    const shareBrandName = viewDisplayData.brandName || 'WEAZ';
     const url = profileShareUrl;
     if (!url) {
       toast.error('Profile link is not available yet.');
       return;
     }
-    const message = `Check out ${shareBrandName} on Threadly: ${url}`;
+    const message = `Check out ${shareBrandName} on WEAZ: ${url}`;
     try {
       if (navigator.share) {
         await navigator.share({
@@ -1578,7 +1578,7 @@ const ProfilePage: React.FC = () => {
       <BrandQrModal
         open={isBrandQrOpen}
         onClose={() => setIsBrandQrOpen(false)}
-        brandName={viewDisplayData.brandName || 'Threadly Brand'}
+        brandName={viewDisplayData.brandName || 'WEAZ Brand'}
         qrTargetUrl={profileQrTargetUrl}
         shareUrl={profileShareUrl}
         logoUrl={viewDisplayData.logoImage ?? null}

@@ -94,16 +94,14 @@ describe('RequireAuthenticated', () => {
     localStorage.clear();
   });
 
-  it('redirects signed-out users even while auth initializes', async () => {
+  it('waits while auth initializes instead of rendering private content', () => {
     authState.loading = true;
 
     renderProtectedPage(null);
 
-    await waitFor(() => {
-      expect(screen.getByText('Login page')).toBeInTheDocument();
-    });
-
+    expect(screen.getByText('Verifying your session...')).toBeInTheDocument();
     expect(screen.queryByText('Private profile content')).not.toBeInTheDocument();
+    expect(screen.queryByText('Login page')).not.toBeInTheDocument();
   });
 
   it('redirects signed-out users to login after auth initialization', async () => {
@@ -116,13 +114,13 @@ describe('RequireAuthenticated', () => {
     expect(screen.queryByText('Private profile content')).not.toBeInTheDocument();
   });
 
-  it('renders protected content while an authenticated session revalidates', () => {
+  it('waits instead of rendering stale protected content while an authenticated session revalidates', () => {
     authState.loading = true;
 
     renderProtectedPage(baseUser);
 
-    expect(screen.getByText('Private profile content')).toBeInTheDocument();
-    expect(screen.queryByText('Refreshing your session')).not.toBeInTheDocument();
+    expect(screen.getByText('Verifying your session...')).toBeInTheDocument();
+    expect(screen.queryByText('Private profile content')).not.toBeInTheDocument();
   });
 
   it('renders protected content after auth finishes', () => {

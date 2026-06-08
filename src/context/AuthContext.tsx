@@ -35,8 +35,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchUserProfile = useCallback(async () => {
     const profilePayload = await queryClient.fetchQuery({
       queryKey: queryKeys.auth.profile(),
+      staleTime: 0,
+      retry: false,
       queryFn: async () => {
-        const response = await apiClient.get('/auth/profile');
+        const response = await apiClient.get('/auth/profile', {
+          headers: {
+            'Cache-Control': 'no-cache',
+            Pragma: 'no-cache',
+          },
+          params: {
+            _authProfileTs: Date.now().toString(),
+          },
+        });
         return unwrapApiResponse<AuthProfileResponse | AuthUserDto>(response.data);
       },
     });
@@ -160,7 +170,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       try {
         await fetchUserProfile();
       } catch (error) {
-        handleProfileError(error, { allowPersistedUser: true });
+        handleProfileError(error);
+        await clearPrivateSession();
       } finally {
         if (isMounted) {
           setLoading(false);

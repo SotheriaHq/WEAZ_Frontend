@@ -214,7 +214,7 @@ html {
     color: var(--text-secondary);
   }
 
-  /* Threadly styled scrollbars (uses theme tokens) */
+  /* WEAZ styled scrollbars (uses theme tokens) */
   .scrollbar-threadly {
     scrollbar-width: thin;
     scrollbar-color: rgba(var(--brand-primary-rgb), 0.35) transparent;
@@ -553,7 +553,7 @@ html {
     @apply text-[15px] px-4 py-2.5;
   }
 
-  /* Threadly select styling (native select enhancements) */
+  /* WEAZ select styling (native select enhancements) */
   .select-threadly {
     @apply appearance-none pr-10;
     background-position: right 0.75rem center;
@@ -1393,7 +1393,7 @@ body.modal-open {
 /* PrimeReact and third-party portal theme alignment.
    PrimeReact still uses the static Lara light theme as its structural base.
    These unlayered overrides intentionally load after vendor CSS from main.tsx
-   and bind Prime/Sonner surfaces to Threadly's root theme tokens, including
+   and bind Prime/Sonner surfaces to WEAZ's root theme tokens, including
    overlays appended directly to document.body. */
 html,
 body {

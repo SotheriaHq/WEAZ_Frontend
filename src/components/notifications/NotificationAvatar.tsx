@@ -39,7 +39,7 @@ export const NotificationAvatar = React.memo<NotificationAvatarProps>(
     // Get display name for alt text and initials fallback
     const displayName = actor?.username 
       || [actor?.firstName, actor?.lastName].filter(Boolean).join(' ')
-      || 'Threadly';
+      || 'WEAZ';
     const avatar = resolveProfileImageSource(actor);
     const initials = getAvatarFallback(displayName, actor?.username) || 'TH';
 

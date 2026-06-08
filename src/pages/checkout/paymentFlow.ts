@@ -183,6 +183,7 @@ export function createInitialPaymentState(email: string, phone: string): Payment
       billingSameAsShipping: true,
       billingAddress: { ...EMPTY_BILLING_ADDRESS },
       consentAccepted: false,
+      legalAcceptances: [],
       useSavedCard: false,
       saveNewCard: true,
       newCardDraft: { ...EMPTY_CARD_DRAFT },
@@ -341,6 +342,12 @@ export function validatePaymentData(
 
   if (!paymentData.consentAccepted) {
     errors.consentAccepted = 'You must confirm the payment and verification terms';
+  } else if (
+    !paymentData.legalAcceptances?.some(
+      (acceptance) => acceptance.documentKey === 'PAYMENT_POLICY' && acceptance.version,
+    )
+  ) {
+    errors.consentAccepted = 'Current Payment Policy version must load before checkout';
   }
 
   if (!paymentData.billingSameAsShipping) {
@@ -378,6 +385,7 @@ export function buildContactInfo(
         billingSameAsShipping: true,
         billingAddress: { ...EMPTY_BILLING_ADDRESS },
         consentAccepted: false,
+        legalAcceptances: [],
         useSavedCard: false,
         saveNewCard: true,
         newCardDraft: { ...EMPTY_CARD_DRAFT },
@@ -408,6 +416,7 @@ export function buildPaymentSubmissionData(
         billingSameAsShipping: true,
         billingAddress: { ...EMPTY_BILLING_ADDRESS },
         consentAccepted: false,
+        legalAcceptances: [],
         useSavedCard: false,
         saveNewCard: true,
         newCardDraft: { ...EMPTY_CARD_DRAFT },
@@ -425,6 +434,7 @@ export function buildPaymentSubmissionData(
     billingSameAsShipping: paystackData.billingSameAsShipping,
     billingAddress: resolveBillingAddress(paystackData, shippingAddress),
     consentAccepted: paystackData.consentAccepted,
+    legalAcceptances: paystackData.legalAcceptances ?? [],
     useSavedCard:
       paystackData.channel === 'CARD'
         ? Boolean(paystackData.useSavedCard && paystackData.savedCardId)
@@ -470,7 +480,7 @@ export function getPaymentSummaryLines(
       ? ` (${paymentData.savedCardDisplay.bank})`
       : '';
     lines.push(`${brand}${bank} ending ${paymentData.savedCardDisplay.last4}`);
-    lines.push('Threadly will verify the saved-card authorization after you continue');
+    lines.push('WEAZ will verify the saved-card authorization after you continue');
   } else {
     lines[lines.length - 1] = 'Card checkout';
     if (hasRawCardDraft(paymentData)) {

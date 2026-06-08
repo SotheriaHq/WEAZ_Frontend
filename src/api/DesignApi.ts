@@ -5,6 +5,10 @@ import {
   type MediaViewSlot,
   toBackendMediaViewSlot,
 } from '@/utils/contentIntegrity';
+import {
+  getRequiredLegalAcceptances,
+  LEGAL_CONTENT_PUBLISH_DOCUMENT_KEYS,
+} from '@/api/LegalApi';
 
 const DESIGN_DETAIL_TTL_MS = 30 * 1000;
 const designDetailCache = new Map<string, { data: unknown; expiresAt: number }>();
@@ -256,7 +260,12 @@ export async function submitDesignForReview(designId: string) {
 }
 
 export async function acknowledgeContentPolicy() {
-  await apiClient.post('/store/content-policy/acknowledge');
+  const legalAcceptances = await getRequiredLegalAcceptances(
+    LEGAL_CONTENT_PUBLISH_DOCUMENT_KEYS,
+  );
+  await apiClient.post('/store/content-policy/acknowledge', {
+    legalAcceptances,
+  });
 }
 
 export async function reorderDesignMedia(designId: string, mediaIds: string[]) {

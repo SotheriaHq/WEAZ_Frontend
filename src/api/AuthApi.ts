@@ -2,6 +2,7 @@ import { apiClient } from './httpClient';
 import type { ApiSuccessPayload } from '@/types/auth';
 import { unwrapApiResponse } from '@/types/auth';
 import type { AuthTokensResponse, AuthUserType } from '@/types/auth';
+import type { LegalAcceptancePayload } from '@/api/LegalApi';
 export {
   PASSWORD_POLICY_HINT,
   PASSWORD_POLICY_MIN_LENGTH,
@@ -44,6 +45,7 @@ export type GoogleAuthPayload = {
   idToken: string;
   type?: AuthUserType;
   brandFullName?: string;
+  legalAcceptances?: LegalAcceptancePayload[];
 };
 
 export type LoginOptionsPayload = {

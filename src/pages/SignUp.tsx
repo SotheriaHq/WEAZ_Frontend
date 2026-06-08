@@ -13,6 +13,10 @@ import { addLocalNotification } from '../features/notificationsSlice';
 import { useNavigate, Link } from 'react-router-dom';
 import { apiClient, persistAccessToken, dropStoredAccessToken } from '../api/httpClient';
 import { AuthApi } from '@/api/AuthApi';
+import {
+  getRequiredLegalAcceptances,
+  LEGAL_SIGNUP_DOCUMENT_KEYS,
+} from '@/api/LegalApi';
 import { env } from '@/config/env';
 
 import '../styles/auth.css';
@@ -237,6 +241,9 @@ const SignUpPage = () => {
 
     try {
       dropStoredAccessToken();
+      const legalAcceptances = await getRequiredLegalAcceptances(
+        LEGAL_SIGNUP_DOCUMENT_KEYS,
+      );
       const signupRes = await apiClient.post<ApiSuccessPayload<AuthTokensResponse>>(
         '/auth/signup',
         {
@@ -246,6 +253,7 @@ const SignUpPage = () => {
           password: data.password,
           type: data.userType,
           ...(data.userType === 'BRAND' && data.brandFullName ? { brandFullName: data.brandFullName.trim() } : {}),
+          legalAcceptances,
         },
       );
       await completeSignup(unwrapApiResponse(signupRes.data));
@@ -319,10 +327,14 @@ const SignUpPage = () => {
     setGoogleLoading(true);
     try {
       dropStoredAccessToken();
+      const legalAcceptances = await getRequiredLegalAcceptances(
+        LEGAL_SIGNUP_DOCUMENT_KEYS,
+      );
       const payload = await AuthApi.googleAuth({
         idToken,
         type: selectedType,
         ...(selectedType === 'BRAND' ? { brandFullName } : {}),
+        legalAcceptances,
       });
       await completeSignup(payload);
     } catch (error: unknown) {

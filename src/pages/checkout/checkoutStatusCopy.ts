@@ -20,7 +20,7 @@ const HEADLINES: Record<string, string> = {
 };
 
 const RETURN_DESCRIPTIONS: Record<string, string> = {
-  PAID: 'Thank you for shopping. Threadly has confirmed your payment and finalized the order.',
+  PAID: 'Thank you for shopping. WEAZ has confirmed your payment and finalized the order.',
   FAILED: 'The payment attempt ended in a failed state. You can retry from your order or switch methods.',
   CANCELLED: 'The payment attempt was cancelled before completion.',
   EXPIRED: 'The payment window expired before the payment was completed.',

@@ -120,6 +120,8 @@ const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const EmailVerifyPage = lazy(() => import('./pages/EmailVerify'));
 const ChangeEmailConfirmPage = lazy(() => import('./pages/ChangeEmailConfirmPage'));
+const LegalIndexPage = lazy(() => import('./pages/legal/LegalIndexPage'));
+const LegalDocumentPage = lazy(() => import('./pages/legal/LegalDocumentPage'));
 
 const AppRouteFallback: React.FC = () => (
   /* Route chunk fallback that stays inside content flow instead of rendering
@@ -472,6 +474,16 @@ const router = createBrowserRouter([
           { path: 'trending', element: <TrendingPlaceholder /> },
           { path: 'size-charts', element: withRouteFallback(<SizeChartsPage />) },
           { path: 'help/verified-badge', element: <VerifiedBadgeMeaningPage /> },
+          { path: 'legal', element: withRouteFallback(<LegalIndexPage />) },
+          { path: 'terms', element: withRouteFallback(<LegalDocumentPage />) },
+          { path: 'privacy', element: withRouteFallback(<LegalDocumentPage />) },
+          { path: 'cookies', element: withRouteFallback(<LegalDocumentPage />) },
+          { path: 'community-guidelines', element: withRouteFallback(<LegalDocumentPage />) },
+          { path: 'seller-terms', element: withRouteFallback(<LegalDocumentPage />) },
+          { path: 'buyer-policy', element: withRouteFallback(<LegalDocumentPage />) },
+          { path: 'payment-policy', element: withRouteFallback(<LegalDocumentPage />) },
+          { path: 'copyright', element: withRouteFallback(<LegalDocumentPage />) },
+          { path: 'account-deletion', element: withRouteFallback(<LegalDocumentPage />) },
           { path: 'settings', element: <SettingsHome /> },
           { path: 'settings/collections', element: <CollectionsSettings /> },
         ],

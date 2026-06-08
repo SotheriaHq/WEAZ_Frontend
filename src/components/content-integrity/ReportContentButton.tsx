@@ -94,7 +94,7 @@ const ReportContentButton: React.FC<ReportContentButtonProps> = ({
       <Modal open={open} onClose={() => setOpen(false)} title="Report content" size="md" backdropStyle="light">
         <div className="space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            Send this product or design media to Threadly review. Reports do not remove content automatically.
+            Send this product or design media to WEAZ review. Reports do not remove content automatically.
           </p>
           <UniversalSelect
             label="Reason"

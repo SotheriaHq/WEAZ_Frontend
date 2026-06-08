@@ -106,7 +106,7 @@ const SettingsPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 label="Brand Name"
-                placeholder="e.g. Threadly Fashion"
+                placeholder="e.g. WEAZ Fashion"
                 {...register('brandFullName')}
               />
               <Input

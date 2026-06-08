@@ -48,7 +48,7 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
   // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [styledBy, setStyledBy] = useState('Threadly Official');
+  const [styledBy, setStyledBy] = useState('WEAZ Official');
   const [lookImage, setLookImage] = useState<string | null>(null);
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [featured, setFeatured] = useState(true);
@@ -298,7 +298,7 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
                       onChange={(e) => setStyledBy(e.target.value)}
                       className="select-threadly w-full bg-gray-50 dark:bg-slate-950/50 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all cursor-pointer text-gray-900 dark:text-white"
                     >
-                      <option>Threadly Official</option>
+                      <option>WEAZ Official</option>
                       <option>Brand Owner</option>
                       <option>Guest Stylist</option>
                     </select>

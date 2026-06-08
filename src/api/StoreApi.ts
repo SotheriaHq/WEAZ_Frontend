@@ -1,4 +1,5 @@
 import { apiClient } from './httpClient';
+import type { LegalAcceptancePayload } from '@/api/LegalApi';
 import type { AxiosResponse } from 'axios';
 import { createIdempotencyKey } from './idempotency';
 import type { PayoutSourceBreakdown } from '@/types/payouts';
@@ -371,6 +372,7 @@ export interface PaymentContactDetails {
   billingSameAsShipping: boolean;
   billingAddress?: BillingAddress;
   consentAccepted: boolean;
+  legalAcceptances?: LegalAcceptancePayload[];
 }
 
 export interface PaystackPaymentData extends PaymentContactDetails {
@@ -981,8 +983,14 @@ export const getStoreStatus = async (options?: { forceRefresh?: boolean }): Prom
   }
 };
 
-export const openStore = async (): Promise<{ success: boolean; message: string; brandId: string }> => {
-  const res = await apiClient.post('/store/open');
+export type OpenStorePayload = {
+  legalAcceptances?: LegalAcceptancePayload[];
+};
+
+export const openStore = async (
+  payload: OpenStorePayload = {},
+): Promise<{ success: boolean; message: string; brandId: string }> => {
+  const res = await apiClient.post('/store/open', payload);
   clearStoreStatusCache();
   return extractData<{ success: boolean; message: string; brandId: string }>(res);
 };

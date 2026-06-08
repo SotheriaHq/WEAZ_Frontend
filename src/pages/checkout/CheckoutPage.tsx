@@ -8,6 +8,11 @@ import {
   type CardValidationSessionSummary,
   type SavedPaymentCardSummary,
 } from '@/api/PaymentApi';
+import {
+  getRequiredLegalAcceptances,
+  LEGAL_PAYMENT_DOCUMENT_KEYS,
+  type LegalAcceptancePayload,
+} from '@/api/LegalApi';
 import { createIdempotencyKey } from '@/api/idempotency';
 import {
   customOrdersBuyerApi,
@@ -292,7 +297,7 @@ interface CheckoutPageProps {
 }
 
 const PROMO_CODES_UNAVAILABLE_MESSAGE =
-  'Promo codes are not available during MVP checkout. Final totals are calculated securely by Threadly at payment time.';
+  'Promo codes are not available during MVP checkout. Final totals are calculated securely by WEAZ at payment time.';
 
 /* ─── Component ─── */
 
@@ -336,6 +341,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     createInitialPaymentState(user?.email ?? '', user?.phoneNumber ?? ''),
   );
   const [paymentErrors, setPaymentErrors] = useState<PaymentFormErrors>({});
+  const [paymentLegalAcceptances, setPaymentLegalAcceptances] = useState<LegalAcceptancePayload[]>([]);
   const [savedCards, setSavedCards] = useState<SavedPaymentCardSummary[]>([]);
   const [savedCardsLoading, setSavedCardsLoading] = useState(false);
   const [savedCardsError, setSavedCardsError] = useState<string | null>(null);
@@ -373,6 +379,30 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         if (active) {
           setRuntimeCardholderNameMatchMode(null);
         }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    void getRequiredLegalAcceptances(LEGAL_PAYMENT_DOCUMENT_KEYS)
+      .then((acceptances) => {
+        if (!active) return;
+        setPaymentLegalAcceptances(acceptances);
+        setPaymentState((prev) => ({
+          ...prev,
+          PAYSTACK: {
+            ...prev.PAYSTACK,
+            legalAcceptances: prev.PAYSTACK.consentAccepted ? acceptances : [],
+          },
+        }));
+      })
+      .catch(() => {
+        if (active) setPaymentLegalAcceptances([]);
       });
 
     return () => {
@@ -955,8 +985,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     setCheckoutProgressStage('OPENING_SECURE_WINDOW');
     setCheckoutProgressMessage(
       options?.retry
-        ? 'Retrying secure checkout inside Threadly...'
-        : 'Opening secure checkout inside Threadly...',
+        ? 'Retrying secure checkout inside WEAZ...'
+        : 'Opening secure checkout inside WEAZ...',
     );
 
     await openPaystackInline(session.accessCode, {
@@ -1558,6 +1588,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                             cardValidationLoading={cardValidationLoading}
                             onStartNewCardCheckout={handlePlaceOrder}
                             startingNewCardCheckout={submitting}
+                            paymentLegalAcceptances={paymentLegalAcceptances}
                             compact
                           />
                         </div>

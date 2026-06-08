@@ -8,6 +8,10 @@ import {
   type MediaViewSlot,
   toBackendMediaViewSlot,
 } from '@/utils/contentIntegrity';
+import {
+  getRequiredLegalAcceptances,
+  LEGAL_CONTENT_PUBLISH_DOCUMENT_KEYS,
+} from '@/api/LegalApi';
 
 // =====================
 // Types
@@ -785,7 +789,12 @@ export const productApi = {
 
   async acknowledgeContentPolicy(): Promise<void> {
     try {
-      await apiClient.post("/store/content-policy/acknowledge");
+      const legalAcceptances = await getRequiredLegalAcceptances(
+        LEGAL_CONTENT_PUBLISH_DOCUMENT_KEYS,
+      );
+      await apiClient.post("/store/content-policy/acknowledge", {
+        legalAcceptances,
+      });
     } catch (error) {
       console.error("Failed to acknowledge content policy", error);
       throw error;

@@ -3,7 +3,7 @@ import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persist
 
 import { isPersistableThreadlyQueryKey } from './queryKeys';
 
-export const THREADLY_QUERY_CACHE_BUSTER = 'threadly-web-phase2-v1';
+export const THREADLY_QUERY_CACHE_BUSTER = 'Threadly-web-phase2-v1';
 export const THREADLY_QUERY_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
 export const THREADLY_QUERY_CACHE_STORAGE_KEY = 'THREADLY_QUERY_CACHE_V1';
 

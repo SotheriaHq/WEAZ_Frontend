@@ -376,16 +376,16 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                     className="w-5 h-5 mt-0.5 bg-gray-100 dark:bg-[#1a1a1a] border-gray-300 dark:border-gray-700 rounded text-purple-600 focus:ring-purple-500 focus:ring-offset-0"
                   />
                   <span className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                    I agree to Threadly's{' '}
+                    I agree to WEAZ's{' '}
                     <a
-                      href="#"
+                      href="/seller-terms"
                       className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
                     >
-                      Terms of Service
+                      Seller Terms
                     </a>{' '}
                     and{' '}
                     <a
-                      href="#"
+                      href="/seller-terms#store-guidelines"
                       className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
                     >
                       Store Guidelines

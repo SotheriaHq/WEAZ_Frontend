@@ -864,7 +864,7 @@ const LoginPage = () => {
                   <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-gray-300">
                     <p className="font-medium text-white">Choose a sign-in path</p>
                     <p className="mt-1 text-gray-400">
-                      Continue with Google or create an account if you are new to Threadly.
+                      Continue with Google or create an account if you are new to WEAZ.
                     </p>
                   </div>
                 )}
@@ -913,7 +913,7 @@ const LoginPage = () => {
                     <div>
                       <p className="text-sm font-medium text-white">Create your password</p>
                       <p className="mt-1 text-xs text-gray-400">
-                        This creates your first Threadly password. You will sign in after it is saved.
+                        This creates your first WEAZ password. You will sign in after it is saved.
                       </p>
                     </div>
                     <input

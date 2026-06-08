@@ -4,6 +4,7 @@ import type {
   CardValidationSessionSummary,
   SavedPaymentCardSummary,
 } from '@/api/PaymentApi';
+import type { LegalAcceptancePayload } from '@/api/LegalApi';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import UniversalSelect from '@/components/forms/UniversalSelect';
@@ -24,6 +25,7 @@ interface PaymentDetailsSectionProps {
   cardValidationLoading?: boolean;
   onStartNewCardCheckout?: () => Promise<void> | void;
   startingNewCardCheckout?: boolean;
+  paymentLegalAcceptances?: LegalAcceptancePayload[];
   compact?: boolean;
 }
 
@@ -57,6 +59,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
   cardValidationLoading = false,
   onStartNewCardCheckout,
   startingNewCardCheckout = false,
+  paymentLegalAcceptances = [],
   compact = false,
 }) => {
   const updateField = <K extends keyof PaystackPaymentData>(
@@ -267,7 +270,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
               <div className={infoCardClassName}>
                 <p className="font-semibold text-slate-900 dark:text-white">No saved cards yet</p>
                 <p className="mt-1">
-                  Complete one successful card payment and Threadly will show it here for faster reuse.
+                  Complete one successful card payment and WEAZ will show it here for faster reuse.
                 </p>
               </div>
             )}
@@ -285,7 +288,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
                 <div>
                   <p className="text-sm font-semibold text-slate-900 dark:text-white">Add a new card securely</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Threadly will prepare Paystack checkout and you will enter card details there.
+                    WEAZ will prepare Paystack checkout and you will enter card details there.
                   </p>
                 </div>
                 <span className="text-lg" aria-hidden>
@@ -309,7 +312,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
                 </label>
 
                 <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 px-3 py-3 text-xs text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-                  Threadly will prepare Paystack secure checkout inside this flow. Enter card number,
+                  WEAZ will prepare Paystack secure checkout inside this flow. Enter card number,
                   expiry, CVV, PIN, or OTP only inside the secure payment window that opens next.
                 </div>
 
@@ -353,7 +356,14 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
         <input
           type="checkbox"
           checked={paymentData.consentAccepted}
-          onChange={(event) => updateField('consentAccepted', event.target.checked)}
+          onChange={(event) => {
+            const checked = event.target.checked;
+            onChange((current) => ({
+              ...current,
+              consentAccepted: checked,
+              legalAcceptances: checked ? paymentLegalAcceptances : [],
+            }));
+          }}
           className="mt-0.5 h-4 w-4 rounded border-slate-300 text-fuchsia-500 focus:ring-fuchsia-500/30"
         />
         <span>

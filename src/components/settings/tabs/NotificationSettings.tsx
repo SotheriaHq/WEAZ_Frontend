@@ -228,7 +228,7 @@ const NotificationSettings: React.FC = () => {
         {
           id: 'desktop',
           label: 'Desktop Notifications',
-          description: 'Show browser notifications when Threadly is open in the background',
+          description: 'Show browser notifications when WEAZ is open in the background',
         },
         {
           id: 'sound',

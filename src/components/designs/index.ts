@@ -1,7 +1,7 @@
 /**
  * Design Components Index
  * 
- * All e-commerce design/collection related components for the Threadly platform.
+ * All e-commerce design/collection related components for the WEAZ platform.
  * These components follow the unified design system with:
  * - Gradient blur backdrop for overlays
  * - Glassmorphism effects

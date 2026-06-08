@@ -753,7 +753,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       <div className="mb-6 rounded-3xl border border-emerald-200/80 bg-emerald-50/80 p-5 text-sm text-emerald-950 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
         <p className="font-semibold">Payment split notice</p>
         <p className="mt-2">
-          Customers pay the full quoted total at checkout. Threadly retains the platform commission, and the brand receives the net settlement in milestone releases after production and delivery conditions are met.
+          Customers pay the full quoted total at checkout. WEAZ retains the platform commission, and the brand receives the net settlement in milestone releases after production and delivery conditions are met.
         </p>
       </div>
 

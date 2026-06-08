@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { APP_NAME } from '@/config/productIdentity';
 import { cn } from '@/lib/utils';
 
 interface DashboardSidebarProps {
@@ -34,7 +35,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ isOpen, onCl
         <div className="h-16 flex items-center justify-center border-b border-gray-200 dark:border-gray-800">
           <span className="text-2xl font-bold">🧵</span>
           <span className="ml-3 font-bold text-xl hidden group-hover:block whitespace-nowrap lg:hidden lg:group-hover:block">
-            Threadly
+            {APP_NAME}
           </span>
         </div>
 

@@ -5,18 +5,27 @@ import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
+import { useAuth } from '@/context/AuthContext';
+
+const AuthRouteFallback: React.FC = () => (
+  <div className="flex min-h-[240px] items-center justify-center text-sm text-gray-500">
+    Verifying your session...
+  </div>
+);
 
 export const RequireAuthenticated: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, profile } = useSelector((state: RootState) => state.user);
+  const { loading } = useAuth();
   const location = useLocation();
+
+  if (loading) {
+    return <AuthRouteFallback />;
+  }
 
   if (!isAuthenticated || !profile) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Render from the existing signed-in profile while AuthProvider revalidates
-  // in the background. If the server rejects the session, AuthProvider clears
-  // the profile and this guard redirects on the next render.
   return <>{children}</>;
 };
 

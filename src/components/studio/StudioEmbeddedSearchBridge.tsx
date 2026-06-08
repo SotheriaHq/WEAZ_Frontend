@@ -27,7 +27,7 @@ const StudioEmbeddedSearchBridge: React.FC = () => {
       />
       <div className="relative mx-auto mt-2 w-full max-w-xl rounded-2xl border border-black/5 bg-[color:var(--surface-primary)] p-3 shadow-2xl dark:border-white/10">
         <SearchBarWithSuggestions
-          placeholder="Search Threadly"
+          placeholder="Search WEAZ"
           className="!max-w-none"
           collapsible={false}
           enableGlobalShortcut={false}

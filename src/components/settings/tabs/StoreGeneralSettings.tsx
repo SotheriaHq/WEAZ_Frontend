@@ -19,6 +19,10 @@ import {
   updateStoreProfile,
   type StoreGeneralSettingsResponse,
 } from '@/api/StoreApi';
+import {
+  getRequiredLegalAcceptances,
+  LEGAL_STORE_PUBLISH_DOCUMENT_KEYS,
+} from '@/api/LegalApi';
 import { primeStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
 
 const MAX_SPECIALIZATIONS = 4;
@@ -206,7 +210,10 @@ const StoreGeneralSettings: React.FC = () => {
 
     try {
       if (nextLiveState) {
-        await openStore();
+        const legalAcceptances = await getRequiredLegalAcceptances(
+          LEGAL_STORE_PUBLISH_DOCUMENT_KEYS,
+        );
+        await openStore({ legalAcceptances });
       } else {
         await closeStore();
       }

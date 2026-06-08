@@ -131,9 +131,9 @@ export function useNotificationsBootstrap() {
 
       if (messagingPrefsRef.current.desktop && notVisible && 'Notification' in window) {
         if (Notification.permission === 'granted') {
-          new Notification('Threadly message', {
+          new Notification('WEAZ message', {
             body: payload.message || 'You have a new order message',
-            tag: `threadly:${payload.id}`,
+            tag: `WEAZ:${payload.id}`,
           });
         } else if (Notification.permission === 'default') {
           void Notification.requestPermission();

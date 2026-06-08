@@ -110,7 +110,7 @@ const OrderConfirmation: React.FC = () => {
     if (!reference) return;
 
     setResumingPayment(true);
-    setPaymentActionMessage('Opening secure checkout inside Threadly...');
+    setPaymentActionMessage('Opening secure checkout inside WEAZ...');
     try {
       const session = resolveInAppPaymentSession({
         providerAccessCode,
@@ -136,7 +136,7 @@ const OrderConfirmation: React.FC = () => {
       });
     } catch (error: any) {
       setPaymentActionMessage(
-        'This payment can only continue from a secure in-app session. Retry the payment from inside Threadly.',
+        'This payment can only continue from a secure in-app session. Retry the payment from inside WEAZ.',
       );
       toast.error(error?.message || 'Unable to resume payment');
     } finally {
@@ -153,7 +153,7 @@ const OrderConfirmation: React.FC = () => {
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
         <div className="mb-6 text-6xl">🧾</div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Loading payment confirmation</h1>
-        <p className="text-gray-500 dark:text-zinc-400">Threadly is loading the latest payment and order state.</p>
+        <p className="text-gray-500 dark:text-zinc-400">WEAZ is loading the latest payment and order state.</p>
       </div>
     );
   }

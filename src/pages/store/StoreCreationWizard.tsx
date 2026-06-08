@@ -20,6 +20,10 @@ import {
   type StoreProfileUpdateData,
   type StorePoliciesUpdateData,
 } from '@/api/StoreApi';
+import {
+  getRequiredLegalAcceptances,
+  LEGAL_STORE_PUBLISH_DOCUMENT_KEYS,
+} from '@/api/LegalApi';
 
 import type { StoreWizardData } from '@/types/storeWizard';
 import {
@@ -536,8 +540,10 @@ const StoreCreationWizard: React.FC = () => {
       // Save any final data
       await persistProgress('publish');
       
-      // Call openStore API to mark setup as complete
-      await openStore();
+      const legalAcceptances = await getRequiredLegalAcceptances(
+        LEGAL_STORE_PUBLISH_DOCUMENT_KEYS,
+      );
+      await openStore({ legalAcceptances });
       primeStoreSetupStatusCache(true);
       markStoreOpenPending(user?.id);
       
@@ -546,7 +552,7 @@ const StoreCreationWizard: React.FC = () => {
       
       toast.success('🎉 Your store is now live!');
       toast.info(
-        'Brand settlement note: customer payments are recorded gross, Threadly retains platform commission, and your net balance releases into payouts as each order milestone is completed.',
+        'Brand settlement note: customer payments are recorded gross, WEAZ retains platform commission, and your net balance releases into payouts as each order milestone is completed.',
       );
       navigate('/store/my');
     } catch (error) {

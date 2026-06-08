@@ -64,7 +64,7 @@ const StoreWelcomeScreen: React.FC<StoreWelcomeScreenProps> = ({
             Create Your Store
           </h1>
           <p className="text-gray-600 dark:text-gray-400 text-base md:text-lg leading-relaxed max-w-md mx-auto font-light">
-            Set up your fashion brand on Threadly in minutes. Reach style-conscious shoppers across Africa.
+            Set up your fashion brand on WEAZ in minutes. Reach style-conscious shoppers across Africa.
           </p>
         </div>
 
