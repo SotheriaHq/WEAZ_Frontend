@@ -1,6 +1,6 @@
 import React from 'react';
 
-import ThreadlyLogo from '@/components/ThreadlyLogo';
+import WeazLogo from '@/components/WeazLogo';
 import { COMPANY_NAME } from '@/lib/brand';
 
 type BrandWordmarkProps = {
@@ -20,7 +20,7 @@ const BrandWordmark: React.FC<BrandWordmarkProps> = ({
 }) => {
   return (
     <span className={`inline-flex items-center gap-2 ${className}`.trim()}>
-      <ThreadlyLogo size={logoSize} className={logoClassName} decorative={!showName} />
+      <WeazLogo size={logoSize} className={logoClassName} decorative={!showName} />
       {showName ? <span className={textClassName}>{COMPANY_NAME}</span> : null}
     </span>
   );
