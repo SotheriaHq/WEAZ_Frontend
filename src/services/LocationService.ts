@@ -21,6 +21,15 @@ export interface CityOption {
 // APIs
 const COUNTRIES_API = 'https://countriesnow.space/api/v0.1/countries';
 const REST_COUNTRIES_API = 'https://restcountries.com/v3.1/all?fields=name,cca2,flags';
+const LOCATION_REQUEST_TIMEOUT_MS = 8000;
+const FALLBACK_COUNTRIES: CountryOption[] = [
+    { name: 'Ghana', iso2: 'GH', flag: '', flagImage: 'https://flagcdn.com/gh.svg' },
+    { name: 'Kenya', iso2: 'KE', flag: '', flagImage: 'https://flagcdn.com/ke.svg' },
+    { name: 'Nigeria', iso2: 'NG', flag: '', flagImage: 'https://flagcdn.com/ng.svg' },
+    { name: 'South Africa', iso2: 'ZA', flag: '', flagImage: 'https://flagcdn.com/za.svg' },
+    { name: 'United Kingdom', iso2: 'GB', flag: '', flagImage: 'https://flagcdn.com/gb.svg' },
+    { name: 'United States', iso2: 'US', flag: '', flagImage: 'https://flagcdn.com/us.svg' },
+];
 
 class LocationService {
     // Cache
@@ -38,7 +47,9 @@ class LocationService {
 
         try {
             // Using RestCountries for the best flag data
-            const response = await axios.get(REST_COUNTRIES_API);
+            const response = await axios.get(REST_COUNTRIES_API, {
+                timeout: LOCATION_REQUEST_TIMEOUT_MS,
+            });
             // Sort by common names
             const sorted = response.data.sort((a: any, b: any) =>
                 a.name.common.localeCompare(b.name.common)
@@ -54,7 +65,8 @@ class LocationService {
             return this.countriesCache || [];
         } catch (error) {
             console.error("Failed to fetch countries:", error);
-            return [];
+            this.countriesCache = FALLBACK_COUNTRIES;
+            return this.countriesCache;
         }
     }
 
@@ -70,6 +82,8 @@ class LocationService {
             // CountriesNow requires POST with { country: "Nigeria" }
             const response = await axios.post(`${COUNTRIES_API}/states`, {
                 country: countryName
+            }, {
+                timeout: LOCATION_REQUEST_TIMEOUT_MS,
             });
 
             if (response.data && !response.data.error) {
@@ -99,6 +113,8 @@ class LocationService {
             const response = await axios.post(`${COUNTRIES_API}/state/cities`, {
                 country: countryName,
                 state: stateName
+            }, {
+                timeout: LOCATION_REQUEST_TIMEOUT_MS,
             });
 
             if (response.data && !response.data.error) {

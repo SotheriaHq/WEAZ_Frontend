@@ -1,4 +1,4 @@
-import React, { lazy } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { isAxiosError } from 'axios';
 import { Sidebar } from '../SideBar';
 import { Navbar } from '../Navbar';
@@ -28,6 +28,40 @@ import { getPublicProfileUserType, usePublicUserProfileQuery } from '@/query/que
 
 const Profile = lazy(() => import('../../pages/catalog/Catalog'));
 const PROFILE_MAIN_CLASS = `min-h-screen pt-16 transition-[margin] duration-300 ease-out ${ISLAND_BOTTOM_NAV_CLEARANCE_CLASS}`;
+
+export const ProfileContentLoadingFallback: React.FC<{
+  brandSetupPrompt?: boolean;
+}> = ({ brandSetupPrompt = false }) => (
+  <div className="p-4 sm:p-6" role="status" aria-live="polite">
+    <div className="mx-auto max-w-screen-xl space-y-6">
+      <div className="rounded-2xl border border-theme bg-[color:var(--surface-secondary)] p-5 shadow-sm">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="h-10 w-10 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800" />
+          <div className="min-w-0 flex-1">
+            <div className="h-4 w-48 animate-pulse rounded-full bg-gray-200 dark:bg-gray-800" />
+            <div className="mt-2 h-3 w-64 max-w-full animate-pulse rounded-full bg-gray-100 dark:bg-gray-900" />
+          </div>
+        </div>
+        <p className="text-sm font-semibold text-theme">
+          {brandSetupPrompt ? 'Preparing brand setup...' : 'Loading profile...'}
+        </p>
+        <p className="mt-1 text-xs text-theme-secondary">
+          {brandSetupPrompt
+            ? 'Your profile is loading. The setup form will open automatically.'
+            : 'Your profile content is loading.'}
+        </p>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="lg:col-span-3">
+          <div className="h-64 w-full animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-900/40" />
+        </div>
+        <div className="lg:col-span-9">
+          <CollectionsSkeleton />
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 const computeSidebarMode = (pathname: string, isMobile: boolean) => {
   if (isMobile) return 'HIDDEN' as const;
@@ -92,6 +126,7 @@ export const ProfileLayout: React.FC = () => {
   );
 
   const verificationPromptContext = searchParams.get('verifyEmailPrompt') ?? '';
+  const isBrandSetupPrompt = searchParams.get('modal') === 'brand-setup';
 
   const computedSidebarMode = useMemo(
     () => computeSidebarMode(location.pathname, isMobile),
@@ -385,9 +420,21 @@ export const ProfileLayout: React.FC = () => {
         >
           <div className="px-0 sm:px-2">
             {location.pathname === '/profile' ? (
-              hasActiveBrandMembership(user) ? <Profile /> : <EndUserProfile />
+              hasActiveBrandMembership(user) ? (
+                <Suspense fallback={<ProfileContentLoadingFallback brandSetupPrompt={isBrandSetupPrompt} />}>
+                  <Profile />
+                </Suspense>
+              ) : (
+                <EndUserProfile />
+              )
             ) : isVisitorRoute && routeBrandId && location.pathname === `/profile/${routeBrandId}` ? (
-              visitorType === 'BRAND' ? <Profile /> : <EndUserProfile />
+              visitorType === 'BRAND' ? (
+                <Suspense fallback={<ProfileContentLoadingFallback />}>
+                  <Profile />
+                </Suspense>
+              ) : (
+                <EndUserProfile />
+              )
             ) : (
               <Outlet />
             )}

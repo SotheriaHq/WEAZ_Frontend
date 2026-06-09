@@ -30,6 +30,7 @@ interface UniversalSelectProps {
   optionCompact?: boolean;
   optionAllowWrap?: boolean;
   selectedAllowWrap?: boolean;
+  menuLayer?: 'dropdown' | 'modal';
 }
 
 const normalizeSearchText = (value: string): string =>
@@ -54,6 +55,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
   optionCompact = false,
   optionAllowWrap = false,
   selectedAllowWrap = false,
+  menuLayer = 'dropdown',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -111,9 +113,12 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
       left,
       width: menuWidth,
       maxHeight,
-      zIndex: 'var(--z-dropdown)',
+      zIndex:
+        menuLayer === 'modal'
+          ? 'calc(var(--z-modal) + 1)'
+          : 'var(--z-dropdown)',
     });
-  }, []);
+  }, [menuLayer]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -180,7 +185,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
           <div
             ref={menuRef}
             style={menuStyle}
-            className="z-layer-dropdown overflow-hidden rounded-2xl border border-[color:var(--border-default)] glass-menu p-1.5 shadow-2xl animate-slideDown focus-within:border-[color:var(--border-strong)] focus:outline-none"
+            className={`${menuLayer === 'modal' ? 'z-layer-modal' : 'z-layer-dropdown'} overflow-hidden rounded-2xl border border-[color:var(--border-default)] glass-menu p-1.5 shadow-2xl animate-slideDown focus-within:border-[color:var(--border-strong)] focus:outline-none`}
           >
             {searchable && (
               <div className="sticky top-0 z-10 rounded-xl bg-[color:var(--surface-primary)] px-2 py-2 backdrop-blur-xl">
@@ -284,6 +289,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
           type="button"
           onClick={() => !disabled && setIsOpen(!isOpen)}
           disabled={disabled}
+          aria-label={label ?? placeholder}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
           className={`

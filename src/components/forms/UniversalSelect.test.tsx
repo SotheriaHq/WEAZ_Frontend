@@ -50,4 +50,25 @@ describe('UniversalSelect', () => {
     expect(screen.getByRole('option', { name: 'Ikeja' })).toBeTruthy();
     expect(dropdown?.className).toContain('border-[color:var(--border-default)]');
   });
+
+  it('can lift modal dropdowns above the modal layer without changing global dropdowns', () => {
+    render(
+      <UniversalSelect
+        label="Country"
+        value=""
+        onChange={vi.fn()}
+        options={[{ value: 'Nigeria', label: 'Nigeria' }]}
+        placeholder="Select Country"
+        menuLayer="modal"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Country' }));
+
+    const dropdown = screen.getByRole('listbox', { name: 'Country' }).parentElement;
+    expect(dropdown?.parentElement).toBe(document.body);
+    expect(dropdown?.className).toContain('z-layer-modal');
+    expect(dropdown?.style.zIndex).toBe('calc(var(--z-modal) + 1)');
+    expect(screen.getByRole('option', { name: 'Nigeria' })).toBeVisible();
+  });
 });

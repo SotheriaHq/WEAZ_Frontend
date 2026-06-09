@@ -12,7 +12,7 @@ import UniversalSelect from '../forms/UniversalSelect';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
-import { BRAND_TAG_OPTIONS } from '../../data/brandTags';
+import { BRAND_TAG_OPTIONS, BRAND_TAG_SELECTION_LIMIT } from '../../data/brandTags';
 import VLoader from '@/components/loaders/VLoader';
 
 // ----------------------------------------------------------------------------
@@ -49,7 +49,12 @@ const profileSchema = z
     brandCountry: z.string().optional(),
     brandState: z.string().optional(),
     brandCity: z.string().optional(),
-    brandTags: z.array(z.string()).optional(),
+    brandTags: z
+      .array(z.string())
+      .max(BRAND_TAG_SELECTION_LIMIT, {
+        message: `Choose up to ${BRAND_TAG_SELECTION_LIMIT} tags.`,
+      })
+      .optional(),
     socialInstagram: optionalSocialSchema,
     socialFacebook: optionalSocialSchema,
     socialTwitter: optionalSocialSchema,
@@ -68,7 +73,15 @@ const profileSchema = z
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 type SubmitStatus = 'idle' | 'saving' | 'syncing' | 'almost' | 'complete';
-const MAX_TAGS = 5;
+const MAX_TAGS = BRAND_TAG_SELECTION_LIMIT;
+const BRAND_TAG_CHIP_PALETTE = [
+  'bg-gradient-to-r from-fuchsia-500 to-violet-600 text-white shadow-fuchsia-500/25',
+  'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-cyan-500/25',
+  'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-emerald-500/25',
+  'bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 shadow-amber-500/25',
+  'bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-rose-500/25',
+  'bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-indigo-500/25',
+];
 const BUSINESS_TYPE_OPTIONS = [
   { value: 'Retailer', label: 'Retailer' },
   { value: 'Designer', label: 'Designer' },
@@ -199,6 +212,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setValue,
     reset,
     setFocus,
+    clearErrors,
     formState: { errors, isSubmitting },
   } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -223,7 +237,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
   // Initialize selected tags from profile/user
   useEffect(() => {
-    setSelectedTags(initialValues.brandTags ?? []);
+    setSelectedTags((initialValues.brandTags ?? []).slice(0, MAX_TAGS));
     setTagError(null);
   }, [initialValues]);
 
@@ -309,6 +323,11 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         if (selectedTags.length === 0) {
           setTagError('Select at least one tag.');
           toast.error('Select at least one tag.');
+          return;
+        }
+        if (selectedTags.length > MAX_TAGS) {
+          setTagError(`Choose up to ${MAX_TAGS} tags.`);
+          toast.error(`Choose up to ${MAX_TAGS} tags.`);
           return;
         }
 
@@ -570,17 +589,20 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                         <span className="ml-2 text-xs font-normal text-gray-500">(Select up to {MAX_TAGS})</span>
                     </label>
                     <div className="flex flex-wrap gap-2 p-4 rounded-xl border border-theme surface-subtle/40">
-                      {tagOptions.map((tag) => {
+                      {tagOptions.map((tag, index) => {
                         const isSelected = selectedTags.includes(tag.value);
+                        const selectedChipColor =
+                          BRAND_TAG_CHIP_PALETTE[index % BRAND_TAG_CHIP_PALETTE.length];
                         return (
                           <button
                             key={tag.value}
                             type="button"
                             onClick={() => toggleTag(tag.value)}
                             disabled={isSubmitting}
-                            className={`px-4 py-2 rounded-full text-xs font-semibold transition ${
+                            aria-pressed={isSelected}
+                            className={`px-4 py-2 rounded-full text-xs font-semibold transition shadow-sm focus:outline-none focus:ring-2 focus:ring-white/30 disabled:cursor-not-allowed disabled:opacity-70 ${
                               isSelected
-                                ? 'bg-purple-600 text-white shadow-md'
+                                ? selectedChipColor
                                 : 'surface-card text-theme-secondary border border-theme hover:bg-gray-100 dark:hover:bg-gray-800'
                             }`}
                           >
@@ -619,9 +641,16 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           label="Country"
                           value={selectedCountry || ''}
                           onChange={(val) => {
-                              setValue('brandCountry', val);
-                              setValue('brandState', '');
-                              setValue('brandCity', '');
+                              setValue('brandCountry', val, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                              });
+                              setValue('brandState', '', {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                              });
+                              setValue('brandCity', '', { shouldDirty: true });
+                              clearErrors('brandCountry');
                           }}
                           options={countryOptions}
                           placeholder={loadingLocations ? "Loading..." : "Select Country"}
@@ -630,13 +659,18 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           emptyMessage="No matching country found"
                           disabled={loadingLocations}
                           className="w-full"
+                          menuLayer="modal"
                       />
                        <UniversalSelect
                           label="State / Province"
                           value={selectedState || ''}
                           onChange={(val) => {
-                              setValue('brandState', val);
-                              setValue('brandCity', '');
+                              setValue('brandState', val, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                              });
+                              setValue('brandCity', '', { shouldDirty: true });
+                              clearErrors('brandCountry');
                           }}
                           options={stateOptions}
                           placeholder={loadingLocations ? "Loading..." : "State/Province"}
@@ -645,11 +679,17 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           emptyMessage="No matching state or province found"
                           disabled={!selectedCountry || stateOptions.length === 0 || loadingLocations}
                           className="w-full"
+                          menuLayer="modal"
                       />
                        <UniversalSelect
                           label="City"
                           value={watch('brandCity') || ''}
-                          onChange={(val) => setValue('brandCity', val)}
+                          onChange={(val) =>
+                            setValue('brandCity', val, {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            })
+                          }
                           options={cityOptions}
                           placeholder={loadingLocations ? "Loading..." : "City"}
                           searchable
@@ -657,6 +697,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           emptyMessage="No matching city found"
                           disabled={!selectedState || cityOptions.length === 0 || loadingLocations}
                           className="w-full"
+                          menuLayer="modal"
                       />
                   </div>
                   {errors.brandCountry && (
@@ -682,6 +723,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     emptyMessage="No matching business type found"
                     disabled={isSubmitting}
                     className="w-full"
+                    menuLayer="modal"
                   />
                   {errors.businessType && (
                     <p className="text-xs text-red-500 font-medium">

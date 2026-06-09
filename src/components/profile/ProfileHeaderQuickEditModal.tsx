@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { BRAND_TAG_OPTIONS } from '../../data/brandTags';
+import { BRAND_TAG_OPTIONS, BRAND_TAG_SELECTION_LIMIT } from '../../data/brandTags';
 import { IconButton } from '@/components/ui/FrostedButton';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
@@ -39,7 +39,7 @@ interface ProfileHeaderQuickEditModalProps {
   saving?: boolean;
 }
 
-const MAX_TAGS = 5;
+const MAX_TAGS = BRAND_TAG_SELECTION_LIMIT;
 
 // ----------------------------------------------------------------------------
 // Main Component
@@ -85,7 +85,7 @@ const ProfileHeaderQuickEditModal: React.FC<ProfileHeaderQuickEditModalProps> = 
         brandState: initialValues.brandState ?? '',
         brandCity: initialValues.brandCity ?? '',
       });
-      setSelectedTags(initialValues.brandTags ?? []);
+      setSelectedTags((initialValues.brandTags ?? []).slice(0, MAX_TAGS));
       setTagError(null);
     }
   }, [open, initialValues, reset]);
@@ -263,7 +263,7 @@ const ProfileHeaderQuickEditModal: React.FC<ProfileHeaderQuickEditModalProps> = 
                             <div>
                                 <h3 className="text-xl font-bold text-theme mb-1 flex items-center gap-2">
                                     Brand Vibe
-                                    <span className="text-xs font-normal text-gray-500 dark:text-white/40 surface-control-muted px-2 py-0.5 rounded-full border border-gray-200 dark:border-white/5">Select up to 5</span>
+                                    <span className="text-xs font-normal text-gray-500 dark:text-white/40 surface-control-muted px-2 py-0.5 rounded-full border border-gray-200 dark:border-white/5">Select up to {MAX_TAGS}</span>
                                 </h3>
                                 <p className="text-sm text-gray-500 dark:text-white/50">Tap tags to define your aesthetic.</p>
                             </div>
@@ -278,6 +278,7 @@ const ProfileHeaderQuickEditModal: React.FC<ProfileHeaderQuickEditModalProps> = 
                                         type="button"
                                         onClick={() => toggleTag(tag.value)}
                                         disabled={saving}
+                                        aria-pressed={isSelected}
                                         className={`group relative px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-300 transform hover:-translate-y-0.5 ${
                                             isSelected 
                                                 ? 'bg-purple-600 border border-purple-500 text-white shadow-neon' 

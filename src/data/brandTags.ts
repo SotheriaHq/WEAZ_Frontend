@@ -3,6 +3,8 @@ export interface BrandTagOption {
   value: string;
 }
 
+export const BRAND_TAG_SELECTION_LIMIT = 7;
+
 const makeOption = (label: string): BrandTagOption => ({
   label,
   value: label,
