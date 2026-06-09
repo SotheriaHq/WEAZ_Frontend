@@ -126,6 +126,11 @@ const isRawStorageKey = (value?: string | null) => {
   return !/^https?:\/\//i.test(value) && !value.includes('?');
 };
 
+const shouldPreferFileIdResolution = (value?: string | null, fileId?: string | null) => {
+  if (!value || !fileId) return false;
+  return isS3LikeUrl(value);
+};
+
 /**
  * Resolve a signed URL for a given fileId with an optional initial fallback URL.
  * Guarantees a stable url string or null, plus loading/error states.
@@ -133,13 +138,16 @@ const isRawStorageKey = (value?: string | null) => {
 export function useSignedFileUrl(fileId?: string | null, initial?: string | null) {
   const queryClient = useQueryClient();
   const [url, setUrl] = useState<string | null>(() => {
-    if (isUsableInitialUrl(initial)) {
+    if (isUsableInitialUrl(initial) && !shouldPreferFileIdResolution(initial, fileId)) {
       return initial ?? null;
     }
     // Try cache first for instant render
     if (fileId) {
       const cached = getCachedUrl(fileId);
       if (cached) return cached;
+    }
+    if (shouldPreferFileIdResolution(initial, fileId)) {
+      return null;
     }
     if (initial && isRawStorageKey(initial)) {
       return getCachedUrl(`key:${initial}`) ?? initial;
@@ -149,7 +157,13 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
     }
     return initial ?? null;
   });
-  const [loading, setLoading] = useState<boolean>(Boolean(fileId && !isUsableInitialUrl(initial)));
+  const [loading, setLoading] = useState<boolean>(
+    Boolean(
+      fileId &&
+        (shouldPreferFileIdResolution(initial, fileId) ||
+          !isUsableInitialUrl(initial)),
+    ),
+  );
   const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
@@ -157,7 +171,7 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     setError(null);
 
-    if (isUsableInitialUrl(initial)) {
+    if (isUsableInitialUrl(initial) && !shouldPreferFileIdResolution(initial, fileId)) {
       setUrl(initial ?? null);
       setLoading(false);
       return;

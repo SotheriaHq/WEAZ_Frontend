@@ -159,6 +159,11 @@ const isRawStorageKey = (value?: string | null) => {
   return !/^https?:\/\//i.test(value) && !value.includes('?');
 };
 
+const shouldPreferFileIdResolution = (value?: string | null, fileId?: string | null) => {
+  if (!value || !fileId) return false;
+  return isS3LikeUrl(value);
+};
+
 const resolveSourceCacheKey = (fileId?: string | null, src?: string | null) => {
   if (fileId) return fileId;
   if (!src) return null;
@@ -209,7 +214,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const sourceCacheKey = resolveSourceCacheKey(fileId, src);
   const cachedLastGoodUrl = sourceCacheKey ? lastGoodUrlCache.get(sourceCacheKey) ?? null : null;
   const [resolved, setResolved] = useState<string | null>(() => {
-    if (isUsableInitialUrl(src)) return src ?? null;
+    if (isUsableInitialUrl(src) && !shouldPreferFileIdResolution(src, fileId)) return src ?? null;
     // fileId-based: always resolve via cache, never use the raw ID
     if (fileId) return getCachedUrl(fileId) ?? null;
     if (src && isRawStorageKey(src)) return getCachedUrl(`key:${src}`) ?? src;
@@ -221,7 +226,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   });
   const [hadError, setHadError] = useState(false);
   const [loaded, setLoaded] = useState(() => {
-    if (isUsableInitialUrl(src)) return true;
+    if (isUsableInitialUrl(src) && !shouldPreferFileIdResolution(src, fileId)) return true;
     if (fileId) return !!(getCachedUrl(fileId));
     if (src && isRawStorageKey(src)) return !!(getCachedUrl(`key:${src}`));
     if (src && isS3LikeUrl(src)) return !!(getCachedUrl(src) ?? src);
@@ -248,7 +253,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       }
       setLoaded(false);
 
-      if (isUsableInitialUrl(src)) {
+      if (isUsableInitialUrl(src) && !shouldPreferFileIdResolution(src, fileId)) {
         setResolved(src ?? null);
         setLoaded(true);
         return;
@@ -292,11 +297,17 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           if (url) {
             setResolved(url);
           } else {
-            if (src) {
+            if (src && !shouldPreferFileIdResolution(src, fileId)) {
               // If file-id signing fails, keep the raw source as a best-effort fallback.
               setResolved(src);
               setHadError(false);
             } else {
+              if (import.meta.env.DEV) {
+                console.warn('[ImageWithFallback] Failed to resolve persisted media URL', {
+                  hasFileId: Boolean(fileId),
+                  sourceType: src && isS3LikeUrl(src) ? 's3-url' : 'file-id',
+                });
+              }
               setHadError(true);
             }
           }

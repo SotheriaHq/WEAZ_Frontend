@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { AppDispatch, RootState } from '@/store';
 import type { AuthUserDto } from '@/types/auth';
 import { setUser } from '@/features/userSlice';
 import { brandApi } from '@/api/BrandApi';
 import { useSignedFileUrl } from '@/hooks/useSignedFileUrl';
+import { queryKeys } from '@/query/queryKeys';
 import ProfileHeader from './ProfileHeader';
 import ImageCropModal from '@/components/upload/ImageCropModal';
 import ProfileImageModal from '@/components/profile/ProfileImageModal';
@@ -67,6 +69,7 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
   onTogglePatch,
 }) => {
   const dispatch = useDispatch<AppDispatch>();
+  const queryClient = useQueryClient();
   const currentUser = useSelector((state: RootState) => state.user.profile);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
@@ -153,6 +156,68 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
     [dispatch],
   );
 
+  const persistBrandProfileMedia = useCallback(
+    (
+      userId: string,
+      media: {
+        profileImage?: string | null;
+        profileImageId?: string | null;
+        profileImageFile?: ReturnType<typeof mapUploadedMedia>;
+        bannerImage?: string | null;
+        bannerImageId?: string | null;
+        bannerImageFile?: ReturnType<typeof mapUploadedMedia>;
+      },
+    ) => {
+      brandApi.invalidateBrandProfileCache(userId);
+      queryClient.setQueryData(queryKeys.brand.profile(userId), (current: any) => {
+        if (!current) return current;
+        return {
+          ...current,
+          ...(media.profileImage !== undefined
+            ? {
+                logoImage: media.profileImage,
+                logoImageId: media.profileImageId ?? null,
+                logoImageMeta: media.profileImageFile
+                  ? {
+                      fileId: media.profileImageFile.id,
+                      id: media.profileImageFile.id,
+                      url: media.profileImageFile.s3Url,
+                      s3Url: media.profileImageFile.s3Url,
+                      originalName: media.profileImageFile.originalName,
+                      fileName: media.profileImageFile.fileName,
+                      createdAt: media.profileImageFile.createdAt,
+                      updatedAt: media.profileImageFile.updatedAt,
+                    }
+                  : null,
+              }
+            : {}),
+          ...(media.bannerImage !== undefined
+            ? {
+                bannerImage: media.bannerImage,
+                bannerImageId: media.bannerImageId ?? null,
+                bannerImageMeta: media.bannerImageFile
+                  ? {
+                      fileId: media.bannerImageFile.id,
+                      id: media.bannerImageFile.id,
+                      url: media.bannerImageFile.s3Url,
+                      s3Url: media.bannerImageFile.s3Url,
+                      originalName: media.bannerImageFile.originalName,
+                      fileName: media.bannerImageFile.fileName,
+                      createdAt: media.bannerImageFile.createdAt,
+                      updatedAt: media.bannerImageFile.updatedAt,
+                    }
+                  : null,
+              }
+            : {}),
+        };
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.brand.profile(userId),
+      });
+    },
+    [queryClient],
+  );
+
   const processAvatarUpload = useCallback(
     async (file: File, previewUrl: string, disposePreview?: () => void) => {
       if (!currentUser) {
@@ -171,12 +236,18 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
         }
 
         const signedUrl = (await brandApi.getSignedFileUrl(uploaded.id)) ?? uploaded.url;
+        const uploadedMedia = mapUploadedMedia(uploaded, file.name);
         updateAvatarPreview(signedUrl);
         persistUserMedia({
           ...currentUser,
           profileImage: uploaded.url,
           profileImageId: uploaded.id,
-          profileImageFile: mapUploadedMedia(uploaded, file.name),
+          profileImageFile: uploadedMedia,
+        });
+        persistBrandProfileMedia(currentUser.id, {
+          profileImage: uploaded.url,
+          profileImageId: uploaded.id,
+          profileImageFile: uploadedMedia,
         });
         setAvatarHighlight(true);
         toast.success('Profile photo updated');
@@ -189,7 +260,14 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
         disposePreview?.();
       }
     },
-    [currentUser, localAvatarPreview, persistUserMedia, resolvedAvatarUrl, updateAvatarPreview],
+    [
+      currentUser,
+      localAvatarPreview,
+      persistBrandProfileMedia,
+      persistUserMedia,
+      resolvedAvatarUrl,
+      updateAvatarPreview,
+    ],
   );
 
   const processBannerUpload = useCallback(
@@ -210,12 +288,18 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
         }
 
         const signedUrl = (await brandApi.getSignedFileUrl(uploaded.id)) ?? uploaded.url;
+        const uploadedMedia = mapUploadedMedia(uploaded, file.name);
         updateBannerPreview(signedUrl);
         persistUserMedia({
           ...currentUser,
           bannerImage: uploaded.url,
           bannerImageId: uploaded.id,
-          bannerImageFile: mapUploadedMedia(uploaded, file.name),
+          bannerImageFile: uploadedMedia,
+        });
+        persistBrandProfileMedia(currentUser.id, {
+          bannerImage: uploaded.url,
+          bannerImageId: uploaded.id,
+          bannerImageFile: uploadedMedia,
         });
         toast.success('Banner image updated');
       } catch (error) {
@@ -227,7 +311,14 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
         disposePreview?.();
       }
     },
-    [bannerPreviewUrl, currentUser, persistUserMedia, resolvedBannerUrl, updateBannerPreview],
+    [
+      bannerPreviewUrl,
+      currentUser,
+      persistBrandProfileMedia,
+      persistUserMedia,
+      resolvedBannerUrl,
+      updateBannerPreview,
+    ],
   );
 
   const handleTriggerAvatarUpload = useCallback(() => {

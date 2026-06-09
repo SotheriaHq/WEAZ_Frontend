@@ -835,7 +835,18 @@ export const brandApi = {
       }
 
       const request = (async () => {
-        const response = await apiClient.get(`/brands/${cacheKey}`);
+        const response = await apiClient.get(
+          `/brands/${cacheKey}`,
+          forceRefresh
+            ? {
+                params: { _cb: Date.now() },
+                headers: {
+                  'Cache-Control': 'no-store',
+                  Pragma: 'no-cache',
+                },
+              }
+            : undefined,
+        );
         const data = unwrapApiResponse<BrandProfileDto>(response.data);
         brandProfileCache.set(cacheKey, { data, expiresAt: Date.now() + BRAND_PROFILE_TTL_MS });
         return data;
@@ -851,12 +862,22 @@ export const brandApi = {
     }
   },
 
+  invalidateBrandProfileCache(brandId?: string | null) {
+    const cacheKey = String(brandId ?? '').trim();
+    if (cacheKey) {
+      brandProfileCache.delete(cacheKey);
+      brandProfilePending.delete(cacheKey);
+      return;
+    }
+    brandProfileCache.clear();
+    brandProfilePending.clear();
+  },
+
   // Update brand profile
   async updateBrandProfile(brandId: string, data: UpdateBrandProfilePayload): Promise<AuthUserDto | null> {
     try {
       const response = await apiClient.patch(`/brands/${brandId}`, data);
-      brandProfileCache.delete(brandId);
-      brandProfilePending.delete(brandId);
+      this.invalidateBrandProfileCache(brandId);
       return unwrapApiResponse<AuthUserDto>(response.data);
     } catch (error) {
       const message = extractApiErrorMessage(error) ?? 'Error updating brand profile';
