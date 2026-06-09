@@ -157,6 +157,45 @@ const FORMULA_WEIGHT_KEYS = [
   'brandDiversity',
 ];
 
+export const MARKET_GOVERNANCE_FIELD_HELP = [
+  {
+    title: 'Ranking enabled',
+    body: 'Controls whether backend ranking is allowed to influence market ordering. Disabled is the safe release state.',
+  },
+  {
+    title: 'Default state',
+    body: 'Shows whether ranking remains disabled by default unless an explicit release gate enables it.',
+  },
+  {
+    title: 'Fallback',
+    body: 'Confirms deterministic fallback ordering is available when ranking config is missing, disabled, or rolled back.',
+  },
+  {
+    title: 'Phase 14',
+    body: 'Marks the final validation gate required before ranking can be treated as production-ready.',
+  },
+  {
+    title: 'Market Sections',
+    body: 'Configurable marketplace rails such as Fresh Drops and Shop by Style. They control labels, limits, order, and View All behavior.',
+  },
+  {
+    title: 'Ranking Profiles',
+    body: 'Named bundles that connect sections, formula versions, rollout percentage, diversity caps, and shadow-mode behavior.',
+  },
+  {
+    title: 'Formulas',
+    body: 'Versioned weight sets for ranking signals. Rollback formula returns to the prior active version when available.',
+  },
+  {
+    title: 'Suggestion Blocks',
+    body: 'Related-item surfaces for product, collection, brand, search-empty, and section-detail contexts.',
+  },
+  {
+    title: 'Audit Log',
+    body: 'Immutable admin activity trail for governance changes, rehearsal checks, and rollback actions.',
+  },
+];
+
 const formatDateTime = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : 'Not set';
 
@@ -707,21 +746,25 @@ const AdminMarketGovernancePage: React.FC = () => {
               label: 'Ranking enabled',
               value: releaseStatus?.rankingEnabled ? 'Enabled' : 'Disabled',
               tone: releaseStatus?.rankingEnabled ? 'warn' : 'safe',
+              hint: 'Disabled keeps live market ordering on deterministic defaults.',
             },
             {
               label: 'Default state',
               value: releaseStatus?.rankingDefaultDisabled ? 'Disabled by default' : 'Needs review',
               tone: releaseStatus?.rankingDefaultDisabled ? 'safe' : 'danger',
+              hint: 'The backend should stay disabled by default until the release gate changes.',
             },
             {
               label: 'Fallback',
               value: releaseStatus?.deterministicFallbackEnabled ? 'Deterministic fallback on' : 'Needs review',
               tone: releaseStatus?.deterministicFallbackEnabled ? 'safe' : 'danger',
+              hint: 'Fallback protects market pages if ranking config is absent or rolled back.',
             },
             {
               label: 'Phase 14',
               value: releaseStatus?.phase14Required ? 'Required' : 'Not required',
               tone: releaseStatus?.phase14Required ? 'warn' : 'safe',
+              hint: 'Final readiness still requires Phase 14 validation and signoff.',
             },
           ].map((item) => (
             <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-black/20">
@@ -731,29 +774,64 @@ const AdminMarketGovernancePage: React.FC = () => {
               <div className="mt-2">
                 <StatusPill tone={item.tone as 'safe' | 'warn' | 'danger'}>{item.value}</StatusPill>
               </div>
+              <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                {item.hint}
+              </p>
             </div>
           ))}
         </div>
 
         <div className="mt-5 grid gap-3 lg:grid-cols-2">
-          <KeyValue label="Shadow mode" value={releaseStatus?.shadowMode ? 'On' : 'Off'} />
-          <KeyValue label="Config read status" value={releaseStatus?.configReadStatus ?? 'Unknown'} />
+          <KeyValue
+            label="Shadow mode"
+            value={releaseStatus?.shadowMode ? 'On' : 'Off'}
+            hint="Shadow mode lets ranking run for observation without changing live ordering."
+          />
+          <KeyValue
+            label="Config read status"
+            value={releaseStatus?.configReadStatus ?? 'Unknown'}
+            hint="Shows whether this page is reading database governance config or code defaults."
+          />
           <KeyValue
             label="Active ranking profile"
             value={releaseStatus?.activeRankingProfile?.profileKey ?? 'None'}
+            hint="The profile that would connect sections, formula, rollout, and diversity limits."
           />
           <KeyValue
             label="Active formula"
             value={releaseStatus?.activeFormulaVersion?.versionKey ?? 'None'}
+            hint="The active ranking weight version, if any."
           />
           <KeyValue
             label="Last rollback"
             value={releaseStatus?.lastRollback ? formatDateTime(releaseStatus.lastRollback.createdAt) : 'None'}
+            hint="Most recent governance rollback audit entry."
           />
           <KeyValue
             label="Release readiness"
             value={releaseStatus?.productionReady ? 'Needs Phase 14 confirmation' : 'Not cleared'}
+            hint="Not cleared means do not treat ranking as production-ready."
           />
+        </div>
+      </div>
+
+      <div className={panelClass}>
+        <h3 className="text-sm font-bold text-slate-950 dark:text-white">What this page controls</h3>
+        <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-300">
+          These controls govern marketplace section configuration and ranking rollout safety. They do not enable ranking for production unless the release gate and backend flags allow it.
+        </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {MARKET_GOVERNANCE_FIELD_HELP.map((item) => (
+            <div
+              key={item.title}
+              className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-black/20"
+            >
+              <p className="text-sm font-bold text-slate-950 dark:text-white">{item.title}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                {item.body}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -1228,7 +1306,7 @@ const AdminMarketGovernancePage: React.FC = () => {
   );
 };
 
-const KeyValue: React.FC<{ label: string; value: unknown }> = ({ label, value }) => (
+const KeyValue: React.FC<{ label: string; value: unknown; hint?: string }> = ({ label, value, hint }) => (
   <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 dark:border-white/10 dark:bg-black/20">
     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
       {label}
@@ -1236,6 +1314,11 @@ const KeyValue: React.FC<{ label: string; value: unknown }> = ({ label, value })
     <div className="mt-1 break-words text-sm font-medium text-slate-900 dark:text-slate-100">
       <SummaryValue value={value} />
     </div>
+    {hint ? (
+      <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+        {hint}
+      </p>
+    ) : null}
   </div>
 );
 

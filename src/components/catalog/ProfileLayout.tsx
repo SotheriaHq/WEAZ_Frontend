@@ -25,6 +25,8 @@ import { setUser } from '@/features/userSlice';
 import { unwrapApiResponse } from '@/types/auth';
 import type { AuthProfileResponse, AuthUserDto } from '@/types/auth';
 import { getPublicProfileUserType, usePublicUserProfileQuery } from '@/query/queries';
+import { AuthApi } from '@/api/AuthApi';
+import EmailVerificationBanner from '@/components/auth/EmailVerificationBanner';
 
 const Profile = lazy(() => import('../../pages/catalog/Catalog'));
 const PROFILE_MAIN_CLASS = `min-h-screen pt-16 transition-[margin] duration-300 ease-out ${ISLAND_BOTTOM_NAV_CLEARANCE_CLASS}`;
@@ -252,10 +254,7 @@ export const ProfileLayout: React.FC = () => {
 
     setIsResendingVerification(true);
     try {
-      const response = await apiClient.post('/auth/verify-email/resend');
-      const payload =
-        (response.data?.data as { message?: string } | undefined) ??
-        (response.data as { message?: string } | undefined);
+      const payload = await AuthApi.resendVerificationEmail();
 
       toast.success(
         payload?.message ||
@@ -378,46 +377,25 @@ export const ProfileLayout: React.FC = () => {
       <div className="min-h-screen bg-[color:var(--surface-primary)] text-gray-900 dark:text-white">
         {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
         <Navbar />
-        {showEmailVerificationPrompt ? (
-          <div
-            className="pointer-events-none fixed right-0 top-[4.75rem] z-[70] px-3 sm:px-5"
-            style={{ left: mainMarginLeft }}
-          >
-            <div className="pointer-events-auto ml-auto flex w-full max-w-[min(90vw,22rem)] items-start gap-2 rounded-xl border border-amber-300/30 bg-white/94 px-3 py-2 text-xs text-gray-800 shadow-lg shadow-amber-900/10 backdrop-blur-xl dark:border-amber-300/20 dark:bg-gray-950/92 dark:text-gray-100">
-              <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-sm dark:bg-amber-400/15">
-                <span aria-hidden="true">{'\u2709'}</span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">{verificationPromptDetails.title}</p>
-                <p className="mt-0.5 truncate text-[11px] leading-4 text-gray-600 dark:text-gray-300">
-                  {verificationPromptDetails.description}
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={resendVerificationEmail}
-                    disabled={isResendingVerification}
-                    className="rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isResendingVerification ? 'Sending...' : 'Resend email'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={refreshVerificationStatus}
-                    disabled={isCheckingVerification}
-                    className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-200 dark:hover:bg-amber-400/10"
-                  >
-                    {isCheckingVerification ? 'Checking...' : verificationPromptDetails.actionLabel}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
         <main
           className={PROFILE_MAIN_CLASS}
           style={{ marginLeft: mainMarginLeft }}
         >
+          {showEmailVerificationPrompt ? (
+            <div className="px-4 pt-4 sm:px-6">
+              <div className="mx-auto max-w-screen-xl">
+                <EmailVerificationBanner
+                  title={verificationPromptDetails.title}
+                  description={verificationPromptDetails.description}
+                  statusLabel={verificationPromptDetails.actionLabel}
+                  isResending={isResendingVerification}
+                  isChecking={isCheckingVerification}
+                  onResend={resendVerificationEmail}
+                  onCheckStatus={refreshVerificationStatus}
+                />
+              </div>
+            </div>
+          ) : null}
           <div className="px-0 sm:px-2">
             {location.pathname === '/profile' ? (
               hasActiveBrandMembership(user) ? (

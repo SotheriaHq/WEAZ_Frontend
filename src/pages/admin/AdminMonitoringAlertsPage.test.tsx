@@ -156,12 +156,14 @@ describe('AdminMonitoringPage', () => {
     render(<AdminMonitoringPage />);
 
     expect(await screen.findByText('Operational Alerts')).toBeTruthy();
+    expect(screen.getAllByText('Redacted metadata').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Data loads from \/admin\/alerts\/summary/)).toBeTruthy();
     expect(await screen.findByText('Payment mismatch')).toBeTruthy();
 
     fireEvent.click(screen.getByText('Payment mismatch'));
 
     await waitFor(() => expect(getById).toHaveBeenCalledWith('alert-1'));
-    expect(screen.getByText('Redacted metadata')).toBeTruthy();
+    expect(screen.getAllByText('Redacted metadata').length).toBeGreaterThan(0);
     expect(screen.queryByText('sk_live_sensitive')).toBeNull();
     expect(screen.queryByText('raw-signature')).toBeNull();
     expect(screen.getAllByText('[REDACTED]').length).toBeGreaterThan(0);
@@ -216,5 +218,34 @@ describe('AdminMonitoringPage', () => {
         }),
       ),
     );
+  });
+
+  it('shows endpoint diagnostics and retry when alerts fail to load', async () => {
+    list.mockRejectedValueOnce({
+      response: { status: 403, data: { message: 'Forbidden' } },
+    });
+
+    render(<AdminMonitoringPage />);
+
+    expect(await screen.findByText('Operational alerts did not load.')).toBeTruthy();
+    expect(screen.getByText('Forbidden')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Request: /admin/alerts | Status: 403 | Required permission: alerts.read',
+      ),
+    ).toBeTruthy();
+
+    list.mockResolvedValueOnce({
+      data: {
+        data: {
+          items: [alert],
+          nextCursor: null,
+        },
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
   });
 });

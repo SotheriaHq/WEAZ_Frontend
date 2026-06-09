@@ -22,6 +22,12 @@ type AlertFilters = {
   search: string;
 };
 
+type MonitoringLoadError = {
+  message: string;
+  endpoint: string;
+  status: string;
+};
+
 const defaultSummary: AdminOperationalAlertSummary = {
   open: 0,
   acknowledged: 0,
@@ -82,6 +88,21 @@ const statusOptions = [
   { value: 'IGNORED', label: 'Ignored' },
 ];
 
+const monitoringGuide = [
+  {
+    title: 'Open',
+    body: 'Needs admin review. Select the alert, inspect redacted metadata, then acknowledge, resolve, or ignore it.',
+  },
+  {
+    title: 'Critical',
+    body: 'Payment, upload, auth, or system events that can block users or money movement.',
+  },
+  {
+    title: 'Redacted metadata',
+    body: 'Secrets, tokens, signatures, raw payloads, and card-like fields are hidden before display.',
+  },
+];
+
 const formatTime = (value?: string | null) => {
   if (!value) return 'Not recorded';
   const date = new Date(value);
@@ -118,6 +139,24 @@ const metadataEntries = (metadata?: Record<string, unknown> | null) => {
   }));
 };
 
+const getApiErrorMessage = (err: any, fallback: string) => {
+  const message = err?.response?.data?.message ?? err?.message;
+  if (Array.isArray(message)) return message.join(', ');
+  return message || fallback;
+};
+
+const wrapEndpointFailure = async <T,>(
+  endpoint: string,
+  request: () => Promise<T>,
+): Promise<T> => {
+  try {
+    return await request();
+  } catch (error: any) {
+    error.__threadlyMonitoringEndpoint = endpoint;
+    throw error;
+  }
+};
+
 const AdminMonitoringPage: React.FC = () => {
   const { hasPermission } = useAdminPermissions();
   const canRead = hasPermission('ALERTS_READ');
@@ -135,7 +174,7 @@ const AdminMonitoringPage: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<MonitoringLoadError | null>(null);
 
   const queryParams = useMemo(() => {
     const params: Record<string, string> = { limit: '50' };
@@ -154,8 +193,12 @@ const AdminMonitoringPage: React.FC = () => {
     setError(null);
     try {
       const [summaryResponse, alertsResponse] = await Promise.all([
-        adminAlertsApi.summary(),
-        adminAlertsApi.list(queryParams),
+        wrapEndpointFailure('/admin/alerts/summary', () =>
+          adminAlertsApi.summary(),
+        ),
+        wrapEndpointFailure('/admin/alerts', () =>
+          adminAlertsApi.list(queryParams),
+        ),
       ]);
       const summaryPayload = unwrapApiResponse<AdminOperationalAlertSummary>(
         summaryResponse.data as any,
@@ -166,11 +209,37 @@ const AdminMonitoringPage: React.FC = () => {
       setSummary(summaryPayload ?? defaultSummary);
       setAlerts(alertsPayload?.items ?? []);
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to load operational alerts.');
+      setError({
+        message: getApiErrorMessage(
+          err,
+          'Failed to load operational alerts.',
+        ),
+        endpoint:
+          err?.__threadlyMonitoringEndpoint ??
+          '/admin/alerts or /admin/alerts/summary',
+        status: err?.response?.status ? String(err.response.status) : 'n/a',
+      });
     } finally {
       setLoading(false);
     }
   }, [canRead, queryParams]);
+
+  const hasActiveFilters =
+    filters.severity !== 'ALL' ||
+    filters.category !== 'ALL' ||
+    filters.status !== 'OPEN' ||
+    Boolean(filters.from || filters.to || filters.search.trim());
+
+  const clearFilters = () => {
+    setFilters({
+      severity: 'ALL',
+      category: 'ALL',
+      status: 'OPEN',
+      from: '',
+      to: '',
+      search: '',
+    });
+  };
 
   useEffect(() => {
     void loadAlerts();
@@ -238,7 +307,7 @@ const AdminMonitoringPage: React.FC = () => {
               Operational Alerts
             </h1>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Monitor critical payment, upload, security, ranking, and system events with redacted details.
+              Monitor critical payment, upload, security, auth, ranking, and system events with redacted details. Data loads from /admin/alerts/summary and /admin/alerts.
             </p>
           </div>
           <button
@@ -250,6 +319,22 @@ const AdminMonitoringPage: React.FC = () => {
           </button>
         </div>
       </header>
+
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {monitoringGuide.map((item) => (
+          <div
+            key={item.title}
+            className="rounded-xl border border-slate-200/70 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.04]"
+          >
+            <p className="text-sm font-bold text-slate-950 dark:text-white">
+              {item.title}
+            </p>
+            <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+              {item.body}
+            </p>
+          </div>
+        ))}
+      </section>
 
       <section className="grid grid-cols-1 gap-3 md:grid-cols-5">
         {summaryCards.map((card) => (
@@ -320,7 +405,22 @@ const AdminMonitoringPage: React.FC = () => {
 
       {error && (
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300">
-          {error}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="font-bold">Operational alerts did not load.</p>
+              <p className="mt-1">{error.message}</p>
+              <p className="mt-2 text-xs">
+                Request: {error.endpoint} | Status: {error.status} | Required permission: alerts.read
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadAlerts()}
+              className="rounded-full border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 dark:border-rose-300/30 dark:bg-transparent dark:text-rose-200 dark:hover:bg-rose-500/10"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       )}
 
@@ -336,8 +436,17 @@ const AdminMonitoringPage: React.FC = () => {
               ))}
             </div>
           ) : alerts.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">
-              No alerts match the current filters.
+            <div className="space-y-3 p-8 text-center text-sm text-slate-500 dark:text-slate-400">
+              <p>No alerts match the current filters.</p>
+              {hasActiveFilters ? (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
+                >
+                  Clear filters
+                </button>
+              ) : null}
             </div>
           ) : (
             <div className="max-h-[62vh] overflow-y-auto">
@@ -435,6 +544,10 @@ const AdminMonitoringPage: React.FC = () => {
                     ))
                   )}
                 </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                Next step: use the category, event, entity, and correlation ID to inspect the owning backend flow. Resolve only after the underlying issue is confirmed fixed.
               </div>
 
               {canManage && (

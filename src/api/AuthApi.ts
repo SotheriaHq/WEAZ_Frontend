@@ -164,6 +164,11 @@ export class AuthApi {
     return unwrapMessageResponse(response.data);
   }
 
+  static async resendVerificationEmail(): Promise<MessageResponse> {
+    const response = await apiClient.post('/auth/verify-email/resend');
+    return unwrapMessageResponse(response.data);
+  }
+
   static async listSecuritySessions(): Promise<any[]> {
     const response = await apiClient.get('/auth/security/sessions');
     return unwrapApiResponse<any[]>(response.data as ApiSuccessPayload<any[]>);
