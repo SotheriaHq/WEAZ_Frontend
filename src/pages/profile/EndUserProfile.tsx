@@ -8,6 +8,7 @@ import { SavedTab } from './tabs/SavedTab';
 import { PatchesTab } from './tabs/PatchesTab';
 import { OrdersPanel, type OrdersPanelSelection } from './tabs/OrdersPanel';
 import { apiClient } from '@/api/httpClient';
+import { ProfilePhotoViewApi } from '@/api/ProfilePhotoViewApi';
 import type { AppDispatch, RootState } from '@/store';
 import { setUser } from '@/features/userSlice';
 import { EndUserQuickEditModal } from './EndUserQuickEditModal';
@@ -22,7 +23,9 @@ import { buildProfileUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomOrderApi';
 import { deriveSizeRecommendation, DISPLAY_CHART_OPTIONS } from '@/lib/sizeCharts';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import ProfileImageModal from '@/components/profile/ProfileImageModal';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
+import type { ProfilePhotoViewState } from '@/types/profilePhoto';
 import {
   fetchDisplayChartPreferenceQuery,
   fetchMySizeFitProfileQuery,
@@ -56,6 +59,8 @@ interface UserProfile {
   address?: string;
   profileVisibility: 'UNLOCKED' | 'LOCKED';
   location?: string;
+  profilePhotoUpdatedAt?: string | null;
+  profilePhotoViewState?: ProfilePhotoViewState | null;
   createdAt?: string;
 }
 
@@ -76,6 +81,8 @@ const normalizeProfile = (raw: any): UserProfile | null => {
     address: source.address ?? undefined,
     location: source.location ?? source.address ?? undefined,
     profileVisibility: source.profileVisibility === 'LOCKED' ? 'LOCKED' : 'UNLOCKED',
+    profilePhotoUpdatedAt: source.profilePhotoUpdatedAt ?? null,
+    profilePhotoViewState: source.profilePhotoViewState ?? null,
     createdAt: typeof source.createdAt === 'string' ? source.createdAt : undefined,
   };
 };
@@ -138,6 +145,7 @@ export const EndUserProfile: React.FC = () => {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [avatarActionsOpen, setAvatarActionsOpen] = useState(false);
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const avatarActionsRef = useRef<HTMLDivElement | null>(null);
 
@@ -206,6 +214,8 @@ export const EndUserProfile: React.FC = () => {
             bannerImage: currentUser.bannerImage ?? undefined,
             address: currentUser.address ?? undefined,
             location: currentUser.address ?? undefined,
+            profilePhotoUpdatedAt: currentUser.profilePhotoUpdatedAt ?? null,
+            profilePhotoViewState: null,
             profileVisibility:
               (currentUser as any).profileVisibility === 'LOCKED' ? 'LOCKED' : 'UNLOCKED',
             createdAt: currentUser.createdAt,
@@ -570,6 +580,7 @@ export const EndUserProfile: React.FC = () => {
         const uploaded = response.data?.data ?? response.data;
         const nextImage = uploaded?.url ?? null;
         const nextImageId = uploaded?.id ?? null;
+        const nextProfilePhotoUpdatedAt = new Date().toISOString();
 
         setProfile((prev) =>
           prev
@@ -577,6 +588,8 @@ export const EndUserProfile: React.FC = () => {
                 ...prev,
                 profileImage: nextImage ?? undefined,
                 profileImageId: nextImageId,
+                profilePhotoUpdatedAt: nextProfilePhotoUpdatedAt,
+                profilePhotoViewState: null,
                 profileImageFile: nextImage
                   ? {
                       id: nextImageId,
@@ -596,6 +609,7 @@ export const EndUserProfile: React.FC = () => {
             ...currentUser,
             profileImage: nextImage,
             profileImageId: nextImageId,
+            profilePhotoUpdatedAt: nextProfilePhotoUpdatedAt,
             profileImageFile: nextImage
               ? {
                   id: nextImageId,
@@ -612,6 +626,7 @@ export const EndUserProfile: React.FC = () => {
           ...(current ?? currentUser),
           profileImage: nextImage,
           profileImageId: nextImageId,
+          profilePhotoUpdatedAt: nextProfilePhotoUpdatedAt,
           profileImageFile: nextImage
             ? {
                 id: nextImageId,
@@ -656,6 +671,8 @@ export const EndUserProfile: React.FC = () => {
               ...prev,
               profileImage: undefined,
               profileImageId: null,
+              profilePhotoUpdatedAt: null,
+              profilePhotoViewState: null,
               profileImageFile: null,
             }
           : prev,
@@ -671,6 +688,7 @@ export const EndUserProfile: React.FC = () => {
           ...currentUser,
           profileImage: null,
           profileImageId: null,
+          profilePhotoUpdatedAt: null,
           profileImageFile: null,
         }),
       );
@@ -678,6 +696,7 @@ export const EndUserProfile: React.FC = () => {
         ...(current ?? currentUser),
         profileImage: null,
         profileImageId: null,
+        profilePhotoUpdatedAt: null,
         profileImageFile: null,
       }));
 
@@ -700,6 +719,43 @@ export const EndUserProfile: React.FC = () => {
 
     setAvatarActionsOpen((current) => !current);
   }, [avatarUploading, handleTriggerAvatarUpload, hasAvatarImage]);
+
+  const handleViewAvatar = useCallback(() => {
+    if (!profile || !hasAvatarImage) return;
+
+    setIsAvatarModalOpen(true);
+
+    const currentState = profile.profilePhotoViewState;
+    if (!currentUser || !currentState?.canMarkViewed) return;
+
+    void ProfilePhotoViewApi.markViewed(profile.id)
+      .then((nextState) => {
+        setProfile((current) =>
+          current
+            ? {
+                ...current,
+                profilePhotoUpdatedAt: nextState.profilePhotoUpdatedAt,
+                profilePhotoViewState: nextState,
+              }
+            : current,
+        );
+        const key = isOwner
+          ? queryKeys.user.meProfile(profile.id)
+          : queryKeys.user.publicProfile(profile.id);
+        queryClient.setQueryData(key, (current: any) =>
+          current
+            ? {
+                ...current,
+                profilePhotoUpdatedAt: nextState.profilePhotoUpdatedAt,
+                profilePhotoViewState: nextState,
+              }
+            : current,
+        );
+      })
+      .catch((error) => {
+        console.error('Failed to mark profile photo viewed', error);
+      });
+  }, [currentUser, hasAvatarImage, isOwner, profile, queryClient]);
 
   if (loading) {
     return (
@@ -762,6 +818,12 @@ export const EndUserProfile: React.FC = () => {
       : (profile.profileImageFile ?? (isOwner ? currentUser?.profileImageFile : null) ?? null),
   });
   const avatarFallback = getAvatarFallback(fullName, profile.username);
+  const avatarRingClass =
+    hasAvatarImage && profile.profilePhotoViewState?.profilePhotoUpdatedAt
+      ? profile.profilePhotoViewState.hasUnviewedUpdate
+        ? 'profile-photo-ring-new'
+        : 'profile-photo-ring-viewed'
+      : 'border-gray-200 shadow-sm dark:border-white/10';
   const alphaFitLabel = describeAlphaFit(computedAlphaSize);
   const profileActions: ProfileAction[] = [
     {
@@ -823,7 +885,16 @@ export const EndUserProfile: React.FC = () => {
           <div className="flex items-start gap-4 sm:gap-6">
             {/* Avatar */}
             <div className="relative shrink-0">
-              <div className="relative h-32 w-32 overflow-hidden rounded-xl sm:h-44 sm:w-44">
+              <div
+                className={`relative h-32 w-32 overflow-hidden rounded-xl border-2 p-0.5 transition-colors duration-300 sm:h-44 sm:w-44 ${avatarRingClass}`}
+              >
+                <button
+                  type="button"
+                  className="relative h-full w-full overflow-hidden rounded-[0.65rem] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] disabled:cursor-default"
+                  onClick={handleViewAvatar}
+                  disabled={!hasAvatarImage}
+                  aria-label="View profile photo"
+                >
                 <ImageWithFallback
                   src={avatar.src}
                   fileId={avatar.fileId}
@@ -835,6 +906,7 @@ export const EndUserProfile: React.FC = () => {
                   className="h-full w-full rounded-[inherit] object-cover"
                   maxHeightClassName="max-h-full"
                 />
+                </button>
                 {avatarUploading && (
                   <div className="absolute inset-0 flex items-center justify-center rounded-[inherit] bg-black/55">
                     <div className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-slate-900">
@@ -866,12 +938,12 @@ export const EndUserProfile: React.FC = () => {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -8, scale: 0.98 }}
                         transition={{ duration: 0.16 }}
-                        className="absolute right-0 top-full mt-2 w-44 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950"
+                        className="glass-menu absolute right-0 top-full mt-2 w-44 overflow-hidden p-1"
                       >
                         <button
                           type="button"
                           onClick={handleTriggerAvatarUpload}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-gray-800 transition hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-white/5"
+                          className="menu-item-interactive flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium"
                         >
                           <span aria-hidden="true">📷</span>
                           Change photo
@@ -880,7 +952,7 @@ export const EndUserProfile: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => void handleRemoveAvatar()}
-                            className="flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2 text-left text-sm font-medium text-rose-600 transition hover:bg-rose-50 dark:border-white/5 dark:hover:bg-rose-500/10"
+                            className="menu-item-danger mt-1 flex w-full items-center gap-2 rounded-xl border-t border-[color:var(--border-default)] px-3 py-2 text-left text-sm font-medium"
                           >
                             <span aria-hidden="true">🗑️</span>
                             Remove photo
@@ -1149,6 +1221,14 @@ export const EndUserProfile: React.FC = () => {
         profileUrl={profileUrl}
         logoUrl={profile.profileImage}
         username={profile.username}
+      />
+
+      <ProfileImageModal
+        open={isAvatarModalOpen && Boolean(avatar.src ?? avatar.fileId)}
+        src={avatar.src}
+        fileId={avatar.fileId}
+        alt={fullName}
+        onClose={() => setIsAvatarModalOpen(false)}
       />
 
       {isReminderDialogOpen ? (

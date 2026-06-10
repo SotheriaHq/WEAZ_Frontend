@@ -106,9 +106,62 @@ type SizeExtraYardFormState = {
   extraYards: string;
 };
 
-type FieldErrors = {
-  rushFee?: string;
-  rushProductionLeadDays?: string;
+type FieldErrors = Partial<Record<
+  | 'buyerInstructionText'
+  | 'requiredMeasurementKeys'
+  | 'fabricRuleBasisId'
+  | 'baseProductionCharge'
+  | 'fabricCostPerYard'
+  | 'productionLeadDays'
+  | 'deliveryMinDays'
+  | 'deliveryMaxDays'
+  | 'revisionPolicy'
+  | 'returnPolicy'
+  | 'defectPolicy'
+  | 'rushFee'
+  | 'rushProductionLeadDays',
+  string
+>>;
+
+const REQUIRED_FIELDS_SUMMARY = 'Some required fields need attention.';
+const MEASUREMENT_REGISTRY_EMPTY_MESSAGE =
+  'No measurement points are available. Run the measurement registry seed or contact an admin.';
+const MEASUREMENT_REGISTRY_LOAD_ERROR_MESSAGE =
+  'Measurement points could not load. Try again or contact an admin.';
+
+const FIELD_ERROR_FOCUS_ORDER: Array<keyof FieldErrors> = [
+  'buyerInstructionText',
+  'baseProductionCharge',
+  'fabricCostPerYard',
+  'productionLeadDays',
+  'deliveryMinDays',
+  'deliveryMaxDays',
+  'requiredMeasurementKeys',
+  'fabricRuleBasisId',
+  'rushFee',
+  'rushProductionLeadDays',
+  'revisionPolicy',
+  'returnPolicy',
+  'defectPolicy',
+];
+
+const FIELD_ERRORS_BY_FORM_KEY: Partial<
+  Record<keyof ConfigurationFormState, Array<keyof FieldErrors>>
+> = {
+  buyerInstructionText: ['buyerInstructionText'],
+  requiredMeasurementKeys: ['requiredMeasurementKeys', 'fabricRuleBasisId'],
+  fabricRuleBasisId: ['fabricRuleBasisId'],
+  baseProductionCharge: ['baseProductionCharge'],
+  fabricCostPerYard: ['fabricCostPerYard'],
+  productionLeadDays: ['productionLeadDays', 'rushProductionLeadDays'],
+  deliveryMinDays: ['deliveryMinDays'],
+  deliveryMaxDays: ['deliveryMaxDays'],
+  revisionPolicy: ['revisionPolicy'],
+  returnPolicy: ['returnPolicy'],
+  defectPolicy: ['defectPolicy'],
+  rushFee: ['rushFee'],
+  rushProductionLeadDays: ['rushProductionLeadDays'],
+  rushEnabled: ['rushFee', 'rushProductionLeadDays'],
 };
 
 const createRuleId = () =>
@@ -373,6 +426,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const containerRef = useRef<HTMLElement | null>(null);
+  const fieldErrorRefs = useRef<Partial<Record<keyof FieldErrors, HTMLElement | null>>>({});
   const seededMeasurementKeysSignatureRef = useRef<string>('');
 
   const normalizedDefaultBaseCharge = useMemo(() => {
@@ -397,7 +451,11 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     () => (measurementGender && measurementGender !== 'UNISEX' ? { gender: measurementGender } : undefined),
     [measurementGender],
   );
-  const { points: measurementPoints } = useMeasurementPoints(measurementFilter);
+  const {
+    points: measurementPoints,
+    isLoading: isMeasurementPointsLoading,
+    error: measurementPointsError,
+  } = useMeasurementPoints(measurementFilter);
   const normalizedMeasurementKeys = useMemo(
     () => normalizeMeasurementKeyList(measurementKeys),
     [measurementKeys],
@@ -429,6 +487,34 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
 
       return changed ? next : current;
     });
+  }, []);
+
+  const registerFieldErrorRef = useCallback(
+    (key: keyof FieldErrors) => (node: HTMLElement | null) => {
+      fieldErrorRefs.current[key] = node;
+    },
+    [],
+  );
+
+  const focusFirstFieldError = useCallback((errors?: FieldErrors) => {
+    const firstErrorKey = FIELD_ERROR_FOCUS_ORDER.find((key) =>
+      Boolean(errors?.[key]),
+    );
+    const target = firstErrorKey
+      ? fieldErrorRefs.current[firstErrorKey]
+      : containerRef.current;
+
+    window.setTimeout(() => {
+      if (!target) {
+        return;
+      }
+      if (typeof target.scrollIntoView === 'function') {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      if (typeof target.focus === 'function') {
+        target.focus({ preventScroll: true });
+      }
+    }, 0);
   }, []);
 
   useEffect(() => {
@@ -873,13 +959,11 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
 
   const updateForm = <K extends keyof ConfigurationFormState>(key: K, value: ConfigurationFormState[K]) => {
     setValidationMessage(null);
-    if (key === 'rushFee') {
-      clearFieldErrors(['rushFee']);
-    } else if (key === 'rushProductionLeadDays') {
-      clearFieldErrors(['rushProductionLeadDays']);
-    } else if (key === 'rushEnabled') {
-      clearFieldErrors(['rushFee', 'rushProductionLeadDays']);
-    } else if (key === 'productionLeadDays') {
+    const errorsToClear = FIELD_ERRORS_BY_FORM_KEY[key];
+    if (errorsToClear?.length) {
+      clearFieldErrors(errorsToClear);
+    }
+    if (key === 'productionLeadDays') {
       setHasEditedProductionLeadDays(true);
     }
     setForm((current) => ({ ...current, [key]: value }));
@@ -921,9 +1005,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     ) => {
       setValidationMessage(options?.showBanner === false ? null : message);
       setFieldErrors(errors ?? {});
-      if (typeof containerRef.current?.scrollIntoView === 'function') {
-        containerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      focusFirstFieldError(errors);
       toast.error(message);
       return null;
     };
@@ -1007,37 +1089,51 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       return failDraftValidation('Each size extra-yard value must be zero or greater.');
     }
 
-    const missingRequiredFields: string[] = [];
-    if (!payload.baseProductionCharge)
-      missingRequiredFields.push('Base production charge');
-    if (!payload.fabricCostPerYard)
-      missingRequiredFields.push('Fabric cost per yard');
-    if (showFabricRules && !payload.fabricRuleBasisId)
-      missingRequiredFields.push('Fabric-rule basis');
-    if (!payload.revisionPolicy) missingRequiredFields.push('Revision policy');
-    if (!payload.returnPolicy) missingRequiredFields.push('Return policy');
-    if (!payload.defectPolicy) missingRequiredFields.push('Defect policy');
-    if (payload.requiredMeasurementKeys.length === 0)
-      missingRequiredFields.push('Required measurement keys');
+    const missingFieldErrors: FieldErrors = {};
+    if (!payload.baseProductionCharge) {
+      missingFieldErrors.baseProductionCharge = 'Enter the base production charge.';
+    }
+    if (!payload.fabricCostPerYard) {
+      missingFieldErrors.fabricCostPerYard = 'Enter the material cost per yard.';
+    }
+    if (!form.productionLeadDays.trim()) {
+      missingFieldErrors.productionLeadDays = 'Enter the production timeline in days.';
+    }
+    if (!form.deliveryMinDays.trim()) {
+      missingFieldErrors.deliveryMinDays = 'Enter the minimum delivery days.';
+    }
+    if (!form.deliveryMaxDays.trim()) {
+      missingFieldErrors.deliveryMaxDays = 'Enter the maximum delivery days.';
+    }
+    if (payload.requiredMeasurementKeys.length === 0) {
+      missingFieldErrors.requiredMeasurementKeys =
+        'Select at least one required measurement point for custom orders.';
+    }
+    if (showFabricRules && !payload.fabricRuleBasisId) {
+      missingFieldErrors.fabricRuleBasisId =
+        'Select or create the fabric basis for this custom order.';
+    }
+    if (!payload.revisionPolicy) {
+      missingFieldErrors.revisionPolicy = 'Add the revision policy.';
+    }
+    if (!payload.returnPolicy) {
+      missingFieldErrors.returnPolicy = 'Add the return policy.';
+    }
+    if (!payload.defectPolicy) {
+      missingFieldErrors.defectPolicy = 'Add the defect policy.';
+    }
     if (form.rushEnabled) {
-      if (!form.rushFee.trim()) missingRequiredFields.push('Rush fee');
-      if (!form.rushProductionLeadDays.trim())
-        missingRequiredFields.push('Rush production lead days');
+      if (!form.rushFee.trim()) {
+        missingFieldErrors.rushFee = 'Rush fee is required.';
+      }
+      if (!form.rushProductionLeadDays.trim()) {
+        missingFieldErrors.rushProductionLeadDays =
+          'Rush production lead days are required.';
+      }
     }
 
-    if (missingRequiredFields.length > 0) {
-      const rushErrors: FieldErrors = {};
-      if (form.rushEnabled && !form.rushFee.trim()) {
-        rushErrors.rushFee = 'Rush fee is required.';
-      }
-      if (form.rushEnabled && !form.rushProductionLeadDays.trim()) {
-        rushErrors.rushProductionLeadDays = 'Rush production lead days are required.';
-      }
-
-      return failDraftValidation(
-        `Complete required fields: ${missingRequiredFields.join(', ')}`,
-        rushErrors,
-      );
+    if (Object.keys(missingFieldErrors).length > 0) {
+      return failDraftValidation(REQUIRED_FIELDS_SUMMARY, missingFieldErrors);
     }
 
     if (form.rushEnabled) {
@@ -1100,6 +1196,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   }, [
     averageBaseYards,
     brandId,
+    focusFirstFieldError,
     measurementPointByKey,
     form,
     showFabricRules,
@@ -1173,7 +1270,6 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     }
   }, [
     buildConfigurationDraft,
-    bases,
     configuration,
     measurementGender,
     sourceTitle,
@@ -1186,6 +1282,20 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       handleSaveConfiguration(options),
     buildConfigurationDraft: () => buildConfigurationDraft(),
   }), [buildConfigurationDraft, handleSaveConfiguration]);
+
+  const getFieldErrorId = (key: keyof FieldErrors) =>
+    `custom-order-${key}-error`;
+  const getFieldInputClassName = (key: keyof FieldErrors) =>
+    `${fieldClassName} ${fieldErrors[key] ? 'border-rose-400 focus:border-rose-500 dark:border-rose-500/50' : ''}`;
+  const renderFieldError = (key: keyof FieldErrors) =>
+    fieldErrors[key] ? (
+      <p
+        id={getFieldErrorId(key)}
+        className="mt-1 text-[11px] font-medium text-rose-600 dark:text-rose-300"
+      >
+        {fieldErrors[key]}
+      </p>
+    ) : null;
 
   return (
     <section
@@ -1216,17 +1326,34 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       {loading ? <div className="mt-5 text-sm text-slate-500 dark:text-slate-400">Loading configuration workspace...</div> : null}
 
       {/* Buyer instructions — full row */}
-      <label className="block">
+      <label
+        ref={registerFieldErrorRef('buyerInstructionText')}
+        tabIndex={-1}
+        className="block"
+      >
         <span className={requiredFieldLabelClassName}>
           Buyer instructions
           <span className={infoBadgeClassName} title="Optional guidance shown to buyers before they submit measurements.">i</span>
         </span>
-        <textarea value={form.buyerInstructionText} onChange={(event) => updateForm('buyerInstructionText', event.target.value)} disabled={disabled} rows={1} className={fieldClassName} />
+        <textarea
+          value={form.buyerInstructionText}
+          onChange={(event) => updateForm('buyerInstructionText', event.target.value)}
+          disabled={disabled}
+          rows={1}
+          aria-invalid={Boolean(fieldErrors.buyerInstructionText)}
+          aria-describedby={fieldErrors.buyerInstructionText ? getFieldErrorId('buyerInstructionText') : undefined}
+          className={getFieldInputClassName('buyerInstructionText')}
+        />
+        {renderFieldError('buyerInstructionText')}
       </label>
 
       {/* Charges row — two equal columns */}
       <div className="mt-2 grid grid-cols-2 gap-2">
-        <label className="block">
+        <label
+          ref={registerFieldErrorRef('baseProductionCharge')}
+          tabIndex={-1}
+          className="block"
+        >
           <span className={requiredFieldLabelClassName}>
             Base charge <span className="text-rose-500">*</span>
             <span className={infoBadgeClassName} title="Labor and production-only cost, excluding fabric yard cost.">i</span>
@@ -1238,9 +1365,12 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               updateForm('baseProductionCharge', event.target.value);
             }}
             disabled={disabled}
-            className={fieldClassName}
+            aria-invalid={Boolean(fieldErrors.baseProductionCharge)}
+            aria-describedby={fieldErrors.baseProductionCharge ? getFieldErrorId('baseProductionCharge') : undefined}
+            className={getFieldInputClassName('baseProductionCharge')}
             placeholder="120000"
           />
+          {renderFieldError('baseProductionCharge')}
           {hasEditedBaseCharge &&
             normalizedDefaultBaseCharge &&
             form.baseProductionCharge.trim() !== normalizedDefaultBaseCharge && (
@@ -1250,42 +1380,94 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               </p>
             )}
         </label>
-        <label className="block">
+        <label
+          ref={registerFieldErrorRef('fabricCostPerYard')}
+          tabIndex={-1}
+          className="block"
+        >
           <span className={requiredFieldLabelClassName}>
             Material cost per yard <span className="text-rose-500">*</span>
             <span className={infoBadgeClassName} title="Estimated material cost used when pricing custom orders.">i</span>
           </span>
-          <input value={form.fabricCostPerYard} onChange={(event) => updateForm('fabricCostPerYard', event.target.value)} disabled={disabled} className={fieldClassName} placeholder="10000" />
+          <input
+            value={form.fabricCostPerYard}
+            onChange={(event) => updateForm('fabricCostPerYard', event.target.value)}
+            disabled={disabled}
+            aria-invalid={Boolean(fieldErrors.fabricCostPerYard)}
+            aria-describedby={fieldErrors.fabricCostPerYard ? getFieldErrorId('fabricCostPerYard') : undefined}
+            className={getFieldInputClassName('fabricCostPerYard')}
+            placeholder="10000"
+          />
+          {renderFieldError('fabricCostPerYard')}
         </label>
       </div>
 
       {/* Days row — three compact columns */}
       <div className="mt-2 grid grid-cols-3 gap-2">
-        <label className="block">
+        <label
+          ref={registerFieldErrorRef('productionLeadDays')}
+          tabIndex={-1}
+          className="block"
+        >
           <span className={requiredFieldLabelClassName}>
             Lead days <span className="text-rose-500">*</span>
             <span className={infoBadgeClassName} title="Production days before dispatch.">i</span>
           </span>
-          <input value={form.productionLeadDays} onChange={(event) => updateForm('productionLeadDays', event.target.value)} disabled={disabled} className={fieldClassName} placeholder="7" />
+          <input
+            value={form.productionLeadDays}
+            onChange={(event) => updateForm('productionLeadDays', event.target.value)}
+            disabled={disabled}
+            aria-invalid={Boolean(fieldErrors.productionLeadDays)}
+            aria-describedby={fieldErrors.productionLeadDays ? getFieldErrorId('productionLeadDays') : undefined}
+            className={getFieldInputClassName('productionLeadDays')}
+            placeholder="7"
+          />
+          {renderFieldError('productionLeadDays')}
           {normalizedDefaultProductionLeadDays ? (
             <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
               Default from store setup{defaultProductionLeadLabel ? `: ${defaultProductionLeadLabel}` : ''}. You can override for this item.
             </p>
           ) : null}
         </label>
-        <label className="block">
+        <label
+          ref={registerFieldErrorRef('deliveryMinDays')}
+          tabIndex={-1}
+          className="block"
+        >
           <span className={requiredFieldLabelClassName}>
             Min delivery <span className="text-rose-500">*</span>
             <span className={infoBadgeClassName} title="Fastest delivery target after dispatch.">i</span>
           </span>
-          <input value={form.deliveryMinDays} onChange={(event) => updateForm('deliveryMinDays', event.target.value)} disabled={disabled} className={fieldClassName} placeholder="3" />
+          <input
+            value={form.deliveryMinDays}
+            onChange={(event) => updateForm('deliveryMinDays', event.target.value)}
+            disabled={disabled}
+            aria-invalid={Boolean(fieldErrors.deliveryMinDays)}
+            aria-describedby={fieldErrors.deliveryMinDays ? getFieldErrorId('deliveryMinDays') : undefined}
+            className={getFieldInputClassName('deliveryMinDays')}
+            placeholder="3"
+          />
+          {renderFieldError('deliveryMinDays')}
         </label>
-        <label className="block">
+        <label
+          ref={registerFieldErrorRef('deliveryMaxDays')}
+          tabIndex={-1}
+          className="block"
+        >
           <span className={requiredFieldLabelClassName}>
             Max delivery <span className="text-rose-500">*</span>
             <span className={infoBadgeClassName} title="Latest delivery target after dispatch.">i</span>
           </span>
-          <input value={form.deliveryMaxDays} onChange={(event) => updateForm('deliveryMaxDays', event.target.value)} disabled={disabled} className={fieldClassName} placeholder="7" />
+          <input
+            value={form.deliveryMaxDays}
+            onChange={(event) => updateForm('deliveryMaxDays', event.target.value)}
+            disabled={disabled}
+            aria-invalid={Boolean(fieldErrors.deliveryMaxDays)}
+            aria-describedby={fieldErrors.deliveryMaxDays ? getFieldErrorId('deliveryMaxDays') : undefined}
+            className={getFieldInputClassName('deliveryMaxDays')}
+            placeholder="7"
+          />
+          {renderFieldError('deliveryMaxDays')}
         </label>
       </div>
 
@@ -1293,14 +1475,21 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         Fields marked <span className="text-rose-500 font-semibold">*</span> are required. Hover <span className={infoBadgeClassName}>i</span> for details.
       </p>
 
-      <div className="mt-4 rounded-2xl border border-black/10 p-3 dark:border-white/10">
+      <div
+        ref={registerFieldErrorRef('requiredMeasurementKeys')}
+        tabIndex={-1}
+        aria-invalid={Boolean(fieldErrors.requiredMeasurementKeys)}
+        aria-describedby={fieldErrors.requiredMeasurementKeys ? getFieldErrorId('requiredMeasurementKeys') : undefined}
+        className={`mt-4 rounded-2xl border p-3 ${fieldErrors.requiredMeasurementKeys ? 'border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-black/10 dark:border-white/10'}`}
+      >
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-          Measurement keys and fabric basis <span className="text-rose-500">*</span>
+          Measurement points <span className="text-rose-500">*</span>
           <span className={infoBadgeClassName} title="This defines which buyer measurements are mandatory and which sizing basis this yard-rule setup belongs to.">i</span>
         </div>
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          Choose what is in use now and what is left in the pool.
+          Select the measurements buyers must provide for this custom order.
         </p>
+        {renderFieldError('requiredMeasurementKeys')}
         {/* Selected keys */}
         <div className="mt-3">
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -1314,7 +1503,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           <div className="mt-2 min-h-[2.5rem] rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-2 dark:border-emerald-300/20 dark:bg-emerald-400/10">
             {selectedMeasurementKeys.length === 0 ? (
               <div className="text-xs text-slate-500 dark:text-slate-400">
-                Select measurement points below to build this basis.
+                Select measurement points below to build this custom order.
               </div>
             ) : (
               <div className="flex flex-wrap gap-1.5">
@@ -1365,9 +1554,13 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           <div className="flex flex-wrap gap-1.5">
           {selectableMeasurementKeys.length === 0 ? (
             <div className="text-xs text-slate-500 dark:text-slate-400">
-              {availableMeasurementKeys.length === 0
-                ? 'No measurement points are available yet. Add a missing key manually below.'
-                : 'All available measurement points are selected.'}
+              {isMeasurementPointsLoading
+                ? 'Loading measurement points...'
+                : measurementPointsError
+                  ? MEASUREMENT_REGISTRY_LOAD_ERROR_MESSAGE
+                  : availableMeasurementKeys.length === 0
+                    ? MEASUREMENT_REGISTRY_EMPTY_MESSAGE
+                    : 'All available measurement points are selected.'}
             </div>
           ) : (
             poolKeysVisible.map((key) => {
@@ -1408,7 +1601,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             onChange={(event) => setManualMeasurementKeyInput(event.target.value)}
             disabled={disabled}
             className={fieldClassName}
-            placeholder="Add missing measurement key (e.g. NECK_CIRCUMFERENCE)"
+            placeholder="Add missing measurement key"
           />
           <button
             type="button"
@@ -1443,8 +1636,14 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         </div>
 
         {showFabricRules ? (
-          <div className="mt-4 space-y-2">
-            <div className="grid gap-3">
+          <div
+            ref={registerFieldErrorRef('fabricRuleBasisId')}
+            tabIndex={-1}
+            className="mt-4 space-y-2"
+          >
+            <div
+              className={`grid gap-3 ${fieldErrors.fabricRuleBasisId ? 'rounded-xl border border-rose-300 bg-rose-50/40 p-3 dark:border-rose-500/40 dark:bg-rose-500/10' : ''}`}
+            >
               <UniversalSelect
                 value={form.fabricRuleBasisId}
                 onChange={(value) => updateForm('fabricRuleBasisId', String(value))}
@@ -1453,6 +1652,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                 disabled={disabled}
                 className="w-full"
               />
+              {renderFieldError('fabricRuleBasisId')}
               <div className="grid gap-3 md:grid-cols-[1fr_auto]">
                 <input
                   value={basisLabel}
@@ -1619,7 +1819,11 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           {/* ── Row 2: Rush fields (conditional) ── */}
           {form.rushEnabled ? (
             <div className="grid gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-800 dark:bg-emerald-950/20 sm:grid-cols-2">
-              <label className="space-y-1.5">
+              <label
+                ref={registerFieldErrorRef('rushFee')}
+                tabIndex={-1}
+                className="space-y-1.5"
+              >
                 <span className={requiredFieldLabelClassName}>
                   Rush fee <span className="text-rose-500">*</span>
                   <span className={infoBadgeClassName} title="Extra amount charged when the buyer selects rush production.">i</span>
@@ -1629,17 +1833,18 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                   onChange={(event) => updateForm('rushFee', event.target.value)}
                   disabled={disabled}
                   aria-invalid={Boolean(fieldErrors.rushFee)}
-                  className={`${fieldClassName} ${fieldErrors.rushFee ? 'border-rose-400 focus:border-rose-500 dark:border-rose-500/50' : ''}`}
+                  aria-describedby={fieldErrors.rushFee ? getFieldErrorId('rushFee') : undefined}
+                  className={getFieldInputClassName('rushFee')}
                   placeholder="e.g. 5000"
                   inputMode="decimal"
                 />
-                {fieldErrors.rushFee ? (
-                  <p className="text-[11px] font-medium text-rose-600 dark:text-rose-300">
-                    {fieldErrors.rushFee}
-                  </p>
-                ) : null}
+                {renderFieldError('rushFee')}
               </label>
-              <label className="space-y-1.5">
+              <label
+                ref={registerFieldErrorRef('rushProductionLeadDays')}
+                tabIndex={-1}
+                className="space-y-1.5"
+              >
                 <span className={requiredFieldLabelClassName}>
                   Rush lead days <span className="text-rose-500">*</span>
                   <span className={infoBadgeClassName} title="Must be shorter than the standard lead time and at least 5 days.">i</span>
@@ -1649,15 +1854,12 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                   onChange={(event) => updateForm('rushProductionLeadDays', event.target.value)}
                   disabled={disabled}
                   aria-invalid={Boolean(fieldErrors.rushProductionLeadDays)}
-                  className={`${fieldClassName} ${fieldErrors.rushProductionLeadDays ? 'border-rose-400 focus:border-rose-500 dark:border-rose-500/50' : ''}`}
+                  aria-describedby={fieldErrors.rushProductionLeadDays ? getFieldErrorId('rushProductionLeadDays') : undefined}
+                  className={getFieldInputClassName('rushProductionLeadDays')}
                   placeholder="e.g. 5"
                   inputMode="numeric"
                 />
-                {fieldErrors.rushProductionLeadDays ? (
-                  <p className="text-[11px] font-medium text-rose-600 dark:text-rose-300">
-                    {fieldErrors.rushProductionLeadDays}
-                  </p>
-                ) : null}
+                {renderFieldError('rushProductionLeadDays')}
               </label>
             </div>
           ) : null}
@@ -1665,7 +1867,11 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           {/* ── Row 3: Policy cards ── */}
           <div className="grid gap-3 sm:grid-cols-3">
             {/* Revision policy */}
-            <div className="space-y-1.5 rounded-xl border border-black/10 p-3 dark:border-white/10">
+            <div
+              ref={registerFieldErrorRef('revisionPolicy')}
+              tabIndex={-1}
+              className={`space-y-1.5 rounded-xl border p-3 ${fieldErrors.revisionPolicy ? 'border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-black/10 dark:border-white/10'}`}
+            >
               <span className={requiredFieldLabelClassName}>
                 Revision <span className="text-rose-500">*</span>
                 <span className={infoBadgeClassName} title="How many revisions the buyer gets and under what timeline.">i</span>
@@ -1687,13 +1893,20 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                 onChange={(event) => updateForm('revisionPolicy', event.target.value)}
                 disabled={disabled}
                 rows={2}
-                className={fieldClassName}
+                aria-invalid={Boolean(fieldErrors.revisionPolicy)}
+                aria-describedby={fieldErrors.revisionPolicy ? getFieldErrorId('revisionPolicy') : undefined}
+                className={getFieldInputClassName('revisionPolicy')}
                 placeholder="Revision policy details"
               />
+              {renderFieldError('revisionPolicy')}
             </div>
 
             {/* Return policy */}
-            <div className="space-y-1.5 rounded-xl border border-black/10 p-3 dark:border-white/10">
+            <div
+              ref={registerFieldErrorRef('returnPolicy')}
+              tabIndex={-1}
+              className={`space-y-1.5 rounded-xl border p-3 ${fieldErrors.returnPolicy ? 'border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-black/10 dark:border-white/10'}`}
+            >
               <span className={requiredFieldLabelClassName}>
                 Returns <span className="text-rose-500">*</span>
                 <span className={infoBadgeClassName} title="Return/refund expectations for custom orders.">i</span>
@@ -1715,13 +1928,20 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                 onChange={(event) => updateForm('returnPolicy', event.target.value)}
                 disabled={disabled}
                 rows={2}
-                className={fieldClassName}
+                aria-invalid={Boolean(fieldErrors.returnPolicy)}
+                aria-describedby={fieldErrors.returnPolicy ? getFieldErrorId('returnPolicy') : undefined}
+                className={getFieldInputClassName('returnPolicy')}
                 placeholder="Return policy details"
               />
+              {renderFieldError('returnPolicy')}
             </div>
 
             {/* Defect policy */}
-            <div className="space-y-1.5 rounded-xl border border-black/10 p-3 dark:border-white/10">
+            <div
+              ref={registerFieldErrorRef('defectPolicy')}
+              tabIndex={-1}
+              className={`space-y-1.5 rounded-xl border p-3 ${fieldErrors.defectPolicy ? 'border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-black/10 dark:border-white/10'}`}
+            >
               <span className={requiredFieldLabelClassName}>
                 Defects <span className="text-rose-500">*</span>
                 <span className={infoBadgeClassName} title="How defect reports are handled (repair/remake/refund flow).">i</span>
@@ -1743,9 +1963,12 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                 onChange={(event) => updateForm('defectPolicy', event.target.value)}
                 disabled={disabled}
                 rows={2}
-                className={fieldClassName}
+                aria-invalid={Boolean(fieldErrors.defectPolicy)}
+                aria-describedby={fieldErrors.defectPolicy ? getFieldErrorId('defectPolicy') : undefined}
+                className={getFieldInputClassName('defectPolicy')}
                 placeholder="Defect policy details"
               />
+              {renderFieldError('defectPolicy')}
             </div>
           </div>
 

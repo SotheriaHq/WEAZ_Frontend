@@ -28,6 +28,7 @@ const normalizeUser = (user: AuthUserDto): AuthUserDto => ({
   profileImage: user.profileImage ?? null,
   profileImageId: user.profileImageId ?? null,
   profileImageFile: user.profileImageFile ?? null,
+  profilePhotoUpdatedAt: user.profilePhotoUpdatedAt ?? null,
   bannerImage: user.bannerImage ?? null,
   bannerImageId: user.bannerImageId ?? null,
   bannerImageFile: user.bannerImageFile ?? null,

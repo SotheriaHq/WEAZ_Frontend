@@ -49,7 +49,7 @@ const variantStyles: Record<SelectVariant, string> = {
     border border-[color:var(--border-default)]
     rounded-md
     text-[color:var(--text-secondary)]
-    hover:bg-[color:var(--surface-muted)]
+    surface-interactive-hover
     focus:outline-none focus:ring-0 focus:border-transparent
     transition-colors duration-150
     cursor-pointer
@@ -190,7 +190,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                     onClick={() =>
                       !opt.disabled && handleSelect(`${opt.value}`)
                     }
-                    className={`${isActive ? "bg-[color:var(--brand-primary)]/10" : ""} ${opt.disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+                    className={opt.disabled ? "opacity-60 cursor-not-allowed" : ""}
                     selected={isActive}
                   >
                     {opt.label}

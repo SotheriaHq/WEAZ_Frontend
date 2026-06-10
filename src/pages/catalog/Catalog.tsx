@@ -14,6 +14,7 @@ import CollectionsSkeleton from '../../components/profile/CollectionsSkeleton';
 import EmptyState from '../../components/EmptyState';
 import AddCollectionDropdown from '../../components/profile/AddCollectionDropdown';
 import ProfileHeaderSkeleton from '../../components/profile/ProfileHeaderSkeleton';
+import ProfileImageModal from '../../components/profile/ProfileImageModal';
 import ReviewsTab from '../../components/profile/tabs/ReviewsTab';
 import AboutTab from '../../components/profile/tabs/AboutTab';
 import InlineCollectionViewer from '../../components/collections/InlineCollectionViewer';
@@ -21,6 +22,7 @@ import CatalogEntityCard from '../../components/profile/CatalogEntityCard';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { setUser } from '../../features/userSlice';
 import { brandApi } from '../../api/BrandApi';
+import { ProfilePhotoViewApi } from '@/api/ProfilePhotoViewApi';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
 import { finalizeCollectionUploads } from '@/api/collectionUploads';
 import ProfileHeaderQuickEditModal from '../../components/profile/ProfileHeaderQuickEditModal';
@@ -572,6 +574,7 @@ const ProfilePage: React.FC = () => {
   const [visitorCollections, setVisitorCollections] = useState<CollectionDto[]>([]);
   const [visitorLoading, setVisitorLoading] = useState<boolean>(() => Boolean(isVisitorView));
   const [visitorError, setVisitorError] = useState<string | null>(null);
+  const [isVisitorAvatarModalOpen, setIsVisitorAvatarModalOpen] = useState(false);
   const visitorProfileQuery = useBrandProfileQuery(normalizedRouteBrandId, {
     enabled: Boolean(isVisitorView && normalizedRouteBrandId),
   });
@@ -1397,6 +1400,49 @@ const ProfilePage: React.FC = () => {
     activeBrandProfile?.shareUrl ??
     fallbackProfileUrl;
 
+  const handleViewVisitorAvatar = useCallback(() => {
+    if (!visitorLogoUrl && !visitorLogoAsset.fileId) return;
+    setIsVisitorAvatarModalOpen(true);
+
+    const currentState = visitorProfile?.profilePhotoViewState;
+    if (!routeBrandId || !user || !currentState?.canMarkViewed) return;
+
+    void ProfilePhotoViewApi.markViewed(routeBrandId)
+      .then((nextState) => {
+        setVisitorProfile((current) =>
+          current
+            ? {
+                ...current,
+                profilePhotoUpdatedAt: nextState.profilePhotoUpdatedAt,
+                profilePhotoViewState: nextState,
+              }
+            : current,
+        );
+        queryClient.setQueryData(
+          queryKeys.brand.profile(routeBrandId),
+          (current: BrandProfileDto | null | undefined) =>
+            current
+              ? {
+                  ...current,
+                  profilePhotoUpdatedAt: nextState.profilePhotoUpdatedAt,
+                  profilePhotoViewState: nextState,
+                }
+              : current,
+        );
+        brandApi.invalidateBrandProfileCache(routeBrandId);
+      })
+      .catch((error) => {
+        console.error('Failed to mark profile photo viewed', error);
+      });
+  }, [
+    queryClient,
+    routeBrandId,
+    user,
+    visitorLogoAsset.fileId,
+    visitorLogoUrl,
+    visitorProfile?.profilePhotoViewState,
+  ]);
+
   const handleShareProfile = useCallback(async () => {
     const shareBrandName = viewDisplayData.brandName || 'WEAZ';
     const url = profileShareUrl;
@@ -1441,8 +1487,10 @@ const ProfilePage: React.FC = () => {
         displayData.verifiedExplanationUrl ?? '/help/verified-badge',
       isOwner: true as const,
       profileVisibility: 'UNLOCKED' as const,
+      profilePhotoViewState: brandProfile?.profilePhotoViewState ?? null,
     }),
     [
+      brandProfile?.profilePhotoViewState,
       displayData.brandName,
       displayData.hashtags,
       displayData.description,
@@ -1475,9 +1523,11 @@ const ProfilePage: React.FC = () => {
         viewDisplayData.verifiedExplanationUrl ?? '/help/verified-badge',
       isOwner: false,
       profileVisibility: 'UNLOCKED' as const,
+      profilePhotoViewState: visitorProfile?.profilePhotoViewState ?? null,
     }),
     [
       routeBrandId,
+      visitorProfile?.profilePhotoViewState,
       viewDisplayData.bannerImage,
       viewDisplayData.brandName,
       viewDisplayData.hashtags,
@@ -1584,6 +1634,13 @@ const ProfilePage: React.FC = () => {
         logoUrl={viewDisplayData.logoImage ?? null}
         username={viewDisplayData.username ?? null}
       />
+      <ProfileImageModal
+        open={isVisitorAvatarModalOpen && Boolean(visitorLogoUrl ?? visitorLogoAsset.fileId)}
+        src={visitorLogoUrl ?? undefined}
+        fileId={visitorLogoAsset.fileId}
+        alt={viewDisplayData.brandName || 'Brand profile photo'}
+        onClose={() => setIsVisitorAvatarModalOpen(false)}
+      />
       {showStoreSetupNudge ? (
         <div className="fixed bottom-24 right-4 sm:right-6 z-[60] w-[min(88vw,270px)]">
           <div className="glass-menu-soft px-3 py-2">
@@ -1646,6 +1703,7 @@ const ProfilePage: React.FC = () => {
       ) : (
         <ProfileHeader
           profile={visitorHeaderProfile}
+          onViewAvatar={handleViewVisitorAvatar}
           onShareProfile={handleShareProfile}
           onShowQrCode={() => setIsBrandQrOpen(true)}
           showPatchAction={showPatchAction}

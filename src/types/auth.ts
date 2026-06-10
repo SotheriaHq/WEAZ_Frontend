@@ -58,6 +58,7 @@ export interface AuthUserDto {
   profileImage: string | null;
   profileImageId: string | null;
   profileImageFile: AuthProfileImageFileDto | null;
+  profilePhotoUpdatedAt?: string | null;
   bannerImage: string | null;
   bannerImageId: string | null;
   bannerImageFile: AuthProfileImageFileDto | null;

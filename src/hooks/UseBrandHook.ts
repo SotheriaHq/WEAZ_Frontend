@@ -124,6 +124,14 @@ const areBrandProfileSnapshotsEqual = (
     previous.bannerImageMeta?.fileId === next.bannerImageMeta?.fileId &&
     previous.logoImage === next.logoImage &&
     previous.logoImageMeta?.fileId === next.logoImageMeta?.fileId &&
+    previous.profilePhotoUpdatedAt === next.profilePhotoUpdatedAt &&
+    previous.profilePhotoViewState?.profilePhotoUpdatedAt ===
+      next.profilePhotoViewState?.profilePhotoUpdatedAt &&
+    previous.profilePhotoViewState?.viewed === next.profilePhotoViewState?.viewed &&
+    previous.profilePhotoViewState?.hasUnviewedUpdate ===
+      next.profilePhotoViewState?.hasUnviewedUpdate &&
+    previous.profilePhotoViewState?.canMarkViewed ===
+      next.profilePhotoViewState?.canMarkViewed &&
     previous.socialLinks.instagram === next.socialLinks.instagram &&
     previous.socialLinks.facebook === next.socialLinks.facebook &&
     previous.socialLinks.twitter === next.socialLinks.twitter &&
@@ -183,6 +191,8 @@ const syncBrandProfileWithUser = (
     bannerImageMeta: mapAuthFileToBrandMediaAsset(user.bannerImageFile),
     logoImage: user.profileImage,
     logoImageMeta: mapAuthFileToBrandMediaAsset(user.profileImageFile),
+    profilePhotoUpdatedAt: user.profilePhotoUpdatedAt ?? current?.profilePhotoUpdatedAt ?? null,
+    profilePhotoViewState: current?.profilePhotoViewState ?? null,
     socialLinks: {
       instagram: user.socialInstagram,
       facebook: user.socialFacebook,

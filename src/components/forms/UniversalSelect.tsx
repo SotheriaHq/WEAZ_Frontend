@@ -259,14 +259,14 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                       relative cursor-pointer select-none rounded-xl ${optionCompact ? 'py-2 pl-2.5 pr-8' : 'py-2.5 pl-3 pr-9'} transition-colors
                       ${
                         isSelected
-                          ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-900 dark:text-purple-100'
-                          : 'text-[color:var(--text-primary)] surface-interactive-hover'
+                          ? 'menu-item-selected'
+                          : 'menu-item-interactive'
                       }
                     `}
                   >
                     <div className={`flex ${optionAllowWrap ? 'items-start' : 'items-center'}`}>
                       {option.icon && (
-                        <span className={`mr-3 mt-0.5 flex-shrink-0 ${isSelected ? 'text-purple-500' : 'text-[color:var(--text-secondary)]'}`}>
+                        <span className={`mr-3 mt-0.5 flex-shrink-0 ${isSelected ? 'text-[color:var(--menu-selected-text)]' : 'text-[color:var(--text-secondary)]'}`}>
                           {option.icon}
                         </span>
                       )}
@@ -286,7 +286,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                               optionAllowWrap
                                 ? 'text-[11px] leading-4 whitespace-normal break-words'
                                 : 'truncate text-xs'
-                            } ${isSelected ? 'text-purple-700 dark:text-purple-300' : 'text-[color:var(--text-secondary)]'}`}
+                            } ${isSelected ? 'text-[color:var(--menu-selected-text)]' : 'text-[color:var(--text-secondary)]'}`}
                           >
                             {option.description}
                           </span>
@@ -296,7 +296,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
 
                     {isSelected && (
                       <span
-                        className="absolute inset-y-0 right-0 flex items-center pr-4 text-purple-600 dark:text-purple-400"
+                        className="absolute inset-y-0 right-0 flex items-center pr-4 text-[color:var(--menu-selected-text)]"
                         aria-hidden="true"
                       >
                         ✓
@@ -335,7 +335,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
           className={`
             relative w-full cursor-pointer rounded-2xl border text-left shadow-sm transition-colors duration-200
             flex items-center justify-between px-4 py-3.5 ${selectedAllowWrap ? 'items-start' : 'items-center'}
-            ${disabled ? 'cursor-not-allowed opacity-60 bg-[color:var(--surface-muted)]' : 'surface-menu backdrop-blur-xl hover:bg-[color:var(--surface-secondary)]'}
+            ${disabled ? 'cursor-not-allowed opacity-60 bg-[color:var(--surface-muted)]' : 'surface-menu backdrop-blur-xl surface-interactive-hover'}
             ${
               error
                 ? 'border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.10)]'

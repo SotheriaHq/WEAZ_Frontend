@@ -6,12 +6,13 @@ import { useFocusTrap } from '@/hooks/useFocusTrap';
 interface ProfileImageModalProps {
   open: boolean;
   src?: string | null;
+  fileId?: string | null;
   alt?: string;
   onClose: () => void;
 }
 
-const ProfileImageModal: React.FC<ProfileImageModalProps> = ({ open, src, alt = 'Profile image', onClose }) => {
-  const isVisible = Boolean(open && src);
+const ProfileImageModal: React.FC<ProfileImageModalProps> = ({ open, src, fileId, alt = 'Profile image', onClose }) => {
+  const isVisible = Boolean(open && (src || fileId));
   const panelRef = React.useRef<HTMLDivElement | null>(null);
 
   useFocusTrap({
@@ -33,7 +34,7 @@ const ProfileImageModal: React.FC<ProfileImageModalProps> = ({ open, src, alt = 
     };
   }, [isVisible]);
 
-  if (!open || !src) return null;
+  if (!open || (!src && !fileId)) return null;
 
   return (
     <OverlayPortal>
@@ -64,6 +65,7 @@ const ProfileImageModal: React.FC<ProfileImageModalProps> = ({ open, src, alt = 
               <div className="flex max-h-[88vh] w-full items-center justify-center p-2 sm:p-3">
                 <ImageWithFallback
                   src={src}
+                  fileId={fileId}
                   alt={alt}
                   fit="contain"
                   rounded="xl"

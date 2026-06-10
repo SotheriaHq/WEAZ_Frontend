@@ -87,7 +87,7 @@ describe('CustomOrderConfigurationEditor', () => {
     value: string,
     expectedSelectedCount: number,
   ) => {
-    const input = screen.getByPlaceholderText('Add missing measurement key (e.g. NECK_CIRCUMFERENCE)');
+    const input = screen.getByPlaceholderText('Add missing measurement key');
     await user.clear(input);
     await user.type(input, value);
     await user.click(screen.getByRole('button', { name: 'Add key' }));
@@ -184,7 +184,7 @@ describe('CustomOrderConfigurationEditor', () => {
         ref={editorRef}
         sourceType="PRODUCT"
         sourceId="product-1"
-        measurementKeys={['bust', 'waist']}
+        measurementKeys={[]}
         measurementGender="WOMEN"
       />,
     );
@@ -242,7 +242,7 @@ describe('CustomOrderConfigurationEditor', () => {
         ref={editorRef}
         sourceType="PRODUCT"
         sourceId="product-1"
-        measurementKeys={['bust', 'waist']}
+        measurementKeys={[]}
         measurementGender="WOMEN"
       />,
     );
@@ -269,7 +269,48 @@ describe('CustomOrderConfigurationEditor', () => {
       expect(saved).toBe(false);
     });
 
-    expect(toastError).toHaveBeenCalledWith('Complete required fields: Rush fee, Rush production lead days');
+    expect(toastError).toHaveBeenCalledWith('Some required fields need attention.');
+    expect(screen.getByText('Rush fee is required.')).toBeInTheDocument();
+    expect(screen.getByText('Rush production lead days are required.')).toBeInTheDocument();
+    expect(createConfiguration).not.toHaveBeenCalled();
+  });
+
+  it('shows registry guidance and requires measurement points before saving', async () => {
+    const user = userEvent.setup();
+    const editorRef = createRef<CustomOrderConfigurationEditorHandle>();
+
+    render(
+      <CustomOrderConfigurationEditor
+        ref={editorRef}
+        sourceType="PRODUCT"
+        sourceId="product-1"
+        measurementKeys={[]}
+        measurementGender="WOMEN"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(getStoreStatus).toHaveBeenCalled();
+      expect(listFabricRuleBases).toHaveBeenCalledWith({ includeBrandOnly: true });
+      expect(getActiveForProduct).toHaveBeenCalledWith('product-1');
+    });
+
+    expect(screen.getByText('No measurement points are available. Run the measurement registry seed or contact an admin.')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('120000'), '120000');
+    await user.type(screen.getByPlaceholderText('10000'), '10000');
+
+    await waitFor(() => {
+      expect(editorRef.current).not.toBeNull();
+    });
+
+    await act(async () => {
+      const saved = await editorRef.current!.saveConfiguration();
+      expect(saved).toBe(false);
+    });
+
+    expect(toastError).toHaveBeenCalledWith('Some required fields need attention.');
+    expect(screen.getByText('Select at least one required measurement point for custom orders.')).toBeInTheDocument();
     expect(createConfiguration).not.toHaveBeenCalled();
   });
 
@@ -282,7 +323,7 @@ describe('CustomOrderConfigurationEditor', () => {
         ref={editorRef}
         sourceType="PRODUCT"
         sourceId="product-1"
-        measurementKeys={['bust', 'waist']}
+        measurementKeys={[]}
         measurementGender="WOMEN"
       />,
     );
@@ -341,7 +382,7 @@ describe('CustomOrderConfigurationEditor', () => {
         sourceType="PRODUCT"
         sourceId="product-1"
         sourceTitle="Tailored jacket"
-        measurementKeys={['bust', 'waist']}
+        measurementKeys={[]}
         measurementGender="WOMEN"
       />,
     );

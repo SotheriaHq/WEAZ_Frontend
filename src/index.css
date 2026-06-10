@@ -51,6 +51,14 @@ html {
     --brand-accent: #d4af37;
     --brand-accent-strong: #b5952f;
     --brand-accent-rgb: 212, 175, 55;
+    --menu-hover-bg: color-mix(in srgb, var(--brand-primary) 8%, var(--surface-primary));
+    --menu-active-bg: color-mix(in srgb, var(--brand-primary) 13%, var(--surface-primary));
+    --menu-selected-bg: color-mix(in srgb, var(--brand-primary) 15%, var(--surface-primary));
+    --menu-selected-text: var(--brand-primary-strong);
+    --menu-border: color-mix(in srgb, var(--brand-primary) 18%, var(--border-default));
+    --menu-focus-ring: rgba(var(--brand-primary-rgb), 0.24);
+    --profile-photo-ring-new: var(--brand-primary);
+    --profile-photo-ring-viewed: color-mix(in srgb, var(--text-secondary) 55%, var(--surface-muted));
 
     /* Surface + Typography - Clean Editorial Theme */
     --surface-primary: #ffffff;
@@ -99,6 +107,12 @@ html {
     --neu-border: rgba(255, 255, 255, 0.08);
     --neu-shadow-dark: rgba(0, 0, 0, 0.5);
     --neu-shadow-light: rgba(255, 255, 255, 0.03);
+    --menu-hover-bg: color-mix(in srgb, var(--brand-primary) 18%, var(--surface-primary));
+    --menu-active-bg: color-mix(in srgb, var(--brand-primary) 25%, var(--surface-primary));
+    --menu-selected-bg: color-mix(in srgb, var(--brand-primary) 28%, var(--surface-primary));
+    --menu-selected-text: #e9d5ff;
+    --menu-border: color-mix(in srgb, var(--brand-primary) 24%, var(--border-default));
+    --profile-photo-ring-viewed: color-mix(in srgb, var(--text-secondary) 48%, var(--surface-muted));
   }
 
   :root {
@@ -166,7 +180,7 @@ html {
   .surface-menu {
     color: var(--text-primary);
     background-color: color-mix(in srgb, var(--surface-primary) 94%, transparent);
-    border-color: var(--border-default);
+    border-color: var(--menu-border);
   }
 
   .surface-modal {
@@ -192,7 +206,55 @@ html {
   }
 
   .surface-interactive-hover:hover {
-    background-color: var(--surface-muted);
+    background-color: var(--menu-hover-bg);
+    border-color: var(--menu-border);
+  }
+
+  .surface-interactive-hover:active {
+    background-color: var(--menu-active-bg);
+  }
+
+  .menu-item-interactive {
+    color: var(--text-primary);
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .menu-item-interactive:hover,
+  .menu-item-interactive:focus-visible {
+    background-color: var(--menu-hover-bg);
+    color: var(--text-primary);
+  }
+
+  .menu-item-interactive:active {
+    background-color: var(--menu-active-bg);
+  }
+
+  .menu-item-selected {
+    background-color: var(--menu-selected-bg);
+    color: var(--menu-selected-text);
+  }
+
+  .menu-item-danger {
+    color: #e11d48;
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  .menu-item-danger:hover,
+  .menu-item-danger:focus-visible {
+    background-color: rgba(225, 29, 72, 0.1);
+  }
+
+  .profile-photo-ring-new {
+    border-color: var(--profile-photo-ring-new);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--brand-accent) 72%, transparent),
+      0 0 0 5px rgba(var(--brand-primary-rgb), 0.18),
+      0 14px 34px rgba(var(--brand-primary-rgb), 0.2);
+  }
+
+  .profile-photo-ring-viewed {
+    border-color: var(--profile-photo-ring-viewed);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--profile-photo-ring-viewed) 72%, transparent);
   }
 
   .surface-panel-subtle,
@@ -314,7 +376,7 @@ html {
     @apply backdrop-blur-xl rounded-2xl border shadow-2xl;
     color: var(--text-primary);
     background-color: color-mix(in srgb, var(--surface-primary) 94%, transparent);
-    border-color: var(--border-default);
+    border-color: var(--menu-border);
     box-shadow:
       0 18px 48px rgba(15, 23, 42, 0.14),
       0 2px 8px rgba(15, 23, 42, 0.06);
@@ -528,7 +590,7 @@ html {
   }
 
   .btn-frost-ghost:hover {
-    background-color: var(--surface-muted);
+    background-color: var(--menu-hover-bg);
   }
 
   .btn-frost-outline {
@@ -1625,7 +1687,7 @@ html.dark .p-toast .p-toast-message {
 .p-cascadeselect-trigger:hover,
 .p-treeselect-trigger:hover,
 .p-toast .p-toast-icon-close:hover {
-  background-color: var(--surface-muted) !important;
+  background-color: var(--menu-hover-bg) !important;
   color: var(--text-primary) !important;
 }
 
@@ -1652,7 +1714,7 @@ html.dark .p-toast .p-toast-message {
 .p-contextmenu .p-menuitem-link:not(.p-disabled):hover,
 .p-slidemenu .p-menuitem-link:not(.p-disabled):hover,
 .p-datepicker table td > span:not(.p-highlight):not(.p-disabled):hover {
-  background-color: var(--surface-muted) !important;
+  background-color: var(--menu-hover-bg) !important;
   color: var(--text-primary) !important;
 }
 
@@ -1662,8 +1724,8 @@ html.dark .p-toast .p-toast-message {
 .p-cascadeselect-panel .p-cascadeselect-items .p-cascadeselect-item.p-highlight,
 .p-treeselect-panel .p-treeselect-items-wrapper .p-treenode-content.p-highlight,
 .p-datepicker table td > span.p-highlight {
-  background-color: rgba(var(--brand-primary-rgb), 0.16) !important;
-  color: var(--brand-primary) !important;
+  background-color: var(--menu-selected-bg) !important;
+  color: var(--menu-selected-text) !important;
 }
 
 .p-checkbox .p-checkbox-box,

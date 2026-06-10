@@ -12,6 +12,7 @@ import ProfileHeader from './ProfileHeader';
 import ImageCropModal from '@/components/upload/ImageCropModal';
 import ProfileImageModal from '@/components/profile/ProfileImageModal';
 import { resolveBannerImageSource, resolveProfileImageSource } from '@/utils/profileImage';
+import type { ProfilePhotoViewState } from '@/types/profilePhoto';
 import {
   WEB_UPLOAD_POLICIES,
   assertValidUploadFile,
@@ -34,6 +35,7 @@ type OwnerHeaderProfileBase = {
   profileVisibility: 'UNLOCKED' | 'LOCKED';
   profileImage?: string | null;
   profileImageFileId?: string | null;
+  profilePhotoViewState?: ProfilePhotoViewState | null;
   bannerImage?: string | null;
   bannerImageFileId?: string | null;
 };
@@ -447,6 +449,7 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
       <ProfileImageModal
         open={isAvatarModalOpen && Boolean(localAvatarPreview ?? resolvedAvatarUrl)}
         src={(localAvatarPreview ?? resolvedAvatarUrl) ?? undefined}
+        fileId={avatarFileId}
         alt={profile.firstName}
         onClose={() => setIsAvatarModalOpen(false)}
       />

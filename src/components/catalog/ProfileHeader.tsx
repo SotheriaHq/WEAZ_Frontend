@@ -6,6 +6,7 @@ import AvatarCard from '../profile/AvatarCard';
 import VLoader from '../loaders/VLoader';
 import ImageWithFallback from '../ImageWithFallback';
 import ThreadActivityIndicator from '../ui/ThreadActivityIndicator';
+import type { ProfilePhotoViewState } from '@/types/profilePhoto';
 
 interface ProfileHeaderProps {
   profile: {
@@ -26,6 +27,7 @@ interface ProfileHeaderProps {
     description?: string;
     isOwner: boolean;
     profileVisibility: 'UNLOCKED' | 'LOCKED';
+    profilePhotoViewState?: ProfilePhotoViewState | null;
   };
   onEditAvatar?: () => void;
   onEditBanner?: () => void;
@@ -70,6 +72,14 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
   // Only show the external spinner for explicit upload operations — ImageWithFallback
   // handles the image-load shimmer internally (including signed URL resolution for S3).
   const showBannerLoader = showBanner && bannerLoading;
+  const hasProfilePhoto = Boolean(profile.profileImage || profile.profileImageFileId);
+  const hasPhotoVersion = Boolean(profile.profilePhotoViewState?.profilePhotoUpdatedAt);
+  const avatarRingClass =
+    showBanner && hasProfilePhoto && hasPhotoVersion
+      ? profile.profilePhotoViewState?.hasUnviewedUpdate
+        ? 'profile-photo-ring-new'
+        : 'profile-photo-ring-viewed'
+      : '';
 
   const tags: string[] = Array.isArray(profile.tags)
     ? profile.tags
@@ -179,9 +189,9 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
               className={`rounded-xl border-2 shadow-lg transition-colors duration-300 ${
                 !showBanner
                   ? 'border-transparent shadow-none ring-0'
-                  : avatarHighlight
+                : avatarHighlight
                   ? 'border-emerald-400 ring-2 ring-emerald-200/70'
-                  : 'border-gray-400 ring-1 ring-black/10 dark:border-gray-900'
+                  : avatarRingClass || 'border-gray-400 ring-1 ring-black/10 dark:border-gray-900'
               }`}
             >
               <AvatarCard

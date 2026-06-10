@@ -1,5 +1,6 @@
 import type { CatalogEntityType } from '@/constants/catalogDomain';
 import type { ContentPublicationStatus } from '@/utils/contentIntegrity';
+import type { ProfilePhotoViewState } from './profilePhoto';
 
 // Collection Types
 export interface CollectionDto {
@@ -88,6 +89,8 @@ export interface BrandProfileDto {
   bannerImageMeta?: BrandMediaAssetDto | null;
   logoImage: string | null;
   logoImageMeta?: BrandMediaAssetDto | null;
+  profilePhotoUpdatedAt?: string | null;
+  profilePhotoViewState?: ProfilePhotoViewState | null;
   socialLinks: {
     instagram?: string | null;
     facebook?: string | null;
