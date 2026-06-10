@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -23,6 +23,10 @@ import '../styles/auth.css';
 import VLoader from '@/components/loaders/VLoader';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import GoogleSignInOverlayButton from '@/components/auth/GoogleSignInOverlayButton';
+import {
+  PasswordMatchFeedback,
+  PasswordPolicyFeedback,
+} from '@/components/auth/PasswordPolicyFeedback';
 import { AppleLogoIcon } from '@/components/auth/SocialAuthIcons';
 import { COMPANY_NAME } from '@/lib/brand';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
@@ -154,21 +158,6 @@ const LoadingScreen = () => (
   </div>
 );
 
-// Password strength calculator
-const getPasswordStrength = (password: string): { strength: number; label: string; color: string } => {
-  let strength = 0;
-  if (password.length >= 8) strength++;
-  if (/[A-Z]/.test(password)) strength++;
-  if (/[a-z]/.test(password)) strength++;
-  if (/[0-9]/.test(password)) strength++;
-  if (/[^A-Za-z0-9]/.test(password)) strength++;
-
-  if (strength <= 2) return { strength, label: 'Weak', color: '#ef4444' };
-  if (strength === 3) return { strength, label: 'Fair', color: '#f59e0b' };
-  if (strength === 4) return { strength, label: 'Good', color: '#10b981' };
-  return { strength, label: 'Strong', color: '#22c55e' };
-};
-
 const SignUpPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -201,9 +190,8 @@ const SignUpPage = () => {
   });
 
   const watchPassword = watch('password') || '';
+  const watchConfirmPassword = watch('confirmPassword') || '';
   const watchUserType = watch('userType');
-
-  const passwordStrength = useMemo(() => getPasswordStrength(watchPassword), [watchPassword]);
 
   const completeSignup = async (payload: AuthTokensResponse) => {
     const { accessToken, user } = payload;
@@ -657,6 +645,8 @@ const SignUpPage = () => {
                     <input
                       type={showPassword ? 'text' : 'password'}
                       {...register('password')}
+                      minLength={PASSWORD_POLICY_MIN_LENGTH}
+                      aria-describedby="signup-password-policy"
                       placeholder="••••••••"
                       className={`auth-input w-full rounded-xl py-3.5 pl-11 pr-12 text-sm ${
                         errors.password ? 'error animate-shake' : ''
@@ -670,27 +660,11 @@ const SignUpPage = () => {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                  {/* Password Strength Indicator */}
-                  {watchPassword && (
-                    <div className="auth-password-strength mt-2">
-                      <div className="flex gap-1 mb-1">
-                        {[1, 2, 3, 4, 5].map((level) => (
-                          <div
-                            key={level}
-                            className={`h-1 flex-1 rounded-full transition-colors ${
-                              level <= passwordStrength.strength ? '' : 'bg-white/10'
-                            }`}
-                            style={{
-                              backgroundColor: level <= passwordStrength.strength ? passwordStrength.color : undefined,
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-xs" style={{ color: passwordStrength.color }}>
-                        {passwordStrength.label}
-                      </span>
-                    </div>
-                  )}
+                  <PasswordPolicyFeedback
+                    id="signup-password-policy"
+                    password={watchPassword}
+                    tone="dark"
+                  />
                   {errors.password && <p className="text-sm text-red-400 ml-1">{errors.password.message}</p>}
                 </div>
 
@@ -706,9 +680,14 @@ const SignUpPage = () => {
                     <input
                       type={showConfirmPassword ? 'text' : 'password'}
                       {...register('confirmPassword')}
+                      minLength={PASSWORD_POLICY_MIN_LENGTH}
                       placeholder="••••••••"
                       className={`auth-input w-full rounded-xl py-3.5 pl-11 pr-12 text-sm ${
-                        errors.confirmPassword ? 'error animate-shake' : ''
+                        errors.confirmPassword
+                          ? 'error animate-shake'
+                          : watchConfirmPassword && watchPassword === watchConfirmPassword
+                            ? 'success'
+                            : ''
                       }`}
                     />
                     <button
@@ -719,6 +698,11 @@ const SignUpPage = () => {
                       {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
+                  <PasswordMatchFeedback
+                    password={watchPassword}
+                    confirmPassword={watchConfirmPassword}
+                    tone="dark"
+                  />
                   {errors.confirmPassword && <p className="text-sm text-red-400 ml-1">{errors.confirmPassword.message}</p>}
                 </div>
 

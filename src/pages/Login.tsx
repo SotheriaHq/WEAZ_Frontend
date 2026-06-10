@@ -25,6 +25,10 @@ import Modal from '@/components/ui/Modal';
 import VLoader from '@/components/loaders/VLoader';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import GoogleSignInOverlayButton from '@/components/auth/GoogleSignInOverlayButton';
+import {
+  PasswordMatchFeedback,
+  PasswordPolicyFeedback,
+} from '@/components/auth/PasswordPolicyFeedback';
 import { AppleLogoIcon } from '@/components/auth/SocialAuthIcons';
 import '../styles/auth.css';
 
@@ -239,6 +243,15 @@ const LoginPage = () => {
     },
   });
   const watchEmail = watch('email');
+  const setupPasswordValid =
+    getPasswordLength(setupPassword) >= PASSWORD_POLICY_MIN_LENGTH;
+  const setupPasswordsMatch =
+    setupConfirmPassword.length > 0 && setupPassword === setupConfirmPassword;
+  const forceResetPasswordValid =
+    getPasswordLength(forceResetNewPassword) >= PASSWORD_POLICY_MIN_LENGTH;
+  const forceResetPasswordsMatch =
+    forceResetConfirmPassword.length > 0 &&
+    forceResetNewPassword === forceResetConfirmPassword;
 
   const resetProgressiveFlow = () => {
     setLoginStep('email');
@@ -965,8 +978,10 @@ const LoginPage = () => {
                         setFlowError('');
                       }}
                       placeholder="New password"
+                      minLength={PASSWORD_POLICY_MIN_LENGTH}
                       className="auth-input w-full rounded-xl px-4 py-3.5 text-sm"
                     />
+                    <PasswordPolicyFeedback password={setupPassword} tone="dark" />
                     <input
                       type="password"
                       value={setupConfirmPassword}
@@ -975,15 +990,22 @@ const LoginPage = () => {
                         setFlowError('');
                       }}
                       placeholder="Confirm password"
+                      minLength={PASSWORD_POLICY_MIN_LENGTH}
                       className="auth-input w-full rounded-xl px-4 py-3.5 text-sm"
                     />
-                    <p className="text-xs text-gray-400">
-                      Use at least {PASSWORD_POLICY_MIN_LENGTH} characters. Longer passphrases are better.
-                    </p>
+                    <PasswordMatchFeedback
+                      password={setupPassword}
+                      confirmPassword={setupConfirmPassword}
+                      tone="dark"
+                    />
                     <button
                       type="button"
                       onClick={() => void submitPasswordSetup()}
-                      disabled={setupPasswordLoading}
+                      disabled={
+                        setupPasswordLoading ||
+                        !setupPasswordValid ||
+                        !setupPasswordsMatch
+                      }
                       className="auth-btn-primary w-full rounded-xl py-3 text-sm font-medium tracking-wide disabled:opacity-60"
                     >
                       {setupPasswordLoading ? 'Saving password...' : 'Create password'}
@@ -1223,6 +1245,7 @@ const LoginPage = () => {
                   type={showResetNew ? 'text' : 'password'}
                   value={forceResetNewPassword}
                   onChange={(e) => setForceResetNewPassword(e.target.value)}
+                  minLength={PASSWORD_POLICY_MIN_LENGTH}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-10 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 />
                 <button
@@ -1243,6 +1266,7 @@ const LoginPage = () => {
                   type={showResetConfirm ? 'text' : 'password'}
                   value={forceResetConfirmPassword}
                   onChange={(e) => setForceResetConfirmPassword(e.target.value)}
+                  minLength={PASSWORD_POLICY_MIN_LENGTH}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-10 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 />
                 <button
@@ -1255,6 +1279,15 @@ const LoginPage = () => {
               </div>
             </div>
           </div>
+          <PasswordPolicyFeedback
+            password={forceResetNewPassword}
+            tone="light"
+          />
+          <PasswordMatchFeedback
+            password={forceResetNewPassword}
+            confirmPassword={forceResetConfirmPassword}
+            tone="light"
+          />
 
           <div className="flex justify-end gap-2 pt-1">
             <button
@@ -1268,7 +1301,11 @@ const LoginPage = () => {
             <button
               type="button"
               onClick={() => void submitFirstLoginReset()}
-              disabled={isSubmittingForceReset}
+              disabled={
+                isSubmittingForceReset ||
+                !forceResetPasswordValid ||
+                !forceResetPasswordsMatch
+              }
               className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
             >
               {isSubmittingForceReset ? 'Setting Password...' : 'Set Password & Sign In'}

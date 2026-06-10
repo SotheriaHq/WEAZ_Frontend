@@ -40,6 +40,11 @@ const normalizeSearchText = (value: string): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const MENU_VIEWPORT_PADDING = 8;
+const MENU_GAP = 6;
+const MENU_MIN_HEIGHT = 120;
+const MENU_MAX_HEIGHT = 320;
+
 const UniversalSelect: React.FC<UniversalSelectProps> = ({
   label,
   value,
@@ -87,38 +92,66 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
     if (!trigger) return;
 
     const rect = trigger.getBoundingClientRect();
-    const viewportPadding = 8;
-    const gap = 6;
-    const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2);
-    const menuWidth = Math.min(Math.max(rect.width, 220), availableWidth);
+    const triggerWidth = rect.width || trigger.offsetWidth || 220;
+    const triggerHeight = rect.height || trigger.offsetHeight || 44;
+    const triggerBottom = rect.bottom || rect.top + triggerHeight;
+
+    const availableWidth = Math.max(0, window.innerWidth - MENU_VIEWPORT_PADDING * 2);
+    const menuWidth = Math.min(Math.max(triggerWidth, 220), availableWidth);
     const left = Math.min(
-      Math.max(viewportPadding, rect.left),
-      Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding),
+      Math.max(MENU_VIEWPORT_PADDING, rect.left),
+      Math.max(
+        MENU_VIEWPORT_PADDING,
+        window.innerWidth - menuWidth - MENU_VIEWPORT_PADDING,
+      ),
     );
 
-    const spaceBelow = window.innerHeight - rect.bottom - gap - viewportPadding;
-    const spaceAbove = rect.top - gap - viewportPadding;
-    const placeAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
-    const maxHeight = Math.max(
-      160,
-      Math.min(320, placeAbove ? spaceAbove : spaceBelow),
+    const optionRowHeight = optionCompact ? 42 : 50;
+    const searchHeight = searchable ? 58 : 0;
+    const contentHeight =
+      searchHeight +
+      (filteredOptions.length > 0 ? filteredOptions.length * optionRowHeight : 48) +
+      20;
+    const desiredHeight = Math.min(MENU_MAX_HEIGHT, contentHeight);
+    const spaceBelow =
+      window.innerHeight - triggerBottom - MENU_GAP - MENU_VIEWPORT_PADDING;
+    const spaceAbove = rect.top - MENU_GAP - MENU_VIEWPORT_PADDING;
+    const safeSpaceBelow = Math.max(0, spaceBelow);
+    const safeSpaceAbove = Math.max(0, spaceAbove);
+    const placeAbove =
+      safeSpaceBelow < Math.min(220, desiredHeight) &&
+      safeSpaceAbove > safeSpaceBelow;
+    const selectedSpace = placeAbove ? safeSpaceAbove : safeSpaceBelow;
+    const viewportMaxHeight = Math.max(
+      MENU_MIN_HEIGHT,
+      window.innerHeight - MENU_VIEWPORT_PADDING * 2,
     );
+    const maxHeight = Math.min(
+      MENU_MAX_HEIGHT,
+      viewportMaxHeight,
+      Math.max(MENU_MIN_HEIGHT, selectedSpace),
+    );
+    const renderedHeight = Math.min(maxHeight, Math.max(MENU_MIN_HEIGHT, desiredHeight));
     const top = placeAbove
-      ? Math.max(viewportPadding, rect.top - gap - maxHeight)
-      : Math.min(window.innerHeight - viewportPadding, rect.bottom + gap);
+      ? Math.max(MENU_VIEWPORT_PADDING, rect.top - MENU_GAP - renderedHeight)
+      : Math.min(
+          triggerBottom + MENU_GAP,
+          window.innerHeight - MENU_VIEWPORT_PADDING - MENU_MIN_HEIGHT,
+        );
 
     setMenuStyle({
       position: 'fixed',
       top,
       left,
       width: menuWidth,
+      minWidth: triggerWidth,
       maxHeight,
       zIndex:
         menuLayer === 'modal'
           ? 'calc(var(--z-modal) + 1)'
           : 'var(--z-dropdown)',
     });
-  }, [menuLayer]);
+  }, [filteredOptions.length, menuLayer, optionCompact, searchable]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -151,12 +184,19 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
     if (!isOpen) return undefined;
 
     const handleWindowChange = () => updateMenuPosition();
+    const handleRouteBoundary = () => setIsOpen(false);
     window.addEventListener('resize', handleWindowChange);
+    window.addEventListener('orientationchange', handleWindowChange);
     window.addEventListener('scroll', handleWindowChange, true);
+    window.addEventListener('hashchange', handleRouteBoundary);
+    window.addEventListener('popstate', handleRouteBoundary);
 
     return () => {
       window.removeEventListener('resize', handleWindowChange);
+      window.removeEventListener('orientationchange', handleWindowChange);
       window.removeEventListener('scroll', handleWindowChange, true);
+      window.removeEventListener('hashchange', handleRouteBoundary);
+      window.removeEventListener('popstate', handleRouteBoundary);
     };
   }, [isOpen, updateMenuPosition]);
 

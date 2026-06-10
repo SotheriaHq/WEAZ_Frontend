@@ -124,6 +124,7 @@ const strengthLabel = (password: string) => {
   const checks = passwordChecks(password);
   const score = Object.values(checks).filter(Boolean).length;
   if (password.length === 0) return { label: 'Weak', progress: 0 };
+  if (!checks.length) return { label: 'Minimum length not met', progress: 25 };
   if (score <= 1) return { label: 'Weak', progress: 25 };
   if (score === 2) return { label: 'Fair', progress: 50 };
   if (score === 3) return { label: 'Strong', progress: 75 };

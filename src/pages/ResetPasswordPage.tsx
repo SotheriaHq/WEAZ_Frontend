@@ -2,12 +2,15 @@ import React, { useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AuthApi } from '@/api/AuthApi';
 import {
-  PASSWORD_POLICY_HINT,
   PASSWORD_POLICY_MIN_LENGTH,
   getPasswordLength,
   getPasswordPolicyErrorMessage,
 } from '@/lib/passwordPolicy';
 import BrandWordmark from '@/components/brand/BrandWordmark';
+import {
+  PasswordMatchFeedback,
+  PasswordPolicyFeedback,
+} from '@/components/auth/PasswordPolicyFeedback';
 import { COMPANY_NAME } from '@/lib/brand';
 import '../styles/auth.css';
 
@@ -32,17 +35,6 @@ const ResetPasswordPage: React.FC = () => {
     () => newPassword === confirmPassword && confirmPassword.length > 0,
     [newPassword, confirmPassword],
   );
-
-  const passwordStrength = useMemo(() => {
-    if (passwordLength === 0) return null;
-    let score = 0;
-    if (passwordLength >= PASSWORD_POLICY_MIN_LENGTH) score++;
-    if (passwordLength >= 20) score++;
-    if (passwordLength >= 24) score++;
-    if (score <= 1) return 'weak';
-    if (score <= 2) return 'medium';
-    return 'strong';
-  }, [passwordLength]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,28 +196,7 @@ const ResetPasswordPage: React.FC = () => {
                       </button>
                     </div>
 
-                    {/* Password Strength Indicator */}
-                    {passwordStrength && (
-                      <div className="space-y-1.5">
-                        <div className="auth-password-strength">
-                          <div className={`auth-password-strength-fill ${passwordStrength}`} />
-                        </div>
-                        <p className={`text-xs ml-1 ${
-                          passwordStrength === 'weak' ? 'text-red-400' :
-                          passwordStrength === 'medium' ? 'text-yellow-400' :
-                          'text-green-400'
-                        }`}>
-                          {passwordStrength === 'weak' && 'Weak password'}
-                          {passwordStrength === 'medium' && 'Fair password'}
-                          {passwordStrength === 'strong' && 'Strong password'}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Requirements Hint */}
-                    <p className="text-xs text-gray-500 ml-1">
-                      {PASSWORD_POLICY_HINT}
-                    </p>
+                    <PasswordPolicyFeedback password={newPassword} tone="dark" />
                   </div>
 
                   {/* Confirm Password */}
@@ -260,9 +231,11 @@ const ResetPasswordPage: React.FC = () => {
                         {showConfirmPassword ? 'Hide' : 'Show'}
                       </button>
                     </div>
-                    {confirmPassword.length > 0 && !passwordsMatch && (
-                      <p className="text-xs text-red-400 ml-1">Passwords do not match.</p>
-                    )}
+                    <PasswordMatchFeedback
+                      password={newPassword}
+                      confirmPassword={confirmPassword}
+                      tone="dark"
+                    />
                   </div>
 
                   {/* Error */}

@@ -382,8 +382,8 @@ export const ProfileLayout: React.FC = () => {
           style={{ marginLeft: mainMarginLeft }}
         >
           {showEmailVerificationPrompt ? (
-            <div className="px-4 pt-4 sm:px-6">
-              <div className="mx-auto max-w-screen-xl">
+            <div className="pointer-events-none fixed left-3 right-3 top-20 z-40 sm:left-auto sm:right-6 sm:w-[360px]">
+              <div className="pointer-events-auto">
                 <EmailVerificationBanner
                   title={verificationPromptDetails.title}
                   description={verificationPromptDetails.description}

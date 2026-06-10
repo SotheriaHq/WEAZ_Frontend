@@ -2,11 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AuthApi } from '@/api/AuthApi';
 import {
-  PASSWORD_POLICY_HINT,
   PASSWORD_POLICY_MIN_LENGTH,
   getPasswordLength,
   getPasswordPolicyErrorMessage,
 } from '@/lib/passwordPolicy';
+import {
+  PasswordMatchFeedback,
+  PasswordPolicyFeedback,
+} from '@/components/auth/PasswordPolicyFeedback';
 
 const AdminResetPasswordPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -205,7 +208,7 @@ const AdminResetPasswordPage: React.FC = () => {
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm"
                 disabled={resetCompleted}
               />
-              <p className="text-xs text-gray-500">{PASSWORD_POLICY_HINT}</p>
+              <PasswordPolicyFeedback password={newPassword} tone="light" />
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Confirm New Password</label>
@@ -219,6 +222,11 @@ const AdminResetPasswordPage: React.FC = () => {
                 disabled={resetCompleted}
               />
             </div>
+            <PasswordMatchFeedback
+              password={newPassword}
+              confirmPassword={confirmPassword}
+              tone="light"
+            />
             {!resetCompleted ? (
               <button
                 type="submit"

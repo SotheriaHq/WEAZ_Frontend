@@ -4,11 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { AuthApi } from '@/api/AuthApi';
 import { useAuth } from '@/context/AuthContext';
 import {
-  PASSWORD_POLICY_HINT,
   PASSWORD_POLICY_MIN_LENGTH,
   getPasswordLength,
   getPasswordPolicyErrorMessage,
 } from '@/lib/passwordPolicy';
+import {
+  PasswordMatchFeedback,
+  PasswordPolicyFeedback,
+} from '@/components/auth/PasswordPolicyFeedback';
 
 const AdminForceResetPasswordPage: React.FC = () => {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -54,7 +57,7 @@ const AdminForceResetPasswordPage: React.FC = () => {
       <form onSubmit={onSubmit} className="w-full max-w-md p-6 rounded-2xl border border-purple-200/40 bg-white/90 shadow-sm space-y-4">
         <h1 className="text-xl font-bold text-gray-900">🔐 Reset Your Password</h1>
         <p className="text-sm text-gray-600">Your admin account requires a password reset before continuing.</p>
-        <p className="text-xs text-gray-500">{PASSWORD_POLICY_HINT}</p>
+        <PasswordPolicyFeedback password={newPassword} tone="light" />
 
         <div>
           <label className="block text-xs text-gray-500 mb-1">Current Password (optional if forced)</label>
@@ -89,6 +92,11 @@ const AdminForceResetPasswordPage: React.FC = () => {
             className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm"
           />
         </div>
+        <PasswordMatchFeedback
+          password={newPassword}
+          confirmPassword={confirmPassword}
+          tone="light"
+        />
 
         {error && <div className="text-red-500 text-xs">{error}</div>}
 
