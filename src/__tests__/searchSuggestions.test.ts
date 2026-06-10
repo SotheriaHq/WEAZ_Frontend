@@ -20,4 +20,46 @@ describe('search suggestion entries', () => {
 
     expect(entries).toHaveLength(0);
   });
+
+  it('includes profile suggestion entries when returned by the backend', () => {
+    const entries = flattenSuggestionEntries(
+      {
+        query: 'cotour',
+        normalizedQuery: 'cotour',
+        recent: [],
+        trending: [],
+        profiles: {
+          items: [
+            {
+              id: 'user-1',
+              type: 'profile',
+              title: 'Avery Cotour',
+              subtitle: '@averycotour',
+              href: '/profile/user-1',
+              score: 900,
+            },
+          ],
+          total: 1,
+        },
+        products: { items: [], total: 0 },
+        brands: { items: [], total: 0 },
+        designs: { items: [], total: 0 },
+        storeCollections: { items: [], total: 0 },
+        tags: [],
+      },
+      [],
+      'cotour',
+    );
+
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'profile:user-1',
+          label: 'Avery Cotour',
+          section: 'Profiles',
+          href: '/profile/user-1',
+        }),
+      ]),
+    );
+  });
 });

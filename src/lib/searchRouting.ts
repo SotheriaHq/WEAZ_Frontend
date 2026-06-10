@@ -10,7 +10,7 @@ export function resolveSearchIntent(query: string): {
   }
 
   if (trimmed.startsWith('@')) {
-    return { query: trimmed, type: 'brand' };
+    return { query: trimmed, type: 'profile' };
   }
 
   if (trimmed.startsWith('/') || trimmed.startsWith('#')) {

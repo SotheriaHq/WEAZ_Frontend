@@ -6,13 +6,17 @@ import type { AppDispatch, RootState } from '@/store';
 import type { AuthUserDto } from '@/types/auth';
 import { setUser } from '@/features/userSlice';
 import { brandApi } from '@/api/BrandApi';
+import { ProfilePhotoViewApi } from '@/api/ProfilePhotoViewApi';
 import { useSignedFileUrl } from '@/hooks/useSignedFileUrl';
 import { queryKeys } from '@/query/queryKeys';
 import ProfileHeader from './ProfileHeader';
 import ImageCropModal from '@/components/upload/ImageCropModal';
 import ProfileImageModal from '@/components/profile/ProfileImageModal';
 import { resolveBannerImageSource, resolveProfileImageSource } from '@/utils/profileImage';
-import type { ProfilePhotoViewState } from '@/types/profilePhoto';
+import {
+  createUnviewedProfilePhotoViewState,
+  type ProfilePhotoViewState,
+} from '@/types/profilePhoto';
 import {
   WEB_UPLOAD_POLICIES,
   assertValidUploadFile,
@@ -165,6 +169,8 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
         profileImage?: string | null;
         profileImageId?: string | null;
         profileImageFile?: ReturnType<typeof mapUploadedMedia>;
+        profilePhotoUpdatedAt?: string | null;
+        profilePhotoViewState?: ProfilePhotoViewState | null;
         bannerImage?: string | null;
         bannerImageId?: string | null;
         bannerImageFile?: ReturnType<typeof mapUploadedMedia>;
@@ -192,6 +198,12 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
                     }
                   : null,
               }
+            : {}),
+          ...(media.profilePhotoUpdatedAt !== undefined
+            ? { profilePhotoUpdatedAt: media.profilePhotoUpdatedAt }
+            : {}),
+          ...(media.profilePhotoViewState !== undefined
+            ? { profilePhotoViewState: media.profilePhotoViewState }
             : {}),
           ...(media.bannerImage !== undefined
             ? {
@@ -239,17 +251,25 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
 
         const signedUrl = (await brandApi.getSignedFileUrl(uploaded.id)) ?? uploaded.url;
         const uploadedMedia = mapUploadedMedia(uploaded, file.name);
+        const nextProfilePhotoUpdatedAt = new Date().toISOString();
+        const nextProfilePhotoViewState = createUnviewedProfilePhotoViewState(
+          currentUser.id,
+          nextProfilePhotoUpdatedAt,
+        );
         updateAvatarPreview(signedUrl);
         persistUserMedia({
           ...currentUser,
           profileImage: uploaded.url,
           profileImageId: uploaded.id,
           profileImageFile: uploadedMedia,
+          profilePhotoUpdatedAt: nextProfilePhotoUpdatedAt,
         });
         persistBrandProfileMedia(currentUser.id, {
           profileImage: uploaded.url,
           profileImageId: uploaded.id,
           profileImageFile: uploadedMedia,
+          profilePhotoUpdatedAt: nextProfilePhotoUpdatedAt,
+          profilePhotoViewState: nextProfilePhotoViewState,
         });
         setAvatarHighlight(true);
         toast.success('Profile photo updated');
@@ -390,13 +410,35 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
   );
 
   const handleViewAvatar = useCallback(() => {
-    if (localAvatarPreview || resolvedAvatarUrl) {
-      setIsAvatarModalOpen(true);
-      if (avatarHighlight) {
-        setAvatarHighlight(false);
-      }
+    if (!localAvatarPreview && !resolvedAvatarUrl) {
+      return;
     }
-  }, [avatarHighlight, localAvatarPreview, resolvedAvatarUrl]);
+
+    setIsAvatarModalOpen(true);
+    if (avatarHighlight) {
+      setAvatarHighlight(false);
+    }
+
+    if (!currentUser?.id || !profile.profilePhotoViewState?.canMarkViewed) return;
+
+    void ProfilePhotoViewApi.markViewed(currentUser.id)
+      .then((nextState) => {
+        persistBrandProfileMedia(currentUser.id, {
+          profilePhotoUpdatedAt: nextState.profilePhotoUpdatedAt,
+          profilePhotoViewState: nextState,
+        });
+      })
+      .catch((error) => {
+        console.error('Failed to mark profile photo viewed', error);
+      });
+  }, [
+    avatarHighlight,
+    currentUser?.id,
+    localAvatarPreview,
+    persistBrandProfileMedia,
+    profile.profilePhotoViewState,
+    resolvedAvatarUrl,
+  ]);
 
   const headerProfile = useMemo(
     () => ({

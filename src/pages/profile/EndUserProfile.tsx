@@ -25,7 +25,10 @@ import { deriveSizeRecommendation, DISPLAY_CHART_OPTIONS } from '@/lib/sizeChart
 import ImageWithFallback from '@/components/ImageWithFallback';
 import ProfileImageModal from '@/components/profile/ProfileImageModal';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
-import type { ProfilePhotoViewState } from '@/types/profilePhoto';
+import {
+  createUnviewedProfilePhotoViewState,
+  type ProfilePhotoViewState,
+} from '@/types/profilePhoto';
 import {
   fetchDisplayChartPreferenceQuery,
   fetchMySizeFitProfileQuery,
@@ -581,6 +584,13 @@ export const EndUserProfile: React.FC = () => {
         const nextImage = uploaded?.url ?? null;
         const nextImageId = uploaded?.id ?? null;
         const nextProfilePhotoUpdatedAt = new Date().toISOString();
+        const nextProfilePhotoViewState =
+          nextImage || nextImageId
+            ? createUnviewedProfilePhotoViewState(
+                currentUser.id,
+                nextProfilePhotoUpdatedAt,
+              )
+            : null;
 
         setProfile((prev) =>
           prev
@@ -589,7 +599,7 @@ export const EndUserProfile: React.FC = () => {
                 profileImage: nextImage ?? undefined,
                 profileImageId: nextImageId,
                 profilePhotoUpdatedAt: nextProfilePhotoUpdatedAt,
-                profilePhotoViewState: null,
+                profilePhotoViewState: nextProfilePhotoViewState,
                 profileImageFile: nextImage
                   ? {
                       id: nextImageId,
@@ -627,6 +637,7 @@ export const EndUserProfile: React.FC = () => {
           profileImage: nextImage,
           profileImageId: nextImageId,
           profilePhotoUpdatedAt: nextProfilePhotoUpdatedAt,
+          profilePhotoViewState: nextProfilePhotoViewState,
           profileImageFile: nextImage
             ? {
                 id: nextImageId,

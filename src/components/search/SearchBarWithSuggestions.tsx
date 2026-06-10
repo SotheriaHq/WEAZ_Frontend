@@ -192,6 +192,17 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
         submitOnEnter={false}
         className="!max-w-none"
         onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            const activeEntry = open && activeIndex >= 0 ? entries[activeIndex] : undefined;
+            if (activeEntry) {
+              handleSelect(activeEntry);
+            } else {
+              runSearch(value);
+            }
+            return;
+          }
+
           if (!open || entries.length === 0) {
             return;
           }

@@ -83,6 +83,9 @@ function buildEntries(
     });
   }
 
+  for (const item of suggestions?.profiles?.items ?? []) {
+    entries.push({ id: `profile:${item.id}`, label: item.title, kind: 'item', href: item.href, section: 'Profiles', item });
+  }
   for (const item of suggestions?.products?.items ?? []) {
     entries.push({ id: `product:${item.id}`, label: item.title, kind: 'item', href: item.href, section: 'Products', item });
   }
@@ -184,6 +187,8 @@ const SearchSuggestionDropdown: React.FC<SearchSuggestionDropdownProps> = ({
                           ? '🔥'
                           : entry.kind === 'tag'
                             ? '🏷️'
+                            : entry.item?.type === 'profile'
+                              ? '@'
                             : '🔎'}
                   </div>
                 )}

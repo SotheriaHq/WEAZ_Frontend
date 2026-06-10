@@ -9,6 +9,7 @@ import MarketSuggestionBlocks from '@/components/market/MarketSuggestionBlocks';
 
 const TABS: Array<{ key: SearchEntityType | 'all'; label: string }> = [
   { key: 'all', label: 'All' },
+  { key: 'profile', label: 'Profiles' },
   { key: 'product', label: 'Products' },
   { key: 'brand', label: 'Brands' },
   { key: 'design', label: 'Designs' },
@@ -63,7 +64,7 @@ const SearchResultCard: React.FC<{ item: SearchItem; onOpen: () => void }> = ({ 
           fit="cover"
           className="h-full w-full"
         />
-      ) : item.type === 'product' ? '🧵' : item.type === 'brand' ? '🏷️' : item.type === 'design' ? '🎨' : item.type === 'collection' ? '🗂️' : '🔖'}
+      ) : item.type === 'profile' ? '@' : item.type === 'product' ? '🧵' : item.type === 'brand' ? '🏷️' : item.type === 'design' ? '🎨' : item.type === 'collection' ? '🗂️' : '🔖'}
     </div>
 
     <div className="min-w-0 flex-1 space-y-1">
@@ -148,7 +149,7 @@ const SearchResultsPage: React.FC = () => {
           <div className="space-y-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Unified Search</p>
-              <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Find products, brands, designs, and collections</h1>
+              <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Find profiles, products, brands, designs, and collections</h1>
             </div>
 
             <SearchBarWithSuggestions
@@ -156,7 +157,7 @@ const SearchResultsPage: React.FC = () => {
               onValueChange={setDraftQuery}
               onSubmitQuery={submitQuery}
               enableGlobalShortcut={false}
-              placeholder="Search products, brands, designs, collections, or use @brand and /tag"
+              placeholder="Search profiles, products, brands, designs, collections, or use @handle and /tag"
               className="!max-w-none"
             />
 
