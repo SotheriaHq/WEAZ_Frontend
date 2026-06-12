@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { RefreshCcw, WifiOff, ServerCrash, SearchX, Sparkles, TrendingUp, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Masonry from 'react-masonry-css';
+import { useQuery } from '@tanstack/react-query';
 import marketApi from '@/api/MarketApi';
 import { brandApi } from '@/api/BrandApi';
 import DesignApi from '@/api/DesignApi';
@@ -11,7 +12,6 @@ import type { MarketItem } from '@/types/market';
 import DesignCard from '@/components/designs/DesignCard';
 import DesignSkeleton from '@/components/designs/DesignSkeleton';
 import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreProductCard';
-// Category chips live directly on page; tag chips removed for now
 import DesignViewModal from '@/components/designs/DesignViewModal';
 import VLoader from '@/components/loaders/VLoader';
 import { setEngagementState } from '@/features/engagementSlice';
@@ -30,6 +30,8 @@ import {
 } from '@/utils/marketProductMapper';
 import { toDesignMarketItem } from '@/utils/designMarketItem';
 import { shouldLoadProductFallback, type MarketPageMode } from '@/utils/marketFallback';
+import { queryKeys } from '@/query/queryKeys';
+import { useScrollRestore } from '@/components/ScrollRestoreProvider';
 
 // Error type detection
 type ErrorType = 'network' | 'timeout' | 'server' | 'empty' | 'category_empty' | 'unknown';
@@ -251,17 +253,12 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useDispatch();
-  const [items, setItems] = useState<MarketItem[]>([]);
   const [fallbackProducts, setFallbackProducts] = useState<MarketplaceProduct[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [viewItem, setViewItem] = useState<MarketItem | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
@@ -279,6 +276,87 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   const dismissedRouteOpenKeyRef = useRef<string | null>(null);
   const savedBatchInFlightRef = useRef<string | null>(null);
   const savedBatchLastRunRef = useRef<Record<string, number>>({});
+  
+  // Scroll restoration hook
+  const { saveScrollPosition } = useScrollRestore('MARKET_FEED');
+
+  // Fetch market feed using React Query with caching
+  const feedQuery = useQuery({
+    queryKey: queryKeys.market.feed({
+      category: selectedCategory !== 'ALL' ? selectedCategory : undefined,
+      counts: 'combined',
+    }),
+    queryFn: async ({ signal }) => {
+      return await marketApi.getFeed({
+        category: selectedCategory !== 'ALL' ? selectedCategory : undefined,
+        counts: 'combined',
+      }, { signal });
+    },
+    // Will use queryClient defaults: staleTime: 3min, gcTime: 30min, etc.
+  });
+
+  const { data: feedData, isLoading, isStale, isFetching, error: queryError, refetch } = feedQuery;
+
+  // Handle engagement state dispatch when feed data arrives
+  useEffect(() => {
+    if (feedData?.items) {
+      feedData.items.forEach((item) => {
+        dispatch(setEngagementState({
+          contentType: 'COLLECTION_MEDIA',
+          contentId: item.id,
+          threadedByMe: item.isThreaded ?? false,
+          threadCount: item.threadsCount ?? 0,
+          commentCount: item.commentsCount ?? 0,
+          collabCount: item.collectionCollabCount ?? 0,
+        }));
+      });
+    }
+  }, [feedData, dispatch]);
+
+  // Load fallback products if needed
+  useEffect(() => {
+    const loadFallback = async () => {
+      if (!feedData?.items) return;
+      if (
+        !shouldLoadProductFallback({
+          mode,
+          selectedCategory,
+          designItemCount: feedData.items.length,
+        })
+      ) {
+        setFallbackProducts([]);
+        return;
+      }
+
+      try {
+        const response = await apiClient.get('/products/market', {
+          params: { limit: 24, sortBy: 'newest' },
+        });
+        const payload = unwrapApiResponse<RawProductsPayload>(
+          response.data as ApiSuccessPayload<RawProductsPayload>,
+        );
+        const products = Array.isArray(payload?.items)
+          ? payload.items
+              .map((row) => normalizeMarketProduct(row))
+              .filter((product): product is MarketplaceProduct => Boolean(product))
+          : [];
+        setFallbackProducts(products);
+      } catch {
+        setFallbackProducts([]);
+      }
+    };
+
+    void loadFallback();
+  }, [feedData, mode, selectedCategory]);
+
+  // Show query error as state error (convert React Query error to display error)
+  useEffect(() => {
+    if (queryError) {
+      const message =
+        queryError instanceof Error ? queryError.message : 'Unable to load market feed';
+      setError(message);
+    }
+  }, [queryError]);
 
   const closeViewModal = useCallback(() => {
     if (openDesignId || openMediaId || openCommentId) {
@@ -294,90 +372,16 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     }, { replace: true });
   }, [openCommentId, openDesignId, openMediaId, routeOpenKey, setSearchParams]);
 
-  const loadFeed = useCallback(async (options?: { silent?: boolean }) => {
-    const silent = Boolean(options?.silent);
-    // First load shows skeleton; subsequent loads use a soft overlay
-    if (!hasLoadedOnce) {
-      setLoading(true);
-    } else if (!silent) {
-      setRefreshing(true);
-    }
-    if (!silent) {
-      setError(null);
-    }
-    try {
-      const feed = await marketApi.getFeed({
-        // Backend may ignore category until supported
-        category: selectedCategory !== 'ALL' ? selectedCategory : undefined,
-        counts: 'combined',
-      });
-      setItems(feed.items);
-      if (
-        shouldLoadProductFallback({
-          mode,
-          selectedCategory,
-          designItemCount: feed.items.length,
-        })
-      ) {
-        try {
-          const response = await apiClient.get('/products/market', {
-            params: { limit: 24, sortBy: 'newest' },
-          });
-          const payload = unwrapApiResponse<RawProductsPayload>(
-            response.data as ApiSuccessPayload<RawProductsPayload>,
-          );
-          const products = Array.isArray(payload?.items)
-            ? payload.items
-              .map((row) => normalizeMarketProduct(row))
-              .filter((product): product is MarketplaceProduct => Boolean(product))
-            : [];
-          setFallbackProducts(products);
-        } catch {
-          setFallbackProducts([]);
-        }
-      } else {
-        setFallbackProducts([]);
-      }
-      
-      // Initialize Redux engagement state for all items (CRITICAL for thread persistence & real-time comment sync)
-      feed.items.forEach((item) => {
-        dispatch(setEngagementState({
-          contentType: 'COLLECTION_MEDIA',
-          contentId: item.id,
-          threadedByMe: item.isThreaded ?? false,
-          threadCount: item.threadsCount ?? 0,
-          commentCount: item.commentsCount ?? 0,
-          collabCount: item.collectionCollabCount ?? 0,
-        }));
-      });
-      
-      setHasLoadedOnce(true);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to load market feed';
-      if (!silent) {
-        setError(message);
-      }
-    } finally {
-      setLoading(false);
-      if (!silent) {
-        setRefreshing(false);
-      }
-    }
-  }, [selectedCategory, hasLoadedOnce, dispatch, mode]);
-
-  // Load feed on mount and when dependencies change
-  useEffect(() => {
-    void loadFeed();
-  }, [loadFeed]);
-
+  // Handle route-based item opening
   useEffect(() => {
     const shouldResolveFromRoute = Boolean(openDesignId || openMediaId);
-    if (!shouldResolveFromRoute || loading) return;
+    if (!shouldResolveFromRoute || isLoading) return;
     if (dismissedRouteOpenKeyRef.current === routeOpenKey) return;
 
     let cancelled = false;
 
     const resolveRoutedItem = async () => {
+      const items = feedData?.items ?? [];
       const fromFeed = items.find((item) => {
         if (openMediaId) return item.id === openMediaId;
         if (openDesignId) return item.collectionId === openDesignId;
@@ -415,7 +419,9 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     return () => {
       cancelled = true;
     };
-  }, [items, loading, openDesignId, openMediaId, routeOpenKey]);
+  }, [feedData, isLoading, openDesignId, openMediaId, routeOpenKey]);
+
+  const items = feedData?.items ?? [];
 
   const mediaTargetIds = useMemo(
     () => items.map((item) => item.id).filter(Boolean),
@@ -432,6 +438,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     [items],
   );
 
+  // Load saved status for items
   useEffect(() => {
     let mounted = true;
     const loadSaved = async () => {
@@ -478,44 +485,29 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
       }
     };
     void loadSaved();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [isAuth, mediaTargetIds, mediaTargetIdsKey]);
 
+  // Prefetch brand patch statuses
   useEffect(() => {
     if (!isAuth || !isPatchCapable || patchBrandTargetIds.length === 0) return;
     void prefetchStatuses(patchBrandTargetIds);
   }, [isAuth, isPatchCapable, patchBrandTargetIds, prefetchStatuses]);
-  
-  // Force reload when navigating back to this page (fixes image loading issue after route changes)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && hasLoadedOnce) {
-        void loadFeed({ silent: true });
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [loadFeed, hasLoadedOnce]);
 
-  // Tag filter UI removed for now; keep hook slots lean
-
-  // Backend now handles category filtering
+  // Client-side filtering (backend may not filter yet)
   const filteredItems = useMemo(() => {
     let result = items;
-    
-    // Client-side category filter (fallback if backend doesn't filter)
+
     if (selectedCategory !== 'ALL') {
       result = result.filter((item) => {
-        // Check if any tag matches the category slug or label (case-insensitive)
-        // Also check if the item has a category property that matches
         const categoryTerms = [selectedCategory, selectedCategory.replace('_', ' ')];
-        const hasMatchingTag = item.tags.some((tag) => 
-          categoryTerms.some(term => tag.toLowerCase().includes(term.toLowerCase()))
+        const hasMatchingTag = item.tags.some((tag) =>
+          categoryTerms.some((term) => tag.toLowerCase().includes(term.toLowerCase())),
         );
-        // If item has a category field, check that too (assuming item.category exists or similar)
         const hasMatchingCategory = (item as any).category === selectedCategory;
-        
+
         return hasMatchingTag || hasMatchingCategory;
       });
     }
@@ -529,16 +521,19 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   }, [items, selectedTag, selectedCategory]);
 
   const handleViewCollection = (designId: string) => {
+    saveScrollPosition(window.scrollY);
     navigate(buildDesignRoute({ designId, legacyCollectionId: designId }));
   };
 
   const handleViewProduct = (product: StoreProduct) => {
+    saveScrollPosition(window.scrollY);
     navigate(buildProductRoute({ productId: product.id }));
   };
 
   const handleViewBrand = (brandId: string, item: MarketItem) => {
     if (!brandId) return;
-    navigate(`/profile/${brandId}` , {
+    saveScrollPosition(window.scrollY);
+    navigate(`/profile/${brandId}`, {
       state: {
         brandPreview: {
           id: brandId,
@@ -555,18 +550,6 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   };
 
   const handleCommentCountChange = (itemId: string, newCount: number) => {
-    setItems((prevItems) => {
-      let changed = false;
-      const nextItems = prevItems.map((item) => {
-        if (item.id !== itemId) return item;
-        const currentCount = item.commentsCount ?? 0;
-        if (currentCount === newCount) return item;
-        changed = true;
-        return { ...item, commentsCount: newCount };
-      });
-      return changed ? nextItems : prevItems;
-    });
-
     setViewItem((prevItem) => {
       if (!prevItem || prevItem.id !== itemId) return prevItem;
       const currentCount = prevItem.commentsCount ?? 0;
@@ -657,8 +640,8 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
 
       {/* Content + soft overlay wrapper for smooth transitions */}
       <div className="relative min-h-[240px]">
-      <div className={`transition-opacity duration-300 ${(!loading && (refreshing || isPending)) ? 'opacity-60' : 'opacity-100'}`}>
-      {loading && !hasLoadedOnce ? (
+      <div className={`transition-opacity duration-300 ${isFetching && feedData ? 'opacity-60' : 'opacity-100'}`}>
+      {isLoading && !feedData ? (
         <Masonry
           breakpointCols={{
             default: 3,
@@ -678,7 +661,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
         // Smart error state - detects error type for appropriate messaging
         <StateDisplay
           type={detectErrorType(error)}
-          onRetry={() => void loadFeed()}
+          onRetry={() => void refetch()}
         />
       ) : filteredItems.length > 0 ? (
         <Masonry
