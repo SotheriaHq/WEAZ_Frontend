@@ -1,13 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
-import { marketApi, type MarketSection, type MarketSectionItem } from '@/api/MarketApi';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import {
+  marketApi,
+  type MarketSection,
+  type MarketSectionDetailResponse,
+  type MarketSectionItem,
+} from '@/api/MarketApi';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 import ProductCardSkeleton from '@/components/designs/ProductCardSkeleton';
 import StoreProductCard from '@/components/designs/StoreProductCard';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useMarketSignals } from '@/hooks/useMarketSignals';
+import { queryKeys } from '@/query/queryKeys';
 import type { MarketplaceProduct } from '@/utils/marketProductMapper';
 import {
   getSectionItemSignalKey,
@@ -15,17 +22,9 @@ import {
   getSectionItemTargetId,
   mapSectionProductToMarketplaceProduct,
 } from '@/utils/marketSectionMapper';
+import { useScrollRestore } from '@/components/ScrollRestoreProvider';
 
 const SECTION_DETAIL_LIMIT = 24;
-
-const isCanceledRequest = (err: unknown) => {
-  const error = err as { code?: string; name?: string; message?: string };
-  return (
-    error?.code === 'ERR_CANCELED' ||
-    error?.name === 'CanceledError' ||
-    error?.message === 'canceled'
-  );
-};
 
 const formatPriceLabel = (item: MarketSectionItem) => {
   const currency = item.price?.currency || item.priceRange?.currency || 'NGN';
@@ -116,84 +115,80 @@ const MarketSectionPage: React.FC = () => {
   const { sectionKey } = useParams<{ sectionKey: string }>();
   const { anonymousSessionId, flushMarketSignals, trackMarketSignal } =
     useMarketSignals('MARKET_SECTION_DETAIL');
-  const [section, setSection] = useState<MarketSection | null>(null);
-  const [items, setItems] = useState<MarketSectionItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
   const [selectedProduct, setSelectedProduct] = useState<MarketplaceProduct | null>(null);
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const observedItemKeysRef = useRef<Set<string>>(new Set());
   const viewedSectionKeyRef = useRef<string | null>(null);
-  const loadMoreControllerRef = useRef<AbortController | null>(null);
 
   const normalizedSectionKey = useMemo(
     () => String(sectionKey ?? '').trim(),
     [sectionKey],
   );
+  const scrollRestoreKey = normalizedSectionKey
+    ? `MARKET_SECTION:${normalizedSectionKey}`
+    : 'MARKET_SECTION';
+  const { saveScrollPosition } = useScrollRestore(scrollRestoreKey);
 
-  const requestSectionPage = useCallback(
-    async (cursor: string | null | undefined, signal?: AbortSignal) => {
+  const sectionDetailQuery = useInfiniteQuery<MarketSectionDetailResponse>({
+    queryKey: queryKeys.market.sectionDetail(normalizedSectionKey, {
+      limit: SECTION_DETAIL_LIMIT,
+      anonymousSessionId,
+    }),
+    queryFn: async ({ pageParam, signal }) => {
       if (!normalizedSectionKey) {
         throw new Error('Missing market section key.');
       }
+      const cursor = typeof pageParam === 'string' ? pageParam : undefined;
       return marketApi.getMarketSectionDetail(
         normalizedSectionKey,
         {
-          cursor: cursor ?? undefined,
+          cursor,
           limit: SECTION_DETAIL_LIMIT,
           anonymousSessionId,
         },
         { signal },
       );
     },
-    [anonymousSessionId, normalizedSectionKey],
+    initialPageParam: null,
+    enabled: Boolean(normalizedSectionKey),
+    getNextPageParam: (lastPage) =>
+      lastPage.section.pagination?.hasNextPage
+        ? lastPage.section.pagination.nextCursor ?? undefined
+        : undefined,
+  });
+
+  const sectionPages = sectionDetailQuery.data?.pages ?? [];
+  const items = useMemo(
+    () =>
+      sectionPages.reduce<MarketSectionItem[]>((merged, page) => {
+        const pageItems = Array.isArray(page.section.items) ? page.section.items : [];
+        return mergeUniqueItems(merged, pageItems);
+      }, []),
+    [sectionPages],
   );
+  const section = useMemo<MarketSection | null>(() => {
+    const latestSection = sectionPages[sectionPages.length - 1]?.section;
+    if (!latestSection) return null;
+    return {
+      ...latestSection,
+      items,
+    };
+  }, [items, sectionPages]);
+  const loading = sectionDetailQuery.isLoading && !sectionDetailQuery.data;
+  const loadingMore = sectionDetailQuery.isFetchingNextPage;
+  const error = useMemo(() => {
+    if (!normalizedSectionKey) return 'Market section not found.';
+    if (!sectionDetailQuery.error) return null;
+    return sectionDetailQuery.error instanceof Error
+      ? sectionDetailQuery.error.message
+      : 'Unable to load this market section.';
+  }, [normalizedSectionKey, sectionDetailQuery.error]);
 
   useEffect(() => {
-    if (!normalizedSectionKey) {
-      setError('Market section not found.');
-      setLoading(false);
-      return undefined;
-    }
-
-    const controller = new AbortController();
     observedItemKeysRef.current.clear();
     viewedSectionKeyRef.current = null;
     itemRefs.current.clear();
-    setLoading(true);
-    setError(null);
-    setItems([]);
-
-    void requestSectionPage(null, controller.signal)
-      .then((payload) => {
-        if (controller.signal.aborted) return;
-        const nextSection = payload.section;
-        const nextItems = Array.isArray(nextSection.items) ? nextSection.items : [];
-        setSection({ ...nextSection, items: nextItems });
-        setItems(nextItems);
-      })
-      .catch((err) => {
-        if (controller.signal.aborted || isCanceledRequest(err)) return;
-        const message =
-          (err as any)?.response?.data?.message ||
-          (err as Error)?.message ||
-          'Unable to load this market section.';
-        setError(typeof message === 'string' ? message : 'Unable to load this market section.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [normalizedSectionKey, reloadToken, requestSectionPage]);
-
-  useEffect(() => {
-    return () => {
-      loadMoreControllerRef.current?.abort();
-    };
-  }, []);
+  }, [normalizedSectionKey]);
 
   useEffect(() => {
     if (!section || viewedSectionKeyRef.current === section.key) return;
@@ -277,50 +272,23 @@ const MarketSectionPage: React.FC = () => {
 
       const product = mapSectionProductToMarketplaceProduct(item);
       if (product) {
+        saveScrollPosition(scrollRestoreKey, window.scrollY);
         setSelectedProduct(product);
         return;
       }
 
       if (item.target?.route) {
+        saveScrollPosition(scrollRestoreKey, window.scrollY);
         navigate(item.target.route);
       }
     },
-    [flushMarketSignals, navigate, section, trackMarketSignal],
+    [flushMarketSignals, navigate, saveScrollPosition, scrollRestoreKey, section, trackMarketSignal],
   );
 
-  const loadMore = useCallback(async () => {
+  const loadMore = useCallback(() => {
     if (!section?.pagination?.hasNextPage || loadingMore) return;
-    const cursor = section.pagination.nextCursor;
-    if (!cursor) return;
-
-    loadMoreControllerRef.current?.abort();
-    const controller = new AbortController();
-    loadMoreControllerRef.current = controller;
-    setLoadingMore(true);
-    setError(null);
-
-    try {
-      const payload = await requestSectionPage(cursor, controller.signal);
-      if (controller.signal.aborted) return;
-      const incomingSection = payload.section;
-      const incomingItems = Array.isArray(incomingSection.items) ? incomingSection.items : [];
-      const merged = mergeUniqueItems(items, incomingItems);
-      setItems(merged);
-      setSection({ ...incomingSection, items: merged });
-    } catch (err) {
-      if (controller.signal.aborted || isCanceledRequest(err)) return;
-      const message =
-        (err as any)?.response?.data?.message ||
-        (err as Error)?.message ||
-        'Unable to load more from this section.';
-      setError(typeof message === 'string' ? message : 'Unable to load more from this section.');
-    } finally {
-      if (!controller.signal.aborted) {
-        setLoadingMore(false);
-        loadMoreControllerRef.current = null;
-      }
-    }
-  }, [items, loadingMore, requestSectionPage, section]);
+    void sectionDetailQuery.fetchNextPage();
+  }, [loadingMore, section, sectionDetailQuery]);
 
   const hasNextPage = Boolean(section?.pagination?.hasNextPage && section.pagination.nextCursor);
 
@@ -331,7 +299,10 @@ const MarketSectionPage: React.FC = () => {
           <div className="min-w-0">
             <button
               type="button"
-              onClick={() => navigate('/market-place')}
+              onClick={() => {
+                saveScrollPosition(scrollRestoreKey, window.scrollY);
+                navigate('/market-place');
+              }}
               className="mb-3 rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/10"
             >
               Back to market
@@ -363,7 +334,7 @@ const MarketSectionPage: React.FC = () => {
             <p className="text-sm font-semibold text-gray-900 dark:text-white">{error}</p>
             <button
               type="button"
-              onClick={() => setReloadToken((current) => current + 1)}
+              onClick={() => void sectionDetailQuery.refetch()}
               className="mt-4 rounded-full bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black dark:bg-white dark:text-gray-900"
             >
               Retry

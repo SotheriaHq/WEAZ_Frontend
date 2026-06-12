@@ -186,6 +186,8 @@ export const queryKeys = {
       ['market', 'sections', normalizeRecord(params)] as const,
     sectionDetail: (sectionKey?: string | null, params?: Record<string, unknown> | null) =>
       ['market', 'sectionDetail', normalizeId(sectionKey), normalizeRecord(params)] as const,
+    fallbackProducts: (params?: Record<string, unknown> | null) =>
+      ['market', 'fallbackProducts', normalizeRecord(params)] as const,
     suggestions: (params?: Record<string, unknown> | null) =>
       ['market', 'suggestions', normalizeRecord(params)] as const,
   },
@@ -203,7 +205,12 @@ export const isPersistableThreadlyQueryKey = (queryKey: readonly unknown[]) => {
     return scope === 'publicUrl';
   }
   if (root === 'market') {
-    return scope === 'feed' || scope === 'sections' || scope === 'sectionDetail';
+    return (
+      scope === 'feed' ||
+      scope === 'sections' ||
+      scope === 'sectionDetail' ||
+      scope === 'fallbackProducts'
+    );
   }
   return false;
 };

@@ -625,8 +625,14 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
 };
 
 export const marketApi = {
-  async getFeed(params?: GetMarketFeedParams): Promise<MarketFeedResponse> {
-    const response = await apiClient.get('/collections/market', { params });
+  async getFeed(
+    params?: GetMarketFeedParams,
+    options?: { signal?: AbortSignal },
+  ): Promise<MarketFeedResponse> {
+    const response = await apiClient.get('/collections/market', {
+      params,
+      signal: options?.signal,
+    });
     const payload = unwrapApiResponse<MarketFeedResponse | { items?: unknown }>(response.data);
     const data =
       (payload && 'items' in payload ? payload : response.data) as MarketFeedResponse & {

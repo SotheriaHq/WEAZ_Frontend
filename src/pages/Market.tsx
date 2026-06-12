@@ -1,11 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { RefreshCcw, WifiOff, ServerCrash, SearchX, Sparkles, TrendingUp, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Masonry from 'react-masonry-css';
 import { useQuery } from '@tanstack/react-query';
-import marketApi from '@/api/MarketApi';
 import { brandApi } from '@/api/BrandApi';
 import DesignApi from '@/api/DesignApi';
 import type { MarketItem } from '@/types/market';
@@ -30,8 +29,9 @@ import {
 } from '@/utils/marketProductMapper';
 import { toDesignMarketItem } from '@/utils/designMarketItem';
 import { shouldLoadProductFallback, type MarketPageMode } from '@/utils/marketFallback';
-import { queryKeys } from '@/query/queryKeys';
 import { useScrollRestore } from '@/components/ScrollRestoreProvider';
+import useMarketFeed from '@/hooks/useMarketFeed';
+import { queryKeys } from '@/query/queryKeys';
 
 // Error type detection
 type ErrorType = 'network' | 'timeout' | 'server' | 'empty' | 'category_empty' | 'unknown';
@@ -253,7 +253,6 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useDispatch();
-  const [fallbackProducts, setFallbackProducts] = useState<MarketplaceProduct[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [viewItem, setViewItem] = useState<MarketItem | null>(null);
@@ -276,26 +275,22 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   const dismissedRouteOpenKeyRef = useRef<string | null>(null);
   const savedBatchInFlightRef = useRef<string | null>(null);
   const savedBatchLastRunRef = useRef<Record<string, number>>({});
+  const [isPending, startTransition] = useTransition();
   
   // Scroll restoration hook
   const { saveScrollPosition } = useScrollRestore('MARKET_FEED');
 
   // Fetch market feed using React Query with caching
-  const feedQuery = useQuery({
-    queryKey: queryKeys.market.feed({
+  const feedQuery = useMarketFeed({
       category: selectedCategory !== 'ALL' ? selectedCategory : undefined,
       counts: 'combined',
-    }),
-    queryFn: async ({ signal }) => {
-      return await marketApi.getFeed({
-        category: selectedCategory !== 'ALL' ? selectedCategory : undefined,
-        counts: 'combined',
-      }, { signal });
-    },
-    // Will use queryClient defaults: staleTime: 3min, gcTime: 30min, etc.
   });
 
-  const { data: feedData, isLoading, isStale, isFetching, error: queryError, refetch } = feedQuery;
+  const { data: feedData, isLoading, isFetching, error: queryError, refetch } = feedQuery;
+  const loadFeed = useCallback(() => {
+    setError(null);
+    return refetch();
+  }, [refetch]);
 
   // Handle engagement state dispatch when feed data arrives
   useEffect(() => {
@@ -313,41 +308,47 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     }
   }, [feedData, dispatch]);
 
-  // Load fallback products if needed
-  useEffect(() => {
-    const loadFallback = async () => {
-      if (!feedData?.items) return;
-      if (
-        !shouldLoadProductFallback({
-          mode,
-          selectedCategory,
-          designItemCount: feedData.items.length,
-        })
-      ) {
-        setFallbackProducts([]);
-        return;
-      }
+  const shouldUseProductFallback = shouldLoadProductFallback({
+    mode,
+    selectedCategory,
+    designItemCount: feedData?.items.length ?? 0,
+  });
 
-      try {
-        const response = await apiClient.get('/products/market', {
-          params: { limit: 24, sortBy: 'newest' },
-        });
-        const payload = unwrapApiResponse<RawProductsPayload>(
-          response.data as ApiSuccessPayload<RawProductsPayload>,
-        );
-        const products = Array.isArray(payload?.items)
-          ? payload.items
-              .map((row) => normalizeMarketProduct(row))
-              .filter((product): product is MarketplaceProduct => Boolean(product))
-          : [];
-        setFallbackProducts(products);
-      } catch {
-        setFallbackProducts([]);
+  const fallbackProductsQuery = useQuery({
+    queryKey: queryKeys.market.fallbackProducts({
+      surface: 'design-feed',
+      limit: 24,
+      sortBy: 'newest',
+    }),
+    queryFn: async ({ signal }) => {
+      const response = await apiClient.get('/products/market', {
+        params: { limit: 24, sortBy: 'newest' },
+        signal,
+      });
+      const payload = unwrapApiResponse<RawProductsPayload>(
+        response.data as ApiSuccessPayload<RawProductsPayload>,
+      );
+      const products = Array.isArray(payload?.items)
+        ? payload.items
+            .map((row) => normalizeMarketProduct(row))
+            .filter((product): product is MarketplaceProduct => Boolean(product))
+        : [];
+      const byId = new Map<string, MarketplaceProduct>();
+      for (const product of products) {
+        if (!byId.has(product.id)) byId.set(product.id, product);
       }
-    };
+      return Array.from(byId.values());
+    },
+    enabled: Boolean(feedData) && shouldUseProductFallback,
+  });
 
-    void loadFallback();
-  }, [feedData, mode, selectedCategory]);
+  const fallbackProducts = fallbackProductsQuery.data ?? [];
+  const loading =
+    (isLoading && !feedData) ||
+    (shouldUseProductFallback && fallbackProductsQuery.isLoading && fallbackProducts.length === 0);
+  const refreshing =
+    (isFetching && Boolean(feedData)) ||
+    (shouldUseProductFallback && fallbackProductsQuery.isFetching && fallbackProducts.length > 0);
 
   // Show query error as state error (convert React Query error to display error)
   useEffect(() => {
@@ -355,7 +356,9 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
       const message =
         queryError instanceof Error ? queryError.message : 'Unable to load market feed';
       setError(message);
+      return;
     }
+    setError(null);
   }, [queryError]);
 
   const closeViewModal = useCallback(() => {
@@ -521,18 +524,18 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   }, [items, selectedTag, selectedCategory]);
 
   const handleViewCollection = (designId: string) => {
-    saveScrollPosition(window.scrollY);
+    saveScrollPosition('MARKET_FEED', window.scrollY);
     navigate(buildDesignRoute({ designId, legacyCollectionId: designId }));
   };
 
   const handleViewProduct = (product: StoreProduct) => {
-    saveScrollPosition(window.scrollY);
+    saveScrollPosition('MARKET_FEED', window.scrollY);
     navigate(buildProductRoute({ productId: product.id }));
   };
 
   const handleViewBrand = (brandId: string, item: MarketItem) => {
     if (!brandId) return;
-    saveScrollPosition(window.scrollY);
+    saveScrollPosition('MARKET_FEED', window.scrollY);
     navigate(`/profile/${brandId}`, {
       state: {
         brandPreview: {

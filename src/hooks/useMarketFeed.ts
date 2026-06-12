@@ -23,8 +23,8 @@ export const useMarketFeed = (
 ) => {
   return useQuery({
     queryKey: queryKeys.market.feed(params),
-    queryFn: async () => {
-      return await marketApi.getFeed(params);
+    queryFn: async ({ signal }) => {
+      return await marketApi.getFeed(params, { signal });
     },
     enabled: options?.enabled !== false,
     initialData: options?.initialData,

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/api/httpClient';
 import { marketApi, type MarketSection, type MarketSectionItem, type MarketSignalEvent } from '@/api/MarketApi';
@@ -28,6 +29,9 @@ import {
   mapSectionProductToMarketplaceProduct,
 } from '@/utils/marketSectionMapper';
 import { useMarketSignals } from '@/hooks/useMarketSignals';
+import useMarketSections from '@/hooks/useMarketSections';
+import { queryKeys } from '@/query/queryKeys';
+import { useScrollRestore } from '@/components/ScrollRestoreProvider';
 
 const BASE_FILTERS = ['FOR_YOU', 'MENSWEAR', 'WOMENSWEAR', 'EVERYBODY', 'ON_SALE'] as const;
 
@@ -51,15 +55,6 @@ const selectDailyBatch = <T,>(items: T[], batchSize: number, utcDayIndex: number
   const batchIndex = safeDayIndex % batchCount;
   const start = batchIndex * batchSize;
   return items.slice(start, start + batchSize);
-};
-
-const isCanceledRequest = (err: unknown) => {
-  const error = err as { code?: string; name?: string; message?: string };
-  return (
-    error?.code === 'ERR_CANCELED' ||
-    error?.name === 'CanceledError' ||
-    error?.message === 'canceled'
-  );
 };
 
 const extractProductsFromSections = (sections: MarketSection[]) => {
@@ -396,44 +391,53 @@ const MarketPlace: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const isAuth = useSelector((state: RootState) => state.user.isAuthenticated);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [products, setProducts] = useState<MarketplaceProduct[]>([]);
-  const [marketSections, setMarketSections] = useState<MarketSection[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<MarketplaceProduct | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<string>('FOR_YOU');
   const [visibleCount, setVisibleCount] = useState(18);
   const [heroIndex, setHeroIndex] = useState(0);
   const [marketClockMs, setMarketClockMs] = useState<number>(() => Date.now());
+  const [hiddenTargetIds, setHiddenTargetIds] = useState<Set<string>>(() => new Set());
   const { anonymousSessionId, flushMarketSignals, trackMarketSignal } = useMarketSignals('MARKET_HOME');
+  const { saveScrollPosition } = useScrollRestore('MARKET_PLACE');
 
+  const marketSectionsParams = useMemo(
+    () => ({ limit: 8, anonymousSessionId }),
+    [anonymousSessionId],
+  );
+  const marketSectionsQuery = useMarketSections(marketSectionsParams);
+  const rawMarketSections = marketSectionsQuery.data?.sections ?? [];
 
-  const loadProducts = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
-    setError(null);
+  const marketSections = useMemo(
+    () =>
+      rawMarketSections
+        .map((section) => ({
+          ...section,
+          items: (section.items ?? []).filter((item) => {
+            const targetId = getSectionItemTargetId(item);
+            return !targetId || !hiddenTargetIds.has(targetId);
+          }),
+        }))
+        .filter((section) => section.items.length > 0),
+    [hiddenTargetIds, rawMarketSections],
+  );
 
-    try {
-      try {
-        const sectionPayload = await marketApi.getMarketSections(
-          { limit: 8, anonymousSessionId },
-          { signal },
-        );
-        if (signal?.aborted) return;
+  const sectionProducts = useMemo(
+    () => extractProductsFromSections(marketSections),
+    [marketSections],
+  );
 
-        const sections = Array.isArray(sectionPayload.sections) ? sectionPayload.sections : [];
-        const sectionProducts = extractProductsFromSections(sections);
-        setMarketSections(sections);
+  const shouldUseFallbackProducts =
+    !marketSectionsQuery.isLoading &&
+    (marketSectionsQuery.isError || sectionProducts.length === 0);
 
-        if (sectionProducts.length > 0) {
-          setProducts(sectionProducts);
-          return;
-        }
-      } catch (sectionError) {
-        if (isCanceledRequest(sectionError)) return;
-        setMarketSections([]);
-      }
-
+  const fallbackProductsQuery = useQuery({
+    queryKey: queryKeys.market.fallbackProducts({
+      surface: 'market-place',
+      limit: MARKET_FALLBACK_PRODUCT_LIMIT,
+      sortBy: 'newest',
+    }),
+    queryFn: async ({ signal }) => {
       const response: { data: unknown } = await apiClient.get('/store/products/market', {
         params: {
           limit: MARKET_FALLBACK_PRODUCT_LIMIT,
@@ -442,7 +446,6 @@ const MarketPlace: React.FC = () => {
         signal,
       });
 
-      if (signal?.aborted) return;
       const payload: RawProductsPayload = unwrapApiResponse<RawProductsPayload>(
         response.data as ApiSuccessPayload<RawProductsPayload>,
       );
@@ -462,27 +465,33 @@ const MarketPlace: React.FC = () => {
         (a, b) => getProductRecencyTimestamp(b) - getProductRecencyTimestamp(a),
       );
 
-      setProducts(sorted);
-    } catch (err: any) {
-      if (isCanceledRequest(err)) return;
-      const message =
-        err?.response?.data?.message ||
-        err?.message ||
-        'Unable to load the general market right now.';
-      setError(message);
-      toast.error(typeof message === 'string' ? message : 'Failed to load market.');
-    } finally {
-      if (!signal?.aborted) {
-        setLoading(false);
-      }
-    }
-  }, [anonymousSessionId]);
+      return sorted;
+    },
+    enabled: shouldUseFallbackProducts,
+  });
 
-  useEffect(() => {
-    const controller = new AbortController();
-    void loadProducts(controller.signal);
-    return () => controller.abort();
-  }, [loadProducts]);
+  const fallbackProducts = useMemo(
+    () => (fallbackProductsQuery.data ?? []).filter((product) => !hiddenTargetIds.has(product.id)),
+    [fallbackProductsQuery.data, hiddenTargetIds],
+  );
+
+  const products = sectionProducts.length > 0 ? sectionProducts : fallbackProducts;
+  const loading =
+    products.length === 0 &&
+    (marketSectionsQuery.isLoading ||
+      (shouldUseFallbackProducts && fallbackProductsQuery.isLoading));
+  const refreshing =
+    products.length > 0 &&
+    (marketSectionsQuery.isFetching ||
+      (shouldUseFallbackProducts && fallbackProductsQuery.isFetching));
+  const error = useMemo(() => {
+    if (products.length > 0) return null;
+    const queryError =
+      marketSectionsQuery.error ?? fallbackProductsQuery.error ?? null;
+    if (!queryError) return null;
+    if (queryError instanceof Error) return queryError.message;
+    return 'Unable to load the general market right now.';
+  }, [fallbackProductsQuery.error, marketSectionsQuery.error, products.length]);
 
   useEffect(() => {
     if (!isAuth) return;
@@ -491,6 +500,7 @@ const MarketPlace: React.FC = () => {
 
   const handleOpenProduct = useCallback(
     (product: StoreProduct, metadata?: Record<string, unknown>) => {
+      saveScrollPosition('MARKET_PLACE', window.scrollY);
       const marketProduct = product as MarketplaceProduct;
       if (marketProduct.id) {
         trackMarketSignal({
@@ -504,15 +514,16 @@ const MarketPlace: React.FC = () => {
       setSelectedProduct(marketProduct);
       void flushMarketSignals();
     },
-    [flushMarketSignals, trackMarketSignal],
+    [flushMarketSignals, saveScrollPosition, trackMarketSignal],
   );
 
   const handleOpenSectionProduct = useCallback(
     (product: MarketplaceProduct) => {
+      saveScrollPosition('MARKET_PLACE', window.scrollY);
       setSelectedProduct(product);
       void flushMarketSignals();
     },
-    [flushMarketSignals],
+    [flushMarketSignals, saveScrollPosition],
   );
 
   const handleHideMarketSectionItem = useCallback(
@@ -520,28 +531,12 @@ const MarketPlace: React.FC = () => {
       const targetId = getSectionItemTargetId(item);
       if (!targetId) return;
 
-      const previousSections = marketSections;
-      const previousProducts = products;
-
-      setMarketSections((current) =>
-        current
-          .map((entry) =>
-            entry.key === section.key
-              ? {
-                  ...entry,
-                  items: (entry.items ?? []).filter(
-                    (existing) => getSectionItemTargetId(existing) !== targetId,
-                  ),
-                }
-              : entry,
-          )
-          .filter((entry) => entry.items?.length > 0),
-      );
-      if (item.entityType === 'PRODUCT') {
-        setProducts((current) =>
-          current.filter((product) => product.id !== targetId && product.id !== item.sourceId),
-        );
-      }
+      setHiddenTargetIds((current) => {
+        const next = new Set(current);
+        next.add(targetId);
+        if (item.sourceId) next.add(item.sourceId);
+        return next;
+      });
 
       try {
         const suppression = await marketApi.createMarketSuppression({
@@ -562,18 +557,26 @@ const MarketPlace: React.FC = () => {
               void marketApi
                 .deleteMarketSuppression(suppression.id, { anonymousSessionId })
                 .catch(() => undefined);
-              setMarketSections(previousSections);
-              setProducts(previousProducts);
+              setHiddenTargetIds((current) => {
+                const next = new Set(current);
+                next.delete(targetId);
+                if (item.sourceId) next.delete(item.sourceId);
+                return next;
+              });
             },
           },
         });
       } catch {
-        setMarketSections(previousSections);
-        setProducts(previousProducts);
+        setHiddenTargetIds((current) => {
+          const next = new Set(current);
+          next.delete(targetId);
+          if (item.sourceId) next.delete(item.sourceId);
+          return next;
+        });
         toast.error('Could not hide that item. Try again.');
       }
     },
-    [anonymousSessionId, marketSections, products],
+    [anonymousSessionId],
   );
 
   const handleViewAllSection = useCallback(
@@ -587,6 +590,7 @@ const MarketPlace: React.FC = () => {
         sectionKey: section.key,
       });
       void flushMarketSignals();
+      saveScrollPosition('MARKET_PLACE', window.scrollY);
       navigate(`/market/sections/${encodeURIComponent(section.key)}`, {
         state: {
           title: section.title,
@@ -594,7 +598,7 @@ const MarketPlace: React.FC = () => {
         },
       });
     },
-    [flushMarketSignals, navigate, trackMarketSignal],
+    [flushMarketSignals, navigate, saveScrollPosition, trackMarketSignal],
   );
 
   useEffect(() => {
@@ -715,7 +719,11 @@ const MarketPlace: React.FC = () => {
   const activeHero = heroProducts[heroIndex] ?? null;
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] px-4 py-4 sm:px-6 lg:px-8">
+    <div
+      className={`mx-auto w-full max-w-[1440px] px-4 py-4 transition-opacity sm:px-6 lg:px-8 ${
+        refreshing ? 'opacity-95' : 'opacity-100'
+      }`}
+    >
       <div className="space-y-6">
         <section className="rounded-2xl bg-white/35 p-3 backdrop-blur-[2px] ring-1 ring-gray-200/55 dark:bg-white/[0.03] dark:ring-white/10 sm:p-4">
           <div className="grid grid-cols-1 gap-3 lg:min-h-[54px] lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
