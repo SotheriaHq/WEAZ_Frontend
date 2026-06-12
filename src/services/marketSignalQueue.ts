@@ -168,7 +168,10 @@ export const getWebMarketSignalAnonymousSessionId = () => {
 
 const isNoisySignal = (event: MarketSignalEvent) =>
   event.signalType === 'IMPRESSION' ||
+  event.signalType === 'ITEM_IMPRESSION' ||
+  event.signalType === 'ITEM_VIEW' ||
   event.signalType === 'VIEW' ||
+  event.signalType === 'SECTION_VIEW' ||
   event.signalType === 'MARKET_SECTION_VIEW' ||
   event.signalType === 'SUGGESTION_ITEM_VIEW';
 
