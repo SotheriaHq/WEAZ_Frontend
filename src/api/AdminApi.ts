@@ -49,6 +49,7 @@ import type {
   AdminMarketRankingProfile,
   AdminMarketRankingProfileUpsert,
   AdminMarketSectionConfig,
+  AdminMarketSectionConfigCreate,
   AdminMarketSectionConfigUpdate,
   AdminMarketSuggestionBlockConfig,
   AdminMarketSuggestionBlockUpsert,
@@ -607,6 +608,15 @@ export const adminMarketGovernanceApi = {
   getSections: (options?: RequestOptions) =>
     apiClient.get<AdminMarketGovernanceListResponse<AdminMarketSectionConfig>>(
       '/admin/market-governance/sections',
+      { signal: options?.signal },
+    ),
+  createSection: (
+    data: AdminMarketSectionConfigCreate,
+    options?: RequestOptions,
+  ) =>
+    apiClient.post<AdminMarketSectionConfig>(
+      '/admin/market-governance/sections',
+      data,
       { signal: options?.signal },
     ),
   updateSection: (

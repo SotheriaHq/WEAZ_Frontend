@@ -859,19 +859,26 @@ export interface AdminAuditLog {
 }
 
 export type AdminMarketSectionKey =
-  | 'fresh-drops'
   | 'hot-right-now'
-  | 'latest-collections'
+  | 'fresh-drops'
+  | 'picked-for-you'
+  | 'new-designers-to-watch'
   | 'shop-by-style'
-  | 'custom-ready'
-  | 'new-designers-to-watch';
+  | 'loved-near-you'
+  | 'shop-the-look'
+  | 'almost-gone'
+  | 'still-thinking-about-these'
+  | 'more-from-brands-you-like'
+  | 'style-picks-of-the-week';
 
 export type AdminMarketSuggestionContext =
   | 'PRODUCT_DETAIL'
   | 'COLLECTION_DETAIL'
   | 'BRAND_DETAIL'
+  | 'BRAND_STORE'
   | 'SEARCH_EMPTY'
-  | 'MARKET_SECTION_DETAIL';
+  | 'MARKET_SECTION_DETAIL'
+  | 'WISHLIST';
 
 export type AdminMarketSuggestionTargetType =
   | 'PRODUCT'
@@ -907,16 +914,24 @@ export type AdminMarketGovernanceAuditLogListResponse =
 
 export interface AdminMarketSectionConfig {
   id?: string;
-  sectionKey: AdminMarketSectionKey;
+  sectionKey: AdminMarketSectionKey | string;
   title: string;
   subtitle: string | null;
   enabled: boolean;
+  status?: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
+  sourceType?: 'PRODUCT' | 'COLLECTION' | 'DESIGN' | 'BRAND' | 'MIXED';
+  rankingProfileKey?: string | null;
   displayOrder: number;
   previewItemLimit: number;
   detailPageLimit: number;
   minimumItems: number;
   viewAllEnabled: boolean;
+  viewAllLabel?: string | null;
   fallbackMode: string;
+  fallbackSectionKey?: string | null;
+  guestEnabled?: boolean;
+  requiresAuth?: boolean;
+  newBrandReservedRatio?: number;
   metadata: Record<string, unknown> | null;
   source?: AdminMarketConfigSource;
   createdById?: string | null;
@@ -1019,15 +1034,29 @@ export type AdminMarketSectionConfigUpdate = Partial<
     | 'title'
     | 'subtitle'
     | 'enabled'
+    | 'status'
+    | 'sourceType'
+    | 'rankingProfileKey'
     | 'displayOrder'
     | 'previewItemLimit'
     | 'detailPageLimit'
     | 'minimumItems'
     | 'viewAllEnabled'
+    | 'viewAllLabel'
     | 'fallbackMode'
+    | 'fallbackSectionKey'
+    | 'guestEnabled'
+    | 'requiresAuth'
+    | 'newBrandReservedRatio'
     | 'metadata'
   >
 > & { reason?: string };
+
+export type AdminMarketSectionConfigCreate = AdminMarketSectionConfigUpdate & {
+  sectionKey: string;
+  title: string;
+  sourceType: NonNullable<AdminMarketSectionConfig['sourceType']>;
+};
 
 export type AdminMarketRankingProfileUpsert = Partial<
   Pick<

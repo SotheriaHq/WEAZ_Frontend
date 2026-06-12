@@ -27,6 +27,7 @@ import {
   type MarketplaceProduct,
   type RawProductsPayload,
 } from '@/utils/marketProductMapper';
+import { marketApi, type FeedCategory } from '@/api/MarketApi';
 import { toDesignMarketItem } from '@/utils/designMarketItem';
 import { shouldLoadProductFallback, type MarketPageMode } from '@/utils/marketFallback';
 import { useScrollRestore } from '@/components/ScrollRestoreProvider';
@@ -35,6 +36,25 @@ import { queryKeys } from '@/query/queryKeys';
 
 // Error type detection
 type ErrorType = 'network' | 'timeout' | 'server' | 'empty' | 'category_empty' | 'unknown';
+
+const FALLBACK_FEED_CATEGORIES: FeedCategory[] = [
+  {
+    id: 'discover',
+    key: 'discover',
+    label: 'Discover',
+    displayOrder: 10,
+    isDefaultForGuest: true,
+    isDefaultForNewUser: true,
+  },
+  { id: 'explore', key: 'explore', label: 'Explore', displayOrder: 20 },
+  { id: 'african-style', key: 'african-style', label: 'African Style', displayOrder: 30 },
+  { id: 'casual-style', key: 'casual-style', label: 'Casual', displayOrder: 40 },
+];
+
+const BROAD_FEED_CATEGORY_KEYS = new Set(['all', 'discover', 'explore', 'for-you']);
+
+const feedTagForCategory = (categoryKey: string) =>
+  BROAD_FEED_CATEGORY_KEYS.has(categoryKey.toLowerCase()) ? null : categoryKey;
 
 const detectErrorType = (error: string | null, isTimeout?: boolean): ErrorType => {
   if (!error) return 'unknown';
@@ -254,7 +274,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useDispatch();
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [selectedCategory, setSelectedCategory] = useState<string>('discover');
   const [viewItem, setViewItem] = useState<MarketItem | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -280,9 +300,41 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   // Scroll restoration hook
   const { saveScrollPosition } = useScrollRestore('MARKET_FEED');
 
+  const feedCategoriesQuery = useQuery({
+    queryKey: queryKeys.market.feedCategories(),
+    queryFn: ({ signal }) => marketApi.getFeedCategories({ signal }),
+  });
+  const feedCategories = useMemo(() => {
+    const categories = feedCategoriesQuery.data?.categories ?? FALLBACK_FEED_CATEGORIES;
+    return [...categories]
+      .filter((category) => category.status === undefined || category.status === 'ACTIVE')
+      .sort((left, right) => {
+        if (left.displayOrder !== right.displayOrder) return left.displayOrder - right.displayOrder;
+        return left.key.localeCompare(right.key);
+      });
+  }, [feedCategoriesQuery.data?.categories]);
+  const defaultFeedCategory =
+    feedCategoriesQuery.data?.defaults?.selected ??
+    (isAuth
+      ? feedCategoriesQuery.data?.defaults?.authenticatedReturningUser ??
+        feedCategoriesQuery.data?.defaults?.authenticatedNewUser
+      : feedCategoriesQuery.data?.defaults?.guest) ??
+    feedCategories[0]?.key ??
+    'discover';
+  const activeFeedTag = feedTagForCategory(selectedCategory);
+  const activeCategoryLabel =
+    feedCategories.find((category) => category.key === selectedCategory)?.label ?? selectedCategory;
+
+  useEffect(() => {
+    if (!feedCategories.length) return;
+    if (!feedCategories.some((category) => category.key === selectedCategory)) {
+      setSelectedCategory(defaultFeedCategory);
+    }
+  }, [defaultFeedCategory, feedCategories, selectedCategory]);
+
   // Fetch market feed using React Query with caching
   const feedQuery = useMarketFeed({
-      category: selectedCategory !== 'ALL' ? selectedCategory : undefined,
+      tag: activeFeedTag ?? undefined,
       counts: 'combined',
   });
 
@@ -503,13 +555,16 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   const filteredItems = useMemo(() => {
     let result = items;
 
-    if (selectedCategory !== 'ALL') {
+    if (activeFeedTag) {
       result = result.filter((item) => {
-        const categoryTerms = [selectedCategory, selectedCategory.replace('_', ' ')];
+        const categoryTerms = [activeFeedTag, activeFeedTag.replace(/[-_]+/g, ' ')];
         const hasMatchingTag = item.tags.some((tag) =>
           categoryTerms.some((term) => tag.toLowerCase().includes(term.toLowerCase())),
         );
-        const hasMatchingCategory = (item as any).category === selectedCategory;
+        const rawCategory = String((item as any).category ?? '').toLowerCase();
+        const hasMatchingCategory =
+          rawCategory === activeFeedTag.toLowerCase() ||
+          rawCategory === activeFeedTag.replace(/[-_]+/g, ' ').toLowerCase();
 
         return hasMatchingTag || hasMatchingCategory;
       });
@@ -521,7 +576,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
       );
     }
     return result;
-  }, [items, selectedTag, selectedCategory]);
+  }, [items, selectedTag, activeFeedTag]);
 
   const handleViewCollection = (designId: string) => {
     saveScrollPosition('MARKET_FEED', window.scrollY);
@@ -615,18 +670,13 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
 
       <div className="sticky top-16 z-20 mb-1 overflow-x-auto no-scrollbar px-2 py-1">
         <div className="mx-auto flex w-max max-w-full items-center justify-center gap-2 border-b border-[color:var(--border-default)]/70 px-1 pb-1 text-sm">
-        {[
-          { slug: 'ALL', label: 'All' },
-          { slug: 'AFRICAN_FASHION', label: 'African Fashion' },
-          { slug: 'WESTERN_FASHION', label: 'Western Fashion' },
-          { slug: 'DE_HOUSE', label: 'De House' },
-        ].map((cat) => {
-          const active = selectedCategory === cat.slug;
+        {feedCategories.map((cat) => {
+          const active = selectedCategory === cat.key;
           return (
             <button
               type="button"
-              key={cat.slug}
-              onClick={() => startTransition(() => setSelectedCategory(cat.slug))}
+              key={cat.key}
+              onClick={() => startTransition(() => setSelectedCategory(cat.key))}
               aria-pressed={active}
               className={`relative shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
                 active
@@ -718,7 +768,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
             ))}
           </div>
         </section>
-      ) : selectedCategory === 'ALL' ? (
+      ) : !activeFeedTag ? (
         // Empty database state - no designs at all
         <StateDisplay
           type="empty"
@@ -728,10 +778,10 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
         // Category-specific empty state
         <StateDisplay
           type="category_empty"
-          category={selectedCategory}
+          category={activeCategoryLabel}
           onRetry={() => void loadFeed()}
           onViewAll={() => {
-            setSelectedCategory('ALL');
+            setSelectedCategory(defaultFeedCategory);
             setSelectedTag(null);
           }}
         />

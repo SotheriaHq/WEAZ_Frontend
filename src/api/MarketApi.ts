@@ -152,12 +152,47 @@ export interface GetMarketSectionDetailParams {
   anonymousSessionId?: string;
 }
 
+export interface FeedCategory {
+  id: string;
+  key: string;
+  label: string;
+  description?: string | null;
+  surface?: 'DESIGN_FEED' | 'MARKET_HOME';
+  rankingProfileKey?: string | null;
+  displayOrder: number;
+  fallbackCategoryKey?: string | null;
+  requiresAuth?: boolean;
+  requiresPersonalization?: boolean;
+  isDefaultForGuest?: boolean;
+  isDefaultForNewUser?: boolean;
+  isDefaultForReturningUser?: boolean;
+  status?: 'ACTIVE';
+}
+
+export interface FeedCategoriesResponse {
+  generatedAt: string;
+  categories: FeedCategory[];
+  defaults?: {
+    guest?: string;
+    authenticatedNewUser?: string;
+    authenticatedReturningUser?: string;
+    selected?: string;
+  };
+  metadata?: {
+    version: string;
+    personalization: string;
+    cachePolicy: string;
+  };
+}
+
 export type MarketSuggestionContext =
   | 'PRODUCT_DETAIL'
   | 'COLLECTION_DETAIL'
   | 'BRAND_DETAIL'
+  | 'BRAND_STORE'
   | 'SEARCH_EMPTY'
-  | 'MARKET_SECTION_DETAIL';
+  | 'MARKET_SECTION_DETAIL'
+  | 'WISHLIST';
 
 export type MarketSuggestionTargetType =
   | 'PRODUCT'
@@ -225,6 +260,7 @@ export interface GetMarketSuggestionsParams {
   limit?: number;
   cursor?: string | null;
   anonymousSessionId?: string;
+  excludeIds?: string[];
 }
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
@@ -632,6 +668,18 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
 };
 
 export const marketApi = {
+  async getFeedCategories(options?: { signal?: AbortSignal }): Promise<FeedCategoriesResponse> {
+    const response = await apiClient.get('/feed/categories', {
+      signal: options?.signal,
+    });
+    const payload = unwrapApiResponse<FeedCategoriesResponse>(response.data);
+    const data = payload ?? (response.data as FeedCategoriesResponse);
+    return {
+      ...data,
+      categories: Array.isArray(data.categories) ? data.categories : [],
+    };
+  },
+
   async getFeed(
     params?: GetMarketFeedParams,
     options?: { signal?: AbortSignal },
@@ -731,6 +779,7 @@ export const marketApi = {
         limit: params.limit,
         cursor: params.cursor ?? undefined,
         anonymousSessionId: params.anonymousSessionId,
+        excludeIds: params.excludeIds?.filter(Boolean).join(',') || undefined,
       },
       signal: options?.signal,
     });

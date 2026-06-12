@@ -181,6 +181,8 @@ export const queryKeys = {
       ['customOrders', 'activeConfiguration', normalizeId(sourceType), normalizeId(sourceId)] as const,
   },
   market: {
+    feedCategories: () =>
+      ['market', 'feedCategories'] as const,
     feed: (params?: object | null) =>
       ['market', 'feed', normalizeRecord(params)] as const,
     sections: (params?: object | null) =>
@@ -208,6 +210,7 @@ export const isPersistableThreadlyQueryKey = (queryKey: readonly unknown[]) => {
   if (root === 'market') {
     return (
       scope === 'feed' ||
+      scope === 'feedCategories' ||
       scope === 'sections' ||
       scope === 'sectionDetail' ||
       scope === 'fallbackProducts'

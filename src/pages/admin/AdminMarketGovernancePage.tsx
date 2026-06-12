@@ -16,6 +16,7 @@ import type {
   AdminMarketRankingProfile,
   AdminMarketRankingProfileUpsert,
   AdminMarketSectionConfig,
+  AdminMarketSectionConfigCreate,
   AdminMarketSectionConfigUpdate,
   AdminMarketSectionKey,
   AdminMarketSuggestionBlockConfig,
@@ -34,15 +35,26 @@ type TabKey =
   | 'audit';
 
 type SectionDraft = {
+  mode: 'create' | 'edit';
+  originalKey?: string;
+  sectionKey: string;
   title: string;
   subtitle: string;
   enabled: boolean;
+  status: NonNullable<AdminMarketSectionConfig['status']>;
+  sourceType: NonNullable<AdminMarketSectionConfig['sourceType']>;
+  rankingProfileKey: string;
   displayOrder: string;
   previewItemLimit: string;
   detailPageLimit: string;
   minimumItems: string;
   viewAllEnabled: boolean;
+  viewAllLabel: string;
   fallbackMode: string;
+  fallbackSectionKey: string;
+  guestEnabled: boolean;
+  requiresAuth: boolean;
+  newBrandReservedRatio: string;
   reason: string;
 };
 
@@ -108,20 +120,42 @@ const TABS: Array<{ key: TabKey; label: string }> = [
 ];
 
 const SECTION_KEYS: AdminMarketSectionKey[] = [
-  'fresh-drops',
   'hot-right-now',
-  'latest-collections',
-  'shop-by-style',
-  'custom-ready',
+  'fresh-drops',
+  'picked-for-you',
   'new-designers-to-watch',
+  'shop-by-style',
+  'loved-near-you',
+  'shop-the-look',
+  'almost-gone',
+  'still-thinking-about-these',
+  'more-from-brands-you-like',
+  'style-picks-of-the-week',
+];
+
+const SECTION_STATUSES: Array<NonNullable<AdminMarketSectionConfig['status']>> = [
+  'DRAFT',
+  'ACTIVE',
+  'PAUSED',
+  'ARCHIVED',
+];
+
+const SECTION_SOURCE_TYPES: Array<NonNullable<AdminMarketSectionConfig['sourceType']>> = [
+  'PRODUCT',
+  'COLLECTION',
+  'DESIGN',
+  'BRAND',
+  'MIXED',
 ];
 
 const SUGGESTION_CONTEXTS: AdminMarketSuggestionContext[] = [
   'PRODUCT_DETAIL',
   'COLLECTION_DETAIL',
   'BRAND_DETAIL',
+  'BRAND_STORE',
   'SEARCH_EMPTY',
   'MARKET_SECTION_DETAIL',
+  'WISHLIST',
 ];
 
 const SUGGESTION_TARGET_TYPES: AdminMarketSuggestionTargetType[] = [
@@ -289,16 +323,27 @@ const inputClass =
 const panelClass =
   'rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04]';
 
-const createSectionDraft = (section: AdminMarketSectionConfig): SectionDraft => ({
-  title: section.title ?? '',
-  subtitle: section.subtitle ?? '',
-  enabled: section.enabled,
-  displayOrder: String(section.displayOrder),
-  previewItemLimit: String(section.previewItemLimit),
-  detailPageLimit: String(section.detailPageLimit),
-  minimumItems: String(section.minimumItems),
-  viewAllEnabled: section.viewAllEnabled,
-  fallbackMode: section.fallbackMode ?? 'CODE_DEFAULTS',
+const createSectionDraft = (section?: AdminMarketSectionConfig): SectionDraft => ({
+  mode: section ? 'edit' : 'create',
+  originalKey: section?.sectionKey,
+  sectionKey: section?.sectionKey ?? '',
+  title: section?.title ?? '',
+  subtitle: section?.subtitle ?? '',
+  enabled: section?.enabled ?? true,
+  status: section?.status ?? 'ACTIVE',
+  sourceType: section?.sourceType ?? 'PRODUCT',
+  rankingProfileKey: section?.rankingProfileKey ?? 'deterministic-v1',
+  displayOrder: String(section?.displayOrder ?? 100),
+  previewItemLimit: String(section?.previewItemLimit ?? 8),
+  detailPageLimit: String(section?.detailPageLimit ?? 24),
+  minimumItems: String(section?.minimumItems ?? 1),
+  viewAllEnabled: section?.viewAllEnabled ?? true,
+  viewAllLabel: section?.viewAllLabel ?? '',
+  fallbackMode: section?.fallbackMode ?? 'SOURCE_TEMPLATE',
+  fallbackSectionKey: section?.fallbackSectionKey ?? '',
+  guestEnabled: section?.guestEnabled ?? true,
+  requiresAuth: section?.requiresAuth ?? false,
+  newBrandReservedRatio: String(section?.newBrandReservedRatio ?? 0),
   reason: '',
 });
 
@@ -396,6 +441,21 @@ const AdminMarketGovernancePage: React.FC = () => {
     [formulas],
   );
 
+  const sectionOptions = useMemo(() => {
+    const byKey = new Map<string, { value: string; label: string; description?: string }>();
+    for (const key of SECTION_KEYS) {
+      byKey.set(key, { value: key, label: humanize(key), description: 'Built-in section' });
+    }
+    for (const section of sections) {
+      byKey.set(section.sectionKey, {
+        value: section.sectionKey,
+        label: section.title || humanize(section.sectionKey),
+        description: `${humanize(section.sourceType ?? 'PRODUCT')} · ${section.source ?? 'db'}`,
+      });
+    }
+    return Array.from(byKey.values());
+  }, [sections]);
+
   const loadAuditLogs = useCallback(async (cursor?: string, append = false) => {
     const response = await adminMarketGovernanceApi.getAuditLogs({ cursor, limit: 25 });
     const payload = normalizeList(unwrap<AdminMarketGovernanceListResponse<AdminAuditLog>>(response.data));
@@ -483,39 +543,71 @@ const AdminMarketGovernancePage: React.FC = () => {
 
   const saveSection = useCallback(
     async (reasonOverride?: string) => {
-      if (!editingSection || !sectionDraft) return;
+      if (!sectionDraft) return;
+      const isCreate = sectionDraft.mode === 'create';
+      const targetKey = sectionDraft.originalKey ?? sectionDraft.sectionKey.trim();
+      if (isCreate && !sectionDraft.sectionKey.trim()) {
+        toast.error('Section key is required.');
+        return;
+      }
       if (!sectionDraft.title.trim()) {
         toast.error('Section title is required.');
+        return;
+      }
+      if (!sectionDraft.sourceType) {
+        toast.error('Section source type is required.');
         return;
       }
       const payload: AdminMarketSectionConfigUpdate = {
         title: sectionDraft.title.trim(),
         subtitle: sectionDraft.subtitle.trim() || null,
         enabled: sectionDraft.enabled,
-        displayOrder: toInt(sectionDraft.displayOrder, editingSection.displayOrder),
-        previewItemLimit: toInt(sectionDraft.previewItemLimit, editingSection.previewItemLimit),
-        detailPageLimit: toInt(sectionDraft.detailPageLimit, editingSection.detailPageLimit),
-        minimumItems: toInt(sectionDraft.minimumItems, editingSection.minimumItems),
+        status: sectionDraft.status,
+        sourceType: sectionDraft.sourceType,
+        rankingProfileKey: sectionDraft.rankingProfileKey.trim() || null,
+        displayOrder: toInt(sectionDraft.displayOrder, isCreate ? 100 : editingSection?.displayOrder ?? 100),
+        previewItemLimit: toInt(sectionDraft.previewItemLimit, isCreate ? 8 : editingSection?.previewItemLimit ?? 8),
+        detailPageLimit: toInt(sectionDraft.detailPageLimit, isCreate ? 24 : editingSection?.detailPageLimit ?? 24),
+        minimumItems: toInt(sectionDraft.minimumItems, isCreate ? 1 : editingSection?.minimumItems ?? 1),
         viewAllEnabled: sectionDraft.viewAllEnabled,
+        viewAllLabel: sectionDraft.viewAllLabel.trim() || null,
         fallbackMode: sectionDraft.fallbackMode.trim() || 'CODE_DEFAULTS',
+        fallbackSectionKey: sectionDraft.fallbackSectionKey.trim() || null,
+        guestEnabled: sectionDraft.guestEnabled,
+        requiresAuth: sectionDraft.requiresAuth,
+        newBrandReservedRatio: toInt(sectionDraft.newBrandReservedRatio, 0),
         reason: reasonOverride || sectionDraft.reason.trim() || undefined,
       };
       await runMutation(
-        `section:${editingSection.sectionKey}`,
+        `section:${targetKey || 'new'}`,
         async () => {
-          await adminMarketGovernanceApi.updateSection(editingSection.sectionKey, payload);
+          if (isCreate) {
+            await adminMarketGovernanceApi.createSection({
+              ...(payload as AdminMarketSectionConfigCreate),
+              sectionKey: sectionDraft.sectionKey.trim(),
+              title: sectionDraft.title.trim(),
+              sourceType: sectionDraft.sourceType,
+            });
+          } else if (targetKey) {
+            await adminMarketGovernanceApi.updateSection(targetKey, payload);
+          }
           setEditingSection(null);
           setSectionDraft(null);
         },
-        'Market section saved.',
+        isCreate ? 'Market section created.' : 'Market section saved.',
       );
     },
     [editingSection, sectionDraft, runMutation],
   );
 
   const requestSectionSave = () => {
-    if (!editingSection || !sectionDraft) return;
-    const disabling = editingSection.enabled && !sectionDraft.enabled;
+    if (!sectionDraft) return;
+    const disabling =
+      sectionDraft.mode === 'edit' &&
+      Boolean(editingSection) &&
+      ((editingSection.enabled && !sectionDraft.enabled) ||
+        (editingSection.status === 'ACTIVE' &&
+          (sectionDraft.status === 'PAUSED' || sectionDraft.status === 'ARCHIVED')));
     if (disabling) {
       setConfirmState({
         title: 'Disable market section?',
@@ -861,6 +953,20 @@ const AdminMarketGovernancePage: React.FC = () => {
         title="Market Sections"
         description="Control market section labels, limits, order, enabled state, and View All behavior. Backend validation keeps at least one section available."
         meta={sectionReadStatus ? `Config: ${sectionReadStatus}` : undefined}
+        action={
+          canWrite ? (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingSection(null);
+                setSectionDraft(createSectionDraft());
+              }}
+              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 dark:bg-white dark:text-slate-950"
+            >
+              Create section
+            </button>
+          ) : null
+        }
       />
       <div className="grid gap-3">
         {sections.map((section) => (
@@ -872,6 +978,10 @@ const AdminMarketGovernancePage: React.FC = () => {
                   <StatusPill tone={section.enabled ? 'safe' : 'warn'}>
                     {section.enabled ? 'Enabled' : 'Disabled'}
                   </StatusPill>
+                  <StatusPill tone={section.status === 'ACTIVE' ? 'safe' : 'warn'}>
+                    {humanize(section.status ?? 'ACTIVE')}
+                  </StatusPill>
+                  <StatusPill>{humanize(section.sourceType ?? 'PRODUCT')}</StatusPill>
                   <StatusPill>{section.source ?? 'db'}</StatusPill>
                 </div>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{section.subtitle || 'No subtitle'}</p>
@@ -896,6 +1006,8 @@ const AdminMarketGovernancePage: React.FC = () => {
               <KeyValue label="Detail limit" value={section.detailPageLimit} />
               <KeyValue label="Minimum items" value={section.minimumItems} />
               <KeyValue label="View All" value={section.viewAllEnabled ? 'Enabled' : 'Disabled'} />
+              <KeyValue label="New-brand reserve" value={`${section.newBrandReservedRatio ?? 0}%`} />
+              <KeyValue label="Fallback" value={section.fallbackSectionKey ?? section.fallbackMode} />
             </div>
           </div>
         ))}
@@ -1222,18 +1334,23 @@ const AdminMarketGovernancePage: React.FC = () => {
         section={editingSection}
         draft={sectionDraft}
         setDraft={setSectionDraft}
+        sectionOptions={sectionOptions}
         onClose={() => {
           setEditingSection(null);
           setSectionDraft(null);
         }}
         onSave={requestSectionSave}
-        busy={Boolean(editingSection && busyKey === `section:${editingSection.sectionKey}`)}
+        busy={Boolean(
+          sectionDraft &&
+            busyKey === `section:${(sectionDraft.originalKey ?? sectionDraft.sectionKey) || 'new'}`,
+        )}
       />
 
       <ProfileModal
         draft={profileDraft}
         setDraft={setProfileDraft}
         formulaOptions={formulaOptions}
+        sectionOptions={sectionOptions}
         onClose={() => setProfileDraft(null)}
         onSave={() => void saveProfile()}
         busy={Boolean(profileDraft && busyKey === `profile:${profileDraft.originalKey ?? 'new'}`)}
@@ -1359,17 +1476,34 @@ const SectionModal: React.FC<{
   section: AdminMarketSectionConfig | null;
   draft: SectionDraft | null;
   setDraft: React.Dispatch<React.SetStateAction<SectionDraft | null>>;
+  sectionOptions: Array<{ value: string; label: string; description?: string }>;
   onClose: () => void;
   onSave: () => void;
   busy: boolean;
-}> = ({ section, draft, setDraft, onClose, onSave, busy }) => (
-  <Modal open={Boolean(section && draft)} onClose={onClose} title="Edit market section" size="lg">
-    {section && draft ? (
+}> = ({ section, draft, setDraft, sectionOptions, onClose, onSave, busy }) => (
+  <Modal
+    open={Boolean(draft)}
+    onClose={onClose}
+    title={draft?.mode === 'create' ? 'Create market section' : 'Edit market section'}
+    size="xl"
+  >
+    {draft ? (
       <div className="space-y-4">
         <p className="text-sm text-slate-600 dark:text-slate-300">
-          {section.sectionKey}. Backend validation enforces supported keys, bounded limits, and primary section safety.
+          Admins configure the section source, copy, limits, and rollout state. Ranking, fallback,
+          suppression, View All, and suggestions are inherited automatically from the market section
+          system.
         </p>
         <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Section key" hint={draft.mode === 'create' ? 'Lowercase slug. This becomes the stable API and View All key.' : section?.sectionKey}>
+            <input
+              value={draft.sectionKey}
+              onChange={(event) => setDraft((current) => current && { ...current, sectionKey: event.target.value })}
+              disabled={draft.mode === 'edit'}
+              className={inputClass}
+              maxLength={80}
+            />
+          </Field>
           <Field label="Title">
             <input
               value={draft.title}
@@ -1378,14 +1512,31 @@ const SectionModal: React.FC<{
               maxLength={120}
             />
           </Field>
-          <Field label="Fallback mode">
-            <input
-              value={draft.fallbackMode}
-              onChange={(event) => setDraft((current) => current && { ...current, fallbackMode: event.target.value })}
-              className={inputClass}
-              maxLength={40}
-            />
-          </Field>
+          <UniversalSelect
+            label="Status"
+            value={draft.status}
+            onChange={(value) =>
+              setDraft((current) => current && { ...current, status: value as SectionDraft['status'] })
+            }
+            options={SECTION_STATUSES.map((status) => ({ value: status, label: humanize(status) }))}
+          />
+          <UniversalSelect
+            label="Source type"
+            value={draft.sourceType}
+            onChange={(value) =>
+              setDraft((current) => current && { ...current, sourceType: value as SectionDraft['sourceType'] })
+            }
+            options={SECTION_SOURCE_TYPES.map((sourceType) => ({
+              value: sourceType,
+              label: humanize(sourceType),
+              description:
+                sourceType === 'DESIGN'
+                  ? 'Runway/design cards'
+                  : sourceType === 'MIXED'
+                    ? 'Category grid'
+                    : `${humanize(sourceType)} rail`,
+            }))}
+          />
           <div className="md:col-span-2">
             <Field label="Subtitle">
               <textarea
@@ -1396,12 +1547,51 @@ const SectionModal: React.FC<{
               />
             </Field>
           </div>
+          <Field label="Ranking profile key">
+            <input
+              value={draft.rankingProfileKey}
+              onChange={(event) =>
+                setDraft((current) => current && { ...current, rankingProfileKey: event.target.value })
+              }
+              className={inputClass}
+              maxLength={80}
+            />
+          </Field>
+          <Field label="View All label">
+            <input
+              value={draft.viewAllLabel}
+              onChange={(event) => setDraft((current) => current && { ...current, viewAllLabel: event.target.value })}
+              className={inputClass}
+              maxLength={80}
+            />
+          </Field>
+          <Field label="Fallback mode">
+            <input
+              value={draft.fallbackMode}
+              onChange={(event) => setDraft((current) => current && { ...current, fallbackMode: event.target.value })}
+              className={inputClass}
+              maxLength={40}
+            />
+          </Field>
+          <UniversalSelect
+            label="Fallback section"
+            value={draft.fallbackSectionKey}
+            onChange={(value) => setDraft((current) => current && { ...current, fallbackSectionKey: value })}
+            options={[
+              { value: '', label: 'No explicit fallback' },
+              ...sectionOptions.filter((option) => option.value !== draft.sectionKey),
+            ]}
+            searchable
+          />
           <NumberField label="Display order" value={draft.displayOrder} min={0} max={100} onChange={(value) => setDraft((current) => current && { ...current, displayOrder: value })} />
           <NumberField label="Preview item limit" value={draft.previewItemLimit} min={1} max={12} onChange={(value) => setDraft((current) => current && { ...current, previewItemLimit: value })} />
           <NumberField label="Detail page limit" value={draft.detailPageLimit} min={1} max={60} onChange={(value) => setDraft((current) => current && { ...current, detailPageLimit: value })} />
           <NumberField label="Minimum items" value={draft.minimumItems} min={0} max={12} onChange={(value) => setDraft((current) => current && { ...current, minimumItems: value })} />
+          <NumberField label="New-brand reserve %" value={draft.newBrandReservedRatio} min={0} max={50} onChange={(value) => setDraft((current) => current && { ...current, newBrandReservedRatio: value })} />
           <CheckboxField label="Section enabled" checked={draft.enabled} onChange={(enabled) => setDraft((current) => current && { ...current, enabled })} />
           <CheckboxField label="View All enabled" checked={draft.viewAllEnabled} onChange={(viewAllEnabled) => setDraft((current) => current && { ...current, viewAllEnabled })} />
+          <CheckboxField label="Guest visible" checked={draft.guestEnabled} onChange={(guestEnabled) => setDraft((current) => current && { ...current, guestEnabled })} />
+          <CheckboxField label="Requires auth" checked={draft.requiresAuth} onChange={(requiresAuth) => setDraft((current) => current && { ...current, requiresAuth })} />
           <div className="md:col-span-2">
             <Field label="Reason">
               <textarea
@@ -1413,7 +1603,12 @@ const SectionModal: React.FC<{
             </Field>
           </div>
         </div>
-        <ModalActions onClose={onClose} onSave={onSave} busy={busy} saveLabel="Save section" />
+        <ModalActions
+          onClose={onClose}
+          onSave={onSave}
+          busy={busy}
+          saveLabel={draft.mode === 'create' ? 'Create section' : 'Save section'}
+        />
       </div>
     ) : null}
   </Modal>
@@ -1423,10 +1618,11 @@ const ProfileModal: React.FC<{
   draft: ProfileDraft | null;
   setDraft: React.Dispatch<React.SetStateAction<ProfileDraft | null>>;
   formulaOptions: Array<{ value: string; label: string; description?: string }>;
+  sectionOptions: Array<{ value: string; label: string; description?: string }>;
   onClose: () => void;
   onSave: () => void;
   busy: boolean;
-}> = ({ draft, setDraft, formulaOptions, onClose, onSave, busy }) => (
+}> = ({ draft, setDraft, formulaOptions, sectionOptions, onClose, onSave, busy }) => (
   <Modal open={Boolean(draft)} onClose={onClose} title={draft?.mode === 'create' ? 'Create ranking profile' : 'Edit ranking profile'} size="xl">
     {draft ? (
       <div className="space-y-4">
@@ -1478,22 +1674,29 @@ const ProfileModal: React.FC<{
           <div className="md:col-span-2">
             <Field label="Section allowlist">
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {SECTION_KEYS.map((key) => (
-                  <label key={key} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-white/10">
+                {sectionOptions.map((option) => (
+                  <label key={option.value} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-white/10">
                     <input
                       type="checkbox"
-                      checked={draft.sectionKeys.includes(key)}
+                      checked={draft.sectionKeys.includes(option.value)}
                       onChange={(event) =>
                         setDraft((current) => {
                           if (!current) return current;
                           const next = new Set(current.sectionKeys);
-                          if (event.target.checked) next.add(key);
-                          else next.delete(key);
+                          if (event.target.checked) next.add(option.value);
+                          else next.delete(option.value);
                           return { ...current, sectionKeys: Array.from(next) };
                         })
                       }
                     />
-                    {humanize(key)}
+                    <span>
+                      {option.label}
+                      {option.description ? (
+                        <span className="block text-xs text-slate-500 dark:text-slate-400">
+                          {option.description}
+                        </span>
+                      ) : null}
+                    </span>
                   </label>
                 ))}
               </div>

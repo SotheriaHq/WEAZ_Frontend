@@ -11,4 +11,6 @@ export const shouldLoadProductFallback = ({
   selectedCategory,
   designItemCount,
 }: ProductFallbackContext): boolean =>
-  mode === 'market' && selectedCategory === 'ALL' && designItemCount === 0;
+  mode === 'market' &&
+  ['ALL', 'all', 'discover', 'explore', 'for-you'].includes(selectedCategory) &&
+  designItemCount === 0;

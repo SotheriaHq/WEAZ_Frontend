@@ -30,8 +30,10 @@ const contextSurface: Record<MarketSuggestionContext, MarketSignalSurface> = {
   PRODUCT_DETAIL: 'PRODUCT_DETAIL',
   COLLECTION_DETAIL: 'COLLECTION_DETAIL',
   BRAND_DETAIL: 'BRAND_DETAIL',
+  BRAND_STORE: 'BRAND_DETAIL',
   SEARCH_EMPTY: 'SEARCH',
   MARKET_SECTION_DETAIL: 'MARKET_SECTION_DETAIL',
+  WISHLIST: 'SUGGESTION_BLOCK',
 };
 
 const toSignalTargetType = (item: MarketSectionItem): MarketSignalTargetType => {
@@ -195,7 +197,9 @@ const MarketSuggestionBlocks: React.FC<MarketSuggestionBlocksProps> = ({
   const viewedItemsRef = React.useRef<Set<string>>(new Set());
 
   const canFetch =
-    context === 'SEARCH_EMPTY'
+    context === 'WISHLIST'
+      ? true
+      : context === 'SEARCH_EMPTY'
       ? Boolean(query?.trim())
       : context === 'MARKET_SECTION_DETAIL'
         ? Boolean(sectionKey)
