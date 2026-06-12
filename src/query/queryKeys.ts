@@ -11,12 +11,13 @@ const normalizeIdList = (values?: Array<string | null | undefined> | null) =>
     ),
   ).sort();
 
-const normalizeRecord = (value?: Record<string, unknown> | null) => {
+const normalizeRecord = (value?: object | null) => {
   if (!value) return {};
-  return Object.keys(value)
+  const record = value as Record<string, unknown>;
+  return Object.keys(record)
     .sort()
     .reduce<Record<string, unknown>>((acc, key) => {
-      const entry = value[key];
+      const entry = record[key];
       if (entry !== undefined && entry !== null && entry !== '') {
         acc[key] = entry;
       }
@@ -180,15 +181,15 @@ export const queryKeys = {
       ['customOrders', 'activeConfiguration', normalizeId(sourceType), normalizeId(sourceId)] as const,
   },
   market: {
-    feed: (params?: Record<string, unknown> | null) =>
+    feed: (params?: object | null) =>
       ['market', 'feed', normalizeRecord(params)] as const,
-    sections: (params?: Record<string, unknown> | null) =>
+    sections: (params?: object | null) =>
       ['market', 'sections', normalizeRecord(params)] as const,
-    sectionDetail: (sectionKey?: string | null, params?: Record<string, unknown> | null) =>
+    sectionDetail: (sectionKey?: string | null, params?: object | null) =>
       ['market', 'sectionDetail', normalizeId(sectionKey), normalizeRecord(params)] as const,
-    fallbackProducts: (params?: Record<string, unknown> | null) =>
+    fallbackProducts: (params?: object | null) =>
       ['market', 'fallbackProducts', normalizeRecord(params)] as const,
-    suggestions: (params?: Record<string, unknown> | null) =>
+    suggestions: (params?: object | null) =>
       ['market', 'suggestions', normalizeRecord(params)] as const,
   },
 };

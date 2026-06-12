@@ -61,15 +61,15 @@ export const useScrollRestore = (key: string, containerSelector?: string) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       const container = containerSelector
-        ? document.querySelector(containerSelector) as HTMLElement
-        : window;
+        ? (document.querySelector(containerSelector) as HTMLElement | null)
+        : null;
 
       const entry = getScrollPosition(key);
       if (entry) {
-        if (container === window) {
-          window.scrollTo(0, entry.y);
-        } else if (container) {
+        if (container) {
           container.scrollTop = entry.y;
+        } else {
+          window.scrollTo(0, entry.y);
         }
       }
     }, 0);

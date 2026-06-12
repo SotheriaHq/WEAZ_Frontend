@@ -328,7 +328,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           } else {
             if (canUseSourceDirectly(src, fileId)) {
               // If file-id signing fails, keep the raw source as a best-effort fallback.
-              setResolved(src);
+              setResolved(src ?? null);
               setHadError(false);
             } else {
               if (import.meta.env.DEV) {
