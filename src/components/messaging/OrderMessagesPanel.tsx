@@ -240,7 +240,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
         setLoading(false);
       }
     }
-  }, [listMessages, loadSummary]);
+  }, [actorSurface, brandId, contextType, listMessages, loadSummary, orderId, threadId]);
 
   useEffect(() => {
     void refresh();

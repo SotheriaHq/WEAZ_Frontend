@@ -20,6 +20,7 @@ export function useConfirm() {
     open: false,
     options: {},
   });
+  const { open, options, resolve } = state;
 
   const confirm = useCallback((options: ConfirmOptions = {}) => {
     return new Promise<boolean>((resolve) => {
@@ -28,29 +29,29 @@ export function useConfirm() {
   }, []);
 
   const handleCancel = useCallback(() => {
-    state.resolve?.(false);
+    resolve?.(false);
     setState({ open: false, options: {} });
-  }, [state.resolve]);
+  }, [resolve]);
 
   const handleConfirm = useCallback(() => {
-    state.resolve?.(true);
+    resolve?.(true);
     setState({ open: false, options: {} });
-  }, [state.resolve]);
+  }, [resolve]);
 
   const dialog = useMemo(
     () => (
       <ConfirmDialog
-        open={state.open}
-        title={state.options.title}
-        message={state.options.message}
-        confirmText={state.options.confirmText}
-        cancelText={state.options.cancelText}
-        isDestructive={state.options.isDestructive}
+        open={open}
+        title={options.title}
+        message={options.message}
+        confirmText={options.confirmText}
+        cancelText={options.cancelText}
+        isDestructive={options.isDestructive}
         onConfirm={handleConfirm}
         onCancel={handleCancel}
       />
     ),
-    [state.open, state.options, handleConfirm, handleCancel],
+    [open, options, handleConfirm, handleCancel],
   );
 
   return { confirm, ConfirmDialog: dialog };

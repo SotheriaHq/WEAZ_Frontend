@@ -135,18 +135,19 @@ const ReviewComposerModal: React.FC<ReviewComposerModalProps> = ({
   }, [open, reviewId, onClose, flags.writeEnabled, flagsLoading]);
 
   useEffect(() => {
+    const previewUrls = previewUrlsRef.current;
     if (!open) {
-      for (const previewUrl of previewUrlsRef.current) {
+      for (const previewUrl of previewUrls) {
         URL.revokeObjectURL(previewUrl);
       }
-      previewUrlsRef.current.clear();
+      previewUrls.clear();
     }
 
     return () => {
-      for (const previewUrl of previewUrlsRef.current) {
+      for (const previewUrl of previewUrls) {
         URL.revokeObjectURL(previewUrl);
       }
-      previewUrlsRef.current.clear();
+      previewUrls.clear();
     };
   }, [open]);
 

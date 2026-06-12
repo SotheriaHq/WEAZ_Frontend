@@ -246,15 +246,17 @@ html {
 
   .profile-photo-ring-new {
     border-color: var(--profile-photo-ring-new);
-    box-shadow:
-      0 0 0 2px color-mix(in srgb, var(--brand-accent) 72%, transparent),
-      0 0 0 5px rgba(var(--brand-primary-rgb), 0.18),
-      0 14px 34px rgba(var(--brand-primary-rgb), 0.2);
+    box-shadow: 0 10px 24px rgba(var(--brand-primary-rgb), 0.12);
   }
 
   .profile-photo-ring-viewed {
     border-color: var(--profile-photo-ring-viewed);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--profile-photo-ring-viewed) 72%, transparent);
+    box-shadow: none;
+  }
+
+  .profile-photo-frame-neutral {
+    border-color: var(--border-default);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   }
 
   .surface-panel-subtle,

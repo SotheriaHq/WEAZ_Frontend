@@ -1,4 +1,4 @@
-import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import { toast } from 'sonner';
@@ -99,7 +99,7 @@ const AdminCustomOrdersPage: React.FC = () => {
   );
   const selectedSource = selected?.source ?? null;
 
-  const loadSelection = async (targetOrderId: string, sequence: number) => {
+  const loadSelection = useCallback(async (targetOrderId: string, sequence: number) => {
     const [detail, allocationData] = await Promise.all([
       customOrdersAdminApi.getById(targetOrderId),
       customOrdersAdminApi.getLedgerAllocations({ customOrderId: targetOrderId, limit: 50 }),
@@ -111,9 +111,9 @@ const AdminCustomOrdersPage: React.FC = () => {
 
     setSelected(detail);
     setLedgerAllocations(allocationData.items);
-  };
+  }, []);
 
-  const loadSecondaryPanels = async (sequence: number) => {
+  const loadSecondaryPanels = useCallback(async (sequence: number) => {
     const [refundData, staleData, disputeData, pendingBasesData, exceptionData] = await Promise.all([
       customOrdersAdminApi.getRefundReviews({ limit: 8 }),
       customOrdersAdminApi.getStaleOrders({ limit: 8 }),
@@ -134,9 +134,9 @@ const AdminCustomOrdersPage: React.FC = () => {
     setDisputes(disputeData.items);
     setPendingBases(pendingBasesData);
     setExceptionReviews(exceptionData.items);
-  };
+  }, [exceptionStatusFilter]);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     const sequence = refreshSequenceRef.current + 1;
     refreshSequenceRef.current = sequence;
 
@@ -177,11 +177,17 @@ const AdminCustomOrdersPage: React.FC = () => {
         setLoading(false);
       }
     }
-  };
+  }, [
+    deferredSearchQuery,
+    loadSecondaryPanels,
+    loadSelection,
+    orderId,
+    statusFilter,
+  ]);
 
   useEffect(() => {
     void refresh();
-  }, [deferredSearchQuery, orderId, statusFilter, exceptionStatusFilter]);
+  }, [refresh]);
 
   useEffect(() => {
     if (disputes.length > 0 && !selectedDisputeId) {

@@ -251,8 +251,8 @@ export default function InlineProductDetail({
     }
   };
 
-  const sizes = product.sizes || [];
-  const colors = product.colors || [];
+  const sizes = useMemo(() => product.sizes || [], [product.sizes]);
+  const colors = useMemo(() => product.colors || [], [product.colors]);
   const variants = Array.isArray(product.variants) ? product.variants : [];
   const hasVariants = variants.length > 0;
   const inStockVariants = variants.filter((variant) => Number(variant.stock || 0) > 0);

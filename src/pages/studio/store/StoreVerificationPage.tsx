@@ -64,7 +64,15 @@ export default function StoreVerificationPage() {
             );
           });
         setHasDraft(draftHasValues);
-        if (user) {
+        if (
+          user &&
+          (
+            user.verificationStatus !== data.verificationStatus ||
+            user.isVerifiedBrand !== data.badgeState.isVerifiedBrand ||
+            user.verificationBadgeVisible !== data.badgeState.verificationBadgeVisible ||
+            user.verifiedExplanationUrl !== data.badgeState.verifiedExplanationUrl
+          )
+        ) {
           dispatch(
             setUser({
               ...user,
@@ -90,7 +98,7 @@ export default function StoreVerificationPage() {
     return () => {
       active = false;
     };
-  }, [brandId, dispatch]);
+  }, [brandId, dispatch, user]);
 
   const callToAction = useMemo(
     () =>

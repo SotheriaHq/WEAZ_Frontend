@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import type { SizeFitProfile } from '@/types/sizeFit';
@@ -45,8 +45,14 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
     'OWNER_ONLY' | 'REQUIRE_PERMISSION' | 'ALLOW_ANYONE'
   >('REQUIRE_PERMISSION');
   const [notifyOnShare, setNotifyOnShare] = useState(true);
-  const baselinePoints = profile?.baselineMeasurementPoints ?? [];
-  const missingBaselineKeys = profile?.missingBaselineKeys ?? [];
+  const baselinePoints = useMemo(
+    () => profile?.baselineMeasurementPoints ?? [],
+    [profile?.baselineMeasurementPoints],
+  );
+  const missingBaselineKeys = useMemo(
+    () => profile?.missingBaselineKeys ?? [],
+    [profile?.missingBaselineKeys],
+  );
 
   useEffect(() => {
     if (!profile) return;

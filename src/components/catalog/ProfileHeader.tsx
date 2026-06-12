@@ -186,12 +186,10 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
         <div className="relative z-20 flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
           <div className="flex-shrink-0">
             <div
-              className={`rounded-xl border-2 shadow-lg transition-colors duration-300 ${
+              className={`rounded-xl border-2 transition-colors duration-300 ${
                 !showBanner
                   ? 'border-transparent shadow-none ring-0'
-                : avatarHighlight
-                  ? 'border-emerald-400 ring-2 ring-emerald-200/70'
-                  : avatarRingClass || 'border-gray-400 ring-1 ring-black/10 dark:border-gray-900'
+                  : avatarRingClass || (avatarHighlight ? 'profile-photo-ring-new' : 'profile-photo-frame-neutral')
               }`}
             >
               <AvatarCard

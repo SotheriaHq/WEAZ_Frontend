@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import VerificationBadgeMeaningContent from './VerificationBadgeMeaningContent';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 
@@ -15,21 +15,21 @@ export default function VerificationBadgeExplanation({
   const closeTimerRef = useRef<number | null>(null);
   const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
-  const clearCloseTimer = () => {
+  const clearCloseTimer = useCallback(() => {
     if (closeTimerRef.current) {
       window.clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
-  };
+  }, []);
 
-  const queueClose = () => {
+  const queueClose = useCallback(() => {
     clearCloseTimer();
     closeTimerRef.current = window.setTimeout(() => {
       setOpen(false);
     }, 140);
-  };
+  }, [clearCloseTimer]);
 
-  const openPanel = () => {
+  const openPanel = useCallback(() => {
     clearCloseTimer();
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -37,7 +37,7 @@ export default function VerificationBadgeExplanation({
     const left = Math.max(12, Math.min(rect.left, window.innerWidth - panelWidth - 12));
     setPosition({ top: rect.bottom + 10, left });
     setOpen(true);
-  };
+  }, [clearCloseTimer]);
 
   useEffect(() => {
     if (!open) return;
@@ -59,7 +59,7 @@ export default function VerificationBadgeExplanation({
       window.removeEventListener('scroll', onReposition, true);
       document.removeEventListener('mousedown', onOutside);
     };
-  }, [open]);
+  }, [open, openPanel]);
 
   return (
     <>

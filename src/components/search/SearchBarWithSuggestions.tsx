@@ -122,7 +122,9 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
   }, [activeIndex, entries.length]);
 
   const activeDescendantId =
-    activeIndex >= 0 ? `${dropdownId}-option-${activeIndex}` : undefined;
+    open && activeIndex >= 0 && activeIndex < entries.length
+      ? `${dropdownId}-option-${activeIndex}`
+      : undefined;
 
   const runSearch = (query: string) => {
     const next = query.trim();
@@ -188,10 +190,20 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
         ariaAutocomplete="list"
         ariaControls={dropdownId}
         ariaActiveDescendant={activeDescendantId}
+        ariaExpanded={open}
         collapsible={collapsible}
         submitOnEnter={false}
         className="!max-w-none"
         onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            if (open) {
+              event.preventDefault();
+              setOpen(false);
+              setActiveIndex(-1);
+            }
+            return;
+          }
+
           if (event.key === 'Enter') {
             event.preventDefault();
             const activeEntry = open && activeIndex >= 0 ? entries[activeIndex] : undefined;
@@ -213,9 +225,6 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
           } else if (event.key === 'ArrowUp') {
             event.preventDefault();
             setActiveIndex((current) => (current <= 0 ? entries.length - 1 : current - 1));
-          } else if (event.key === 'Escape') {
-            setOpen(false);
-            setActiveIndex(-1);
           }
         }}
       />

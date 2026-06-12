@@ -4,15 +4,28 @@ import { StrictMode } from 'react';
 import { Provider } from 'react-redux';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { env } from '@/config/env';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import userReducer from '@/features/userSlice';
 import { queryClient } from '@/query/queryClient';
 import type { AuthUserDto } from '@/types/auth';
 
-const { apiGet, apiPost, clearWebPrivateSessionState } = vi.hoisted(() => ({
+const {
+  apiGet,
+  apiPost,
+  clearWebPrivateSessionState,
+  dropStoredAccessToken,
+  persistAccessToken,
+  toastError,
+  toastInfo,
+} = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPost: vi.fn(),
   clearWebPrivateSessionState: vi.fn(),
+  dropStoredAccessToken: vi.fn(),
+  persistAccessToken: vi.fn(),
+  toastError: vi.fn(),
+  toastInfo: vi.fn(),
 }));
 
 vi.mock('@/api/httpClient', () => ({
@@ -20,8 +33,8 @@ vi.mock('@/api/httpClient', () => ({
     get: apiGet,
     post: apiPost,
   },
-  dropStoredAccessToken: vi.fn(),
-  persistAccessToken: vi.fn(),
+  dropStoredAccessToken,
+  persistAccessToken,
 }));
 
 vi.mock('@/auth/sessionCleanup', () => ({
@@ -30,8 +43,8 @@ vi.mock('@/auth/sessionCleanup', () => ({
 
 vi.mock('sonner', () => ({
   toast: {
-    error: vi.fn(),
-    info: vi.fn(),
+    error: toastError,
+    info: toastInfo,
   },
 }));
 
@@ -99,6 +112,10 @@ const renderAuthProvider = ({ strict = false }: { strict?: boolean } = {}) => {
   return render(strict ? <StrictMode>{authTree}</StrictMode> : authTree);
 };
 
+const persistBaseUser = () => {
+  localStorage.setItem(env.userStorageKey, JSON.stringify(baseUser));
+};
+
 describe('AuthProvider profile bootstrap', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -113,7 +130,18 @@ describe('AuthProvider profile bootstrap', () => {
     });
   });
 
+  it('skips profile bootstrap when there is no persisted session evidence', async () => {
+    renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByText('auth ready')).toBeInTheDocument();
+    });
+
+    expect(apiGet).not.toHaveBeenCalled();
+  });
+
   it('fetches auth profile with cache bypass headers and a fresh query key request', async () => {
+    persistBaseUser();
     renderAuthProvider();
 
     await waitFor(() => {
@@ -135,6 +163,7 @@ describe('AuthProvider profile bootstrap', () => {
   });
 
   it('finishes auth bootstrap under React StrictMode double effects', async () => {
+    persistBaseUser();
     renderAuthProvider({ strict: true });
 
     await waitFor(() => {
@@ -149,5 +178,45 @@ describe('AuthProvider profile bootstrap', () => {
         }),
       }),
     );
+  });
+
+  it('does not log or clear auth state for expected profile query cancellation', async () => {
+    const cancelled = new Error('Cancelled');
+    cancelled.name = 'CancelledError';
+    persistBaseUser();
+    apiGet.mockRejectedValueOnce(cancelled);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByText('auth ready')).toBeInTheDocument();
+    });
+
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(dropStoredAccessToken).not.toHaveBeenCalled();
+    expect(clearWebPrivateSessionState).not.toHaveBeenCalled();
+
+    consoleError.mockRestore();
+  });
+
+  it('dedupes user-facing expired-session toasts after auth bootstrap', async () => {
+    persistBaseUser();
+    renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByText('auth ready')).toBeInTheDocument();
+    });
+
+    vi.clearAllMocks();
+
+    window.dispatchEvent(new CustomEvent('auth:expired'));
+    window.dispatchEvent(new CustomEvent('auth:expired'));
+
+    await waitFor(() => {
+      expect(clearWebPrivateSessionState).toHaveBeenCalled();
+    });
+    expect(toastInfo).toHaveBeenCalledTimes(1);
+    expect(toastInfo).toHaveBeenCalledWith('Session expired. Please sign in again.');
   });
 });

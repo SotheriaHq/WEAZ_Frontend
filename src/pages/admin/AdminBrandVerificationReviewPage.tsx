@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import { toast } from 'sonner';
@@ -76,7 +76,7 @@ export default function AdminBrandVerificationReviewPage() {
   const [isRevealNinDialogOpen, setIsRevealNinDialogOpen] = useState(false);
   const [isNinRevealed, setIsNinRevealed] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!id) return;
 
     const [detailsResponse, reasonsResponse, notesResponse] = await Promise.all([
@@ -112,7 +112,7 @@ export default function AdminBrandVerificationReviewPage() {
       }
       return merged.documents?.[0]?.key ?? '';
     });
-  };
+  }, [id]);
 
   useEffect(() => {
     let active = true;
@@ -132,7 +132,7 @@ export default function AdminBrandVerificationReviewPage() {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [load]);
 
   const latestAttempt = details?.latestAttempt as Record<string, any> | null;
   const returnTo =

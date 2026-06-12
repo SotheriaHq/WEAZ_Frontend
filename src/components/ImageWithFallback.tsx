@@ -101,6 +101,19 @@ const isS3LikeUrl = (value?: string | null) => {
   return lower.includes('.s3.') || lower.includes('amazonaws.com');
 };
 
+const STORAGE_KEY_PREFIXES = [
+  'PROFILE_IMAGE',
+  'BANNER_IMAGE',
+  'POST_IMAGE',
+  'POST_VIDEO',
+  'REVIEW_IMAGE',
+  'REVIEW_VIDEO',
+  'DOCUMENT',
+  'BRAND_VERIFICATION',
+  'MESSAGE_IMAGE',
+  'MESSAGE_DOCUMENT',
+] as const;
+
 const hasSignedUrlParams = (value?: string | null) => {
   if (!value) return false;
   try {
@@ -149,6 +162,7 @@ const getSignedUrlExpiresAt = (value: string) => {
 
 const isUsableInitialUrl = (value?: string | null) => {
   if (!value || !/^https?:\/\//i.test(value)) return false;
+  if (isS3LikeUrl(value) && !hasSignedUrlParams(value)) return false;
   if (!hasSignedUrlParams(value)) return true;
   const expiresAt = getSignedUrlExpiresAt(value);
   return Boolean(expiresAt && expiresAt > Date.now() + 30_000);
@@ -156,13 +170,18 @@ const isUsableInitialUrl = (value?: string | null) => {
 
 const isRawStorageKey = (value?: string | null) => {
   if (!value) return false;
-  return !/^https?:\/\//i.test(value) && !value.includes('?');
+  if (/^(https?:|data:|blob:)/i.test(value) || value.includes('?')) return false;
+  const normalized = value.replace(/^\/+/, '').toUpperCase();
+  return STORAGE_KEY_PREFIXES.some((prefix) => normalized.startsWith(`${prefix}/`));
 };
 
 const shouldPreferFileIdResolution = (value?: string | null, fileId?: string | null) => {
   if (!value || !fileId) return false;
   return isS3LikeUrl(value);
 };
+
+const canUseSourceDirectly = (value?: string | null, fileId?: string | null) =>
+  isUsableInitialUrl(value) && !shouldPreferFileIdResolution(value, fileId);
 
 const resolveSourceCacheKey = (fileId?: string | null, src?: string | null) => {
   if (fileId) return fileId;
@@ -214,22 +233,22 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const sourceCacheKey = resolveSourceCacheKey(fileId, src);
   const cachedLastGoodUrl = sourceCacheKey ? lastGoodUrlCache.get(sourceCacheKey) ?? null : null;
   const [resolved, setResolved] = useState<string | null>(() => {
-    if (isUsableInitialUrl(src) && !shouldPreferFileIdResolution(src, fileId)) return src ?? null;
+    if (canUseSourceDirectly(src, fileId)) return src ?? null;
     // fileId-based: always resolve via cache, never use the raw ID
     if (fileId) return getCachedUrl(fileId) ?? null;
-    if (src && isRawStorageKey(src)) return getCachedUrl(`key:${src}`) ?? src;
-    // S3-like URLs may be expired signed URLs — check session cache first,
-    // but keep raw as an immediate visual fallback while refresh resolves.
-    if (src && isS3LikeUrl(src)) return getCachedUrl(src) ?? src;
-    // Non-S3 absolute URLs and raw storage keys can be used directly
+    if (src && isRawStorageKey(src)) return getCachedUrl(`key:${src}`) ?? null;
+    // S3-like URLs may be expired or unsigned; never render them until the
+    // permission-gated signer returns a usable URL.
+    if (src && isS3LikeUrl(src)) return getCachedUrl(src) ?? null;
+    // Non-S3 absolute URLs and local app assets can be used directly.
     return src ?? null;
   });
   const [hadError, setHadError] = useState(false);
   const [loaded, setLoaded] = useState(() => {
-    if (isUsableInitialUrl(src) && !shouldPreferFileIdResolution(src, fileId)) return true;
+    if (canUseSourceDirectly(src, fileId)) return true;
     if (fileId) return !!(getCachedUrl(fileId));
     if (src && isRawStorageKey(src)) return !!(getCachedUrl(`key:${src}`));
-    if (src && isS3LikeUrl(src)) return !!(getCachedUrl(src) ?? src);
+    if (src && isS3LikeUrl(src)) return !!getCachedUrl(src);
     return !!src;
   });
   const [lastGoodUrl, setLastGoodUrl] = useState<string | null>(() =>
@@ -253,7 +272,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       }
       setLoaded(false);
 
-      if (isUsableInitialUrl(src) && !shouldPreferFileIdResolution(src, fileId)) {
+      if (canUseSourceDirectly(src, fileId)) {
         setResolved(src ?? null);
         setLoaded(true);
         return;
@@ -262,18 +281,28 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       if (!fileId && src && isS3LikeUrl(src)) {
         const url = await resolveSignedUrl(src, () => brandApi.getSignedS3Url(src));
         if (mounted) {
-          setResolved(url || src);
+          if (url) {
+            setResolved(url);
+          } else {
+            setResolved(null);
+            setHadError(true);
+          }
         }
         return;
       }
 
-      // Handle storage keys persisted without full host (e.g. "POST_IMAGE/.../file.jpg")
-      if (!fileId && src && !src.includes('?') && !/^https?:\/\//i.test(src)) {
+      // Handle storage keys persisted without full host (e.g. "POST_IMAGE/.../file.jpg").
+      if (!fileId && src && isRawStorageKey(src)) {
         const url = await resolveSignedUrl(`key:${src}`, () =>
           brandApi.getSignedS3KeyUrl(src),
         );
         if (mounted) {
-          setResolved(url || src);
+          if (url) {
+            setResolved(url);
+          } else {
+            setResolved(null);
+            setHadError(true);
+          }
         }
         return;
       }
@@ -297,7 +326,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           if (url) {
             setResolved(url);
           } else {
-            if (src && !shouldPreferFileIdResolution(src, fileId)) {
+            if (canUseSourceDirectly(src, fileId)) {
               // If file-id signing fails, keep the raw source as a best-effort fallback.
               setResolved(src);
               setHadError(false);

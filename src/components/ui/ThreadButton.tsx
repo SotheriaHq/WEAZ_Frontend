@@ -402,7 +402,6 @@ const ThreadButton: React.FC<Props> = ({
       parentCollectionId,
       playThreadAnimation,
       triggerRevert,
-      visualState,
     ],
   );
 

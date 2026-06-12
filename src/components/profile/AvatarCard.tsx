@@ -87,7 +87,7 @@ const AvatarCard: React.FC<AvatarCardProps> = ({
             event.stopPropagation();
             onEdit?.();
           }}
-          className="absolute right-2 bottom-2 z-30 rounded-full bg-gradient-to-br from-purple-500 via-fuchsia-500 to-pink-500 p-2 text-white shadow-lg transition hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 disabled:cursor-not-allowed disabled:opacity-70 dark:shadow-purple-900/40"
+          className="absolute right-2 bottom-2 z-30 rounded-full bg-purple-600 p-2 text-white shadow-sm transition hover:scale-105 hover:bg-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 disabled:cursor-not-allowed disabled:opacity-70"
           disabled={loading}
           type="button"
         >

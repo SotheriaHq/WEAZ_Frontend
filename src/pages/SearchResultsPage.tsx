@@ -4,7 +4,7 @@ import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestio
 import useSearch from '@/hooks/useSearch';
 import type { SearchEntityType, SearchHighlightOffset, SearchItem } from '@/types/search';
 import { resolveSearchIntent } from '@/lib/searchRouting';
-import MediaRenderer from '@/components/media/MediaRenderer';
+import ImageWithFallback from '@/components/ImageWithFallback';
 import MarketSuggestionBlocks from '@/components/market/MarketSuggestionBlocks';
 
 const TABS: Array<{ key: SearchEntityType | 'all'; label: string }> = [
@@ -57,12 +57,14 @@ const SearchResultCard: React.FC<{ item: SearchItem; onOpen: () => void }> = ({ 
   >
     <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gray-100 text-2xl dark:bg-white/10">
       {item.imageUrl ? (
-        <MediaRenderer
-          kind="image"
+        <ImageWithFallback
           src={item.imageUrl}
           alt={item.title}
+          fallbackName={item.title}
           fit="cover"
-          className="h-full w-full"
+          className="h-full w-full object-cover"
+          containerClassName="h-full w-full"
+          rounded="xl"
         />
       ) : item.type === 'profile' ? '@' : item.type === 'product' ? '🧵' : item.type === 'brand' ? '🏷️' : item.type === 'design' ? '🎨' : item.type === 'collection' ? '🗂️' : '🔖'}
     </div>

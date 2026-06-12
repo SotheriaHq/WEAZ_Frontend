@@ -1,5 +1,6 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { isCancelledError } from '@tanstack/react-query';
 import { unwrapApiResponse } from '../types/auth';
 import type { AuthUserDto, AuthProfileResponse, AuthTokensResponse } from '../types/auth';
 import { useDispatch } from 'react-redux';
@@ -28,9 +29,41 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const CANCELLED_ERROR_NAMES = new Set(['CancelledError', 'CanceledError', 'AbortError']);
+
+const isExpectedQueryCancellation = (error: unknown) => {
+  if (isCancelledError(error)) {
+    return true;
+  }
+  if (error instanceof Error && CANCELLED_ERROR_NAMES.has(error.name)) {
+    return true;
+  }
+  if (error && typeof error === 'object' && 'name' in error) {
+    const name = (error as { name?: unknown }).name;
+    return typeof name === 'string' && CANCELLED_ERROR_NAMES.has(name);
+  }
+  return false;
+};
+
+const hasPersistedSessionEvidence = () => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  try {
+    return Boolean(
+      localStorage.getItem(env.tokenStorageKey) ||
+        localStorage.getItem(env.userStorageKey),
+    );
+  } catch {
+    return false;
+  }
+};
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(true);
+  const authExpiredToastShownRef = useRef(false);
+  const bootstrapCompleteRef = useRef(false);
 
   const fetchUserProfile = useCallback(async () => {
     const profilePayload = await queryClient.fetchQuery({
@@ -83,6 +116,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const handleProfileError = useCallback(
     (error: unknown, { allowPersistedUser = false }: { allowPersistedUser?: boolean } = {}) => {
+      if (isExpectedQueryCancellation(error)) {
+        return;
+      }
       if (isAxiosError(error)) {
         const status = error.response?.status ?? 0;
         if (status === 401) {
@@ -127,8 +163,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let isMounted = true;
 
     const onAuthExpired = () => {
+      const shouldNotify = bootstrapCompleteRef.current && hasPersistedSessionEvidence();
       void clearPrivateSession();
-      try { toast.info('Session expired. Please sign in again.'); } catch {}
+      if (shouldNotify && !authExpiredToastShownRef.current) {
+        authExpiredToastShownRef.current = true;
+        try { toast.info('Session expired. Please sign in again.'); } catch {}
+      }
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('auth:expired', onAuthExpired);
@@ -161,11 +201,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const initialize = async () => {
       try {
+        if (!hasPersistedSessionEvidence()) {
+          return;
+        }
         await fetchUserProfile();
+        authExpiredToastShownRef.current = false;
       } catch (error) {
+        if (isExpectedQueryCancellation(error)) {
+          return;
+        }
         handleProfileError(error);
         await clearPrivateSession();
       } finally {
+        bootstrapCompleteRef.current = true;
         if (isMounted) {
           setLoading(false);
         }
@@ -207,6 +255,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (accessToken) {
         persistAccessToken(accessToken);
       }
+      authExpiredToastShownRef.current = false;
       queryClient.removeQueries({ queryKey: queryKeys.auth.profile(), exact: true });
 
       if (user && user.id) {

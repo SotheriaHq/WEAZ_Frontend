@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef, useMemo } from 'react';
+import React, { createContext, useCallback, useContext, useReducer, useEffect, useRef, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import type { MediaItem, MediaItemKind } from '../types/media';
 import { normalizeMediaViewSlot } from '@/utils/contentIntegrity';
@@ -108,14 +108,23 @@ export function useMediaStore() {
   if (!ctx) throw new Error('useMediaStore must be used within MediaProvider');
   const { state, dispatch } = ctx;
 
-  return {
+  const addFiles = useCallback(
+    (files: File[], maxItems?: number) => dispatch({ type: 'add', files, maxItems }),
+    [dispatch],
+  );
+  const remove = useCallback((id: string) => dispatch({ type: 'remove', id }), [dispatch]);
+  const clear = useCallback(() => dispatch({ type: 'clear' }), [dispatch]);
+  const set = useCallback((items: MediaItem[]) => dispatch({ type: 'set', items }), [dispatch]);
+  const reorder = useCallback((items: MediaItem[]) => dispatch({ type: 'reorder', items }), [dispatch]);
+
+  return useMemo(() => ({
     items: state.items,
-    addFiles: (files: File[], maxItems?: number) => dispatch({ type: 'add', files, maxItems }),
-    remove: (id: string) => dispatch({ type: 'remove', id }),
-    clear: () => dispatch({ type: 'clear' }),
-    set: (items: MediaItem[]) => dispatch({ type: 'set', items }),
-    reorder: (items: MediaItem[]) => dispatch({ type: 'reorder', items }),
-  };
+    addFiles,
+    remove,
+    clear,
+    set,
+    reorder,
+  }), [addFiles, clear, remove, reorder, set, state.items]);
 }
 
 export default useMediaStore;

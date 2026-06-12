@@ -48,7 +48,7 @@ export const BrandedQRCode = forwardRef<HTMLDivElement, BrandedQRCodeProps>(
       return () => {
         active = false;
       };
-    }, [logo?.fileId, logo?.url, onLogoMessage]);
+    }, [logo, onLogoMessage]);
 
     const darkMode = theme === 'dark';
     const fgColor = darkMode ? '#c4b5fd' : THREADLY_FG_COLOR; // purple-300 in dark, purple-700 in light

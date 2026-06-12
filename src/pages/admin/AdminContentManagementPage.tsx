@@ -135,21 +135,21 @@ const AdminContentManagementPage: React.FC = () => {
   );
 
   const loadPage = useCallback(
-    async (isLoadMore = false) => {
+    async (isLoadMore = false, cursor?: string) => {
       if (visibleTabs.length === 0) {
         return;
       }
       try {
         setError(null);
         if (isLoadMore) {
-          if (!nextCursor) return;
+          if (!cursor) return;
           setLoadingMore(true);
         } else {
           setLoading(true);
           resetCurrentTabItems();
         }
 
-        const page = await fetchTabPage(isLoadMore ? nextCursor : undefined);
+        const page = await fetchTabPage(isLoadMore ? cursor : undefined);
         setNextCursor(page.nextCursor);
 
         if (tab === 'products') {
@@ -166,14 +166,14 @@ const AdminContentManagementPage: React.FC = () => {
         setLoadingMore(false);
       }
     },
-    [fetchTabPage, nextCursor, resetCurrentTabItems, tab, visibleTabs.length],
+    [fetchTabPage, resetCurrentTabItems, tab, visibleTabs.length],
   );
 
   useEffect(() => {
     if (visibleTabs.length === 0) return;
     updateUrlTab(tab);
     void loadPage(false);
-  }, [tab, debouncedSearch, designVisibility, designStatus, designSortBy, visibleTabs.length]);
+  }, [loadPage, tab, updateUrlTab, visibleTabs.length]);
 
   const currentItemsCount = useMemo(() => {
     if (tab === 'products') return products.length;
@@ -671,7 +671,7 @@ const AdminContentManagementPage: React.FC = () => {
         <div className="flex justify-center">
           <button
             type="button"
-            onClick={() => void loadPage(true)}
+            onClick={() => void loadPage(true, nextCursor)}
             disabled={loadingMore}
             className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10"
           >

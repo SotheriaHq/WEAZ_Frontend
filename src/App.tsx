@@ -49,6 +49,7 @@ import RequireAdmin from './components/admin/RequireAdmin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { ThemeBackendSync } from '@/components/theme/ThemeBackendSync';
+import ScrollRestoreProvider from '@/components/ScrollRestoreProvider';
 
 const Market = lazy(() => import('./pages/Market'));
 const CartDrawer = lazy(() => import('./components/designs/CartDrawer'));
@@ -922,12 +923,14 @@ const router = createBrowserRouter([
 const App: React.FC = () => (
   <AuthProvider>
     <ThemeBackendSync />
-    <DropdownManagerProvider>
-      <BrandPatchProvider>
-        <Toaster position="top-center" richColors closeButton />
-        <RouterProvider router={router} />
-      </BrandPatchProvider>
-    </DropdownManagerProvider>
+    <ScrollRestoreProvider>
+      <DropdownManagerProvider>
+        <BrandPatchProvider>
+          <Toaster position="top-center" richColors closeButton />
+          <RouterProvider router={router} />
+        </BrandPatchProvider>
+      </DropdownManagerProvider>
+    </ScrollRestoreProvider>
   </AuthProvider>
 );
 

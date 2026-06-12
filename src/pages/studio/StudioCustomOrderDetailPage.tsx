@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -225,7 +225,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
   const [exceptionQuote, setExceptionQuote] = useState('');
   const highlightMessageId = searchParams.get('messageId');
 
-  const loadOrder = async (resolvedBrandId?: string | null) => {
+  const loadOrder = useCallback(async (resolvedBrandId?: string | null) => {
     if (!orderId) return;
     const effectiveBrandId = resolvedBrandId ?? brandId;
     if (!effectiveBrandId) return;
@@ -240,7 +240,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [brandId, navigate, orderId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -263,7 +263,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [orderId]);
+  }, [loadOrder]);
 
   useEffect(() => {
     const nextTab = hashToTab(location.hash);

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { clsx } from 'clsx';
 import { OverlayPortal } from './OverlayPortal';
 import { useDropdownManagerOptional } from '@/context/DropdownManagerContext';
@@ -56,14 +56,14 @@ export const Dropdown: React.FC<DropdownProps> = ({
   const resolvedId = menuId ?? generatedId;
   const managerOpen = dropdownManager ? dropdownManager.openId === resolvedId : undefined;
   const open = controlledOpen ?? managerOpen ?? uncontrolledOpen;
-  const setOpen = (next: boolean) => {
+  const setOpen = useCallback((next: boolean) => {
     if (dropdownManager) {
       dropdownManager.setOpenId(next ? resolvedId : null);
     } else {
       setUncontrolledOpen(next);
     }
     onOpenChange?.(next);
-  };
+  }, [dropdownManager, onOpenChange, resolvedId]);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -227,7 +227,7 @@ export const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
         window.removeEventListener('scroll', update, true);
         window.removeEventListener('resize', update);
       };
-    }, [open, placement, menuRef, triggerRef]);
+    }, [open, placement, menuRef, triggerRef, offset]);
 
     if (!open) return null;
 

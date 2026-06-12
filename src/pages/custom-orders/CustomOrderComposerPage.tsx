@@ -262,11 +262,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
 
   const requiredMeasurementKeys = useMemo(
     () => resolveBuyerRequiredMeasurementKeys(configuration),
-    [
-      configuration?.requiredMeasurementKeys,
-      configuration?.requiredMeasurementPoints,
-      configuration?.resolvedRequiredMeasurementKeys,
-    ],
+    [configuration],
   );
 
   const measurementPointByKey = useMemo(

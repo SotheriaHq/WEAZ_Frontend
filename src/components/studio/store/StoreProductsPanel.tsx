@@ -748,7 +748,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             createdAt: typeof c.createdAt === 'string' ? c.createdAt : undefined,
           }));
         setCollections(mappedCollections.filter((collection) => !isSystemStoreCollection(collection)));
-      } catch (e) {
+      } catch {
         if (!mounted) return;
         setCollections([]);
       } finally {
@@ -802,6 +802,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     });
   }, [draftCollections]);
 
+  const currentPageCursor = page > 1 ? cursorByPage[page] : undefined;
+
   useEffect(() => {
     let mounted = true;
 
@@ -819,14 +821,12 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       try {
         setLoading(true);
 
-        const cursor = page > 1 ? cursorByPage[page] : undefined;
-
         const productsRes = await apiClient.get<Partial<ProductsResponse>>(`/brands/${user.id}/products`, {
           params: {
             page,
             limit,
             sortBy: productSortBy,
-            cursor: cursor ?? undefined,
+            cursor: currentPageCursor ?? undefined,
             search: searchQuery.trim() ? searchQuery.trim() : undefined,
             collectionId: filterCollection !== 'all' ? filterCollection : undefined,
             isActive:
@@ -869,7 +869,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     return () => {
       mounted = false;
     };
-  }, [filterCollection, filterStatus, limit, outletView, page, productSortBy, searchQuery, user?.id]);
+  }, [currentPageCursor, filterCollection, filterStatus, limit, outletView, page, productSortBy, searchQuery, user?.id]);
 
   useEffect(() => {
     let mounted = true;
@@ -1046,13 +1046,12 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
   const refresh = useCallback(async () => {
     if (!user?.id) return;
-    const cursor = page > 1 ? cursorByPage[page] : undefined;
     const productsRes = await apiClient.get<Partial<ProductsResponse>>(`/brands/${user.id}/products`, {
       params: {
         page,
         limit,
         sortBy: productSortBy,
-        cursor: cursor ?? undefined,
+        cursor: currentPageCursor ?? undefined,
         search: searchQuery.trim() ? searchQuery.trim() : undefined,
         collectionId: filterCollection !== 'all' ? filterCollection : undefined,
         isActive:
@@ -1079,7 +1078,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       setCursorByPage((prev) => ({ ...prev, [page + 1]: nextCursor }));
     }
   }, [
-    cursorByPage,
+    currentPageCursor,
     filterCollection,
     filterStatus,
     limit,

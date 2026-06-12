@@ -532,9 +532,7 @@ const EditProduct: React.FC = () => {
     if (localStorage.getItem('threadly_tour_product_create')) return;
     const timer = window.setTimeout(() => setIsTourActive(true), 800);
     return () => clearTimeout(timer);
-    // isEditMode is stable for the lifetime of this page instance
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isEditMode]);
 
   const handleTourClose = useCallback(() => {
     setIsTourActive(false);
@@ -787,11 +785,12 @@ const EditProduct: React.FC = () => {
   }, [pendingMediaFiles, revokeBlobUrl]);
 
   useEffect(() => {
+    const pendingPreviewUrls = pendingPreviewUrlsRef.current;
     return () => {
-      for (const url of pendingPreviewUrlsRef.current.values()) {
+      for (const url of pendingPreviewUrls.values()) {
         revokeBlobUrl(url);
       }
-      pendingPreviewUrlsRef.current.clear();
+      pendingPreviewUrls.clear();
     };
   }, [revokeBlobUrl]);
 
@@ -1101,7 +1100,7 @@ const EditProduct: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [isEditMode, productId, navigate]);
+  }, [includeDeleted, isEditMode, productId, navigate]);
 
   const effectiveCollectionId = useMemo(
     () => (isCollectionFlow ? collectionContextId || form.categoryId : form.categoryId),
@@ -1504,8 +1503,6 @@ const EditProduct: React.FC = () => {
         enterDelay: 350,
       },
     ],
-    // setCollapsedSections is a stable useState setter — no dependency needed
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
@@ -1990,7 +1987,6 @@ const EditProduct: React.FC = () => {
       isEditMode,
       isCollectionFlow,
       isCollectionContext,
-      collectionCategoryById,
       collectionContextId,
       maxMediaCount,
       mediaUrls,
@@ -2202,7 +2198,6 @@ const EditProduct: React.FC = () => {
     user,
     isCollectionFlow,
     collectionContextId,
-    collectionCategoryById,
     pendingSaveDraft,
     pendingStatusOverride,
     variantTotalStock,
@@ -2553,7 +2548,7 @@ const EditProduct: React.FC = () => {
           await productApi.setPrimaryMedia(productId, mediaId);
           notifyProductStudioSync("product-media-primary", productId);
           toast.success("Cover image updated");
-        } catch (error) {
+        } catch {
           toast.error("Failed to update cover image");
         }
       }
@@ -2590,7 +2585,7 @@ const EditProduct: React.FC = () => {
           }
           notifyProductStudioSync("product-media-deleted", productId);
           toast.success("Image deleted");
-        } catch (error) {
+        } catch {
           toast.error("Failed to delete image");
           setMediaUrls((prev) => normalizePrimary([...prev, target]));
         }
@@ -2629,7 +2624,7 @@ const EditProduct: React.FC = () => {
           await productApi.reorderProductMedia(productId, orderedIds);
           updateForm("mediaIds", orderedIds);
           notifyProductStudioSync("product-media-reordered", productId);
-        } catch (error) {
+        } catch {
           toast.error("Failed to reorder images");
         }
       }
@@ -2643,7 +2638,7 @@ const EditProduct: React.FC = () => {
       const duplicated = await productApi.duplicateProduct(productId);
       toast.success("Product duplicated");
       navigate(`/studio/store/products/${duplicated.id}/edit`);
-    } catch (error) {
+    } catch {
       toast.error("Failed to duplicate product");
     }
   }, [productId, navigate]);
@@ -2654,7 +2649,7 @@ const EditProduct: React.FC = () => {
       await productApi.archiveProduct(productId);
       toast.success("Product archived");
       navigate("/studio/store");
-    } catch (error) {
+    } catch {
       toast.error("Failed to archive product");
     }
   }, [productId, navigate]);
@@ -2681,7 +2676,7 @@ const EditProduct: React.FC = () => {
         return;
       }
       navigate("/studio/store");
-    } catch (error) {
+    } catch {
       toast.error("Failed to delete product");
     }
   }, [confirm, isCollectionContext, productId, navigate, returnTo]);

@@ -1733,7 +1733,7 @@ export const brandApi = {
   /**
    * Resolve a raw unsigned S3 URL into a signed/accessible URL.
    * Extracts the S3 key from the URL and calls the public-url-by-key endpoint.
-   * Falls back to returning the original URL if signing fails.
+   * Returns null if signing fails so private/raw bucket URLs are not rendered.
    */
   async getSignedS3Url(
     rawS3Url: string,
@@ -1762,7 +1762,7 @@ export const brandApi = {
       try {
         // Extract the S3 key from the URL (supports malformed legacy URL snapshots).
         const s3Key = extractS3KeyFromMaybeMalformedUrl(cacheKey);
-        if (!s3Key) return cacheKey;
+        if (!s3Key) return null;
 
         // Use the key-based signing endpoint (query param, not path param)
         const response = await apiClient.get('/uploads/public-url-by-key', {
@@ -1780,11 +1780,9 @@ export const brandApi = {
           });
           return signedUrl;
         }
-        // Fall back to raw URL
-        return cacheKey;
+        return null;
       } catch {
-        // If signing fails, return the original raw URL as a best-effort fallback
-        return cacheKey;
+        return null;
       } finally {
         signedUrlPending.delete(cacheKey);
       }

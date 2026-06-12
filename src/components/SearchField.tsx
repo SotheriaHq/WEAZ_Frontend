@@ -20,6 +20,7 @@ interface SearchFieldProps {
   submitOnEnter?: boolean;
   ariaControls?: string;
   ariaActiveDescendant?: string;
+  ariaExpanded?: boolean;
   ariaAutocomplete?: 'list' | 'none';
   /** When true, the field starts collapsed as an emoji icon and expands on click. Default: true */
   collapsible?: boolean;
@@ -44,6 +45,7 @@ const SearchField: React.FC<SearchFieldProps> = ({
   submitOnEnter = true,
   ariaControls,
   ariaActiveDescendant,
+  ariaExpanded,
   ariaAutocomplete = 'none',
   collapsible = true,
 }) => {
@@ -57,6 +59,7 @@ const SearchField: React.FC<SearchFieldProps> = ({
 
   // Field is expanded when focused, has a value, or collapsible is disabled
   const isExpanded = !collapsible || isFocused || Boolean(inputValue);
+  const comboboxExpanded = ariaExpanded ?? isFocused;
 
   const containerClassName = useMemo(
     () => `relative z-[80] flex-1 min-w-0 max-w-2xl ${className ?? ''}`,
@@ -115,9 +118,9 @@ const SearchField: React.FC<SearchFieldProps> = ({
           value={inputValue}
           aria-label={ariaLabel}
           role="combobox"
-          aria-expanded={isFocused}
-          aria-controls={ariaControls}
-          aria-activedescendant={ariaActiveDescendant}
+          aria-expanded={comboboxExpanded}
+          aria-controls={comboboxExpanded ? ariaControls : undefined}
+          aria-activedescendant={comboboxExpanded ? ariaActiveDescendant : undefined}
           aria-autocomplete={ariaAutocomplete}
           onFocus={() => {
             setIsFocused(true);

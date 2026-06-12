@@ -203,7 +203,10 @@ const DashboardHome: React.FC = () => {
     (typeof store?.isLive === 'boolean' ? store.isLive : null) ??
     (typeof (user as any)?.isStoreOpen === 'boolean' ? (user as any).isStoreOpen : false);
   const storeHealth = overview?.storeHealth || { score: 0, responseTime: 0, inventory: 0, reviews: 0 };
-  const actionRequired = overview?.actionRequired || [];
+  const actionRequired = useMemo(
+    () => overview?.actionRequired || [],
+    [overview?.actionRequired],
+  );
 
   const normalizedActionRequired = useMemo(() => {
     return actionRequired.map((item: any) => ({

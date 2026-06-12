@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { productApi } from '@/api/ProductApi';
 import VLoader from '@/components/loaders/VLoader';
@@ -49,17 +49,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
   const [confirmText, setConfirmText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Reset state when modal opens/closes
-  useEffect(() => {
-    if (isOpen && product) {
-      setScreen('impact');
-      setConfirmText('');
-      setError(null);
-      fetchImpact();
-    }
-  }, [isOpen, product?.id]);
-
-  const fetchImpact = async () => {
+  const fetchImpact = useCallback(async () => {
     if (!product?.id) return;
     
     setLoading(true);
@@ -85,7 +75,17 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [product?.id, product?.name]);
+
+  // Reset state when modal opens/closes
+  useEffect(() => {
+    if (isOpen && product?.id) {
+      setScreen('impact');
+      setConfirmText('');
+      setError(null);
+      void fetchImpact();
+    }
+  }, [fetchImpact, isOpen, product?.id]);
 
   const handleDelete = async () => {
     if (!product?.id || confirmText !== 'DELETE') return;

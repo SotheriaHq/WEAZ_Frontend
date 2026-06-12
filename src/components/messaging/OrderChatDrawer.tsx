@@ -161,7 +161,7 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
       void fetchMessages();
     });
     return () => { unsubNotif(); unsubRead(); unsubThread(); };
-  }, [open, orderId, onNotification, fetchMessages, scrollToBottom]);
+  }, [open, orderId, onNotification, onMessageEvent, fetchMessages, scrollToBottom]);
 
   const handleRequestExtension = useCallback(async () => {
     if (actorSurface !== 'BRAND' || !brandId) return;
@@ -306,7 +306,7 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
     } finally {
       setActionLoading(false);
     }
-  }, [actorSurface, contextType, fetchCustomOrderDetail, fetchMessages, orderId]);
+  }, [actorSurface, brandId, contextType, fetchCustomOrderDetail, fetchMessages, orderId]);
 
   useEffect(() => {
     if (!highlightMessageId) return;

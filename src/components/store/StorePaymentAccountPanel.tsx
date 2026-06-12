@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -258,7 +258,7 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
   const lastVerificationKeyRef = useRef('');
   const verificationRunRef = useRef(0);
 
-  const applyLoadedPanelData = (
+  const applyLoadedPanelData = useCallback((
     nextAccount: StorePaymentAccountResponse,
     nextBanks: StorePaymentBankOption[],
   ) => {
@@ -322,9 +322,9 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
         '',
     );
     onStatusChange?.(nextAccount.account ?? null);
-  };
+  }, [onStatusChange]);
 
-  const loadPanel = async (silent = false) => {
+  const loadPanel = useCallback(async (silent = false) => {
     if (!silent) {
       setLoading(true);
     }
@@ -355,7 +355,7 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
         setLoading(false);
       }
     }
-  };
+  }, [applyLoadedPanelData]);
 
   useEffect(() => {
     let cancelled = false;
@@ -397,7 +397,7 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [onStatusChange]);
+  }, [applyLoadedPanelData]);
 
   const account = accountResponse?.account ?? null;
   const statusMeta = getStatusMeta(account?.status);
@@ -438,7 +438,7 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
   const showAccountNameField = Boolean(resolvedVerifiedAccountName);
   const isDevRuntime = import.meta.env.DEV;
 
-  const executeSync = async ({
+  const executeSync = useCallback(async ({
     useExistingAccountNumber,
     successMessage,
     action = 'primary',
@@ -482,7 +482,15 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
       setSaving(false);
       setSyncAction(null);
     }
-  };
+  }, [
+    account?.bankCode,
+    accountNumber,
+    bankCode,
+    loadPanel,
+    primaryContactEmail,
+    primaryContactName,
+    primaryContactPhone,
+  ]);
 
   const handlePrimarySave = async () => {
     if (
@@ -631,7 +639,7 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [accountNumber, bankCode, mode, hasExistingAccount, isDevRuntime]);
+  }, [accountNumber, bankCode, executeSync, mode, hasExistingAccount, isDevRuntime]);
 
   return (
     <div className={`${panelClassName} space-y-6`}>

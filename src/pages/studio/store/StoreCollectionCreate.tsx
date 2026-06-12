@@ -1436,7 +1436,7 @@ const StoreCollectionCreate: React.FC = () => {
           const detail = await productApi.getProduct(productId);
           const normalized = normalizeLinkedProduct(detail);
           if (normalized) hydrated.push(normalized);
-        } catch (err) {
+        } catch {
           // hydration fetch failed – ignore this product
         }
       }
@@ -1608,7 +1608,6 @@ const StoreCollectionCreate: React.FC = () => {
         );
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProducts, hasManualTagEdits, hasManualFilterEdits, hasManualCategoryEdit, hasManualSubCategoryEdit]);
 
   const orderedSelectedProductIds = useMemo(() => {
@@ -1992,14 +1991,14 @@ const StoreCollectionCreate: React.FC = () => {
     }
   };
 
-  const isLikelyFileId = (value?: string | null) =>
+  const isLikelyFileId = useCallback((value?: string | null) =>
     Boolean(value) &&
     !value!.includes("://") &&
     !value!.startsWith("http") &&
     !value!.startsWith("/") &&
-    !value!.includes("/");
+    !value!.includes("/"), []);
 
-  const resolveImageCandidate = (value?: string | null) => {
+  const resolveImageCandidate = useCallback((value?: string | null) => {
     if (typeof value !== "string") {
       return { src: null as string | null, fileId: null as string | null };
     }
@@ -2013,7 +2012,7 @@ const StoreCollectionCreate: React.FC = () => {
     // Keep remote URLs and raw storage keys as src so ImageWithFallback can
     // resolve signed URLs for keys containing path segments.
     return { src: normalized, fileId: null as string | null };
-  };
+  }, [isLikelyFileId]);
 
   const getProductImage = (product: StoreProduct) => {
     const cover =
@@ -2151,7 +2150,7 @@ const StoreCollectionCreate: React.FC = () => {
     }
 
     return entries;
-  }, []);
+  }, [isLikelyFileId, resolveImageCandidate]);
 
   const previewImages = useMemo(
     () => (previewProduct ? getProductPreviewSources(previewProduct) : []),

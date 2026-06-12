@@ -448,7 +448,7 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
         const data = await getMyOrder(orderId);
         if (!mounted) return;
         setOrder(data as Order);
-      } catch (error) {
+      } catch {
         if (!mounted) return;
         setOrder(null);
       } finally {

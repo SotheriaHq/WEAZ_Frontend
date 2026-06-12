@@ -179,6 +179,16 @@ export const queryKeys = {
     activeConfiguration: (sourceType?: string | null, sourceId?: string | null) =>
       ['customOrders', 'activeConfiguration', normalizeId(sourceType), normalizeId(sourceId)] as const,
   },
+  market: {
+    feed: (params?: Record<string, unknown> | null) =>
+      ['market', 'feed', normalizeRecord(params)] as const,
+    sections: (params?: Record<string, unknown> | null) =>
+      ['market', 'sections', normalizeRecord(params)] as const,
+    sectionDetail: (sectionKey?: string | null, params?: Record<string, unknown> | null) =>
+      ['market', 'sectionDetail', normalizeId(sectionKey), normalizeRecord(params)] as const,
+    suggestions: (params?: Record<string, unknown> | null) =>
+      ['market', 'suggestions', normalizeRecord(params)] as const,
+  },
 };
 
 export const isPersistableThreadlyQueryKey = (queryKey: readonly unknown[]) => {
@@ -191,6 +201,9 @@ export const isPersistableThreadlyQueryKey = (queryKey: readonly unknown[]) => {
   }
   if (root === 'media') {
     return scope === 'publicUrl';
+  }
+  if (root === 'market') {
+    return scope === 'feed' || scope === 'sections' || scope === 'sectionDetail';
   }
   return false;
 };

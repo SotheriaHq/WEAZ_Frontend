@@ -41,6 +41,7 @@ const CreateCollectionInner: React.FC = () => {
   
   const mediaStore = useMediaStore();
   const files = mediaStore.items;
+  const setMediaItems = mediaStore.set;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [minPrice, setMinPrice] = useState('');
@@ -187,7 +188,7 @@ const CreateCollectionInner: React.FC = () => {
                 } as MediaItem;
               }),
             );
-            mediaStore.set(mediaResults.filter(Boolean) as MediaItem[]);
+            setMediaItems(mediaResults.filter(Boolean) as MediaItem[]);
           }
         }
       } catch (error: any) {
@@ -201,7 +202,7 @@ const CreateCollectionInner: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [id, isEditMode]);
+  }, [id, isEditMode, setMediaItems]);
 
   useEffect(() => {
     if (!categoryId) {

@@ -15,9 +15,17 @@ export function useMeasurementPoints(filter?: {
   const [error, setError] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
+  const requestFilter = useMemo(() => {
+    const nextFilter = {
+      gender: filter?.gender,
+      category: filter?.category,
+    };
+    return nextFilter.gender || nextFilter.category ? nextFilter : undefined;
+  }, [filter?.gender, filter?.category]);
+
   const cacheKey = useMemo(
-    () => `measurement_points:${filter?.gender ?? 'ALL'}:${filter?.category ?? 'ALL'}`,
-    [filter?.gender, filter?.category],
+    () => `measurement_points:${requestFilter?.gender ?? 'ALL'}:${requestFilter?.category ?? 'ALL'}`,
+    [requestFilter?.gender, requestFilter?.category],
   );
 
   useEffect(() => {
@@ -33,7 +41,7 @@ export function useMeasurementPoints(filter?: {
       try {
         setIsLoading(true);
         setError(null);
-        const response = await MeasurementPointsApi.getAll(filter);
+        const response = await MeasurementPointsApi.getAll(requestFilter);
         if (!active) return;
 
         setPoints(response);
@@ -51,7 +59,7 @@ export function useMeasurementPoints(filter?: {
     return () => {
       active = false;
     };
-  }, [cacheKey, filter?.gender, filter?.category, refreshTick]);
+  }, [cacheKey, requestFilter, refreshTick]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {

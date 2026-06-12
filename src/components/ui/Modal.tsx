@@ -59,7 +59,7 @@ const Modal: React.FC<ModalProps> = ({
         document.documentElement.style.overflow = originalHtmlOverflow;
       };
     }
-  }, [open]);
+  }, [open, scope]);
 
   const modalContent = (
     <div

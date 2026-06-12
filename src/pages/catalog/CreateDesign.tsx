@@ -179,6 +179,7 @@ const CreateDesignInner: React.FC = () => {
 
   const mediaStore = useMediaStore();
   const files = mediaStore.items;
+  const setMediaItems = mediaStore.set;
   const navigate = useNavigate();
   const location = useLocation();
   const customOrderEditorRef = useRef<CustomOrderConfigurationEditorHandle | null>(null);
@@ -448,7 +449,7 @@ const CreateDesignInner: React.FC = () => {
             }),
           );
           const items = mediaResults.filter(Boolean) as MediaItem[];
-          mediaStore.set(items);
+          setMediaItems(items);
         }
       } catch (error: any) {
         console.error(error);
@@ -469,7 +470,7 @@ const CreateDesignInner: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [id, isEditMode]);
+  }, [id, isEditMode, setMediaItems]);
 
   const filteredCategories = useMemo(
     () => filterDesignCategoriesForAudience(categories, type, targetAgeGroup),
@@ -585,11 +586,12 @@ const CreateDesignInner: React.FC = () => {
   }, [files]);
 
   useEffect(() => {
+    const transientObjectUrls = transientObjectUrlsRef.current;
     return () => {
-      for (const url of transientObjectUrlsRef.current.values()) {
+      for (const url of transientObjectUrls.values()) {
         URL.revokeObjectURL(url);
       }
-      transientObjectUrlsRef.current.clear();
+      transientObjectUrls.clear();
     };
   }, []);
 
@@ -1431,7 +1433,6 @@ const CreateDesignInner: React.FC = () => {
     isMadeToOrder,
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const tourSteps = useMemo<TourStep[]>(
     () => [
       {

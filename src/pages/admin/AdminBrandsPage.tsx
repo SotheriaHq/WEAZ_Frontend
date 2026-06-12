@@ -79,42 +79,27 @@ const AdminBrandsPage: React.FC = () => {
 
   useEffect(() => {
     let active = true;
-    const loadQueue = async (loadMore = false) => {
+    const loadQueue = async () => {
       try {
-        if (loadMore) {
-          setQueueLoadingMore(true);
-        } else {
-          setQueueLoading(true);
-        }
+        setQueueLoading(true);
 
         const response = await adminBrandsApi.getVerificationQueue({
           limit: '8',
-          ...(loadMore && queueCursor ? { cursor: queueCursor } : {}),
         });
         const data = unwrapApiResponse<{ items?: VerificationQueueItem[]; nextCursor?: string; totalPending?: number }>(response.data as any);
         if (!active) return;
 
-        if (loadMore) {
-          setVerificationQueue((current) => [...current, ...(data.items ?? [])]);
-        } else {
-          setVerificationQueue(data.items ?? []);
-        }
+        setVerificationQueue(data.items ?? []);
         setQueueCursor(data.nextCursor ?? null);
         setPendingVerificationCount(data.totalPending ?? 0);
       } catch {
         if (!active) return;
-        if (!loadMore) {
-          setVerificationQueue([]);
-          setPendingVerificationCount(0);
-          setQueueCursor(null);
-        }
+        setVerificationQueue([]);
+        setPendingVerificationCount(0);
+        setQueueCursor(null);
       } finally {
         if (active) {
-          if (loadMore) {
-            setQueueLoadingMore(false);
-          } else {
-            setQueueLoading(false);
-          }
+          setQueueLoading(false);
         }
       }
     };

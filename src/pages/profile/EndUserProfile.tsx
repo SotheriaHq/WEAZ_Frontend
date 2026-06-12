@@ -834,7 +834,7 @@ export const EndUserProfile: React.FC = () => {
       ? profile.profilePhotoViewState.hasUnviewedUpdate
         ? 'profile-photo-ring-new'
         : 'profile-photo-ring-viewed'
-      : 'border-gray-200 shadow-sm dark:border-white/10';
+      : 'profile-photo-frame-neutral';
   const alphaFitLabel = describeAlphaFit(computedAlphaSize);
   const profileActions: ProfileAction[] = [
     {
@@ -897,7 +897,7 @@ export const EndUserProfile: React.FC = () => {
             {/* Avatar */}
             <div className="relative shrink-0">
               <div
-                className={`relative h-32 w-32 overflow-hidden rounded-xl border-2 p-0.5 transition-colors duration-300 sm:h-44 sm:w-44 ${avatarRingClass}`}
+                className={`relative h-32 w-32 overflow-hidden rounded-xl border-2 transition-colors duration-300 sm:h-44 sm:w-44 ${avatarRingClass}`}
               >
                 <button
                   type="button"
@@ -933,7 +933,7 @@ export const EndUserProfile: React.FC = () => {
                     type="button"
                     onClick={handleAvatarButtonClick}
                     disabled={avatarUploading}
-                    className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-purple-600 text-sm shadow-md transition hover:bg-purple-700 active:scale-95 disabled:opacity-60 dark:border-zinc-900"
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-white/80 bg-purple-600 text-sm shadow-sm transition hover:bg-purple-700 active:scale-95 disabled:opacity-60 dark:border-zinc-900/80"
                     title={hasAvatarImage ? 'Profile photo actions' : 'Upload profile photo'}
                     aria-label={hasAvatarImage ? 'Profile photo actions' : 'Upload profile photo'}
                     aria-expanded={avatarActionsOpen}

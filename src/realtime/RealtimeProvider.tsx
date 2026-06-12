@@ -229,7 +229,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     pendingJoinTimeouts.current.set(room, timeoutId);
 
     s.emit('join', { room });
-  }, [clearPendingJoin, userId]);
+  }, [clearPendingJoin]);
 
   const joinCollection = useCallback((collectionId: string) => safeJoin(`COLLECTION:${collectionId}`), [safeJoin]);
   const joinCollectionMedia = useCallback((mediaId: string) => safeJoin(`COLLECTION_MEDIA:${mediaId}`), [safeJoin]);

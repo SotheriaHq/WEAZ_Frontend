@@ -688,7 +688,16 @@ const MessagingManagementPage: React.FC = () => {
       setMessagesLoading(false);
       scrollToBottom();
     }
-  }, [fetchMessages, fetchCustomOrderDetail, fetchThreadOrders, scrollToBottom]);
+  }, [
+    activeConversation,
+    brandId,
+    fetchMessages,
+    fetchCustomOrderDetail,
+    fetchThreadOrders,
+    scrollToBottom,
+    surface,
+    useThreadTransport,
+  ]);
 
   useEffect(() => {
     if (!activeConversation) { setMessages([]); return; }

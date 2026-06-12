@@ -223,8 +223,9 @@ export function useNotificationsBootstrap() {
 
   // Reset preloaded avatar cache when user changes/logs out.
   useEffect(() => {
+    const preloaded = preloadedRef.current;
     return () => {
-      preloadedRef.current.clear();
+      preloaded.clear();
     };
   }, [userId]);
 }
