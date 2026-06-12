@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useScrollRestore } from '@/components/ScrollRestoreProvider';
 import useMarketFeed from '@/hooks/useMarketFeed';
 import useMarketSections from '@/hooks/useMarketSections';

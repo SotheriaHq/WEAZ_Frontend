@@ -406,7 +406,10 @@ const MarketPlace: React.FC = () => {
     [anonymousSessionId],
   );
   const marketSectionsQuery = useMarketSections(marketSectionsParams);
-  const rawMarketSections = marketSectionsQuery.data?.sections ?? [];
+  const rawMarketSections = useMemo(
+    () => marketSectionsQuery.data?.sections ?? [],
+    [marketSectionsQuery.data?.sections],
+  );
 
   const marketSections = useMemo(
     () =>

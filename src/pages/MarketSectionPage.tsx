@@ -157,7 +157,10 @@ const MarketSectionPage: React.FC = () => {
         : undefined,
   });
 
-  const sectionPages = sectionDetailQuery.data?.pages ?? [];
+  const sectionPages = useMemo(
+    () => sectionDetailQuery.data?.pages ?? [],
+    [sectionDetailQuery.data?.pages],
+  );
   const items = useMemo(
     () =>
       sectionPages.reduce<MarketSectionItem[]>((merged, page) => {

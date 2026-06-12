@@ -424,7 +424,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     };
   }, [feedData, isLoading, openDesignId, openMediaId, routeOpenKey]);
 
-  const items = feedData?.items ?? [];
+  const items = useMemo(() => feedData?.items ?? [], [feedData?.items]);
 
   const mediaTargetIds = useMemo(
     () => items.map((item) => item.id).filter(Boolean),
