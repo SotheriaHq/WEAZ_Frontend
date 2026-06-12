@@ -4,6 +4,7 @@ interface ScrollEntry {
   y: number;
   filterState?: Record<string, any>;
   selectedIndex?: number;
+  savedAt: number;
 }
 
 interface ScrollRestoreContextType {
@@ -21,9 +22,18 @@ const ScrollRestoreContext = React.createContext<ScrollRestoreContextType | null
 export const ScrollRestoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const scrollPositions = useRef<Map<string, ScrollEntry>>(new Map());
 
+  useEffect(() => {
+    if (!('scrollRestoration' in window.history)) return;
+    const previous = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+    return () => {
+      window.history.scrollRestoration = previous;
+    };
+  }, []);
+
   const saveScrollPosition = useCallback(
     (key: string, y: number, filterState?: Record<string, any>, selectedIndex?: number) => {
-      scrollPositions.current.set(key, { y, filterState, selectedIndex });
+      scrollPositions.current.set(key, { y, filterState, selectedIndex, savedAt: Date.now() });
     },
     [],
   );
@@ -59,7 +69,7 @@ export const useScrollRestore = (key: string, containerSelector?: string) => {
 
   // Restore scroll on mount
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const restore = () => {
       const container = containerSelector
         ? (document.querySelector(containerSelector) as HTMLElement | null)
         : null;
@@ -72,22 +82,28 @@ export const useScrollRestore = (key: string, containerSelector?: string) => {
           window.scrollTo(0, entry.y);
         }
       }
-    }, 0);
+    };
+    const timers = [0, 50, 150, 350, 750].map((delay) => window.setTimeout(restore, delay));
 
-    return () => clearTimeout(timer);
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [key, containerSelector, getScrollPosition]);
 
   // Save scroll on scroll event
   const handleScroll = useCallback(() => {
     const container = containerSelector ? (document.querySelector(containerSelector) as HTMLElement) : null;
     const y = container ? container.scrollTop : window.scrollY;
+    const existing = getScrollPosition(key);
+
+    if (y === 0 && existing && existing.y > 0 && Date.now() - existing.savedAt < 1200) {
+      return;
+    }
 
     if (containerRef.current) {
       saveScrollPosition(key, y);
     } else if (!containerSelector) {
       saveScrollPosition(key, y);
     }
-  }, [key, containerSelector, saveScrollPosition]);
+  }, [key, containerSelector, getScrollPosition, saveScrollPosition]);
 
   useEffect(() => {
     const container = containerSelector ? (document.querySelector(containerSelector) as HTMLElement) : window;

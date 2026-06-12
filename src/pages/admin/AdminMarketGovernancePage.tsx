@@ -602,11 +602,12 @@ const AdminMarketGovernancePage: React.FC = () => {
 
   const requestSectionSave = () => {
     if (!sectionDraft) return;
+    const currentEditingSection = editingSection;
     const disabling =
       sectionDraft.mode === 'edit' &&
-      Boolean(editingSection) &&
-      ((editingSection.enabled && !sectionDraft.enabled) ||
-        (editingSection.status === 'ACTIVE' &&
+      currentEditingSection !== null &&
+      ((currentEditingSection.enabled && !sectionDraft.enabled) ||
+        (currentEditingSection.status === 'ACTIVE' &&
           (sectionDraft.status === 'PAUSED' || sectionDraft.status === 'ARCHIVED')));
     if (disabling) {
       setConfirmState({
