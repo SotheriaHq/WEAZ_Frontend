@@ -40,10 +40,6 @@ vi.mock('@/components/admin/AdminBreadcrumb', () => ({
   default: () => <nav aria-label="Breadcrumb">Content Review</nav>,
 }));
 
-vi.mock('@/components/ImageWithFallback', () => ({
-  default: ({ alt }: { alt: string }) => <div role="img" aria-label={alt} />,
-}));
-
 vi.mock('@/components/ui/Modal', () => ({
   default: ({
     open,
@@ -155,7 +151,7 @@ const submission = {
       reviewStatus: 'PENDING',
       orderIndex: 0,
       canPreview: true,
-      previewUrl: null,
+      previewUrl: 'https://signed.example/front.jpg?token=ok',
     },
   ],
   requiredSlotChecklist: [
@@ -217,8 +213,13 @@ describe('AdminContentReviewPage', () => {
 
     expect(await screen.findByText('Adire Jacket')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Review/i }));
-    expect(await screen.findByText('Required Slot Checklist')).toBeTruthy();
+    const mediaImage = await screen.findByAltText('Front media');
+    expect(mediaImage.getAttribute('src')).toBe('https://signed.example/front.jpg?token=ok');
+    expect(screen.queryByText('Required Slot Checklist')).toBeNull();
+    expect(screen.getByText('Missing Required Views')).toBeTruthy();
     expect(screen.getAllByText('Front').length).toBeGreaterThan(0);
+    expect(screen.getByText('Back')).toBeTruthy();
+    expect(screen.getByText(/Submitted:/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: /Request Changes/i }));
     fireEvent.click(screen.getByRole('button', { name: /Continue/i }));

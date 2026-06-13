@@ -45,6 +45,10 @@ import {
   getCompactPublishTaskStatusLabel,
 } from '@/utils/publishTracker';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
+import {
+  resolveVisibilityFilterFromQuery,
+  type CatalogVisibilityFilter,
+} from '@/utils/catalogVisibilityQuery';
 import { canManageCatalog, getActiveBrandId } from '@/lib/brandAccess';
 import {
   fetchBrandCollectionsQuery,
@@ -59,14 +63,7 @@ import { queryKeys } from '@/query/queryKeys';
 import ComingSoon from '../placeholders/ComingSoon';
 
 type TabType = 'Content' | 'Store' | 'Reviews' | 'Us' | 'Drafts';
-type VisibilityFilter =
-  | 'Public'
-  | 'Private'
-  | 'Drafts'
-  | 'In Review'
-  | 'Changes Requested'
-  | 'Rejected'
-  | 'Deleted';
+type VisibilityFilter = CatalogVisibilityFilter;
 const VISIBILITY_FILTERS: VisibilityFilter[] = ['Public', 'Private'];
 const OWNER_VISIBILITY_FILTERS: VisibilityFilter[] = [
   'Public',
@@ -82,6 +79,7 @@ const REVIEW_VISIBILITY_STATUS: Partial<Record<VisibilityFilter, string>> = {
   'Changes Requested': 'CHANGES_REQUESTED',
   Rejected: 'REJECTED',
 };
+
 type PrivateAccessState = {
   collectionId: string;
   title: string;
@@ -163,7 +161,7 @@ const ProfilePage: React.FC = () => {
   const [draftsError, setDraftsError] = useState<string | null>(null);
   const [draftsInitialized, setDraftsInitialized] = useState(false);
   const [isBrandQrOpen, setIsBrandQrOpen] = useState(false);
-  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; title?: string; visibility?: 'PUBLIC' | 'PRIVATE'; kind?: PublishTaskKind }>>({});
+  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; title?: string; visibility?: 'PUBLIC' | 'PRIVATE'; kind?: PublishTaskKind; reviewStatus?: string | null }>>({});
   const [publishTasks, setPublishTasks] = useState<PublishTask[]>([]);
 
   const navigate = useNavigate();
@@ -194,15 +192,23 @@ const ProfilePage: React.FC = () => {
     if (urlCollectionId) {
       setSelectedCollectionId(urlCollectionId);
     }
-    const tab = searchParams.get('tab');
-    if (tab && ['Collections', 'Content', 'Shop', 'Store', 'Reviews', 'Us'].includes(tab)) {
-      const normalized = tab === 'Collections' ? 'Content' : tab === 'Shop' ? 'Store' : tab;
+    const tab = String(searchParams.get('tab') ?? '').trim().toLowerCase();
+    const tabAlias: Record<string, TabType> = {
+      collections: 'Content',
+      content: 'Content',
+      shop: 'Store',
+      store: 'Store',
+      reviews: 'Reviews',
+      us: 'Us',
+    };
+    if (tabAlias[tab]) {
+      const normalized = tabAlias[tab];
       setActiveTab(normalized as TabType);
     }
-    // Handle visibility filter from URL (e.g., after draft save redirect)
-    const visibility = searchParams.get('visibility');
-    if (visibility && OWNER_VISIBILITY_FILTERS.includes(visibility as VisibilityFilter)) {
-      setVisibilityFilter(visibility as VisibilityFilter);
+    // Handle visibility/status filter from URL (e.g., after draft save or review submit redirect)
+    const visibility = resolveVisibilityFilterFromQuery(searchParams);
+    if (visibility && OWNER_VISIBILITY_FILTERS.includes(visibility)) {
+      setVisibilityFilter(visibility);
     }
   }, [searchParams]);
 
@@ -265,6 +271,10 @@ const ProfilePage: React.FC = () => {
           previewUrl: task?.coverPreviewUrl,
           taskId,
           kind,
+          reviewStatus:
+            typeof navState.publishingReviewStatus === 'string'
+              ? String(navState.publishingReviewStatus).toUpperCase()
+              : null,
           visibility:
             navState.publishingVisibility === 'PRIVATE'
               ? 'PRIVATE'
@@ -962,7 +972,51 @@ const ProfilePage: React.FC = () => {
     });
 
     if (visibilityFilter !== 'Public' && visibilityFilter !== 'Private' && visibilityFilter !== 'Drafts') {
-      return decorated;
+      const targetReviewStatus = REVIEW_VISIBILITY_STATUS[visibilityFilter];
+      if (!targetReviewStatus) return decorated;
+      const decoratedIds = new Set(decorated.map((entry) => entry.id));
+      const reviewPlaceholders: CollectionDto[] = Object.entries(publishingStates)
+        .filter(([key, state]) => {
+          if (decoratedIds.has(key)) return false;
+          if (state.kind === 'draft') return false;
+          if (state.status !== 'publishing' && state.status !== 'failed') return false;
+          return String(state.reviewStatus ?? '').toUpperCase() === targetReviewStatus;
+        })
+        .map(([key, state]) => {
+          const nowIso = new Date(state.startedAt || Date.now()).toISOString();
+          const compactMessage = getCompactPublishTaskStatusLabel({
+            status: state.status === 'failed' ? 'failed' : 'uploading',
+            kind: state.kind,
+            progress: state.progress,
+          });
+          return {
+            id: key,
+            status: targetReviewStatus,
+            publicationStatus: targetReviewStatus,
+            name: state.title || 'Design submitted for review',
+            description: compactMessage,
+            ownerId: user?.id || '',
+            title: state.title || 'Design submitted for review',
+            isPublic: state.visibility !== 'PRIVATE',
+            visibility: state.visibility ?? 'PUBLIC',
+            type: 'EVERYBODY',
+            coverImage: state.previewUrl,
+            createdAt: nowIso,
+            updatedAt: nowIso,
+            clientStatus: state.status === 'failed' ? 'publish-failed' : 'publishing',
+            clientStatusMessage: compactMessage,
+            clientStatusMeta: {
+              startedAt: state.startedAt,
+              attempts: state.attempts,
+              offline: !navigator.onLine,
+              progress: state.progress,
+              previewUrl: state.previewUrl,
+              taskId: state.taskId,
+              kind: state.kind,
+            },
+          } as CollectionDto;
+        });
+      return [...reviewPlaceholders, ...decorated];
     }
 
     const decoratedIds = new Set(decorated.map((entry) => entry.id));

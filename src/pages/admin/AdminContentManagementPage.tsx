@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import UniversalSelect from '@/components/forms/UniversalSelect';
+import AdminContentReviewPage from '@/pages/admin/AdminContentReviewPage';
 import { adminCollectionsApi, adminDesignsApi, adminProductsApi } from '@/api/AdminApi';
 import type { AdminCollection, AdminDesign, AdminProduct } from '@/types/admin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -10,7 +12,7 @@ import { unwrapApiResponse } from '@/types/auth';
 import { toast } from 'sonner';
 import useDebounce from '@/hooks/useDebounce';
 
-type ContentTab = 'products' | 'designs' | 'collections';
+type ContentTab = 'products' | 'designs' | 'collections' | 'review';
 
 const TABS: Array<{ key: ContentTab; label: string; emoji: string }> = [
   { key: 'products', label: 'Products', emoji: '📦' },
@@ -18,23 +20,51 @@ const TABS: Array<{ key: ContentTab; label: string; emoji: string }> = [
   { key: 'collections', label: 'Collections', emoji: '🗂️' },
 ];
 
+const DESIGN_VISIBILITY_OPTIONS = [
+  { value: '', label: 'All visibility' },
+  { value: 'PUBLIC', label: 'Public' },
+  { value: 'PRIVATE', label: 'Private' },
+];
+
+const DESIGN_STATUS_OPTIONS = [
+  { value: '', label: 'All statuses' },
+  { value: 'PUBLISHED', label: 'Published' },
+  { value: 'ARCHIVED', label: 'Archived' },
+  { value: 'DRAFT', label: 'Draft' },
+];
+
+const DESIGN_SORT_OPTIONS = [
+  { value: '', label: 'Sort: Newest' },
+  { value: 'recent', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'views', label: 'Most viewed' },
+  { value: 'orders', label: 'Most ordered' },
+];
+
 const AdminContentManagementPage: React.FC = () => {
   const { hasPermission } = useAdminPermissions();
   const [searchParams, setSearchParams] = useSearchParams();
   const canReadProducts = hasPermission('PRODUCTS_READ');
   const canReadCollections = hasPermission('COLLECTIONS_READ');
+  const canReadReview = hasPermission('CONTENT_REVIEW_READ');
   const visibleTabs = useMemo(() => {
-    return TABS.filter((entry) => {
+    const baseTabs = TABS.filter((entry) => {
       if (entry.key === 'products') return canReadProducts;
       return canReadCollections;
     });
-  }, [canReadCollections, canReadProducts]);
+    return canReadReview
+      ? [...baseTabs, { key: 'review' as ContentTab, label: 'Reviews / Pending Review', emoji: 'CR' }]
+      : baseTabs;
+  }, [canReadCollections, canReadProducts, canReadReview]);
 
   const resolveAllowedTab = useCallback(
     (raw: string | null): ContentTab => {
       const value = (raw || '').toLowerCase();
+      const normalized = value === 'content-review' ? 'review' : value;
       const candidate: ContentTab =
-        value === 'designs' || value === 'collections' ? (value as ContentTab) : 'products';
+        normalized === 'designs' || normalized === 'collections' || normalized === 'review'
+          ? (normalized as ContentTab)
+          : 'products';
       if (visibleTabs.some((entry) => entry.key === candidate)) {
         return candidate;
       }
@@ -128,6 +158,9 @@ const AdminContentManagementPage: React.FC = () => {
         const res = await adminDesignsApi.list(params);
         return parsePage<AdminDesign>(res.data);
       }
+      if (tab === 'review') {
+        return { items: [] };
+      }
       const res = await adminCollectionsApi.list(params);
       return parsePage<AdminCollection>(res.data);
     },
@@ -136,7 +169,11 @@ const AdminContentManagementPage: React.FC = () => {
 
   const loadPage = useCallback(
     async (isLoadMore = false, cursor?: string) => {
-      if (visibleTabs.length === 0) {
+      if (visibleTabs.length === 0 || tab === 'review') {
+        setError(null);
+        setLoading(false);
+        setLoadingMore(false);
+        setNextCursor(undefined);
         return;
       }
       try {
@@ -178,6 +215,7 @@ const AdminContentManagementPage: React.FC = () => {
   const currentItemsCount = useMemo(() => {
     if (tab === 'products') return products.length;
     if (tab === 'designs') return designs.length;
+    if (tab === 'review') return 0;
     return collections.length;
   }, [collections.length, designs.length, products.length, tab]);
 
@@ -308,10 +346,14 @@ const AdminContentManagementPage: React.FC = () => {
 
       {visibleTabs.length === 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300">
-          You do not currently have permissions to view products, designs, or collections.
+          You do not currently have permissions to view content management.
         </div>
       )}
 
+      {tab === 'review' ? (
+        <AdminContentReviewPage embedded />
+      ) : (
+        <>
       <section className="rounded-2xl border border-gray-200/80 bg-white/85 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
           <input
@@ -329,36 +371,27 @@ const AdminContentManagementPage: React.FC = () => {
         {/* Designs-specific filters */}
         {tab === 'designs' && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <select
+            <UniversalSelect
               value={designVisibility}
-              onChange={(event) => setDesignVisibility(event.target.value as '' | 'PUBLIC' | 'PRIVATE')}
-              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 outline-none focus:border-purple-400 dark:border-white/10 dark:bg-black/20 dark:text-gray-300"
-            >
-              <option value="">All visibility</option>
-              <option value="PUBLIC">Public</option>
-              <option value="PRIVATE">Private</option>
-            </select>
-            <select
+              onChange={(value) => setDesignVisibility(value as '' | 'PUBLIC' | 'PRIVATE')}
+              options={DESIGN_VISIBILITY_OPTIONS}
+              className="min-w-[150px]"
+              optionCompact
+            />
+            <UniversalSelect
               value={designStatus}
-              onChange={(event) => setDesignStatus(event.target.value as '' | 'PUBLISHED' | 'ARCHIVED' | 'DRAFT')}
-              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 outline-none focus:border-purple-400 dark:border-white/10 dark:bg-black/20 dark:text-gray-300"
-            >
-              <option value="">All statuses</option>
-              <option value="PUBLISHED">Published</option>
-              <option value="ARCHIVED">Archived</option>
-              <option value="DRAFT">Draft</option>
-            </select>
-            <select
+              onChange={(value) => setDesignStatus(value as '' | 'PUBLISHED' | 'ARCHIVED' | 'DRAFT')}
+              options={DESIGN_STATUS_OPTIONS}
+              className="min-w-[150px]"
+              optionCompact
+            />
+            <UniversalSelect
               value={designSortBy}
-              onChange={(event) => setDesignSortBy(event.target.value as '' | 'recent' | 'oldest' | 'views' | 'orders')}
-              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 outline-none focus:border-purple-400 dark:border-white/10 dark:bg-black/20 dark:text-gray-300"
-            >
-              <option value="">Sort: Newest</option>
-              <option value="recent">Newest first</option>
-              <option value="oldest">Oldest first</option>
-              <option value="views">Most viewed</option>
-              <option value="orders">Most ordered</option>
-            </select>
+              onChange={(value) => setDesignSortBy(value as '' | 'recent' | 'oldest' | 'views' | 'orders')}
+              options={DESIGN_SORT_OPTIONS}
+              className="min-w-[160px]"
+              optionCompact
+            />
             {(designVisibility || designStatus || designSortBy) && (
               <button
                 type="button"
@@ -678,6 +711,8 @@ const AdminContentManagementPage: React.FC = () => {
             {loadingMore ? 'Loading...' : 'Load more'}
           </button>
         </div>
+      )}
+        </>
       )}
 
       <ConfirmDialog

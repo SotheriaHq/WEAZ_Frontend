@@ -112,6 +112,83 @@ const normalizeDesignSizingModeForCreation = (value?: string | null): DesignSizi
   return 'NONE';
 };
 
+const PROFILE_REVIEW_ROUTES: Record<string, { query: string; toastMessage: string; taskMessage: string }> = {
+  IN_REVIEW: {
+    query: 'in-review',
+    toastMessage: 'Design submitted for review.',
+    taskMessage: 'In review',
+  },
+  CHANGES_REQUESTED: {
+    query: 'changes-requested',
+    toastMessage: 'Design needs changes before it can go live.',
+    taskMessage: 'Changes requested',
+  },
+  REJECTED: {
+    query: 'rejected',
+    toastMessage: 'Design was rejected by review.',
+    taskMessage: 'Rejected',
+  },
+};
+
+const normalizePublicationStatusValue = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toUpperCase().replace(/[\s-]+/g, '_');
+  if (!normalized) return null;
+  if (normalized === 'INREVIEW' || normalized === 'PENDING_REVIEW') return 'IN_REVIEW';
+  if (normalized === 'CHANGESREQUESTED') return 'CHANGES_REQUESTED';
+  return normalized;
+};
+
+const resolvePublicationStatus = (payload: unknown): string | null => {
+  const stack: unknown[] = [payload];
+  const seen = new Set<object>();
+
+  while (stack.length > 0) {
+    const current = stack.shift();
+    if (!current || typeof current !== 'object') continue;
+    if (seen.has(current)) continue;
+    seen.add(current);
+
+    const record = current as Record<string, unknown>;
+    const directStatus =
+      normalizePublicationStatusValue(record.publicationStatus) ??
+      normalizePublicationStatusValue(record.status);
+    if (directStatus) return directStatus;
+
+    for (const key of ['data', 'design', 'collection', 'result', 'item']) {
+      if (record[key] && typeof record[key] === 'object') {
+        stack.push(record[key]);
+      }
+    }
+  }
+
+  return null;
+};
+
+const getProfileRouteForPublication = (
+  payload: unknown,
+  visibility: 'PUBLIC' | 'PRIVATE' | string | null | undefined,
+) => {
+  const publicationStatus = resolvePublicationStatus(payload);
+  const reviewRoute = publicationStatus ? PROFILE_REVIEW_ROUTES[publicationStatus] : undefined;
+
+  if (reviewRoute) {
+    return {
+      url: `/profile?tab=content&contentStatus=${reviewRoute.query}`,
+      reviewStatus: publicationStatus,
+      toastMessage: reviewRoute.toastMessage,
+      taskMessage: reviewRoute.taskMessage,
+    };
+  }
+
+  return {
+    url: `/profile?tab=content&visibility=${visibility === 'PRIVATE' ? 'Private' : 'Public'}`,
+    reviewStatus: null,
+    toastMessage: 'Design is live.',
+    taskMessage: 'Live',
+  };
+};
+
 const normalizeMeasurementLabel = (value: string) =>
   value.trim().toLowerCase().replace(/[\s_]+/g, ' ');
 
@@ -1137,7 +1214,7 @@ const CreateDesignInner: React.FC = () => {
 
             updatePublishTask(task.id, { status: 'finalizing', progress: 70, message: 'Finalizing...' }, publishTaskScope);
 
-            await finalizeDesignUploads(
+            const finalizeResult = await finalizeDesignUploads(
               id,
               [],
               true,
@@ -1171,16 +1248,18 @@ const CreateDesignInner: React.FC = () => {
               legacyCollectionId: id,
               collectionId: id,
               coverPreviewUrl: undefined,
-              message: 'Live',
+              message: getProfileRouteForPublication(finalizeResult, visibility).taskMessage,
             }, publishTaskScope);
-            toast.success('Design submitted for review.');
-            navigate(`/profile?tab=Content&visibility=InReview`, {
+            const profileRoute = getProfileRouteForPublication(finalizeResult, visibility);
+            toast.success(profileRoute.toastMessage);
+            navigate(profileRoute.url, {
               replace: true,
               state: {
                 publishingTaskId: task.id,
                 publishingTitle: title,
                 publishingStartedAt: task.startedAt,
                 publishingVisibility: visibility,
+                publishingReviewStatus: profileRoute.reviewStatus,
               },
             });
             window.setTimeout(() => removePublishTask(task.id, publishTaskScope), 30_000);
@@ -1301,7 +1380,7 @@ const CreateDesignInner: React.FC = () => {
               message: 'Taking design live...',
             }, publishTaskScope);
 
-            await finalizeDesignUploads(
+            const finalizeResult = await finalizeDesignUploads(
               uploadedDesignId,
               [],
               true,
@@ -1335,17 +1414,19 @@ const CreateDesignInner: React.FC = () => {
               legacyCollectionId: uploadedDesignId,
               collectionId: uploadedDesignId,
               coverPreviewUrl: undefined,
-              message: 'Live',
+              message: getProfileRouteForPublication(finalizeResult, visibility).taskMessage,
             }, publishTaskScope);
 
-            toast.success('Design submitted for review.');
-            navigate(`/profile?tab=Content&visibility=InReview`, {
+            const profileRoute = getProfileRouteForPublication(finalizeResult, visibility);
+            toast.success(profileRoute.toastMessage);
+            navigate(profileRoute.url, {
               replace: true,
               state: {
                 publishingTaskId: task.id,
                 publishingTitle: title,
                 publishingStartedAt: task.startedAt,
                 publishingVisibility: visibility,
+                publishingReviewStatus: profileRoute.reviewStatus,
               },
             });
             window.setTimeout(() => removePublishTask(task.id, publishTaskScope), 30_000);

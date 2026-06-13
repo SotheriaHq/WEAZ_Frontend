@@ -531,7 +531,9 @@ export interface ContentReviewMediaItem {
   reviewReason?: string | null;
   orderIndex: number;
   canPreview: boolean;
+  url?: string | null;
   previewUrl?: string | null;
+  thumbnailUrl?: string | null;
 }
 
 export interface ContentReviewSlotChecklistItem {

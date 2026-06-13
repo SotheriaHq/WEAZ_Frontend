@@ -14,7 +14,6 @@ import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import Modal from '@/components/ui/Modal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import ImageWithFallback from '@/components/ImageWithFallback';
 import {
   adminContentReviewApi,
 } from '@/api/AdminApi';
@@ -25,10 +24,15 @@ import type {
   AdminContentReportListResponse,
   AdminContentReviewListResponse,
   AdminContentSubmission,
+  ContentReviewMediaItem,
   ContentReportStatus,
   ContentReviewReasonCode,
   ContentSubmissionStatus,
 } from '@/types/admin';
+
+type AdminContentReviewPageProps = {
+  embedded?: boolean;
+};
 
 type ReviewFilters = {
   status: string;
@@ -142,7 +146,52 @@ const mediaIsVideo = (mediaType?: string | null, mimeType?: string | null) =>
   String(mediaType ?? '').toUpperCase().includes('VIDEO') ||
   String(mimeType ?? '').toLowerCase().startsWith('video/');
 
-const AdminContentReviewPage: React.FC = () => {
+const getMediaPreviewSrc = (media?: Pick<ContentReviewMediaItem, 'previewUrl' | 'thumbnailUrl' | 'url'> | null) =>
+  media?.previewUrl?.trim() || media?.thumbnailUrl?.trim() || media?.url?.trim() || null;
+
+const MediaUnavailablePreview: React.FC<{ label?: string }> = ({ label = 'Media unavailable' }) => (
+  <div className="flex h-full w-full items-center justify-center bg-gray-100 px-4 text-center text-sm font-medium text-gray-500 dark:bg-white/8 dark:text-gray-400">
+    {label}
+  </div>
+);
+
+const AdminReviewImagePreview: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return <MediaUnavailablePreview />;
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="h-full w-full object-cover"
+      onError={() => setFailed(true)}
+    />
+  );
+};
+
+const buildReviewLifecycle = (submission: AdminContentSubmission) => {
+  if (submission.reviewHistory.length > 0) {
+    return submission.reviewHistory;
+  }
+
+  return [
+    {
+      id: `${submission.id}-current`,
+      status: submission.status,
+      reasonCode: submission.reasonCode ?? null,
+      reasonLabel: submission.reasonLabel ?? null,
+      reasonNote: submission.reasonNote ?? null,
+      submittedAt: submission.submittedAt,
+      reviewedAt: submission.reviewedAt ?? null,
+      reviewedById: submission.reviewedBy?.id ?? null,
+    },
+  ];
+};
+
+const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedded = false }) => {
   const { hasPermission } = useAdminPermissions();
   const canManage = hasPermission('CONTENT_REVIEW_MANAGE');
   const [filters, setFilters] = useState<ReviewFilters>({
@@ -356,7 +405,7 @@ const AdminContentReviewPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <AdminBreadcrumb segments={[{ label: 'Content Review' }]} />
+      {!embedded && <AdminBreadcrumb segments={[{ label: 'Content Review' }]} />}
 
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
@@ -479,23 +528,19 @@ const AdminContentReviewPage: React.FC = () => {
               <tbody className="divide-y divide-gray-100 dark:divide-white/8">
                 {submissions.map((submission) => {
                   const thumbnail = submission.media[0];
+                  const thumbnailSrc = getMediaPreviewSrc(thumbnail);
                   return (
                     <tr key={submission.id} className="align-top text-gray-700 dark:text-gray-200">
                       <td className="px-4 py-3">
                         <div className="flex min-w-[260px] items-center gap-3">
                           <div className="h-16 w-16 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/8">
-                            {thumbnail?.fileId && !mediaIsVideo(thumbnail.mediaType, thumbnail.mimeType) ? (
-                              <ImageWithFallback
-                                fileId={thumbnail.fileId}
+                            {thumbnailSrc && !mediaIsVideo(thumbnail?.mediaType, thumbnail?.mimeType) ? (
+                              <AdminReviewImagePreview
+                                src={thumbnailSrc}
                                 alt={submission.target.title || 'Content media'}
-                                fit="cover"
-                                className="h-full w-full object-cover"
-                                containerClassName="h-full w-full"
                               />
                             ) : (
-                              <div className="flex h-full w-full items-center justify-center text-xs text-gray-500">
-                                Media
-                              </div>
+                              <MediaUnavailablePreview label={thumbnail && mediaIsVideo(thumbnail.mediaType, thumbnail.mimeType) ? 'Video' : 'Media unavailable'} />
                             )}
                           </div>
                           <div>
@@ -656,61 +701,69 @@ const AdminContentReviewPage: React.FC = () => {
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {selected.media.map((media) => (
-                <div key={media.id} className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/10">
-                  <div className="aspect-square bg-gray-100 dark:bg-white/8">
-                    {media.fileId && !mediaIsVideo(media.mediaType, media.mimeType) ? (
-                      <ImageWithFallback
-                        fileId={media.fileId}
-                        alt={`${media.slotLabel} media`}
-                        fit="cover"
-                        className="h-full w-full object-cover"
-                        containerClassName="h-full w-full"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center px-4 text-center text-sm text-gray-500">
-                        Video preview unavailable
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-1 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">{media.slotLabel}</span>
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700 dark:bg-white/10 dark:text-gray-200">
-                        {friendlyEnum(media.reviewStatus)}
-                      </span>
+              {selected.media.map((media) => {
+                const mediaPreviewSrc = getMediaPreviewSrc(media);
+                const isVideo = mediaIsVideo(media.mediaType, media.mimeType);
+                return (
+                  <div key={media.id} className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/10">
+                    <div className="aspect-square bg-gray-100 dark:bg-white/8">
+                      {mediaPreviewSrc && !isVideo ? (
+                        <AdminReviewImagePreview
+                          src={mediaPreviewSrc}
+                          alt={`${media.slotLabel} media`}
+                        />
+                      ) : (
+                        <MediaUnavailablePreview label={isVideo ? 'Video preview unavailable' : 'Media unavailable'} />
+                      )}
                     </div>
-                    {media.reviewReasonLabel && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{media.reviewReasonLabel}</p>
-                    )}
+                    <div className="space-y-1 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{media.slotLabel}</span>
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700 dark:bg-white/10 dark:text-gray-200">
+                          {friendlyEnum(media.reviewStatus)}
+                        </span>
+                      </div>
+                      {media.reviewReasonLabel && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{media.reviewReasonLabel}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
-            <div className="rounded-lg border border-gray-200 p-4 dark:border-white/10">
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white">Required Slot Checklist</h3>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {selected.requiredSlotChecklist.map((slot) => (
-                  <div key={slot.slot} className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-white/5">
-                    {slot.present ? <CheckCircle2 size={16} className="text-emerald-500" /> : <AlertTriangle size={16} className="text-red-500" />}
-                    <span className="text-gray-800 dark:text-gray-200">{slot.label}</span>
-                  </div>
-                ))}
+            {selected.slotCompleteness.missing.length > 0 && (
+              <div className="rounded-lg border border-red-200 bg-red-50/70 p-4 dark:border-red-500/25 dark:bg-red-500/10">
+                <h3 className="text-sm font-bold text-red-800 dark:text-red-200">Missing Required Views</h3>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  {selected.requiredSlotChecklist
+                    .filter((slot) => !slot.present)
+                    .map((slot) => (
+                      <div key={slot.slot} className="flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-red-800 dark:border-red-500/25 dark:bg-white/5 dark:text-red-200">
+                        <AlertTriangle size={16} className="shrink-0" />
+                        <span>{slot.label}</span>
+                      </div>
+                    ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="rounded-lg border border-gray-200 p-4 dark:border-white/10">
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">Review History</h3>
                 <div className="mt-3 space-y-3">
-                  {selected.reviewHistory.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">No previous decisions.</p>
-                  ) : selected.reviewHistory.map((history) => (
+                  {buildReviewLifecycle(selected).map((history) => (
                     <div key={history.id} className="rounded-lg bg-gray-50 p-3 text-sm dark:bg-white/5">
                       <div className="font-semibold text-gray-900 dark:text-white">{statusLabel[history.status]}</div>
+                      <div className="mt-1 text-xs text-gray-500">Submitted: {formatDate(history.submittedAt)}</div>
+                      {history.reviewedAt && (
+                        <div className="mt-1 text-xs text-gray-500">Reviewed: {formatDate(history.reviewedAt)}</div>
+                      )}
+                      {history.reviewedById && (
+                        <div className="mt-1 text-xs text-gray-500">Reviewer: {history.reviewedById}</div>
+                      )}
                       {history.reasonLabel && <div className="mt-1 text-gray-500 dark:text-gray-400">{history.reasonLabel}</div>}
-                      <div className="mt-1 text-xs text-gray-500">{formatDate(history.submittedAt)}</div>
+                      {history.reasonNote && <div className="mt-1 text-gray-500 dark:text-gray-400">{history.reasonNote}</div>}
                     </div>
                   ))}
                 </div>
