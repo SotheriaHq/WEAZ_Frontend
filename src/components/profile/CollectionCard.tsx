@@ -31,6 +31,7 @@ export interface CollectionCardProps {
   isDraft?: boolean;
   isDeleted?: boolean;
   onRetryPublish?: (id: string) => void;
+  onDismiss?: (id: string) => void;
   isSaved?: boolean;
   onToggleSave?: (id: string) => void;
   saveBusy?: boolean;
@@ -48,6 +49,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
   isDraft = false,
   isDeleted = false,
   onRetryPublish,
+  onDismiss,
   isSaved: isSavedProp,
   onToggleSave,
   saveBusy: saveBusyProp,
@@ -339,38 +341,64 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
           <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/70 px-4 text-center text-white backdrop-blur-sm">
             {isPublishing ? (
               <>
-                <VLoader size={24} progress={publishProgress} phase="loading" showLabel={false} />
-                <div className="text-sm font-semibold">{compactStatusLabel}</div>
+                <VLoader size={24} progress={publishProgress ?? undefined} phase="loading" showLabel={false} />
+                {publishProgress !== null && publishProgress < 99 ? (
+                  <div className="text-sm font-semibold">{compactStatusLabel}</div>
+                ) : (
+                  <div className="flex flex-col items-center gap-1.5">
+                    <div className="text-xs font-medium text-white/80">Uploading...</div>
+                    <div className="w-28 h-1 rounded-full bg-white/20 overflow-hidden">
+                      <div className="h-full w-1/2 rounded-full bg-white/70 animate-pulse" />
+                    </div>
+                  </div>
+                )}
               </>
-            ) : (
-              <>
-                <AlertTriangle className="w-6 h-6 text-amber-300" />
-                <div className="text-sm font-semibold">{compactStatusLabel}</div>
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  {hasPersistedCollectionId && onEdit ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEdit(collection.id);
-                      }}
-                      className="px-3 py-1 rounded-lg bg-white/20 border border-white/30 text-xs font-semibold hover:bg-white/25"
-                    >
-                      Open editor
-                    </button>
-                  ) : null}
-                  {onRetryPublish && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onRetryPublish(collection.id); }}
-                      className="px-3 py-1 rounded-lg bg-white/15 border border-white/25 text-xs font-semibold hover:bg-white/20"
-                    >
-                      Retry status
-                    </button>
+            ) : (() => {
+              const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+              return (
+                <>
+                  <AlertTriangle className="w-6 h-6 text-amber-300" />
+                  {isOffline ? (
+                    <div className="text-xs font-medium text-white/70">Upload status unavailable.</div>
+                  ) : (
+                    <div className="text-sm font-semibold">{compactStatusLabel}</div>
                   )}
-                </div>
-              </>
-            )}
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {!isOffline && hasPersistedCollectionId && onEdit ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEdit(collection.id);
+                        }}
+                        className="px-3 py-1 rounded-lg bg-white/20 border border-white/30 text-xs font-semibold hover:bg-white/25"
+                      >
+                        Open editor
+                      </button>
+                    ) : null}
+                    {!isOffline && onRetryPublish ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onRetryPublish(collection.id); }}
+                        className="px-3 py-1 rounded-lg bg-white/15 border border-white/25 text-xs font-semibold hover:bg-white/20"
+                      >
+                        Retry status
+                      </button>
+                    ) : null}
+                    {onDismiss ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onDismiss(collection.id); }}
+                        className="px-3 py-1 rounded-lg bg-white/10 border border-white/20 text-xs font-semibold hover:bg-white/15"
+                        aria-label="Remove this failed upload card"
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
         {resolvedDisplaySrc ? (

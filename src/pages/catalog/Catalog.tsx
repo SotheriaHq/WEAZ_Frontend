@@ -843,6 +843,20 @@ const ProfilePage: React.FC = () => {
     });
   }, [setSearchParams]);
 
+  const handleDismissFailedCard = useCallback((id: string) => {
+    if (!id) return;
+    setPublishingStates((prev) => {
+      if (!prev[id]) return prev;
+      const next = { ...prev };
+      const state = prev[id];
+      if (state?.taskId) {
+        delete next[state.taskId];
+      }
+      delete next[id];
+      return next;
+    });
+  }, []);
+
   const removeCollectionFromView = useCallback((collectionId: string) => {
     if (!collectionId) return;
 
@@ -1121,12 +1135,13 @@ const ProfilePage: React.FC = () => {
       }));
 
       const current = await fetchCollectionDetailQuery(queryClient, targetCollectionId);
-      if (current?.status !== 'PUBLISHED') {
+      const RETRY_RESOLVED = new Set(['PUBLISHED', 'IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED']);
+      if (!RETRY_RESOLVED.has(current?.status ?? '')) {
         await finalizeCollectionUploads(targetCollectionId, [], true, { action: 'publish' });
       }
 
       const refreshedDetail = await fetchCollectionDetailQuery(queryClient, targetCollectionId, 'design', { forceRefresh: true });
-      if (refreshedDetail?.status !== 'PUBLISHED') {
+      if (!RETRY_RESOLVED.has(refreshedDetail?.status ?? '')) {
         setPublishingStates((prev) => ({
           ...prev,
           [collectionId]: {
@@ -1240,7 +1255,10 @@ const ProfilePage: React.FC = () => {
 
         try {
           const detail = await fetchCollectionDetailQuery(queryClient, resolvedCollectionId, 'design', { forceRefresh: true });
-          if (detail?.status !== 'PUBLISHED') {
+          // Resolve on any moderation-terminal status, not just PUBLISHED.
+          // IN_REVIEW means brand review picked it up; CHANGES_REQUESTED/REJECTED means moderation acted.
+          const MODERATION_RESOLVED = new Set(['PUBLISHED', 'IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED']);
+          if (!MODERATION_RESOLVED.has(detail?.status ?? '')) {
             const attempts = state.attempts + 1;
             const tookTooLong = Date.now() - state.startedAt > 90_000;
             setPublishingStates((prev) => ({
@@ -2019,6 +2037,7 @@ const ProfilePage: React.FC = () => {
                             }
                           }}
                           onRetryPublish={handleRetryPublishCheck}
+                          onDismiss={isOwner ? handleDismissFailedCard : undefined}
                         />
                       ) : (
                         isOwner ? (

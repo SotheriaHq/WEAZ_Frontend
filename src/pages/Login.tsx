@@ -160,6 +160,8 @@ const LoginPage = () => {
   const [setupPassword, setSetupPassword] = useState('');
   const [setupConfirmPassword, setSetupConfirmPassword] = useState('');
   const [setupPasswordLoading, setSetupPasswordLoading] = useState(false);
+  const [resendCooldownUntil, setResendCooldownUntil] = useState<number | null>(null);
+  const [resendCooldownSeconds, setResendCooldownSeconds] = useState(0);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showReactivationLink, setShowReactivationLink] = useState(false);
@@ -197,6 +199,22 @@ const LoginPage = () => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (resendCooldownUntil === null) return;
+    const tick = () => {
+      const remaining = Math.ceil((resendCooldownUntil - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setResendCooldownUntil(null);
+        setResendCooldownSeconds(0);
+        return;
+      }
+      setResendCooldownSeconds(remaining);
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [resendCooldownUntil]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -404,11 +422,20 @@ const LoginPage = () => {
   };
 
   const sendDirectLoginCode = async (email: string, requestId?: string) => {
+    if (resendCooldownUntil !== null && Date.now() < resendCooldownUntil) return;
     setDirectLoginSendLoading(true);
     try {
       await AuthApi.requestEmailLoginCode({ email, purpose: 'DIRECT_LOGIN', requestId });
-    } catch {
-      // Silently fail — user can resend manually
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 429) {
+        const rawRetryAfter = error.response.headers?.['retry-after'];
+        const seconds = parseInt(String(rawRetryAfter ?? '60'), 10);
+        const cooldown = isNaN(seconds) ? 60 : seconds;
+        setResendCooldownUntil(Date.now() + cooldown * 1000);
+        setResendCooldownSeconds(cooldown);
+        setFlowError(`Too many resend attempts. Please wait ${cooldown}s before trying again.`);
+      }
+      // Otherwise silently fail — user can resend manually
     } finally {
       setDirectLoginSendLoading(false);
     }
@@ -427,7 +454,11 @@ const LoginPage = () => {
       const result = await AuthApi.confirmDirectLoginCode(normalizedEmail, code);
       completeLogin(result, result.user?.email || normalizedEmail);
     } catch (error) {
-      setFlowError(getAuthFlowErrorMessage(error, 'Invalid or expired code.'));
+      if (isAxiosError(error) && error.response?.status === 429) {
+        setFlowError('Too many attempts. Please wait a moment before trying again.');
+      } else {
+        setFlowError(getAuthFlowErrorMessage(error, 'Invalid or expired code.'));
+      }
     } finally {
       setDirectLoginConfirmLoading(false);
     }
@@ -443,6 +474,7 @@ const LoginPage = () => {
       setFlowError('Enter your email first.');
       return;
     }
+    if (resendCooldownUntil !== null && Date.now() < resendCooldownUntil) return;
 
     setFlowError('');
     setEmailCodeLoading(true);
@@ -457,7 +489,16 @@ const LoginPage = () => {
       setLoginStep('code');
       toast.success('If eligible, a password setup code has been sent.');
     } catch (error) {
-      setFlowError(getAuthFlowErrorMessage(error, 'Unable to send a password setup code.'));
+      if (isAxiosError(error) && error.response?.status === 429) {
+        const rawRetryAfter = error.response.headers?.['retry-after'];
+        const seconds = parseInt(String(rawRetryAfter ?? '60'), 10);
+        const cooldown = isNaN(seconds) ? 60 : seconds;
+        setResendCooldownUntil(Date.now() + cooldown * 1000);
+        setResendCooldownSeconds(cooldown);
+        setFlowError(`Too many requests. Please wait ${cooldown}s before requesting another code.`);
+      } else {
+        setFlowError(getAuthFlowErrorMessage(error, 'Unable to send a password setup code.'));
+      }
     } finally {
       setEmailCodeLoading(false);
     }
@@ -484,7 +525,11 @@ const LoginPage = () => {
       setShowEmailCode(false);
       setLoginStep('password-setup');
     } catch (error) {
-      setFlowError(getAuthFlowErrorMessage(error, 'Invalid or expired verification code.'));
+      if (isAxiosError(error) && error.response?.status === 429) {
+        setFlowError('Too many attempts. Please wait a moment before trying again.');
+      } else {
+        setFlowError(getAuthFlowErrorMessage(error, 'Invalid or expired verification code.'));
+      }
     } finally {
       setEmailCodeLoading(false);
     }
@@ -879,19 +924,23 @@ const LoginPage = () => {
                     </div>
                     <p className="text-xs text-gray-400 ml-1">
                       A one-time sign-in code was sent to your email.{' '}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void sendDirectLoginCode(
-                            (watchEmail ?? '').trim(),
-                            loginOptions?.requestId,
-                          )
-                        }
-                        disabled={directLoginSendLoading}
-                        className="text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)] underline disabled:opacity-60"
-                      >
-                        {directLoginSendLoading ? 'Sending...' : 'Resend'}
-                      </button>
+                      {resendCooldownSeconds > 0 ? (
+                        <span className="text-gray-500">Please wait {resendCooldownSeconds}s...</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void sendDirectLoginCode(
+                              (watchEmail ?? '').trim(),
+                              loginOptions?.requestId,
+                            )
+                          }
+                          disabled={directLoginSendLoading}
+                          className="text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)] underline disabled:opacity-60"
+                        >
+                          {directLoginSendLoading ? 'Sending...' : 'Resend'}
+                        </button>
+                      )}
                     </p>
                   </div>
                 )}
@@ -950,14 +999,20 @@ const LoginPage = () => {
                       >
                         {emailCodeLoading ? 'Checking...' : 'Verify code'}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => void requestPasswordSetupCode()}
-                        disabled={emailCodeLoading}
-                        className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-medium text-gray-300 hover:text-white disabled:opacity-60"
-                      >
-                        Resend code
-                      </button>
+                      {resendCooldownSeconds > 0 ? (
+                        <span className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-medium text-gray-500">
+                          Wait {resendCooldownSeconds}s...
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void requestPasswordSetupCode()}
+                          disabled={emailCodeLoading}
+                          className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-medium text-gray-300 hover:text-white disabled:opacity-60"
+                        >
+                          Resend code
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1014,9 +1069,18 @@ const LoginPage = () => {
                 )}
 
                 {loginStep === 'setup-success' && (
-                  <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm text-emerald-200">
-                    Password created. Sign in with your email and new password, or continue with Google.
-                  </div>
+                  <>
+                    <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm text-emerald-200">
+                      Password created. Sign in with your new password below.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLoginStep('password')}
+                      className="auth-btn-primary w-full py-3.5 rounded-xl text-sm font-medium tracking-wide"
+                    >
+                      Sign in with new password
+                    </button>
+                  </>
                 )}
 
                 {flowError && (

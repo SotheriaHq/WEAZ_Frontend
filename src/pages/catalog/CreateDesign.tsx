@@ -1048,6 +1048,7 @@ const CreateDesignInner: React.FC = () => {
   };
 
   const handlePublishConfirm = async () => {
+    if (isSubmitting) return;
     setSubmitIntent("publish");
     setIsSubmitting(true);
     try {
@@ -1172,8 +1173,8 @@ const CreateDesignInner: React.FC = () => {
               coverPreviewUrl: undefined,
               message: 'Live',
             }, publishTaskScope);
-            toast.success('Design is live');
-            navigate(`/profile?tab=Content&visibility=${visibility === 'PRIVATE' ? 'Private' : 'Public'}`, {
+            toast.success('Design submitted for review.');
+            navigate(`/profile?tab=Content&visibility=InReview`, {
               replace: true,
               state: {
                 publishingTaskId: task.id,
@@ -1337,8 +1338,8 @@ const CreateDesignInner: React.FC = () => {
               message: 'Live',
             }, publishTaskScope);
 
-            toast.success('Design is live');
-            navigate(`/profile?tab=Content&visibility=${visibility === 'PRIVATE' ? 'Private' : 'Public'}`, {
+            toast.success('Design submitted for review.');
+            navigate(`/profile?tab=Content&visibility=InReview`, {
               replace: true,
               state: {
                 publishingTaskId: task.id,
@@ -2160,7 +2161,7 @@ const CreateDesignInner: React.FC = () => {
             <button
               type="button"
               onClick={handleSaveDraft}
-              disabled={disabled}
+              disabled={disabled || isSubmitting}
               className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-6 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isSubmitting && submitIntent === "draft" ? (
@@ -2181,7 +2182,7 @@ const CreateDesignInner: React.FC = () => {
             <button
               type="button"
               onClick={handlePublishClick}
-              disabled={disabled}
+              disabled={disabled || isSubmitting}
               className="flex-1 sm:flex-none py-3 px-6 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-purple-500/25 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isSubmitting && submitIntent === "publish" ? (

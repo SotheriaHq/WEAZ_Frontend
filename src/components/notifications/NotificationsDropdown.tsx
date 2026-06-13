@@ -462,9 +462,17 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
         {/* Error State */}
         {showError && (
           <div className="surface-card rounded-2xl border backdrop-blur p-6 text-center">
-            <p className="text-sm font-medium text-[color:var(--text-primary)]">Failed to load notifications</p>
-            <p className="mt-1 text-xs text-[color:var(--text-secondary)]">Please try again.</p>
-            <button onClick={handleRetry} className="mt-3 btn-frost-outline btn-tight-sm">Try again</button>
+            <p className="text-sm font-medium text-[color:var(--text-primary)]">
+              Failed to load notifications.{' '}
+              <button
+                type="button"
+                onClick={handleRetry}
+                className="underline text-[color:var(--brand-primary)] hover:opacity-80 transition-opacity"
+                aria-label="Retry loading notifications"
+              >
+                Try again
+              </button>
+            </p>
           </div>
         )}
 

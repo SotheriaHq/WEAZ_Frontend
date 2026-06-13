@@ -22,6 +22,7 @@ interface CollectionsGridProps {
   isDraft?: boolean;
   isDeleted?: boolean;
   onRetryPublish?: (id: string) => void;
+  onDismiss?: (id: string) => void;
 }
 
 const areSavedMapsEqual = (left: Record<string, boolean>, right: Record<string, boolean>) => {
@@ -32,8 +33,8 @@ const areSavedMapsEqual = (left: Record<string, boolean>, right: Record<string, 
 };
 
 const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
-  collections, 
-  onEdit, 
+  collections,
+  onEdit,
   onDelete,
   onRestore,
   onPermanentDelete,
@@ -41,6 +42,7 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
   isDraft,
   isDeleted,
   onRetryPublish,
+  onDismiss,
 }) => {
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const queryClient = useQueryClient();
@@ -150,6 +152,7 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
             isDraft={isDraft}
             isDeleted={isDeleted}
             onRetryPublish={onRetryPublish}
+            onDismiss={onDismiss}
             isSaved={savedMap[collection.id] ?? false}
             onToggleSave={handleToggleSave}
             saveBusy={savingIds.has(collection.id)}
