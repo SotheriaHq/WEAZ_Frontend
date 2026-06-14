@@ -918,12 +918,11 @@ const ProfilePage: React.FC = () => {
   } else {
     displayCollections = activeCollections.filter((c) => {
       const status = String(c.publicationStatus ?? c.status ?? '').toUpperCase();
-      const isReviewStatus =
-        status === 'IN_REVIEW' ||
-        status === 'CHANGES_REQUESTED' ||
-        status === 'REJECTED' ||
-        status === 'FAILED';
-      if (isReviewStatus) return false;
+      // Public/Private tabs only ever show fully PUBLISHED content. Review,
+      // processing, archived, removed, draft, or unknown states must never
+      // appear here — they have dedicated tabs or stay hidden. Fail closed so
+      // no unapproved status can leak onto the public-facing tab.
+      if (status !== 'PUBLISHED') return false;
       return visibilityFilter === 'Public'
         ? c.isPublic || c.visibility === 'PUBLIC'
         : !c.isPublic || c.visibility === 'PRIVATE';
