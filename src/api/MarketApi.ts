@@ -1,6 +1,11 @@
 import { apiClient } from './httpClient';
 import { unwrapApiResponse } from '@/types/auth';
-import type { MarketFeedResponse, MarketItem, MarketMediaType } from '@/types/market';
+import type {
+  MarketFeedResponse,
+  MarketItem,
+  MarketMediaType,
+  RunwayPinnedFeedResponse,
+} from '@/types/market';
 import { normalizeSizingMode } from '@/types/sizing';
 import { resolveCatalogEntityType } from '@/utils/catalogEntity';
 
@@ -727,6 +732,60 @@ export const marketApi = {
       items,
       hasNextPage: Boolean((data as MarketFeedResponse)?.hasNextPage ?? items.length > 0),
       nextCursor: (data as MarketFeedResponse)?.nextCursor ?? null,
+    };
+  },
+
+  /**
+   * SEARCH-CORE-4/5: Runway search-pinned feed. Reuses the same item DTO mapping
+   * as the default feed (the backend emits identical item shapes) and surfaces
+   * the additive pinned-feed metadata (anchor, exhaustion, route hints).
+   */
+  async getRunwayPinnedFeed(
+    params: {
+      query: string;
+      anchorDesignId?: string;
+      cursor?: string;
+      limit?: number;
+    },
+    options?: { signal?: AbortSignal },
+  ): Promise<RunwayPinnedFeedResponse> {
+    const response = await apiClient.get('/collections/market', {
+      params: {
+        feedMode: 'searchPinned',
+        query: params.query,
+        anchorDesignId: params.anchorDesignId || undefined,
+        cursor: params.cursor || undefined,
+        limit: params.limit,
+      },
+      signal: options?.signal,
+    });
+    const payload = unwrapApiResponse<RunwayPinnedFeedResponse | { items?: unknown }>(
+      response.data,
+    );
+    const data = (payload && 'items' in payload ? payload : response.data) as
+      RunwayPinnedFeedResponse & { items?: RawMarketItem[] };
+
+    const rawItems = (data as { items?: RawMarketItem[] }).items;
+    const items = Array.isArray(rawItems)
+      ? rawItems.map((item) => {
+          const mapped = toMarketItem(item);
+          if (typeof (item as any).combinedCommentsCount === 'number') {
+            mapped.commentsCount = (item as any).combinedCommentsCount as number;
+          }
+          return mapped;
+        })
+      : [];
+
+    return {
+      feedMode: 'searchPinned',
+      query: data?.query ?? params.query,
+      items,
+      nextCursor: data?.nextCursor ?? null,
+      hasMore: Boolean(data?.hasMore),
+      anchorIncluded: Boolean(data?.anchorIncluded),
+      exhaustedReason: data?.exhaustedReason ?? 'NONE',
+      searchContext: data?.searchContext,
+      routeHints: data?.routeHints,
     };
   },
 

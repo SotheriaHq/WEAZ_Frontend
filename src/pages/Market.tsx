@@ -32,6 +32,7 @@ import { toDesignMarketItem } from '@/utils/designMarketItem';
 import { shouldLoadProductFallback, type MarketPageMode } from '@/utils/marketFallback';
 import { useScrollRestore } from '@/components/ScrollRestoreProvider';
 import useMarketFeed from '@/hooks/useMarketFeed';
+import useRunwayPinnedFeed from '@/hooks/useRunwayPinnedFeed';
 import { queryKeys } from '@/query/queryKeys';
 
 // Error type detection
@@ -343,6 +344,57 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     setError(null);
     return refetch();
   }, [refetch]);
+
+  // SEARCH-CORE-5: Runway search-pinned mode. Activated by the search result
+  // tap routing (?feedMode=searchPinned&query=...&anchorDesignId=...). The
+  // default feed code path below is left entirely untouched.
+  const isPinnedMode = searchParams.get('feedMode') === 'searchPinned';
+  const pinnedQuery = searchParams.get('query') ?? '';
+  const pinnedAnchorId = searchParams.get('anchorDesignId') ?? undefined;
+  const [pinnedCursor, setPinnedCursor] = useState<string | undefined>(undefined);
+  const [pinnedItems, setPinnedItems] = useState<MarketItem[]>([]);
+  const pinnedFeed = useRunwayPinnedFeed(
+    { query: pinnedQuery, anchorDesignId: pinnedAnchorId, cursor: pinnedCursor, limit: 12 },
+    { enabled: isPinnedMode },
+  );
+
+  // Reset accumulation whenever the pinned query/anchor changes or pinned mode
+  // is exited, so a stale search context can never overwrite a newer one.
+  useEffect(() => {
+    setPinnedCursor(undefined);
+    setPinnedItems([]);
+  }, [pinnedQuery, pinnedAnchorId, isPinnedMode]);
+
+  // Accumulate keyset pages (dedupe by id) as the cursor advances.
+  useEffect(() => {
+    const data = pinnedFeed.data;
+    if (!isPinnedMode || !data) return;
+    setPinnedItems((prev) => {
+      const base = pinnedCursor ? prev : [];
+      const seen = new Set(base.map((entry) => entry.id));
+      const merged = [...base];
+      for (const entry of data.items) {
+        if (!seen.has(entry.id)) {
+          seen.add(entry.id);
+          merged.push(entry);
+        }
+      }
+      return merged;
+    });
+  }, [pinnedFeed.data, isPinnedMode, pinnedCursor]);
+
+  const exitPinnedToDefaultFeed = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('feedMode');
+    next.delete('query');
+    next.delete('anchorDesignId');
+    setSearchParams(next);
+  }, [searchParams, setSearchParams]);
+
+  const broadenPinnedSearch = useCallback(() => {
+    // Safe placeholder: route back to global search with the same query.
+    navigate(`/search?q=${encodeURIComponent(pinnedQuery)}`);
+  }, [navigate, pinnedQuery]);
 
   // Handle engagement state dispatch when feed data arrives
   useEffect(() => {
@@ -656,6 +708,118 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
       toast.error('Unable to update patch.');
     }
   };
+
+  if (isPinnedMode) {
+    const pinnedLoading = pinnedFeed.isLoading && pinnedItems.length === 0;
+    const hasMore = Boolean(pinnedFeed.data?.hasMore);
+    const exhausted = !pinnedLoading && !hasMore;
+    return (
+      <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 px-4">
+        <div className="sticky top-16 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border-default)]/70 bg-[color:var(--surface-muted)]/60 px-4 py-3 backdrop-blur">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-theme-secondary">
+              Pinned to your search
+            </p>
+            <h2 className="truncate text-lg font-bold text-theme">“{pinnedQuery}”</h2>
+          </div>
+          <button
+            type="button"
+            onClick={exitPinnedToDefaultFeed}
+            className="shrink-0 rounded-full bg-[color:var(--brand-primary)]/10 px-4 py-2 text-xs font-semibold text-[color:var(--brand-primary)] transition-colors hover:bg-[color:var(--brand-primary)]/20"
+          >
+            Continue normal Runway feed
+          </button>
+        </div>
+
+        <div className="relative min-h-[240px]">
+          {pinnedLoading ? (
+            <Masonry
+              breakpointCols={{ default: 3, 1920: 4, 1536: 3, 1280: 3, 1024: 2, 768: 2, 640: 1 }}
+              className="flex -ml-6 w-auto"
+              columnClassName="pl-6 space-y-6 bg-clip-padding"
+            >
+              <DesignSkeleton />
+            </Masonry>
+          ) : pinnedItems.length > 0 ? (
+            <Masonry
+              breakpointCols={{ default: 3, 1920: 4, 1536: 3, 1280: 3, 1024: 2, 768: 2, 640: 1 }}
+              className="flex -ml-6 w-auto"
+              columnClassName="pl-6 space-y-6 bg-clip-padding"
+            >
+              {pinnedItems.map((item) => (
+                <div key={item.id} className="w-full">
+                  <DesignCard
+                    item={item}
+                    onOpenView={(it) => setViewItem(it)}
+                    onViewCollection={handleViewCollection}
+                    onViewBrand={handleViewBrand}
+                    isSaved={savedMap[item.id] ?? false}
+                    onToggleSave={handleToggleSave}
+                    saveBusy={savingIds.has(item.id)}
+                    isPatched={item.brandId ? getPatched(item.brandId) : false}
+                    onTogglePatch={handleTogglePatch}
+                    patchBusy={item.brandId ? isPatchLoading(item.brandId) : false}
+                  />
+                </div>
+              ))}
+            </Masonry>
+          ) : (
+            <div className="rounded-2xl border border-[color:var(--border-default)]/70 bg-[color:var(--surface-muted)]/50 p-10 text-center text-theme-secondary">
+              No matching designs for “{pinnedQuery}” yet.
+            </div>
+          )}
+
+          {hasMore ? (
+            <div className="flex justify-center pt-6">
+              <button
+                type="button"
+                onClick={() => setPinnedCursor(pinnedFeed.data?.nextCursor ?? undefined)}
+                disabled={pinnedFeed.isFetching}
+                className="rounded-full bg-theme px-5 py-3 text-sm font-semibold text-theme-inverse transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {pinnedFeed.isFetching ? 'Loading more…' : 'Load more'}
+              </button>
+            </div>
+          ) : null}
+
+          {exhausted ? (
+            <div className="mt-6 rounded-2xl border border-[color:var(--border-default)]/70 bg-[color:var(--surface-muted)]/60 p-6 text-center">
+              <p className="text-sm font-semibold text-theme">
+                You’ve reached the end of matches for “{pinnedQuery}”.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={exitPinnedToDefaultFeed}
+                  className="rounded-full bg-theme px-5 py-2.5 text-sm font-semibold text-theme-inverse transition hover:opacity-90"
+                >
+                  Continue normal Runway feed
+                </button>
+                <button
+                  type="button"
+                  onClick={broadenPinnedSearch}
+                  className="rounded-full border border-[color:var(--border-default)] px-5 py-2.5 text-sm font-semibold text-theme transition hover:bg-[color:var(--surface-muted)]"
+                >
+                  Broaden search
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <DesignViewModal
+          open={Boolean(viewItem)}
+          item={viewItem}
+          onClose={closeViewModal}
+          onCommentCountChange={(newCount) => {
+            if (viewItem) {
+              handleCommentCountChange(viewItem.id, newCount);
+            }
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 px-4">

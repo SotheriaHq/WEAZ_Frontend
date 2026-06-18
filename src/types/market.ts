@@ -51,3 +51,30 @@ export interface MarketFeedResponse {
   hasNextPage: boolean;
   nextCursor?: string | null;
 }
+
+export type RunwayPinnedExhaustedReason =
+  | 'NONE'
+  | 'NO_MORE_MATCHES'
+  | 'EMPTY_QUERY'
+  | 'ANCHOR_NOT_VISIBLE'
+  | 'INVALID_CURSOR';
+
+export interface RunwayPinnedFeedResponse {
+  feedMode: 'searchPinned';
+  query: string;
+  items: MarketItem[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  anchorIncluded: boolean;
+  exhaustedReason: RunwayPinnedExhaustedReason;
+  searchContext?: {
+    normalizedQuery: string;
+    matchedTokens: string[];
+    anchorDesignId: string | null;
+    anchorStatus: 'NONE' | 'INCLUDED' | 'NOT_VISIBLE';
+  };
+  routeHints?: {
+    defaultFeedAvailable: boolean;
+    broadenAvailable: boolean;
+  };
+}

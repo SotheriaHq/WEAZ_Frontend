@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
 import useSearch from '@/hooks/useSearch';
 import type { SearchEntityType, SearchHighlightOffset, SearchItem } from '@/types/search';
-import { resolveSearchIntent } from '@/lib/searchRouting';
+import { resolveSearchIntent, resolveSearchResultRoute } from '@/lib/searchRouting';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import MarketSuggestionBlocks from '@/components/market/MarketSuggestionBlocks';
 
@@ -228,9 +228,16 @@ const SearchResultsPage: React.FC = () => {
             </div>
 
             <div className="grid gap-4">
-              {results.items.map((item) => (
-                <SearchResultCard key={`${item.type}:${item.id}`} item={item} onOpen={() => navigate(item.href)} />
-              ))}
+              {results.items.map((item) => {
+                const route = resolveSearchResultRoute(item, query);
+                return (
+                  <SearchResultCard
+                    key={`${item.type}:${item.id}`}
+                    item={item}
+                    onOpen={() => navigate(route.to, route.state ? { state: route.state } : undefined)}
+                  />
+                );
+              })}
             </div>
 
             {results.meta.hasNextPage ? (

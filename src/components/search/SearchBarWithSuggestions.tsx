@@ -4,7 +4,7 @@ import SearchField from '@/components/SearchField';
 import useDebounce from '@/hooks/useDebounce';
 import useSearchSuggestions from '@/hooks/useSearchSuggestions';
 import { getRecentSearches, storeRecentSearch } from '@/lib/searchHistory';
-import { buildSearchHref } from '@/lib/searchRouting';
+import { buildSearchHref, resolveSearchResultRoute } from '@/lib/searchRouting';
 import SearchSuggestionDropdown, {
   flattenSuggestionEntries,
   type SearchSuggestionEntry,
@@ -155,6 +155,17 @@ const SearchBarWithSuggestions: React.FC<SearchBarWithSuggestionsProps> = ({
     }
     setOpen(false);
     setActiveIndex(-1);
+    // SEARCH-CORE-5: route design results to Runway pinned mode and product
+    // results to the brand store, mirroring the search results page.
+    if (entry.kind === 'item' && entry.item) {
+      const route = resolveSearchResultRoute(entry.item, value);
+      if (onNavigate) {
+        onNavigate(route.to);
+        return;
+      }
+      navigate(route.to, route.state ? { state: route.state } : undefined);
+      return;
+    }
     if (onNavigate) {
       onNavigate(entry.href);
       return;
