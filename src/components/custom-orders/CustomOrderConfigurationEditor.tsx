@@ -1136,6 +1136,18 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       return failDraftValidation(REQUIRED_FIELDS_SUMMARY, missingFieldErrors);
     }
 
+    const productionLeadDaysValue = Number(form.productionLeadDays);
+    if (
+      !Number.isFinite(productionLeadDaysValue) ||
+      !Number.isInteger(productionLeadDaysValue) ||
+      productionLeadDaysValue < 1 ||
+      productionLeadDaysValue > 7
+    ) {
+      return failDraftValidation('Production lead days must be between 1 and 7.', {
+        productionLeadDays: 'Production lead days must be between 1 and 7.',
+      }, { showBanner: false });
+    }
+
     if (form.rushEnabled) {
       const rushFeeValue = Number(form.rushFee);
       if (!Number.isFinite(rushFeeValue) || rushFeeValue <= 0) {
@@ -1145,13 +1157,14 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       }
 
       const rushProductionLeadDaysValue = Number(form.rushProductionLeadDays);
-      const productionLeadDaysValue = Number(form.productionLeadDays);
       if (
         !Number.isFinite(rushProductionLeadDaysValue) ||
-        rushProductionLeadDaysValue < 5
+        !Number.isInteger(rushProductionLeadDaysValue) ||
+        rushProductionLeadDaysValue < 1 ||
+        rushProductionLeadDaysValue > 3
       ) {
-        return failDraftValidation('Rush production lead days must be at least 5.', {
-          rushProductionLeadDays: 'Rush production lead days must be at least 5.',
+        return failDraftValidation('Rush production lead days must be between 1 and 3.', {
+          rushProductionLeadDays: 'Rush production lead days must be between 1 and 3.',
         }, { showBanner: false });
       }
 
@@ -1411,7 +1424,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         >
           <span className={requiredFieldLabelClassName}>
             Lead days <span className="text-rose-500">*</span>
-            <span className={infoBadgeClassName} title="Production days before dispatch.">i</span>
+            <span className={infoBadgeClassName} title="Production days before dispatch. Must be 1-7 days.">i</span>
           </span>
           <input
             value={form.productionLeadDays}
@@ -1847,7 +1860,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               >
                 <span className={requiredFieldLabelClassName}>
                   Rush lead days <span className="text-rose-500">*</span>
-                  <span className={infoBadgeClassName} title="Must be shorter than the standard lead time and at least 5 days.">i</span>
+                  <span className={infoBadgeClassName} title="Must be shorter than the standard lead time and 1-3 days.">i</span>
                 </span>
                 <input
                   value={form.rushProductionLeadDays}
@@ -1856,7 +1869,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                   aria-invalid={Boolean(fieldErrors.rushProductionLeadDays)}
                   aria-describedby={fieldErrors.rushProductionLeadDays ? getFieldErrorId('rushProductionLeadDays') : undefined}
                   className={getFieldInputClassName('rushProductionLeadDays')}
-                  placeholder="e.g. 5"
+                  placeholder="e.g. 3"
                   inputMode="numeric"
                 />
                 {renderFieldError('rushProductionLeadDays')}

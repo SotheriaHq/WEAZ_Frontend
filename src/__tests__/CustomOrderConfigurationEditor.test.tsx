@@ -344,8 +344,8 @@ describe('CustomOrderConfigurationEditor', () => {
     await user.click(screen.getByRole('checkbox', { name: /rush ordering enabled/i }));
     await user.clear(screen.getByPlaceholderText('e.g. 5000'));
     await user.type(screen.getByPlaceholderText('e.g. 5000'), '0');
-    await user.clear(screen.getByPlaceholderText('e.g. 5'));
-    await user.type(screen.getByPlaceholderText('e.g. 5'), '5');
+    await user.clear(screen.getByPlaceholderText('e.g. 3'));
+    await user.type(screen.getByPlaceholderText('e.g. 3'), '3');
 
     await waitFor(() => {
       expect(editorRef.current).not.toBeNull();
