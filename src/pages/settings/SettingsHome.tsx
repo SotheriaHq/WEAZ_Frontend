@@ -93,6 +93,37 @@ const LocationSettings: React.FC = () => {
   );
 };
 
+const UploadPreferencesSettings: React.FC = () => (
+  <div className="space-y-8">
+    <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+      Upload Preferences
+    </h1>
+
+    <div className="border-b border-gray-200 dark:border-white/10">
+      {[
+        { icon: '🖼️', label: 'Upload quality' },
+        { icon: '📶', label: 'Data usage' },
+      ].map((item) => (
+        <div
+          key={item.label}
+          className="flex min-h-14 items-center gap-3 border-b border-gray-200 py-3 dark:border-white/10"
+        >
+          <span aria-hidden="true">{item.icon}</span>
+          <span className="flex-1 font-medium text-gray-900 dark:text-white">{item.label}</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">Unavailable</span>
+        </div>
+      ))}
+    </div>
+
+    <div className="flex flex-col items-center gap-2 py-10 text-center">
+      <span className="text-3xl" aria-hidden="true">⬆️</span>
+      <p className="font-medium text-gray-900 dark:text-white">
+        Upload preferences are not available yet
+      </p>
+    </div>
+  </div>
+);
+
 const StoreDangerZone: React.FC = () => (
   <div className="space-y-6">
     <div>
@@ -149,6 +180,7 @@ const sections: Record<string, React.ReactNode> = {
   'size-fits': <SizeFitSettings />,
   'market-preferences': <HiddenContentSettings />,
   'hidden-content': <HiddenContentSettings />,
+  'upload-preferences': <UploadPreferencesSettings />,
   billing: (
     <ComingSoon
       title="Accounts"

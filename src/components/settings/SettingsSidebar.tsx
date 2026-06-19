@@ -35,6 +35,7 @@ const sidebarGroups: SidebarGroup[] = [
       { key: 'location', label: 'Location', path: '/settings?tab=location', icon: '📍', description: 'Share location access' },
       { key: 'size-fits', label: 'Size & Fittings', path: '/settings?tab=size-fits', icon: '📏', description: 'Body measurements', nonAdmin: true },
       { key: 'market-preferences', label: 'Market & Feed', path: '/settings?tab=market-preferences', icon: '🧵', description: 'Hidden content and reset' },
+      { key: 'upload-preferences', label: 'Upload Preferences', path: '/settings?tab=upload-preferences', icon: '⬆️', description: 'Quality limits and data usage' },
       { key: 'billing', label: 'Accounts', path: '/settings?tab=billing', icon: '🏦', description: 'Wallet, payout account, and payout history' },
     ],
   },
