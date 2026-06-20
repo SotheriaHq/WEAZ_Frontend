@@ -1148,6 +1148,32 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       }, { showBanner: false });
     }
 
+    // Phase 2B: delivery range locked to 1-7 days (was 2-14).
+    const deliveryMinDaysValue = Number(form.deliveryMinDays);
+    const deliveryMaxDaysValue = Number(form.deliveryMaxDays);
+    const isDeliveryDayValid = (value: number) =>
+      Number.isFinite(value) && Number.isInteger(value) && value >= 1 && value <= 7;
+    if (!isDeliveryDayValid(deliveryMinDaysValue)) {
+      return failDraftValidation('Delivery days must be between 1 and 7.', {
+        deliveryMinDays: 'Delivery days must be between 1 and 7.',
+      }, { showBanner: false });
+    }
+    if (!isDeliveryDayValid(deliveryMaxDaysValue)) {
+      return failDraftValidation('Delivery days must be between 1 and 7.', {
+        deliveryMaxDays: 'Delivery days must be between 1 and 7.',
+      }, { showBanner: false });
+    }
+    if (deliveryMinDaysValue > deliveryMaxDaysValue) {
+      return failDraftValidation(
+        'Minimum delivery days cannot exceed maximum delivery days.',
+        {
+          deliveryMaxDays:
+            'Minimum delivery days cannot exceed maximum delivery days.',
+        },
+        { showBanner: false },
+      );
+    }
+
     if (form.rushEnabled) {
       const rushFeeValue = Number(form.rushFee);
       if (!Number.isFinite(rushFeeValue) || rushFeeValue <= 0) {
