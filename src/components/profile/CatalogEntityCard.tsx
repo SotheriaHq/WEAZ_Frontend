@@ -20,7 +20,7 @@ const CatalogEntityCard: React.FC<CatalogEntityCardProps> = ({
     return (
       <CollectionCard
         {...props}
-        collection={{ ...collection, entityType: 'COLLECTION' }}
+        collection={collection}
         cardKind="collection"
       />
     );
@@ -33,7 +33,7 @@ const CatalogEntityCard: React.FC<CatalogEntityCardProps> = ({
     return (
       <CollectionCard
         {...props}
-        collection={{ ...collection, entityType: 'COLLECTION' }}
+        collection={collection}
         cardKind="collection"
       />
     );
@@ -42,7 +42,7 @@ const CatalogEntityCard: React.FC<CatalogEntityCardProps> = ({
   return (
     <DesignCard
       {...props}
-      collection={{ ...collection, entityType: 'DESIGN' }}
+      collection={collection}
     />
   );
 };

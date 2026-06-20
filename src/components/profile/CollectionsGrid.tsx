@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Masonry from 'react-masonry-css';
 import type { CollectionDto } from '../../types/profile';
 import CatalogEntityCard from './CatalogEntityCard';
@@ -57,6 +57,14 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
     () => new Map((collections ?? []).map((collection) => [collection.id, collection])),
     [collections],
   );
+  const collectionByIdRef = useRef(collectionById);
+  collectionByIdRef.current = collectionById;
+  const collectionIdsRef = useRef(collectionIds);
+  collectionIdsRef.current = collectionIds;
+  const savedMapRef = useRef(savedMap);
+  savedMapRef.current = savedMap;
+  const savingIdsRef = useRef(savingIds);
+  savingIdsRef.current = savingIds;
 
   const collectionIdsKey = useMemo(
     () => collectionIds.join('|'),
@@ -79,16 +87,16 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
     }
   }, [collectionIds.length, collectionIdsKey, isAuth, savedStatusQuery.data]);
 
-  const handleToggleSave = async (collectionId: string) => {
+  const handleToggleSave = useCallback(async (collectionId: string) => {
     if (!isAuth) {
       toast.info('Please sign in to save collections.');
       return;
     }
-    if (savingIds.has(collectionId)) return;
+    if (savingIdsRef.current.has(collectionId)) return;
     try {
       setSavingIds((prev) => new Set(prev).add(collectionId));
-      const isSaved = Boolean(savedMap[collectionId]);
-      const collection = collectionById.get(collectionId);
+      const isSaved = Boolean(savedMapRef.current[collectionId]);
+      const collection = collectionByIdRef.current.get(collectionId);
       const entityType = resolveCatalogEntityType(
         collection,
         collection?.isAvailableInStore ? 'COLLECTION' : 'DESIGN',
@@ -107,7 +115,7 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
       }
       setSavedMap((prev) => ({ ...prev, [collectionId]: !isSaved }));
       queryClient.setQueryData<Record<string, boolean>>(
-        queryKeys.saved.batch('COLLECTION', collectionIds),
+        queryKeys.saved.batch('COLLECTION', collectionIdsRef.current),
         (current) => ({ ...(current ?? {}), [collectionId]: !isSaved }),
       );
       toast.success(isSaved ? 'Removed from saved.' : 'Saved for later.');
@@ -120,7 +128,7 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
         return next;
       });
     }
-  };
+  }, [isAuth, queryClient]);
   const breakpointColumns = {
     default: 4,
     1536: 4,
@@ -144,7 +152,7 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
         <div key={collection.id} className="w-full">
           <CatalogEntityCard
             collection={collection}
-            onClick={() => onCollectionClick?.(collection.id)}
+            onClick={onCollectionClick}
             onEdit={onEdit} 
             onDelete={onDelete}
             onRestore={onRestore}

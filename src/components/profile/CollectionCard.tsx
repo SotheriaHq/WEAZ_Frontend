@@ -22,7 +22,7 @@ import ContentReviewDecisionModal from '@/components/content-integrity/ContentRe
 export interface CollectionCardProps {
   collection: CollectionDto;
   cardKind?: 'design' | 'collection';
-  onClick?: () => void;
+  onClick?: (id: string) => void;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   onRestore?: (id: string) => void;
@@ -331,12 +331,12 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
       className={`relative group w-full overflow-hidden shadow-md transition-transform duration-200 rounded-xl ${
         isDeleted ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'
       }`}
-      onClick={isPublishing || isDeleted ? undefined : onClick}
+      onClick={isPublishing || isDeleted || !onClick ? undefined : () => onClick(collection.id)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       {/* Background Media */}
-      <div className="relative w-full overflow-hidden bg-transparent">
+      <div className="relative aspect-[4/5] w-full overflow-hidden bg-transparent">
         {(isPublishing || publishFailed) && (
           <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/70 px-4 text-center text-white backdrop-blur-sm">
             {isPublishing ? (
@@ -402,9 +402,9 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
           </div>
         )}
         {resolvedDisplaySrc ? (
-          <div className="relative w-full min-h-[320px]">
+          <div className="relative h-full w-full">
             {!imgLoaded && (
-              <div className="absolute inset-0 min-h-[320px] animate-pulse bg-black/15 dark:bg-black/35" />
+              <div className="absolute inset-0 animate-pulse bg-gray-100 dark:bg-white/10" />
             )}
 
             {/* Check if video based on extension */}
@@ -420,11 +420,11 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
                     muted
                     loop
                     playsInline
-                    fit="contain"
+                    fit="cover"
                     maxHeightClassName="max-h-none"
                     maxWidthClassName="max-w-full"
-                    className="w-full"
-                    mediaClassName="block w-full h-auto object-contain"
+                    className="absolute inset-0 h-full w-full"
+                    mediaClassName="block h-full w-full object-cover"
                     onLoadedData={() => setImgLoaded(true)}
                   />
                 );
@@ -434,11 +434,11 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
                   kind="image"
                   src={resolvedDisplaySrc}
                   alt={displayTitle}
-                  fit="contain"
+                  fit="cover"
                   maxHeightClassName="max-h-none"
                   maxWidthClassName="max-w-full"
-                  className="w-full"
-                  mediaClassName="block w-full h-auto object-contain"
+                  className="absolute inset-0 h-full w-full"
+                  mediaClassName="block h-full w-full object-cover"
                   onLoad={() => setImgLoaded(true)}
                 />
               );
@@ -464,7 +464,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
             )}
           </div>
         ) : (
-            <div className="relative flex min-h-[320px] items-center justify-center bg-black/15 dark:bg-black/40 glass-panel">
+            <div className="relative flex h-full items-center justify-center bg-gray-100 dark:bg-white/10">
               <span className="text-white text-3xl font-bold opacity-70">
                 {displayTitle.charAt(0)}
               </span>
@@ -476,7 +476,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
           )}
         
         {/* Always-visible gradient overlay for text readability - lighter for more image visibility */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 via-black/35 to-transparent" />
         
         {/* Entity badge (top left) */}
         <div className="absolute top-3 left-3 z-20">
@@ -641,7 +641,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
                 </div>
                 <button
                   className="shrink-0 px-3 py-1.5 rounded-md bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[11px] font-medium hover:from-purple-600 hover:to-indigo-600 transition-all shadow-md"
-                  onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+                  onClick={(e) => { e.stopPropagation(); onClick?.(collection.id); }}
                 >
                   {copy.continueLabel}
                 </button>
@@ -662,7 +662,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
                       if (needsReviewDecision) {
                         setReviewDecisionOpen(true);
                       } else {
-                        onClick?.();
+                        onClick?.(collection.id);
                       }
                     }}
                   >
@@ -684,7 +684,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
                 </div>
                 <button
                   className="shrink-0 px-3 py-1 rounded-md bg-white/10 border border-white/20 text-white text-[11px] font-medium backdrop-blur-sm hover:bg-white/15 transition"
-                  onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+                  onClick={(e) => { e.stopPropagation(); onClick?.(collection.id); }}
                 >
                   {copy.viewLabel}
                 </button>
@@ -703,7 +703,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
       submissionId={collection.submissionId}
       status={backendStatus}
       title={displayTitle}
-      onEdit={onEdit ? () => onEdit(collection.id) : onClick}
+      onEdit={onEdit ? () => onEdit(collection.id) : onClick ? () => onClick(collection.id) : undefined}
     />
     </>
   );

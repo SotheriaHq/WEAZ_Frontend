@@ -893,7 +893,11 @@ const ProfilePage: React.FC = () => {
     });
   }, [setSearchParams]);
 
-  const restoreCollectionInView = useCallback((collectionId: string) => {
+  const restoreCollectionInView = useCallback((
+    collectionId: string,
+    snapshot?: CollectionDto,
+    restoreDraft = false,
+  ) => {
     if (!collectionId) return;
     setLocallyRemovedCollectionIds((prev) => {
       if (!prev.has(collectionId)) return prev;
@@ -901,7 +905,42 @@ const ProfilePage: React.FC = () => {
       next.delete(collectionId);
       return next;
     });
+    if (restoreDraft && snapshot) {
+      setDrafts((prev) => (
+        prev.some((item) => item.id === snapshot.id) ? prev : [snapshot, ...prev]
+      ));
+    }
   }, []);
+
+  const handleEditCollection = useCallback((id: string) => {
+    navigate(buildDesignRoute({ designId: id, legacyCollectionId: id, mode: 'edit' }));
+  }, [navigate]);
+
+  const handleRequestCollectionDelete = useCallback((id: string) => {
+    setCollectionToDelete(id);
+  }, []);
+
+  const handleRequestCollectionRestore = useCallback((id: string) => {
+    setCollectionToRestore(id);
+  }, []);
+
+  const handleRequestPermanentDelete = useCallback((id: string) => {
+    setCollectionToPermanentDelete(id);
+  }, []);
+
+  const handleCollectionClick = useCallback((id: string) => {
+    if (visibilityFilter === 'Drafts') {
+      handleEditCollection(id);
+      return;
+    }
+    if (visibilityFilter === 'Deleted') return;
+    setSelectedCollectionId(id);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('collectionId', id);
+      return next;
+    });
+  }, [handleEditCollection, setSearchParams, visibilityFilter]);
   
   // Filter logic updated to handle Drafts
   let displayCollections: CollectionDto[] = [];
@@ -2071,24 +2110,11 @@ const ProfilePage: React.FC = () => {
                           collections={decoratedCollections}
                           isDraft={isDraftVisibility}
                           isDeleted={isDeletedVisibility}
-                          onEdit={isOwner ? (id) => navigate(buildDesignRoute({ designId: id, legacyCollectionId: id, mode: 'edit' })) : undefined}
-                          onDelete={isOwner ? (id) => setCollectionToDelete(id) : undefined}
-                          onRestore={isOwner ? (id) => setCollectionToRestore(id) : undefined}
-                          onPermanentDelete={isOwner ? (id) => setCollectionToPermanentDelete(id) : undefined}
-                          onCollectionClick={(id) => {
-                            if (isDraftVisibility) {
-                              navigate(buildDesignRoute({ designId: id, legacyCollectionId: id, mode: 'edit' }));
-                            } else if (isDeletedVisibility) {
-                              return;
-                            } else {
-                              setSelectedCollectionId(id);
-                              setSearchParams((prev) => {
-                                const next = new URLSearchParams(prev);
-                                next.set('collectionId', id);
-                                return next;
-                              });
-                            }
-                          }}
+                          onEdit={isOwner ? handleEditCollection : undefined}
+                          onDelete={isOwner ? handleRequestCollectionDelete : undefined}
+                          onRestore={isOwner ? handleRequestCollectionRestore : undefined}
+                          onPermanentDelete={isOwner ? handleRequestPermanentDelete : undefined}
+                          onCollectionClick={handleCollectionClick}
                           onRetryPublish={handleRetryPublishCheck}
                           onDismiss={isOwner ? handleDismissFailedCard : undefined}
                         />
@@ -2239,6 +2265,8 @@ const ProfilePage: React.FC = () => {
           if (!collectionToDelete || !user) return;
           const id = collectionToDelete;
           const isDraft = drafts.some(d => d.id === id);
+          const removedSnapshot = drafts.find((item) => item.id === id)
+            ?? activeCollections.find((item) => item.id === id);
           setCollectionToDelete(null);
           removeCollectionFromView(id);
           try {
@@ -2248,16 +2276,10 @@ const ProfilePage: React.FC = () => {
             if (success) {
               toast.success(isDraft ? 'Draft discarded' : 'Design deleted');
               setRecentlyDeletedDesign({ isDraft });
-              if (isDraft) {
-                // Refresh drafts list
-                setDraftsLoading(true);
-                brandApi.getMyDraftCollections()
-                  .then(items => setDrafts(items))
-                  .catch(err => console.error(err))
-                  .finally(() => setDraftsLoading(false));
-              } else {
-                // Keep local list in sync with server-side counters and any eventual consistency updates.
-                void fetchCollections(user.id, { forceRefresh: true });
+              if (!isDraft) {
+                // Refresh only the off-screen Deleted source. The visible source remains
+                // the optimistic local removal, so one delete never replaces or blanks
+                // the current grid.
                 void brandApi
                   .getCollections(user.id, {
                     scope: 'design',
@@ -2268,11 +2290,11 @@ const ProfilePage: React.FC = () => {
                   .catch((err) => console.error(err));
               }
             } else {
-              restoreCollectionInView(id);
+              restoreCollectionInView(id, removedSnapshot, isDraft);
               toast.error(isDraft ? 'Failed to discard draft' : 'Failed to delete design');
             }
           } catch (error) {
-            restoreCollectionInView(id);
+            restoreCollectionInView(id, removedSnapshot, isDraft);
             console.error('Error deleting collection:', error);
             toast.error('An error occurred');
           }
@@ -2297,6 +2319,7 @@ const ProfilePage: React.FC = () => {
           }
           toast.success('Design restored');
           setDeletedDesigns((prev) => prev.filter((item) => item.id !== targetId));
+          restoreCollectionInView(targetId);
           void fetchCollections(user.id, { forceRefresh: true });
         }}
       />
