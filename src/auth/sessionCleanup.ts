@@ -24,6 +24,8 @@ const PRIVATE_QUERY_ROOTS = new Set([
   'messaging',
   'sizeFit',
   'customOrders',
+  // Cache-first reviews surface (Phase 4) — user-scoped, must be purged on logout.
+  'myReviews',
 ]);
 
 export const isWebPrivateSessionQueryKey = (queryKey: QueryKey) => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import DeleteReviewConfirmDialog from '@/components/reviews/DeleteReviewConfirmDialog';
@@ -9,6 +9,7 @@ import reviewApi, {
   type ReviewTargetType,
   type UpdateReviewPayload,
 } from '@/api/ReviewApi';
+import { useCachedQuery, cachePolicies } from '@/cache';
 
 type ReviewFilter = 'ALL' | 'EDITABLE' | 'EXPIRED' | ReviewTargetType;
 
@@ -40,30 +41,27 @@ const editWindowLabel = (review: ReviewDto) => {
 };
 
 export default function MyReviewsPage() {
-  const [reviews, setReviews] = useState<ReviewDto[]>([]);
   const [filter, setFilter] = useState<ReviewFilter>('ALL');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [editingReview, setEditingReview] = useState<ReviewDto | null>(null);
   const [deleteReview, setDeleteReview] = useState<ReviewDto | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const loadReviews = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await reviewApi.getMyReviews({ limit: 50 });
-      setReviews(response.items);
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Unable to load your reviews');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadReviews();
-  }, [loadReviews]);
+  // Cache-first: render the last loaded reviews instantly, revalidate in background.
+  const reviewsQuery = useCachedQuery<ReviewDto[]>({
+    key: ['myReviews'],
+    fetcher: () => reviewApi.getMyReviews({ limit: 50 }).then((response) => response.items),
+    policy: cachePolicies.defaultQuery,
+  });
+  const reviews = reviewsQuery.data ?? [];
+  const loading = reviewsQuery.isLoading;
+  const error = reviewsQuery.error
+    ? reviewsQuery.error.message || 'Unable to load your reviews'
+    : null;
+  const refetchReviews = reviewsQuery.refetch;
+  const mutateReviews = reviewsQuery.mutate;
+  const loadReviews = useCallback(() => {
+    void refetchReviews({ forceRefresh: true });
+  }, [refetchReviews]);
 
   const filteredReviews = useMemo(() => {
     const sorted = [...reviews].sort(
@@ -81,7 +79,7 @@ export default function MyReviewsPage() {
   const handleEdit = async (payload: UpdateReviewPayload) => {
     if (!editingReview) return;
     const updated = await reviewApi.updateReview(editingReview.id, payload);
-    setReviews((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+    mutateReviews((current) => (current ?? []).map((item) => (item.id === updated.id ? updated : item)));
     setEditingReview(null);
     toast.success('Review updated');
   };
@@ -91,7 +89,7 @@ export default function MyReviewsPage() {
     setDeleting(true);
     try {
       await reviewApi.deleteReview(deleteReview.id);
-      setReviews((current) => current.filter((item) => item.id !== deleteReview.id));
+      mutateReviews((current) => (current ?? []).filter((item) => item.id !== deleteReview.id));
       toast.success('Review deleted');
       setDeleteReview(null);
     } catch (nextError) {
