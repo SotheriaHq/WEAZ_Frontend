@@ -1,7 +1,7 @@
-import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useDeferredValue, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import { getStoreStatus } from '@/api/StoreApi';
+import { useCachedQuery, cachePolicies } from '@/cache';
 import {
   customOrdersBrandApi,
   type CustomOrderListItem,
@@ -183,72 +183,55 @@ const StudioCustomOrderCard: React.FC<{
   );
 };
 
+type CustomOrdersData = {
+  brandId: string | null;
+  orders: CustomOrderListItem[];
+  summaryByOrderId: Record<string, ThreadSummaryResponse | null>;
+};
+
 const CustomOrdersPage: React.FC = () => {
   const navigate = useNavigate();
-  const [brandId, setBrandId] = useState<string | null>(null);
-  const [orders, setOrders] = useState<CustomOrderListItem[]>([]);
   const [chatTarget, setChatTarget] = useState<Pick<CustomOrderListItem, 'id'> & { customerName: string } | null>(null);
-  const [summaryByOrderId, setSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const refreshSequenceRef = useRef(0);
 
-  useEffect(() => {
-    let active = true;
-
-    const run = async () => {
-      const sequence = refreshSequenceRef.current + 1;
-      refreshSequenceRef.current = sequence;
-      setLoading(true);
-
-      try {
-        const status = await getStoreStatus();
-        if (!active || refreshSequenceRef.current !== sequence) return;
-
-        setBrandId(status.brandId);
-        const response = await customOrdersBrandApi.list(status.brandId, {
-          status: statusFilter ? (statusFilter as CustomOrderStatus) : undefined,
-          q: deferredSearchQuery || undefined,
-          limit: 30,
-        });
-        if (!active || refreshSequenceRef.current !== sequence) return;
-
-        const visibleOrders = collapseVisibleQueueOrders(response.items);
-        setOrders(visibleOrders);
-        const orderIds = visibleOrders.map((entry) => entry.id);
-        if (orderIds.length === 0) {
-          setSummaryByOrderId({});
-        } else {
-          const summaries = await messagingApi.getBulkCustomOrderSummariesForBrand(
-            status.brandId,
-            orderIds,
-            true,
-          );
-          if (!active || refreshSequenceRef.current !== sequence) return;
-          setSummaryByOrderId(
-            summaries.items.reduce<Record<string, ThreadSummaryResponse | null>>((accumulator, item) => {
-              accumulator[item.contextId] = item.summary;
-              return accumulator;
-            }, {}),
-          );
-        }
-      } catch (error: any) {
-        if (!active) return;
-        toast.error(error?.response?.data?.message || 'Unable to load custom orders');
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
+  // Cache-first: a previously loaded queue paints instantly and revalidates in
+  // the background; each (status, search) combination is cached under its own key.
+  const customOrdersQuery = useCachedQuery<CustomOrdersData>({
+    key: ['brandCustomOrders', statusFilter, deferredSearchQuery],
+    fetcher: async () => {
+      const status = await getStoreStatus();
+      const response = await customOrdersBrandApi.list(status.brandId, {
+        status: statusFilter ? (statusFilter as CustomOrderStatus) : undefined,
+        q: deferredSearchQuery || undefined,
+        limit: 30,
+      });
+      const visibleOrders = collapseVisibleQueueOrders(response.items);
+      const orderIds = visibleOrders.map((entry) => entry.id);
+      let summaryByOrderId: Record<string, ThreadSummaryResponse | null> = {};
+      if (orderIds.length > 0) {
+        const summaries = await messagingApi.getBulkCustomOrderSummariesForBrand(
+          status.brandId,
+          orderIds,
+          true,
+        );
+        summaryByOrderId = summaries.items.reduce<Record<string, ThreadSummaryResponse | null>>(
+          (accumulator, item) => {
+            accumulator[item.contextId] = item.summary;
+            return accumulator;
+          },
+          {},
+        );
       }
-    };
-
-    void run();
-    return () => {
-      active = false;
-    };
-  }, [deferredSearchQuery, statusFilter]);
+      return { brandId: status.brandId, orders: visibleOrders, summaryByOrderId };
+    },
+    policy: cachePolicies.defaultQuery,
+  });
+  const brandId = customOrdersQuery.data?.brandId ?? null;
+  const orders = customOrdersQuery.data?.orders ?? [];
+  const summaryByOrderId = customOrdersQuery.data?.summaryByOrderId ?? {};
+  const loading = customOrdersQuery.isLoading;
 
   const metrics = useMemo(
     () => ({
