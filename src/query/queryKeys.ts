@@ -179,6 +179,11 @@ export const queryKeys = {
       ['customOrders', 'displayChartPreference', normalizeId(userId)] as const,
     activeConfiguration: (sourceType?: string | null, sourceId?: string | null) =>
       ['customOrders', 'activeConfiguration', normalizeId(sourceType), normalizeId(sourceId)] as const,
+    brandQueue: (params?: object | null) =>
+      ['customOrders', 'brandQueue', normalizeRecord(params)] as const,
+  },
+  reviews: {
+    mine: () => ['reviews', 'mine'] as const,
   },
   market: {
     feedCategories: () =>
@@ -195,6 +200,22 @@ export const queryKeys = {
       ['market', 'suggestions', normalizeRecord(params)] as const,
   },
 };
+
+// Single source of truth for which query roots hold user/brand-private data and
+// must be purged on logout. sessionCleanup imports this instead of re-listing.
+export const PRIVATE_QUERY_ROOTS = new Set<string>([
+  'auth',
+  'user',
+  'brand',
+  'brandPrivateAccess',
+  'store',
+  'saved',
+  'notifications',
+  'messaging',
+  'sizeFit',
+  'customOrders',
+  'reviews',
+]);
 
 export const isPersistableThreadlyQueryKey = (queryKey: readonly unknown[]) => {
   const [root, scope] = queryKey;

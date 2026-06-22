@@ -2,6 +2,7 @@ import React, { useDeferredValue, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getStoreStatus } from '@/api/StoreApi';
 import { useCachedQuery, cachePolicies } from '@/cache';
+import { queryKeys } from '@/query/queryKeys';
 import {
   customOrdersBrandApi,
   type CustomOrderListItem,
@@ -199,7 +200,7 @@ const CustomOrdersPage: React.FC = () => {
   // Cache-first: a previously loaded queue paints instantly and revalidates in
   // the background; each (status, search) combination is cached under its own key.
   const customOrdersQuery = useCachedQuery<CustomOrdersData>({
-    key: ['brandCustomOrders', statusFilter, deferredSearchQuery],
+    key: queryKeys.customOrders.brandQueue({ status: statusFilter, search: deferredSearchQuery }),
     fetcher: async () => {
       const status = await getStoreStatus();
       const response = await customOrdersBrandApi.list(status.brandId, {

@@ -10,6 +10,7 @@ import reviewApi, {
   type UpdateReviewPayload,
 } from '@/api/ReviewApi';
 import { useCachedQuery, cachePolicies } from '@/cache';
+import { queryKeys } from '@/query/queryKeys';
 
 type ReviewFilter = 'ALL' | 'EDITABLE' | 'EXPIRED' | ReviewTargetType;
 
@@ -48,7 +49,7 @@ export default function MyReviewsPage() {
 
   // Cache-first: render the last loaded reviews instantly, revalidate in background.
   const reviewsQuery = useCachedQuery<ReviewDto[]>({
-    key: ['myReviews'],
+    key: queryKeys.reviews.mine(),
     fetcher: () => reviewApi.getMyReviews({ limit: 50 }).then((response) => response.items),
     policy: cachePolicies.defaultQuery,
   });

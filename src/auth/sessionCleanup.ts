@@ -7,27 +7,12 @@ import { clearSignedFileUrlSessionCache } from '@/hooks/useSignedFileUrl';
 import { ACTIVE_BRAND_STORAGE_KEY } from '@/lib/brandAccess';
 import { disconnectSocket } from '@/lib/ws';
 import { purgeWebPersistedQueryCache, THREADLY_QUERY_CACHE_STORAGE_KEY } from '@/query/queryPersistor';
+import { PRIVATE_QUERY_ROOTS } from '@/query/queryKeys';
 import { clearWebMarketSignalQueue } from '@/services/marketSignalQueue';
 
 const SIGNED_URL_SESSION_STORAGE_KEY = 'threadly_signed_url_cache';
 const PENDING_BAG_ACTION_SESSION_STORAGE_KEY = 'threadly.pendingBagAction.v1';
 const UNIFIED_CHECKOUT_QUEUE_SESSION_STORAGE_KEY = 'threadly.unifiedCheckout.queue.v1';
-
-const PRIVATE_QUERY_ROOTS = new Set([
-  'auth',
-  'user',
-  'brand',
-  'brandPrivateAccess',
-  'store',
-  'saved',
-  'notifications',
-  'messaging',
-  'sizeFit',
-  'customOrders',
-  // Cache-first surfaces (Phase 4) — user/brand-scoped, must be purged on logout.
-  'myReviews',
-  'brandCustomOrders',
-]);
 
 export const isWebPrivateSessionQueryKey = (queryKey: QueryKey) => {
   const [root, scope] = queryKey;
