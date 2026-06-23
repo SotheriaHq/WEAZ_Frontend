@@ -70,13 +70,19 @@ const getAuthFlowErrorMessage = (error: unknown, fallback: string): string => {
     ];
     for (const candidate of candidates) {
       if (typeof candidate === 'string' && candidate.trim()) {
-        return candidate.trim();
+        const msg = candidate.trim();
+        if (msg.includes('ThrottlerException') || msg.includes('Too Many Requests')) return 'Too many requests. Please try again later.';
+        if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('incorrect')) return 'Invalid credentials';
+        return msg;
       }
     }
   }
 
   const message = (error as { message?: unknown })?.message;
-  return typeof message === 'string' && message.trim() ? message.trim() : fallback;
+  const finalMsg = typeof message === 'string' && message.trim() ? message.trim() : fallback;
+  if (finalMsg.includes('ThrottlerException') || finalMsg.includes('Too Many Requests')) return 'Too many requests. Please try again later.';
+  if (finalMsg.toLowerCase().includes('invalid') || finalMsg.toLowerCase().includes('unauthorized') || finalMsg.toLowerCase().includes('not found') || finalMsg.toLowerCase().includes('incorrect')) return 'Invalid credentials';
+  return finalMsg;
 };
 
 // Loading Component
@@ -207,9 +213,11 @@ const LoginPage = () => {
       if (remaining <= 0) {
         setResendCooldownUntil(null);
         setResendCooldownSeconds(0);
+        setFlowError((prev) => prev.startsWith('Too many requests') ? '' : prev);
         return;
       }
       setResendCooldownSeconds(remaining);
+      setFlowError((prev) => prev.startsWith('Too many requests') ? `Too many requests. Please try again in ${remaining}s.` : prev);
     };
     tick();
     const timer = window.setInterval(tick, 1000);
@@ -394,9 +402,18 @@ const LoginPage = () => {
         return;
       }
 
-      setLoginStep('generic');
+      setFlowError('Invalid credentials');
     } catch (error) {
-      setFlowError(getAuthFlowErrorMessage(error, 'Unable to check sign-in options. Try again.'));
+      if (isAxiosError(error) && error.response?.status === 429) {
+        const rawRetryAfter = error.response.headers?.['retry-after'];
+        const seconds = parseInt(String(rawRetryAfter ?? '60'), 10);
+        const cooldown = isNaN(seconds) ? 60 : seconds;
+        setResendCooldownUntil(Date.now() + cooldown * 1000);
+        setResendCooldownSeconds(cooldown);
+        setFlowError(`Too many requests. Please try again in ${cooldown}s.`);
+      } else {
+        setFlowError(getAuthFlowErrorMessage(error, 'Unable to check sign-in options. Try again.'));
+      }
     } finally {
       setLoginOptionsLoading(false);
     }
@@ -632,10 +649,30 @@ const LoginPage = () => {
       completeLogin(payload, normalizedEmail);
     } catch (error: unknown) {
       if (isAxiosError(error)) {
+        if (error.response?.status === 429) {
+          const rawRetryAfter = error.response.headers?.['retry-after'];
+          const seconds = parseInt(String(rawRetryAfter ?? '60'), 10);
+          const cooldown = isNaN(seconds) ? 60 : seconds;
+          setResendCooldownUntil(Date.now() + cooldown * 1000);
+          setResendCooldownSeconds(cooldown);
+          const msg = `Too many requests. Please try again in ${cooldown}s.`;
+          setError('password', { type: 'server', message: msg });
+          toast.error(msg);
+          setIsLoading(false);
+          return;
+        }
+
         const responseData = error.response?.data as Record<string, unknown> | undefined;
-        const responseMessage =
+        let responseMessage =
           (responseData && typeof responseData.message === 'string' && responseData.message) ||
           'Login failed. Please try again.';
+        
+        if (responseMessage.includes('ThrottlerException') || responseMessage.includes('Too Many Requests')) {
+          responseMessage = 'Too many requests. Please try again later.';
+        } else if (responseMessage.toLowerCase().includes('invalid') || responseMessage.toLowerCase().includes('unauthorized') || responseMessage.toLowerCase().includes('not found') || responseMessage.toLowerCase().includes('incorrect')) {
+          responseMessage = 'Invalid credentials';
+        }
+
         const normalizedMessage = responseMessage.toLowerCase();
         const isForceResetRequired =
           normalizedMessage.includes('password reset required for this admin account before login');
@@ -945,14 +982,7 @@ const LoginPage = () => {
                   </div>
                 )}
 
-                {loginStep === 'generic' && (
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-gray-300">
-                    <p className="font-medium text-white">Choose a sign-in path</p>
-                    <p className="mt-1 text-gray-400">
-                      Continue with Google or create an account if you are new to WEAZ.
-                    </p>
-                  </div>
-                )}
+
 
                 {loginStep === 'code' && (
                   <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4">

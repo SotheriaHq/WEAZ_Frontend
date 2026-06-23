@@ -208,10 +208,10 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
             </div>
           </div>
 
-          <div className={`mt-4 flex flex-1 flex-col gap-2 sm:mt-2 ${showBanner ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+          <div className={`mt-4 flex flex-1 flex-col gap-2 sm:mt-[3.25rem] ${showBanner ? '' : 'text-gray-900 dark:text-white'}`}>
             <h1
               className={`flex flex-wrap items-center gap-2 font-semibold italic tracking-[0.08em] leading-tight ${
-                showBanner ? 'text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]' : 'text-gray-900 dark:text-white'
+                showBanner ? 'text-gray-900 dark:text-white sm:text-white sm:drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]' : 'text-gray-900 dark:text-white'
               }`}
               style={{ fontSize: 'clamp(1rem, 3vw, 1.5rem)' }}
             >
@@ -232,11 +232,11 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                 {profile.verificationBadgeVisible ? 'Verified' : 'Unverified'}
               </Link>
             </h1>
-            <p className={`inline-flex w-fit items-center gap-2 rounded-md px-2 py-1 text-sm font-semibold ${showBanner ? 'bg-black/35 text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]' : 'text-gray-700 dark:text-gray-300'}`}>
+            <p className={`inline-flex w-fit items-center gap-2 rounded-md px-2 py-1 text-sm font-semibold text-gray-700 dark:text-gray-300`}>
               <span aria-hidden="true">📍</span>
               <span>{profile.location || profile.address || 'Location not set'}</span>
             </p>
-            <span className={`inline-flex w-fit rounded-md px-2 py-1 text-sm font-semibold italic tracking-[0.01em] ${showBanner ? 'bg-black/35 text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]' : 'text-indigo-600 dark:text-indigo-300'}`}>
+            <span className={`inline-flex w-fit rounded-md px-2 py-1 text-sm font-semibold italic tracking-[0.01em] text-indigo-600 dark:text-indigo-300`}>
               @{profile.username}
             </span>
             {tags.length > 0 ? (
