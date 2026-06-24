@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import type { RootState, AppDispatch } from '@/store';
 import { useRealtime } from '@/realtime';
 import { toast } from 'sonner';
+import { determineNotificationRoute } from '@/utils/notificationRouting';
 import { useNotificationSettingsQuery } from '@/query/queries';
 import {
   fetchNotifications,
@@ -20,6 +22,7 @@ import {
  */
 export function useNotificationsBootstrap() {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const userId = useSelector((s: RootState) => s.user.profile?.id);
   const initialized = useSelector((s: RootState) => s.notifications.initialized);
   const items = useSelector((s: RootState) => s.notifications.items);
@@ -116,25 +119,63 @@ export function useNotificationsBootstrap() {
       const type = String(payload?.type || '').toUpperCase();
       const isMessageSignal = type.includes('MESSAGE');
       const notVisible = document.visibilityState !== 'visible';
-      if (!isMessageSignal) {
-        return;
+
+      // Message-specific affordances: audible tone + a short rapid-fire dedupe so
+      // a burst of incoming messages doesn't spam the tone. Non-message types
+      // skip these but still surface a desktop notification below.
+      if (isMessageSignal) {
+        if (now - lastSignalRef.current < 800) {
+          return;
+        }
+        lastSignalRef.current = now;
+
+        if (messagingPrefsRef.current.sound) {
+          playMessageTone();
+        }
       }
 
-      if (now - lastSignalRef.current < 800) {
-        return;
-      }
-      lastSignalRef.current = now;
-
-      if (messagingPrefsRef.current.sound) {
-        playMessageTone();
-      }
-
+      // Desktop notification for EVERY allowed type (mirrors native push). Shown
+      // only when the tab is hidden and the user has desktop alerts enabled; the
+      // backend already gates which notification types reach this client.
       if (messagingPrefsRef.current.desktop && notVisible && 'Notification' in window) {
         if (Notification.permission === 'granted') {
-          new Notification('WEAZ message', {
-            body: payload.message || 'You have a new order message',
-            tag: `WEAZ:${payload.id}`,
-          });
+          const desktopNotification = new Notification(
+            isMessageSignal ? 'WEAZ message' : 'WEAZ',
+            {
+              body:
+                payload.message ||
+                (isMessageSignal ? 'You have a new order message' : 'You have a new notification'),
+              tag: `WEAZ:${payload.id}`,
+            },
+          );
+          // Make the desktop notification actionable: focus the tab and route to
+          // the exact content it references, mirroring native push tap behavior.
+          desktopNotification.onclick = () => {
+            try {
+              window.focus();
+              const normalized = {
+                id: payload.id,
+                type: payload.type,
+                message: payload.message,
+                createdAt: payload.createdAt,
+                isRead: payload.isRead,
+                actor: payload.actor ?? null,
+                target: payload.target ?? payload.payload?.target ?? null,
+                subTargetId:
+                  payload.subTargetId ??
+                  payload.payload?.subTargetId ??
+                  payload.payload?.commentId ??
+                  null,
+                payload: payload.payload ?? undefined,
+                targetUrl: payload.targetUrl ?? payload.payload?.targetUrl ?? undefined,
+              };
+              navigate(determineNotificationRoute(normalized as never));
+            } catch {
+              // Best-effort: never let a notification click throw.
+            } finally {
+              desktopNotification.close();
+            }
+          };
         } else if (Notification.permission === 'default') {
           void Notification.requestPermission();
         }
@@ -148,7 +189,7 @@ export function useNotificationsBootstrap() {
       unsub();
       unsubDeleted();
     };
-  }, [userId, realtime, dispatch, playMessageTone]);
+  }, [userId, realtime, dispatch, playMessageTone, navigate]);
 
   // Lightweight debounce for unread fetches
   const maybeFetchUnread = useCallback(() => {
