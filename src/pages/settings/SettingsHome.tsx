@@ -67,7 +67,7 @@ const LocationSettings: React.FC = () => {
           Location
         </h1>
         <p className="text-gray-500 dark:text-gray-400">
-          Choose whether WEAZ can ask for your location to personalize nearby brands, delivery context, and future local discovery.
+          Choose whether WIEZ can ask for your location to personalize nearby brands, delivery context, and future local discovery.
         </p>
       </div>
 
@@ -79,7 +79,7 @@ const LocationSettings: React.FC = () => {
           Share your location?
         </h2>
         <p className="mb-5 max-w-xl text-sm leading-6 text-gray-600 dark:text-gray-300">
-          WEAZ will always ask before using your location. Your precise location will not be shared with brands or other users from this screen.
+          WIEZ will always ask before using your location. Your precise location will not be shared with brands or other users from this screen.
         </p>
         <button
           type="button"

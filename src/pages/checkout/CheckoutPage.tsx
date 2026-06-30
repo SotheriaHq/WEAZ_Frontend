@@ -297,7 +297,7 @@ interface CheckoutPageProps {
 }
 
 const PROMO_CODES_UNAVAILABLE_MESSAGE =
-  'Promo codes are not available during MVP checkout. Final totals are calculated securely by WEAZ at payment time.';
+  'Promo codes are not available during MVP checkout. Final totals are calculated securely by WIEZ at payment time.';
 
 /* ─── Component ─── */
 
@@ -985,8 +985,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     setCheckoutProgressStage('OPENING_SECURE_WINDOW');
     setCheckoutProgressMessage(
       options?.retry
-        ? 'Retrying secure checkout inside WEAZ...'
-        : 'Opening secure checkout inside WEAZ...',
+        ? 'Retrying secure checkout inside WIEZ...'
+        : 'Opening secure checkout inside WIEZ...',
     );
 
     await openPaystackInline(session.accessCode, {

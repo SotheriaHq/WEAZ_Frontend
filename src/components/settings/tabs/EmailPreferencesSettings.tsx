@@ -44,13 +44,13 @@ const SCENARIO_OVERRIDES: Record<string, ScenarioMeta> = {
   'auth.signin.new_device': {
     title: 'New sign-in from a new device',
     description:
-      'Sent when your account is accessed from a device WEAZ has not seen before so you can confirm it was really you.',
+      'Sent when your account is accessed from a device WIEZ has not seen before so you can confirm it was really you.',
     group: 'Security',
   },
   'auth.signin.high_risk': {
     title: 'High-risk sign-in alert',
     description:
-      'Sent when WEAZ detects a sign-in that looks unusual or risky and wants you to review it immediately.',
+      'Sent when WIEZ detects a sign-in that looks unusual or risky and wants you to review it immediately.',
     group: 'Security',
   },
   'notification.LOGIN': {
@@ -73,7 +73,7 @@ const SCENARIO_OVERRIDES: Record<string, ScenarioMeta> = {
   'notification.SIGNUP': {
     title: 'Account creation confirmation',
     description:
-      'Sent when your WEAZ account is created and ready for setup.',
+      'Sent when your WIEZ account is created and ready for setup.',
     group: 'Security',
   },
   'notification.ORDER_PLACED': {
@@ -103,7 +103,7 @@ const SCENARIO_OVERRIDES: Record<string, ScenarioMeta> = {
   'notification.MESSAGE_RECEIVED': {
     title: 'New direct or order message',
     description:
-      'Sent when a new message arrives in a conversation WEAZ tracks for you.',
+      'Sent when a new message arrives in a conversation WIEZ tracks for you.',
     group: 'Messaging & Social',
   },
   'notification.MESSAGE_UNREAD_REMINDER': {
@@ -283,7 +283,7 @@ function describeScenario(title: string, scenarioKey: string) {
     return `Sent when ${title.toLowerCase()} changes and there is something new to review.`;
   }
 
-  return `Sent when ${title.toLowerCase()} happens in WEAZ.`;
+  return `Sent when ${title.toLowerCase()} happens in WIEZ.`;
 }
 
 function getScenarioMeta(scenarioKey: string): ScenarioMeta {
@@ -515,7 +515,7 @@ const EmailPreferencesSettings: React.FC = () => {
       <div>
         <h1 className="mb-2 text-2xl font-semibold text-gray-900 dark:text-white">Email notifications</h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Control which email updates WEAZ sends you. Security emails stay protected unless you confirm the change with your password.
+          Control which email updates WIEZ sends you. Security emails stay protected unless you confirm the change with your password.
         </p>
       </div>
 

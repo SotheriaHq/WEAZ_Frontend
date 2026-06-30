@@ -1,8 +1,8 @@
 <svg width="152" height="280" viewBox="180 96 152 280" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" preserveAspectRatio="xMidYMid meet">
-  <title id="title">WEAZ logo mark</title>
+  <title id="title">WIEZ logo mark</title>
   <desc id="desc">Gold fashion figure: circular head, V-collar torso, side arm-space gaps, and pointed asymmetric lower sweep.</desc>
   <defs>
-    <linearGradient id="weaz-gold" x1="190" y1="96" x2="330" y2="376" gradientUnits="userSpaceOnUse">
+    <linearGradient id="wiez-gold" x1="190" y1="96" x2="330" y2="376" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#fff1a8"/>
       <stop offset="0.34" stop-color="#d8b24a"/>
       <stop offset="0.68" stop-color="#f8dc78"/>
@@ -11,17 +11,17 @@
   </defs>
 
   <!-- Head -->
-  <circle cx="256" cy="116" r="18" fill="url(#weaz-gold)"/>
+  <circle cx="256" cy="116" r="18" fill="url(#wiez-gold)"/>
 
   <!-- Torso: V-collar lines from neck to wide shoulders, sides drop straight down,
        waist pinches inward. Deliberately wider than lower body so background shows
        through on both sides — creating the arm-space gaps. -->
   <path d="M256 134 L222 162 L222 210 L238 228 L274 228 L280 210 L290 162 Z"
-        fill="url(#weaz-gold)"/>
+        fill="url(#wiez-gold)"/>
 
   <!-- Lower body: starts narrow (246–266) so arm gaps are visible on both sides.
        Left edge narrows straight to a pointed bottom at (252,368).
        Right edge sweeps dramatically outward via cubic Bezier then returns. -->
   <path d="M246 240 L240 278 L236 318 L252 368 C268 362 308 332 326 296 C330 270 312 248 266 240 Z"
-        fill="url(#weaz-gold)"/>
+        fill="url(#wiez-gold)"/>
 </svg>

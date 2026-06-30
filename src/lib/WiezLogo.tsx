@@ -3,20 +3,20 @@ import React from 'react';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { COMPANY_LOGO_PATH, COMPANY_NAME } from '@/lib/brand';
 
-const WEAZ_MARK_ASPECT_RATIO = 152 / 280;
+const WIEZ_MARK_ASPECT_RATIO = 152 / 280;
 
-type WeazLogoProps = {
+type WiezLogoProps = {
   size?: number;
   className?: string;
   decorative?: boolean;
 };
 
-const WeazLogo: React.FC<WeazLogoProps> = ({
+const WiezLogo: React.FC<WiezLogoProps> = ({
   size = 32,
   className = '',
   decorative = true,
 }) => {
-  const width = Math.round(size * WEAZ_MARK_ASPECT_RATIO);
+  const width = Math.round(size * WIEZ_MARK_ASPECT_RATIO);
 
   return (
     <span
@@ -40,4 +40,4 @@ const WeazLogo: React.FC<WeazLogoProps> = ({
   );
 };
 
-export default WeazLogo;
+export default WiezLogo;

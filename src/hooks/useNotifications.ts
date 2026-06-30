@@ -140,12 +140,12 @@ export function useNotificationsBootstrap() {
       if (messagingPrefsRef.current.desktop && notVisible && 'Notification' in window) {
         if (Notification.permission === 'granted') {
           const desktopNotification = new Notification(
-            isMessageSignal ? 'WEAZ message' : 'WEAZ',
+            isMessageSignal ? 'WIEZ message' : 'WIEZ',
             {
               body:
                 payload.message ||
                 (isMessageSignal ? 'You have a new order message' : 'You have a new notification'),
-              tag: `WEAZ:${payload.id}`,
+              tag: `WIEZ:${payload.id}`,
             },
           );
           // Make the desktop notification actionable: focus the tab and route to

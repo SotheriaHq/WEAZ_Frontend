@@ -32,7 +32,7 @@ export default function VerifiedBadgeMeaningPage() {
           Verified badge meaning
         </h1>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-gray-600 sm:text-base">
-          This page explains what WEAZ&apos;s verified badge represents on
+          This page explains what WIEZ&apos;s verified badge represents on
           store, catalog, and profile surfaces, and why that signal may change
           over time.
         </p>

@@ -66,7 +66,7 @@ vi.mock('react-redux', () => ({
 
 const makeBrandUser = (overrides: Partial<AuthUserDto> = {}): AuthUserDto => ({
   id: 'user-1',
-  username: 'weazbrand',
+  username: 'wiezbrand',
   email: 'brand@example.com',
   firstName: 'Ada',
   lastName: 'Okafor',
@@ -75,7 +75,7 @@ const makeBrandUser = (overrides: Partial<AuthUserDto> = {}): AuthUserDto => ({
   themePreference: 'system',
   phoneNumber: null,
   address: null,
-  brandFullName: 'WEAZ Atelier',
+  brandFullName: 'WIEZ Atelier',
   brandDescription: 'A focused fashion brand story for setup testing.',
   brandCountry: null,
   brandState: null,
@@ -103,7 +103,7 @@ const makeBrandUser = (overrides: Partial<AuthUserDto> = {}): AuthUserDto => ({
   brandMemberships: [
     {
       brandId: 'brand-1',
-      brandName: 'WEAZ Atelier',
+      brandName: 'WIEZ Atelier',
       role: 'OWNER',
       status: 'ACTIVE',
       isOwner: true,

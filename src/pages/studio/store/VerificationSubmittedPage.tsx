@@ -85,7 +85,7 @@ export default function VerificationSubmittedPage() {
       <VerificationHero
         eyebrow="Submission complete"
         title="Verification sent for review"
-        description="Your current evidence set is locked for reviewer handling. Track the queue state from the workspace and only re-enter the wizard when WEAZ asks for updates."
+        description="Your current evidence set is locked for reviewer handling. Track the queue state from the workspace and only re-enter the wizard when WIEZ asks for updates."
         statusLabel={verificationStatusLabel(status?.verificationStatus)}
         statusTone={verificationStatusTone(status?.verificationStatus)}
         actions={
@@ -110,7 +110,7 @@ export default function VerificationSubmittedPage() {
             What happens next
           </p>
           <div className="mt-5 space-y-4 text-sm leading-7 text-gray-600">
-            <p>WEAZ reviewers pick up submissions from the queue in order.</p>
+            <p>WIEZ reviewers pick up submissions from the queue in order.</p>
             <p>
               If more evidence is needed, the request will appear in your
               verification workspace with field-specific instructions.

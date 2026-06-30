@@ -1,7 +1,7 @@
-export const APP_NAME = 'WEAZ';
+export const APP_NAME = 'WIEZ';
 export const COMPANY_NAME = APP_NAME;
 export const FORMER_PRODUCT_NAME = 'Threadly';
-export const PRODUCT_TAGLINE = 'When you think WEARS, you think WEAZ.';
+export const PRODUCT_TAGLINE = 'When you think WEARS, you think WIEZ.';
 export const PRODUCT_LOGO_TAGLINE = 'JUST WEAR';
 export const PRODUCT_DESCRIPTION =
   'African fashion social commerce marketplace';
@@ -13,10 +13,10 @@ export const LEGAL_EMAIL =
   import.meta.env.VITE_LEGAL_EMAIL || '[PRODUCT CONFIRMATION NEEDED]';
 export const COPYRIGHT_OWNER = '[PRODUCT CONFIRMATION NEEDED]';
 
-export const COMPANY_LOGO_PATH = '/brand/weaz-logo-mark.svg';
-export const COMPANY_LOGO_LOCKUP_PATH = '/brand/weaz-logo-lockup.svg';
-export const COMPANY_WORDMARK_PATH = '/brand/weaz-wordmark.svg';
-export const COMPANY_FAVICON_PATH = '/brand/weaz-favicon.svg';
+export const COMPANY_LOGO_PATH = '/brand/wiez-logo-mark.svg';
+export const COMPANY_LOGO_LOCKUP_PATH = '/brand/wiez-logo-lockup.svg';
+export const COMPANY_WORDMARK_PATH = '/brand/wiez-wordmark.svg';
+export const COMPANY_FAVICON_PATH = '/brand/wiez-favicon.svg';
 export const LOGO_ACCESSIBILITY_LABEL = `${APP_NAME} logo`;
 
 export const BRAND_PALETTE = {
