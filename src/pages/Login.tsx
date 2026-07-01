@@ -25,6 +25,12 @@ import Modal from '@/components/ui/Modal';
 import VLoader from '@/components/loaders/VLoader';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import GoogleSignInOverlayButton from '@/components/auth/GoogleSignInOverlayButton';
+import GoogleConsentModal from '@/components/auth/GoogleConsentModal';
+import {
+  getRequiredLegalAcceptances,
+  isLegalAcceptanceRequiredError,
+  LEGAL_SIGNUP_DOCUMENT_KEYS,
+} from '@/api/LegalApi';
 import {
   PasswordMatchFeedback,
   PasswordPolicyFeedback,
@@ -155,6 +161,10 @@ const LoginPage = () => {
   const [loginOptionsLoading, setLoginOptionsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [flowError, setFlowError] = useState('');
+  // New Google users need to accept terms before their account is created; the
+  // pending ID token is retried with legalAcceptances once they consent.
+  const [pendingGoogleIdToken, setPendingGoogleIdToken] = useState<string | null>(null);
+  const [consentLoading, setConsentLoading] = useState(false);
   const [emailCode, setEmailCode] = useState('');
   const [emailCodeLoading, setEmailCodeLoading] = useState(false);
   const [directLoginCode, setDirectLoginCode] = useState('');
@@ -428,9 +438,31 @@ const LoginPage = () => {
       const payload = await AuthApi.googleAuth({ idToken });
       completeLogin(payload, payload.user?.email || normalizedEmail);
     } catch (error) {
+      // Brand-new user: account creation needs terms acceptance. Capture the token
+      // and prompt for consent instead of surfacing a raw error.
+      if (isLegalAcceptanceRequiredError(error)) {
+        setPendingGoogleIdToken(idToken);
+        return;
+      }
       toast.error(getAuthFlowErrorMessage(error, 'Google sign-in could not be completed.'));
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleConsentAccept = async () => {
+    if (!pendingGoogleIdToken) return;
+    const normalizedEmail = (watchEmail ?? '').trim();
+    setConsentLoading(true);
+    try {
+      const legalAcceptances = await getRequiredLegalAcceptances(LEGAL_SIGNUP_DOCUMENT_KEYS);
+      const payload = await AuthApi.googleAuth({ idToken: pendingGoogleIdToken, legalAcceptances });
+      setPendingGoogleIdToken(null);
+      completeLogin(payload, payload.user?.email || normalizedEmail);
+    } catch (error) {
+      toast.error(getAuthFlowErrorMessage(error, 'Google sign-in could not be completed.'));
+    } finally {
+      setConsentLoading(false);
     }
   };
 
@@ -1232,6 +1264,13 @@ const LoginPage = () => {
                   Google sign-in needs VITE_GOOGLE_CLIENT_ID in this environment.
                 </p>
               )}
+
+              <GoogleConsentModal
+                open={pendingGoogleIdToken !== null}
+                loading={consentLoading}
+                onCancel={() => setPendingGoogleIdToken(null)}
+                onAccept={() => void handleGoogleConsentAccept()}
+              />
 
               {canShowPasswordSetup &&
                 loginStep !== 'code' &&
