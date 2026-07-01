@@ -34,7 +34,7 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 import { MY_BAG_EMOJI } from '@/constants/bagging';
 
 const PROMO_CODES_UNAVAILABLE_MESSAGE =
-  'Promo codes are not available during MVP checkout. Final totals are calculated securely by WEAZ at payment time.';
+  'Promo codes are not available during MVP checkout. Final totals are calculated securely by WIEZ at payment time.';
 
 // Small component to handle signed URL resolution for cart thumbnails
 const CartItemThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {

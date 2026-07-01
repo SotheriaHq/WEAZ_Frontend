@@ -16,7 +16,7 @@ interface GlassBackdropProps {
  * GlassBackdrop Component
  * 
  * A unified gradient blur backdrop for modals and overlays.
- * Implements the WEAZ design system with:
+ * Implements the WIEZ design system with:
  * - Multi-layer gradient (purple → indigo → blue)
  * - Backdrop blur for glassmorphism effect
  * - Dark overlay for content contrast

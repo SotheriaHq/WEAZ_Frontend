@@ -2,7 +2,7 @@
  * PHASE 6: My Drafts Page
  * Shows collections pending category approval
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { brandApi } from '@/api/BrandApi';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,8 @@ import VLoader from '@/components/loaders/VLoader';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
+import useCachedResource from '@/hooks/useCachedResource';
+import { queryClient } from '@/query/queryClient';
 
 interface DraftCollection {
   id: string;
@@ -23,30 +25,35 @@ interface DraftCollection {
   coverImage?: string;
 }
 
+const DRAFTS_QUERY_KEY = ['brand', 'draft-collections'] as const;
+
 const MyDraftsPage: React.FC = () => {
-  const [drafts, setDrafts] = useState<DraftCollection[]>([]);
-  const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
   const navigate = useNavigate();
 
-  const fetchDrafts = async () => {
-    setLoading(true);
-    try {
+  // Cached fetch: drafts paint instantly on revisit and revalidate silently.
+  const {
+    data: drafts = [],
+    loading,
+    error: fetchError,
+  } = useCachedResource<DraftCollection[]>({
+    queryKey: DRAFTS_QUERY_KEY,
+    queryFn: async () => {
       const response = await brandApi.getMyDraftCollections();
-      const cleaned = (response || []).filter((d) => d && d.id && ((d.title && d.title.trim().length) || d.coverImage || (d.itemCount ?? 0) > 0));
-      setDrafts(cleaned);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message ?? 'Failed to load draft designs');
-    } finally {
-      setLoading(false);
-    }
-  };
+      return (response || []).filter(
+        (d) =>
+          d &&
+          d.id &&
+          ((d.title && d.title.trim().length) || d.coverImage || (d.itemCount ?? 0) > 0),
+      );
+    },
+  });
 
-  useEffect(() => {
-    fetchDrafts();
-  }, []);
+  React.useEffect(() => {
+    if (fetchError) toast.error('Failed to load draft designs');
+  }, [fetchError]);
 
   const handleDelete = (id: string, title: string) => {
     setPendingDelete({ id, title });
@@ -57,14 +64,18 @@ const MyDraftsPage: React.FC = () => {
     if (!pendingDelete) return;
     const { id } = pendingDelete;
     setDeleting(id);
+    const removeFromCache = () =>
+      queryClient.setQueryData<DraftCollection[]>(DRAFTS_QUERY_KEY, (prev) =>
+        (prev ?? []).filter((d) => d.id !== id),
+      );
     try {
       await brandApi.deleteCollection(id);
       toast.success('Draft deleted successfully');
-      setDrafts((prev) => prev.filter((d) => d.id !== id));
+      removeFromCache();
     } catch (error: any) {
       // If backend cannot delete (already missing records), remove locally to avoid broken cards
       toast.error(error?.response?.data?.message ?? 'Failed to delete draft');
-      setDrafts((prev) => prev.filter((d) => d.id !== id));
+      removeFromCache();
     } finally {
       setDeleting(null);
       setConfirmOpen(false);

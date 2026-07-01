@@ -2134,7 +2134,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
 
       {mode === 'summary' && activeView === 'standard' && standardOrders.length > 0 ? (
         <section className="glass-panel rounded-3xl border border-gray-200/70 bg-white/70 p-5 text-center backdrop-blur-md dark:border-white/10 dark:bg-white/5">
-          <h4 className="text-base font-bold text-gray-900 dark:text-white">WEAZ Pro</h4>
+          <h4 className="text-base font-bold text-gray-900 dark:text-white">WIEZ Pro</h4>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Unlock exclusive drops and lower fees.</p>
           <button
             type="button"
@@ -2147,7 +2147,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
         <section className="glass-panel rounded-3xl border border-gray-200/70 bg-white/70 p-5 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
           <h4 className="text-base font-bold text-gray-900 dark:text-white">Buyer Protection</h4>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Every purchase on WEAZ is covered by our authenticity and fulfillment protections.
+            Every purchase on WIEZ is covered by our authenticity and fulfillment protections.
           </p>
         </section>
       ) : null}

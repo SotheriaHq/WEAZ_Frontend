@@ -552,7 +552,7 @@ const StoreCreationWizard: React.FC = () => {
       
       toast.success('🎉 Your store is now live!');
       toast.info(
-        'Brand settlement note: customer payments are recorded gross, WEAZ retains platform commission, and your net balance releases into payouts as each order milestone is completed.',
+        'Brand settlement note: customer payments are recorded gross, WIEZ retains platform commission, and your net balance releases into payouts as each order milestone is completed.',
       );
       navigate('/store/my');
     } catch (error) {

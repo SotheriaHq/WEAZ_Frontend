@@ -763,7 +763,7 @@ const MarketPlace: React.FC = () => {
                           {activeHero.name}
                         </h1>
                         <p className="mt-1 text-xs text-white/80 sm:text-sm">
-                          {activeHero.brand?.name || 'WEAZ Brand'} · Smooth picks from recent brand drops.
+                          {activeHero.brand?.name || 'WIEZ Brand'} · Smooth picks from recent brand drops.
                         </p>
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <button

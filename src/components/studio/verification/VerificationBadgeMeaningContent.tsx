@@ -24,7 +24,7 @@ export default function VerificationBadgeMeaningContent({
           What it means
         </p>
         <p className={compact ? 'mt-2' : 'mt-3'}>
-          WEAZ reviewed the brand&apos;s submitted identity and business
+          WIEZ reviewed the brand&apos;s submitted identity and business
           evidence, approved the current store record, and keeps that badge tied
           to the live account state.
         </p>

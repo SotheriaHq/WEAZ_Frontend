@@ -115,7 +115,7 @@ export default function VerificationWizardPage() {
       status.verificationStatus === 'PENDING' ||
       status.verificationStatus === 'IN_REVIEW'
     ) {
-      return 'This attempt is already in the review queue. The wizard unlocks again only if WEAZ requests more information or a new attempt becomes available.';
+      return 'This attempt is already in the review queue. The wizard unlocks again only if WIEZ requests more information or a new attempt becomes available.';
     }
     if (
       status.verificationStatus === 'REJECTED' &&

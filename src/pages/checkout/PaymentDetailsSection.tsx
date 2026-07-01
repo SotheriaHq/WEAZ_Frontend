@@ -270,7 +270,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
               <div className={infoCardClassName}>
                 <p className="font-semibold text-slate-900 dark:text-white">No saved cards yet</p>
                 <p className="mt-1">
-                  Complete one successful card payment and WEAZ will show it here for faster reuse.
+                  Complete one successful card payment and WIEZ will show it here for faster reuse.
                 </p>
               </div>
             )}
@@ -288,7 +288,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
                 <div>
                   <p className="text-sm font-semibold text-slate-900 dark:text-white">Add a new card securely</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    WEAZ will prepare Paystack checkout and you will enter card details there.
+                    WIEZ will prepare Paystack checkout and you will enter card details there.
                   </p>
                 </div>
                 <span className="text-lg" aria-hidden>
@@ -312,7 +312,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
                 </label>
 
                 <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 px-3 py-3 text-xs text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-                  WEAZ will prepare Paystack secure checkout inside this flow. Enter card number,
+                  WIEZ will prepare Paystack secure checkout inside this flow. Enter card number,
                   expiry, CVV, PIN, or OTP only inside the secure payment window that opens next.
                 </div>
 

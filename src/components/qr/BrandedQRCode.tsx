@@ -14,7 +14,7 @@ export interface BrandedQRCodeProps {
   onLogoMessage?: (message: string | null) => void;
 }
 
-/** WEAZ brand gradient — purple to indigo */
+/** WIEZ brand gradient — purple to indigo */
 const THREADLY_FG_COLOR = '#6d28d9'; // purple-700
 const THREADLY_EYE_COLOR = '#4f46e5'; // indigo-600
 

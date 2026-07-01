@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import WeazLogo from './WeazLogo';
+import WiezLogo from './WiezLogo';
 import { COMPANY_LOGO_PATH, COMPANY_NAME } from './brand';
 
 vi.mock('@/components/media/MediaRenderer', () => ({
@@ -22,9 +22,9 @@ vi.mock('@/components/media/MediaRenderer', () => ({
   ),
 }));
 
-describe('WeazLogo', () => {
+describe('WiezLogo', () => {
   it('renders through the approved media renderer', () => {
-    render(<WeazLogo decorative={false} />);
+    render(<WiezLogo decorative={false} />);
 
     const logo = screen.getByTestId('logo-media');
     expect(logo).toHaveAttribute('data-kind', 'image');

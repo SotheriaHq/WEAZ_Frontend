@@ -14,9 +14,19 @@ import { useReviewRuntimeFlags } from '@/hooks/useReviewRuntimeFlags';
 import { CustomOrderBadge, formatDateTime } from '@/components/custom-orders/CustomOrderUi';
 import { formatCustomOrderCode } from '@/components/custom-orders/customOrderFormatting';
 import reviewApi, { type ReviewPromptDto, type SubmitReviewPayload } from '@/api/ReviewApi';
+import useCachedResource from '@/hooks/useCachedResource';
 
 type BuyerOrderTab = 'all' | 'active' | 'awaiting' | 'completed' | 'cancelled';
 type OrdersView = 'standard' | 'custom';
+
+type OrderSummaryMap = Record<string, ThreadSummaryResponse | null>;
+type MyOrdersData = {
+  orders: Order[];
+  totalPages: number;
+  customOrders: CustomOrderListItem[];
+  summaryByOrderId: OrderSummaryMap;
+  customSummaryByOrderId: OrderSummaryMap;
+};
 
 const standardTabs: Array<{ key: BuyerOrderTab; label: string }> = [
   { key: 'all', label: 'All orders' },
@@ -88,13 +98,7 @@ const MyOrders: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { flags } = useReviewRuntimeFlags();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [customOrders, setCustomOrders] = useState<CustomOrderListItem[]>([]);
-  const [summaryByOrderId, setSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
-  const [customSummaryByOrderId, setCustomSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [ordersView, setOrdersView] = useState<OrdersView>('standard');
   const [activeTab, setActiveTab] = useState<BuyerOrderTab>('all');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -119,9 +123,17 @@ const MyOrders: React.FC = () => {
     navigate(location.pathname, { replace: true, state: null });
   }, [location.pathname, location.state, navigate]);
 
-  const loadOrders = useCallback(async () => {
-    setLoading(true);
-    try {
+  // Cached aggregate: standard + custom orders and their message summaries paint
+  // instantly on revisit and revalidate silently. `refetch` (loadOrders) is reused
+  // after review save/delete to refresh the list.
+  const {
+    data: ordersData,
+    loading,
+    error: ordersError,
+    refetch: loadOrders,
+  } = useCachedResource<MyOrdersData>({
+    queryKey: ['orders', 'me', page],
+    queryFn: async () => {
       const [standardResult, customResult] = await Promise.allSettled([
         getMyOrders(page, 10),
         customOrdersBuyerApi.list({ limit: 25 }),
@@ -131,51 +143,43 @@ const MyOrders: React.FC = () => {
         throw standardResult.reason;
       }
 
-      const standardItems = (standardResult.value as any)?.items || (standardResult.value as any)?.data || [];
-      setOrders(standardItems);
-      setTotalPages((standardResult.value as any)?.totalPages || 1);
+      const standardItems: Order[] =
+        (standardResult.value as any)?.items || (standardResult.value as any)?.data || [];
+      const totalPages = (standardResult.value as any)?.totalPages || 1;
+      const customOrders =
+        customResult.status === 'fulfilled' ? customResult.value.items : [];
 
-      if (customResult.status === 'fulfilled') {
-        setCustomOrders(customResult.value.items);
-      } else {
-        setCustomOrders([]);
-      }
+      const reduceSummaries = (items: { contextId: string; summary: ThreadSummaryResponse | null }[]) =>
+        items.reduce<OrderSummaryMap>((acc, item) => {
+          acc[item.contextId] = item.summary;
+          return acc;
+        }, {});
 
-      const orderIds = standardItems.map((item: Order) => item.id).filter(Boolean);
-      if (orderIds.length > 0) {
-        const summaries = await messagingApi.getBulkOrderSummaries(orderIds, true);
-        setSummaryByOrderId(
-          summaries.items.reduce<Record<string, ThreadSummaryResponse | null>>((acc, item) => {
-            acc[item.contextId] = item.summary;
-            return acc;
-          }, {}),
-        );
-      } else {
-        setSummaryByOrderId({});
-      }
+      const orderIds = standardItems.map((item) => item.id).filter(Boolean);
+      const summaryByOrderId = orderIds.length
+        ? reduceSummaries((await messagingApi.getBulkOrderSummaries(orderIds, true)).items)
+        : {};
 
-      const customIds = customResult.status === 'fulfilled' ? customResult.value.items.map((item) => item.id) : [];
-      if (customIds.length > 0) {
-        const summaries = await messagingApi.getBulkCustomOrderSummaries(customIds, true);
-        setCustomSummaryByOrderId(
-          summaries.items.reduce<Record<string, ThreadSummaryResponse | null>>((acc, item) => {
-            acc[item.contextId] = item.summary;
-            return acc;
-          }, {}),
-        );
-      } else {
-        setCustomSummaryByOrderId({});
-      }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to load your orders');
-    } finally {
-      setLoading(false);
-    }
-  }, [page]);
+      const customIds = customOrders.map((item) => item.id);
+      const customSummaryByOrderId = customIds.length
+        ? reduceSummaries((await messagingApi.getBulkCustomOrderSummaries(customIds, true)).items)
+        : {};
+
+      return { orders: standardItems, totalPages, customOrders, summaryByOrderId, customSummaryByOrderId };
+    },
+  });
+
+  const orders = ordersData?.orders ?? [];
+  const customOrders = ordersData?.customOrders ?? [];
+  const summaryByOrderId = ordersData?.summaryByOrderId ?? {};
+  const customSummaryByOrderId = ordersData?.customSummaryByOrderId ?? {};
+  const totalPages = ordersData?.totalPages ?? 1;
 
   useEffect(() => {
-    void loadOrders();
-  }, [loadOrders]);
+    if (ordersError) {
+      toast.error('Failed to load your orders');
+    }
+  }, [ordersError]);
 
   const loadReviewPrompts = useCallback(async () => {
     if (!flags.writeEnabled) {

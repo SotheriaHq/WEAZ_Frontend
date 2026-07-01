@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, ArrowRight, Bookmark } from 'lucide-react';
 import { apiClient } from '@/api/httpClient';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { buildCollectionRoute, buildDesignRoute, buildProductRoute } from '@/utils/catalogRoutes';
+import useCachedResource from '@/hooks/useCachedResource';
 
 interface SavedItem {
   id: string;
@@ -90,35 +91,23 @@ const formatPrice = (value?: number): string | null => {
 };
 
 export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
-  const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchSavedItems = async () => {
-      if (!isOwner) {
-        setSavedItems([]);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const response = await apiClient.get('/saved/me');
-        setSavedItems(toSavedItems(response.data));
-        setError(null);
-      } catch (err) {
-        setSavedItems([]);
-        setError('Failed to load saved items');
-        console.error('Error fetching saved items:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void fetchSavedItems();
-  }, [isOwner]);
+  // Cached fetch: on revisit within the retention window, saved items paint
+  // instantly (no skeleton) and revalidate silently. See useCachedResource.
+  const {
+    data: savedItems = [],
+    loading,
+    error: fetchError,
+  } = useCachedResource<SavedItem[]>({
+    queryKey: ['saved', 'me'],
+    queryFn: async ({ signal }) => {
+      const response = await apiClient.get('/saved/me', { signal });
+      return toSavedItems(response.data);
+    },
+    enabled: isOwner,
+  });
+  const error = fetchError ? 'Failed to load saved items' : null;
 
   if (!isOwner) {
     return null;

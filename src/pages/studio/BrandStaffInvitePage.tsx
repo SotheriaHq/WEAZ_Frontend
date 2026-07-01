@@ -91,7 +91,7 @@ const BrandStaffInvitePage: React.FC = () => {
             Brand invite
           </p>
           <h1 className="mt-2 text-3xl font-semibold">
-            Join a WEAZ brand workspace
+            Join a WIEZ brand workspace
           </h1>
           <p className="mt-3 text-sm text-theme-secondary">
             Accepting adds your account to the brand team. The brand owner controls your role and permissions.

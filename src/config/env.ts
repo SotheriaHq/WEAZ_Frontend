@@ -18,7 +18,7 @@ const getEnvVar = (key: string, fallback?: string): string => {
 
 const parseBoolean = (value: string): boolean => value.toLowerCase() === 'true';
 
-const apiBaseUrl = getEnvVar('VITE_API_BASE_URL');
+const apiBaseUrl = getEnvVar('VITE_API_BASE_URL', '');
 const appUrl = getEnvVar('VITE_APP_URL', '');
 const tokenStorageKey = getEnvVar('VITE_TOKEN_STORAGE_KEY', 'THREADLY_ACCESS_TOKEN');
 const userStorageKey = getEnvVar('VITE_USER_STORAGE_KEY', 'THREADLY_USER');
