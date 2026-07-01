@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { AlertTriangle, CalendarClock, ChevronRight, Lock, MapPin, Tag } from 'lucide-react';
@@ -8,6 +8,8 @@ import type { RootState } from '@/store';
 import EmptyState from '@/components/EmptyState';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
+import useCachedResource from '@/hooks/useCachedResource';
+import { queryClient } from '@/query/queryClient';
 
 type ViewMode = 'grid' | 'list' | 'compact';
 
@@ -34,47 +36,36 @@ interface PatchesTabProps {
 }
 
 export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibility }) => {
-  const [patchedBrands, setPatchedBrands] = useState<PatchedBrand[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [unpatchingBrandId, setUnpatchingBrandId] = useState<string | null>(null);
   const currentUserId = useSelector((state: RootState) => state.user.profile?.id);
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchPatchedBrands = async () => {
-      if (!isOwner && profileVisibility === 'LOCKED') {
-        setPatchedBrands([]);
-        setLoading(false);
-        return;
-      }
+  const profileId = isOwner ? currentUserId : id;
+  const patchesEnabled = (isOwner || profileVisibility !== 'LOCKED') && Boolean(profileId);
+  const patchesQueryKey = ['patches', profileId ?? null, isOwner ? 'owner' : 'public'] as const;
 
-      try {
-        setLoading(true);
-        const profileId = isOwner ? currentUserId : id;
-        if (!profileId) {
-          throw new Error('Profile ID not found');
-        }
-
-        const endpoint = isOwner
-          ? `/users/${profileId}/patches`
-          : `/users/${profileId}/patches/public`;
-        const response = await apiClient.get(endpoint);
-        const payload = response.data?.data ?? response.data;
-        const rows = payload?.items ?? payload;
-        setPatchedBrands(Array.isArray(rows) ? rows : []);
-      } catch (err) {
-        setError('Failed to load patched brands');
-        console.error('Error fetching patched brands:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void fetchPatchedBrands();
-  }, [isOwner, profileVisibility, currentUserId, id]);
+  // Cached fetch: patched brands paint instantly on revisit and revalidate silently.
+  const {
+    data: patchedBrands = [],
+    loading,
+    error: fetchError,
+  } = useCachedResource<PatchedBrand[]>({
+    queryKey: patchesQueryKey,
+    queryFn: async ({ signal }) => {
+      if (!profileId) throw new Error('Profile ID not found');
+      const endpoint = isOwner
+        ? `/users/${profileId}/patches`
+        : `/users/${profileId}/patches/public`;
+      const response = await apiClient.get(endpoint, { signal });
+      const payload = response.data?.data ?? response.data;
+      const rows = payload?.items ?? payload;
+      return Array.isArray(rows) ? (rows as PatchedBrand[]) : [];
+    },
+    enabled: patchesEnabled,
+  });
+  const error = fetchError ? 'Failed to load patched brands' : null;
 
   const sortedPatchedBrands = useMemo(() => {
     return [...patchedBrands].sort((a, b) => {
@@ -92,7 +83,9 @@ export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibili
     try {
       setUnpatchingBrandId(brandId);
       await apiClient.delete(`/brands/${brandId}/patches`);
-      setPatchedBrands((prev) => prev.filter((b) => b.id !== brandId));
+      queryClient.setQueryData<PatchedBrand[]>(patchesQueryKey, (prev) =>
+        (prev ?? []).filter((b) => b.id !== brandId),
+      );
       toast.success('Brand unpatched successfully.');
     } catch (err) {
       console.error('Error unpatching brand:', err);
