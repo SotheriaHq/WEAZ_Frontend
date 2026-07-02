@@ -271,6 +271,8 @@ const CreateDesignInner: React.FC = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   const [tagSearch, setTagSearch] = useState("");
+  const [tagSearchResults, setTagSearchResults] = useState<string[]>([]);
+  const [showAllTags, setShowAllTags] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [categoryId, setCategoryId] = useState<string>("");
@@ -699,19 +701,59 @@ const CreateDesignInner: React.FC = () => {
     return resolveMediaWithUrl(files[fullscreenIndex]);
   }, [files, fullscreenIndex, resolveMediaWithUrl]);
 
-  // Filter tag suggestions based on search
-  const filteredSuggestions = useMemo(() => {
+  const isSearchingTags = tagSearch.trim().length > 0;
+
+  // Server-side tag search (debounced): typing queries the FULL approved catalog
+  // via /tags/search, so any tag is findable regardless of how large the tag table
+  // is — not just the loaded popular set. Empty box => show the popular default list.
+  useEffect(() => {
+    const q = tagSearch.trim();
+    if (q.length < 2) {
+      setTagSearchResults([]);
+      return;
+    }
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const results = await TagsApi.search(q, 30);
+        if (active) setTagSearchResults(results.map((r) => r.name));
+      } catch {
+        if (active) setTagSearchResults([]);
+      }
+    }, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [tagSearch]);
+
+  useEffect(() => {
+    if (isSearchingTags && showAllTags) setShowAllTags(false);
+  }, [isSearchingTags, showAllTags]);
+
+  const availableTagSuggestions = useMemo(() => {
     const search = tagSearch.toLowerCase().trim();
-    if (!search)
-      return tagSuggestions
-        .filter((t) => !selectedTags.includes(t))
-        .slice(0, 12);
-    return tagSuggestions
-      .filter(
-        (t) => t.toLowerCase().includes(search) && !selectedTags.includes(t),
-      )
-      .slice(0, 12);
-  }, [tagSearch, tagSuggestions, selectedTags]);
+    if (search) {
+      const localMatches = tagSuggestions.filter((t) =>
+        t.toLowerCase().includes(search),
+      );
+      // Server results first (whole catalog), then any local popular matches.
+      return Array.from(new Set([...tagSearchResults, ...localMatches])).filter(
+        (t) => !selectedTags.includes(t),
+      );
+    }
+    return tagSuggestions.filter((t) => !selectedTags.includes(t));
+  }, [tagSearch, tagSuggestions, selectedTags, tagSearchResults]);
+
+  const filteredSuggestions = useMemo(() => {
+    const limit = isSearchingTags || showAllTags ? 60 : 24;
+    return availableTagSuggestions.slice(0, limit);
+  }, [availableTagSuggestions, isSearchingTags, showAllTags]);
+
+  const hiddenTagCount = Math.max(
+    availableTagSuggestions.length - filteredSuggestions.length,
+    0,
+  );
 
   const handleFilterTagSuggestions = useCallback((suggestions: string[]) => {
     if (!Array.isArray(suggestions) || suggestions.length === 0) {
@@ -1969,10 +2011,10 @@ const CreateDesignInner: React.FC = () => {
                             </button>
                           </div>
 
-                          {filteredSuggestions.length > 0 && (
+                          {filteredSuggestions.length > 0 ? (
                             <div className="mt-3">
                               <p className="text-xs text-theme-secondary mb-2">
-                                Popular hashtags:
+                                {isSearchingTags ? 'Matching hashtags:' : 'Popular hashtags:'}
                               </p>
                               <div className="flex flex-wrap gap-1.5">
                                 {filteredSuggestions.map((tag) => {
@@ -1996,8 +2038,22 @@ const CreateDesignInner: React.FC = () => {
                                   );
                                 })}
                               </div>
+                              {!isSearchingTags && (hiddenTagCount > 0 || showAllTags) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAllTags((v) => !v)}
+                                  className="mt-2 text-xs font-semibold text-purple-600 transition-colors hover:text-purple-500 dark:text-purple-400"
+                                >
+                                  {showAllTags ? 'Show less' : `Show more (${hiddenTagCount})`}
+                                </button>
+                              )}
                             </div>
-                          )}
+                          ) : isSearchingTags ? (
+                            <p className="mt-3 text-xs text-theme-secondary">
+                              No existing tag matches "{tagSearch.trim()}". Press{' '}
+                              <span className="font-semibold">Add</span> to create it (sent for admin approval).
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     </div>
