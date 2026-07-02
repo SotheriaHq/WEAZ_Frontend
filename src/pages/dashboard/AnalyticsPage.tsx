@@ -57,7 +57,7 @@ const AnalyticsPage: React.FC = () => {
       {/* Sales Chart */}
       <div className="bg-white dark:bg-gray-900/50 rounded-2xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm">
         <h3 className="text-lg font-semibold mb-6">Revenue Over Time</h3>
-        <div className="h-[400px] w-full">
+        <div className="h-[300px] sm:h-[400px] w-full min-w-0 relative">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data?.salesChart || []}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
@@ -65,13 +65,14 @@ const AnalyticsPage: React.FC = () => {
                 dataKey="date" 
                 axisLine={false} 
                 tickLine={false} 
-                tick={{ fontSize: 12, fill: '#6B7280' }}
+                minTickGap={15}
+                tick={{ fontSize: 10, fill: '#6B7280' }}
                 tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               />
               <YAxis 
                 axisLine={false} 
                 tickLine={false} 
-                tick={{ fontSize: 12, fill: '#6B7280' }}
+                tick={{ fontSize: 10, fill: '#6B7280' }}
                 tickFormatter={(val) => `${val / 1000}k`}
               />
               <Tooltip 
@@ -83,7 +84,6 @@ const AnalyticsPage: React.FC = () => {
                 dataKey="amount" 
                 fill="#000000" 
                 radius={[4, 4, 0, 0]}
-                barSize={40}
               />
             </BarChart>
           </ResponsiveContainer>

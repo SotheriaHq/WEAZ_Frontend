@@ -5,6 +5,7 @@ import { Navbar } from '../Navbar';
 import ProfileHeaderSkeleton from '../profile/ProfileHeaderSkeleton';
 import CollectionsSkeleton from '../profile/CollectionsSkeleton';
 import { EndUserProfile } from '../../pages/profile/EndUserProfile';
+import VLoader from '../loaders/VLoader';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '@/context/AuthContext';
 import { closeSidebar, selectIsMobile, setSidebarMode } from '@/features/uiSlice';
@@ -36,22 +37,13 @@ export const ProfileContentLoadingFallback: React.FC<{
 }> = ({ brandSetupPrompt = false }) => (
   <div className="p-4 sm:p-6" role="status" aria-live="polite">
     <div className="mx-auto max-w-screen-xl space-y-6">
-      <div className="rounded-2xl border border-theme bg-[color:var(--surface-secondary)] p-5 shadow-sm">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="h-10 w-10 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800" />
-          <div className="min-w-0 flex-1">
-            <div className="h-4 w-48 animate-pulse rounded-full bg-gray-200 dark:bg-gray-800" />
-            <div className="mt-2 h-3 w-64 max-w-full animate-pulse rounded-full bg-gray-100 dark:bg-gray-900" />
-          </div>
-        </div>
-        <p className="text-sm font-semibold text-theme">
-          {brandSetupPrompt ? 'Preparing brand setup...' : 'Loading profile...'}
-        </p>
-        <p className="mt-1 text-xs text-theme-secondary">
-          {brandSetupPrompt
-            ? 'Your profile is loading. The setup form will open automatically.'
-            : 'Your profile content is loading.'}
-        </p>
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-theme bg-[color:var(--surface-secondary)] p-12 shadow-sm text-center">
+        <VLoader size={64} showLabel={true} />
+        {brandSetupPrompt && (
+          <p className="mt-4 text-xs text-theme-secondary">
+            Preparing brand setup... The setup form will open automatically.
+          </p>
+        )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-3">

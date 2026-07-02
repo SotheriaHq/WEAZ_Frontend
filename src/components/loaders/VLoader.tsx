@@ -87,7 +87,7 @@ const VLoader: React.FC<VLoaderProps> = ({
           ? 'Starting thread'
           : 'Winding thread';
   const ringStyle = {
-    background: `conic-gradient(rgba(147,51,234,0.95) ${completion * 3.6}deg, rgba(255,255,255,0.1) 0deg)`,
+    background: `conic-gradient(rgba(147,51,234,0.95) ${completion * 3.6}deg, rgba(147,51,234,0.1) 0deg)`,
   };
 
   return (
@@ -97,7 +97,7 @@ const VLoader: React.FC<VLoaderProps> = ({
         style={{ width: size, height: size, ...ringStyle }}
         aria-label={`${phaseLabel} ${completion}%`}
       >
-        <div className="relative flex h-full w-full items-center justify-center rounded-full bg-transparent text-purple-600 dark:text-fuchsia-300">
+        <div className="relative flex h-full w-full items-center justify-center rounded-full bg-white dark:bg-gray-950 text-purple-600 dark:text-fuchsia-300">
           <span
             className={`text-[1.45rem] leading-none ${isActive ? 'animate-[spin_1.8s_linear_infinite]' : ''}`}
             aria-hidden="true"

@@ -87,11 +87,7 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
         .filter(Boolean)
     : [];
 
-  // Split tags into rows of 3 so we always display max 3 tags per row
-  const tagRows: string[][] = [];
-  for (let i = 0; i < tags.length; i += 3) {
-    tagRows.push(tags.slice(i, i + 3));
-  }
+
   return (
     <div className="w-full">
       {showBanner ? (
@@ -210,29 +206,58 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
             </div>
           </div>
 
-          <div className={`flex min-w-0 flex-1 flex-col gap-2 sm:mt-4 ${showBanner ? '' : 'text-gray-900 dark:text-white'}`}>
+          <div className={`flex min-w-0 flex-1 flex-col gap-1.5 sm:gap-2 sm:mt-4 ${showBanner ? '' : 'text-gray-900 dark:text-white'}`}>
             <h1
-              className={`flex flex-wrap items-center gap-2 font-semibold italic tracking-[0.08em] leading-tight ${
-                showBanner ? 'text-gray-900 dark:text-white sm:text-white sm:drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]' : 'text-gray-900 dark:text-white'
+              className={`flex flex-wrap items-center gap-1.5 font-semibold italic tracking-[0.08em] leading-tight ${
+                showBanner ? 'text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]' : 'text-gray-900 dark:text-white'
               }`}
               style={{ fontSize: 'clamp(1rem, 3vw, 1.5rem)' }}
             >
               {profile.firstName} {profile.lastName}
-              <Link
-                to={profile.verifiedExplanationUrl || '/help/verified-badge'}
-                state={{
-                  from:
-                    `${location.pathname}${location.search}${location.hash}` ||
-                    '/studio/store',
-                }}
-                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-black uppercase tracking-wide ${
-                  profile.verificationBadgeVisible
-                    ? 'bg-emerald-500 text-white'
-                    : 'bg-slate-300 text-slate-900'
-                }`}
-              >
-                {profile.verificationBadgeVisible ? 'Verified' : 'Unverified'}
-              </Link>
+              {((profile as any).isSubscribed) ? (
+                <Link
+                  to="/help/subscribed"
+                  title="Subscribed User"
+                  className="inline-flex items-center align-middle ml-1"
+                >
+                  <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.99-3.818-3.99-.48 0-.941.1-1.356.278C14.774 2.525 13.5 1.5 12 1.5s-2.774 1.025-3.416 2.288C8.17 3.6 7.708 3.5 7.23 3.5 5.12 3.5 3.41 5.28 3.41 7.49c0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.21 1.71 3.99 3.818 3.99.48 0 .941-.1 1.356-.278C9.226 21.475 10.5 22.5 12 22.5s2.774-1.025 3.416-2.288c.415.178.876.278 1.356.278 2.108 0 3.818-1.78 3.818-3.99 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6z" fill="var(--brand-accent, #d4af37)" />
+                    <path d="M9.7 16.1l-3.2-3.2 1.4-1.4 1.8 1.8 5.8-5.8 1.4 1.4-7.2 7.2z" fill="#0d0d0d" />
+                  </svg>
+                </Link>
+              ) : profile.verificationBadgeVisible ? (
+                <Link
+                  to={profile.verifiedExplanationUrl || '/help/verified-badge'}
+                  state={{
+                    from:
+                      `${location.pathname}${location.search}${location.hash}` ||
+                      '/studio/store',
+                  }}
+                  title="Verified User"
+                  className="inline-flex items-center align-middle ml-1"
+                >
+                  <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.99-3.818-3.99-.48 0-.941.1-1.356.278C14.774 2.525 13.5 1.5 12 1.5s-2.774 1.025-3.416 2.288C8.17 3.6 7.708 3.5 7.23 3.5 5.12 3.5 3.41 5.28 3.41 7.49c0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.21 1.71 3.99 3.818 3.99.48 0 .941-.1 1.356-.278C9.226 21.475 10.5 22.5 12 22.5s2.774-1.025 3.416-2.288c.415.178.876.278 1.356.278 2.108 0 3.818-1.78 3.818-3.99 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6z" fill="var(--brand-primary, #9333ea)" />
+                    <path d="M9.7 16.1l-3.2-3.2 1.4-1.4 1.8 1.8 5.8-5.8 1.4 1.4-7.2 7.2z" fill="white" />
+                  </svg>
+                </Link>
+              ) : (
+                <Link
+                  to={profile.verifiedExplanationUrl || '/help/verified-badge'}
+                  state={{
+                    from:
+                      `${location.pathname}${location.search}${location.hash}` ||
+                      '/studio/store',
+                  }}
+                  title="Unverified Brand"
+                  className="inline-flex items-center align-middle ml-1"
+                >
+                  <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.99-3.818-3.99-.48 0-.941.1-1.356.278C14.774 2.525 13.5 1.5 12 1.5s-2.774 1.025-3.416 2.288C8.17 3.6 7.708 3.5 7.23 3.5 5.12 3.5 3.41 5.28 3.41 7.49c0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.21 1.71 3.99 3.818 3.99.48 0 .941-.1 1.356-.278C9.226 21.475 10.5 22.5 12 22.5s2.774-1.025 3.416-2.288c.415.178.876.278 1.356.278 2.108 0 3.818-1.78 3.818-3.99 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6z" fill="#94A3B8" />
+                    <path d="M12 7.5c-1.38 0-2.5 1.12-2.5 2.5h1.5c0-.55.45-1 1-1s1 .45 1 1c0 1-1.5 1.5-1.5 2.5v1h1.5v-.5c0-.83.83-1.33 1.5-2 .67-.67 1-1.5 1-2.5 0-1.38-1.12-2.5-2.5-2.5zm-.75 8.5v1.5h1.5V16h-1.5z" fill="white" />
+                  </svg>
+                </Link>
+              )}
             </h1>
             <p className={`inline-flex w-fit items-center gap-2 rounded-md px-2 py-1 text-sm font-semibold text-gray-700 dark:text-gray-300`}>
               <span aria-hidden="true">📍</span>
@@ -242,15 +267,11 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
               @{profile.username}
             </span>
             {tags.length > 0 ? (
-              <div className="mt-2 flex flex-col gap-2">
-                {tagRows.map((row, idx) => (
-                  <div key={idx} className="flex gap-2">
-                    {row.map((tag) => {
-                      const color = getTagColor(tag);
-                      return <Tag key={tag} label={`#${tag}`} color={color} size="sm" className="font-bold" />;
-                    })}
-                  </div>
-                ))}
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {tags.map((tag) => {
+                  const color = getTagColor(tag);
+                  return <Tag key={tag} label={`#${tag}`} color={color} size="sm" className="font-bold" />;
+                })}
               </div>
             ) : null}
           </div>

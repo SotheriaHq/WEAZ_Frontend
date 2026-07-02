@@ -1858,7 +1858,7 @@ const CreateDesignInner: React.FC = () => {
                         </p>
                       )}
 
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
                           <label className="mb-2 flex items-center text-sm font-medium text-theme">
                             Who is it for?
@@ -1890,7 +1890,7 @@ const CreateDesignInner: React.FC = () => {
                         />
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-3">
                         <UniversalSelect
                           label="What is it?"
                           value={categoryId}
@@ -2081,7 +2081,7 @@ const CreateDesignInner: React.FC = () => {
                   Price Range
                   <InfoTooltip text="An indicative price range for this design. This is NOT a checkout price — it helps buyers understand the expected cost." />
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-secondary)]">
                       ₦
@@ -2181,7 +2181,7 @@ const CreateDesignInner: React.FC = () => {
             className="self-start"
           >
             <div className="space-y-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3">
                 <UniversalSelect
                   label="Sizing Mode"
                   value={sizingMode}
@@ -2215,7 +2215,7 @@ const CreateDesignInner: React.FC = () => {
                   Who can see this?
                   <InfoTooltip text={CREATOR_METADATA_HELP.visibility} />
                 </label>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-2">
                   {(
                     [
                       {
