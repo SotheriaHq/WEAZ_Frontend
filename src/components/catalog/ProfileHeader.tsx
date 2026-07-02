@@ -184,12 +184,14 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
       {/* FIX #4: Reduced negative margin from -mt-24/-mt-28 to -mt-16/-mt-20 */}
       <div className={showBanner ? '-mt-16 px-4 sm:-mt-20 sm:px-6' : 'mt-2 px-4 sm:px-6'}>
         <div className="relative z-20 flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+          {/* Avatar + identity stay on one row even on mobile (matches native app) */}
+          <div className="flex min-w-0 flex-1 flex-row items-start gap-4">
           <div className="flex-shrink-0">
             <div
               className={`rounded-xl border-2 transition-colors duration-300 ${
                 !showBanner
                   ? 'border-transparent shadow-none ring-0'
-                  : avatarRingClass || (avatarHighlight ? 'profile-photo-ring-new' : 'profile-photo-frame-neutral')
+                  : avatarRingClass || (avatarHighlight ? 'profile-photo-ring-new' : 'border-transparent shadow-none')
               }`}
             >
               <AvatarCard
@@ -208,7 +210,7 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
             </div>
           </div>
 
-          <div className={`mt-4 flex flex-1 flex-col gap-2 sm:mt-[3.25rem] ${showBanner ? '' : 'text-gray-900 dark:text-white'}`}>
+          <div className={`flex min-w-0 flex-1 flex-col gap-2 sm:mt-4 ${showBanner ? '' : 'text-gray-900 dark:text-white'}`}>
             <h1
               className={`flex flex-wrap items-center gap-2 font-semibold italic tracking-[0.08em] leading-tight ${
                 showBanner ? 'text-gray-900 dark:text-white sm:text-white sm:drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]' : 'text-gray-900 dark:text-white'
@@ -252,9 +254,10 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
               </div>
             ) : null}
           </div>
+          </div>
 
           {/* FIX #4: Reduced bottom margin from mb-16 to mb-6 */}
-          <div className={`flex gap-2 self-end sm:self-end ${showBanner ? 'mb-6' : 'mb-0'}`}>
+          <div className={`flex flex-shrink-0 gap-2 self-end sm:self-end ${showBanner ? 'mb-6' : 'mb-0'}`}>
             {!showBanner && profile.profileVisibility === 'LOCKED' ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-red-500 px-2 py-1 text-xs font-bold text-white">
                 <span aria-hidden="true">🔒</span>

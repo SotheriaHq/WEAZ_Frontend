@@ -27,8 +27,8 @@ interface CustomOrderConfigurationEditorProps {
 }
 
 export interface CustomOrderConfigurationEditorHandle {
-  saveConfiguration: (options?: { silentSuccess?: boolean }) => Promise<boolean>;
-  buildConfigurationDraft: () => Omit<CustomOrderConfigurationUpsertInput, 'sourceId'> | null;
+  saveConfiguration: (options?: { silentSuccess?: boolean; silent?: boolean }) => Promise<boolean>;
+  buildConfigurationDraft: (options?: { silent?: boolean }) => Omit<CustomOrderConfigurationUpsertInput, 'sourceId'> | null;
 }
 
 type ConfigurationFormState = {
@@ -997,16 +997,21 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     }
   };
 
-  const buildConfigurationDraft = useCallback(() => {
+  const buildConfigurationDraft = useCallback((buildOptions?: { silent?: boolean }) => {
+    // Silent mode is used by draft saves: an incomplete custom-order config must
+    // never block, toast, or steal focus while saving a draft.
+    const silent = buildOptions?.silent === true;
     const failDraftValidation = (
       message: string,
       errors?: FieldErrors,
       options?: { showBanner?: boolean },
     ) => {
-      setValidationMessage(options?.showBanner === false ? null : message);
-      setFieldErrors(errors ?? {});
-      focusFirstFieldError(errors);
-      toast.error(message);
+      if (!silent) {
+        setValidationMessage(options?.showBanner === false ? null : message);
+        setFieldErrors(errors ?? {});
+        focusFirstFieldError(errors);
+        toast.error(message);
+      }
       return null;
     };
 
@@ -1245,12 +1250,14 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     sourceType,
   ]);
 
-  const handleSaveConfiguration = useCallback(async (options?: { silentSuccess?: boolean }) => {
+  const handleSaveConfiguration = useCallback(async (options?: { silentSuccess?: boolean; silent?: boolean }) => {
     if (!sourceId) {
-      toast.error('Save the product or design first, then configure its custom-order configuration.');
+      if (!options?.silent) {
+        toast.error('Save the product or design first, then configure its custom-order configuration.');
+      }
       return false;
     }
-    const draft = buildConfigurationDraft();
+    const draft = buildConfigurationDraft(options?.silent ? { silent: true } : undefined);
     if (!draft) {
       return false;
     }
@@ -1275,7 +1282,9 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           fabricRuleBasisId: hiddenBasis.id,
         };
       } catch (error: any) {
-        toast.error(error?.response?.data?.message || 'Unable to prepare fabric-rule basis');
+        if (!options?.silent) {
+          toast.error(error?.response?.data?.message || 'Unable to prepare fabric-rule basis');
+        }
         return false;
       }
     } else if (fabricRuleBasisId !== payload.fabricRuleBasisId) {
@@ -1302,7 +1311,9 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       }
       return true;
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Unable to save custom-order configuration');
+      if (!options?.silent) {
+        toast.error(error?.response?.data?.message || 'Unable to save custom-order configuration');
+      }
       return false;
     } finally {
       setSaving(false);
@@ -1317,9 +1328,9 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   ]);
 
   useImperativeHandle(ref, () => ({
-    saveConfiguration: (options?: { silentSuccess?: boolean }) =>
+    saveConfiguration: (options?: { silentSuccess?: boolean; silent?: boolean }) =>
       handleSaveConfiguration(options),
-    buildConfigurationDraft: () => buildConfigurationDraft(),
+    buildConfigurationDraft: (options?: { silent?: boolean }) => buildConfigurationDraft(options),
   }), [buildConfigurationDraft, handleSaveConfiguration]);
 
   const getFieldErrorId = (key: keyof FieldErrors) =>

@@ -47,6 +47,7 @@ import { brandApi } from "@/api/BrandApi";
 import FilterSelector, {
   type FilterSelection,
 } from "@/components/categories/FilterSelector";
+import { DEFAULT_HASHTAG_SUGGESTIONS } from "@/components/categories/filterTagSuggestions";
 import InfoTooltip from "@/components/ui/InfoTooltip";
 import type { MediaItem } from "@/types/media";
 import { MediaProvider, useMediaStore } from "../../hooks/useMediaStore";
@@ -407,11 +408,15 @@ const CreateDesignInner: React.FC = () => {
 
     const loadTagSuggestions = async () => {
       try {
+        // `/tags` returns the full approved tag catalog. Only fall back to the
+        // curated default pool if the catalog is genuinely empty/unreachable
+        // (e.g. an environment whose tag seed hasn't been run yet).
         const s = await TagsApi.getSuggestions(80);
-        if (mounted) setTagSuggestions(Array.isArray(s) ? s : []);
+        const list = Array.isArray(s) && s.length > 0 ? s : DEFAULT_HASHTAG_SUGGESTIONS;
+        if (mounted) setTagSuggestions(list);
       } catch (error) {
         console.warn("Failed to load tag suggestions", error);
-        if (mounted) setTagSuggestions([]);
+        if (mounted) setTagSuggestions([...DEFAULT_HASHTAG_SUGGESTIONS]);
       }
     };
 
@@ -610,24 +615,6 @@ const CreateDesignInner: React.FC = () => {
     categoryId.trim().length > 0 &&
     categoryTypeId.trim().length > 0 &&
     type.trim().length > 0;
-  const hasDraftContent = Boolean(
-    title.trim().length > 0 ||
-    description.trim().length > 0 ||
-    minPrice.trim().length > 0 ||
-    maxPrice.trim().length > 0 ||
-    selectedTags.length > 0 ||
-    categoryId.trim().length > 0 ||
-    categoryTypeId.trim().length > 0 ||
-    files.length > 0 ||
-    isMadeToOrder ||
-    sizingMode !== 'NONE' ||
-    fitPreference !== 'REGULAR' ||
-    targetAgeGroup !== 'ADULT' ||
-    normalizedCustomMeasurementKeys.length > 0 ||
-    type !== 'EVERYBODY' ||
-    visibility !== 'PUBLIC' ||
-    Object.values(filterSelection).some((values) => values.length > 0),
-  );
 
   const resolveMediaWithUrl = useCallback((item?: MediaItem | null) => {
     if (!item) return null;
@@ -891,8 +878,11 @@ const CreateDesignInner: React.FC = () => {
   };
 
   const handleSaveDraft = async () => {
-    if (!hasDraftContent) {
-      toast.error('Add at least one detail to save a draft');
+    // Draft rule: a title is the ONLY requirement. Custom-order / measurement
+    // details are never enforced for drafts — they are completed later, before
+    // publishing. So a draft saves even with Custom Order toggled and no points.
+    if (title.trim().length === 0) {
+      toast.error('Add a title to save your draft');
       return;
     }
     await executeSaveDraft();
@@ -906,14 +896,13 @@ const CreateDesignInner: React.FC = () => {
     setIsSubmitting(true);
     try {
       if (isEditMode && id && isMadeToOrder) {
-        const saved = await customOrderEditorRef.current?.saveConfiguration({
+        // Best-effort: persist the custom-order config if it is complete, but
+        // never block a draft when it is not (e.g. measurement points
+        // unavailable). Publish still enforces a valid config.
+        await customOrderEditorRef.current?.saveConfiguration({
           silentSuccess: true,
+          silent: true,
         });
-        if (!saved) {
-          setIsSubmitting(false);
-          setSubmitIntent(null);
-          return;
-        }
       }
 
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
@@ -952,7 +941,7 @@ const CreateDesignInner: React.FC = () => {
 
       const pendingCustomOrderDraft =
         isMadeToOrder
-          ? customOrderEditorRef.current?.buildConfigurationDraft() ?? null
+          ? customOrderEditorRef.current?.buildConfigurationDraft({ silent: true }) ?? null
           : null;
       const filesSnapshot = [...files];
       const coverIndexSnapshot = coverIndex;
@@ -1022,17 +1011,23 @@ const CreateDesignInner: React.FC = () => {
 
           savedDesignId = extractDesignId(response);
           if (pendingCustomOrderDraft && savedDesignId) {
-            await customOrderConfigurationsApi.create({
-              ...pendingCustomOrderDraft,
-              fabricRuleBasisId: String(pendingCustomOrderDraft.fabricRuleBasisId ?? '').trim() || (
-                await customOrderConfigurationsApi.createFabricRuleBasis({
-                  label: `${draftTitle} fabric rules`,
-                  measurementKeys: pendingCustomOrderDraft.requiredMeasurementKeys,
-                  gender: measurementGender,
-                })
-              ).id,
-              sourceId: savedDesignId,
-            });
+            // Non-fatal for drafts: if the custom-order config can't be saved yet,
+            // the draft still succeeds and the config is completed before publish.
+            try {
+              await customOrderConfigurationsApi.create({
+                ...pendingCustomOrderDraft,
+                fabricRuleBasisId: String(pendingCustomOrderDraft.fabricRuleBasisId ?? '').trim() || (
+                  await customOrderConfigurationsApi.createFabricRuleBasis({
+                    label: `${draftTitle} fabric rules`,
+                    measurementKeys: pendingCustomOrderDraft.requiredMeasurementKeys,
+                    gender: measurementGender,
+                  })
+                ).id,
+                sourceId: savedDesignId,
+              });
+            } catch {
+              /* Draft saved; custom-order config can be completed before publishing. */
+            }
           }
 
           updatePublishTask(
@@ -1560,7 +1555,7 @@ const CreateDesignInner: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-transparent text-[var(--text-primary)] transition-colors duration-300">
+    <div className="min-h-screen overflow-x-clip bg-transparent text-[var(--text-primary)] transition-colors duration-300">
       {/* Main Content */}
       <main className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-24 sm:pb-32">
         <div className="mb-4 flex items-center justify-between sm:mb-6">
@@ -1948,7 +1943,7 @@ const CreateDesignInner: React.FC = () => {
                               onKeyDown={handleTagInputKeyDown}
                               placeholder="Search or create a hashtag..."
                               disabled={disabled || selectedTags.length >= 10}
-                              className="threadly-search-input pl-10 pr-12"
+                              className="threadly-search-input pl-10 pr-[5.5rem]"
                             />
                             <button
                               type="button"

@@ -1873,8 +1873,8 @@ const ProfilePage: React.FC = () => {
                 ) : (
                   // Show collections grid
                   <>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-                      <div className="flex-1 w-full sm:w-auto">
+                    <div className="flex flex-row items-center justify-between gap-3 mb-4">
+                      <div className="min-w-0 flex-1">
                         <div className="relative w-full">
                           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">🔎</span>
                           <input
@@ -1897,7 +1897,7 @@ const ProfilePage: React.FC = () => {
                       </div>
                       {/* Show create controls only for owner */}
                       {isOwner && (
-                        <div className="flex gap-2">
+                        <div className="flex flex-shrink-0 gap-2">
                           <AddCollectionDropdown openModal={() => handleOpenAddModal()} />
                         </div>
                       )}
