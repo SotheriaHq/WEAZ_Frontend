@@ -1,89 +1,56 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import DesignViewModal from '@/components/designs/DesignViewModal';
 import VLoader from '@/components/loaders/VLoader';
-import type { MarketItem } from '@/types/market';
+import DesignApi from '@/api/DesignApi';
+import useCachedResource from '@/hooks/useCachedResource';
+import { fetchCollectionDetailQuery } from '@/query/queries';
 import { toDesignMarketItem } from '@/utils/designMarketItem';
-import { fetchCollectionDetailQuery, useDesignDetailQuery } from '@/query/queries';
-
-const areMarketItemsEquivalent = (left: MarketItem | null, right: MarketItem) =>
-  Boolean(
-    left &&
-      left.id === right.id &&
-      left.collectionId === right.collectionId &&
-      left.brandId === right.brandId &&
-      left.commentsCount === right.commentsCount &&
-      left.media?.url === right.media?.url &&
-      left.media?.type === right.media?.type,
-  );
 
 const DesignDetailsPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [detail, setDetail] = useState<unknown | null>(null);
-  const [item, setItem] = useState<MarketItem | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const openMediaId = searchParams.get('openMedia');
-  const designQuery = useDesignDetailQuery(id, { enabled: Boolean(id) });
 
-  useEffect(() => {
-    if (!id) {
-      setError('Design reference is missing.');
-      setLoading(false);
-      return;
-    }
-
-    let mounted = true;
-    const applyDetail = (nextDetail: unknown) => {
-      const nextItem = toDesignMarketItem(nextDetail, openMediaId);
-      if (nextItem) {
-        setDetail(nextDetail);
-        setItem((current) => (areMarketItemsEquivalent(current, nextItem) ? current : nextItem));
-        setError(null);
-        return true;
-      }
-      return false;
-    };
-
-    const loadFallback = async () => {
-      setError(null);
+  const {
+    data: detail,
+    loading,
+    error: fetchError,
+  } = useCachedResource<unknown>({
+    queryKey: ['design', 'detail-page', id],
+    queryFn: async () => {
+      if (!id) throw new Error('Design reference is missing.');
       try {
-        const legacyDetail = await fetchCollectionDetailQuery(queryClient, id, 'design');
-        if (!mounted) return;
-        if (!applyDetail(legacyDetail)) setError('This design does not have display media yet.');
+        return await DesignApi.getDesignDetail(id);
       } catch {
-        if (mounted) setError('Design not found.');
-      } finally {
-        if (mounted) setLoading(false);
+        const legacyDetail = await fetchCollectionDetailQuery(queryClient, id, 'design');
+        if (!legacyDetail) throw new Error('Design not found.');
+        return legacyDetail;
       }
-    };
+    },
+    enabled: Boolean(id),
+  });
 
-    if (designQuery.data !== undefined) {
-      if (!applyDetail(designQuery.data)) setError('This design does not have display media yet.');
-      setLoading(false);
-    } else if (designQuery.error) {
-      void loadFallback();
-    } else {
-      setLoading((current) => {
-        const nextLoading = designQuery.isLoading && designQuery.data === undefined;
-        return current === nextLoading ? current : nextLoading;
-      });
+  const item = useMemo(
+    () => (detail ? toDesignMarketItem(detail, openMediaId) : null),
+    [detail, openMediaId],
+  );
+
+  const error = useMemo(() => {
+    if (!id) return 'Design reference is missing.';
+    if (fetchError) {
+      return fetchError.message === 'Design not found.'
+        ? 'Design not found.'
+        : fetchError.message;
     }
-
-    return () => {
-      mounted = false;
-    };
-  }, [designQuery.data, designQuery.error, designQuery.isLoading, id, openMediaId, queryClient]);
-
-  useEffect(() => {
-    if (!detail) return;
-    const nextItem = toDesignMarketItem(detail, openMediaId);
-    if (nextItem) setItem(nextItem);
-  }, [detail, openMediaId]);
+    if (!loading && detail && !item) {
+      return 'This design does not have display media yet.';
+    }
+    return null;
+  }, [detail, fetchError, id, item, loading]);
 
   if (loading) {
     return (

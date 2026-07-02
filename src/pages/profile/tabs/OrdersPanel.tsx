@@ -49,6 +49,7 @@ import {
   type PaymentFormState,
 } from '@/pages/checkout/paymentFlow';
 import { useConfirm } from '@/components/ui/useConfirm';
+import { useCachedResource } from '@/hooks/useCachedResource';
 
 const STANDARD_STATUS_OPTIONS = ['ALL', 'PENDING', 'PROCESSING', 'SHIPPED'] as const;
 const CUSTOM_STATUS_OPTIONS = ['ALL', 'PENDING', 'ACTIVE', 'COMPLETED', 'ISSUES'] as const;
@@ -1659,10 +1660,62 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
 }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [standardOrders, setStandardOrders] = useState<Order[]>([]);
-  const [customOrders, setCustomOrders] = useState<CustomOrderListItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Cached through the shared query client so returning to the Orders tab paints
+  // instantly from cache instead of flashing the skeleton + refetching every time.
+  const {
+    data: ordersData,
+    loading,
+    error: ordersError,
+  } = useCachedResource({
+    queryKey: ['profile', 'orders', 'me'],
+    queryFn: async () => {
+      const [standardResponse, customResponse] = await Promise.all([
+        getMyOrders(1, 50),
+        customOrdersBuyerApi.list({ page: 1, limit: 50 }),
+      ]);
+
+      const nextStandardOrders = Array.isArray(standardResponse?.items)
+        ? standardResponse.items
+        : [];
+      const nextCustomOrders = Array.isArray(customResponse?.items)
+        ? customResponse.items
+        : [];
+
+      const standardIds = nextStandardOrders.map((item) => item.id).filter(Boolean);
+      const customIds = nextCustomOrders.map((item) => item.id).filter(Boolean);
+
+      const [standardSummaries, customSummaries] = await Promise.all([
+        standardIds.length > 0
+          ? messagingApi.getBulkOrderSummaries(standardIds, true)
+          : Promise.resolve({ items: [] }),
+        customIds.length > 0
+          ? messagingApi.getBulkCustomOrderSummaries(customIds, true)
+          : Promise.resolve({ items: [] }),
+      ]);
+
+      return {
+        standardOrders: nextStandardOrders,
+        customOrders: nextCustomOrders,
+        standardSummaryByOrderId: standardSummaries.items.reduce<
+          Record<string, ThreadSummaryResponse | null>
+        >((acc, item) => {
+          acc[item.contextId] = item.summary;
+          return acc;
+        }, {}),
+        customSummaryByOrderId: customSummaries.items.reduce<
+          Record<string, ThreadSummaryResponse | null>
+        >((acc, item) => {
+          acc[item.contextId] = item.summary;
+          return acc;
+        }, {}),
+      };
+    },
+  });
+  const standardOrders = ordersData?.standardOrders ?? [];
+  const customOrders = ordersData?.customOrders ?? [];
+  const standardSummaryByOrderId = ordersData?.standardSummaryByOrderId ?? {};
+  const customSummaryByOrderId = ordersData?.customSummaryByOrderId ?? {};
+  const error = ordersError ? 'Unable to load your orders right now.' : null;
   const [query, setQuery] = useState('');
   const [standardStatus, setStandardStatus] = useState<StandardStatusFilter>('ALL');
   const [customStatus, setCustomStatus] = useState<CustomStatusFilter>('ALL');
@@ -1678,72 +1731,6 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
     urlOrderId && urlKind ? { kind: urlKind, id: urlOrderId } : null;
   const [localSelection, setLocalSelection] = useState<OrdersPanelSelection | null>(null);
   const selection = mode === 'full' ? urlSelection : localSelection;
-  const [standardSummaryByOrderId, setStandardSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
-  const [customSummaryByOrderId, setCustomSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
-
-  useEffect(() => {
-    let mounted = true;
-
-    const run = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [standardResponse, customResponse] = await Promise.all([
-          getMyOrders(1, 50),
-          customOrdersBuyerApi.list({ page: 1, limit: 50 }),
-        ]);
-
-        if (!mounted) return;
-
-        const nextStandardOrders = Array.isArray(standardResponse?.items) ? standardResponse.items : [];
-        const nextCustomOrders = Array.isArray(customResponse?.items) ? customResponse.items : [];
-
-        setStandardOrders(nextStandardOrders);
-        setCustomOrders(nextCustomOrders);
-
-        const standardIds = nextStandardOrders.map((item) => item.id).filter(Boolean);
-        const customIds = nextCustomOrders.map((item) => item.id).filter(Boolean);
-
-        const [standardSummaries, customSummaries] = await Promise.all([
-          standardIds.length > 0
-            ? messagingApi.getBulkOrderSummaries(standardIds, true)
-            : Promise.resolve({ items: [] }),
-          customIds.length > 0
-            ? messagingApi.getBulkCustomOrderSummaries(customIds, true)
-            : Promise.resolve({ items: [] }),
-        ]);
-
-        if (!mounted) return;
-
-        setStandardSummaryByOrderId(
-          standardSummaries.items.reduce<Record<string, ThreadSummaryResponse | null>>((acc, item) => {
-            acc[item.contextId] = item.summary;
-            return acc;
-          }, {}),
-        );
-        setCustomSummaryByOrderId(
-          customSummaries.items.reduce<Record<string, ThreadSummaryResponse | null>>((acc, item) => {
-            acc[item.contextId] = item.summary;
-            return acc;
-          }, {}),
-        );
-      } catch (err) {
-        if (!mounted) return;
-        setStandardOrders([]);
-        setCustomOrders([]);
-        setError('Unable to load your orders right now.');
-        console.error('Orders panel failed to fetch orders:', err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    void run();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (!initialSelection || mode !== 'full') return;

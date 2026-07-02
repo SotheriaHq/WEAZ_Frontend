@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Heart, 
@@ -16,8 +16,9 @@ import VLoader from '@/components/loaders/VLoader';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToWishlist, checkWishlistStatus, removeFromWishlist } from '@/features/wishlistSlice';
-import { productApi } from '@/api/ProductApi';
-import type { ProductDto } from '@/api/ProductApi';
+import { apiClient } from '@/api/httpClient';
+import { normalizeProductDto, type ProductDto } from '@/api/ProductApi';
+import useCachedResource from '@/hooks/useCachedResource';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { formatPrice } from '@/utils/helpers';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
@@ -166,10 +167,28 @@ export default function ProductDetailsPage() {
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
   const { addStandard, bagProduct, beginCustomFlow, getPulseStatus, loadingByProductId } = useBagging();
-  const [product, setProduct] = useState<ProductDto | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
+  const initializedProductIdRef = useRef<string | null>(null);
+
+  const {
+    data: product = null,
+    loading,
+    error: fetchError,
+  } = useCachedResource<ProductDto | null>({
+    queryKey: ['products', 'detail', id],
+    queryFn: async ({ signal }) => {
+      const response = await apiClient.get(`/products/${id}`, {
+        params: { includeDeleted: false },
+        signal,
+      });
+      const raw = response.data?.data ?? response.data;
+      const normalized = normalizeProductDto(raw as ProductDto | null);
+      if (!normalized) throw new Error('Product not found');
+      return normalized;
+    },
+    enabled: Boolean(id),
+  });
+  const error = fetchError ? 'Failed to load product' : null;
+
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string>('');
@@ -182,34 +201,16 @@ export default function ProductDetailsPage() {
   const [startingCustomOrder, setStartingCustomOrder] = useState(false);
   const [customOrderComposerOpen, setCustomOrderComposerOpen] = useState(false);
   
-  // Fetch product
   useEffect(() => {
-    if (!id) return;
-    const loadProduct = async () => {
-      try {
-        setLoading(true);
-        const data = await productApi.getProduct(id, { includeDeleted: false });
-        if (data) {
-          setProduct(data);
-          // Auto-select first available options if any
-          const variants = data.variants || [];
-          const inStock = variants.find(v => v.stock > 0) || variants[0];
-          if (inStock) {
-             if (inStock.size) setSelectedSize(inStock.size);
-             if (inStock.color) setSelectedColor(inStock.color);
-          }
-        } else {
-           setError('Product not found');
-        }
-      } catch (err) {
-        console.error(err);
-        setError('Failed to load product');
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadProduct();
-  }, [id]);
+    if (!product?.id || initializedProductIdRef.current === product.id) return;
+    initializedProductIdRef.current = product.id;
+    const variants = product.variants || [];
+    const inStock = variants.find((v) => v.stock > 0) || variants[0];
+    if (inStock) {
+      if (inStock.size) setSelectedSize(inStock.size);
+      if (inStock.color) setSelectedColor(inStock.color);
+    }
+  }, [product]);
 
   // Derived media list
   const mediaList = useMemo(() => {

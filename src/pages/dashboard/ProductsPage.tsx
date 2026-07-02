@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import {
@@ -17,11 +17,25 @@ import Textarea from '@/components/ui/Textarea';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/Button';
+import useCachedResource from '@/hooks/useCachedResource';
 
 const ProductsPage: React.FC = () => {
   const user = useSelector((s: RootState) => s.user.profile);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const productsQueryKey = ['dashboard', 'products', user?.id] as const;
+  const {
+    data: products = [],
+    loading,
+    refetch: loadProducts,
+  } = useCachedResource<Product[]>({
+    queryKey: productsQueryKey,
+    queryFn: async () => {
+      const res = await getBrandProductsForOwner(user!.id, 100);
+      return (res as { items?: Product[]; data?: Product[] })?.items
+        || (res as { items?: Product[]; data?: Product[] })?.data
+        || [];
+    },
+    enabled: Boolean(user?.id),
+  });
   const [isCreating, setIsCreating] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'in-stock' | 'low-stock'>('all');
   
@@ -32,24 +46,6 @@ const ProductsPage: React.FC = () => {
     totalStock: 0,
     description: '',
   });
-
-  const loadProducts = useCallback(async () => {
-    if (!user?.id) return;
-    setLoading(true);
-    try {
-      const res = await getBrandProductsForOwner(user.id, 100);
-      const items = (res as any)?.items || (res as any)?.data || [];
-      setProducts(items);
-    } catch {
-      toast.error('Failed to load products');
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    void loadProducts();
-  }, [loadProducts]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();

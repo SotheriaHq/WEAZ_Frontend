@@ -16,70 +16,61 @@ import { Layout } from '@/components/Layout';
 import InlineStoreCollectionView from '@/components/catalog/InlineStoreCollectionView';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
 import InlineProductDetail from '@/components/catalog/InlineProductDetail';
+import useCachedResource from '@/hooks/useCachedResource';
+
+type CollectionRouteKind = 'store' | 'design-page' | 'design-modal';
 
 const CollectionRouter: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [type, setType] = useState<'store' | 'design' | null>(null);
-  const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
 
-  useEffect(() => {
-    if (!id) return;
-    let mounted = true;
-
-    const detect = async () => {
-      setLoading(true);
-      const buildMarketDesignRoute = () => {
-        const params = new URLSearchParams(location.search);
-        params.set('openDesign', id);
-        const query = params.toString();
-        return `/market${query ? `?${query}` : ''}${location.hash}`;
-      };
+  const { data: routeKind, loading } = useCachedResource<CollectionRouteKind | null>({
+    queryKey: ['collection', 'router', id],
+    queryFn: async () => {
+      if (!id) return null;
 
       try {
         const design = await DesignApi.getDesignDetail(id);
-        if (!mounted) return;
-        if (design) {
-          navigate(`/designs/${encodeURIComponent(id)}${location.search}${location.hash}`, { replace: true });
-          return;
-        }
+        if (design) return 'design-page';
       } catch {
         // Not an explicit design; continue with collection detection.
       }
 
       try {
-        // Use the general /collections/:id endpoint with scope=all
-        // Backend will find the collection in either table
         const d = await brandApi.getCollectionDetail(id, { scope: 'all' });
-        if (!mounted) return;
         if (d?.isAvailableInStore === true || d?.domain === 'STORE') {
-          setType('store');
-        } else {
-          // Design collections open in the modal on the market page
-          navigate(buildMarketDesignRoute(), { replace: true });
-          return;
+          return 'store';
         }
+        return 'design-modal';
       } catch {
-        if (mounted) {
-          // Fallback: open as design modal on market page
-          navigate(buildMarketDesignRoute(), { replace: true });
-          return;
-        }
-      } finally {
-        if (mounted) setLoading(false);
+        return 'design-modal';
       }
-    };
+    },
+    enabled: Boolean(id),
+  });
 
-    void detect();
-    return () => { mounted = false; };
-  }, [id, location.hash, location.search, navigate]);
+  useEffect(() => {
+    if (!id || loading || !routeKind || routeKind === 'store') return;
+
+    if (routeKind === 'design-page') {
+      navigate(`/designs/${encodeURIComponent(id)}${location.search}${location.hash}`, {
+        replace: true,
+      });
+      return;
+    }
+
+    const params = new URLSearchParams(location.search);
+    params.set('openDesign', id);
+    const query = params.toString();
+    navigate(`/market${query ? `?${query}` : ''}${location.hash}`, { replace: true });
+  }, [id, loading, location.hash, location.search, navigate, routeKind]);
 
   if (!id) return null;
 
-  if (loading) {
+  if (loading || routeKind !== 'store') {
     return (
       <Layout>
         <div className="min-h-screen w-full bg-gray-50 dark:bg-black flex items-center justify-center">
@@ -97,33 +88,27 @@ const CollectionRouter: React.FC = () => {
     );
   }
 
-  // Store collections render within Layout with product drill-down
-  if (type === 'store') {
-    return (
-      <Layout>
-        <div className="min-h-screen w-full bg-gray-50 dark:bg-black pt-20 pb-10">
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
-            {selectedProduct ? (
-              <InlineProductDetail
-                product={selectedProduct}
-                onBack={() => setSelectedProduct(null)}
-                brandName={selectedProduct.brand?.name}
-              />
-            ) : (
-              <InlineStoreCollectionView
-                collectionId={id}
-                onBack={() => navigate(-1)}
-                onViewProduct={(product) => setSelectedProduct(product)}
-              />
-            )}
-          </div>
+  return (
+    <Layout>
+      <div className="min-h-screen w-full bg-gray-50 dark:bg-black pt-20 pb-10">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
+          {selectedProduct ? (
+            <InlineProductDetail
+              product={selectedProduct}
+              onBack={() => setSelectedProduct(null)}
+              brandName={selectedProduct.brand?.name}
+            />
+          ) : (
+            <InlineStoreCollectionView
+              collectionId={id}
+              onBack={() => navigate(-1)}
+              onViewProduct={(product) => setSelectedProduct(product)}
+            />
+          )}
         </div>
-      </Layout>
-    );
-  }
-
-  // If we somehow reach here without a type, redirect to market
-  return null;
+      </div>
+    </Layout>
+  );
 };
 
 export default CollectionRouter;

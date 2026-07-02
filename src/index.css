@@ -68,6 +68,8 @@ html {
     --text-secondary: #78716c;     /* warm stone-gray */
     --border-default: #e5e5e5;     /* standard 1px card/input border */
     --border-strong: #d4d4d4;      /* stronger border for emphasis */
+    --field-border: #cfcfcf;       /* clearly visible form input border */
+    --field-border-hover: #9ca3af; /* input border on hover */
 
     /* Dark scheme helpers (kept for legacy selectors) */
     --dark-bg-primary: #0a0a0a;
@@ -100,6 +102,8 @@ html {
     --text-secondary: #a3a3a3;     /* warm neutral gray, not cool blue */
     --border-default: rgba(255, 255, 255, 0.08);
     --border-strong: rgba(255, 255, 255, 0.14);
+    --field-border: rgba(255, 255, 255, 0.20);   /* clearly visible input border on dark */
+    --field-border-hover: rgba(255, 255, 255, 0.34);
     --neu-surface: #161616;
     --neu-surface-soft: #1c1c1c;
     --neu-text: #f5f5f5;
@@ -175,6 +179,40 @@ html {
     color: var(--text-primary);
     background-color: var(--surface-primary);
     border-color: var(--border-default);
+  }
+
+  /* Reusable form control: always-visible border + clear focus ring.
+     Use on <input>/<textarea>/<select> instead of ad-hoc border+surface
+     combos (which collide on border-color) or focus:border-transparent. */
+  .form-field {
+    color: var(--text-primary);
+    background-color: var(--surface-primary);
+    border: 1px solid var(--field-border);
+    transition: border-color 150ms ease, box-shadow 150ms ease,
+      background-color 150ms ease;
+  }
+
+  .form-field::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.75;
+  }
+
+  .form-field:hover:not(:disabled):not(:focus) {
+    border-color: var(--field-border-hover);
+  }
+
+  .form-field:focus,
+  .form-field:focus-visible {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--brand-primary) 30%, transparent);
+  }
+
+  .form-field:disabled {
+    background-color: var(--surface-secondary);
+    color: var(--text-secondary);
+    cursor: not-allowed;
   }
 
   .surface-menu {

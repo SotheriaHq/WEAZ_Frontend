@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
+import useCachedResource from '@/hooks/useCachedResource';
 import { 
   BarChart, 
   Bar, 
@@ -16,25 +17,12 @@ import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 
 const AnalyticsPage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user.profile);
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<'7d' | '30d' | 'ytd'>('30d');
-
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!user?.id) return;
-      setLoading(true);
-      try {
-        const analyticsData = await brandApi.getDashboardAnalytics(user.id, range);
-        setData(analyticsData);
-      } catch (error) {
-        console.error('Failed to fetch analytics', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [user?.id, range]);
+  const { data, loading } = useCachedResource<any>({
+    queryKey: ['dashboard', 'analytics', user?.id, range],
+    queryFn: async () => brandApi.getDashboardAnalytics(user!.id, range),
+    enabled: Boolean(user?.id),
+  });
 
   if (loading && !data) {
     return <StudioPageSkeleton variant="dashboard" />;

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import type { RootState } from '@/store';
@@ -12,6 +12,7 @@ import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { getAvatarFallback } from '@/utils/profileImage';
 import { DraftExpiryStats as DraftExpiryStatsComponent } from '@/components/collections/DraftExpiryComponents';
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
+import useCachedResource from '@/hooks/useCachedResource';
 import { normalizeNotification } from '@/utils/notificationAdapter';
 import { determineNotificationRoute } from '@/utils/notificationRouting';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
@@ -120,23 +121,52 @@ const DashboardHome: React.FC = () => {
   const isEmbeddedMobile = useEmbeddedSurface() === 'mobile-app';
   const user = useSelector((state: RootState) => state.user.profile);
   const notificationItems = useSelector((state: RootState) => state.notifications.items);
-  const [overview, setOverview] = useState<any>(null);
-  const [activityFeed, setActivityFeed] = useState<any[]>([]);
-  const [, setAnalytics] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<'7d' | '30d' | 'ytd'>('30d');
-  const [draftStats, setDraftStats] = useState<DraftExpiryStats | null>(null);
-  const [storeOpenStatus, setStoreOpenStatus] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
+  type DashboardHomeData = {
+    overview: any;
+    activityFeed: any[];
+    draftStats: DraftExpiryStats | null;
+    storeOpenStatus: boolean | null;
+  };
+
+  const buildFallbackOverview = () => ({
+    kpis: {
+      totalRevenue: 0,
+      totalOrders: 0,
+      conversionRate: 0,
+      avgOrderValue: 0,
+      storeViews: 0,
+      patches: 0,
+      activeProducts: 0,
+      reviewScore: 0,
+      reviewCount: 0,
+    },
+    currency: 'NGN',
+    store: {
+      name: user?.brandFullName || 'Store',
+      slug: user?.username || 'your-store',
+      logoUrl: null,
+      isLive: false,
+    },
+    actionRequired: [],
+    recentActivity: [],
+    recentOrders: [],
+    storeHealth: {
+      score: 0,
+      responseTime: 0,
+      inventory: 0,
+      reviews: 0,
+    },
+  });
+
+  const { data: dashboardData, loading } = useCachedResource<DashboardHomeData>({
+    queryKey: ['dashboard', 'home', user?.id, range],
+    queryFn: async () => {
+      if (!user?.id) throw new Error('No user ID');
+
       try {
-        if (!user?.id) {
-          throw new Error('No user ID');
-        }
-
-        const [overviewData, analyticsData, activityFeedData, draftStatsData, statusData] = await Promise.all([
+        const [overviewData, , activityFeedData, draftStatsData, statusData] = await Promise.all([
           brandApi.getDashboardOverview(user.id),
           brandApi.getDashboardAnalytics(user.id, range),
           brandApi.getDashboardActivityFeed(user.id, 12),
@@ -144,51 +174,29 @@ const DashboardHome: React.FC = () => {
           getStoreStatus().catch(() => null),
         ]);
 
-        setOverview(overviewData);
-        setAnalytics(analyticsData);
-        setActivityFeed(Array.isArray(activityFeedData?.items) ? activityFeedData.items : []);
-        setDraftStats(draftStatsData);
-        setStoreOpenStatus(statusData?.isStoreOpen ?? null);
+        return {
+          overview: overviewData,
+          activityFeed: Array.isArray(activityFeedData?.items) ? activityFeedData.items : [],
+          draftStats: draftStatsData,
+          storeOpenStatus: statusData?.isStoreOpen ?? null,
+        };
       } catch (error) {
         console.warn('Failed to fetch dashboard data, using demo data', error);
-        setOverview({
-          kpis: {
-            totalRevenue: 0,
-            totalOrders: 0,
-            conversionRate: 0,
-            avgOrderValue: 0,
-            storeViews: 0,
-            patches: 0,
-            activeProducts: 0,
-            reviewScore: 0,
-            reviewCount: 0,
-          },
-          currency: 'NGN',
-          store: {
-            name: user?.brandFullName || 'Store',
-            slug: user?.username || 'your-store',
-            logoUrl: null,
-            isLive: false,
-          },
-          actionRequired: [],
-          recentActivity: [],
-          recentOrders: [],
-          storeHealth: {
-            score: 0,
-            responseTime: 0,
-            inventory: 0,
-            reviews: 0,
-          },
-        });
-        setActivityFeed([]);
-        setAnalytics({ salesChart: [] });
-      } finally {
-        setLoading(false);
+        return {
+          overview: buildFallbackOverview(),
+          activityFeed: [],
+          draftStats: null,
+          storeOpenStatus: null,
+        };
       }
-    };
+    },
+    enabled: Boolean(user?.id),
+  });
 
-    void fetchData();
-  }, [range, user?.brandFullName, user?.id, user?.username]);
+  const overview = dashboardData?.overview ?? null;
+  const activityFeed = dashboardData?.activityFeed ?? [];
+  const draftStats = dashboardData?.draftStats ?? null;
+  const storeOpenStatus = dashboardData?.storeOpenStatus ?? null;
 
   const kpis = overview?.kpis || {};
   const store = overview?.store || {};

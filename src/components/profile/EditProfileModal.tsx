@@ -511,7 +511,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   <input 
                     type="text" 
                     placeholder="e.g. WIEZ Couture"
-                    className="w-full h-12 px-4 rounded-lg border border-theme-strong surface-card text-theme placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" 
+                    className="form-field w-full h-12 px-4 rounded-lg"
                     {...register('brandFullName')}
                   />
                   {errors.brandFullName && <p className="text-xs text-red-500 font-medium">{errors.brandFullName.message}</p>}
@@ -522,8 +522,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">@</span>
                     <input 
                       type="text" 
-                      placeholder="username" 
-                      className="w-full h-12 pl-8 pr-4 rounded-lg border border-theme-strong surface-subtle text-gray-500 cursor-not-allowed" 
+                      placeholder="username"
+                      className="form-field w-full h-12 pl-8 pr-4 rounded-lg"
                       value={user.username}
                       disabled
                       title="Username cannot be changed here"
@@ -536,8 +536,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     <label className="text-sm font-semibold text-theme-secondary">Email Address <span className="text-gray-400 font-normal text-xs ml-2">(Private)</span></label>
                     <input 
                         type="email" 
-                        placeholder="contact@brand.com" 
-                        className="w-full h-12 px-4 rounded-lg border border-theme-strong surface-subtle text-gray-500 cursor-not-allowed" 
+                        placeholder="contact@brand.com"
+                        className="form-field w-full h-12 px-4 rounded-lg"
                         value={user.email}
                         disabled
                     />
@@ -564,8 +564,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
               <div className="space-y-6">
                 <div className="space-y-2 relative">
                     <label className="text-sm font-semibold text-theme-secondary">Brand Story</label>
-                    <textarea 
-                        className="w-full h-40 p-4 rounded-lg border border-theme-strong surface-card text-theme placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none leading-relaxed" 
+                    <textarea
+                        className="form-field w-full h-40 p-4 rounded-lg resize-none leading-relaxed"
                         placeholder="Tell the world about your vision, heritage, and what makes your fashion unique..."
                         {...brandDescriptionField}
                         ref={(e) => {
@@ -736,8 +736,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   <label className="text-sm font-semibold text-theme-secondary">Phone Number</label>
                   <input 
                     type="tel" 
-                    placeholder="+1 (555) 000-0000" 
-                    className="w-full h-12 px-4 rounded-lg border border-theme-strong surface-card text-theme placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    placeholder="+1 (555) 000-0000"
+                    className="form-field w-full h-12 px-4 rounded-lg"
                     {...register('phoneNumber')}
                   />
                   {errors.phoneNumber && <p className="text-xs text-red-500 font-medium">{errors.phoneNumber.message}</p>}
@@ -755,8 +755,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     </div>
                     <input 
                       type="text" 
-                      placeholder="instagram.com/" 
-                      className="w-full h-12 pl-12 pr-4 rounded-lg border border-theme-strong surface-card text-theme placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                      placeholder="instagram.com/"
+                      className="form-field w-full h-12 pl-12 pr-4 rounded-lg"
                       {...register('socialInstagram')}
                     />
                   </div>
