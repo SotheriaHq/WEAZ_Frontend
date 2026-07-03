@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -15,6 +15,15 @@ import {
 import type { StoreWizardData } from '@/types/storeWizard';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import VLoader from '@/components/loaders/VLoader';
+import {
+  getStorePoliciesStepValidation,
+  STORE_CUSTOM_ORDER_LEAD_TIME_OPTIONS,
+  STORE_REFUND_METHOD_OPTIONS,
+  STORE_RESPONSE_SLA_OPTIONS,
+  STORE_RETURN_WINDOW_OPTIONS,
+  STORE_SHIPPING_COUNTRIES,
+} from '@/utils/storePolicyConstraints';
 
 interface StorePoliciesStepProps {
   data: StoreWizardData;
@@ -26,18 +35,7 @@ interface StorePoliciesStepProps {
   primaryActionLabel?: string;
 }
 
-// Shipping regions with flags (Africa-first)
-const SHIPPING_COUNTRIES = [
-  { value: 'nigeria', label: 'Nigeria', flag: '🇳🇬', accent: 'from-emerald-500/20 to-emerald-600/20' },
-  { value: 'ghana', label: 'Ghana', flag: '🇬🇭', accent: 'from-amber-500/20 to-red-500/20' },
-  { value: 'kenya', label: 'Kenya', flag: '🇰🇪', accent: 'from-green-500/20 to-red-500/20' },
-  { value: 'south-africa', label: 'South Africa', flag: '🇿🇦', accent: 'from-cyan-500/20 to-emerald-500/20' },
-  { value: 'rwanda', label: 'Rwanda', flag: '🇷🇼', accent: 'from-yellow-500/20 to-blue-500/20' },
-  { value: 'egypt', label: 'Egypt', flag: '🇪🇬', accent: 'from-red-500/20 to-gray-500/20' },
-  { value: 'uk', label: 'United Kingdom', flag: '🇬🇧', accent: 'from-blue-500/20 to-red-500/20' },
-  { value: 'us', label: 'United States', flag: '🇺🇸', accent: 'from-blue-500/20 to-indigo-500/20' },
-  { value: 'international', label: 'International', flag: '🌍', accent: 'from-purple-500/20 to-blue-500/20' },
-];
+const SHIPPING_COUNTRIES = STORE_SHIPPING_COUNTRIES;
 
 // Processing times
 const PROCESSING_TIMES = [
@@ -61,25 +59,20 @@ const ORDER_CANCELLATION_WINDOWS = [
   { value: '24h', label: 'Within 24 hours' },
 ];
 
-const CUSTOM_ORDER_LEAD_TIMES = [
-  { value: '7-14', label: '7-14 days' },
-  { value: '14-21', label: '14-21 days' },
-  { value: '21-30', label: '21-30 days' },
-  { value: '30-plus', label: '30+ days' },
-];
+const CUSTOM_ORDER_LEAD_TIMES = STORE_CUSTOM_ORDER_LEAD_TIME_OPTIONS;
 
 const CUSTOM_ORDER_CONSULTATION_MODES = [
-  { value: 'required', label: 'Consultation required before quote' },
-  { value: 'optional', label: 'Consultation optional' },
+  { value: 'required', label: 'Required before quote' },
+  { value: 'optional', label: 'Optional consultation' },
 ];
 
-// Return windows
-const RETURN_WINDOWS = [
-  { value: '7', label: '7 days' },
-  { value: '14', label: '14 days' },
-  { value: '30', label: '30 days' },
-  { value: 'none', label: 'No returns' },
-];
+const SELECT_WRAP_PROPS = {
+  selectedAllowWrap: true,
+  optionAllowWrap: true,
+  optionCompact: true,
+} as const;
+
+const RETURN_WINDOWS = STORE_RETURN_WINDOW_OPTIONS;
 
 // Return conditions
 const RETURN_CONDITIONS = [
@@ -128,20 +121,8 @@ const SIZE_CHARTS = [
   },
 ];
 
-// Refund methods
-const REFUND_METHODS = [
-  { value: 'original', label: 'Original payment method' },
-  { value: 'store-credit', label: 'Store credit' },
-  { value: 'exchange', label: 'Exchange only' },
-];
-
-// Response time SLAs
-const RESPONSE_SLAS = [
-  { value: '2h', label: 'Within 2 hours' },
-  { value: 'same-day', label: 'Same business day' },
-  { value: '24h', label: 'Within 24 hours' },
-  { value: '48h', label: 'Within 48 hours' },
-];
+const REFUND_METHODS = STORE_REFUND_METHOD_OPTIONS;
+const RESPONSE_SLAS = STORE_RESPONSE_SLA_OPTIONS;
 
 // Recommended defaults
 const RECOMMENDED_DEFAULTS: Partial<StoreWizardData> = {
@@ -159,7 +140,7 @@ const RECOMMENDED_DEFAULTS: Partial<StoreWizardData> = {
   responseTimeSla: '24h',
   customOrdersEnabled: true,
   customOrderConsultationMode: 'required',
-  customOrderLeadTime: '14-21',
+  customOrderLeadTime: '2-4',
   customOrderRushSupported: false,
 };
 
@@ -269,10 +250,13 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
     }
   }, [data.orderProcessingMode, onChange]);
 
+  const stepValidation = useMemo(() => getStorePoliciesStepValidation(data), [data]);
+  const canContinue = stepValidation.valid && !isSaving;
+
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
       {/* Main Content - Centered Card */}
-      <div className="flex-1 flex items-start justify-center p-6 lg:p-12 overflow-y-auto">
+      <div className="flex-1 flex items-start justify-center p-3 sm:p-6 lg:p-12 overflow-y-auto">
         <div className="w-full max-w-[900px]">
           {/* Glass Card Container */}
           <div className="rounded-2xl overflow-hidden bg-white/80 dark:bg-white/[0.03] backdrop-blur-xl border border-gray-200/50 dark:border-purple-500/10 shadow-xl">
@@ -298,31 +282,30 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
             )}
 
             {/* Content Area */}
-            <div className="p-8 space-y-8">
+            <div className="origin-top scale-[0.92] p-4 space-y-5 sm:scale-100 sm:p-8 sm:space-y-8">
               {/* Header */}
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+              <div className="flex flex-row items-start justify-between gap-2 sm:gap-4">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">
                     Set Your Policies
                   </h1>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm md:text-base">
-                    Define how you handle shipping, returns, and customer
-                    inquiries.
+                  <p className="text-xs text-gray-600 dark:text-gray-400 sm:text-base">
+                    Define how you handle shipping, returns, and customer inquiries.
                   </p>
                 </div>
                 <button
                   onClick={applyDefaults}
-                  className="px-4 py-2 rounded-lg bg-purple-600/10 hover:bg-purple-600/20 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-sm font-medium transition-colors inline-flex items-center gap-2"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-purple-500/20 bg-purple-600/10 px-2 py-1.5 text-[10px] font-medium text-purple-600 transition-colors hover:bg-purple-600/20 dark:text-purple-400 sm:gap-2 sm:px-4 sm:py-2 sm:text-sm"
                 >
-                  <Sparkles className="w-4 h-4" />
-                  Apply Recommended
+                  <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="whitespace-nowrap">Apply Recommended</span>
                 </button>
               </div>
 
               {/* Policy Cards Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
                 {/* Shipping Policy Card */}
-                <div className="rounded-xl bg-gray-50/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 p-6 space-y-5">
+                <div className="space-y-4 rounded-xl border border-gray-200/50 bg-gray-50/50 p-4 dark:border-white/5 dark:bg-white/[0.02] sm:space-y-5 sm:p-6">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400">
                       <Package className="w-5 h-5" />
@@ -337,7 +320,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Shipping Regions
                     </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
                       {SHIPPING_COUNTRIES.map((region) => {
                         const isSelected = data.shippingRegions.includes(region.value);
                         const isAfrican = ['nigeria', 'ghana', 'kenya', 'south-africa', 'rwanda', 'egypt'].includes(region.value);
@@ -345,25 +328,25 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                           <button
                             key={region.value}
                             onClick={() => toggleRegion(region.value)}
-                            className={`flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-all duration-200 bg-gradient-to-r ${region.accent} ${
+                            className={`flex items-center justify-between rounded-xl border bg-gradient-to-r px-2 py-2 text-left transition-all duration-200 sm:px-4 sm:py-3 ${region.accent} ${
                               isSelected
                                 ? 'border-purple-500/50 shadow-lg shadow-purple-500/10'
                                 : 'border-gray-200 dark:border-white/10 hover:border-purple-400/60'
                             }`}
                           >
-                            <div className="flex items-center gap-3">
-                              <span className="text-xl" aria-hidden="true">{region.flag}</span>
-                              <div className="flex flex-col">
-                                <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                            <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
+                              <span className="text-base sm:text-xl" aria-hidden="true">{region.flag}</span>
+                              <div className="flex min-w-0 flex-col">
+                                <span className="text-[11px] font-semibold leading-tight text-gray-900 dark:text-white sm:text-sm">
                                   {region.label}
                                 </span>
-                                <span className="text-[11px] text-gray-600 dark:text-gray-400">
+                                <span className="hidden text-[10px] text-gray-600 dark:text-gray-400 sm:block">
                                   {isAfrican ? 'Africa-first lane' : 'Secondary lane'}
                                 </span>
                               </div>
                             </div>
                             <div
-                              className={`w-6 h-6 rounded-full border flex items-center justify-center ${
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border sm:h-6 sm:w-6 ${
                                 isSelected
                                   ? 'bg-purple-600 text-white border-purple-600'
                                   : 'bg-white/70 dark:bg-gray-800 text-gray-400 border-gray-300 dark:border-gray-700'
@@ -385,6 +368,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       onChange={(value) => onChange({ processingTime: value })}
                       options={PROCESSING_TIMES}
                       placeholder="Select processing time"
+                      {...SELECT_WRAP_PROPS}
                     />
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       This becomes the default processing time for new products and custom-order setup.
@@ -445,7 +429,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 </div>
 
                 {/* Returns Policy Card */}
-                <div className="rounded-xl bg-gray-50/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 p-6 space-y-5">
+                <div className="space-y-4 rounded-xl border border-gray-200/50 bg-gray-50/50 p-4 dark:border-white/5 dark:bg-white/[0.02] sm:space-y-5 sm:p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-600 dark:text-orange-400">
@@ -482,8 +466,9 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                           label="Return Window"
                           value={data.returnWindow}
                           onChange={(value) => onChange({ returnWindow: value })}
-                          options={RETURN_WINDOWS.filter((window) => window.value !== 'none')}
+                          options={[...RETURN_WINDOWS]}
                           placeholder="Select return window"
+                          {...SELECT_WRAP_PROPS}
                         />
                       </div>
 
@@ -525,8 +510,9 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                           label="Refund Method"
                           value={data.refundMethod}
                           onChange={(value) => onChange({ refundMethod: value })}
-                          options={REFUND_METHODS}
+                          options={[...REFUND_METHODS]}
                           placeholder="Select refund method"
+                          {...SELECT_WRAP_PROPS}
                         />
                       </div>
                     </>
@@ -540,7 +526,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 </div>
 
                 {/* Orders & Custom Orders Card */}
-                <div className="rounded-xl bg-gray-50/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 p-6 space-y-5">
+                <div className="space-y-4 rounded-xl border border-gray-200/50 bg-gray-50/50 p-4 dark:border-white/5 dark:bg-white/[0.02] sm:space-y-5 sm:p-6">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-lg">
                       🧾
@@ -572,8 +558,9 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                             value as StoreWizardData['orderCancellationWindow'],
                         })
                       }
-                      options={ORDER_CANCELLATION_WINDOWS}
+                      options={[...ORDER_CANCELLATION_WINDOWS]}
                       placeholder="Select cancellation window"
+                      {...SELECT_WRAP_PROPS}
                     />
                   </div>
 
@@ -625,8 +612,9 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                                 value as StoreWizardData['customOrderConsultationMode'],
                             })
                           }
-                          options={CUSTOM_ORDER_CONSULTATION_MODES}
+                          options={[...CUSTOM_ORDER_CONSULTATION_MODES]}
                           placeholder="Select consultation mode"
+                          {...SELECT_WRAP_PROPS}
                         />
                       </div>
 
@@ -640,8 +628,9 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                                 value as StoreWizardData['customOrderLeadTime'],
                             })
                           }
-                          options={CUSTOM_ORDER_LEAD_TIMES}
+                          options={[...CUSTOM_ORDER_LEAD_TIMES]}
                           placeholder="Select lead time"
+                          {...SELECT_WRAP_PROPS}
                         />
                       </div>
 
@@ -1221,8 +1210,9 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       label="Response Time Commitment"
                       value={data.responseTimeSla}
                       onChange={(value) => onChange({ responseTimeSla: value })}
-                      options={RESPONSE_SLAS}
+                      options={[...RESPONSE_SLAS]}
                       placeholder="Select response commitment"
+                      {...SELECT_WRAP_PROPS}
                     />
                     {/* Preview badge */}
                     <div className="p-3 rounded-lg bg-purple-600/5 border border-purple-500/20">
@@ -1280,9 +1270,9 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-black/20">
+            <div className="border-t border-gray-200/50 bg-gray-50/50 p-4 dark:border-white/5 dark:bg-black/20 sm:p-6">
               {!isSettingsMode && (
-                <div className="mb-6">
+                <div className="mb-4 sm:mb-6">
                   <div className="flex justify-between text-sm mb-2">
                     <span className="text-gray-500">Progress</span>
                     <span className="text-purple-600 font-medium">Step 2 of 3</span>
@@ -1296,23 +1286,35 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                {!isSettingsMode && (
+              {!isSettingsMode && !stepValidation.valid ? (
+                <p className="mb-3 text-xs text-amber-700 dark:text-amber-300">
+                  Complete required fields: {stepValidation.missing.join(', ')}
+                </p>
+              ) : null}
+
+              <div className="flex flex-row items-center justify-between gap-2 sm:gap-4">
+                {!isSettingsMode ? (
                   <button
+                    type="button"
                     onClick={onBack}
-                    className="text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors text-sm inline-flex items-center gap-2"
+                    disabled={isSaving}
+                    className="inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-xs text-gray-500 transition-colors hover:text-gray-900 disabled:opacity-50 dark:hover:text-white sm:gap-2 sm:px-0 sm:py-0 sm:text-sm"
                   >
-                    <ArrowLeft className="w-4 h-4" />
+                    <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     Back
                   </button>
+                ) : (
+                  <span />
                 )}
                 <button
+                  type="button"
                   onClick={onContinue}
-                  disabled={isSaving}
-                  className="px-8 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 shadow-lg shadow-purple-500/20"
+                  disabled={!canContinue}
+                  className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-purple-500/20 transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none sm:px-8 sm:py-3"
                 >
-                  {actionLabel}
-                  <ArrowRight className="w-4 h-4" />
+                  {isSaving ? <VLoader size={16} phase="loading" showLabel={false} /> : null}
+                  {isSaving ? 'Saving...' : actionLabel}
+                  {!isSaving ? <ArrowRight className="h-4 w-4" /> : null}
                 </button>
               </div>
             </div>

@@ -4,24 +4,26 @@ import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { useStoreStatusQuery } from '@/query/queries';
 
 /**
- * Lightweight hook that tells the caller whether the current BRAND user
- * has completed their store setup (i.e. the store is "open").
+ * Tells the caller whether the current brand user has COMPLETED the store
+ * setup flow (`isSetupComplete`). This is independent of whether the store is
+ * currently open/paused (`isStoreOpen`) — a completed store that is paused is
+ * still "set up".
  *
- * For non-BRAND users it always returns `true` (no restrictions apply).
+ * For non-brand users it always returns `true` (no restrictions apply).
  * While the status is being fetched it returns `null` (unknown / loading).
  */
 
-let cachedIsStoreOpen: boolean | null = null;
+let cachedSetupComplete: boolean | null = null;
 let cacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000;
 
 export function invalidateStoreSetupStatusCache(): void {
-  cachedIsStoreOpen = null;
+  cachedSetupComplete = null;
   cacheTime = 0;
 }
 
-export function primeStoreSetupStatusCache(isStoreOpen: boolean): void {
-  cachedIsStoreOpen = isStoreOpen;
+export function primeStoreSetupStatusCache(isSetupComplete: boolean): void {
+  cachedSetupComplete = isSetupComplete;
   cacheTime = Date.now();
 }
 
@@ -32,15 +34,15 @@ export function useStoreSetupStatus(): boolean | null {
 
   if (!isBrand) return true;
   if (statusQuery.data) {
-    cachedIsStoreOpen = statusQuery.data.isStoreOpen;
+    cachedSetupComplete = statusQuery.data.isSetupComplete;
     cacheTime = Date.now();
-    return statusQuery.data.isStoreOpen;
+    return statusQuery.data.isSetupComplete;
   }
-  if (cachedIsStoreOpen !== null && Date.now() - cacheTime < CACHE_TTL) {
-    return cachedIsStoreOpen;
+  if (cachedSetupComplete !== null && Date.now() - cacheTime < CACHE_TTL) {
+    return cachedSetupComplete;
   }
   if (statusQuery.error) {
-    return true;
+    return false;
   }
   return null;
 }

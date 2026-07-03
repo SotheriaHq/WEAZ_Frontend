@@ -30,9 +30,16 @@ import {
   clearStoreProgressLocally,
   markStoreOpenPending,
   readStoreProgressLocally,
+  sanitizeSingleSocialLink,
   saveStoreProgressLocally,
 } from '@/utils/storeSetup';
 import { primeStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
+import {
+  sanitizeCustomOrderLeadTime,
+  sanitizeResponseTimeSla,
+  sanitizeReturnWindow,
+  sanitizeShippingRegions,
+} from '@/utils/storePolicyConstraints';
 
 // Initial empty state for the wizard
 const initialData: StoreWizardData = {
@@ -75,7 +82,7 @@ const initialData: StoreWizardData = {
   contactEmail: '',
   customOrdersEnabled: false,
   customOrderConsultationMode: 'required',
-  customOrderLeadTime: '14-21',
+  customOrderLeadTime: '2-4',
   customOrderRushSupported: false,
 
   // Step 4: Catalog
@@ -327,7 +334,9 @@ const StoreCreationWizard: React.FC = () => {
       try {
         const response = await getStoreStatus();
         if (!isCancelled) {
-          setHasLiveStore(Boolean(response?.isStoreOpen));
+          // Redirect away once the setup FLOW is complete — independent of whether
+          // the store is currently open or paused. Completed brands never re-enter setup.
+          setHasLiveStore(Boolean(response?.isSetupComplete));
         }
 
         // Server data only overrides specific fields (not policies, products, etc.)
@@ -382,7 +391,9 @@ const StoreCreationWizard: React.FC = () => {
         if (!isCancelled && policy) {
           nextData = {
             ...nextData,
-            shippingRegions: policy.shippingRegions?.length ? policy.shippingRegions : nextData.shippingRegions,
+            shippingRegions: policy.shippingRegions?.length
+              ? sanitizeShippingRegions(policy.shippingRegions)
+              : nextData.shippingRegions,
             processingTime: policy.processingTime || nextData.processingTime,
             shippingMethods: policy.shippingMethods?.length ? policy.shippingMethods : nextData.shippingMethods,
             freeShippingThreshold:
@@ -393,10 +404,10 @@ const StoreCreationWizard: React.FC = () => {
               typeof policy.returnsAccepted === 'boolean'
                 ? policy.returnsAccepted
                 : nextData.returnsAccepted,
-            returnWindow: policy.returnWindow || nextData.returnWindow,
+            returnWindow: sanitizeReturnWindow(policy.returnWindow || nextData.returnWindow),
             returnConditions: policy.returnConditions?.length ? policy.returnConditions : nextData.returnConditions,
             refundMethod: policy.refundMethod || nextData.refundMethod,
-            responseTimeSla: policy.responseTimeSla || nextData.responseTimeSla,
+            responseTimeSla: sanitizeResponseTimeSla(policy.responseTimeSla || nextData.responseTimeSla),
             sizeChartUrl: policy.sizeChart?.url ?? nextData.sizeChartUrl,
             sizeChartPresetKey: policy.sizeChart?.presetKey ?? nextData.sizeChartPresetKey,
             sizeChartSystem: policy.sizeChart?.system ?? nextData.sizeChartSystem,
@@ -419,8 +430,9 @@ const StoreCreationWizard: React.FC = () => {
             customOrderConsultationMode:
               policy.shippingRules?.customOrderSettings?.consultationMode ||
               nextData.customOrderConsultationMode,
-            customOrderLeadTime:
+            customOrderLeadTime: sanitizeCustomOrderLeadTime(
               policy.shippingRules?.customOrderSettings?.leadTime || nextData.customOrderLeadTime,
+            ),
             customOrderRushSupported:
               typeof policy.shippingRules?.customOrderSettings?.rushSupported === 'boolean'
                 ? policy.shippingRules.customOrderSettings.rushSupported
@@ -448,7 +460,14 @@ const StoreCreationWizard: React.FC = () => {
       }
 
       if (!isCancelled) {
-        const sanitized = sanitizeWizardData(nextData);
+        const sanitized = sanitizeWizardData({
+          ...nextData,
+          ...sanitizeSingleSocialLink(nextData),
+          shippingRegions: sanitizeShippingRegions(nextData.shippingRegions),
+          returnWindow: sanitizeReturnWindow(nextData.returnWindow),
+          responseTimeSla: sanitizeResponseTimeSla(nextData.responseTimeSla),
+          customOrderLeadTime: sanitizeCustomOrderLeadTime(nextData.customOrderLeadTime),
+        });
         setWizardData(sanitized);
         setCurrentStep(restoreWizardStep(localDraft));
         setIsLoadingDraft(false);
@@ -461,7 +480,8 @@ const StoreCreationWizard: React.FC = () => {
     };
   }, [user]);
 
-  // Redirect if user already has a live store
+  // Redirect if the brand has already completed store setup — they must never be
+  // shown / routed back into the setup wizard.
   useEffect(() => {
     if (hasLiveStore) {
       navigate('/studio/store', { replace: true });
@@ -551,9 +571,6 @@ const StoreCreationWizard: React.FC = () => {
       clearStoreProgressLocally(user?.id);
       
       toast.success('🎉 Your store is now live!');
-      toast.info(
-        'Brand settlement note: customer payments are recorded gross, WIEZ retains platform commission, and your net balance releases into payouts as each order milestone is completed.',
-      );
       navigate('/store/my');
     } catch (error) {
       console.error('Failed to publish store', error);

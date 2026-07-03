@@ -106,7 +106,13 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
       ),
     );
 
-    const optionRowHeight = optionCompact ? 42 : 50;
+    const optionRowHeight = optionAllowWrap
+      ? optionCompact
+        ? 56
+        : 64
+      : optionCompact
+        ? 42
+        : 50;
     const searchHeight = searchable ? 58 : 0;
     const contentHeight =
       searchHeight +
@@ -151,7 +157,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
           ? 'calc(var(--z-modal) + 1)'
           : 'var(--z-dropdown)',
     });
-  }, [filteredOptions.length, menuLayer, optionCompact, searchable]);
+  }, [filteredOptions.length, menuLayer, optionAllowWrap, optionCompact, searchable]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -334,7 +340,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
           aria-expanded={isOpen}
           className={`
             relative w-full cursor-pointer rounded-2xl border text-left shadow-sm transition-colors duration-200
-            flex items-center justify-between px-4 py-3.5 ${selectedAllowWrap ? 'items-start' : 'items-center'}
+            flex px-4 ${selectedAllowWrap ? 'items-start py-2.5' : 'items-center justify-between py-3.5'}
             ${disabled ? 'cursor-not-allowed opacity-60 bg-[color:var(--surface-muted)]' : 'surface-menu backdrop-blur-xl surface-interactive-hover'}
             ${
               error
@@ -343,25 +349,43 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
             }
           `}
         >
-          <span className={`flex min-w-0 flex-1 ${selectedAllowWrap ? 'items-start' : 'items-center'} ${!selectedOption ? 'text-[color:var(--text-secondary)]' : 'text-[color:var(--text-primary)]'}`}>
+          <span
+            className={`flex min-w-0 flex-1 ${selectedAllowWrap ? 'items-start pr-8' : 'items-center'} ${!selectedOption ? 'text-[color:var(--text-secondary)]' : 'text-[color:var(--text-primary)]'}`}
+          >
             {selectedOption ? (
-              <span className={`flex min-w-0 gap-2 ${selectedAllowWrap ? 'items-start' : 'items-center'}`}>
+              <span className={`flex min-w-0 flex-1 gap-2 ${selectedAllowWrap ? 'items-start' : 'items-center'}`}>
                 {selectedOption.icon && (
                   <span className="flex-shrink-0 text-[color:var(--text-secondary)]">
                     {selectedOption.icon}
                   </span>
                 )}
-                <span className={selectedAllowWrap ? 'whitespace-normal break-words text-sm leading-5' : 'truncate'}>
+                <span
+                  className={
+                    selectedAllowWrap
+                      ? 'block w-full whitespace-normal break-words text-sm leading-5'
+                      : 'truncate'
+                  }
+                >
                   {selectedOption.label}
                 </span>
               </span>
             ) : (
-              <span className={selectedAllowWrap ? 'whitespace-normal break-words text-sm leading-5' : 'truncate'}>
+              <span
+                className={
+                  selectedAllowWrap
+                    ? 'block w-full whitespace-normal break-words text-sm leading-5'
+                    : 'truncate'
+                }
+              >
                 {placeholder}
               </span>
             )}
           </span>
-          <span className="pointer-events-none flex items-center pr-2">
+          <span
+            className={`pointer-events-none ${
+              selectedAllowWrap ? 'absolute right-3 top-3' : 'flex items-center pr-2'
+            }`}
+          >
             <span
               aria-hidden="true"
               className={`text-base leading-none text-[color:var(--text-secondary)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}

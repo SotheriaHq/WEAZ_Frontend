@@ -437,6 +437,19 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
     verificationState.accountName ?? account?.accountName ?? '';
   const showAccountNameField = Boolean(resolvedVerifiedAccountName);
   const isDevRuntime = import.meta.env.DEV;
+  const [useModalBankMenu, setUseModalBankMenu] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(max-width: 640px)').matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const media = window.matchMedia('(max-width: 640px)');
+    const update = () => setUseModalBankMenu(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
 
   const executeSync = useCallback(async ({
     useExistingAccountNumber,
@@ -751,24 +764,28 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <UniversalSelect
-          label="Settlement bank"
-          value={bankCode}
-          onChange={setBankCode}
-          options={banks.map((bank) => ({
-            value: bank.code,
-            label: normalizeBankDisplayName(bank.name),
-            description: `${bank.currency} • ${bank.code}`,
-            icon: <BankOptionIcon bankName={bank.name} />,
-          }))}
-          placeholder={loading ? 'Loading banks...' : 'Choose a bank'}
-          searchable
-          searchPlaceholder="Search bank name or code"
-          emptyMessage="No banks match your search"
-          optionCompact
-          optionAllowWrap
-          disabled={loading || saving}
-        />
+        <div className="min-w-0 origin-top scale-[0.92] sm:scale-100">
+          <UniversalSelect
+            label="Settlement bank"
+            value={bankCode}
+            onChange={setBankCode}
+            options={banks.map((bank) => ({
+              value: bank.code,
+              label: normalizeBankDisplayName(bank.name),
+              description: `${bank.currency} • ${bank.code}`,
+              icon: <BankOptionIcon bankName={bank.name} />,
+            }))}
+            placeholder={loading ? 'Loading banks...' : 'Choose a bank'}
+            searchable
+            searchPlaceholder="Search bank name or code"
+            emptyMessage="No banks match your search"
+            selectedAllowWrap
+            optionCompact
+            optionAllowWrap
+            menuLayer={useModalBankMenu ? 'modal' : 'dropdown'}
+            disabled={loading || saving}
+          />
+        </div>
         {!hasExistingAccount && hasTemporaryTestBankOption && bankCode !== '001' ? (
           <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
             Test-mode limit is active for live bank resolves. Select <span className="font-semibold">Test Bank (001)</span> to continue development verification.

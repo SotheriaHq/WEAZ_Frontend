@@ -8,6 +8,12 @@ import {
   updateStorePolicies,
   updateStoreProfile,
 } from '@/api/StoreApi';
+import {
+  sanitizeCustomOrderLeadTime,
+  sanitizeResponseTimeSla,
+  sanitizeReturnWindow,
+  sanitizeShippingRegions,
+} from '@/utils/storePolicyConstraints';
 
 const initialPolicyData: StoreWizardData = {
   name: '',
@@ -42,7 +48,7 @@ const initialPolicyData: StoreWizardData = {
   contactEmail: '',
   customOrdersEnabled: false,
   customOrderConsultationMode: 'required',
-  customOrderLeadTime: '14-21',
+  customOrderLeadTime: '2-4',
   customOrderRushSupported: false,
   products: [],
   collections: [],
@@ -73,7 +79,7 @@ const StorePoliciesSettings: React.FC = () => {
         setData((prev) => ({
           ...prev,
           contactEmail: settings.contactEmail || prev.contactEmail,
-          shippingRegions: policies.shippingRegions || prev.shippingRegions,
+          shippingRegions: sanitizeShippingRegions(policies.shippingRegions || prev.shippingRegions),
           processingTime: policies.processingTime || prev.processingTime,
           shippingMethods: policies.shippingMethods || prev.shippingMethods,
           freeShippingThreshold:
@@ -84,10 +90,10 @@ const StorePoliciesSettings: React.FC = () => {
             typeof policies.returnsAccepted === 'boolean'
               ? policies.returnsAccepted
               : prev.returnsAccepted,
-          returnWindow: policies.returnWindow || prev.returnWindow,
+          returnWindow: sanitizeReturnWindow(policies.returnWindow || prev.returnWindow),
           returnConditions: policies.returnConditions || prev.returnConditions,
           refundMethod: policies.refundMethod || prev.refundMethod,
-          responseTimeSla: policies.responseTimeSla || prev.responseTimeSla,
+          responseTimeSla: sanitizeResponseTimeSla(policies.responseTimeSla || prev.responseTimeSla),
           sizeChartUrl: policies.sizeChart?.url ?? prev.sizeChartUrl,
           sizeChartPresetKey: policies.sizeChart?.presetKey ?? prev.sizeChartPresetKey,
           sizeChartSystem: policies.sizeChart?.system ?? prev.sizeChartSystem,
@@ -110,8 +116,9 @@ const StorePoliciesSettings: React.FC = () => {
           customOrderConsultationMode:
             policies.shippingRules?.customOrderSettings?.consultationMode ||
             prev.customOrderConsultationMode,
-          customOrderLeadTime:
+          customOrderLeadTime: sanitizeCustomOrderLeadTime(
             policies.shippingRules?.customOrderSettings?.leadTime || prev.customOrderLeadTime,
+          ),
           customOrderRushSupported:
             typeof policies.shippingRules?.customOrderSettings?.rushSupported === 'boolean'
               ? policies.shippingRules.customOrderSettings.rushSupported

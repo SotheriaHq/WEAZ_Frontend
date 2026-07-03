@@ -49,7 +49,7 @@ const isCacheFresh = (userId?: string | null) =>
 const canServeFromCache = (userId?: string | null) =>
   isCacheFresh(userId) &&
   !storeStatusCache.hadError &&
-  Boolean(storeStatusCache.status?.isStoreOpen);
+  Boolean(storeStatusCache.status?.isSetupComplete);
 
 const fetchStoreStatusWithRetry = async (
   userId?: string | null,
@@ -169,7 +169,7 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
 
     const shouldBlockWithLoader =
       !isCacheFresh(user?.id) ||
-      !storeStatusCache.status?.isStoreOpen ||
+      !storeStatusCache.status?.isSetupComplete ||
       storeStatusCache.hadError;
     if (shouldBlockWithLoader) {
       setLoading(true);
@@ -234,8 +234,10 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     return <>{children}</>;
   }
 
-  if (status?.isStoreOpen) {
-    clearStoreOpenPending(user?.id);
+  // Setup complete → allow Studio regardless of open/paused, so a paused store is
+  // never redirected back into the setup flow. Clear pending only once truly open.
+  if (status?.isSetupComplete) {
+    if (status.isStoreOpen) clearStoreOpenPending(user?.id);
     return <>{children}</>;
   }
 
@@ -248,7 +250,7 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     return <>{children}</>;
   }
 
-  if (status.isStoreOpen) {
+  if (status.isSetupComplete) {
     return <>{children}</>;
   }
 

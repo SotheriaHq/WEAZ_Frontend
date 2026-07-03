@@ -1,9 +1,14 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { toast } from 'sonner';
+import type { RootState } from '@/store';
 import type { StoreWizardData } from '@/types/storeWizard';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import type { StorePaymentAccountSummary } from '@/api/StoreApi';
 import StorePaymentAccountPanel from '@/components/store/StorePaymentAccountPanel';
+import BrandSettlementNoteFlag from '@/components/store/BrandSettlementNoteFlag';
+import { buildStorefrontUrl } from '@/utils/publicUrlBuilder';
 
 // Step type for navigation
 type WizardStep = 'social' | 'policies' | 'review';
@@ -45,10 +50,17 @@ const CANCELLATION_WINDOW_LABELS: Record<StoreWizardData['orderCancellationWindo
 };
 
 const CUSTOM_ORDER_LEAD_TIME_LABELS: Record<StoreWizardData['customOrderLeadTime'], string> = {
-  '7-14': '7-14 days',
-  '14-21': '14-21 days',
-  '21-30': '21-30 days',
-  '30-plus': '30+ days',
+  '1-2': '1-2 days',
+  '2-4': '2-4 days',
+  '4-7': '4-7 days',
+};
+
+const CUSTOM_ORDER_CONSULTATION_LABELS: Record<
+  StoreWizardData['customOrderConsultationMode'],
+  string
+> = {
+  required: 'Required before quote',
+  optional: 'Optional consultation',
 };
 
 /**
@@ -64,8 +76,10 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
   isSaving = false,
 }) => {
   const navigate = useNavigate();
+  const user = useSelector((state: RootState) => state.user.profile);
   const [expandedSection, setExpandedSection] = useState<string | null>('payments');
   const [paymentAccount, setPaymentAccount] = useState<StorePaymentAccountSummary | null>(null);
+  const [isCopyingPreview, setIsCopyingPreview] = useState(false);
 
   // Check if all requirements are met (minimal requirements)
   const descriptionComplete = data.description.trim().length > 0;
@@ -91,6 +105,31 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
     },
     [onChange]
   );
+
+  const handlePreviewLink = useCallback(async () => {
+    if (isCopyingPreview) return;
+    const previewUrl = buildStorefrontUrl({
+      slug: data.slug,
+      username: user?.username,
+      ownerId: user?.id,
+    });
+
+    setIsCopyingPreview(true);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(previewUrl);
+        toast.success('Preview link copied to clipboard');
+      } else {
+        toast.message('Preview link ready', { description: previewUrl });
+      }
+      window.open(previewUrl, '_blank', 'noopener,noreferrer');
+    } catch {
+      toast.message('Preview link', { description: previewUrl });
+      window.open(previewUrl, '_blank', 'noopener,noreferrer');
+    } finally {
+      setIsCopyingPreview(false);
+    }
+  }, [data.slug, isCopyingPreview, user?.id, user?.username]);
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
@@ -302,7 +341,11 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                   />
                   <InfoItem
                     label="Custom Consultation"
-                    value={data.customOrdersEnabled ? data.customOrderConsultationMode : 'Not applicable'}
+                    value={
+                      data.customOrdersEnabled
+                        ? CUSTOM_ORDER_CONSULTATION_LABELS[data.customOrderConsultationMode]
+                        : 'Not applicable'
+                    }
                   />
                   <InfoItem
                     label="Custom Lead Time"
@@ -367,7 +410,8 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
               </div>
 
               <div className="border-t border-gray-200 dark:border-gray-800 pt-6 space-y-4">
-                {/* Terms Checkbox - moved here for proximity to Publish */}
+                <BrandSettlementNoteFlag userId={user?.id} />
+
                 <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700 transition-colors">
                   <input
                     type="checkbox"
@@ -409,9 +453,14 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                   Your store will go live immediately after publishing
                 </p>
 
-                <button className="w-full py-3 bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-white font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-[#1e1e1e] transition-colors flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handlePreviewLink()}
+                  disabled={isCopyingPreview || !data.slug}
+                  className="w-full py-3 bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-white font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-[#1e1e1e] transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+                >
                   <span aria-hidden="true">🔗</span>
-                  Get Preview Link
+                  {isCopyingPreview ? 'Opening preview...' : 'Get Preview Link'}
                 </button>
               </div>
             </div>

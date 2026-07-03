@@ -207,7 +207,7 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
             </div>
           </div>
 
-          <div className={`flex min-w-0 flex-1 flex-col gap-1 ${showBanner ? 'mt-8 sm:mt-12' : ''} ${showBanner ? '' : 'text-gray-900 dark:text-white'}`}>
+          <div className={`flex min-w-0 flex-1 flex-col gap-1 ${showBanner ? 'mt-8' : ''} ${showBanner ? '' : 'text-gray-900 dark:text-white'}`}>
             <h1
               className={`flex flex-wrap items-center gap-1.5 font-semibold italic tracking-[0.08em] leading-tight ${
                 showBanner ? 'text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]' : 'text-gray-900 dark:text-white'

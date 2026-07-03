@@ -24,9 +24,14 @@ import {
   LEGAL_STORE_PUBLISH_DOCUMENT_KEYS,
 } from '@/api/LegalApi';
 import { primeStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
+import { sanitizeResponseTimeSla } from '@/utils/storePolicyConstraints';
 
 const MAX_SPECIALIZATIONS = 4;
-const RESPONSE_TIME_OPTIONS = ['12h', '24h', '48h'];
+const RESPONSE_TIME_OPTIONS = ['2h', 'same-day', '24h'] as const;
+type ResponseTimeOption = (typeof RESPONSE_TIME_OPTIONS)[number];
+
+const resolveResponseTime = (value: string | undefined | null): ResponseTimeOption =>
+  sanitizeResponseTimeSla(value, '24h');
 
 const BRAND_SPECIALIZATION_OPTIONS = [
   { value: 'womenswear', label: 'Womenswear' },
@@ -99,10 +104,7 @@ const StoreGeneralSettings: React.FC = () => {
         setDescription(settings.description || '');
         setContactEmail(settings.contactEmail || '');
         setSelectedCategories(normalizeSpecializationSelection(settings.tags || []));
-        const resolvedResponseTime = RESPONSE_TIME_OPTIONS.includes(settings.responseTimeSla || '')
-          ? (settings.responseTimeSla as string)
-          : '24h';
-        setResponseTime(resolvedResponseTime);
+        setResponseTime(resolveResponseTime(settings.responseTimeSla));
         setIsLive(Boolean(settings.isStoreOpen));
         setInitialSettings(settings);
       } catch (error) {
@@ -133,9 +135,7 @@ const StoreGeneralSettings: React.FC = () => {
       description.trim() !== (initialSettings.description || '') ||
       contactEmail.trim() !== (initialSettings.contactEmail || '') ||
       normalizedTagSnapshot !== normalizedInitialTags ||
-      responseTime !== (RESPONSE_TIME_OPTIONS.includes(initialSettings.responseTimeSla || '')
-        ? (initialSettings.responseTimeSla as string)
-        : '24h')
+      responseTime !== resolveResponseTime(initialSettings.responseTimeSla)
     )
   );
 
@@ -217,7 +217,12 @@ const StoreGeneralSettings: React.FC = () => {
       } else {
         await closeStore();
       }
-      primeStoreSetupStatusCache(nextLiveState);
+      // Opening a store requires completed setup, so opening confirms it.
+      // Closing/pausing must NOT flip "setup complete" to false — a paused
+      // store is still fully set up.
+      if (nextLiveState) {
+        primeStoreSetupStatusCache(true);
+      }
       setIsLive(nextLiveState);
       toast.success(nextLiveState ? 'Store is now live.' : 'Store is now paused.');
     } catch (error: any) {
@@ -529,9 +534,9 @@ const StoreGeneralSettings: React.FC = () => {
                   onChange={(e) => setResponseTime(e.target.value)}
                   disabled={isLoading}
                 >
-                  <option value="12h">Within 12 hours</option>
+                  <option value="2h">Within 2 hours</option>
+                  <option value="same-day">Same business day</option>
                   <option value="24h">Within 24 hours</option>
-                  <option value="48h">Within 48 hours</option>
                 </Select>
             </div>
 
@@ -560,10 +565,7 @@ const StoreGeneralSettings: React.FC = () => {
             setDescription(initialSettings.description || '');
             setContactEmail(initialSettings.contactEmail || '');
             setSelectedCategories(normalizeSpecializationSelection(initialSettings.tags || []));
-            const resolvedResponseTime = RESPONSE_TIME_OPTIONS.includes(initialSettings.responseTimeSla || '')
-              ? (initialSettings.responseTimeSla as string)
-              : '24h';
-            setResponseTime(resolvedResponseTime);
+            setResponseTime(resolveResponseTime(initialSettings.responseTimeSla));
           }}
           className="px-6 py-2.5 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium text-sm transition-colors"
         >

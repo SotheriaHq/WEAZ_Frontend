@@ -465,18 +465,18 @@ const ProfilePage: React.FC = () => {
   const showStoreSetupNudge = useMemo(() => {
     if (!isOwner) return false;
     if (hasDismissedStoreSetup) return false;
-    if (storeStatusLoading) return false;
-    // Encourage setup until the store is marked live/open.
-    if (!storeStatus) return false;
-    return storeStatus.isStoreOpen === false;
+    if (storeStatusLoading && !storeStatus) return true;
+    if (!storeStatus) return true;
+    // Flag shows only until the setup FLOW is complete (independent of open/paused).
+    return storeStatus.isSetupComplete === false;
   }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading]);
 
   const showStoreSetupChip = useMemo(() => {
     if (!isOwner) return false;
     if (!hasDismissedStoreSetup) return false;
-    if (storeStatusLoading) return false;
-    if (!storeStatus) return false;
-    return storeStatus.isStoreOpen === false;
+    if (storeStatusLoading && !storeStatus) return true;
+    if (!storeStatus) return true;
+    return storeStatus.isSetupComplete === false;
   }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading]);
 
   const dismissStoreSetupNudge = useCallback(() => {
@@ -489,7 +489,7 @@ const ProfilePage: React.FC = () => {
   const handleOpenStoreSetup = useCallback(() => {
     if (isStoreSetupNavigating) return;
     setIsStoreSetupNavigating(true);
-    navigate('/studio/store');
+    navigate('/studio/store/essentials');
   }, [isStoreSetupNavigating, navigate]);
 
   useEffect(() => {

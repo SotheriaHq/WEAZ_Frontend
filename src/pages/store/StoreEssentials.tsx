@@ -26,6 +26,37 @@ const BRAND_SPECIALIZATION_OPTIONS = [
 
 const normalizeToken = (value: string): string => value.trim().replace(/^#/, '').toLowerCase();
 
+const MAX_TAGLINE = 60;
+
+const firstSentence = (text: string): string => {
+  const trimmed = text.trim();
+  if (!trimmed) return '';
+  return (trimmed.split(/(?<=[.!?])\s+/)[0] ?? trimmed).trim();
+};
+
+const resolveSuggestedTagline = (options: {
+  savedTagline?: string;
+  apiTagline?: string;
+  description?: string;
+  userBrandDescription?: string | null;
+  tags?: string[];
+}): string => {
+  const saved = options.savedTagline?.trim();
+  if (saved) return saved.slice(0, MAX_TAGLINE);
+
+  const api = options.apiTagline?.trim();
+  if (api) return api.slice(0, MAX_TAGLINE);
+
+  const fromDescription = firstSentence(options.description || '');
+  if (fromDescription) return fromDescription.slice(0, MAX_TAGLINE);
+
+  const fromUserDescription = firstSentence(options.userBrandDescription || '');
+  if (fromUserDescription) return fromUserDescription.slice(0, MAX_TAGLINE);
+
+  const fromTags = (options.tags || []).slice(0, 3).join(' • ');
+  return fromTags.slice(0, MAX_TAGLINE);
+};
+
 const normalizeSpecializationSelection = (
   values: string[],
   options: Array<{ value: string; label: string }>
@@ -67,6 +98,7 @@ const StoreEssentials: React.FC = () => {
   const user = useSelector((state: RootState) => state.user.profile);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [selected, setSelected] = useState<string[]>([]);
   const [tagline, setTagline] = useState('');
@@ -106,24 +138,45 @@ const StoreEssentials: React.FC = () => {
             )
           : [];
 
-        if (typeof localProgress?.tagline === 'string') {
-          setTagline(localProgress.tagline);
-        } else if (prefill.brand?.tagline) {
-          setTagline(prefill.brand.tagline);
+        const prefillCategories = Array.isArray(prefill.brand?.tags)
+          ? normalizeSpecializationSelection(
+              prefill.brand.tags.filter((entry): entry is string => typeof entry === 'string'),
+              BRAND_SPECIALIZATION_OPTIONS,
+            )
+          : [];
+
+        const resolvedCategories =
+          localCategories.length > 0 ? localCategories : prefillCategories;
+
+        if (localCategories.length > 0) {
+          setSelected(localCategories);
+        } else if (prefillCategories.length > 0) {
+          setSelected(prefillCategories);
         }
 
-        if (typeof localProgress?.description === 'string') {
+        const resolvedDescription =
+          typeof localProgress?.description === 'string' && localProgress.description.trim()
+            ? localProgress.description
+            : (prefill.brand?.description || user?.brandDescription || '');
+
+        if (typeof localProgress?.description === 'string' && localProgress.description.trim()) {
           setDescription(localProgress.description);
         } else if (prefill.brand?.description) {
           setDescription(prefill.brand.description);
+        } else if (user?.brandDescription) {
+          setDescription(user.brandDescription);
         }
 
-        if (
-          localProgress?.essentialsComplete === true &&
-          localProgress.setupWizardVersion === 2
-        ) {
-          setSelected(localCategories);
-        }
+        setTagline(
+          resolveSuggestedTagline({
+            savedTagline:
+              typeof localProgress?.tagline === 'string' ? localProgress.tagline : undefined,
+            apiTagline: prefill.brand?.tagline,
+            description: resolvedDescription,
+            userBrandDescription: user?.brandDescription,
+            tags: resolvedCategories,
+          }),
+        );
       } catch (error) {
         // If this fails, still render the static brand-positioning options.
         console.error('Failed to load store essentials prefill', error);
@@ -137,7 +190,7 @@ const StoreEssentials: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [navigate, user?.id]);
+  }, [navigate, user?.brandDescription, user?.id]);
 
   useEffect(() => {
     // Confetti once on mount (best-effort)
@@ -180,12 +233,15 @@ const StoreEssentials: React.FC = () => {
     []
   );
 
+  const taglineValid = tagline.trim().length > 0;
   const descriptionValid = description.trim().length > 0;
   const canContinue = selected.length > 0 && descriptionValid;
   const canSkip = descriptionValid;
 
   const persistAndContinue = useCallback(
     async (skipSpecializations: boolean) => {
+      if (isSubmitting) return;
+      setIsSubmitting(true);
       const payload = {
         tags: skipSpecializations ? [] : selected,
         tagline: tagline.trim(),
@@ -201,21 +257,25 @@ const StoreEssentials: React.FC = () => {
       };
 
       try {
-        saveStoreProgressLocally(localProgress, user?.id);
-      } catch {
-        // ignore storage errors; onboarding can still continue
-      }
+        try {
+          saveStoreProgressLocally(localProgress, user?.id);
+        } catch {
+          // ignore storage errors; onboarding can still continue
+        }
 
-      try {
-        await updateStoreProfile(payload);
-      } catch (error) {
-        console.error('Failed to save store essentials', error);
-        // Don’t block onboarding on transient failures.
-      }
+        try {
+          await updateStoreProfile(payload);
+        } catch (error) {
+          console.error('Failed to save store essentials', error);
+          // Don’t block onboarding on transient failures.
+        }
 
-      navigate('/studio/store/setup', { replace: true });
+        navigate('/studio/store/setup', { replace: true });
+      } finally {
+        setIsSubmitting(false);
+      }
     },
-    [description, navigate, selected, tagline, user?.id]
+    [description, isSubmitting, navigate, selected, tagline, user?.id]
   );
 
   const selectedLabels = useMemo(() => {
@@ -387,8 +447,14 @@ const StoreEssentials: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Circle className="w-4 h-4 text-gray-300" />
-                  <span className="text-sm text-gray-400">Tagline (optional)</span>
+                  {taglineValid ? (
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <Circle className="w-4 h-4 text-gray-300" />
+                  )}
+                  <span className={`text-sm ${taglineValid ? 'text-gray-700' : 'text-gray-400'}`}>
+                    Tagline {taglineValid ? '' : '(optional)'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   {descriptionValid ? (
@@ -408,23 +474,23 @@ const StoreEssentials: React.FC = () => {
             </div>
 
             {/* Actions */}
-            <div className="mt-8 flex flex-col sm:flex-row gap-4">
+            <div className="mt-8 flex flex-row items-center gap-2 sm:gap-4">
               <button
                 type="button"
-                disabled={!canContinue || isLoading}
+                disabled={!canContinue || isLoading || isSubmitting}
                 onClick={() => void persistAndContinue(false)}
-                className="flex-1 px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:py-4 sm:text-base"
               >
-                Continue to Store Setup
-                <ArrowRight className="inline-block w-5 h-5 ml-2" />
+                {isSubmitting ? 'Saving...' : 'Continue to Store Setup'}
+                {!isSubmitting ? <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" /> : null}
               </button>
               <button
                 type="button"
-                disabled={isLoading || !canSkip}
+                disabled={isLoading || !canSkip || isSubmitting}
                 onClick={() => void persistAndContinue(true)}
-                className="px-6 py-4 text-gray-600 font-medium hover:text-gray-800 transition-colors duration-200"
+                className="shrink-0 px-3 py-3 text-xs font-medium text-gray-600 transition-colors duration-200 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:py-4 sm:text-base"
               >
-                Skip for now
+                Skip
               </button>
             </div>
           </div>

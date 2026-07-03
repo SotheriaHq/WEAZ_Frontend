@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -11,6 +11,9 @@ import {
 import { toast } from 'sonner';
 import type { StoreWizardData } from '@/types/storeWizard';
 import VLoader from '@/components/loaders/VLoader';
+import { sanitizeSingleSocialLink } from '@/utils/storeSetup';
+
+const SOCIAL_FIELD_IDS = ['instagram', 'tiktok', 'twitter'] as const;
 
 interface StoreSocialStepProps {
   data: StoreWizardData;
@@ -95,19 +98,54 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
     twitter: { status: 'idle' },
   });
 
-  const hasSocialConnected = Boolean(
-    data.instagram || data.tiktok || data.twitter || data.website
+  const connectedSocialPlatform = useMemo(
+    () => SOCIAL_PLATFORMS.find((platform) => Boolean(data[platform.id as keyof StoreWizardData])),
+    [data],
   );
+  const hasSocialConnected = Boolean(connectedSocialPlatform || data.website);
   const hasVerifiedHandle = Object.values(verificationStatus).some((state) => state.status === 'valid');
+
+  useEffect(() => {
+    const sanitized = sanitizeSingleSocialLink({
+      instagram: data.instagram,
+      tiktok: data.tiktok,
+      twitter: data.twitter,
+    });
+    const changed = SOCIAL_FIELD_IDS.some(
+      (field) => sanitized[field] !== String(data[field] ?? '').trim(),
+    );
+    if (changed) {
+      onChange(sanitized);
+    }
+  }, [data.instagram, data.tiktok, data.twitter, onChange]);
 
   const handleSocialChange = useCallback(
     (platform: string, value: string) => {
       const cleanValue = value.startsWith('@') ? value.slice(1) : value;
-      onChange({ [platform]: cleanValue } as Partial<StoreWizardData>);
-      setVerificationStatus((prev) => ({
-        ...prev,
-        [platform]: { status: 'idle' },
-      }));
+      const updates: Partial<StoreWizardData> = {
+        [platform]: cleanValue,
+      } as Partial<StoreWizardData>;
+
+      if (cleanValue) {
+        for (const field of SOCIAL_FIELD_IDS) {
+          if (field !== platform) {
+            updates[field] = '';
+          }
+        }
+      }
+
+      onChange(updates);
+      setVerificationStatus((prev) => {
+        const next = { ...prev, [platform]: { status: 'idle' as const } };
+        if (cleanValue) {
+          for (const field of SOCIAL_FIELD_IDS) {
+            if (field !== platform) {
+              next[field] = { status: 'idle' };
+            }
+          }
+        }
+        return next;
+      });
     },
     [onChange]
   );
@@ -149,11 +187,22 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
           throw new Error('not-found');
         }
 
-        onChange({ [platform]: cleanValue } as Partial<StoreWizardData>);
-        setVerificationStatus((prev) => ({
-          ...prev,
-          [platform]: { status: 'valid' },
-        }));
+        onChange(
+          sanitizeSingleSocialLink({
+            instagram: platform === 'instagram' ? cleanValue : '',
+            tiktok: platform === 'tiktok' ? cleanValue : '',
+            twitter: platform === 'twitter' ? cleanValue : '',
+          }),
+        );
+        setVerificationStatus((prev) => {
+          const next = { ...prev, [platform]: { status: 'valid' as const } };
+          for (const field of SOCIAL_FIELD_IDS) {
+            if (field !== platform) {
+              next[field] = { status: 'idle' };
+            }
+          }
+          return next;
+        });
         toast.success(`${label} connected`);
       } catch {
         setVerificationStatus((prev) => ({
@@ -170,19 +219,42 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
   );
 
   const websiteIsValid = validateWebsite(data.website);
+  const isCheckingAny = Object.values(verificationStatus).some((state) => state.status === 'checking');
+  const canContinue = !isSaving && !isCheckingAny;
+
+  const handleContinue = useCallback(() => {
+    const updates: Partial<StoreWizardData> = {};
+
+    for (const platform of SOCIAL_PLATFORMS) {
+      const value = data[platform.id as keyof StoreWizardData] as string;
+      if (value && !validateUsername(platform.id, value)) {
+        updates[platform.id as keyof StoreWizardData] = '' as never;
+      }
+    }
+
+    if (data.website && !websiteIsValid) {
+      updates.website = '';
+    }
+
+    if (Object.keys(updates).length > 0) {
+      onChange(updates);
+    }
+
+    onContinue();
+  }, [data, onChange, onContinue, websiteIsValid]);
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
-      <div className="flex-1 flex items-start justify-center p-6 lg:p-12 overflow-y-auto">
+      <div className="flex-1 flex items-start justify-center p-3 sm:p-6 lg:p-12 overflow-y-auto">
         <div className="w-full max-w-[720px]">
           <div className="rounded-2xl overflow-hidden bg-white/80 dark:bg-white/[0.03] backdrop-blur-xl border border-gray-200/50 dark:border-purple-500/10 shadow-xl">
-            <div className="p-8 space-y-8">
+            <div className="origin-top scale-[0.92] space-y-5 p-4 sm:scale-100 sm:space-y-8 sm:p-8">
               <div className="text-center space-y-2">
                 <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
                   Connect Your Socials
                 </h1>
                 <p className="text-gray-600 dark:text-gray-400 text-sm md:text-base">
-                  Help customers find and trust your brand by linking active profiles.
+                  Optionally connect one social profile or your website. You can also skip this step entirely.
                 </p>
               </div>
 
@@ -194,13 +266,18 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                   const isValid = validateUsername(platform.id, value);
                   const isChecking = status.status === 'checking';
                   const isVerified = status.status === 'valid';
+                  const isBlocked =
+                    Boolean(connectedSocialPlatform) &&
+                    connectedSocialPlatform?.id !== platform.id;
 
                   return (
                     <div
                       key={platform.id}
-                      className="group rounded-xl border border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] transition-all hover:bg-gray-100/50 dark:hover:bg-white/[0.04] p-4"
+                      className={`group rounded-xl border border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] transition-all hover:bg-gray-100/50 dark:hover:bg-white/[0.04] p-4 ${
+                        isBlocked ? 'opacity-60' : ''
+                      }`}
                     >
-                      <div className="flex flex-col md:flex-row md:items-center gap-4">
+                      <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-4">
                         <div className="flex items-center gap-4 min-w-[140px]">
                           <div
                             className={`w-10 h-10 rounded-lg ${platform.gradient} flex items-center justify-center text-white shadow-lg`}
@@ -224,7 +301,9 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                             </span>
                             {!isConnected && (
                               <span className="text-xs text-gray-500">
-                                Connect to display on store
+                                {isBlocked
+                                  ? `Disconnect ${connectedSocialPlatform?.name} first`
+                                  : 'Connect to display on store'}
                               </span>
                             )}
                           </div>
@@ -238,6 +317,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                             <input
                               type="text"
                               value={value || ''}
+                              disabled={isBlocked}
                               onChange={(e) =>
                                 handleSocialChange(platform.id, e.target.value)
                               }
@@ -275,7 +355,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                                   platform.name
                                 )
                               }
-                              disabled={isChecking}
+                              disabled={isChecking || isBlocked}
                               className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 text-sm font-medium text-gray-700 dark:text-white transition-colors inline-flex items-center gap-2 disabled:opacity-60"
                             >
                               {isChecking && <VLoader size={16} phase="loading" showLabel={false} />}
@@ -296,8 +376,8 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                 })}
 
                 <div className="group rounded-xl border border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] transition-all hover:bg-gray-100/50 dark:hover:bg-white/[0.04] p-4">
-                  <div className="flex flex-col md:flex-row md:items-center gap-4">
-                    <div className="flex items-center gap-4 min-w-[140px]">
+                  <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-4">
+                    <div className="flex min-w-[120px] items-center gap-3 sm:min-w-[140px] sm:gap-4">
                       <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-lg">
                         <Globe className="w-5 h-5" />
                       </div>
@@ -354,8 +434,10 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                   <Info className="w-5 h-5" />
                 </div>
                 <div className="space-y-1 text-sm text-blue-900 dark:text-blue-100/80">
-                  <p>We verify handles using free public avatar lookups (unavatar.io) before marking them as connected.</p>
-                  <p className="text-xs text-blue-700/80 dark:text-blue-200/70">No DNS/domain steps needed—just add active socials.</p>
+                  <p>Connect one social profile at a time (optional). Disconnect to switch platforms.</p>
+                  <p className="text-xs text-blue-700/80 dark:text-blue-200/70">
+                    Handles are checked with public avatar lookups before they are marked connected.
+                  </p>
                 </div>
               </div>
 
@@ -436,28 +518,34 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-black/20 flex flex-col-reverse sm:flex-row items-center justify-between gap-4">
+            <div className="flex flex-row items-center justify-between gap-2 border-t border-gray-200/50 bg-gray-50/50 p-4 dark:border-white/5 dark:bg-black/20 sm:gap-4 sm:p-6">
               <button
+                type="button"
                 onClick={onSkip}
-                className="text-gray-500 hover:text-gray-900 dark:hover:text-white text-sm font-medium transition-colors px-4 py-2"
+                disabled={isSaving}
+                className="shrink-0 px-2 py-2 text-xs font-medium text-gray-500 transition-colors hover:text-gray-900 disabled:opacity-50 dark:hover:text-white sm:px-4 sm:text-sm"
               >
-                Skip for now
+                Skip
               </button>
-              <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
                 <button
+                  type="button"
                   onClick={onBack}
-                  className="flex-1 sm:flex-none px-6 py-2.5 rounded-lg border border-gray-200 dark:border-white/10 text-gray-700 dark:text-white text-sm font-medium hover:bg-gray-100 dark:hover:bg-white/5 transition-colors inline-flex items-center justify-center gap-2"
+                  disabled={isSaving}
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-white/10 dark:text-white dark:hover:bg-white/5 sm:gap-2 sm:px-6 sm:py-2.5 sm:text-sm"
                 >
-                  <ArrowLeft className="w-4 h-4" />
+                  <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   Back
                 </button>
                 <button
-                  onClick={onContinue}
-                  disabled={isSaving}
-                  className="flex-1 sm:flex-none px-8 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition-colors shadow-lg shadow-purple-500/20 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                  type="button"
+                  onClick={handleContinue}
+                  disabled={!canContinue}
+                  className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-purple-500/20 transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none sm:px-8 sm:py-2.5 sm:text-sm"
                 >
-                  Continue
-                  <ArrowRight className="w-4 h-4" />
+                  {isSaving ? <VLoader size={16} phase="loading" showLabel={false} /> : null}
+                  {isSaving ? 'Saving...' : 'Continue'}
+                  {!isSaving ? <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : null}
                 </button>
               </div>
             </div>

@@ -135,10 +135,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
   };
   const profileHomeRoute = user ? getProfileOrHomeUrl(user) : '/profile';
   const hasBrandAccess = hasActiveBrandMembership(user);
-  const ordersRoute = hasBrandAccess ? '/studio?tab=orders' : '/profile?tab=orders';
   const savedRoute = hasBrandAccess ? '/profile?tab=Content' : profileHomeRoute;
   const isStudioProfileMenu = profileMenuContext === 'studio';
-  const showStudioMenuEntry = !isStudioProfileMenu && hasBrandAccess && storeSetupComplete === true;
+  const showStudioMenuEntry =
+    !isStudioProfileMenu && hasBrandAccess && storeSetupComplete === true;
 
   const renderProfileMenu = () => {
     if (!user) return null;
@@ -200,39 +200,35 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
                   {user.firstName} {user.lastName}
                 </div>
               </div>
-              <div className="flex items-center gap-1 mt-0.5 text-[11px] font-semibold leading-4 text-[color:var(--text-primary)] whitespace-nowrap overflow-visible">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void navigator.clipboard.writeText(user.email);
+                  toast.success('Email copied to clipboard!');
+                }}
+                title="Tap to copy email"
+                className="mt-0.5 flex w-full items-center gap-1 overflow-visible whitespace-nowrap text-left text-[11px] font-semibold leading-4 text-[color:var(--text-primary)] transition-colors hover:text-purple-600"
+              >
                 <span>{user.email}</span>
+                <span aria-hidden="true" className="shrink-0">📋</span>
+              </button>
+              {userUid && (
                 <button
                   type="button"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    void navigator.clipboard.writeText(user.email);
-                    toast.success('Email copied to clipboard!');
+                    void navigator.clipboard.writeText(userUid);
+                    toast.success('UID copied to clipboard!');
                   }}
-                  className="hover:text-purple-600 transition-colors flex items-center justify-center p-0.5"
-                  title="Copy email"
+                  title="Tap to copy UID"
+                  className="flex w-full items-center gap-1 overflow-visible whitespace-nowrap text-left text-[11px] font-semibold leading-4 text-[color:var(--text-primary)] transition-colors hover:text-purple-600"
                 >
-                  📋
-                </button>
-              </div>
-              {userUid && (
-                <div className="flex items-center gap-1 text-[11px] font-semibold leading-4 text-[color:var(--text-primary)] whitespace-nowrap overflow-visible">
                   <span>UID: <span className="font-mono">{userUid}</span></span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      void navigator.clipboard.writeText(userUid);
-                      toast.success('UID copied to clipboard!');
-                    }}
-                    className="hover:text-purple-600 transition-colors flex items-center justify-center p-0.5"
-                    title="Copy UID"
-                  >
-                    📋
-                  </button>
-                </div>
+                  <span aria-hidden="true" className="shrink-0">📋</span>
+                </button>
               )}
               <div className="mt-2 flex items-center gap-1 rounded-xl surface-control p-1">
                 {THEME_MENU_OPTIONS.map((option) => {
@@ -267,13 +263,13 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
 
           {showStudioMenuEntry ? (
             <DropdownItem
-              leftIcon="🧵"
+              leftIcon="📊"
               onClick={() => {
                 navigate('/studio');
                 setShowProfileMenu(false);
               }}
             >
-              Studio
+              Dashboard
             </DropdownItem>
           ) : null}
 
@@ -333,15 +329,17 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
 
           <DropdownDivider />
 
-          <DropdownItem
-            leftIcon="📦"
-            onClick={() => {
-              navigate(ordersRoute);
-              setShowProfileMenu(false);
-            }}
-          >
-            My Orders
-          </DropdownItem>
+          {!hasBrandAccess ? (
+            <DropdownItem
+              leftIcon="📦"
+              onClick={() => {
+                navigate('/profile?tab=orders');
+                setShowProfileMenu(false);
+              }}
+            >
+              My Orders
+            </DropdownItem>
+          ) : null}
 
           <DropdownItem
             leftIcon="⭐"
