@@ -12,6 +12,7 @@ interface CommentInputProps {
   className?: string;
   maxLength?: number;
   variant?: 'default' | 'overlay';
+  size?: 'default' | 'compact';
   submitAriaLabel?: string;
 }
 
@@ -25,6 +26,7 @@ export const CommentInput: React.FC<CommentInputProps> = ({
   className = "",
   maxLength = 500,
   variant = 'default',
+  size = 'default',
   submitAriaLabel = 'Send comment',
 }) => {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -51,9 +53,11 @@ export const CommentInput: React.FC<CommentInputProps> = ({
     ? "text-white/70"
     : "text-gray-600 dark:text-white/70";
 
+  const isCompact = size === 'compact';
+
   return (
     <div className={`relative ${className}`}>
-      <MessageCircle className={`pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 ${iconColor}`} />
+      <MessageCircle className={`pointer-events-none absolute top-1/2 -translate-y-1/2 ${iconColor} ${isCompact ? 'left-1.5 h-3 w-3' : 'left-2.5 h-4 w-4'}`} />
       <input
         type="text"
         value={value}
@@ -61,7 +65,9 @@ export const CommentInput: React.FC<CommentInputProps> = ({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         onClick={(e) => e.stopPropagation()}
-        className={`w-full rounded-lg border pl-9 pr-10 py-2 text-sm focus:outline-none focus:ring-2 shadow-lg transition-all ${inputStyles}`}
+        className={`w-full rounded-lg border focus:outline-none focus:ring-2 shadow-lg transition-all ${inputStyles} ${
+          isCompact ? 'pl-6 pr-7 py-1 text-[10px] sm:py-1.5 sm:text-xs' : 'pl-9 pr-10 py-2 text-sm'
+        }`}
         maxLength={maxLength}
         disabled={disabled || busy}
       />
@@ -70,9 +76,11 @@ export const CommentInput: React.FC<CommentInputProps> = ({
         aria-label={submitAriaLabel}
         disabled={busy || disabled || value.trim().length === 0}
         onClick={handleSubmit}
-        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white shadow-md hover:brightness-110 disabled:opacity-60"
+        className={`absolute right-1 top-1/2 -translate-y-1/2 rounded-md bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white shadow-md hover:brightness-110 disabled:opacity-60 ${
+          isCompact ? 'p-1' : 'right-2 p-1.5'
+        }`}
       >
-        {busy ? <VLoader size={16} phase="loading" showLabel={false} /> : <Send size={14} />}
+        {busy ? <VLoader size={isCompact ? 12 : 16} phase="loading" showLabel={false} /> : <Send size={isCompact ? 11 : 14} />}
       </button>
     </div>
   );

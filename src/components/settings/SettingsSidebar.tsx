@@ -150,8 +150,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
                 <button
                   key={key}
                   onClick={() => handleSelect(key, path)}
-                  className={`flex w-full items-center gap-2 py-1.5 text-left text-[12px] leading-tight transition-colors md:gap-2.5 md:py-2 md:text-sm ${
-                    group.collapsible ? 'pl-3 pr-2 md:pl-6 md:pr-4' : 'px-2.5 md:px-4'
+            className={`flex w-full items-center gap-1.5 py-1 text-left text-[10px] leading-tight transition-colors md:gap-2.5 md:py-2 md:text-sm ${
+                    group.collapsible ? 'pl-2 pr-1.5 md:pl-6 md:pr-4' : 'px-2 md:px-4'
                   } ${
                     isActive
                       ? '-ml-[1px] border-l-[3px] border-primary bg-primary/10 font-medium text-primary'
@@ -173,7 +173,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
 
   const sidebarContent = (
     <div className="py-4">
-      <h2 className="mb-3 px-2.5 text-base font-semibold text-gray-900 md:mb-4 md:px-4 md:text-xl dark:text-white">Settings</h2>
+      <h2 className="mb-2 px-2 text-sm font-semibold text-gray-900 md:mb-4 md:px-4 md:text-xl dark:text-white">Settings</h2>
       <nav className="space-y-1">
         {visibleGroups.map((group, index) => (
           <React.Fragment key={group.id}>
@@ -189,7 +189,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
 
   return (
     // Scaled fixed sidebar — stays visible on mobile (narrow) and full-width on md+.
-    <aside className="fixed left-0 top-16 z-20 block h-[calc(100vh-64px)] w-[150px] overflow-y-auto border-r border-gray-200 bg-white scrollbar-hide dark:border-white/5 dark:bg-zinc-900 md:w-[240px]">
+    <aside className="fixed left-0 top-16 z-20 block h-[calc(100vh-64px)] w-[118px] overflow-y-auto border-r border-gray-200 bg-white scrollbar-hide dark:border-white/5 dark:bg-zinc-900 md:w-[220px]">
       {sidebarContent}
     </aside>
   );

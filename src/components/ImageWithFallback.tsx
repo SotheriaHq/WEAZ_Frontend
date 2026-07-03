@@ -270,7 +270,23 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           setLastGoodUrl(cachedLastGood);
         }
       }
-      setLoaded(false);
+
+      const cachedFileUrl = fileId ? getCachedUrl(fileId) : null;
+      const cachedSourceUrl =
+        !fileId && src && isRawStorageKey(src)
+          ? getCachedUrl(`key:${src}`)
+          : !fileId && src && isS3LikeUrl(src)
+            ? getCachedUrl(src)
+            : null;
+      const hasInstantSource =
+        canUseSourceDirectly(src, fileId) ||
+        Boolean(cachedFileUrl) ||
+        Boolean(cachedSourceUrl) ||
+        Boolean(sourceCacheKey && lastGoodUrlCache.get(sourceCacheKey));
+
+      if (!hasInstantSource) {
+        setLoaded(false);
+      }
 
       if (canUseSourceDirectly(src, fileId)) {
         setResolved(src ?? null);
@@ -318,6 +334,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         const cachedUrl = getCachedUrl(fileId);
         if (cachedUrl) {
           setResolved(cachedUrl);
+          setLoaded(true);
           return; // Use cached URL, no need to fetch
         }
 

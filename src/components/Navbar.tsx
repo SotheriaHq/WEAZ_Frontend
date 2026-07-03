@@ -171,6 +171,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
                 className="h-full w-full object-cover"
                 containerClassName="h-full w-full"
                 rounded="xl"
+                keepPreviousOnReload
               />
             </span>
         </DropdownTrigger>
@@ -190,6 +191,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
                 className="h-full w-full object-cover"
                 containerClassName="h-full w-full"
                 rounded="xl"
+                keepPreviousOnReload
               />
             </div>
             <div className="min-w-0 flex-1">

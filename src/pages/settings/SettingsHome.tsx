@@ -275,8 +275,8 @@ const SettingsHome: React.FC = () => {
     <div className="min-h-screen">
       <SettingsSidebar active={resolvedActive} onSelect={setActive} />
 
-      <div className="min-h-screen pb-10 pl-[158px] pr-4 pt-6 md:pl-[248px]">
-        <div className="max-w-4xl mx-auto">
+      <div className="min-h-screen pb-10 pl-[126px] pr-3 pt-4 text-[13px] md:pl-[236px] md:pr-4 md:pt-6 md:text-base">
+        <div className="max-w-4xl mx-auto [&_h1]:text-xl [&_h1]:md:text-2xl [&_h2]:text-base [&_h2]:md:text-lg">
           <Breadcrumbs activeKey={resolvedActive} onNavigate={setActive} />
           {resolvedSection ?? (
             <ComingSoon

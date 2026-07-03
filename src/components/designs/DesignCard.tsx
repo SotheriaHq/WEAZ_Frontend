@@ -324,7 +324,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
         {/* Tag Button */}
-        <div className="absolute top-3 left-3 z-20">
+        <div className="absolute top-2 left-2 z-20 scale-[0.72] origin-top-left sm:top-3 sm:left-3 sm:scale-100">
            <button
             onClick={(e) => {
               e.stopPropagation();
@@ -333,7 +333,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
             className="hover:scale-110 transition-transform drop-shadow-md"
             title="View Tags"
           >
-            <Tag className="h-5 w-5 text-white" aria-hidden="true" />
+            <Tag className="h-4 w-4 text-white sm:h-5 sm:w-5" aria-hidden="true" />
           </button>
           {showTags && item.tags && item.tags.length > 0 && (
             <div className="absolute top-8 left-0 flex flex-wrap gap-1 w-48 animate-in fade-in zoom-in-95 duration-100">
@@ -356,7 +356,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                 onMouseLeave={() => setShowCustomLabel(false)}
                 onFocus={() => setShowCustomLabel(true)}
                 onBlur={() => setShowCustomLabel(false)}
-                className="inline-flex items-center justify-center rounded-full border border-purple-300/50 bg-purple-500/25 px-2 py-1 text-sm leading-none text-white shadow-md"
+                className="inline-flex items-center justify-center rounded-full border border-purple-300/50 bg-purple-500/25 px-1.5 py-0.5 text-[10px] leading-none text-white shadow-md sm:px-2 sm:py-1 sm:text-sm"
                 aria-label="Custom available"
                 title="Custom available"
               >
@@ -372,15 +372,15 @@ export const DesignCard: React.FC<DesignCardProps> = ({
         </div>
 
         {/* Context Menu (Three Dots) */}
-        <div className="absolute top-3 right-3 z-30">
+        <div className="absolute top-2 right-2 z-30 scale-[0.72] origin-top-right sm:top-3 sm:right-3 sm:scale-100">
           <button
             onClick={(e) => {
               e.stopPropagation();
               setShowMenu(!showMenu);
             }}
-            className="p-1 rounded-full text-white/90 hover:text-white transition-colors drop-shadow-md"
+            className="p-0.5 rounded-full text-white/90 hover:text-white transition-colors drop-shadow-md sm:p-1"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="sm:h-6 sm:w-6">
               <circle cx="12" cy="12" r="1" />
               <circle cx="12" cy="5" r="1" />
               <circle cx="12" cy="19" r="1" />
@@ -438,11 +438,11 @@ export const DesignCard: React.FC<DesignCardProps> = ({
         </div>
 
         {/* Vertical Action Bar (Right Side - Instagram/TikTok Style) */}
-        <div className="absolute bottom-20 right-1.5 z-10 flex origin-bottom-right scale-[0.78] flex-col items-center gap-2.5 sm:bottom-24 sm:right-3 sm:scale-100 sm:gap-4">
+        <div className="absolute bottom-10 right-1 z-10 flex flex-col items-center gap-1 sm:bottom-20 sm:right-3 sm:gap-2.5">
           {isCustomAvailable ? (
             <button
               type="button"
-              className="flex flex-col items-center text-white transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex origin-bottom-right scale-[0.95] flex-col items-center text-white transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60 sm:scale-100"
               onClick={handleBagDesign}
               disabled={bagBusy || ownsDesignBrand}
               aria-label={BAG_IT_LABEL}
@@ -454,36 +454,38 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                 size={34}
                 disabled={bagBusy || ownsDesignBrand}
               />
-              <span className="text-[10px] font-bold mt-0.5 drop-shadow sm:text-xs sm:mt-1">{BAG_IT_LABEL}</span>
+              <span className="text-[9px] font-bold mt-0.5 drop-shadow sm:text-xs sm:mt-1">{BAG_IT_LABEL}</span>
             </button>
           ) : null}
 
-          <ThreadButton
-            contentType="COLLECTION_MEDIA"
-            contentId={item.id}
-            initialCount={item.threadsCount ?? 0}
-            initialThreaded={item.isThreaded}
-            ownerId={item.brandId}
-            parentCollectionId={item.collectionId}
-          />
-          
-          <button 
-            className="flex flex-col items-center text-white hover:scale-110 transition-transform"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Handle share action
-            }}
-            aria-label="Share"
-            title="Share collection"
-          >
-            <Link className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-            <span className="text-[10px] font-bold mt-0.5 drop-shadow sm:text-xs sm:mt-1">{item.collectionCollabCount ?? 0}</span>
-          </button>
+          <div className="flex origin-bottom-right scale-[0.62] flex-col items-center gap-1 sm:scale-[0.88] sm:gap-2 lg:scale-100 lg:gap-3">
+            <ThreadButton
+              contentType="COLLECTION_MEDIA"
+              contentId={item.id}
+              initialCount={item.threadsCount ?? 0}
+              initialThreaded={item.isThreaded}
+              ownerId={item.brandId}
+              parentCollectionId={item.collectionId}
+            />
+
+            <button
+              className="flex flex-col items-center text-white hover:scale-110 transition-transform"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Handle share action
+              }}
+              aria-label="Share"
+              title="Share collection"
+            >
+              <Link className="h-3.5 w-3.5 sm:h-5 sm:w-5" aria-hidden="true" />
+              <span className="text-[8px] font-bold mt-0.5 drop-shadow sm:text-xs sm:mt-1">{item.collectionCollabCount ?? 0}</span>
+            </button>
+          </div>
         </div>
 
         {/* Bottom Content Overlay */}
         {/* FIX #6: Responsive padding for different screen sizes */}
-        <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-3 md:p-4 text-white z-10">
+        <div className="absolute bottom-0 left-0 right-0 p-1.5 sm:p-3 md:p-4 text-white z-10">
           {/* Brand Info with Glassmorphism */}
           {/* FIX #6: Responsive padding and spacing */}
           <button
@@ -492,9 +494,9 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               e.stopPropagation();
               onViewBrand?.(item.brandId, item);
             }}
-            className="flex items-center gap-2 mb-1 w-fit rounded-lg py-1 transition-all"
+            className="flex items-center gap-1.5 mb-0.5 w-fit rounded-lg py-0.5 transition-all sm:gap-2 sm:mb-1 sm:py-1"
           >
-            <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-xl border border-white/40 shadow-md">
+            <div className="relative h-6 w-6 flex-shrink-0 overflow-hidden rounded-lg border border-white/40 shadow-md sm:h-8 sm:w-8 sm:rounded-xl">
               <ImageWithFallback
                 src={brandAvatar.src}
                 fileId={brandAvatar.fileId}
@@ -502,22 +504,22 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                 fit="cover"
                 rounded="xl"
                 fallbackName={brandAvatarFallback}
-                containerClassName="h-8 w-8 rounded-xl"
-                className="h-8 w-8 object-cover"
+                containerClassName="h-6 w-6 rounded-lg sm:h-8 sm:w-8 sm:rounded-xl"
+                className="h-6 w-6 object-cover sm:h-8 sm:w-8"
               />
             </div>
             <div className="min-w-0 text-left">
               {/* FIX #5: Responsive font sizing, removed truncate, allow wrapping with line-clamp */}
               <p 
                 className="font-bold leading-tight text-white drop-shadow line-clamp-2"
-                style={{ fontSize: 'clamp(0.75rem, 2.5vw, 0.875rem)' }}
+                style={{ fontSize: 'clamp(0.5625rem, 2vw, 0.875rem)' }}
               >
                 {item.brandName ?? item.username ?? 'Brand'}
               </p>
               {item.username && item.brandName !== item.username && (
                 <p 
                   className="leading-tight text-white/80 line-clamp-1"
-                  style={{ fontSize: 'clamp(0.625rem, 2vw, 0.75rem)' }}
+                  style={{ fontSize: 'clamp(0.5rem, 1.6vw, 0.75rem)' }}
                 >
                   @{item.username}
                 </p>
@@ -534,7 +536,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               fontWeight: 700, 
               letterSpacing: '0.03em', 
               textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-              fontSize: 'clamp(0.875rem, 2.5vw, 1rem)'
+              fontSize: 'clamp(0.625rem, 2vw, 1rem)'
             }}
           >
             {item.collectionTitle}
@@ -585,6 +587,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                 busy={directMessageBusy}
                 className="w-full"
                 variant="overlay"
+                size="compact"
                 submitAriaLabel="Send direct message"
               />
             </div>

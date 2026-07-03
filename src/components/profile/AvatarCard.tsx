@@ -20,7 +20,7 @@ interface AvatarCardProps {
 const sizeMap: Record<'sm' | 'md' | 'lg', string> = {
   sm: 'w-20 h-20',
   md: 'w-28 h-28',
-  lg: 'w-24 h-24 sm:w-36 sm:h-36 md:w-44 md:h-44 lg:w-52 lg:h-52',
+  lg: 'w-[7.2rem] h-[7.2rem] sm:w-36 sm:h-36 md:w-44 md:h-44 lg:w-52 lg:h-52',
 };
 
 const AvatarCard: React.FC<AvatarCardProps> = ({

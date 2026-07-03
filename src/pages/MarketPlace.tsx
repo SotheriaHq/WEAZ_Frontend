@@ -729,8 +729,8 @@ const MarketPlace: React.FC = () => {
     >
       <div className="space-y-6">
         <section className="rounded-2xl bg-white/35 p-3 backdrop-blur-[2px] ring-1 ring-gray-200/55 dark:bg-white/[0.03] dark:ring-white/10 sm:p-4">
-          <div className="grid grid-cols-1 gap-3 lg:min-h-[54px] lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <div className="min-h-[46px] sm:min-h-[54px] lg:h-full lg:min-h-0">
+          <div className="grid min-h-[7.5rem] grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-2 sm:min-h-[9rem] sm:gap-3 lg:min-h-[54px] lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <div className="h-full min-h-0">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeHero?.id ?? 'hero-empty'}
@@ -755,25 +755,25 @@ const MarketPlace: React.FC = () => {
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                       </div>
-                      <div className="relative flex h-full min-h-[46px] flex-col justify-end p-3 text-white sm:min-h-[54px] lg:min-h-0">
-                        <span className="mb-2 inline-flex w-fit items-center gap-2 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold backdrop-blur">
+                      <div className="relative flex h-full min-h-0 flex-col justify-end p-2 text-white sm:p-3">
+                        <span className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-semibold backdrop-blur sm:mb-2 sm:gap-2 sm:px-2.5 sm:text-[11px]">
                           🔥 Trending now
                         </span>
-                        <h1 className="max-w-xl text-lg font-black leading-tight sm:text-2xl">
+                        <h1 className="max-w-xl text-sm font-black leading-tight sm:text-2xl">
                           {activeHero.name}
                         </h1>
-                        <p className="mt-1 text-xs text-white/80 sm:text-sm">
+                        <p className="mt-0.5 line-clamp-2 text-[10px] text-white/80 sm:mt-1 sm:text-sm">
                           {activeHero.brand?.name || 'WIEZ Brand'} · Smooth picks from recent brand drops.
                         </p>
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 sm:mt-3 sm:gap-2">
                           <button
                             type="button"
                             onClick={() => handleOpenProduct(activeHero, { source: 'market_hero' })}
-                            className="rounded-full bg-white px-4 py-1.5 text-xs font-semibold text-gray-900 transition-transform hover:scale-[1.02]"
+                            className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-gray-900 transition-transform hover:scale-[1.02] sm:px-4 sm:py-1.5 sm:text-xs"
                           >
                             👀 View product
                           </button>
-                          <span className="rounded-full bg-black/40 px-3 py-1.5 text-xs font-semibold">
+                          <span className="rounded-full bg-black/40 px-2 py-1 text-[10px] font-semibold sm:px-3 sm:py-1.5 sm:text-xs">
                             {new Intl.NumberFormat('en-NG', {
                               style: 'currency',
                               currency: 'NGN',
@@ -784,7 +784,7 @@ const MarketPlace: React.FC = () => {
                       </div>
                     </>
                   ) : (
-                    <div className="flex h-full min-h-[46px] items-center justify-center rounded-2xl bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-300 sm:min-h-[54px] lg:min-h-0">
+                    <div className="flex h-full min-h-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-300">
                       No featured products yet.
                     </div>
                   )}
@@ -792,13 +792,13 @@ const MarketPlace: React.FC = () => {
               </AnimatePresence>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 lg:h-full lg:grid-cols-1 lg:grid-rows-2">
+            <div className="grid h-full grid-cols-1 grid-rows-2 gap-2 sm:gap-3 lg:grid-cols-1 lg:grid-rows-2">
               {heroProducts.slice(0, 2).map((product) => (
                 <button
                   key={product.id}
                   type="button"
                   onClick={() => handleOpenProduct(product, { source: 'market_hero_secondary' })}
-                  className="group relative h-24 overflow-hidden rounded-xl bg-gray-100 text-left ring-1 ring-gray-200/70 dark:bg-white/5 dark:ring-white/10 sm:h-28 lg:h-full"
+                  className="group relative min-h-0 overflow-hidden rounded-lg bg-gray-100 text-left ring-1 ring-gray-200/70 dark:bg-white/5 dark:ring-white/10 sm:rounded-xl lg:h-full"
                 >
                   <ImageWithFallback
                     src={product.thumbnail || product.images[0] || null}
@@ -811,10 +811,10 @@ const MarketPlace: React.FC = () => {
                     fallbackName={product.name}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                  <div className="absolute inset-x-0 bottom-0 p-2.5 text-white sm:p-4">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-white/70 sm:text-xs">{product.brand?.name}</p>
-                    <p className="mt-0.5 line-clamp-1 text-xs font-bold sm:mt-1 sm:line-clamp-2 sm:text-sm">{product.name}</p>
-                    <p className="mt-1 text-[10px] font-semibold text-white/80 sm:mt-3 sm:text-xs">✨ Tap to preview</p>
+                  <div className="absolute inset-x-0 bottom-0 p-1.5 text-white sm:p-4">
+                    <p className="text-[8px] font-semibold uppercase tracking-wide text-white/70 sm:text-xs">{product.brand?.name}</p>
+                    <p className="mt-0.5 line-clamp-1 text-[10px] font-bold sm:mt-1 sm:line-clamp-2 sm:text-sm">{product.name}</p>
+                    <p className="mt-0.5 text-[8px] font-semibold text-white/80 sm:mt-3 sm:text-xs">✨ Tap to preview</p>
                   </div>
                 </button>
               ))}
