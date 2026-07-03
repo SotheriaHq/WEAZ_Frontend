@@ -12,6 +12,7 @@ interface SidebarItem {
   danger?: boolean;
   description?: string;
   nonAdmin?: boolean;
+  endUserOnly?: boolean; // hidden for brand accounts (shopper-only settings)
 }
 
 interface SidebarGroup {
@@ -31,7 +32,7 @@ const sidebarGroups: SidebarGroup[] = [
       { key: 'notifications', label: 'Notifications', path: '/settings?tab=notifications', icon: '🔔', description: 'Email & push alerts' },
       { key: 'email-preferences', label: 'Email Preferences', path: '/settings?tab=email-preferences', icon: '📧', description: 'Scenario-level email delivery' },
       { key: 'privacy', label: 'Privacy', path: '/settings?tab=privacy', icon: '🛡️', description: 'Data & visibility' },
-      { key: 'profile-visibility', label: 'Profile Visibility', path: '/settings?tab=profile-visibility', icon: '👁️', description: 'Who can see your profile', nonAdmin: true },
+      { key: 'profile-visibility', label: 'Profile Visibility', path: '/settings?tab=profile-visibility', icon: '👁️', description: 'Who can see your profile', nonAdmin: true, endUserOnly: true },
       { key: 'location', label: 'Location', path: '/settings?tab=location', icon: '📍', description: 'Share location access' },
       { key: 'size-fits', label: 'Size & Fittings', path: '/settings?tab=size-fits', icon: '📏', description: 'Body measurements', nonAdmin: true },
       { key: 'market-preferences', label: 'Market & Feed', path: '/settings?tab=market-preferences', icon: '🧵', description: 'Hidden content and reset' },
@@ -86,7 +87,6 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
   const me = useSelector((state: RootState) => state.user.profile);
   const isBrandUser = hasActiveBrandMembership(me);
   const isAdmin = me?.role === 'SuperAdmin' || me?.role === 'Admin';
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     for (const group of sidebarGroups) {
@@ -104,14 +104,18 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
   const handleSelect = (key: string, path: string) => {
     onSelect(key);
     navigate(path);
-    setMobileOpen(false);
   };
 
   const visibleGroups = sidebarGroups
     .filter((group) => !group.brandOnly || isBrandUser)
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => !isAdmin || !item.nonAdmin),
+      items: group.items.filter(
+        (item) =>
+          (!isAdmin || !item.nonAdmin) &&
+          // Shopper-only links never show for brand accounts, and vice-versa.
+          (!isBrandUser || !item.endUserOnly),
+      ),
     }));
 
   const renderGroup = (group: SidebarGroup) => {
@@ -146,8 +150,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
                 <button
                   key={key}
                   onClick={() => handleSelect(key, path)}
-                  className={`flex w-full items-center gap-2.5 py-2 text-left text-sm transition-colors ${
-                    group.collapsible ? 'pl-6 pr-4' : 'px-4'
+                  className={`flex w-full items-center gap-2 py-1.5 text-left text-[12px] leading-tight transition-colors md:gap-2.5 md:py-2 md:text-sm ${
+                    group.collapsible ? 'pl-3 pr-2 md:pl-6 md:pr-4' : 'px-2.5 md:px-4'
                   } ${
                     isActive
                       ? '-ml-[1px] border-l-[3px] border-primary bg-primary/10 font-medium text-primary'
@@ -169,7 +173,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
 
   const sidebarContent = (
     <div className="py-4">
-      <h2 className="mb-4 px-4 text-xl font-semibold text-gray-900 dark:text-white">Settings</h2>
+      <h2 className="mb-3 px-2.5 text-base font-semibold text-gray-900 md:mb-4 md:px-4 md:text-xl dark:text-white">Settings</h2>
       <nav className="space-y-1">
         {visibleGroups.map((group, index) => (
           <React.Fragment key={group.id}>
@@ -184,65 +188,10 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
   );
 
   return (
-    <>
-      {/* Mobile Settings Tab Strip (Sticky under the navbar) */}
-      <div className="md:hidden sticky top-16 z-10 w-full overflow-x-auto scrollbar-hide border-b border-gray-200 dark:border-white/5 bg-white dark:bg-zinc-900 py-2 px-4 shadow-sm">
-        <div className="flex gap-2.5 whitespace-nowrap min-w-max">
-          {visibleGroups.flatMap((group) =>
-            group.items.map(({ key, label, path, icon, danger }) => {
-              const isActive = active === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => handleSelect(key, path)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                    isActive
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : danger
-                        ? 'text-red-500 hover:bg-red-500/10 dark:text-red-400'
-                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-white/5 dark:hover:bg-white/10 dark:text-gray-300'
-                  }`}
-                >
-                  <span aria-hidden="true">{icon}</span>
-                  <span>{label}</span>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="fixed bottom-4 right-4 z-30 rounded-full bg-primary p-3 text-white shadow-lg transition-colors hover:bg-primary/90 md:hidden"
-        aria-label="Open settings menu"
-      >
-        <span aria-hidden="true">☰</span>
-      </button>
-
-      {mobileOpen ? (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 h-full w-[280px] overflow-y-auto bg-white shadow-xl dark:bg-zinc-900">
-            <div className="flex items-center justify-between px-4 pt-4">
-              <span className="text-lg font-semibold text-gray-900 dark:text-white">Settings</span>
-              <button
-                onClick={() => setMobileOpen(false)}
-                className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-white/10"
-              >
-                <span className="text-gray-500" aria-hidden="true">✕</span>
-              </button>
-            </div>
-            {sidebarContent}
-          </aside>
-        </div>
-      ) : null}
-
-      <aside className="fixed left-0 top-16 z-20 hidden h-[calc(100vh-64px)] w-[240px] overflow-y-auto border-r border-gray-200 bg-white scrollbar-hide dark:border-white/5 dark:bg-zinc-900 md:block">
-        {sidebarContent}
-      </aside>
-    </>
+    // Scaled fixed sidebar — stays visible on mobile (narrow) and full-width on md+.
+    <aside className="fixed left-0 top-16 z-20 block h-[calc(100vh-64px)] w-[150px] overflow-y-auto border-r border-gray-200 bg-white scrollbar-hide dark:border-white/5 dark:bg-zinc-900 md:w-[240px]">
+      {sidebarContent}
+    </aside>
   );
 };
 

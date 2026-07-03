@@ -177,10 +177,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
 
         <DropdownMenu
           maxHeight="min(80dvh, 30rem)"
-          className="surface-menu w-[min(13.5rem,calc(100vw-1rem))] !shadow-none !ring-0 outline-none sm:w-[15.5rem]"
+          className="surface-menu w-[min(17rem,calc(100vw-1rem))] !shadow-none !ring-0 outline-none sm:w-[19rem]"
         >
           <div className="flex items-center gap-3 px-3.5 pb-3 pt-3.5">
-            <div className="h-12 w-12 overflow-hidden rounded-xl border border-theme">
+            <div className="h-14 w-14 overflow-hidden rounded-xl border border-theme">
               <ImageWithFallback
                 src={userAvatar.src}
                 fileId={userAvatar.fileId}
@@ -198,7 +198,8 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
                   {user.firstName} {user.lastName}
                 </div>
               </div>
-              <div className="flex items-center gap-1 mt-0.5 text-[10px] leading-4 text-[color:var(--text-secondary)] whitespace-nowrap overflow-visible">
+              <div className="flex items-center gap-1 mt-0.5 text-[11px] font-semibold leading-4 text-[color:var(--text-primary)] whitespace-nowrap overflow-visible">
+                <span>{user.email}</span>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -212,10 +213,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
                 >
                   📋
                 </button>
-                <span>{user.email}</span>
               </div>
               {userUid && (
-                <div className="flex items-center gap-1 text-[10px] leading-4 text-[color:var(--text-secondary)] whitespace-nowrap">
+                <div className="flex items-center gap-1 text-[11px] font-semibold leading-4 text-[color:var(--text-primary)] whitespace-nowrap overflow-visible">
+                  <span>UID: <span className="font-mono">{userUid}</span></span>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -229,7 +230,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
                   >
                     📋
                   </button>
-                  <span>UID: <span className="font-mono">{userUid}</span></span>
                 </div>
               )}
               <div className="mt-2 flex items-center gap-1 rounded-xl surface-control p-1">

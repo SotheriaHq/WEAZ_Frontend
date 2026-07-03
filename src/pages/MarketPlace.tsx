@@ -792,13 +792,13 @@ const MarketPlace: React.FC = () => {
               </AnimatePresence>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:h-full lg:grid-cols-1 lg:grid-rows-2">
+            <div className="grid grid-cols-2 gap-3 lg:h-full lg:grid-cols-1 lg:grid-rows-2">
               {heroProducts.slice(0, 2).map((product) => (
                 <button
                   key={product.id}
                   type="button"
                   onClick={() => handleOpenProduct(product, { source: 'market_hero_secondary' })}
-                  className="group relative h-[37px] overflow-hidden rounded-xl bg-gray-100 text-left ring-1 ring-gray-200/70 dark:bg-white/5 dark:ring-white/10 sm:h-[42px] lg:h-full"
+                  className="group relative h-24 overflow-hidden rounded-xl bg-gray-100 text-left ring-1 ring-gray-200/70 dark:bg-white/5 dark:ring-white/10 sm:h-28 lg:h-full"
                 >
                   <ImageWithFallback
                     src={product.thumbnail || product.images[0] || null}
@@ -811,10 +811,10 @@ const MarketPlace: React.FC = () => {
                     fallbackName={product.name}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                  <div className="absolute inset-x-0 bottom-0 p-4 text-white">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-white/70">{product.brand?.name}</p>
-                    <p className="mt-1 line-clamp-2 text-sm font-bold">{product.name}</p>
-                    <p className="mt-3 text-xs font-semibold text-white/80">✨ Tap to preview</p>
+                  <div className="absolute inset-x-0 bottom-0 p-2.5 text-white sm:p-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-white/70 sm:text-xs">{product.brand?.name}</p>
+                    <p className="mt-0.5 line-clamp-1 text-xs font-bold sm:mt-1 sm:line-clamp-2 sm:text-sm">{product.name}</p>
+                    <p className="mt-1 text-[10px] font-semibold text-white/80 sm:mt-3 sm:text-xs">✨ Tap to preview</p>
                   </div>
                 </button>
               ))}

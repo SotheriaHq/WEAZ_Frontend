@@ -734,7 +734,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
         <div className="relative min-h-[240px]">
           {pinnedLoading ? (
             <Masonry
-              breakpointCols={{ default: 3, 1920: 4, 1536: 3, 1280: 3, 1024: 2, 768: 2, 640: 1 }}
+              breakpointCols={{ default: 3, 1920: 4, 1536: 3, 1280: 3, 1024: 2, 768: 2, 640: 2 }}
               className="flex -ml-6 w-auto"
               columnClassName="pl-6 space-y-6 bg-clip-padding"
             >
@@ -742,7 +742,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
             </Masonry>
           ) : pinnedItems.length > 0 ? (
             <Masonry
-              breakpointCols={{ default: 3, 1920: 4, 1536: 3, 1280: 3, 1024: 2, 768: 2, 640: 1 }}
+              breakpointCols={{ default: 3, 1920: 4, 1536: 3, 1280: 3, 1024: 2, 768: 2, 640: 2 }}
               className="flex -ml-6 w-auto"
               columnClassName="pl-6 space-y-6 bg-clip-padding"
             >
@@ -867,7 +867,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
             1280: 3,
             1024: 2,
             768: 2,
-            640: 1,
+            640: 2,
           }}
           className="flex -ml-6 w-auto"
           columnClassName="pl-6 space-y-6 bg-clip-padding"
@@ -889,7 +889,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
             1280: 3,
             1024: 2,
             768: 2,
-            640: 1,
+            640: 2,
           }}
           className="flex -ml-6 w-auto"
           columnClassName="pl-6 space-y-6 bg-clip-padding"

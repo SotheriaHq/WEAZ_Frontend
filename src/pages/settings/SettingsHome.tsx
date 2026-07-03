@@ -275,7 +275,7 @@ const SettingsHome: React.FC = () => {
     <div className="min-h-screen">
       <SettingsSidebar active={resolvedActive} onSelect={setActive} />
 
-      <div className="min-h-screen pb-10 px-4 md:pl-[248px] pt-6">
+      <div className="min-h-screen pb-10 pl-[158px] pr-4 pt-6 md:pl-[248px]">
         <div className="max-w-4xl mx-auto">
           <Breadcrumbs activeKey={resolvedActive} onNavigate={setActive} />
           {resolvedSection ?? (

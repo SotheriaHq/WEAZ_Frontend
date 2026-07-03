@@ -5,7 +5,6 @@ import { Navbar } from '../Navbar';
 import ProfileHeaderSkeleton from '../profile/ProfileHeaderSkeleton';
 import CollectionsSkeleton from '../profile/CollectionsSkeleton';
 import { EndUserProfile } from '../../pages/profile/EndUserProfile';
-import VLoader from '../loaders/VLoader';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '@/context/AuthContext';
 import { closeSidebar, selectIsMobile, setSidebarMode } from '@/features/uiSlice';
@@ -37,14 +36,11 @@ export const ProfileContentLoadingFallback: React.FC<{
 }> = ({ brandSetupPrompt = false }) => (
   <div className="p-4 sm:p-6" role="status" aria-live="polite">
     <div className="mx-auto max-w-screen-xl space-y-6">
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-theme bg-[color:var(--surface-secondary)] p-12 shadow-sm text-center">
-        <VLoader size={64} showLabel={true} />
-        {brandSetupPrompt && (
-          <p className="mt-4 text-xs text-theme-secondary">
-            Preparing brand setup... The setup form will open automatically.
-          </p>
-        )}
-      </div>
+      {/* Skeleton only — no spinner. The shimmer signals loading. */}
+      <ProfileHeaderSkeleton />
+      {brandSetupPrompt ? (
+        <span className="sr-only">Preparing brand setup...</span>
+      ) : null}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-3">
           <div className="h-64 w-full animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-900/40" />

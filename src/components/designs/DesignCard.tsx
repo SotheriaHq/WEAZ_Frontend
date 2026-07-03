@@ -438,7 +438,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
         </div>
 
         {/* Vertical Action Bar (Right Side - Instagram/TikTok Style) */}
-        <div className="absolute bottom-24 right-3 z-10 flex flex-col items-center gap-4">
+        <div className="absolute bottom-20 right-1.5 z-10 flex origin-bottom-right scale-[0.78] flex-col items-center gap-2.5 sm:bottom-24 sm:right-3 sm:scale-100 sm:gap-4">
           {isCustomAvailable ? (
             <button
               type="button"
@@ -454,7 +454,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                 size={34}
                 disabled={bagBusy || ownsDesignBrand}
               />
-              <span className="text-xs font-bold mt-1 drop-shadow">{BAG_IT_LABEL}</span>
+              <span className="text-[10px] font-bold mt-0.5 drop-shadow sm:text-xs sm:mt-1">{BAG_IT_LABEL}</span>
             </button>
           ) : null}
 
@@ -476,8 +476,8 @@ export const DesignCard: React.FC<DesignCardProps> = ({
             aria-label="Share"
             title="Share collection"
           >
-            <Link className="h-5 w-5" aria-hidden="true" />
-            <span className="text-xs font-bold mt-1 drop-shadow">{item.collectionCollabCount ?? 0}</span>
+            <Link className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+            <span className="text-[10px] font-bold mt-0.5 drop-shadow sm:text-xs sm:mt-1">{item.collectionCollabCount ?? 0}</span>
           </button>
         </div>
 

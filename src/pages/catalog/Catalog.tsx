@@ -1802,6 +1802,7 @@ const ProfilePage: React.FC = () => {
       {isOwner ? (
         <OwnerCatalogMediaHeader
           profile={ownerHeaderProfile}
+          isStoreOpen={viewIsStoreOpen}
           onEditProfile={handleOpenHeaderQuickEdit}
           onShareProfile={handleShareProfile}
           onShowQrCode={() => setIsBrandQrOpen(true)}
@@ -1813,6 +1814,7 @@ const ProfilePage: React.FC = () => {
       ) : (
         <ProfileHeader
           profile={visitorHeaderProfile}
+          isStoreOpen={viewIsStoreOpen}
           onViewAvatar={handleViewVisitorAvatar}
           onShareProfile={handleShareProfile}
           onShowQrCode={() => setIsBrandQrOpen(true)}
