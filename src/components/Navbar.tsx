@@ -1,4 +1,4 @@
-﻿import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../context/LanguageContext';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearUser, setUser } from '../features/userSlice';
 import { resetUnreadCount } from '../features/notificationsSlice';
@@ -198,10 +198,40 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
                   {user.firstName} {user.lastName}
                 </div>
               </div>
-              <div className="mt-0.5 break-words text-[11px] leading-4 text-[color:var(--text-secondary)]">
-                {user.email}
-                {userUid ? ` · UID ${userUid}` : ''}
+              <div className="flex items-center gap-1 mt-0.5 text-[10px] leading-4 text-[color:var(--text-secondary)] whitespace-nowrap overflow-visible">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void navigator.clipboard.writeText(user.email);
+                    toast.success('Email copied to clipboard!');
+                  }}
+                  className="hover:text-purple-600 transition-colors flex items-center justify-center p-0.5"
+                  title="Copy email"
+                >
+                  📋
+                </button>
+                <span>{user.email}</span>
               </div>
+              {userUid && (
+                <div className="flex items-center gap-1 text-[10px] leading-4 text-[color:var(--text-secondary)] whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void navigator.clipboard.writeText(userUid);
+                      toast.success('UID copied to clipboard!');
+                    }}
+                    className="hover:text-purple-600 transition-colors flex items-center justify-center p-0.5"
+                    title="Copy UID"
+                  >
+                    📋
+                  </button>
+                  <span>UID: <span className="font-mono">{userUid}</span></span>
+                </div>
+              )}
               <div className="mt-2 flex items-center gap-1 rounded-xl surface-control p-1">
                 {THEME_MENU_OPTIONS.map((option) => {
                   const active = themePreference === option.value;

@@ -401,7 +401,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   // Shimmer should stay visible until the image is fully loaded, not just until the URL resolves.
   // Without this, there is a white flash between "URL resolved" and "image onLoad" because the
   // <img> is opacity-0 with no background behind it during that window.
-  const showFallback = hadError || isKnownUnavailableSource;
+  const showFallback = !hasSource || hadError || isKnownUnavailableSource;
   const showPreviousImage =
     keepPreviousOnReload && Boolean(lastGoodUrl) && !showFallback && hasSource && (isResolving || !loaded);
   const showShimmer = !showPreviousImage && !showFallback && (isResolving || (hasSource && !hadError && !loaded));

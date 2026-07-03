@@ -833,7 +833,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
       />
 
       <div className="sticky top-16 z-20 mb-1 overflow-x-auto no-scrollbar px-2 py-1">
-        <div className="mx-auto flex w-max max-w-full items-center justify-center gap-2 border-b border-[color:var(--border-default)]/70 px-1 pb-1 text-sm">
+        <div className="flex items-center gap-2 border-b border-[color:var(--border-default)]/70 pb-1 text-sm min-w-max justify-start md:justify-center md:mx-auto">
         {feedCategories.map((cat) => {
           const active = selectedCategory === cat.key;
           return (

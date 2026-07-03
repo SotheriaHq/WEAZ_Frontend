@@ -185,6 +185,34 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
 
   return (
     <>
+      {/* Mobile Settings Tab Strip (Sticky under the navbar) */}
+      <div className="md:hidden sticky top-16 z-10 w-full overflow-x-auto scrollbar-hide border-b border-gray-200 dark:border-white/5 bg-white dark:bg-zinc-900 py-2 px-4 shadow-sm">
+        <div className="flex gap-2.5 whitespace-nowrap min-w-max">
+          {visibleGroups.flatMap((group) =>
+            group.items.map(({ key, label, path, icon, danger }) => {
+              const isActive = active === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handleSelect(key, path)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                    isActive
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : danger
+                        ? 'text-red-500 hover:bg-red-500/10 dark:text-red-400'
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-white/5 dark:hover:bg-white/10 dark:text-gray-300'
+                  }`}
+                >
+                  <span aria-hidden="true">{icon}</span>
+                  <span>{label}</span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
       <button
         onClick={() => setMobileOpen(true)}
         className="fixed bottom-4 right-4 z-30 rounded-full bg-primary p-3 text-white shadow-lg transition-colors hover:bg-primary/90 md:hidden"
