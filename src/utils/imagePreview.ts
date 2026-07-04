@@ -3,10 +3,14 @@ const TRANSCODE_IMAGE_TYPES = new Set(['image/heic', 'image/heif', 'image/avif']
 export const MAX_PREVIEW_SOURCE_BYTES = 32 * 1024 * 1024;
 export const MAX_PREVIEW_DIMENSION = 1600;
 export const JPEG_PREVIEW_QUALITY = 0.82;
+export const PREVIEW_STRATEGY_TIMEOUT_MS = 12_000;
 
-/** Tiny gray JPEG used when every decode strategy fails (never use blob: on mobile). */
+/** Gray 64×64 JPEG used when every decode strategy fails (never use blob: on mobile). */
 export const IMAGE_PREVIEW_UNAVAILABLE_DATA_URL =
-  'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=';
+  'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCABAAEADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=';
+
+export const isPreviewUnavailableDataUrl = (url?: string | null): boolean =>
+  typeof url === 'string' && url === IMAGE_PREVIEW_UNAVAILABLE_DATA_URL;
 
 export const isLikelyImageFile = (file: File): boolean => {
   if (file.type.startsWith('image/')) return true;
@@ -18,8 +22,12 @@ export const prefersCanvasImagePreview = (): boolean => {
 
   const touchCapable =
     navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
-  const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
-  const narrowViewport = window.matchMedia('(max-width: 1024px)').matches;
+  const matchMedia =
+    typeof window.matchMedia === 'function'
+      ? window.matchMedia.bind(window)
+      : null;
+  const coarsePointer = matchMedia?.('(pointer: coarse)').matches ?? false;
+  const narrowViewport = matchMedia?.('(max-width: 1024px)').matches ?? false;
 
   return touchCapable && (coarsePointer || narrowViewport);
 };
@@ -118,9 +126,35 @@ const bitmapToJpegDataUrl = (bitmap: ImageBitmap): string => {
   }
 };
 
+const withPreviewTimeout = async <T>(
+  label: string,
+  task: () => Promise<T>,
+  timeoutMs = PREVIEW_STRATEGY_TIMEOUT_MS,
+): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      task(),
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
 const createBitmapFromFile = async (file: File): Promise<ImageBitmap> => {
   if (typeof createImageBitmap !== 'function') {
     throw new Error('createImageBitmap unavailable');
+  }
+
+  // iOS Safari can hang on resize/orientation options for HEIC camera rolls.
+  if (prefersCanvasImagePreview()) {
+    return createImageBitmap(file);
   }
 
   const resizeWidth = MAX_PREVIEW_DIMENSION;
@@ -206,16 +240,38 @@ export const buildDisplayableImagePreview = async (
     throw new Error('Image is too large to preview locally');
   }
 
-  const strategies = [
-    buildPreviewViaImageBitmap,
-    buildPreviewViaBlobCanvas,
-    buildPreviewViaDataUrlCanvas,
-  ];
+  const mobileFirst = prefersCanvasImagePreview();
+  const mime = normalizedFile.type.trim().toLowerCase();
+  const isHeicLike =
+    TRANSCODE_IMAGE_TYPES.has(mime) ||
+    /\.(heic|heif)$/i.test(normalizedFile.name);
+
+  const bitmapStrategy = {
+    label: 'bitmap',
+    run: buildPreviewViaImageBitmap,
+  };
+  const blobStrategy = {
+    label: 'blob-canvas',
+    run: buildPreviewViaBlobCanvas,
+  };
+  const dataUrlStrategy = {
+    label: 'dataurl-canvas',
+    run: buildPreviewViaDataUrlCanvas,
+  };
+
+  const strategies: Array<{ label: string; run: (file: File) => Promise<string> }> =
+    mobileFirst
+      ? isHeicLike
+        ? [bitmapStrategy, dataUrlStrategy, blobStrategy]
+        : [blobStrategy, bitmapStrategy, dataUrlStrategy]
+      : [bitmapStrategy, blobStrategy, dataUrlStrategy];
 
   let lastError: unknown;
   for (const strategy of strategies) {
     try {
-      const previewUrl = await strategy(normalizedFile);
+      const previewUrl = await withPreviewTimeout(strategy.label, () =>
+        strategy.run(normalizedFile),
+      );
       if (previewUrl.startsWith('data:image/jpeg')) {
         return previewUrl;
       }

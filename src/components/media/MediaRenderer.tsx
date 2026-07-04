@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
 import { isKnownUnavailableSeedMediaUrl } from '@/utils/mediaSource';
+import { isPreviewUnavailableDataUrl } from '@/utils/imagePreview';
 
 export type MediaKind = 'image' | 'video';
 
@@ -123,7 +124,9 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
     [src],
   );
   const isKnownUnavailableSource = React.useMemo(
-    () => isKnownUnavailableSeedMediaUrl(normalizedSrc),
+    () =>
+      isKnownUnavailableSeedMediaUrl(normalizedSrc) ||
+      isPreviewUnavailableDataUrl(normalizedSrc),
     [normalizedSrc],
   );
   const [hasLoadError, setHasLoadError] = React.useState(false);
@@ -154,7 +157,11 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
           role="img"
           aria-label={alt && alt.trim().length > 0 ? alt : 'Media unavailable'}
         >
-          🖼️
+          <span className="px-4 text-center text-theme-secondary">
+            {isPreviewUnavailableDataUrl(normalizedSrc)
+              ? 'Preview unavailable on this device'
+              : '🖼️'}
+          </span>
         </div>
       </div>
     );

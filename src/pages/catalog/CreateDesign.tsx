@@ -618,8 +618,8 @@ const CreateDesignInner: React.FC = () => {
     type.trim().length > 0;
 
   const resolveMediaWithUrl = useCallback((item?: MediaItem | null) => {
-    if (!item?.previewUrl) return null;
-    return { ...item, url: item.previewUrl };
+    if (!item) return null;
+    return { ...item, url: item.previewUrl || '' };
   }, []);
 
   // Get current selected file for main preview

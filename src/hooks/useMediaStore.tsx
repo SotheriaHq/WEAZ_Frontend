@@ -6,8 +6,11 @@ import {
   buildDisplayableImagePreview,
   buildVideoPreviewUrl,
   IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
+  PREVIEW_STRATEGY_TIMEOUT_MS,
   revokeObjectPreviewUrl,
 } from '@/utils/imagePreview';
+
+const PREVIEW_OVERALL_TIMEOUT_MS = PREVIEW_STRATEGY_TIMEOUT_MS * 3 + 5_000;
 
 type State = { items: MediaItem[] };
 
@@ -130,7 +133,15 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
       void (async () => {
         try {
-          const previewUrl = await buildDisplayableImagePreview(file);
+          const previewUrl = await Promise.race([
+            buildDisplayableImagePreview(file),
+            new Promise<string>((_, reject) => {
+              setTimeout(
+                () => reject(new Error('Preview generation timed out')),
+                PREVIEW_OVERALL_TIMEOUT_MS,
+              );
+            }),
+          ]);
           dispatch({ type: 'setPreview', id: itemId, previewUrl });
         } catch (error) {
           console.warn('[useMediaStore] preview generation failed', error);
