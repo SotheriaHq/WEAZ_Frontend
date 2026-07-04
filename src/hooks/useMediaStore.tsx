@@ -5,6 +5,7 @@ import { normalizeMediaViewSlot } from '@/utils/contentIntegrity';
 import {
   buildDisplayableImagePreview,
   buildVideoPreviewUrl,
+  IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
   revokeObjectPreviewUrl,
 } from '@/utils/imagePreview';
 
@@ -131,10 +132,13 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         try {
           const previewUrl = await buildDisplayableImagePreview(file);
           dispatch({ type: 'setPreview', id: itemId, previewUrl });
-        } catch {
-          const fallbackUrl = URL.createObjectURL(file);
-          urlRef.current.set(itemId, fallbackUrl);
-          dispatch({ type: 'setPreview', id: itemId, previewUrl: fallbackUrl });
+        } catch (error) {
+          console.warn('[useMediaStore] preview generation failed', error);
+          dispatch({
+            type: 'setPreview',
+            id: itemId,
+            previewUrl: IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
+          });
         } finally {
           convertingRef.current.delete(itemId);
         }

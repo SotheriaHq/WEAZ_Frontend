@@ -132,7 +132,14 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
     setHasLoadError(false);
   }, [kind, normalizedSrc]);
 
-  const shouldRenderMedia = normalizedSrc.length > 0 && !hasLoadError && !isKnownUnavailableSource;
+  const isBlobImageSource =
+    kind === 'image' && normalizedSrc.startsWith('blob:');
+
+  const shouldRenderMedia =
+    normalizedSrc.length > 0 &&
+    !hasLoadError &&
+    !isKnownUnavailableSource &&
+    !isBlobImageSource;
 
   if (!shouldRenderMedia) {
     return (

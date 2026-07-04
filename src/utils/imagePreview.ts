@@ -1,45 +1,61 @@
-const DISPLAYABLE_IMAGE_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-]);
+const TRANSCODE_IMAGE_TYPES = new Set(['image/heic', 'image/heif', 'image/avif']);
 
-const TRANSCODE_IMAGE_TYPES = new Set(['image/heic', 'image/heif']);
+export const MAX_PREVIEW_SOURCE_BYTES = 32 * 1024 * 1024;
+export const MAX_PREVIEW_DIMENSION = 1600;
+export const JPEG_PREVIEW_QUALITY = 0.82;
 
-export const MAX_PREVIEW_SOURCE_BYTES = 24 * 1024 * 1024;
-export const MAX_PREVIEW_DIMENSION = 2048;
+/** Tiny gray JPEG used when every decode strategy fails (never use blob: on mobile). */
+export const IMAGE_PREVIEW_UNAVAILABLE_DATA_URL =
+  'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=';
 
-const readFileAsDataURL = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result);
-        return;
-      }
-      reject(new Error('Preview read failed'));
-    };
-    reader.onerror = () => reject(reader.error ?? new Error('Preview read failed'));
-    reader.readAsDataURL(file);
+export const isLikelyImageFile = (file: File): boolean => {
+  if (file.type.startsWith('image/')) return true;
+  return /\.(jpe?g|png|webp|gif|heic|heif|bmp|avif)$/i.test(file.name);
+};
+
+export const prefersCanvasImagePreview = (): boolean => {
+  if (typeof window === 'undefined') return true;
+
+  const touchCapable =
+    navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+  const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+  const narrowViewport = window.matchMedia('(max-width: 1024px)').matches;
+
+  return touchCapable && (coarsePointer || narrowViewport);
+};
+
+export const normalizeImageFile = (file: File): File => {
+  const mime = file.type.trim().toLowerCase();
+  if (mime.startsWith('image/')) {
+    return file;
+  }
+
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+  const inferredType =
+    extension === 'png'
+      ? 'image/png'
+      : extension === 'webp'
+        ? 'image/webp'
+        : extension === 'gif'
+          ? 'image/gif'
+          : extension === 'heic' || extension === 'heif'
+            ? 'image/heic'
+            : 'image/jpeg';
+
+  return new File([file], file.name, {
+    type: inferredType,
+    lastModified: file.lastModified,
   });
-
-const loadImageElement = (src: string): Promise<HTMLImageElement> =>
-  new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('Preview image decode failed'));
-    image.src = src;
-  });
+};
 
 const scaleToFit = (
   width: number,
   height: number,
   maxDimension: number,
 ): { width: number; height: number } => {
-  const longestEdge = Math.max(width, height);
+  const longestEdge = Math.max(width, height, 1);
   if (longestEdge <= maxDimension) {
-    return { width, height };
+    return { width: Math.max(1, width), height: Math.max(1, height) };
   }
   const scale = maxDimension / longestEdge;
   return {
@@ -60,31 +76,36 @@ const canvasToJpegDataUrl = (
   if (!ctx) {
     throw new Error('Canvas rendering context not available');
   }
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
   ctx.drawImage(source, 0, 0, width, height);
-  return canvas.toDataURL('image/jpeg', 0.88);
+  return canvas.toDataURL('image/jpeg', JPEG_PREVIEW_QUALITY);
 };
 
-export const isLikelyImageFile = (file: File): boolean => {
-  if (file.type.startsWith('image/')) return true;
-  return /\.(jpe?g|png|webp|gif|heic|heif|bmp|avif)$/i.test(file.name);
-};
+const loadImageElement = (src: string): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    image.decoding = 'async';
 
-export const shouldTranscodeImagePreview = (file: File): boolean => {
-  const mime = file.type.trim().toLowerCase();
-  if (!mime) return true;
-  if (TRANSCODE_IMAGE_TYPES.has(mime)) return true;
-  if (DISPLAYABLE_IMAGE_TYPES.has(mime)) return false;
-  return mime.startsWith('image/');
-};
+    const finish = async () => {
+      try {
+        if (typeof image.decode === 'function') {
+          await image.decode();
+        }
+        resolve(image);
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error('Preview decode failed'));
+      }
+    };
 
-const buildPreviewViaImageBitmap = async (file: File): Promise<string> => {
-  if (typeof createImageBitmap !== 'function') {
-    throw new Error('createImageBitmap unavailable');
-  }
-
-  const bitmap = await createImageBitmap(file, {
-    imageOrientation: 'from-image',
+    image.onload = () => {
+      void finish();
+    };
+    image.onerror = () => reject(new Error('Preview image decode failed'));
+    image.src = src;
   });
+
+const bitmapToJpegDataUrl = (bitmap: ImageBitmap): string => {
   try {
     const { width, height } = scaleToFit(
       bitmap.width,
@@ -97,8 +118,62 @@ const buildPreviewViaImageBitmap = async (file: File): Promise<string> => {
   }
 };
 
-const buildPreviewViaImageElement = async (file: File): Promise<string> => {
-  const dataUrl = await readFileAsDataURL(file);
+const createBitmapFromFile = async (file: File): Promise<ImageBitmap> => {
+  if (typeof createImageBitmap !== 'function') {
+    throw new Error('createImageBitmap unavailable');
+  }
+
+  const resizeWidth = MAX_PREVIEW_DIMENSION;
+
+  try {
+    return await createImageBitmap(file, {
+      imageOrientation: 'from-image',
+      resizeWidth,
+      resizeQuality: 'high',
+    });
+  } catch {
+    try {
+      return await createImageBitmap(file, { resizeWidth, resizeQuality: 'high' });
+    } catch {
+      return await createImageBitmap(file);
+    }
+  }
+};
+
+const buildPreviewViaImageBitmap = async (file: File): Promise<string> => {
+  const bitmap = await createBitmapFromFile(file);
+  return bitmapToJpegDataUrl(bitmap);
+};
+
+const buildPreviewViaBlobCanvas = async (file: File): Promise<string> => {
+  const blobUrl = URL.createObjectURL(file);
+  try {
+    const image = await loadImageElement(blobUrl);
+    const { width, height } = scaleToFit(
+      image.naturalWidth,
+      image.naturalHeight,
+      MAX_PREVIEW_DIMENSION,
+    );
+    return canvasToJpegDataUrl(image, width, height);
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+};
+
+const buildPreviewViaDataUrlCanvas = async (file: File): Promise<string> => {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error('Preview read failed'));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Preview read failed'));
+    reader.readAsDataURL(file);
+  });
+
   const image = await loadImageElement(dataUrl);
   const { width, height } = scaleToFit(
     image.naturalWidth,
@@ -108,45 +183,55 @@ const buildPreviewViaImageElement = async (file: File): Promise<string> => {
   return canvasToJpegDataUrl(image, width, height);
 };
 
+const shouldForceCanvasOutput = (file: File): boolean => {
+  if (prefersCanvasImagePreview()) return true;
+  const mime = file.type.trim().toLowerCase();
+  if (!mime || TRANSCODE_IMAGE_TYPES.has(mime)) return true;
+  return file.size > 2 * 1024 * 1024;
+};
+
 /**
- * Builds a browser-displayable inline preview for local image files.
- * Mobile browsers often fail to render blob: URLs and cannot display HEIC in <img>.
+ * Builds a browser-displayable JPEG data URL for local image files.
+ * Mobile Safari cannot reliably render blob: or large raw data: URLs in <img>.
  */
 export const buildDisplayableImagePreview = async (
   file: File,
 ): Promise<string> => {
-  if (!isLikelyImageFile(file)) {
+  const normalizedFile = normalizeImageFile(file);
+
+  if (!isLikelyImageFile(normalizedFile)) {
     throw new Error('Unsupported preview file type');
   }
-  if (file.size > MAX_PREVIEW_SOURCE_BYTES) {
+  if (normalizedFile.size > MAX_PREVIEW_SOURCE_BYTES) {
     throw new Error('Image is too large to preview locally');
   }
 
-  const requiresTranscode = shouldTranscodeImagePreview(file);
+  const strategies = [
+    buildPreviewViaImageBitmap,
+    buildPreviewViaBlobCanvas,
+    buildPreviewViaDataUrlCanvas,
+  ];
 
-  if (requiresTranscode) {
+  let lastError: unknown;
+  for (const strategy of strategies) {
     try {
-      return await buildPreviewViaImageBitmap(file);
-    } catch {
-      return buildPreviewViaImageElement(file);
+      const previewUrl = await strategy(normalizedFile);
+      if (previewUrl.startsWith('data:image/jpeg')) {
+        return previewUrl;
+      }
+    } catch (error) {
+      lastError = error;
     }
   }
 
-  if (file.size <= 4 * 1024 * 1024) {
-    try {
-      const dataUrl = await readFileAsDataURL(file);
-      await loadImageElement(dataUrl);
-      return dataUrl;
-    } catch {
-      // Fall through to transcoding for odd mobile payloads.
-    }
+  if (shouldForceCanvasOutput(normalizedFile)) {
+    console.warn('[imagePreview] All strategies failed; using placeholder', lastError);
+    return IMAGE_PREVIEW_UNAVAILABLE_DATA_URL;
   }
 
-  try {
-    return await buildPreviewViaImageBitmap(file);
-  } catch {
-    return buildPreviewViaImageElement(file);
-  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Unable to build image preview');
 };
 
 export const buildVideoPreviewUrl = (file: File): string =>
