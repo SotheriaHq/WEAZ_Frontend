@@ -72,6 +72,18 @@ export default defineConfig(({ mode }) => {
       dedupe: ['react', 'react-dom'],
     },
     build: {
+      // Mobile browsers were stalling on a blank screen while preloading every
+      // lazy admin/route chunk referenced from App.tsx. Only warm core vendors.
+      modulePreload: {
+        resolveDependencies(_filename, deps, { hostType }) {
+          if (hostType !== 'html') {
+            return deps;
+          }
+          return deps.filter((dep) =>
+            /\/assets\/(react-vendor|router-vendor|redux-vendor)-/.test(dep),
+          );
+        },
+      },
       rollupOptions: {
         output: {
           manualChunks(id) {

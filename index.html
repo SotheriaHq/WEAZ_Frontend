@@ -94,7 +94,53 @@
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div
+        id="boot-splash"
+        role="status"
+        aria-live="polite"
+        aria-label="Loading WIEZ"
+        style="
+          display: flex;
+          min-height: 100dvh;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          gap: 16px;
+          padding: 24px;
+          background: #ffffff;
+          color: #16233f;
+          font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+        "
+      >
+        <div
+          style="
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(22, 35, 63, 0.15);
+            border-top-color: #7c3aed;
+            border-radius: 9999px;
+            animation: boot-spin 0.8s linear infinite;
+          "
+        ></div>
+        <div style="font-size: 14px; font-weight: 600; letter-spacing: 0.02em;">Loading WIEZ…</div>
+      </div>
+      <style>
+        @keyframes boot-spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        html.dark #boot-splash {
+          background: #0a0a0a;
+          color: #f3f4f6;
+        }
+        html.dark #boot-splash div:first-child {
+          border-color: rgba(255, 255, 255, 0.12);
+          border-top-color: #a78bfa;
+        }
+      </style>
+    </div>
     <div id="overlay-root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
