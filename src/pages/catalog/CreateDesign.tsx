@@ -353,7 +353,6 @@ const CreateDesignInner: React.FC = () => {
 
   // Track original items for deletion in edit mode
   const originalItemIds = useRef<Set<string>>(new Set());
-  const transientObjectUrlsRef = useRef<Map<string, string>>(new Map());
 
   const {
     uploadDesign,
@@ -619,46 +618,8 @@ const CreateDesignInner: React.FC = () => {
     type.trim().length > 0;
 
   const resolveMediaWithUrl = useCallback((item?: MediaItem | null) => {
-    if (!item) return null;
-    if (item.previewUrl) {
-      // Prefer stable preview URL from store (already lifecycle-managed).
-      const transient = transientObjectUrlsRef.current.get(item.id);
-      if (transient) {
-        URL.revokeObjectURL(transient);
-        transientObjectUrlsRef.current.delete(item.id);
-      }
-      return { ...item, url: item.previewUrl };
-    }
-
-    let url = transientObjectUrlsRef.current.get(item.id);
-    if (!url && item.file) {
-      url = URL.createObjectURL(item.file);
-      transientObjectUrlsRef.current.set(item.id, url);
-    }
-    return url ? { ...item, url } : null;
-  }, []);
-
-  useEffect(() => {
-    const keepIds = new Set(files.map((item) => item.id));
-    for (const [id, url] of Array.from(
-      transientObjectUrlsRef.current.entries(),
-    )) {
-      const item = files.find((it) => it.id === id);
-      if (!keepIds.has(id) || item?.previewUrl) {
-        URL.revokeObjectURL(url);
-        transientObjectUrlsRef.current.delete(id);
-      }
-    }
-  }, [files]);
-
-  useEffect(() => {
-    const transientObjectUrls = transientObjectUrlsRef.current;
-    return () => {
-      for (const url of transientObjectUrls.values()) {
-        URL.revokeObjectURL(url);
-      }
-      transientObjectUrls.clear();
-    };
+    if (!item?.previewUrl) return null;
+    return { ...item, url: item.previewUrl };
   }, []);
 
   // Get current selected file for main preview
@@ -1708,18 +1669,25 @@ const CreateDesignInner: React.FC = () => {
                           exit={{ opacity: 0 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <MediaRenderer
-                            kind={
-                              selectedFile.kind === "video" ? "video" : "image"
-                            }
-                            src={selectedFile.url}
-                            alt={selectedFile.file?.name || "Preview"}
-                            className="w-full h-full flex items-center justify-center"
-                            mediaClassName="h-full w-full object-contain"
-                            maxHeightClassName="max-h-[85vh]"
-                            maxWidthClassName="max-w-full"
-                            allowScroll
-                          />
+                          {selectedFile.url ? (
+                            <MediaRenderer
+                              kind={
+                                selectedFile.kind === "video" ? "video" : "image"
+                              }
+                              src={selectedFile.url}
+                              alt={selectedFile.file?.name || "Preview"}
+                              className="w-full h-full flex items-center justify-center"
+                              mediaClassName="h-full w-full object-contain"
+                              maxHeightClassName="max-h-[85vh]"
+                              maxWidthClassName="max-w-full"
+                              allowScroll
+                            />
+                          ) : (
+                            <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-sm font-medium text-theme-secondary">
+                              <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+                              Preparing preview...
+                            </div>
+                          )}
                         </motion.div>
                       )}
                     </AnimatePresence>

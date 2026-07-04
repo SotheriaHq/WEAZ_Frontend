@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiPlay, FiStar, FiPlus } from 'react-icons/fi';
 import type { MediaItem, MediaItemKind } from '../../types/media';
@@ -52,57 +52,15 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
   progressById,
   showSlotLabels = false,
 }) => {
-  const urlMap = useRef<Map<string, string>>(new Map());
-
-  // Build preview files with object URLs
   const previewFiles: PreviewFile[] = useMemo(() => {
-    const arr: PreviewFile[] = [];
-    for (const it of items) {
-      let url = it.previewUrl;
-      if (!url && it.file) {
-        const existing = urlMap.current.get(it.id);
-        if (existing) {
-          url = existing;
-        } else {
-          url = URL.createObjectURL(it.file);
-          urlMap.current.set(it.id, url);
-        }
-      }
-      arr.push({
-        file: it.file,
-        url: url!,
-        id: it.id,
-        kind: it.kind,
-        viewSlot: it.viewSlot,
-      });
-    }
-    return arr;
+    return items.map((it) => ({
+      file: it.file,
+      url: it.previewUrl,
+      id: it.id,
+      kind: it.kind,
+      viewSlot: it.viewSlot,
+    }));
   }, [items]);
-
-  // Cleanup object URLs
-  useEffect(() => {
-    const keep = new Set(previewFiles.map((pf) => pf.id));
-    const map = urlMap.current;
-    for (const key of Array.from(map.keys())) {
-      if (!keep.has(key)) {
-        const url = map.get(key);
-        if (url && url.startsWith('blob:')) {
-          URL.revokeObjectURL(url);
-        }
-        map.delete(key);
-      }
-    }
-  }, [previewFiles]);
-
-  useEffect(() => {
-    const map = urlMap.current;
-    return () => {
-      for (const url of map.values()) {
-        if (url.startsWith('blob:')) URL.revokeObjectURL(url);
-      }
-      map.clear();
-    };
-  }, []);
 
   if (previewFiles.length === 0) return null;
 
@@ -139,17 +97,22 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
                   if (!disabled && !isUploading) onSelect(idx);
                 }}
               >
-                {/* Thumbnail image/video (intrinsic size; capped height with internal scroll) */}
-                <MediaRenderer
-                  kind={isVideo ? 'video' : 'image'}
-                  src={pf.url}
-                  alt={pf.file?.name || `Thumbnail ${idx + 1}`}
-                  className="w-full h-24 flex items-center justify-center bg-white/70 dark:bg-white/[0.03]"
-                  maxHeightClassName="max-h-full"
-                  maxWidthClassName="max-w-full"
-                  controls={false}
-                  muted
-                />
+                {pf.url ? (
+                  <MediaRenderer
+                    kind={isVideo ? 'video' : 'image'}
+                    src={pf.url}
+                    alt={pf.file?.name || `Thumbnail ${idx + 1}`}
+                    className="w-full h-24 flex items-center justify-center bg-white/70 dark:bg-white/[0.03]"
+                    maxHeightClassName="max-h-full"
+                    maxWidthClassName="max-w-full"
+                    controls={false}
+                    muted
+                  />
+                ) : (
+                  <div className="flex h-24 w-full items-center justify-center bg-white/70 text-xs font-medium text-gray-500 dark:bg-white/[0.03] dark:text-gray-400">
+                    Preparing...
+                  </div>
+                )}
 
                 {/* Cover badge */}
                 {isCover && (

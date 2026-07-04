@@ -8,7 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/generate-security-headers.cjs && tsc -b && vite build",
+    "generate:security-headers": "node scripts/generate-security-headers.cjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",

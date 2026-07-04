@@ -18,6 +18,7 @@ import { ProfileLayout } from './components/catalog/ProfileLayout';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
 import ErrorPage from './pages/ErrorPage';
+import SeoHead from './components/seo/SeoHead';
 import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
 import OrderConfirmation from './pages/checkout/OrderConfirmation';
 import PaymentReturnPage from './pages/checkout/PaymentReturnPage';
@@ -336,6 +337,7 @@ const RootLayout: React.FC = () => {
   return (
     <BagFlowProvider>
       <>
+        <SeoHead />
         {showRouteIntentProgress && (
           <div className="pointer-events-none fixed inset-x-0 top-0 z-[2147483646] h-0.5 overflow-hidden">
             <div className="h-full w-full animate-pulse bg-gradient-to-r from-fuchsia-500 via-indigo-500 to-cyan-500" />

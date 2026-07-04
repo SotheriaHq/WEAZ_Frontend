@@ -2,6 +2,11 @@ import React, { createContext, useCallback, useContext, useReducer, useEffect, u
 import type { ReactNode } from 'react';
 import type { MediaItem, MediaItemKind } from '../types/media';
 import { normalizeMediaViewSlot } from '@/utils/contentIntegrity';
+import {
+  buildDisplayableImagePreview,
+  buildVideoPreviewUrl,
+  revokeObjectPreviewUrl,
+} from '@/utils/imagePreview';
 
 type State = { items: MediaItem[] };
 
@@ -12,10 +17,6 @@ type Action =
   | { type: 'set'; items: MediaItem[] }
   | { type: 'reorder'; items: MediaItem[] }
   | { type: 'setPreview'; id: string; previewUrl: string };
-
-// Cap for converting an image preview to an inline data URL (below). Larger
-// images keep their blob: URL to avoid ballooning memory with base64 strings.
-const MAX_DATA_URL_PREVIEW_BYTES = 12 * 1024 * 1024;
 
 const initialState: State = { items: [] };
 
@@ -30,15 +31,16 @@ const genId = () => {
 };
 
 function detectKind(file: File): MediaItemKind {
-  if (file.type.startsWith('image/')) return 'image';
   if (file.type.startsWith('video/')) return 'video';
+  if (file.type.startsWith('image/')) return 'image';
   return 'image';
 }
 
 function createItemFromFile(f: File, index = 0): MediaItem {
   const id = genId();
-  const previewUrl = URL.createObjectURL(f);
   const kind = detectKind(f);
+  const previewUrl =
+    kind === 'video' ? buildVideoPreviewUrl(f) : '';
   return { id, file: f, previewUrl, kind, viewSlot: normalizeMediaViewSlot(null, index) };
 }
 
@@ -82,67 +84,69 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [state, dispatch] = useReducer(reducer, initialState);
 
   const urlRef = useRef<Map<string, string>>(new Map());
-  // Ids currently being read into a data URL, so we don't start the read twice.
   const convertingRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     for (const it of state.items) {
-      // Only blob: URLs need lifecycle management (revocation); data: URLs are
-      // self-contained and must never be tracked/revoked here.
-      if (it.previewUrl?.startsWith('blob:') && !urlRef.current.has(it.id)) {
-        urlRef.current.set(it.id, it.previewUrl);
+      if (it.previewUrl?.startsWith('blob:')) {
+        if (!urlRef.current.has(it.id)) {
+          urlRef.current.set(it.id, it.previewUrl);
+        }
+        continue;
+      }
+
+      const tracked = urlRef.current.get(it.id);
+      if (tracked?.startsWith('blob:')) {
+        revokeObjectPreviewUrl(tracked);
+        urlRef.current.delete(it.id);
       }
     }
 
     const keep = new Set(state.items.map((it) => it.id));
-  const map = urlRef.current;
+    const map = urlRef.current;
     for (const k of Array.from(map.keys())) {
       if (!keep.has(k)) {
-        const u = map.get(k);
-        if (u && u.startsWith('blob:')) URL.revokeObjectURL(u);
+        revokeObjectPreviewUrl(map.get(k));
         map.delete(k);
       }
     }
   }, [state.items]);
 
-  // Mobile browsers are unreliable at loading blob: object-URLs in <img> (they
-  // can fail/decode-error where desktop is fine). Convert each image preview to
-  // a stable inline data: URL right after it's added; MediaRenderer resets its
-  // error state when src changes, so any preview that flashed broken recovers.
   useEffect(() => {
     for (const it of state.items) {
       if (
-        it.kind === 'image' &&
-        it.file &&
-        it.previewUrl?.startsWith('blob:') &&
-        !convertingRef.current.has(it.id) &&
-        it.file.size <= MAX_DATA_URL_PREVIEW_BYTES
+        it.kind !== 'image' ||
+        !it.file ||
+        it.previewUrl ||
+        convertingRef.current.has(it.id)
       ) {
-        convertingRef.current.add(it.id);
-        const blobUrl = it.previewUrl;
-        const reader = new FileReader();
-        reader.onload = () => {
-          convertingRef.current.delete(it.id);
-          const result =
-            typeof reader.result === 'string' ? reader.result : null;
-          if (!result) return;
-          // Swap to the data URL and retire the transient blob.
-          if (blobUrl.startsWith('blob:')) URL.revokeObjectURL(blobUrl);
-          urlRef.current.delete(it.id);
-          dispatch({ type: 'setPreview', id: it.id, previewUrl: result });
-        };
-        reader.onerror = () => convertingRef.current.delete(it.id);
-        reader.readAsDataURL(it.file);
+        continue;
       }
+
+      convertingRef.current.add(it.id);
+      const itemId = it.id;
+      const file = it.file;
+
+      void (async () => {
+        try {
+          const previewUrl = await buildDisplayableImagePreview(file);
+          dispatch({ type: 'setPreview', id: itemId, previewUrl });
+        } catch {
+          const fallbackUrl = URL.createObjectURL(file);
+          urlRef.current.set(itemId, fallbackUrl);
+          dispatch({ type: 'setPreview', id: itemId, previewUrl: fallbackUrl });
+        } finally {
+          convertingRef.current.delete(itemId);
+        }
+      })();
     }
   }, [state.items]);
 
   useEffect(() => {
     const map = urlRef.current;
     return () => {
-      const urls = Array.from(map.values());
-      for (const u of urls) {
-        if (u.startsWith('blob:')) URL.revokeObjectURL(u);
+      for (const url of map.values()) {
+        revokeObjectPreviewUrl(url);
       }
       map.clear();
     };
