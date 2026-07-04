@@ -320,6 +320,7 @@ const SignUpPage = () => {
       );
       const payload = await AuthApi.googleAuth({
         idToken,
+        intent: 'SIGNUP',
         type: selectedType,
         ...(selectedType === 'BRAND' ? { brandFullName } : {}),
         legalAcceptances,

@@ -28,7 +28,6 @@ import GoogleSignInOverlayButton from '@/components/auth/GoogleSignInOverlayButt
 import GoogleConsentModal from '@/components/auth/GoogleConsentModal';
 import {
   getRequiredLegalAcceptances,
-  isLegalAcceptanceRequiredError,
   LEGAL_SIGNUP_DOCUMENT_KEYS,
 } from '@/api/LegalApi';
 import {
@@ -435,13 +434,18 @@ const LoginPage = () => {
     setGoogleLoading(true);
     try {
       dropStoredAccessToken();
-      const payload = await AuthApi.googleAuth({ idToken });
+      const payload = await AuthApi.googleAuth({ idToken, intent: 'LOGIN' });
       completeLogin(payload, payload.user?.email || normalizedEmail);
     } catch (error) {
-      // Brand-new user: account creation needs terms acceptance. Capture the token
-      // and prompt for consent instead of surfacing a raw error.
-      if (isLegalAcceptanceRequiredError(error)) {
-        setPendingGoogleIdToken(idToken);
+      // Unknown Google user: the login screen must never create an account
+      // silently. The backend returns GOOGLE_NO_ACCOUNT — route the user to
+      // signup so they can choose an account type and accept the current terms.
+      const data = isAxiosError(error)
+        ? (error.response?.data as Record<string, unknown> | undefined)
+        : undefined;
+      if (data?.code === 'GOOGLE_NO_ACCOUNT') {
+        toast.info("No account found for that Google sign-in — let's get you signed up.");
+        navigate('/signup');
         return;
       }
       toast.error(getAuthFlowErrorMessage(error, 'Google sign-in could not be completed.'));

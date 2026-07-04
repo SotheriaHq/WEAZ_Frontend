@@ -179,8 +179,11 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
         </div>
       ) : null}
 
-      {/* FIX #4: Reduced negative margin from -mt-24/-mt-28 to -mt-16/-mt-20 */}
-      <div className={showBanner ? '-mt-16 px-4 sm:-mt-20 sm:px-6' : 'mt-2 px-4 sm:px-6'}>
+      {/* The avatar (size="lg") scales across breakpoints (115px → 144 → 176 → 208px),
+          so the overlap pull-up must scale WITH it — otherwise on wide screens the giant
+          avatar overhangs the banner while the identity text stays put and floats high.
+          Overlap stays ~half the avatar height at every width; see the matching text offset below. */}
+      <div className={showBanner ? '-mt-14 px-4 sm:-mt-20 sm:px-6 md:-mt-24 lg:-mt-28' : 'mt-2 px-4 sm:px-6'}>
         <div className="relative z-20 flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
           {/* Avatar + identity stay on one row even on mobile (matches native app) */}
           <div className="flex min-w-0 flex-1 flex-row items-start gap-4">
@@ -207,7 +210,10 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
             </div>
           </div>
 
-          <div className={`flex min-w-0 flex-1 flex-col gap-1 ${showBanner ? 'mt-8' : ''} ${showBanner ? '' : 'text-gray-900 dark:text-white'}`}>
+          {/* Text offset scales in lockstep with the avatar pull-up above, so the name
+              stays ~30px above the banner edge at every breakpoint instead of drifting
+              upward as the avatar grows on tablet/desktop. */}
+          <div className={`flex min-w-0 flex-1 flex-col gap-1 ${showBanner ? 'mt-7 sm:mt-12 md:mt-16 lg:mt-20' : ''} ${showBanner ? '' : 'text-gray-900 dark:text-white'}`}>
             <h1
               className={`flex flex-wrap items-center gap-1.5 font-semibold italic tracking-[0.08em] leading-tight ${
                 showBanner ? 'text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]' : 'text-gray-900 dark:text-white'
