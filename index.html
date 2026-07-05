@@ -94,54 +94,84 @@
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div id="root">
+    <div
+      id="boot-splash"
+      role="status"
+      aria-live="polite"
+      aria-label="Loading WIEZ"
+      style="
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: flex;
+        min-height: 100dvh;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 16px;
+        padding: 24px;
+        background: #ffffff;
+        color: #16233f;
+        font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+      "
+    >
       <div
-        id="boot-splash"
-        role="status"
-        aria-live="polite"
-        aria-label="Loading WIEZ"
+        id="boot-splash-spinner"
         style="
-          display: flex;
-          min-height: 100dvh;
-          align-items: center;
-          justify-content: center;
-          flex-direction: column;
-          gap: 16px;
-          padding: 24px;
-          background: #ffffff;
-          color: #16233f;
-          font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+          width: 40px;
+          height: 40px;
+          border: 3px solid rgba(22, 35, 63, 0.15);
+          border-top-color: #7c3aed;
+          border-radius: 9999px;
+          animation: boot-spin 0.8s linear infinite;
         "
-      >
-        <div
-          style="
-            width: 40px;
-            height: 40px;
-            border: 3px solid rgba(22, 35, 63, 0.15);
-            border-top-color: #7c3aed;
-            border-radius: 9999px;
-            animation: boot-spin 0.8s linear infinite;
-          "
-        ></div>
-        <div style="font-size: 14px; font-weight: 600; letter-spacing: 0.02em;">Loading WIEZ…</div>
+      ></div>
+      <div id="boot-splash-label" style="font-size: 14px; font-weight: 600; letter-spacing: 0.02em;">
+        Loading WIEZ…
       </div>
-      <style>
-        @keyframes boot-spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-        html.dark #boot-splash {
-          background: #0a0a0a;
-          color: #f3f4f6;
-        }
-        html.dark #boot-splash div:first-child {
-          border-color: rgba(255, 255, 255, 0.12);
-          border-top-color: #a78bfa;
-        }
-      </style>
     </div>
+    <style>
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      html.dark #boot-splash {
+        background: #0a0a0a;
+        color: #f3f4f6;
+      }
+      html.dark #boot-splash-spinner {
+        border-color: rgba(255, 255, 255, 0.12);
+        border-top-color: #a78bfa;
+      }
+    </style>
+    <div id="root"></div>
     <div id="overlay-root"></div>
+    <script>
+      (function () {
+        var BOOT_TIMEOUT_MS = 25000;
+        var timer = window.setTimeout(function () {
+          var splash = document.getElementById('boot-splash');
+          if (!splash || !document.body.contains(splash)) return;
+          var spinner = document.getElementById('boot-splash-spinner');
+          var label = document.getElementById('boot-splash-label');
+          if (spinner) spinner.style.display = 'none';
+          if (label) {
+            label.innerHTML =
+              'Still loading… <button type="button" id="boot-timeout-retry" style="display:block;margin:12px auto 0;border:0;border-radius:9999px;padding:10px 18px;background:#7c3aed;color:#fff;font-weight:600;">Tap to reload</button>';
+            var retry = document.getElementById('boot-timeout-retry');
+            if (retry) {
+              retry.addEventListener('click', function () {
+                window.location.reload();
+              });
+            }
+          }
+        }, BOOT_TIMEOUT_MS);
+        window.addEventListener('wiez:boot-ready', function () {
+          window.clearTimeout(timer);
+        }, { once: true });
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

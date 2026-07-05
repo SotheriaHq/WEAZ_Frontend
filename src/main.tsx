@@ -13,6 +13,7 @@ import { UploadLimitsProvider } from './context/UploadLimitsContext';
 import { Provider } from 'react-redux';
 import { store } from './store';
 import { QueryProvider } from './query/QueryProvider';
+import RootErrorBoundary, { removeBootSplash } from './components/RootErrorBoundary';
 
 const STALE_CHUNK_RELOAD_KEY = 'vite:preloadError:reloadedAt';
 
@@ -45,21 +46,9 @@ const reloadForStaleChunks = (): boolean => {
   return true;
 };
 
-// Self-heal stale lazy-loaded chunks after a deploy. When a new build ships,
-// old chunk filenames (content-hashed) disappear, so a browser holding a stale
-// index.html fails the dynamic import with "Failed to fetch dynamically imported
-// module". Vite emits `vite:preloadError` in that case — reload once to pull the
-// fresh index.html (which points at the current hashes). The time-boxed guard
-// prevents a reload loop if the asset is genuinely unreachable (e.g. offline).
 window.addEventListener('vite:preloadError', (event) => {
   event.preventDefault();
   reloadForStaleChunks();
-});
-
-window.addEventListener('error', (event) => {
-  if (isStaleChunkLoadError(event.message) || isStaleChunkLoadError(event.error)) {
-    reloadForStaleChunks();
-  }
 });
 
 window.addEventListener('unhandledrejection', (event) => {
@@ -71,7 +60,7 @@ window.addEventListener('unhandledrejection', (event) => {
 
 const BootSplashCleanup: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useEffect(() => {
-    document.getElementById('boot-splash')?.remove();
+    removeBootSplash();
   }, []);
   return <>{children}</>;
 };
@@ -83,20 +72,22 @@ if (!rootElement) {
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
-    <BootSplashCleanup>
-      <Provider store={store}>
-        <QueryProvider>
-          <RealtimeProvider>
-            <ThemeProvider>
-              <LanguageProvider>
-                <UploadLimitsProvider>
-                  <App />
-                </UploadLimitsProvider>
-              </LanguageProvider>
-            </ThemeProvider>
-          </RealtimeProvider>
-        </QueryProvider>
-      </Provider>
-    </BootSplashCleanup>
-  </React.StrictMode>
+    <RootErrorBoundary>
+      <BootSplashCleanup>
+        <Provider store={store}>
+          <QueryProvider>
+            <RealtimeProvider>
+              <ThemeProvider>
+                <LanguageProvider>
+                  <UploadLimitsProvider>
+                    <App />
+                  </UploadLimitsProvider>
+                </LanguageProvider>
+              </ThemeProvider>
+            </RealtimeProvider>
+          </QueryProvider>
+        </Provider>
+      </BootSplashCleanup>
+    </RootErrorBoundary>
+  </React.StrictMode>,
 );

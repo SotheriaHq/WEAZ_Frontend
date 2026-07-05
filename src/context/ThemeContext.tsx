@@ -152,6 +152,9 @@ export function ThemeProvider({
       return preloadedTheme;
     }
 
+    if (typeof window.matchMedia !== 'function') {
+      return 'light';
+    }
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
   const transitionTimerRef = useRef<number | null>(null);
@@ -212,6 +215,10 @@ export function ThemeProvider({
 
   // Sync when system theme changes (only when theme is 'system') and across tabs
   useEffect(() => {
+    if (typeof window.matchMedia !== 'function') {
+      return undefined;
+    }
+
     const mql = window.matchMedia('(prefers-color-scheme: dark)');
 
     const handleMql = () => {
