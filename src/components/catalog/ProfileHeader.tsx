@@ -292,17 +292,24 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
               @{profile.username}
             </span>
             {tags.length > 0 ? (
-              // 3 per row, and chips scale DOWN (xs) so the same 3-up layout holds
-              // on narrow mobile widths instead of one tag dropping to a new line.
-              <div className="mt-2 flex flex-col gap-1">
-                {Array.from({ length: Math.ceil(tags.length / 3) }).map((_, rowIdx) => (
-                  <div key={rowIdx} className="flex flex-wrap gap-1">
-                    {tags.slice(rowIdx * 3, rowIdx * 3 + 3).map((tag) => {
-                      const color = getTagColor(tag);
-                      return <Tag key={tag} label={`#${tag}`} color={color} size="xs" className="font-bold" />;
-                    })}
-                  </div>
-                ))}
+              // STRICT 3-up: a real grid (grid-cols-3), not flex-wrap — wrap
+              // layouts drop chips to 2/1 rows on narrow widths, a grid cannot.
+              // Chips fill their cell and clip overflow instead of wrapping.
+              // Long tag lists stay compact: capped at ~5 rows (15 tags tall),
+              // the rest scroll inline with no border and no visible scrollbar.
+              <div className="mt-2 grid max-h-[8.5rem] grid-cols-3 gap-1 overflow-y-auto scrollbar-hide">
+                {tags.map((tag) => {
+                  const color = getTagColor(tag);
+                  return (
+                    <Tag
+                      key={tag}
+                      label={`#${tag}`}
+                      color={color}
+                      size="xs"
+                      className="w-full min-w-0 justify-center overflow-hidden font-bold"
+                    />
+                  );
+                })}
               </div>
             ) : null}
           </div>

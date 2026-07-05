@@ -18,82 +18,20 @@
     <meta name="twitter:title" content="WIEZ" />
     <meta name="twitter:description" content="When you think WEARS, you think WIEZ. African fashion social commerce marketplace." />
     <meta name="twitter:image" content="/brand/wiez-logo-mark.svg" />
-    <script>
-      (function () {
-        var storageKey = 'vite-ui-theme';
-        var embeddedSurfaceKey = 'WIEZ.studio.embeddedSurface';
-        var embeddedThemeKey = 'WIEZ.studio.embeddedTheme';
-        var fallbackTheme = 'system';
-        var root = document.documentElement;
-        var storedTheme = null;
-        var params = new URLSearchParams(window.location.search);
-        var explicitEmbeddedSurface = params.get('surface') === 'mobile-app';
-        var sessionEmbeddedSurface = false;
-        var embeddedTheme = null;
-
-        try {
-          storedTheme = localStorage.getItem(storageKey);
-        } catch (_error) {
-          storedTheme = null;
-        }
-
-        try {
-          sessionEmbeddedSurface = sessionStorage.getItem(embeddedSurfaceKey) === 'mobile-app';
-        } catch (_error) {
-          sessionEmbeddedSurface = false;
-        }
-
-        if (explicitEmbeddedSurface || sessionEmbeddedSurface) {
-          var requestedTheme = params.get('theme');
-          if (requestedTheme === 'light' || requestedTheme === 'dark') {
-            embeddedTheme = requestedTheme;
-            try {
-              sessionStorage.setItem(embeddedSurfaceKey, 'mobile-app');
-              sessionStorage.setItem(embeddedThemeKey, requestedTheme);
-            } catch (_error) {}
-          } else {
-            try {
-              var savedEmbeddedTheme = sessionStorage.getItem(embeddedThemeKey);
-              embeddedTheme =
-                savedEmbeddedTheme === 'light' || savedEmbeddedTheme === 'dark'
-                  ? savedEmbeddedTheme
-                  : null;
-            } catch (_error) {
-              embeddedTheme = null;
-            }
-          }
-        }
-
-        var theme =
-          embeddedTheme ||
-          (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system'
-            ? storedTheme
-            : fallbackTheme);
-
-        var prefersDark =
-          window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        var className = theme === 'dark' || (theme === 'system' && prefersDark)
-          ? 'dark'
-          : 'light';
-
-        root.classList.remove('light', 'dark');
-        root.classList.add(className);
-        root.dataset.theme = className;
-        root.dataset.themePreference = theme;
-        root.style.colorScheme = className;
-
-        var themeColorMeta = document.querySelector('meta[name="theme-color"]');
-        if (themeColorMeta) {
-          themeColorMeta.setAttribute('content', className === 'dark' ? '#0a0a0a' : '#ffffff');
-        }
-      })();
-    </script>
+    <!-- CSP NOTE: production script-src is 'self' with NO 'unsafe-inline'.
+         Never add inline <script> here — it will be silently blocked on
+         weaz.me (this froze the boot splash on mobile once already).
+         Pre-paint logic lives in external files under /boot/. -->
+    <script src="/boot/theme-init.js"></script>
     <!-- Google Fonts: Playfair Display for elegant product titles -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   </head>
   <body>
+    <!-- Brand boot gauge: a seal-shaped (curly-edged) filler ring that fills
+         toward completion around the spinning thread — no text, the fill IS
+         the progress. Driven by /boot/boot-splash.js (external for CSP). -->
     <div
       id="boot-splash"
       role="status"
@@ -115,26 +53,21 @@
         font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
       "
     >
-      <!-- Pre-React replica of the brand VLoader (components/loaders/VLoader.tsx):
-           spinning 🧵 thread inside a conic-gradient ring that FILLS like a progress
-           gauge. The inline script below advances it with VLoader's exact simulation
-           curve (8% start, +4/+2/+1 steps every 320ms, hold at 92% until mount). -->
-      <div
-        id="boot-splash-ring"
-        style="
-          width: 72px;
-          height: 72px;
-          border-radius: 9999px;
-          padding: 3px;
-          background: conic-gradient(rgba(147, 51, 234, 0.95) 28.8deg, rgba(147, 51, 234, 0.1) 0deg);
-        "
-      >
+      <div id="boot-splash-gauge" style="position: relative; width: 88px; height: 88px;">
+        <div
+          id="boot-splash-ring"
+          style="
+            position: absolute;
+            inset: 0;
+            background: conic-gradient(rgba(147, 51, 234, 0.95) 28.8deg, rgba(147, 51, 234, 0.12) 0deg);
+          "
+        ></div>
         <div
           id="boot-splash-ring-core"
           style="
+            position: absolute;
+            inset: 16px;
             display: flex;
-            width: 100%;
-            height: 100%;
             align-items: center;
             justify-content: center;
             border-radius: 9999px;
@@ -142,18 +75,10 @@
           "
         >
           <span
-            style="font-size: 1.45rem; line-height: 1; display: inline-block; animation: boot-spin 1.8s linear infinite;"
+            style="font-size: 1.7rem; line-height: 1; display: inline-block; animation: boot-spin 1.8s linear infinite;"
             aria-hidden="true"
           >🧵</span>
         </div>
-      </div>
-      <div id="boot-splash-label" style="text-align: center;">
-        <p id="boot-splash-phase" style="margin: 0; font-size: 11px; font-weight: 600; color: #334155;">
-          Winding thread
-        </p>
-        <p id="boot-splash-percent" style="margin: 2px 0 0; font-size: 14px; font-weight: 800; color: #9333ea;">
-          8% complete
-        </p>
       </div>
     </div>
     <style>
@@ -162,6 +87,17 @@
           transform: rotate(360deg);
         }
       }
+      /* Clip the conic fill to the scalloped brand-seal silhouette (same path
+         as the verified badge) so the gauge reads as a curly circle, not a
+         plain ring. */
+      #boot-splash-ring {
+        -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.99-3.818-3.99-.48 0-.941.1-1.356.278C14.774 2.525 13.5 1.5 12 1.5s-2.774 1.025-3.416 2.288C8.17 3.6 7.708 3.5 7.23 3.5 5.12 3.5 3.41 5.28 3.41 7.49c0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.21 1.71 3.99 3.818 3.99.48 0 .941-.1 1.356-.278C9.226 21.475 10.5 22.5 12 22.5s2.774-1.025 3.416-2.288c.415.178.876.278 1.356.278 2.108 0 3.818-1.78 3.818-3.99 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6z'/%3E%3C/svg%3E");
+        mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.99-3.818-3.99-.48 0-.941.1-1.356.278C14.774 2.525 13.5 1.5 12 1.5s-2.774 1.025-3.416 2.288C8.17 3.6 7.708 3.5 7.23 3.5 5.12 3.5 3.41 5.28 3.41 7.49c0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.21 1.71 3.99 3.818 3.99.48 0 .941-.1 1.356-.278C9.226 21.475 10.5 22.5 12 22.5s2.774-1.025 3.416-2.288c.415.178.876.278 1.356.278 2.108 0 3.818-1.78 3.818-3.99 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6z'/%3E%3C/svg%3E");
+        -webkit-mask-size: 100% 100%;
+        mask-size: 100% 100%;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+      }
       html.dark #boot-splash {
         background: #0a0a0a;
         color: #f3f4f6;
@@ -169,96 +105,10 @@
       html.dark #boot-splash-ring-core {
         background: #0a0a0a;
       }
-      html.dark #boot-splash-phase {
-        color: #e2e8f0;
-      }
-      html.dark #boot-splash-percent {
-        color: #d8b4fe;
-      }
     </style>
     <div id="root"></div>
     <div id="overlay-root"></div>
-    <script>
-      (function () {
-        var BOOT_TIMEOUT_MS = 25000;
-        var AUTO_RECOVER_KEY = 'wiez:boot-auto-recovered';
-
-        // --- VLoader-style progress simulation (mirror of VLoader.tsx timings) ---
-        var progress = 8;
-        var progressTimer = window.setInterval(function () {
-          var ring = document.getElementById('boot-splash-ring');
-          var percentEl = document.getElementById('boot-splash-percent');
-          if (!ring || !percentEl) {
-            window.clearInterval(progressTimer);
-            return;
-          }
-          if (progress >= 92) return; // hold at 92% until the app actually mounts
-          progress = Math.min(92, progress + (progress < 35 ? 4 : progress < 70 ? 2 : 1));
-          ring.style.background =
-            'conic-gradient(rgba(147,51,234,0.95) ' + progress * 3.6 + 'deg, rgba(147,51,234,0.1) 0deg)';
-          percentEl.textContent = progress + '% complete';
-        }, 320);
-
-        function hasAutoRecovered() {
-          try { return sessionStorage.getItem(AUTO_RECOVER_KEY) === '1'; } catch (_e) { return false; }
-        }
-
-        // Force a fresh document fetch. The usual cause of a permanent boot
-        // stall is a cached index.html pointing at asset hashes that no longer
-        // exist on the server, so a plain reload re-serves the same stale HTML.
-        // A unique query param guarantees a cache miss on the navigation.
-        function cacheBustReload() {
-          try { sessionStorage.setItem(AUTO_RECOVER_KEY, '1'); } catch (_e) {}
-          try {
-            var url = new URL(window.location.href);
-            url.searchParams.set('_r', String(Date.now()));
-            window.location.replace(url.toString());
-          } catch (_e) {
-            window.location.reload();
-          }
-        }
-
-        function showManualReload() {
-          var splash = document.getElementById('boot-splash');
-          if (!splash || !document.body.contains(splash)) return;
-          window.clearInterval(progressTimer);
-          var spinner = document.getElementById('boot-splash-ring');
-          var label = document.getElementById('boot-splash-label');
-          if (spinner) spinner.style.display = 'none';
-          if (label) {
-            label.innerHTML =
-              'Still loading… <button type="button" id="boot-timeout-retry" style="display:block;margin:12px auto 0;border:0;border-radius:9999px;padding:10px 18px;background:#7c3aed;color:#fff;font-weight:600;">Tap to reload</button>';
-            var retry = document.getElementById('boot-timeout-retry');
-            if (retry) {
-              retry.addEventListener('click', function () {
-                cacheBustReload();
-              });
-            }
-          }
-        }
-
-        var timer = window.setTimeout(function () {
-          var splash = document.getElementById('boot-splash');
-          if (!splash || !document.body.contains(splash)) return;
-          // First stall this session: try one automatic cache-busting reload.
-          // If we already tried and are still stuck, it's a genuine problem —
-          // surface a manual reload instead of looping.
-          if (!hasAutoRecovered()) {
-            cacheBustReload();
-            return;
-          }
-          showManualReload();
-        }, BOOT_TIMEOUT_MS);
-
-        window.addEventListener('wiez:boot-ready', function () {
-          window.clearTimeout(timer);
-          window.clearInterval(progressTimer);
-          // Booted successfully — allow auto-recovery again for a future stale
-          // deploy within this same session.
-          try { sessionStorage.removeItem(AUTO_RECOVER_KEY); } catch (_e) {}
-        }, { once: true });
-      })();
-    </script>
+    <script src="/boot/boot-splash.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

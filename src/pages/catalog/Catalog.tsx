@@ -14,6 +14,7 @@ import CollectionsSkeleton from '../../components/profile/CollectionsSkeleton';
 import EmptyState from '../../components/EmptyState';
 import AddCollectionDropdown from '../../components/profile/AddCollectionDropdown';
 import ProfileHeaderSkeleton from '../../components/profile/ProfileHeaderSkeleton';
+import ScrollAssist from '../../components/ui/ScrollAssist';
 import ProfileImageModal from '../../components/profile/ProfileImageModal';
 import ReviewsTab from '../../components/profile/tabs/ReviewsTab';
 import AboutTab from '../../components/profile/tabs/AboutTab';
@@ -1717,6 +1718,9 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div className="w-full">
+      {/* Long catalogs (hundreds of designs) need one-tap escape hatches back
+          to the profile metadata or down to the end of the feed. */}
+      <ScrollAssist />
       {isOwner && user && (
         <ProfileHeaderQuickEditModal
           open={isHeaderQuickEditOpen}
