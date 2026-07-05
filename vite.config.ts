@@ -72,6 +72,8 @@ export default defineConfig(({ mode }) => {
       dedupe: ['react', 'react-dom'],
     },
     build: {
+      target: ['es2020', 'safari14'],
+      cssTarget: 'safari14',
       // Mobile browsers were stalling on a blank screen while preloading every
       // lazy admin/route chunk referenced from App.tsx. Only warm core vendors.
       modulePreload: {
@@ -122,6 +124,11 @@ export default defineConfig(({ mode }) => {
                 return 'feature-vendor';
               }
             }
+            // LOAD-BEARING for mobile startup: without this, admin page
+            // modules collapse into the ENTRY bundle (measured: 748 kB →
+            // 1,101 kB when removed on 2026-07-05). Forcing each admin page
+            // into its own chunk keeps the console out of every visitor's
+            // first download. Do not remove without re-measuring the entry.
             if (id.includes('/pages/admin/')) {
               const normalized = id.split(path.sep).join('/');
               const fileName = normalized.slice(normalized.lastIndexOf('/') + 1);

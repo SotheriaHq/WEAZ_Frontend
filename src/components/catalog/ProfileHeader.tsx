@@ -308,10 +308,13 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
             {tags.length > 0 ? (
               // STRICT 3-up: a real grid (grid-cols-3), not flex-wrap — wrap
               // layouts drop chips to 2/1 rows on narrow widths, a grid cannot.
-              // Chips fill their cell and clip overflow instead of wrapping.
+              // w-fit + auto-sized columns: the grid hugs its content so chips
+              // keep their natural pill width on wide screens (chips must LOOK
+              // like chips). On narrow widths max-w-full clamps the columns and
+              // FitText scales each label down — full text, never truncated.
               // Long tag lists stay compact: capped at ~5 rows (15 tags tall),
               // the rest scroll inline with no border and no visible scrollbar.
-              <div className="mt-2 grid max-h-[8.5rem] grid-cols-3 gap-1 overflow-y-auto scrollbar-hide">
+              <div className="mt-2 grid w-fit max-w-full grid-cols-[repeat(3,minmax(0,auto))] justify-items-start gap-1 max-h-[8.5rem] overflow-y-auto scrollbar-hide">
                 {tags.map((tag) => {
                   const color = getTagColor(tag);
                   return (
@@ -322,7 +325,7 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                       label={<FitText text={`#${tag}`} maxPx={11} minPx={7} className="font-bold" />}
                       color={color}
                       size="xs"
-                      className="w-full min-w-0 justify-center"
+                      className="max-w-full min-w-0"
                     />
                   );
                 })}
