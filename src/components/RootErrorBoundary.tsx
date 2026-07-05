@@ -42,6 +42,23 @@ const showBootFailure = (message: string) => {
 export const removeBootSplash = () => {
   document.getElementById('boot-splash')?.remove();
   window.dispatchEvent(new Event('wiez:boot-ready'));
+
+  // Strip the one-time cache-busting recovery param (added by index.html when a
+  // stale boot is detected) so it doesn't linger in the address bar or in shared
+  // links once the app has booted cleanly.
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('_r')) {
+      url.searchParams.delete('_r');
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    }
+  } catch {
+    // ignore — URL cleanup is best-effort
+  }
 };
 
 export class RootErrorBoundary extends React.Component<

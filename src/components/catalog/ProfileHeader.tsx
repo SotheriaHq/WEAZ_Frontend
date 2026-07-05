@@ -184,7 +184,11 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
           avatar overhangs the banner while the identity text stays put and floats high.
           Overlap stays ~half the avatar height at every width; see the matching text offset below. */}
       <div className={showBanner ? '-mt-14 px-4 sm:-mt-20 sm:px-6 md:-mt-24 lg:-mt-28' : 'mt-2 px-4 sm:px-6'}>
-        <div className="relative z-20 flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+        {/* NOTE: this project's Tailwind breakpoints are CUSTOM (sm=480, md=640, lg=768,
+            xl=1024). The action buttons join the header row only at md (640px+): at
+            sm (480-640) the row must stay stacked, otherwise avatar(144) + buttons(~136)
+            + paddings leave the identity text ~79px and every word wraps to its own line. */}
+        <div className="relative z-20 flex flex-col gap-4 p-4 md:flex-row md:items-start md:justify-between sm:px-6">
           {/* Avatar + identity stay on one row even on mobile (matches native app) */}
           <div className="flex min-w-0 flex-1 flex-row items-start gap-4">
           <div className="flex-shrink-0">
@@ -210,10 +214,14 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
             </div>
           </div>
 
-          {/* Text offset scales in lockstep with the avatar pull-up above, so the name
-              stays ~30px above the banner edge at every breakpoint instead of drifting
-              upward as the avatar grows on tablet/desktop. */}
-          <div className={`flex min-w-0 flex-1 flex-col gap-1 ${showBanner ? 'mt-7 sm:mt-12 md:mt-16 lg:mt-20' : ''} ${showBanner ? '' : 'text-gray-900 dark:text-white'}`}>
+          {/* The name's BOTTOM edge must rest ON the banner's bottom border. Derivation
+              (custom breakpoints sm=480/md=640/lg=768):
+                identityTop = bannerBottom - pullUp + rowPadding(16)
+                mt          = pullUp - 16 - nameLineHeight
+              pullUp per bp: 56 / 80 / 96 / 112 (matches -mt-14/-mt-20/-mt-24/-mt-28 above)
+              name line-height (clamp font * leading-tight): ~20 / ~22 / ~27 / 30
+              => mt: 20 / 42 / 53 / 66 px. These arbitrary values ARE the tuning knobs. */}
+          <div className={`flex min-w-0 flex-1 flex-col gap-1 ${showBanner ? 'mt-[20px] sm:mt-[42px] md:mt-[53px] lg:mt-[66px]' : ''} ${showBanner ? '' : 'text-gray-900 dark:text-white'}`}>
             <h1
               className={`flex flex-wrap items-center gap-1.5 font-semibold italic tracking-[0.08em] leading-tight ${
                 showBanner ? 'text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]' : 'text-gray-900 dark:text-white'
@@ -254,12 +262,24 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                 </Link>
               ) : null}
               {isStoreOpen ? (
+                /* Scalloped/wavy seal silhouette (same shape as the verified &
+                   subscribed badges) so the store marker reads round and spherical
+                   with curly edges instead of a flat rounded-rect pill. */
                 <span
                   title="Store open"
                   aria-label="Store open"
-                  className="inline-flex items-center rounded-full bg-slate-500 px-1.5 py-0.5 text-[12px] font-bold leading-none text-white shadow-sm"
+                  className="relative inline-flex h-[23px] w-[23px] flex-shrink-0 items-center justify-center align-middle not-italic"
                 >
-                  <span aria-hidden="true">🏪</span>
+                  <svg
+                    className="absolute inset-0 h-full w-full drop-shadow-sm"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                  >
+                    <path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.99-3.818-3.99-.48 0-.941.1-1.356.278C14.774 2.525 13.5 1.5 12 1.5s-2.774 1.025-3.416 2.288C8.17 3.6 7.708 3.5 7.23 3.5 5.12 3.5 3.41 5.28 3.41 7.49c0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.21 1.71 3.99 3.818 3.99.48 0 .941-.1 1.356-.278C9.226 21.475 10.5 22.5 12 22.5s2.774-1.025 3.416-2.288c.415.178.876.278 1.356.278 2.108 0 3.818-1.78 3.818-3.99 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6z" fill="#64748b" />
+                  </svg>
+                  <span aria-hidden="true" className="relative text-[9px] leading-none">🏪</span>
                 </span>
               ) : null}
               </span>

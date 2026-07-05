@@ -582,8 +582,6 @@ const ProfilePage: React.FC = () => {
   // ---------------- Visitor data fetch ----------------
   const [visitorProfile, setVisitorProfile] = useState<BrandProfileDto | null>(null);
   const [visitorCollections, setVisitorCollections] = useState<CollectionDto[]>([]);
-  const [visitorLoading, setVisitorLoading] = useState<boolean>(() => Boolean(isVisitorView));
-  const [visitorError, setVisitorError] = useState<string | null>(null);
   const [isVisitorAvatarModalOpen, setIsVisitorAvatarModalOpen] = useState(false);
   const visitorProfileQuery = useBrandProfileQuery(normalizedRouteBrandId, {
     enabled: Boolean(isVisitorView && normalizedRouteBrandId),
@@ -592,6 +590,47 @@ const ProfilePage: React.FC = () => {
     { ownerId: normalizedRouteBrandId, visibility: 'all', scope: 'design' },
     { enabled: Boolean(isVisitorView && normalizedRouteBrandId) },
   );
+
+  // Reset mirrors when routing to a DIFFERENT brand so brand A's data never
+  // flashes under brand B's URL (render-phase reset-on-key-change pattern).
+  const [visitorBrandKey, setVisitorBrandKey] = useState(normalizedRouteBrandId);
+  if (visitorBrandKey !== normalizedRouteBrandId) {
+    setVisitorBrandKey(normalizedRouteBrandId);
+    setVisitorProfile(null);
+    setVisitorCollections([]);
+  }
+
+  // Sync query results into the local mirrors DURING RENDER (not in an effect)
+  // so a warm react-query cache paints real content on the very first frame.
+  // The old effect-based mirror guaranteed at least one full skeleton frame on
+  // EVERY profile visit — even with cached data — because state only updated
+  // after paint. React re-renders synchronously (before commit) when state is
+  // set during render, so this path never paints a skeleton over cached data.
+  if (isVisitorView) {
+    const nextProfile = visitorProfileQuery.data ?? null;
+    if (visitorProfileQuery.data !== undefined && visitorProfile !== nextProfile) {
+      setVisitorProfile(nextProfile);
+    }
+    if (visitorCollectionsQuery.data && visitorCollections !== visitorCollectionsQuery.data) {
+      setVisitorCollections(visitorCollectionsQuery.data);
+    }
+  } else if (visitorProfile !== null || visitorCollections.length > 0) {
+    setVisitorProfile(null);
+    setVisitorCollections([]);
+  }
+
+  // Derived, never state: the full-page skeleton is justified only while there
+  // is genuinely nothing to show yet. Cached visits skip it entirely; the
+  // background refetch still runs silently per stale-while-revalidate.
+  const visitorLoading =
+    isVisitorView &&
+    Boolean(normalizedRouteBrandId) &&
+    !visitorProfile &&
+    (visitorProfileQuery.isLoading || visitorCollectionsQuery.isLoading);
+  const visitorError =
+    isVisitorView && (visitorProfileQuery.error || visitorCollectionsQuery.error)
+      ? 'Failed to load profile data'
+      : null;
   const {
     getPatched,
     isLoading: isPatchLoading,
@@ -602,44 +641,6 @@ const ProfilePage: React.FC = () => {
   const showPatchAction = Boolean(isVisitorView && user?.type === 'REGULAR' && routeBrandId);
   const isPatched = showPatchAction ? getPatched(routeBrandId) : false;
   const patchLoading = showPatchAction ? isPatchLoading(routeBrandId) : false;
-
-  useEffect(() => {
-    if (!isVisitorView || !normalizedRouteBrandId) {
-      setVisitorProfile(null);
-      setVisitorCollections([]);
-      setVisitorLoading(false);
-      setVisitorError(null);
-      return;
-    }
-
-    if (visitorProfileQuery.data !== undefined) {
-      setVisitorProfile(visitorProfileQuery.data ?? null);
-    }
-    if (visitorCollectionsQuery.data) {
-      setVisitorCollections(visitorCollectionsQuery.data);
-    }
-    const hasCachedVisitorData = Boolean(visitorProfile || visitorCollections.length > 0);
-    setVisitorLoading(
-      !hasCachedVisitorData &&
-        (visitorProfileQuery.isLoading || visitorCollectionsQuery.isLoading),
-    );
-    if (visitorProfileQuery.error || visitorCollectionsQuery.error) {
-      setVisitorError('Failed to load profile data');
-    } else {
-      setVisitorError(null);
-    }
-  }, [
-    isVisitorView,
-    normalizedRouteBrandId,
-    visitorCollections.length,
-    visitorCollectionsQuery.data,
-    visitorCollectionsQuery.error,
-    visitorCollectionsQuery.isLoading,
-    visitorProfile,
-    visitorProfileQuery.data,
-    visitorProfileQuery.error,
-    visitorProfileQuery.isLoading,
-  ]);
 
   useEffect(() => {
     if (!showPatchAction || !routeBrandId) return;

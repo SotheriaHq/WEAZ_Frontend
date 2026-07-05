@@ -31,6 +31,7 @@ import { marketApi, type FeedCategory } from '@/api/MarketApi';
 import { toDesignMarketItem } from '@/utils/designMarketItem';
 import { shouldLoadProductFallback, type MarketPageMode } from '@/utils/marketFallback';
 import { useScrollRestore } from '@/components/ScrollRestoreProvider';
+import { useMarketSurfacePrefetch } from '@/hooks/useMarketSurfacePrefetch';
 import useMarketFeed from '@/hooks/useMarketFeed';
 import useRunwayPinnedFeed from '@/hooks/useRunwayPinnedFeed';
 import { queryKeys } from '@/query/queryKeys';
@@ -300,6 +301,10 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   
   // Scroll restoration hook
   const { saveScrollPosition } = useScrollRestore('MARKET_FEED');
+
+  // Warm the Market surface cache while this screen idles so Runway → Market
+  // switches paint instantly instead of cold-loading.
+  useMarketSurfacePrefetch('runway');
 
   const feedCategoriesQuery = useQuery({
     queryKey: queryKeys.market.feedCategories(),

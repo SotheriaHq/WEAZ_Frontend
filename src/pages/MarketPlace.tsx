@@ -32,6 +32,7 @@ import { useMarketSignals } from '@/hooks/useMarketSignals';
 import useMarketSections from '@/hooks/useMarketSections';
 import { queryKeys } from '@/query/queryKeys';
 import { useScrollRestore } from '@/components/ScrollRestoreProvider';
+import { useMarketSurfacePrefetch } from '@/hooks/useMarketSurfacePrefetch';
 
 const BASE_FILTERS = ['FOR_YOU', 'MENSWEAR', 'WOMENSWEAR', 'EVERYBODY', 'ON_SALE'] as const;
 
@@ -399,6 +400,10 @@ const MarketPlace: React.FC = () => {
   const [marketClockMs, setMarketClockMs] = useState<number>(() => Date.now());
   const [hiddenTargetIds, setHiddenTargetIds] = useState<Set<string>>(() => new Set());
   const { anonymousSessionId, flushMarketSignals, trackMarketSignal } = useMarketSignals('MARKET_HOME');
+
+  // Warm the Runway feed cache while this screen idles so Market → Runway
+  // switches paint instantly instead of cold-loading.
+  useMarketSurfacePrefetch('market');
   const { saveScrollPosition } = useScrollRestore('MARKET_PLACE');
 
   const marketSectionsParams = useMemo(

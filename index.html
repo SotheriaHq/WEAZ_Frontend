@@ -115,19 +115,45 @@
         font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
       "
     >
+      <!-- Pre-React replica of the brand VLoader (components/loaders/VLoader.tsx):
+           spinning 🧵 thread inside a conic-gradient ring that FILLS like a progress
+           gauge. The inline script below advances it with VLoader's exact simulation
+           curve (8% start, +4/+2/+1 steps every 320ms, hold at 92% until mount). -->
       <div
-        id="boot-splash-spinner"
+        id="boot-splash-ring"
         style="
-          width: 40px;
-          height: 40px;
-          border: 3px solid rgba(22, 35, 63, 0.15);
-          border-top-color: #7c3aed;
+          width: 72px;
+          height: 72px;
           border-radius: 9999px;
-          animation: boot-spin 0.8s linear infinite;
+          padding: 3px;
+          background: conic-gradient(rgba(147, 51, 234, 0.95) 28.8deg, rgba(147, 51, 234, 0.1) 0deg);
         "
-      ></div>
-      <div id="boot-splash-label" style="font-size: 14px; font-weight: 600; letter-spacing: 0.02em;">
-        Loading WIEZ…
+      >
+        <div
+          id="boot-splash-ring-core"
+          style="
+            display: flex;
+            width: 100%;
+            height: 100%;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9999px;
+            background: #ffffff;
+          "
+        >
+          <span
+            style="font-size: 1.45rem; line-height: 1; display: inline-block; animation: boot-spin 1.8s linear infinite;"
+            aria-hidden="true"
+          >🧵</span>
+        </div>
+      </div>
+      <div id="boot-splash-label" style="text-align: center;">
+        <p id="boot-splash-phase" style="margin: 0; font-size: 11px; font-weight: 600; color: #334155;">
+          Winding thread
+        </p>
+        <p id="boot-splash-percent" style="margin: 2px 0 0; font-size: 14px; font-weight: 800; color: #9333ea;">
+          8% complete
+        </p>
       </div>
     </div>
     <style>
@@ -140,9 +166,14 @@
         background: #0a0a0a;
         color: #f3f4f6;
       }
-      html.dark #boot-splash-spinner {
-        border-color: rgba(255, 255, 255, 0.12);
-        border-top-color: #a78bfa;
+      html.dark #boot-splash-ring-core {
+        background: #0a0a0a;
+      }
+      html.dark #boot-splash-phase {
+        color: #e2e8f0;
+      }
+      html.dark #boot-splash-percent {
+        color: #d8b4fe;
       }
     </style>
     <div id="root"></div>
@@ -150,10 +181,48 @@
     <script>
       (function () {
         var BOOT_TIMEOUT_MS = 25000;
-        var timer = window.setTimeout(function () {
+        var AUTO_RECOVER_KEY = 'wiez:boot-auto-recovered';
+
+        // --- VLoader-style progress simulation (mirror of VLoader.tsx timings) ---
+        var progress = 8;
+        var progressTimer = window.setInterval(function () {
+          var ring = document.getElementById('boot-splash-ring');
+          var percentEl = document.getElementById('boot-splash-percent');
+          if (!ring || !percentEl) {
+            window.clearInterval(progressTimer);
+            return;
+          }
+          if (progress >= 92) return; // hold at 92% until the app actually mounts
+          progress = Math.min(92, progress + (progress < 35 ? 4 : progress < 70 ? 2 : 1));
+          ring.style.background =
+            'conic-gradient(rgba(147,51,234,0.95) ' + progress * 3.6 + 'deg, rgba(147,51,234,0.1) 0deg)';
+          percentEl.textContent = progress + '% complete';
+        }, 320);
+
+        function hasAutoRecovered() {
+          try { return sessionStorage.getItem(AUTO_RECOVER_KEY) === '1'; } catch (_e) { return false; }
+        }
+
+        // Force a fresh document fetch. The usual cause of a permanent boot
+        // stall is a cached index.html pointing at asset hashes that no longer
+        // exist on the server, so a plain reload re-serves the same stale HTML.
+        // A unique query param guarantees a cache miss on the navigation.
+        function cacheBustReload() {
+          try { sessionStorage.setItem(AUTO_RECOVER_KEY, '1'); } catch (_e) {}
+          try {
+            var url = new URL(window.location.href);
+            url.searchParams.set('_r', String(Date.now()));
+            window.location.replace(url.toString());
+          } catch (_e) {
+            window.location.reload();
+          }
+        }
+
+        function showManualReload() {
           var splash = document.getElementById('boot-splash');
           if (!splash || !document.body.contains(splash)) return;
-          var spinner = document.getElementById('boot-splash-spinner');
+          window.clearInterval(progressTimer);
+          var spinner = document.getElementById('boot-splash-ring');
           var label = document.getElementById('boot-splash-label');
           if (spinner) spinner.style.display = 'none';
           if (label) {
@@ -162,13 +231,31 @@
             var retry = document.getElementById('boot-timeout-retry');
             if (retry) {
               retry.addEventListener('click', function () {
-                window.location.reload();
+                cacheBustReload();
               });
             }
           }
+        }
+
+        var timer = window.setTimeout(function () {
+          var splash = document.getElementById('boot-splash');
+          if (!splash || !document.body.contains(splash)) return;
+          // First stall this session: try one automatic cache-busting reload.
+          // If we already tried and are still stuck, it's a genuine problem —
+          // surface a manual reload instead of looping.
+          if (!hasAutoRecovered()) {
+            cacheBustReload();
+            return;
+          }
+          showManualReload();
         }, BOOT_TIMEOUT_MS);
+
         window.addEventListener('wiez:boot-ready', function () {
           window.clearTimeout(timer);
+          window.clearInterval(progressTimer);
+          // Booted successfully — allow auto-recovery again for a future stale
+          // deploy within this same session.
+          try { sessionStorage.removeItem(AUTO_RECOVER_KEY); } catch (_e) {}
         }, { once: true });
       })();
     </script>
