@@ -13,9 +13,32 @@
  *   then a manual "Tap to reload" fallback if still stuck.
  */
 (function () {
-  var BOOT_TIMEOUT_MS = 25000;
+  var BOOT_TIMEOUT_MS = 15000;
   var AUTO_RECOVER_KEY = 'wiez:boot-auto-recovered';
   var progress = 8;
+
+  // Defensive purge: if ANY past deploy ever registered a service worker or
+  // populated CacheStorage, a mobile browser can keep serving stale files
+  // forever (mobile users cannot clear caches themselves). WIEZ has no
+  // service worker today, so unregistering everything is always safe.
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        registrations.forEach(function (registration) {
+          registration.unregister();
+        });
+      }).catch(function () {});
+    }
+  } catch (_e) {}
+  try {
+    if (typeof caches !== 'undefined' && caches.keys) {
+      caches.keys().then(function (keys) {
+        keys.forEach(function (key) {
+          caches.delete(key);
+        });
+      }).catch(function () {});
+    }
+  } catch (_e) {}
 
   function paintProgress() {
     var ring = document.getElementById('boot-splash-ring');

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Tag from '@/components/ui/Tag';
+import FitText from '@/components/ui/FitText';
 import { getTagColor } from '@/utils/tagColors';
 import AvatarCard from '../profile/AvatarCard';
 import VLoader from '../loaders/VLoader';
@@ -222,16 +223,23 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
               name line-height (clamp font * leading-tight): ~20 / ~22 / ~27 / 30
               => mt: 20 / 42 / 53 / 66 px. These arbitrary values ARE the tuning knobs. */}
           <div className={`flex min-w-0 flex-1 flex-col gap-1 ${showBanner ? 'mt-[20px] sm:mt-[42px] md:mt-[53px] lg:mt-[66px]' : ''} ${showBanner ? '' : 'text-gray-900 dark:text-white'}`}>
+            {/* NAME + BADGES: one line, always. flex-nowrap keeps the badges
+                glued beside the name; FitText scales the name down to fit the
+                remaining width instead of wrapping or truncating. */}
             <h1
-              className={`flex flex-wrap items-center gap-1.5 font-semibold italic tracking-[0.08em] leading-tight ${
+              className={`flex flex-nowrap items-center gap-1.5 font-semibold italic tracking-[0.08em] leading-tight ${
                 showBanner ? 'text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]' : 'text-gray-900 dark:text-white'
               }`}
-              style={{ fontSize: 'clamp(1rem, 3vw, 1.5rem)' }}
             >
-              {profile.firstName} {profile.lastName}
+              <FitText
+                text={profileName}
+                maxPx={24}
+                minPx={12}
+                className="font-semibold italic tracking-[0.08em] leading-tight"
+              />
               {/* Positive-state badges only; NEVER an unverified badge.
                   Purple = verified · Gold = subscribed · Gray (🏪) = open store. */}
-              <span className="inline-flex items-center gap-1 align-middle not-italic">
+              <span className="inline-flex flex-shrink-0 items-center gap-1 align-middle not-italic">
               {(profile as any).isSubscribed ? (
                 <Link
                   to="/help/subscribed"
@@ -284,9 +292,15 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
               ) : null}
               </span>
             </h1>
-            <p className={`inline-flex w-fit items-center gap-1.5 rounded-md px-1 py-0.5 text-sm font-semibold text-gray-700 dark:text-gray-300`}>
-              <span aria-hidden="true">📍</span>
-              <span>{profile.location || profile.address || 'Location not set'}</span>
+            {/* LOCATION: one line, always — FitText scales it down to fit. */}
+            <p className={`flex w-full min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 font-semibold text-gray-700 dark:text-gray-300`}>
+              <span aria-hidden="true" className="flex-shrink-0 text-sm">📍</span>
+              <FitText
+                text={profile.location || profile.address || 'Location not set'}
+                maxPx={14}
+                minPx={9}
+                className="font-semibold"
+              />
             </p>
             <span className={`inline-flex w-fit rounded-md px-1 py-0.5 text-sm font-semibold italic tracking-[0.01em] text-indigo-600 dark:text-indigo-300`}>
               @{profile.username}
@@ -303,10 +317,12 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                   return (
                     <Tag
                       key={tag}
-                      label={`#${tag}`}
+                      // FitText: tag text SCALES DOWN to fit its cell — full
+                      // text always visible, never clipped or truncated.
+                      label={<FitText text={`#${tag}`} maxPx={11} minPx={7} className="font-bold" />}
                       color={color}
                       size="xs"
-                      className="w-full min-w-0 justify-center overflow-hidden font-bold"
+                      className="w-full min-w-0 justify-center"
                     />
                   );
                 })}
