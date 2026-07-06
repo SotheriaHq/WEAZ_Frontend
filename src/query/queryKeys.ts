@@ -1,15 +1,9 @@
+import { normalizeUuidV4List } from '@/utils/uuid';
+
 export type CollectionScopeKey = 'design' | 'store' | 'all' | null | undefined;
 export type CollectionVisibilityKey = 'public' | 'private' | 'all' | null | undefined;
 
 const normalizeId = (value?: string | null) => String(value ?? '').trim();
-const normalizeIdList = (values?: Array<string | null | undefined> | null) =>
-  Array.from(
-    new Set(
-      (values ?? [])
-        .map((value) => normalizeId(value))
-        .filter(Boolean),
-    ),
-  ).sort();
 
 const normalizeRecord = (value?: object | null) => {
   if (!value) return {};
@@ -110,7 +104,7 @@ export const queryKeys = {
     status: (targetType?: string | null, targetId?: string | null) =>
       ['saved', 'status', normalizeId(targetType), normalizeId(targetId)] as const,
     batch: (targetType?: string | null, targetIds?: Array<string | null | undefined> | null) =>
-      ['saved', 'batch', normalizeId(targetType), normalizeIdList(targetIds)] as const,
+      ['saved', 'batch', normalizeId(targetType), normalizeUuidV4List(targetIds)] as const,
   },
   threaded: {
     collection: (collectionId?: string | null) => ['threaded', 'collection', normalizeId(collectionId)] as const,

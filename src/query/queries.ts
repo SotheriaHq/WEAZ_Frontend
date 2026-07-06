@@ -19,6 +19,7 @@ import type { CommentTarget, CommentV2Dto, PageResult } from '@/types/comments';
 import type { BrandProfileDto, CollectionDto } from '@/types/profile';
 import { THREADLY_QUERY_STALE_TIME_MS } from './queryClient';
 import { queryKeys } from './queryKeys';
+import { isUuidV4, normalizeUuidV4List } from '@/utils/uuid';
 
 type EnabledOption = { enabled?: boolean };
 type ThreadContentType = 'COLLECTION' | 'COLLECTION_MEDIA';
@@ -60,15 +61,6 @@ type BrandCollectionsArgs = {
 };
 
 const isEnabled = (value: unknown, enabled = true) => Boolean(value) && enabled;
-const normalizeIdList = (values?: Array<string | null | undefined> | null) =>
-  Array.from(
-    new Set(
-      (values ?? [])
-        .map((value) => String(value ?? '').trim())
-        .filter(Boolean),
-    ),
-  ).sort();
-
 const toSavedStatusMap = (items: unknown) => {
   const result: Record<string, boolean> = {};
   if (!Array.isArray(items)) return result;
@@ -355,7 +347,7 @@ export function useSavedBatchStatusQuery(
   targetIds?: Array<string | null | undefined> | null,
   options?: EnabledOption,
 ) {
-  const normalizedTargetIds = normalizeIdList(targetIds);
+  const normalizedTargetIds = normalizeUuidV4List(targetIds);
   return useQuery({
     queryKey: queryKeys.saved.batch(targetType, normalizedTargetIds),
     queryFn: async () => {
@@ -376,16 +368,17 @@ export function useSavedStatusQuery(
   targetId?: string | null,
   options?: EnabledOption,
 ) {
+  const normalizedTargetId = String(targetId ?? '').trim();
   return useQuery({
-    queryKey: queryKeys.saved.status(targetType, targetId),
+    queryKey: queryKeys.saved.status(targetType, normalizedTargetId),
     queryFn: async () => {
       const response = await apiClient.get('/saved/check', {
-        params: { targetType, targetId },
+        params: { targetType, targetId: normalizedTargetId },
       });
       const payload = response.data?.data ?? response.data ?? {};
       return Boolean((payload as { isSaved?: unknown }).isSaved);
     },
-    enabled: isEnabled(targetId, options?.enabled ?? true),
+    enabled: isUuidV4(normalizedTargetId) && (options?.enabled ?? true),
     staleTime: THREADLY_QUERY_STALE_TIME_MS,
   });
 }
