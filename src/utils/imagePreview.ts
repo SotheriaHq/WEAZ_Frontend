@@ -82,11 +82,11 @@ const scaleToFit = (
   };
 };
 
-const canvasToJpegDataUrl = (
+const canvasToJpegCanvas = (
   source: CanvasImageSource,
   width: number,
   height: number,
-): string => {
+) => {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -97,7 +97,34 @@ const canvasToJpegDataUrl = (
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, height);
   ctx.drawImage(source, 0, 0, width, height);
-  return canvas.toDataURL('image/jpeg', JPEG_PREVIEW_QUALITY);
+  return canvas;
+};
+
+const canvasToJpegBlobUrl = async (
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+): Promise<string> => {
+  const canvas = canvasToJpegCanvas(source, width, height);
+  if (typeof canvas.toBlob !== 'function' || typeof URL.createObjectURL !== 'function') {
+    return canvas.toDataURL('image/jpeg', JPEG_PREVIEW_QUALITY);
+  }
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (nextBlob) => {
+        if (nextBlob) {
+          resolve(nextBlob);
+          return;
+        }
+        reject(new Error('Canvas blob encoding failed'));
+      },
+      'image/jpeg',
+      JPEG_PREVIEW_QUALITY,
+    );
+  });
+
+  return URL.createObjectURL(blob);
 };
 
 const loadImageElement = (src: string): Promise<HTMLImageElement> =>
@@ -123,14 +150,14 @@ const loadImageElement = (src: string): Promise<HTMLImageElement> =>
     image.src = src;
   });
 
-const bitmapToJpegDataUrl = (bitmap: ImageBitmap): string => {
+const bitmapToJpegPreviewUrl = async (bitmap: ImageBitmap): Promise<string> => {
   try {
     const { width, height } = scaleToFit(
       bitmap.width,
       bitmap.height,
       MAX_PREVIEW_DIMENSION,
     );
-    return canvasToJpegDataUrl(bitmap, width, height);
+    return await canvasToJpegBlobUrl(bitmap, width, height);
   } finally {
     bitmap.close();
   }
@@ -186,7 +213,7 @@ const createBitmapFromFile = async (file: File): Promise<ImageBitmap> => {
 
 const buildPreviewViaImageBitmap = async (file: File): Promise<string> => {
   const bitmap = await createBitmapFromFile(file);
-  return bitmapToJpegDataUrl(bitmap);
+  return bitmapToJpegPreviewUrl(bitmap);
 };
 
 const buildPreviewViaBlobCanvas = async (file: File): Promise<string> => {
@@ -198,7 +225,7 @@ const buildPreviewViaBlobCanvas = async (file: File): Promise<string> => {
       image.naturalHeight,
       MAX_PREVIEW_DIMENSION,
     );
-    return canvasToJpegDataUrl(image, width, height);
+    return canvasToJpegBlobUrl(image, width, height);
   } finally {
     URL.revokeObjectURL(blobUrl);
   }
@@ -227,7 +254,7 @@ const buildPreviewViaDataUrlCanvas = async (file: File): Promise<string> => {
     image.naturalHeight,
     MAX_PREVIEW_DIMENSION,
   );
-  return canvasToJpegDataUrl(image, width, height);
+  return canvasToJpegBlobUrl(image, width, height);
 };
 
 const shouldForceCanvasOutput = (file: File): boolean => {
@@ -238,8 +265,9 @@ const shouldForceCanvasOutput = (file: File): boolean => {
 };
 
 /**
- * Builds a browser-displayable JPEG data URL for local image files.
- * Mobile Safari cannot reliably render blob: or large raw data: URLs in <img>.
+ * Builds a browser-displayable preview URL for local image files.
+ * Prefer a small blob: JPEG preview so Android does not have to render the
+ * original camera file or a large inline base64 string.
  */
 export const buildDisplayableImagePreview = async (
   file: File,
@@ -285,7 +313,7 @@ export const buildDisplayableImagePreview = async (
       const previewUrl = await withPreviewTimeout(strategy.label, () =>
         strategy.run(normalizedFile),
       );
-      if (previewUrl.startsWith('data:image/jpeg')) {
+      if (previewUrl.startsWith('blob:') || previewUrl.startsWith('data:image/jpeg')) {
         return previewUrl;
       }
     } catch (error) {

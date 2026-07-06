@@ -946,7 +946,7 @@ const CreateDesignInner: React.FC = () => {
         message: 'Saving draft...',
       });
 
-      await (async () => {
+      const runDraftSaveTask = async () => {
         let savedDesignId: string | undefined;
         try {
           updatePublishTask(
@@ -1030,16 +1030,6 @@ const CreateDesignInner: React.FC = () => {
           );
 
           toast.success("Draft saved");
-          navigate("/profile?tab=Content&visibility=Drafts", {
-            replace: true,
-            state: {
-              publishingTaskId: draftTask.id,
-              publishingTitle: draftTitle,
-              publishingStartedAt: draftTask.startedAt,
-              publishingVisibility: 'PRIVATE',
-              publishingKind: 'draft',
-            },
-          });
           window.setTimeout(() => removePublishTask(draftTask.id, publishTaskScope), 60_000);
         } catch (error) {
           const errMsg =
@@ -1065,7 +1055,31 @@ const CreateDesignInner: React.FC = () => {
           });
           toast.error(`Failed to save draft: ${String(errMsg)}`);
         }
-      })();
+      };
+
+      updatePublishTask(
+        draftTask.id,
+        {
+          progress: 1,
+          message: 'Draft queued...',
+        },
+        publishTaskScope,
+      );
+      toast.info('Draft is saving in the background');
+      navigate("/profile?tab=Content&visibility=Drafts", {
+        replace: true,
+        state: {
+          publishingTaskId: draftTask.id,
+          publishingTitle: draftTitle,
+          publishingStartedAt: draftTask.startedAt,
+          publishingVisibility: 'PRIVATE',
+          publishingKind: 'draft',
+        },
+      });
+      window.setTimeout(() => {
+        void runDraftSaveTask();
+      }, 0);
+      return;
     } catch (error) {
       console.error(error);
       const errMsg =

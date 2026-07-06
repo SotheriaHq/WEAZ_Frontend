@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SizingMode } from '@/types/sizing';
 import type { MediaItem } from '../types/media';
 import { normalizeMediaViewSlot } from '@/utils/contentIntegrity';
@@ -355,6 +355,14 @@ export function useDesignUpload() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const activeXhrsRef = useRef<Set<XMLHttpRequest>>(new Set());
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const uploadDesign = useCallback(async (...args: unknown[]) => {
     const parsed = parseUploadArgs(args);
@@ -407,10 +415,12 @@ export function useDesignUpload() {
       }
     }
 
-    setIsUploading(true);
-    setProgress(0);
-    setPerFileProgress({});
-    setError(null);
+    if (mountedRef.current) {
+      setIsUploading(true);
+      setProgress(0);
+      setPerFileProgress({});
+      setError(null);
+    }
 
     try {
       addClientDiagnostic('info', 'design-upload', 'Initializing design uploads', {
@@ -461,26 +471,28 @@ export function useDesignUpload() {
         throw new Error('Server did not return upload instructions');
       }
 
-      if (uploads.length > 0) {
+      let progressSnapshot: Record<string, number> = {};
+
+      if (uploads.length > 0 && mountedRef.current) {
+        progressSnapshot = Object.fromEntries(
+          uploads.map((entry) => [entry.fileId, 0]),
+        ) as Record<string, number>;
         setPerFileProgress(
-          Object.fromEntries(uploads.map((entry) => [entry.fileId, 0])) as Record<
-            string,
-            number
-          >,
+          progressSnapshot,
         );
       }
 
       const updateFileProgress = (fileId: string, value: number) => {
-        setPerFileProgress((current) => {
-          const next = {
-            ...current,
-            [fileId]: clamp(value),
-          };
-          const aggregate = computeAggregateProgress(next, uploads.length);
+        progressSnapshot = {
+          ...progressSnapshot,
+          [fileId]: clamp(value),
+        };
+        const aggregate = computeAggregateProgress(progressSnapshot, uploads.length);
+        if (mountedRef.current) {
+          setPerFileProgress(progressSnapshot);
           setProgress(aggregate);
-          parsed.onProgress?.(aggregate);
-          return next;
-        });
+        }
+        parsed.onProgress?.(aggregate);
       };
 
       const completions: CompletionDto[] = [];
@@ -537,8 +549,10 @@ export function useDesignUpload() {
         },
       );
 
-      setProgress(100);
-      setPerFileProgress({});
+      if (mountedRef.current) {
+        setProgress(100);
+        setPerFileProgress({});
+      }
       parsed.onProgress?.(100);
       addClientDiagnostic('info', 'design-upload', 'Upload flow completed', {
         designId,
@@ -554,10 +568,14 @@ export function useDesignUpload() {
         errorName: normalizedError.name,
         errorMessage: normalizedError.message,
       });
-      setError(normalizedError);
+      if (mountedRef.current) {
+        setError(normalizedError);
+      }
       throw normalizedError;
     } finally {
-      setIsUploading(false);
+      if (mountedRef.current) {
+        setIsUploading(false);
+      }
     }
   }, []);
 

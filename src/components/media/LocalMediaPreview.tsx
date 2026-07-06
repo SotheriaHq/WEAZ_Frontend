@@ -3,6 +3,7 @@ import MediaRenderer, { type MediaKind } from './MediaRenderer';
 import { cn } from '@/lib/utils';
 import { addClientDiagnostic } from '@/utils/clientDiagnostics';
 import { isPreviewUnavailableDataUrl } from '@/utils/imagePreview';
+import { uploadPreviewImage } from '@/api/UploadApi';
 
 type LocalMediaPreviewProps = {
   kind: MediaKind;
@@ -22,6 +23,12 @@ type LocalMediaPreviewProps = {
 };
 
 const PROBE_TIMEOUT_MS = 5_000;
+
+const canRequestServerPreview = (file?: File) => {
+  if (!file) return false;
+  if (file.type.trim().toLowerCase().startsWith('image/')) return true;
+  return /\.(jpe?g|png|webp|gif|heic|heif|avif|bmp)$/i.test(file.name);
+};
 
 const probeImage = (src: string): Promise<void> =>
   new Promise((resolve, reject) => {
@@ -124,6 +131,7 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
     }
 
     let cancelled = false;
+    let serverPreviewUrl = '';
     const candidates = Array.from(
       new Set(
         [normalizedSrc, objectUrl].filter(
@@ -168,6 +176,46 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
           });
         }
       }
+      if (file && canRequestServerPreview(file)) {
+        try {
+          addClientDiagnostic('info', diagnosticScope, 'Requesting server preview fallback', {
+            fileName: file?.name,
+            fileType: file?.type,
+            fileSize: file?.size,
+          });
+          serverPreviewUrl = await uploadPreviewImage(file);
+          if (cancelled) {
+            URL.revokeObjectURL(serverPreviewUrl);
+            serverPreviewUrl = '';
+            return;
+          }
+          await probeImage(serverPreviewUrl);
+          if (cancelled) {
+            URL.revokeObjectURL(serverPreviewUrl);
+            serverPreviewUrl = '';
+            return;
+          }
+          setResolvedSrc(serverPreviewUrl);
+          setStatus('ready');
+          addClientDiagnostic('info', diagnosticScope, 'Server preview fallback decoded', {
+            fileName: file?.name,
+            fileType: file?.type,
+            fileSize: file?.size,
+          });
+          return;
+        } catch (error) {
+          if (serverPreviewUrl) {
+            URL.revokeObjectURL(serverPreviewUrl);
+            serverPreviewUrl = '';
+          }
+          addClientDiagnostic('warn', diagnosticScope, 'Server preview fallback failed', {
+            fileName: file?.name,
+            fileType: file?.type,
+            fileSize: file?.size,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
       if (!cancelled) {
         setStatus('failed');
       }
@@ -175,6 +223,9 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
 
     return () => {
       cancelled = true;
+      if (serverPreviewUrl) {
+        URL.revokeObjectURL(serverPreviewUrl);
+      }
     };
   }, [diagnosticScope, file, kind, normalizedSrc, objectUrl]);
 
