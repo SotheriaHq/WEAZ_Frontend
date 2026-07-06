@@ -142,16 +142,25 @@ const normalizeInitializeDesignResponse = (payload: unknown): InitializeDesignRe
   };
 };
 
+// Initialize/finalize do real server work (draft rows, media finalization)
+// and run over mobile links; the global 15 s axios timeout produced FALSE
+// task failures whose drafts actually existed — the cross-device ghost cards.
+const DESIGN_MUTATION_TIMEOUT_MS = 60_000;
+
 export async function initializeDesignUploads(
   dto: InitializeDesignUploadsDto,
 ): Promise<InitializeDesignResponse> {
-  const response = await apiClient.post('/designs/initialize', {
-    ...dto,
-    files: dto.files.map((file, index) => ({
-      ...file,
-      viewSlot: toBackendMediaViewSlot(file.viewSlot, index),
-    })),
-  });
+  const response = await apiClient.post(
+    '/designs/initialize',
+    {
+      ...dto,
+      files: dto.files.map((file, index) => ({
+        ...file,
+        viewSlot: toBackendMediaViewSlot(file.viewSlot, index),
+      })),
+    },
+    { timeout: DESIGN_MUTATION_TIMEOUT_MS },
+  );
   return normalizeInitializeDesignResponse(response.data);
 }
 
@@ -186,7 +195,10 @@ export async function finalizeDesignUploads(
       draftSessionToken: options?.draftSessionToken,
       draftVersion: options?.draftVersion,
     },
-    { headers: { 'Idempotency-Key': createIdempotencyKey() } },
+    {
+      headers: { 'Idempotency-Key': createIdempotencyKey() },
+      timeout: DESIGN_MUTATION_TIMEOUT_MS,
+    },
   );
   clearDesignDetailCache(designId);
   return unwrapData<unknown>(response.data);
@@ -235,7 +247,17 @@ export async function getDesignDetail(
 }
 
 export async function updateDesign(designId: string, designMetadata: DesignMetadata) {
-  const response = await apiClient.patch(`/designs/${designId}`, designMetadata);
+  // Drafts legitimately have unset fields the editor holds as ''. The backend
+  // DTO validates optional fields only when present, and @IsUUID/@IsEnum
+  // reject empty strings outright — so strip them instead of sending them.
+  const sanitized = Object.fromEntries(
+    Object.entries(designMetadata).filter(
+      ([, value]) => !(typeof value === 'string' && value.trim() === ''),
+    ),
+  ) as DesignMetadata;
+  const response = await apiClient.patch(`/designs/${designId}`, sanitized, {
+    timeout: DESIGN_MUTATION_TIMEOUT_MS,
+  });
   clearDesignDetailCache(designId);
   return unwrapData<unknown>(response.data);
 }

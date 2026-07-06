@@ -9,6 +9,13 @@ import {
   PREVIEW_STRATEGY_TIMEOUT_MS,
   revokeObjectPreviewUrl,
 } from '@/utils/imagePreview';
+import {
+  sniffImageFormat,
+  isBrowserDisplayableSniff,
+  isUnreadableSniff,
+} from '@/utils/imageByteSniff';
+import { getNormalizedImageFile } from '@/api/UploadApi';
+import { addClientDiagnostic } from '@/utils/clientDiagnostics';
 
 const PREVIEW_OVERALL_TIMEOUT_MS = PREVIEW_STRATEGY_TIMEOUT_MS * 3 + 5_000;
 
@@ -20,7 +27,8 @@ type Action =
   | { type: 'clear' }
   | { type: 'set'; items: MediaItem[] }
   | { type: 'reorder'; items: MediaItem[] }
-  | { type: 'setPreview'; id: string; previewUrl: string };
+  | { type: 'setPreview'; id: string; previewUrl: string }
+  | { type: 'setNormalized'; id: string; file: File; previewUrl: string };
 
 const initialState: State = { items: [] };
 
@@ -72,6 +80,16 @@ function reducer(state: State, action: Action): State {
       return {
         items: state.items.map((it) =>
           it.id === action.id ? { ...it, previewUrl: action.previewUrl } : it,
+        ),
+      };
+    case 'setNormalized':
+      // The normalized JPEG replaces the original file: preview, upload
+      // preprocessing, and size validation all consume the same bytes.
+      return {
+        items: state.items.map((it) =>
+          it.id === action.id
+            ? { ...it, file: action.file, previewUrl: action.previewUrl }
+            : it,
         ),
       };
     default:
@@ -133,6 +151,43 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
       void (async () => {
         try {
+          // Route on the file's REAL bytes, not its claimed type: Android
+          // galleries hand over HEIC named .jpg, which no local strategy can
+          // decode — normalize those on the server ONCE, at selection, so
+          // preview, upload, and validation all use the same JPEG.
+          const sniffedFormat = await sniffImageFormat(file);
+          addClientDiagnostic('info', 'media-store', 'Sniffed selected file', {
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            sniffedFormat,
+          });
+
+          if (isUnreadableSniff(sniffedFormat)) {
+            dispatch({
+              type: 'setPreview',
+              id: itemId,
+              previewUrl: IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
+            });
+            return;
+          }
+
+          if (!isBrowserDisplayableSniff(sniffedFormat)) {
+            const normalized = await getNormalizedImageFile(file);
+            dispatch({
+              type: 'setNormalized',
+              id: itemId,
+              file: normalized,
+              previewUrl: URL.createObjectURL(normalized),
+            });
+            addClientDiagnostic('info', 'media-store', 'Normalized undecodable file on server', {
+              fileName: file.name,
+              sniffedFormat,
+              normalizedSize: normalized.size,
+            });
+            return;
+          }
+
           const previewUrl = await Promise.race([
             buildDisplayableImagePreview(file),
             new Promise<string>((_, reject) => {
@@ -145,11 +200,27 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           dispatch({ type: 'setPreview', id: itemId, previewUrl });
         } catch (error) {
           console.warn('[useMediaStore] preview generation failed', error);
-          dispatch({
-            type: 'setPreview',
-            id: itemId,
-            previewUrl: IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
+          addClientDiagnostic('warn', 'media-store', 'Local preview failed; trying server normalize', {
+            fileName: file.name,
+            error: error instanceof Error ? error.message : String(error),
           });
+          // Last resort for browser-displayable files whose local pipeline
+          // still failed (blocked canvas + undecodable data URL, OOM, ...).
+          try {
+            const normalized = await getNormalizedImageFile(file);
+            dispatch({
+              type: 'setNormalized',
+              id: itemId,
+              file: normalized,
+              previewUrl: URL.createObjectURL(normalized),
+            });
+          } catch {
+            dispatch({
+              type: 'setPreview',
+              id: itemId,
+              previewUrl: IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
+            });
+          }
         } finally {
           convertingRef.current.delete(itemId);
         }

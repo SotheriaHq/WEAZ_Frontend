@@ -1035,14 +1035,55 @@ const CreateDesignInner: React.FC = () => {
           const errMsg =
             (error as any)?.response?.data?.message ||
             (error instanceof Error ? error.message : 'Failed to save draft');
+          const failedDesignId =
+            savedDesignId ||
+            (typeof (error as any)?.designId === 'string'
+              ? ((error as any).designId as string)
+              : undefined);
+          const failedStage =
+            typeof (error as any)?.stage === 'string'
+              ? ((error as any).stage as string)
+              : undefined;
+
+          // Media uploaded 100% and only the finalize response was lost
+          // (mobile timeout): if the draft exists server-side, it IS saved —
+          // reporting failure here is what created failed+saved ghost pairs.
+          if (failedDesignId && failedStage === 'finalize') {
+            try {
+              await DesignApi.getDesignDetail(failedDesignId, { forceRefresh: true });
+              updatePublishTask(
+                draftTask.id,
+                {
+                  status: 'saved',
+                  progress: 100,
+                  designId: failedDesignId,
+                  legacyCollectionId: failedDesignId,
+                  collectionId: failedDesignId,
+                  message: 'Draft saved',
+                },
+                publishTaskScope,
+              );
+              addClientDiagnostic('warn', 'create-design', 'Draft finalize response lost but draft exists; marked saved', {
+                taskId: draftTask.id,
+                designId: failedDesignId,
+                error: String(errMsg),
+              });
+              toast.success('Draft saved');
+              window.setTimeout(() => removePublishTask(draftTask.id, publishTaskScope), 60_000);
+              return;
+            } catch {
+              /* Design not reachable — fall through to genuine failure. */
+            }
+          }
+
           updatePublishTask(
             draftTask.id,
             {
               status: 'failed',
               progress: 100,
-              designId: savedDesignId,
-              legacyCollectionId: savedDesignId,
-              collectionId: savedDesignId,
+              designId: failedDesignId,
+              legacyCollectionId: failedDesignId,
+              collectionId: failedDesignId,
               message: 'Draft save failed',
               error: String(errMsg),
             },
@@ -1050,7 +1091,8 @@ const CreateDesignInner: React.FC = () => {
           );
           addClientDiagnostic('error', 'create-design', 'Save draft failed', {
             taskId: draftTask.id,
-            savedDesignId,
+            savedDesignId: failedDesignId,
+            stage: failedStage,
             error: String(errMsg),
           });
           toast.error(`Failed to save draft: ${String(errMsg)}`);
@@ -1422,6 +1464,14 @@ const CreateDesignInner: React.FC = () => {
               (backgroundError as any)?.response?.data?.message ||
               (backgroundError instanceof Error ? backgroundError.message : 'Failed to go live with design');
             const errMsg = mapCreatorMetadataError(rawErrMsg, 'Failed to go live with design');
+            // uploadDesign tags errors with the server design id once
+            // initialize succeeds — keep it so the failed card can be
+            // reconciled against the server row instead of ghosting.
+            uploadedDesignId =
+              uploadedDesignId ||
+              (typeof (backgroundError as any)?.designId === 'string'
+                ? ((backgroundError as any).designId as string)
+                : undefined);
             updatePublishTask(task.id, {
               status: 'failed',
               progress: 100,

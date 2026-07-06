@@ -79,6 +79,8 @@ import {
   getStoreProcessingTimeLabel,
 } from "@/utils/storeProcessing";
 import { preprocessImageFile } from "@/utils/imagePreprocess";
+import { WEB_UPLOAD_POLICIES } from "@/utils/uploadValidation";
+import { getNormalizedImageFile } from "@/api/UploadApi";
 import {
   CREATOR_AUDIENCE_OPTIONS,
   CREATOR_METADATA_HELP,
@@ -2361,14 +2363,30 @@ const EditProduct: React.FC = () => {
   );
 
   const preprocessProductMediaFiles = useCallback(async (files: File[]) => {
+    const maxSizeBytes = WEB_UPLOAD_POLICIES.productMedia.maxSizeBytes;
     const prepResults = await Promise.all(
       files.map(async (file) => {
         try {
-          const processed = await preprocessImageFile(file, "detail");
-          return { ok: true as const, file: processed.file, optimized: !processed.skipped };
+          const processed = await preprocessImageFile(file, "detail", {
+            maxSizeBytes,
+          });
+          if (processed.file.size <= maxSizeBytes) {
+            return { ok: true as const, file: processed.file, optimized: !processed.skipped };
+          }
         } catch {
-          return { ok: false as const, file };
+          /* Local decode failed (HEIC named .jpg, blocked canvas) — try server. */
         }
+        try {
+          const transcoded = await getNormalizedImageFile(file);
+          if (transcoded.size <= maxSizeBytes) {
+            return { ok: true as const, file: transcoded, optimized: true };
+          }
+        } catch {
+          /* Server normalize unavailable — fall through to raw checks. */
+        }
+        return file.size <= maxSizeBytes
+          ? { ok: true as const, file, optimized: false }
+          : { ok: false as const, file };
       }),
     );
 

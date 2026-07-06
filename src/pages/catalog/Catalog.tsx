@@ -847,6 +847,36 @@ const ProfilePage: React.FC = () => {
     });
   }, [activeCollections, publishTaskScope, publishingStates]);
 
+  // A failed local task whose design row DID reach the server is a ghost:
+  // the server draft renders as its own card here AND on every other device,
+  // so the per-device "Failed - Retry" card would duplicate it forever.
+  useEffect(() => {
+    if (drafts.length === 0 || publishTasks.length === 0) return;
+    const draftIds = new Set(drafts.map((entry) => entry.id));
+    const reconciled = publishTasks.filter((task) => {
+      if (task.status !== 'failed') return false;
+      const designId = getPublishTaskDesignId(task);
+      const legacyCollectionId = getPublishTaskLegacyCollectionId(task);
+      return Boolean(
+        (designId && draftIds.has(designId)) ||
+          (legacyCollectionId && draftIds.has(legacyCollectionId)),
+      );
+    });
+    if (reconciled.length === 0) return;
+    reconciled.forEach((task) => removePublishTask(task.id, publishTaskScope));
+    setPublishingStates((prev) => {
+      const next = { ...prev };
+      reconciled.forEach((task) => {
+        delete next[task.id];
+        const designId = getPublishTaskDesignId(task);
+        const legacyCollectionId = getPublishTaskLegacyCollectionId(task);
+        if (designId) delete next[designId];
+        if (legacyCollectionId) delete next[legacyCollectionId];
+      });
+      return next;
+    });
+  }, [drafts, publishTaskScope, publishTasks]);
+
   const handleCollectionViewerBack = useCallback(() => {
     setSelectedCollectionId(null);
     setSearchParams((prev) => {
@@ -1217,6 +1247,15 @@ const ProfilePage: React.FC = () => {
       : (state?.taskId && state.taskId === collectionId ? null : collectionId);
 
     if (!targetCollectionId) {
+      // A FAILED task with no server design id means initialize never
+      // succeeded — nothing exists server-side and the selected files only
+      // lived in the editor session. Retrying can never work; be honest.
+      if (linkedTask?.status === 'failed' || state?.status === 'failed') {
+        toast.error(
+          'This save never reached the server, so it cannot be retried. Dismiss this card and create the design again.',
+        );
+        return;
+      }
       setPublishingStates((prev) => ({
         ...prev,
         [collectionId]: {

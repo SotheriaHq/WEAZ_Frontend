@@ -4,6 +4,11 @@ import { cn } from '@/lib/utils';
 import { addClientDiagnostic } from '@/utils/clientDiagnostics';
 import { isPreviewUnavailableDataUrl } from '@/utils/imagePreview';
 import { uploadPreviewImage } from '@/api/UploadApi';
+import {
+  sniffImageFormat,
+  isUnreadableSniff,
+  type SniffedImageFormat,
+} from '@/utils/imageByteSniff';
 
 type LocalMediaPreviewProps = {
   kind: MediaKind;
@@ -110,6 +115,7 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
   const [status, setStatus] = React.useState<'loading' | 'ready' | 'failed'>(
     kind === 'video' && normalizedSrc ? 'ready' : 'loading',
   );
+  const [failureLabel, setFailureLabel] = React.useState<string>('');
 
   React.useEffect(() => {
     if (kind !== 'image' || !file) {
@@ -144,16 +150,48 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
     );
 
     setResolvedSrc('');
-    setStatus(candidates.length > 0 ? 'loading' : 'failed');
+    setFailureLabel('');
+    setStatus(candidates.length > 0 || file ? 'loading' : 'failed');
 
     void (async () => {
+      // Sniff the REAL container from the file's magic bytes. Pickers lie:
+      // Android galleries hand over HEIC bytes named .jpg, and cloud-only
+      // photos can be unreadable — sniffing routes and explains both.
+      let sniffedFormat: SniffedImageFormat | undefined;
+      if (file) {
+        sniffedFormat = await sniffImageFormat(file);
+        if (cancelled) return;
+        addClientDiagnostic('info', diagnosticScope, 'Sniffed picked file bytes', {
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          sniffedFormat,
+        });
+        if (isUnreadableSniff(sniffedFormat)) {
+          addClientDiagnostic('warn', diagnosticScope, 'Picked file bytes are unreadable', {
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            sniffedFormat,
+          });
+          setFailureLabel(
+            "This photo couldn't be read from your gallery. Remove it, make sure it's downloaded to this device, then add it again.",
+          );
+          setStatus('failed');
+          return;
+        }
+      }
+      const fileDiag = {
+        fileName: file?.name,
+        fileType: file?.type,
+        fileSize: file?.size,
+        sniffedFormat,
+      };
       for (const candidate of candidates) {
         try {
           addClientDiagnostic('info', diagnosticScope, 'Probing local preview candidate', {
             candidateKind: candidate.startsWith('blob:') ? 'blob' : candidate.startsWith('data:') ? 'data' : 'url',
-            fileName: file?.name,
-            fileType: file?.type,
-            fileSize: file?.size,
+            ...fileDiag,
           });
           await probeImage(candidate);
           if (cancelled) return;
@@ -161,28 +199,20 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
           setStatus('ready');
           addClientDiagnostic('info', diagnosticScope, 'Local preview candidate decoded', {
             candidateKind: candidate.startsWith('blob:') ? 'blob' : candidate.startsWith('data:') ? 'data' : 'url',
-            fileName: file?.name,
-            fileType: file?.type,
-            fileSize: file?.size,
+            ...fileDiag,
           });
           return;
         } catch (error) {
           addClientDiagnostic('warn', diagnosticScope, 'Local preview candidate failed', {
             candidateKind: candidate.startsWith('blob:') ? 'blob' : candidate.startsWith('data:') ? 'data' : 'url',
-            fileName: file?.name,
-            fileType: file?.type,
-            fileSize: file?.size,
+            ...fileDiag,
             error: error instanceof Error ? error.message : String(error),
           });
         }
       }
       if (file && canRequestServerPreview(file)) {
         try {
-          addClientDiagnostic('info', diagnosticScope, 'Requesting server preview fallback', {
-            fileName: file?.name,
-            fileType: file?.type,
-            fileSize: file?.size,
-          });
+          addClientDiagnostic('info', diagnosticScope, 'Requesting server preview fallback', fileDiag);
           serverPreviewUrl = await uploadPreviewImage(file);
           if (cancelled) {
             URL.revokeObjectURL(serverPreviewUrl);
@@ -197,11 +227,7 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
           }
           setResolvedSrc(serverPreviewUrl);
           setStatus('ready');
-          addClientDiagnostic('info', diagnosticScope, 'Server preview fallback decoded', {
-            fileName: file?.name,
-            fileType: file?.type,
-            fileSize: file?.size,
-          });
+          addClientDiagnostic('info', diagnosticScope, 'Server preview fallback decoded', fileDiag);
           return;
         } catch (error) {
           if (serverPreviewUrl) {
@@ -209,9 +235,7 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
             serverPreviewUrl = '';
           }
           addClientDiagnostic('warn', diagnosticScope, 'Server preview fallback failed', {
-            fileName: file?.name,
-            fileType: file?.type,
-            fileSize: file?.size,
+            ...fileDiag,
             error: error instanceof Error ? error.message : String(error),
           });
         }
@@ -235,7 +259,7 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
         className={className}
         maxHeightClassName={maxHeightClassName}
         maxWidthClassName={maxWidthClassName}
-        label={status === 'loading' ? loadingLabel : unavailableLabel}
+        label={status === 'loading' ? loadingLabel : failureLabel || unavailableLabel}
         loading={status === 'loading'}
       />
     );
