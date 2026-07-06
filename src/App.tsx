@@ -88,6 +88,7 @@ const CheckoutPage = lazy(() => import('./pages/checkout/CheckoutPage'));
 const CustomOrderComposerPage = lazy(() => import('./pages/custom-orders/CustomOrderComposerPage'));
 const CustomOrderCheckoutResumePage = lazy(() => import('./pages/custom-orders/CustomOrderCheckoutResumePage'));
 const MessagingManagementPage = lazy(() => import('./pages/messages/MessagingManagementPage'));
+const DiagnosticsPage = lazy(() => import('./pages/DiagnosticsPage'));
 
 // Admin pages — lazy loaded for code splitting
 const AdminScaffold = lazy(() => import('./components/admin/AdminScaffold'));
@@ -470,6 +471,7 @@ const router = createBrowserRouter([
           { path: 'market-place', element: withRouteFallback(<MarketPlace />) },
           { path: 'market/sections/:sectionKey', element: withRouteFallback(<MarketSectionPage />) },
           { path: 'search', element: withRouteFallback(<SearchResultsPage />) },
+          { path: 'diagnostics', element: withRouteFallback(<DiagnosticsPage />) },
           { path: 'subscriptions', element: <SubscriptionsPlaceholder /> },
           { path: 'history', element: <HistoryPlaceholder /> },
           { path: 'watch-later', element: <WatchLaterPlaceholder /> },

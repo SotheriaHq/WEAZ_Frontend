@@ -13,6 +13,7 @@ import {
   type PresignEntry,
 } from '../api/DesignApi';
 import { WEB_UPLOAD_POLICIES, assertValidUploadFiles } from '@/utils/uploadValidation';
+import { addClientDiagnostic } from '@/utils/clientDiagnostics';
 
 const MAX_RETRY_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 750;
@@ -74,6 +75,20 @@ const resolveFile = (item: UploadSource): File | null => {
   }
 
   return null;
+};
+
+const fileDiagnostic = (file: File) => ({
+  name: file.name,
+  type: file.type,
+  size: file.size,
+});
+
+const uploadHost = (entry: PresignEntry) => {
+  try {
+    return new URL(entry.uploadUrl).host;
+  } catch {
+    return 'invalid-url';
+  }
 };
 
 const resolveViewSlot = (item: UploadSource, index: number) => {
@@ -206,17 +221,44 @@ const uploadPresignedFile = async (
     };
     xhr.onerror = () => {
       cleanup();
+      addClientDiagnostic('error', 'design-upload', 'Presigned file upload network error', {
+        file: fileDiagnostic(file),
+        fileId: entry.fileId,
+        method: entry.method ?? (entry.uploadFields ? 'POST' : 'PUT'),
+        host: uploadHost(entry),
+        status: xhr.status,
+      });
       reject(new Error('File upload failed'));
     };
     xhr.onabort = () => {
       cleanup();
+      addClientDiagnostic('warn', 'design-upload', 'Presigned file upload aborted', {
+        file: fileDiagnostic(file),
+        fileId: entry.fileId,
+        method: entry.method ?? (entry.uploadFields ? 'POST' : 'PUT'),
+        host: uploadHost(entry),
+      });
       reject(new Error('Upload cancelled'));
     };
     xhr.onload = () => {
       cleanup();
       if (xhr.status >= 200 && xhr.status < 300) {
+        addClientDiagnostic('info', 'design-upload', 'Presigned file upload completed', {
+          file: fileDiagnostic(file),
+          fileId: entry.fileId,
+          method: entry.method ?? (entry.uploadFields ? 'POST' : 'PUT'),
+          host: uploadHost(entry),
+          status: xhr.status,
+        });
         resolve();
       } else {
+        addClientDiagnostic('error', 'design-upload', 'Presigned file upload returned non-2xx', {
+          file: fileDiagnostic(file),
+          fileId: entry.fileId,
+          method: entry.method ?? (entry.uploadFields ? 'POST' : 'PUT'),
+          host: uploadHost(entry),
+          status: xhr.status,
+        });
         reject(new Error(`File upload failed with status ${xhr.status}`));
       }
     };
@@ -225,9 +267,21 @@ const uploadPresignedFile = async (
     try {
       xhr.open(method, entry.uploadUrl, true);
     } catch {
+      addClientDiagnostic('error', 'design-upload', 'Invalid presigned upload URL', {
+        file: fileDiagnostic(file),
+        fileId: entry.fileId,
+        method,
+      });
       reject(new Error(`Invalid upload URL: ${entry.uploadUrl}`));
       return;
     }
+
+    addClientDiagnostic('info', 'design-upload', 'Starting presigned file upload', {
+      file: fileDiagnostic(file),
+      fileId: entry.fileId,
+      method,
+      host: uploadHost(entry),
+    });
 
     if (method === 'POST') {
       const form = new FormData();
@@ -260,6 +314,11 @@ export function useDesignUpload() {
     const resolvedFiles = parsed.items
       .map(resolveFile)
       .filter((file): file is File => file !== null);
+    addClientDiagnostic('info', 'design-upload', 'Upload flow started', {
+      shouldPublish: parsed.shouldPublish,
+      fileCount: resolvedFiles.length,
+      files: resolvedFiles.map(fileDiagnostic),
+    });
     assertValidUploadFiles(resolvedFiles, WEB_UPLOAD_POLICIES.designMedia);
 
     if (parsed.shouldPublish) {
@@ -301,6 +360,11 @@ export function useDesignUpload() {
           (entry): entry is { file: File; viewSlot: ReturnType<typeof normalizeMediaViewSlot> } =>
             entry !== null,
         );
+      addClientDiagnostic('info', 'design-upload', 'Initializing design uploads', {
+        shouldPublish: parsed.shouldPublish,
+        fileCount: uploadItems.length,
+      });
+
       const initResp = await initializeDesignUploads({
         title: normalizeString(parsed.title),
         description: optionalString(parsed.description),
@@ -336,6 +400,10 @@ export function useDesignUpload() {
       }
 
       const uploads = Array.isArray(initResp.uploads) ? initResp.uploads : [];
+      addClientDiagnostic('info', 'design-upload', 'Design uploads initialized', {
+        designId,
+        uploadCount: uploads.length,
+      });
       if (resolvedFiles.length > 0 && uploads.length === 0) {
         throw new Error('Server did not return upload instructions');
       }
@@ -399,6 +467,12 @@ export function useDesignUpload() {
         }),
       );
 
+      addClientDiagnostic('info', 'design-upload', 'Finalizing design uploads', {
+        designId,
+        completionCount: completions.length,
+        shouldPublish: parsed.shouldPublish,
+      });
+
       const finalized = await finalizeDesignUploads(
         designId,
         completions,
@@ -413,10 +487,20 @@ export function useDesignUpload() {
       setProgress(100);
       setPerFileProgress({});
       parsed.onProgress?.(100);
+      addClientDiagnostic('info', 'design-upload', 'Upload flow completed', {
+        designId,
+        shouldPublish: parsed.shouldPublish,
+      });
       return finalized;
     } catch (caughtError) {
       const normalizedError =
         caughtError instanceof Error ? caughtError : new Error('Upload failed');
+      addClientDiagnostic('error', 'design-upload', 'Upload flow failed', {
+        shouldPublish: parsed.shouldPublish,
+        fileCount: resolvedFiles.length,
+        errorName: normalizedError.name,
+        errorMessage: normalizedError.message,
+      });
       setError(normalizedError);
       throw normalizedError;
     } finally {

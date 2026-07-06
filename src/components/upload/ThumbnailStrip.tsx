@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiPlay, FiStar, FiPlus } from 'react-icons/fi';
 import type { MediaItem, MediaItemKind } from '../../types/media';
-import MediaRenderer from '../media/MediaRenderer';
+import LocalMediaPreview from '../media/LocalMediaPreview';
 import { getMediaViewSlotLabel, normalizeMediaViewSlot } from '@/utils/contentIntegrity';
 
 interface ThumbnailStripProps {
@@ -98,15 +98,19 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
                 }}
               >
                 {pf.url ? (
-                  <MediaRenderer
+                  <LocalMediaPreview
                     kind={isVideo ? 'video' : 'image'}
                     src={pf.url}
+                    file={pf.file}
                     alt={pf.file?.name || `Thumbnail ${idx + 1}`}
                     className="w-full h-24 flex items-center justify-center bg-white/70 dark:bg-white/[0.03]"
                     maxHeightClassName="max-h-full"
                     maxWidthClassName="max-w-full"
                     controls={false}
                     muted
+                    loadingLabel="Preparing..."
+                    unavailableLabel="Preview unavailable"
+                    diagnosticScope="create-design-thumbnail-preview"
                   />
                 ) : (
                   <div className="flex h-24 w-full items-center justify-center bg-white/70 text-xs font-medium text-gray-500 dark:bg-white/[0.03] dark:text-gray-400">

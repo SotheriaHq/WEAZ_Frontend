@@ -39,7 +39,7 @@ import TextField from "../../components/forms/TextField";
 import UniversalSelect from "@/components/forms/UniversalSelect";
 import MediaUploadZone from "../../components/upload/MediaUploadZone";
 import ThumbnailStrip from "../../components/upload/ThumbnailStrip";
-import MediaRenderer from "../../components/media/MediaRenderer";
+import LocalMediaPreview from "../../components/media/LocalMediaPreview";
 import useFilePicker from "../../components/upload/useFilePicker";
 import { PrePublishConfirmModal } from "@/components/modals";
 import TagsApi from "@/api/TagsApi";
@@ -89,6 +89,7 @@ import {
   getMissingRequiredMediaSlots,
   normalizeMediaViewSlot,
 } from '@/utils/contentIntegrity';
+import { addClientDiagnostic } from '@/utils/clientDiagnostics';
 import { TourOverlay, type TourStep } from '@/components/ui/TourOverlay';
 // ============================================================================
 
@@ -881,11 +882,20 @@ const CreateDesignInner: React.FC = () => {
   };
 
   const handleSaveDraft = async () => {
+    addClientDiagnostic('info', 'create-design', 'Save draft clicked', {
+      isEditMode,
+      fileCount: files.length,
+      titleLength: title.trim().length,
+      userId: user?.id,
+    });
     // Draft rule: a title is the ONLY requirement. Custom-order / measurement
     // details are never enforced for drafts — they are completed later, before
     // publishing. So a draft saves even with Custom Order toggled and no points.
     if (title.trim().length === 0) {
       toast.error('Add a title to save your draft');
+      addClientDiagnostic('warn', 'create-design', 'Save draft blocked by missing title', {
+        fileCount: files.length,
+      });
       return;
     }
     await executeSaveDraft();
@@ -1075,12 +1085,23 @@ const CreateDesignInner: React.FC = () => {
             },
             publishTaskScope,
           );
-          toast.error("Failed to save draft");
+          addClientDiagnostic('error', 'create-design', 'Save draft failed', {
+            taskId: draftTask.id,
+            savedDesignId,
+            error: String(errMsg),
+          });
+          toast.error(`Failed to save draft: ${String(errMsg)}`);
         }
       })();
     } catch (error) {
       console.error(error);
-      toast.error("Failed to save draft");
+      const errMsg =
+        (error as any)?.response?.data?.message ||
+        (error instanceof Error ? error.message : 'Failed to save draft');
+      addClientDiagnostic('error', 'create-design', 'Save draft failed before upload task', {
+        error: String(errMsg),
+      });
+      toast.error(`Failed to save draft: ${String(errMsg)}`);
       setIsSubmitting(false);
       setSubmitIntent(null);
     } finally {
@@ -1670,17 +1691,19 @@ const CreateDesignInner: React.FC = () => {
                           transition={{ duration: 0.2 }}
                         >
                           {selectedFile.url ? (
-                            <MediaRenderer
+                            <LocalMediaPreview
                               kind={
                                 selectedFile.kind === "video" ? "video" : "image"
                               }
                               src={selectedFile.url}
+                              file={selectedFile.file}
                               alt={selectedFile.file?.name || "Preview"}
                               className="w-full h-full flex items-center justify-center"
                               mediaClassName="h-full w-full object-contain"
                               maxHeightClassName="max-h-[85vh]"
                               maxWidthClassName="max-w-full"
                               allowScroll
+                              diagnosticScope="create-design-main-preview"
                             />
                           ) : (
                             <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-sm font-medium text-theme-secondary">
@@ -2455,12 +2478,14 @@ const CreateDesignInner: React.FC = () => {
                     transition: "transform 0.2s ease",
                   }}
                 >
-                  <MediaRenderer
+                  <LocalMediaPreview
                     kind={fullscreenFile.kind === "video" ? "video" : "image"}
                     src={fullscreenFile.url}
+                    file={fullscreenFile.file}
                     alt="Fullscreen preview"
                     maxHeightClassName="max-h-[80vh]"
                     className="rounded-none"
+                    diagnosticScope="create-design-fullscreen-preview"
                   />
                 </div>
 

@@ -14,8 +14,11 @@ import { Provider } from 'react-redux';
 import { store } from './store';
 import { QueryProvider } from './query/QueryProvider';
 import RootErrorBoundary, { removeBootSplash } from './components/RootErrorBoundary';
+import { initClientDiagnostics } from './utils/clientDiagnostics';
 
 const STALE_CHUNK_RELOAD_KEY = 'vite:preloadError:reloadedAt';
+
+initClientDiagnostics();
 
 const isStaleChunkLoadError = (value: unknown): boolean => {
   const message =
