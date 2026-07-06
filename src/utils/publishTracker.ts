@@ -37,6 +37,7 @@ const MAX_TOTAL_TASKS = 120;
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 const PUBLISHED_GRACE_MS = 30 * 1000;
 const SAVED_GRACE_MS = 2 * 60 * 1000;
+const MAX_PERSISTED_PREVIEW_URL_LENGTH = 4096;
 
 const clampProgress = (value: number) => {
   if (!Number.isFinite(value)) return 0;
@@ -71,6 +72,20 @@ const normalizeEntityId = (value?: string | null) => {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const sanitizePreviewUrlForStorage = (value?: string | null) => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('blob:') ||
+    trimmed.startsWith('filesystem:')
+  ) {
+    return undefined;
+  }
+  return trimmed.length <= MAX_PERSISTED_PREVIEW_URL_LENGTH ? trimmed : undefined;
 };
 
 const resolveScopeOwnerId = (scope?: PublishTaskScope) => {
@@ -117,6 +132,11 @@ export const normalizePublishTaskIdentifiers = (task: PublishTask): PublishTask 
   };
 };
 
+const normalizePublishTaskForStorage = (task: PublishTask): PublishTask => ({
+  ...normalizePublishTaskIdentifiers(task),
+  coverPreviewUrl: sanitizePreviewUrlForStorage(task.coverPreviewUrl),
+});
+
 export const getPublishTaskDesignId = (task: Pick<PublishTask, 'designId' | 'legacyCollectionId' | 'collectionId'>) => (
   normalizeEntityId(task.designId) ??
   normalizeEntityId(task.legacyCollectionId) ??
@@ -138,7 +158,7 @@ const normalizeTaskList = (tasks: PublishTask[]) => {
       if (task.status === 'saved' && now - task.updatedAt > SAVED_GRACE_MS) return false;
       return true;
     })
-    .map(normalizePublishTaskIdentifiers)
+    .map(normalizePublishTaskForStorage)
     .sort((a, b) => b.updatedAt - a.updatedAt);
 
   const byScope = new Map<string, PublishTask[]>();
@@ -188,8 +208,19 @@ export const readPublishTasks = (scope?: PublishTaskScope): PublishTask[] => {
 
 const writePublishTasks = (tasks: PublishTask[]) => {
   if (typeof window === 'undefined') return;
-  const normalized = normalizeTaskList(tasks);
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+  const normalized = normalizeTaskList(tasks).map(normalizePublishTaskForStorage);
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+  } catch {
+    try {
+      const compact = normalized
+        .map((task) => ({ ...task, coverPreviewUrl: undefined }))
+        .slice(0, MAX_TASKS_PER_SCOPE);
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(compact));
+    } catch {
+      // Safari/private-mode quota failures should not block the upload flow.
+    }
+  }
   emitTasksUpdated();
 };
 

@@ -638,26 +638,6 @@ const CreateDesignInner: React.FC = () => {
     return withUrl?.url;
   }, [files, coverIndex, resolveMediaWithUrl]);
 
-  const buildCoverPreviewDataUrl = useCallback(
-    async (sourceFiles: MediaItem[] = files, sourceCoverIndex = coverIndex): Promise<string | undefined> => {
-      const coverItem = sourceFiles[sourceCoverIndex];
-      if (!coverItem || coverItem.kind !== 'image' || !coverItem.file) {
-        return undefined;
-      }
-      const file = coverItem.file;
-      if (file.size > 6 * 1024 * 1024) {
-        return undefined;
-      }
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : undefined);
-        reader.onerror = () => resolve(undefined);
-        reader.readAsDataURL(file);
-      });
-    },
-    [coverIndex, files],
-  );
-
   const fullscreenFile = useMemo(() => {
     if (fullscreenIndex === null) return null;
     return resolveMediaWithUrl(files[fullscreenIndex]);
@@ -969,21 +949,14 @@ const CreateDesignInner: React.FC = () => {
       await (async () => {
         let savedDesignId: string | undefined;
         try {
-          const previewDataUrl = await buildCoverPreviewDataUrl(
-            filesSnapshot,
-            coverIndexSnapshot,
+          updatePublishTask(
+            draftTask.id,
+            {
+              progress: 5,
+              message: 'Preparing draft media...',
+            },
+            publishTaskScope,
           );
-          if (previewDataUrl) {
-            updatePublishTask(
-              draftTask.id,
-              {
-                coverPreviewUrl: previewDataUrl,
-                progress: 5,
-                message: 'Preparing draft media...',
-              },
-              publishTaskScope,
-            );
-          }
 
           const response = await uploadDesign(
             filesSnapshot,
@@ -1298,29 +1271,10 @@ const CreateDesignInner: React.FC = () => {
         })();
         return;
       } else {
-        const buildCoverPreviewDataUrl = async (): Promise<string | undefined> => {
-          const coverItem = files[coverIndex];
-          if (!coverItem || coverItem.kind !== 'image' || !coverItem.file) {
-            return undefined;
-          }
-          const file = coverItem.file;
-          if (file.size > 4 * 1024 * 1024) {
-            return undefined;
-          }
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : undefined);
-            reader.onerror = () => resolve(undefined);
-            reader.readAsDataURL(file);
-          });
-        };
-
-        const previewDataUrl = await buildCoverPreviewDataUrl();
         const task = createPublishTask({
           ownerId: user?.id,
           title,
           visibility,
-          coverPreviewUrl: previewDataUrl,
           message: 'Preparing draft upload...',
         });
 

@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  createPublishTask,
   getPublishTaskDesignId,
   getPublishTaskLegacyCollectionId,
   getCompactPublishTaskStatusLabel,
   normalizePublishTaskIdentifiers,
+  readPublishTasks,
   type PublishTask,
 } from './publishTracker';
 
@@ -19,6 +21,10 @@ const baseTask = (overrides: Partial<PublishTask>): PublishTask => ({
 });
 
 describe('publishTracker identifiers', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it('prefers designId while keeping legacy collection-backed ids', () => {
     const task = normalizePublishTaskIdentifiers(baseTask({
       designId: 'design-1',
@@ -95,5 +101,25 @@ describe('publishTracker identifiers', () => {
     // The server id and local task id must differ — if they were the same the
     // dedup would fail to distinguish between the placeholder and the real card.
     expect(task.id).not.toBe(getPublishTaskDesignId(task));
+  });
+
+  it('does not persist local data/blob preview URLs in publish tasks', () => {
+    createPublishTask({
+      ownerId: 'owner-1',
+      title: 'Quota-safe task',
+      coverPreviewUrl: 'data:image/jpeg;base64,' + 'a'.repeat(5000),
+    });
+
+    expect(readPublishTasks({ ownerId: 'owner-1' })[0]?.coverPreviewUrl).toBeUndefined();
+
+    createPublishTask({
+      ownerId: 'owner-1',
+      title: 'Blob task',
+      coverPreviewUrl: 'blob:https://weaz.me/local-preview',
+    });
+
+    expect(
+      readPublishTasks({ ownerId: 'owner-1' }).every((task) => !task.coverPreviewUrl),
+    ).toBe(true);
   });
 });

@@ -26,6 +26,7 @@ declare global {
 
 const STORAGE_KEY = 'threadly:diagnostics:v1';
 const ENABLED_KEY = 'threadly:diagnostics:enabled';
+export const CLIENT_DIAGNOSTICS_EVENT = 'threadly:diagnostics-updated';
 const MAX_ENTRIES = 300;
 
 const nowIso = () => new Date().toISOString();
@@ -46,13 +47,29 @@ const parseEntries = (): ClientDiagnosticEntry[] => {
 
 const writeEntries = (entries: ClientDiagnosticEntry[]) => {
   if (!hasBrowserStorage()) return;
+  const emitUpdated = () => {
+    try {
+      window.dispatchEvent(new CustomEvent(CLIENT_DIAGNOSTICS_EVENT));
+    } catch {
+      // Non-critical diagnostics signal.
+    }
+  };
   try {
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify(entries.slice(-MAX_ENTRIES)),
     );
+    emitUpdated();
   } catch {
-    // Ignore storage quota/private-mode failures.
+    try {
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(entries.slice(-50)),
+      );
+      emitUpdated();
+    } catch {
+      // Ignore storage quota/private-mode failures.
+    }
   }
 };
 
@@ -90,17 +107,29 @@ const sanitizeData = (data?: Record<string, unknown>) => {
 
 export const areClientDiagnosticsEnabled = () => {
   if (!hasBrowserStorage()) return false;
-  return window.localStorage.getItem(ENABLED_KEY) === 'true';
+  try {
+    return window.localStorage.getItem(ENABLED_KEY) === 'true';
+  } catch {
+    return false;
+  }
 };
 
 export const enableClientDiagnostics = () => {
   if (!hasBrowserStorage()) return;
-  window.localStorage.setItem(ENABLED_KEY, 'true');
+  try {
+    window.localStorage.setItem(ENABLED_KEY, 'true');
+  } catch {
+    // Ignore storage quota/private-mode failures.
+  }
 };
 
 export const disableClientDiagnostics = () => {
   if (!hasBrowserStorage()) return;
-  window.localStorage.removeItem(ENABLED_KEY);
+  try {
+    window.localStorage.removeItem(ENABLED_KEY);
+  } catch {
+    // Ignore storage quota/private-mode failures.
+  }
 };
 
 export const clearClientDiagnostics = () => {
@@ -177,14 +206,6 @@ export const initClientDiagnostics = () => {
   };
   window.__THREADLY_DIAGNOSTICS__ = controls;
 
-  if (!areClientDiagnosticsEnabled()) return;
-
-  addClientDiagnostic('info', 'diagnostics', 'Diagnostics initialized', {
-    href: window.location.href,
-    userAgent: navigator.userAgent,
-    viewport: `${window.innerWidth}x${window.innerHeight}`,
-  });
-
   window.addEventListener('error', (event) => {
     addClientDiagnostic('error', 'window.error', event.message || 'Window error', {
       filename: event.filename,
@@ -199,4 +220,12 @@ export const initClientDiagnostics = () => {
       reason: normalizeError(event.reason),
     });
   });
+
+  if (areClientDiagnosticsEnabled()) {
+    addClientDiagnostic('info', 'diagnostics', 'Diagnostics initialized', {
+      href: window.location.href,
+      userAgent: navigator.userAgent,
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
+    });
+  }
 };

@@ -14,6 +14,7 @@ import {
 } from '../api/DesignApi';
 import { WEB_UPLOAD_POLICIES, assertValidUploadFiles } from '@/utils/uploadValidation';
 import { addClientDiagnostic } from '@/utils/clientDiagnostics';
+import { preprocessImageFile } from '@/utils/imagePreprocess';
 
 const MAX_RETRY_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 750;
@@ -83,6 +84,14 @@ const fileDiagnostic = (file: File) => ({
   size: file.size,
 });
 
+type PreparedUploadItem = {
+  file: File;
+  originalFile: File;
+  viewSlot: ReturnType<typeof normalizeMediaViewSlot>;
+  optimized: boolean;
+  reason?: string;
+};
+
 const uploadHost = (entry: PresignEntry) => {
   try {
     return new URL(entry.uploadUrl).host;
@@ -96,6 +105,44 @@ const resolveViewSlot = (item: UploadSource, index: number) => {
     return normalizeMediaViewSlot(null, index);
   }
   return normalizeMediaViewSlot(item.viewSlot, index);
+};
+
+const prepareDesignUploadItems = async (
+  items: UploadSource[],
+): Promise<PreparedUploadItem[]> => {
+  const prepared = await Promise.all(
+    items.map(async (item, index): Promise<PreparedUploadItem | null> => {
+      const file = resolveFile(item);
+      if (!file) return null;
+
+      try {
+        const processed = await preprocessImageFile(file, 'detail', {
+          maxSizeBytes: WEB_UPLOAD_POLICIES.designMedia.maxSizeBytes,
+        });
+        return {
+          file: processed.file,
+          originalFile: file,
+          viewSlot: resolveViewSlot(item, index),
+          optimized: !processed.skipped,
+          reason: processed.reason,
+        };
+      } catch (error) {
+        addClientDiagnostic('warn', 'design-upload', 'Image preprocessing failed', {
+          file: fileDiagnostic(file),
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return {
+          file,
+          originalFile: file,
+          viewSlot: resolveViewSlot(item, index),
+          optimized: false,
+          reason: 'preprocess-failed',
+        };
+      }
+    }),
+  );
+
+  return prepared.filter((entry): entry is PreparedUploadItem => entry !== null);
 };
 
 const computeAggregateProgress = (
@@ -311,13 +358,28 @@ export function useDesignUpload() {
 
   const uploadDesign = useCallback(async (...args: unknown[]) => {
     const parsed = parseUploadArgs(args);
-    const resolvedFiles = parsed.items
+    const originalFiles = parsed.items
       .map(resolveFile)
       .filter((file): file is File => file !== null);
     addClientDiagnostic('info', 'design-upload', 'Upload flow started', {
       shouldPublish: parsed.shouldPublish,
+      fileCount: originalFiles.length,
+      files: originalFiles.map(fileDiagnostic),
+    });
+
+    const uploadItems = await prepareDesignUploadItems(parsed.items);
+    const resolvedFiles = uploadItems.map((item) => item.file);
+    const optimizedItems = uploadItems.filter((item) => item.optimized);
+    addClientDiagnostic('info', 'design-upload', 'Upload media prepared', {
+      shouldPublish: parsed.shouldPublish,
       fileCount: resolvedFiles.length,
-      files: resolvedFiles.map(fileDiagnostic),
+      optimizedCount: optimizedItems.length,
+      files: uploadItems.map((item) => ({
+        original: fileDiagnostic(item.originalFile),
+        prepared: fileDiagnostic(item.file),
+        optimized: item.optimized,
+        reason: item.reason,
+      })),
     });
     assertValidUploadFiles(resolvedFiles, WEB_UPLOAD_POLICIES.designMedia);
 
@@ -351,15 +413,6 @@ export function useDesignUpload() {
     setError(null);
 
     try {
-      const uploadItems = parsed.items
-        .map((item, index) => {
-          const file = resolveFile(item);
-          return file ? { file, viewSlot: resolveViewSlot(item, index) } : null;
-        })
-        .filter(
-          (entry): entry is { file: File; viewSlot: ReturnType<typeof normalizeMediaViewSlot> } =>
-            entry !== null,
-        );
       addClientDiagnostic('info', 'design-upload', 'Initializing design uploads', {
         shouldPublish: parsed.shouldPublish,
         fileCount: uploadItems.length,

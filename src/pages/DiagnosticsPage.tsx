@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  CLIENT_DIAGNOSTICS_EVENT,
+  addClientDiagnostic,
   clearClientDiagnostics,
   enableClientDiagnostics,
   formatClientDiagnostics,
@@ -12,10 +14,40 @@ const DiagnosticsPage: React.FC = () => {
   const entries = useMemo(() => getClientDiagnostics(), [revision]);
   const text = useMemo(() => formatClientDiagnostics(), [revision]);
 
-  const refresh = () => setRevision((value) => value + 1);
+  const refresh = useCallback(() => setRevision((value) => value + 1), []);
+
+  useEffect(() => {
+    enableClientDiagnostics();
+    addClientDiagnostic('info', 'diagnostics', 'Diagnostics page opened', {
+      href: window.location.href,
+      userAgent: navigator.userAgent,
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
+    });
+    refresh();
+
+    const onUpdate = () => refresh();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    const interval = window.setInterval(refresh, 1000);
+
+    window.addEventListener(CLIENT_DIAGNOSTICS_EVENT, onUpdate);
+    window.addEventListener('storage', onUpdate);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener(CLIENT_DIAGNOSTICS_EVENT, onUpdate);
+      window.removeEventListener('storage', onUpdate);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [refresh]);
 
   const handleEnable = () => {
     enableClientDiagnostics();
+    addClientDiagnostic('info', 'diagnostics', 'Diagnostics enabled from page', {
+      href: window.location.href,
+    });
     refresh();
   };
 
@@ -59,8 +91,8 @@ const DiagnosticsPage: React.FC = () => {
           </p>
           <h1 className="text-2xl font-bold">Frontend logs</h1>
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            Use this page after reproducing a mobile browser issue with
-            <span className="font-mono"> ?debug=1</span> in the URL.
+            Open this page on the same phone before reproducing a mobile browser issue.
+            It enables logging for this browser and refreshes automatically.
           </p>
         </header>
 
