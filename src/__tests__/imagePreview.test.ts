@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  buildDisplayableImagePreview,
   IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
   isLikelyImageFile,
   normalizeImageFile,
@@ -52,5 +53,37 @@ describe('imagePreview', () => {
 
     expect(prefersCanvasImagePreview()).toBe(true);
     window.matchMedia = originalMatchMedia;
+  });
+
+  it('falls back to the raw data: URL when every canvas strategy fails (privacy browsers)', async () => {
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = () => 'blob:mock';
+    URL.revokeObjectURL = () => undefined;
+    vi.stubGlobal('createImageBitmap', () =>
+      Promise.reject(new Error('canvas blocked')),
+    );
+    // Image that never decodes — simulates canvas/fingerprint-blocked browsers.
+    class FailingImage {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      decoding = '';
+      set src(_value: string) {
+        queueMicrotask(() => this.onerror?.());
+      }
+    }
+    vi.stubGlobal('Image', FailingImage);
+
+    try {
+      const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x43]);
+      const file = new File([bytes], 'photo.jpg', { type: 'image/jpeg' });
+      const url = await buildDisplayableImagePreview(file);
+      expect(url.startsWith('data:image/jpeg')).toBe(true);
+      expect(url).not.toBe(IMAGE_PREVIEW_UNAVAILABLE_DATA_URL);
+    } finally {
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+      vi.unstubAllGlobals();
+    }
   });
 });

@@ -1,6 +1,16 @@
 const TRANSCODE_IMAGE_TYPES = new Set(['image/heic', 'image/heif', 'image/avif']);
 
+/** Formats <img> renders natively everywhere — eligible for the raw data: URL fallback. */
+const RAW_PREVIEW_DISPLAYABLE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/bmp',
+]);
+
 export const MAX_PREVIEW_SOURCE_BYTES = 32 * 1024 * 1024;
+export const MAX_RAW_PREVIEW_SOURCE_BYTES = 12 * 1024 * 1024;
 export const MAX_PREVIEW_DIMENSION = 1600;
 export const JPEG_PREVIEW_QUALITY = 0.82;
 export const PREVIEW_STRATEGY_TIMEOUT_MS = 12_000;
@@ -194,8 +204,8 @@ const buildPreviewViaBlobCanvas = async (file: File): Promise<string> => {
   }
 };
 
-const buildPreviewViaDataUrlCanvas = async (file: File): Promise<string> => {
-  const dataUrl = await new Promise<string>((resolve, reject) => {
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
@@ -207,6 +217,9 @@ const buildPreviewViaDataUrlCanvas = async (file: File): Promise<string> => {
     reader.onerror = () => reject(reader.error ?? new Error('Preview read failed'));
     reader.readAsDataURL(file);
   });
+
+const buildPreviewViaDataUrlCanvas = async (file: File): Promise<string> => {
+  const dataUrl = await readFileAsDataUrl(file);
 
   const image = await loadImageElement(dataUrl);
   const { width, height } = scaleToFit(
@@ -274,6 +287,30 @@ export const buildDisplayableImagePreview = async (
       );
       if (previewUrl.startsWith('data:image/jpeg')) {
         return previewUrl;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  // Every strategy above requires canvas READBACK (toDataURL), which privacy
+  // browsers (Brave shields, fingerprint protection) can block wholesale — a
+  // plain JPEG then fails all three. Formats <img> renders natively fall back
+  // to the raw file bytes as a data: URL: no canvas involved, works anywhere.
+  if (
+    RAW_PREVIEW_DISPLAYABLE_TYPES.has(mime) &&
+    normalizedFile.size <= MAX_RAW_PREVIEW_SOURCE_BYTES
+  ) {
+    try {
+      const rawDataUrl = await withPreviewTimeout('raw-dataurl', () =>
+        readFileAsDataUrl(normalizedFile),
+      );
+      if (rawDataUrl.startsWith('data:image/')) {
+        console.warn(
+          '[imagePreview] canvas strategies failed; using raw data URL preview',
+          lastError,
+        );
+        return rawDataUrl;
       }
     } catch (error) {
       lastError = error;
