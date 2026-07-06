@@ -4,6 +4,7 @@ import {
   getPublishTaskDesignId,
   getPublishTaskLegacyCollectionId,
   getCompactPublishTaskStatusLabel,
+  isLocalPublishTaskId,
   normalizePublishTaskIdentifiers,
   readPublishTasks,
   type PublishTask,
@@ -101,6 +102,12 @@ describe('publishTracker identifiers', () => {
     // The server id and local task id must differ — if they were the same the
     // dedup would fail to distinguish between the placeholder and the real card.
     expect(task.id).not.toBe(getPublishTaskDesignId(task));
+  });
+
+  it('identifies local publish task ids so UI never routes them as persisted designs', () => {
+    expect(isLocalPublishTaskId('publish_1783327468928_r1mee6')).toBe(true);
+    expect(isLocalPublishTaskId('11111111-1111-4111-8111-111111111111')).toBe(false);
+    expect(isLocalPublishTaskId(null)).toBe(false);
   });
 
   it('does not persist local data/blob preview URLs in publish tasks', () => {

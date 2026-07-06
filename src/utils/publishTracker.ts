@@ -74,6 +74,9 @@ const normalizeEntityId = (value?: string | null) => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
+export const isLocalPublishTaskId = (value?: string | null): value is string =>
+  typeof value === 'string' && value.trim().startsWith('publish_');
+
 const sanitizePreviewUrlForStorage = (value?: string | null) => {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();

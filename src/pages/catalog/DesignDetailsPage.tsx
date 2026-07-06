@@ -7,6 +7,7 @@ import DesignApi from '@/api/DesignApi';
 import useCachedResource from '@/hooks/useCachedResource';
 import { fetchCollectionDetailQuery } from '@/query/queries';
 import { toDesignMarketItem } from '@/utils/designMarketItem';
+import { isLocalPublishTaskId } from '@/utils/publishTracker';
 
 const DesignDetailsPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -14,6 +15,7 @@ const DesignDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const openMediaId = searchParams.get('openMedia');
+  const isLocalTaskRoute = isLocalPublishTaskId(id);
 
   const {
     data: detail,
@@ -31,7 +33,7 @@ const DesignDetailsPage: React.FC = () => {
         return legacyDetail;
       }
     },
-    enabled: Boolean(id),
+    enabled: Boolean(id) && !isLocalTaskRoute,
   });
 
   const item = useMemo(
@@ -41,6 +43,9 @@ const DesignDetailsPage: React.FC = () => {
 
   const error = useMemo(() => {
     if (!id) return 'Design reference is missing.';
+    if (isLocalTaskRoute) {
+      return 'This upload is still local to your browser. Open it from your Drafts or In Review tab once upload finishes.';
+    }
     if (fetchError) {
       return fetchError.message === 'Design not found.'
         ? 'Design not found.'
@@ -50,7 +55,7 @@ const DesignDetailsPage: React.FC = () => {
       return 'This design does not have display media yet.';
     }
     return null;
-  }, [detail, fetchError, id, item, loading]);
+  }, [detail, fetchError, id, isLocalTaskRoute, item, loading]);
 
   if (loading) {
     return (

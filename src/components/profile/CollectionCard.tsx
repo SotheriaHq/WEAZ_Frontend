@@ -15,7 +15,7 @@ import type { RootState } from '@/store';
 import VLoader from '@/components/loaders/VLoader';
 import { getCatalogEntityCardCopy, resolveCatalogEntityCardBranch } from './catalogEntityCardModel';
 import { mapCatalogTargetForLegacyApi } from '@/utils/catalogTarget';
-import { getCompactPublishTaskStatusLabel } from '@/utils/publishTracker';
+import { getCompactPublishTaskStatusLabel, isLocalPublishTaskId } from '@/utils/publishTracker';
 import { getContentStatusLabel, getContentStatusTone } from '@/utils/contentIntegrity';
 import ContentReviewDecisionModal from '@/components/content-integrity/ContentReviewDecisionModal';
 
@@ -116,7 +116,8 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
     ? getContentStatusTone(backendStatus)
     : 'bg-sky-500/90 text-white';
   const clientPreviewUrl = collection.clientStatusMeta?.previewUrl;
-  const hasPersistedCollectionId = !collection.id.startsWith('publish_');
+  const isLocalPublishTask = isLocalPublishTaskId(collection.id);
+  const hasPersistedCollectionId = !isLocalPublishTask;
 
   const displayItemCount = itemCount || postsCount;
   const [resolvedCover, setResolvedCover] = useState<string | undefined>(coverImage && coverImage.length > 0 ? coverImage : undefined);
@@ -323,15 +324,17 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
     }
   };
 
+  const canOpenCard = !isPublishing && !publishFailed && !isDeleted && hasPersistedCollectionId && Boolean(onClick);
+
   return (
     <>
     <div 
       data-entity-type={entityType}
       data-card-branch={cardBranch}
       className={`relative group w-full overflow-hidden shadow-md transition-transform duration-200 rounded-xl ${
-        isDeleted ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'
+        canOpenCard ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-default'
       }`}
-      onClick={isPublishing || isDeleted || !onClick ? undefined : () => onClick(collection.id)}
+      onClick={canOpenCard ? () => onClick?.(collection.id) : undefined}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -486,7 +489,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
         </div>
         
         {/* Three-dot menu for owners (top right) */}
-        {showActions && (onEdit || onDelete || onRestore || onPermanentDelete) && (
+        {showActions && hasPersistedCollectionId && (onEdit || onDelete || onRestore || onPermanentDelete) && (
           <div className="absolute top-3 right-3 z-50" onClick={(e) => e.stopPropagation()}>
             <Dropdown>
               <DropdownTrigger className="btn-tight-xs">
@@ -522,7 +525,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
         )}
 
         {/* Vertical Action Bar (like in Reels) - Right side */}
-        {!isDraft && !isDeleted && (
+        {!isDraft && !isDeleted && hasPersistedCollectionId && (
         <div className="absolute bottom-28 right-2 z-10 flex flex-col items-center gap-3">
           {/* Legacy thread targets are still collection-backed for design rows. */}
           <ThreadButton

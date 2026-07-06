@@ -44,6 +44,7 @@ import {
   getPublishTaskDesignId,
   getPublishTaskLegacyCollectionId,
   getCompactPublishTaskStatusLabel,
+  isLocalPublishTaskId,
 } from '@/utils/publishTracker';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
 import {
@@ -857,6 +858,13 @@ const ProfilePage: React.FC = () => {
 
   const handleDismissFailedCard = useCallback((id: string) => {
     if (!id) return;
+    const state = publishingStates[id];
+    if (state?.taskId) {
+      removePublishTask(state.taskId, publishTaskScope);
+    }
+    if (isLocalPublishTaskId(id)) {
+      removePublishTask(id, publishTaskScope);
+    }
     setPublishingStates((prev) => {
       if (!prev[id]) return prev;
       const next = { ...prev };
@@ -867,7 +875,7 @@ const ProfilePage: React.FC = () => {
       delete next[id];
       return next;
     });
-  }, []);
+  }, [publishTaskScope, publishingStates]);
 
   const removeCollectionFromView = useCallback((collectionId: string) => {
     if (!collectionId) return;
@@ -915,12 +923,21 @@ const ProfilePage: React.FC = () => {
   }, []);
 
   const handleEditCollection = useCallback((id: string) => {
+    if (isLocalPublishTaskId(id)) {
+      toast.info('Upload session is still initializing. Use Retry status or remove the status card.');
+      return;
+    }
     navigate(buildDesignRoute({ designId: id, legacyCollectionId: id, mode: 'edit' }));
   }, [navigate]);
 
   const handleRequestCollectionDelete = useCallback((id: string) => {
+    if (isLocalPublishTaskId(id)) {
+      handleDismissFailedCard(id);
+      toast.success('Removed upload status card.');
+      return;
+    }
     setCollectionToDelete(id);
-  }, []);
+  }, [handleDismissFailedCard]);
 
   const handleRequestCollectionRestore = useCallback((id: string) => {
     setCollectionToRestore(id);
@@ -931,6 +948,10 @@ const ProfilePage: React.FC = () => {
   }, []);
 
   const handleCollectionClick = useCallback((id: string) => {
+    if (isLocalPublishTaskId(id)) {
+      toast.info('Upload session is still initializing. Use Retry status to check it.');
+      return;
+    }
     if (visibilityFilter === 'Drafts') {
       handleEditCollection(id);
       return;
@@ -2271,6 +2292,12 @@ const ProfilePage: React.FC = () => {
         onConfirm={async () => {
           if (!collectionToDelete || !user) return;
           const id = collectionToDelete;
+          if (isLocalPublishTaskId(id)) {
+            setCollectionToDelete(null);
+            handleDismissFailedCard(id);
+            toast.success('Removed upload status card.');
+            return;
+          }
           const isDraft = drafts.some(d => d.id === id);
           const removedSnapshot = drafts.find((item) => item.id === id)
             ?? activeCollections.find((item) => item.id === id);
