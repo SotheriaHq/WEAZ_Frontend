@@ -164,7 +164,7 @@ const ProfilePage: React.FC = () => {
   const [draftsError, setDraftsError] = useState<string | null>(null);
   const [draftsInitialized, setDraftsInitialized] = useState(false);
   const [isBrandQrOpen, setIsBrandQrOpen] = useState(false);
-  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; title?: string; visibility?: 'PUBLIC' | 'PRIVATE'; kind?: PublishTaskKind; reviewStatus?: string | null }>>({});
+  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; designId?: string; title?: string; visibility?: 'PUBLIC' | 'PRIVATE'; kind?: PublishTaskKind; reviewStatus?: string | null }>>({});
   const [publishTasks, setPublishTasks] = useState<PublishTask[]>([]);
 
   const navigate = useNavigate();
@@ -725,6 +725,7 @@ const ProfilePage: React.FC = () => {
             kind: isDraftTask ? 'draft' : 'publish',
             progress: task.progress,
           });
+        const nextDesignId = getPublishTaskDesignId(task);
         if (
           !current ||
           current.status !== nextStatus ||
@@ -732,6 +733,7 @@ const ProfilePage: React.FC = () => {
           current.message !== nextMessage ||
           current.previewUrl !== task.coverPreviewUrl ||
           current.taskId !== task.id ||
+          current.designId !== nextDesignId ||
           current.title !== task.title ||
           current.kind !== task.kind
         ) {
@@ -742,6 +744,7 @@ const ProfilePage: React.FC = () => {
             progress: task.progress,
             previewUrl: task.coverPreviewUrl,
             taskId: task.id,
+            designId: nextDesignId,
             title: task.title,
             visibility: task.visibility,
             kind: task.kind,
