@@ -14,6 +14,8 @@ import { queryKeys } from '@/query/queryKeys';
 
 interface CollectionsGridProps {
   collections: CollectionDto[];
+  /** Tighter typography for catalog visibility tabs on mobile browsers. */
+  compactCards?: boolean;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   onRestore?: (id: string) => void;
@@ -34,6 +36,7 @@ const areSavedMapsEqual = (left: Record<string, boolean>, right: Record<string, 
 
 const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
   collections,
+  compactCards = false,
   onEdit,
   onDelete,
   onRestore,
@@ -135,7 +138,9 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
     1280: 3,
     1024: 3,
     768: 2,
-    640: 1,
+    640: 2,
+    480: 2,
+    0: 1,
   };
 
   if (!collections || collections.length === 0) {
@@ -145,13 +150,14 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
   return (
     <Masonry
       breakpointCols={breakpointColumns}
-      className="flex -ml-6 w-auto"
-      columnClassName="pl-6 space-y-6 bg-clip-padding"
+      className="catalog-masonry-grid flex w-full -ml-3 sm:-ml-6"
+      columnClassName="catalog-masonry-column pl-3 sm:pl-6 bg-clip-padding"
     >
       {collections.map((collection) => (
-        <div key={collection.id} className="w-full">
+        <div key={collection.id} className="catalog-masonry-item mb-3 sm:mb-6 w-full">
           <CatalogEntityCard
             collection={collection}
+            compact={compactCards}
             onClick={onCollectionClick}
             onEdit={onEdit} 
             onDelete={onDelete}

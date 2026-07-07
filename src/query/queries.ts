@@ -146,6 +146,8 @@ export function useBrandCollectionsQuery(args: BrandCollectionsArgs, options?: E
     queryKey: queryKeys.brand.collections(ownerId, { scope, visibility, includeDeleted, onlyDeleted }),
     queryFn: () => brandApi.getCollections(String(ownerId), { scope, visibility, includeDeleted, onlyDeleted }),
     enabled: isEnabled(ownerId, options?.enabled ?? true),
+    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -158,6 +160,8 @@ export function useMyDraftCollectionsQuery(
     queryFn: () => brandApi.getMyDraftCollections(),
     enabled: isEnabled(ownerId, options?.enabled ?? true),
     staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
   });
 }
 
@@ -639,4 +643,42 @@ export const setBrandProfileQueryData = (
   profile: BrandProfileDto | null,
 ) => {
   queryClient.setQueryData(queryKeys.brand.profile(brandId), profile);
+};
+
+export const setMyDraftsQueryData = (
+  queryClient: QueryClient,
+  ownerId: string | null | undefined,
+  updater: (items: CollectionDto[]) => CollectionDto[],
+) => {
+  if (!ownerId) return;
+  queryClient.setQueryData<CollectionDto[]>(
+    queryKeys.brand.myDrafts(ownerId),
+    (current) => updater(current ?? []),
+  );
+};
+
+export const removeFromMyDraftsQueryData = (
+  queryClient: QueryClient,
+  ownerId: string | null | undefined,
+  collectionId: string,
+) => {
+  setMyDraftsQueryData(queryClient, ownerId, (items) =>
+    items.filter((item) => item.id !== collectionId),
+  );
+};
+
+/** Stale-while-revalidate: patch cache immediately, refetch in background. */
+export const refreshOwnerCatalogQueries = (
+  queryClient: QueryClient,
+  ownerId: string | null | undefined,
+) => {
+  if (!ownerId) return;
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.brand.myDrafts(ownerId),
+    refetchType: 'active',
+  });
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.brand.collections(ownerId),
+    refetchType: 'active',
+  });
 };

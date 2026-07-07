@@ -2085,3 +2085,17 @@ html:not(.dark) .input-glass:focus {
     animation: none;
   }
 }
+
+/* Catalog visibility tabs — keep react-masonry-css columns from collapsing/overlapping on mobile */
+.catalog-masonry-grid {
+  width: 100%;
+  margin-left: 0;
+}
+.catalog-masonry-column {
+  display: flex;
+  flex-direction: column;
+}
+.catalog-masonry-item {
+  width: 100%;
+  break-inside: avoid;
+}

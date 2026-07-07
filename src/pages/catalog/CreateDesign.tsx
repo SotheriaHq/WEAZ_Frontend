@@ -53,6 +53,9 @@ import type { MediaItem } from "@/types/media";
 import { MediaProvider, useMediaStore } from "../../hooks/useMediaStore";
 import useDesignUpload from "../../hooks/useDesignUpload";
 import { useBrandProfile } from "../../hooks/UseBrandHook";
+import { useQueryClient } from "@tanstack/react-query";
+import { refreshOwnerCatalogQueries } from "@/query/queries";
+import { getActiveBrandId } from "@/lib/brandAccess";
 import { DesignApi, finalizeDesignUploads, resolveDesignId } from "@/api/DesignApi";
 import type { SizingMode } from '@/types/sizing';
 import {
@@ -287,6 +290,7 @@ const CreateDesignInner: React.FC = () => {
   const [fitPreference, setFitPreference] = useState<DesignFitPreference>('REGULAR');
   const [targetAgeGroup, setTargetAgeGroup] = useState<DesignTargetAgeGroup>('ADULT');
   const [metadataEditedAt, setMetadataEditedAt] = useState<Date | null>(null);
+  const [editingDraft, setEditingDraft] = useState(false);
   const [storeProcessingTime, setStoreProcessingTime] = useState('');
   const [storeCustomOrderLeadTime, setStoreCustomOrderLeadTime] = useState('');
   const [customMeasurementKeys, setCustomMeasurementKeys] = useState<string[]>(
@@ -363,6 +367,11 @@ const CreateDesignInner: React.FC = () => {
     cancelUploads,
   } = useDesignUpload();
   const { user } = useBrandProfile();
+  const queryClient = useQueryClient();
+  const ownerBrandId = getActiveBrandId(user);
+  const refreshCatalogAfterMutation = useCallback(() => {
+    refreshOwnerCatalogQueries(queryClient, ownerBrandId);
+  }, [ownerBrandId, queryClient]);
   const publishTaskScope = useMemo(
     () => ({ ownerId: user?.id ?? undefined }),
     [user?.id],
@@ -375,15 +384,15 @@ const CreateDesignInner: React.FC = () => {
 
   const disabled = false;
   const titleDescriptionLocked = useMemo(() => {
-    if (!isEditMode || !metadataEditedAt) return false;
+    if (!isEditMode || editingDraft || !metadataEditedAt) return false;
     const cooldownMs = 30 * 24 * 60 * 60 * 1000;
     return Date.now() < metadataEditedAt.getTime() + cooldownMs;
-  }, [metadataEditedAt, isEditMode]);
+  }, [editingDraft, metadataEditedAt, isEditMode]);
   const nextTitleEditDate = useMemo(() => {
-    if (!metadataEditedAt) return null;
+    if (!metadataEditedAt || editingDraft) return null;
     const cooldownMs = 30 * 24 * 60 * 60 * 1000;
     return new Date(metadataEditedAt.getTime() + cooldownMs);
-  }, [metadataEditedAt]);
+  }, [editingDraft, metadataEditedAt]);
   const picker = useFilePicker({
     accept: ["image/*", "video/*"],
     maxFiles: Math.max(0, DESIGN_MAX_MEDIA_COUNT - files.length),
@@ -494,6 +503,7 @@ const CreateDesignInner: React.FC = () => {
         setMetadataEditedAt(
           d.metadataEditedAt ? new Date(d.metadataEditedAt) : null,
         );
+        setEditingDraft(String(d.status ?? '').toUpperCase() === 'DRAFT');
 
         const draftFilters = Array.isArray((d as any).filters)
           ? ((d as any).filters as Array<{ dimensionId?: string; valueId?: string }>).reduce(
@@ -928,6 +938,7 @@ const CreateDesignInner: React.FC = () => {
         } as any);
         setLastSaved(new Date());
         toast.success("Draft saved");
+        refreshCatalogAfterMutation();
         navigate("/profile?tab=Content&visibility=Drafts", { replace: true });
         return;
       }
@@ -1857,6 +1868,11 @@ const CreateDesignInner: React.FC = () => {
                           {description.length} / 500 characters
                         </p>
                       </div>
+                      {editingDraft && (
+                        <p className="rounded-lg border border-sky-300/60 bg-sky-50/80 px-3 py-2 text-xs font-medium text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
+                          Drafts can be updated up to 2 times every 24 hours.
+                        </p>
+                      )}
                       {titleDescriptionLocked && (
                         <p className="rounded-lg border border-amber-300/60 bg-amber-50/80 px-3 py-2 text-xs font-medium text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
                           Title and description can only be updated once every

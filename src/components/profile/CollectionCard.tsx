@@ -35,6 +35,7 @@ export interface CollectionCardProps {
   isSaved?: boolean;
   onToggleSave?: (id: string) => void;
   saveBusy?: boolean;
+  compact?: boolean;
 }
 
 const CollectionCardComponent: React.FC<CollectionCardProps> = ({
@@ -53,6 +54,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
   isSaved: isSavedProp,
   onToggleSave,
   saveBusy: saveBusyProp,
+  compact = false,
 }) => {
   const {
     title,
@@ -332,7 +334,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
       data-entity-type={entityType}
       data-card-branch={cardBranch}
       className={`relative group w-full overflow-hidden shadow-md transition-transform duration-200 rounded-xl ${
-        canOpenCard ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-default'
+        canOpenCard ? 'cursor-pointer md:hover:scale-[1.02]' : 'cursor-default'
       }`}
       onClick={canOpenCard ? () => onClick?.(collection.id) : undefined}
       onMouseEnter={handleMouseEnter}
@@ -555,7 +557,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
         )}
 
         {/* Bottom Info */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 text-white z-10">
+        <div className={`absolute bottom-0 left-0 right-0 text-white z-10 ${compact ? 'p-2' : 'p-3'}`}>
           {/* Brand Info with Avatar */}
           <div className="flex items-center gap-2 mb-2">
             <div className="w-7 h-7 flex-shrink-0 ring-1 ring-white/30 rounded-sm overflow-hidden">
@@ -580,7 +582,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
           </div>
 
           {/* Collection Title */}
-          <h3 className="text-base font-bold mb-1 line-clamp-2 leading-tight">{displayTitle}</h3>
+          <h3 className={`font-bold mb-1 line-clamp-2 leading-tight ${compact ? 'text-sm' : 'text-base'}`}>{displayTitle}</h3>
           
           {/* Collection Stats */}
           <div className="flex items-center gap-1.5 text-[11px] text-white/90 mb-2">

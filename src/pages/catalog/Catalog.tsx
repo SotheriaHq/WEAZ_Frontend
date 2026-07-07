@@ -61,6 +61,8 @@ import {
   useBrandProfileQuery,
   useMyDraftCollectionsQuery,
   useStoreStatusQuery,
+  removeFromMyDraftsQueryData,
+  refreshOwnerCatalogQueries,
 } from '@/query/queries';
 import { queryKeys } from '@/query/queryKeys';
 
@@ -270,13 +272,14 @@ const ProfilePage: React.FC = () => {
 
   // Sync react-query draft/deleted caches during render so tab switches paint
   // cached data on the first frame — never a blocking skeleton on revisits.
+  // Respect optimistic removals so a stale query cache cannot resurrect deleted rows.
   if (isOwner && myDraftsQuery.data) {
     const uniqueDrafts = myDraftsQuery.data.reduce((acc, draft) => {
       if (!acc.some((entry) => entry.id === draft.id)) {
         acc.push(draft);
       }
       return acc;
-    }, [] as CollectionDto[]);
+    }, [] as CollectionDto[]).filter((draft) => !locallyRemovedCollectionIds.has(draft.id));
     if (collectionListChanged(drafts, uniqueDrafts)) {
       setDrafts(uniqueDrafts);
     }
@@ -289,8 +292,11 @@ const ProfilePage: React.FC = () => {
   }
 
   if (isOwner && deletedDesignsQuery.data) {
-    if (collectionListChanged(deletedDesigns, deletedDesignsQuery.data)) {
-      setDeletedDesigns(deletedDesignsQuery.data);
+    const visibleDeleted = deletedDesignsQuery.data.filter(
+      (item) => !locallyRemovedCollectionIds.has(item.id),
+    );
+    if (collectionListChanged(deletedDesigns, visibleDeleted)) {
+      setDeletedDesigns(visibleDeleted);
     }
     if (!deletedDesignsInitialized) {
       setDeletedDesignsInitialized(true);
@@ -329,6 +335,20 @@ const ProfilePage: React.FC = () => {
       setPublishTasks(readPublishTasks(publishTaskScope));
     });
   }, [publishTaskScope]);
+
+  // Industry-standard stale-while-revalidate: when the user returns from create/edit
+  // flows (or refocuses the tab), refresh owner catalog data in the background.
+  useEffect(() => {
+    if (!isOwner || !ownerBrandId) return;
+    refreshOwnerCatalogQueries(queryClient, ownerBrandId);
+  }, [isOwner, location.key, ownerBrandId, queryClient]);
+
+  useEffect(() => {
+    if (!isOwner || !ownerBrandId) return;
+    const onFocus = () => refreshOwnerCatalogQueries(queryClient, ownerBrandId);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [isOwner, ownerBrandId, queryClient]);
 
   const handleOpenAddModal = () => {
     // collection type passed from dropdown; modal uses internal defaults for now
@@ -2198,6 +2218,7 @@ const ProfilePage: React.FC = () => {
                       ) : decoratedCollections.length > 0 ? (
                         <CollectionsGrid
                           collections={decoratedCollections}
+                          compactCards
                           isDraft={isDraftVisibility}
                           isDeleted={isDeletedVisibility}
                           onEdit={isOwner ? handleEditCollection : undefined}
@@ -2365,6 +2386,9 @@ const ProfilePage: React.FC = () => {
             ?? activeCollections.find((item) => item.id === id);
           setCollectionToDelete(null);
           removeCollectionFromView(id);
+          if (isDraft) {
+            removeFromMyDraftsQueryData(queryClient, ownerBrandId, id);
+          }
           try {
             const success = isDraft
               ? await brandApi.deleteCollection(id)
@@ -2372,6 +2396,7 @@ const ProfilePage: React.FC = () => {
             if (success) {
               toast.success(isDraft ? 'Draft discarded' : 'Design deleted');
               setRecentlyDeletedDesign({ isDraft });
+              refreshOwnerCatalogQueries(queryClient, ownerBrandId);
               if (!isDraft) {
                 // Refresh only the off-screen Deleted source. The visible source remains
                 // the optimistic local removal, so one delete never replaces or blanks
@@ -2387,10 +2412,32 @@ const ProfilePage: React.FC = () => {
               }
             } else {
               restoreCollectionInView(id, removedSnapshot, isDraft);
+              if (isDraft && removedSnapshot) {
+                queryClient.setQueryData<CollectionDto[]>(
+                  queryKeys.brand.myDrafts(ownerBrandId),
+                  (current) => {
+                    const list = current ?? [];
+                    return list.some((item) => item.id === removedSnapshot.id)
+                      ? list
+                      : [removedSnapshot, ...list];
+                  },
+                );
+              }
               toast.error(isDraft ? 'Failed to discard draft' : 'Failed to delete design');
             }
           } catch (error) {
             restoreCollectionInView(id, removedSnapshot, isDraft);
+            if (isDraft && removedSnapshot) {
+              queryClient.setQueryData<CollectionDto[]>(
+                queryKeys.brand.myDrafts(ownerBrandId),
+                (current) => {
+                  const list = current ?? [];
+                  return list.some((item) => item.id === removedSnapshot.id)
+                    ? list
+                    : [removedSnapshot, ...list];
+                },
+              );
+            }
             console.error('Error deleting collection:', error);
             toast.error('An error occurred');
           }
