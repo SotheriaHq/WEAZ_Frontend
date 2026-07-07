@@ -11,6 +11,8 @@ const RAW_PREVIEW_DISPLAYABLE_TYPES = new Set([
 
 export const MAX_PREVIEW_SOURCE_BYTES = 32 * 1024 * 1024;
 export const MAX_RAW_PREVIEW_SOURCE_BYTES = 12 * 1024 * 1024;
+/** Camera JPEGs above this on mobile skip local data-URL preview (Android probe failures). */
+export const MOBILE_PROACTIVE_NORMALIZE_MIN_BYTES = 1024 * 1024;
 export const MAX_PREVIEW_DIMENSION = 1600;
 export const JPEG_PREVIEW_QUALITY = 0.82;
 export const PREVIEW_STRATEGY_TIMEOUT_MS = 12_000;

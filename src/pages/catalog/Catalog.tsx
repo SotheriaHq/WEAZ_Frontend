@@ -59,6 +59,7 @@ import {
   useBrandPrivateAccessStatesQuery,
   useBrandCollectionsQuery,
   useBrandProfileQuery,
+  useMyDraftCollectionsQuery,
   useStoreStatusQuery,
 } from '@/query/queries';
 import { queryKeys } from '@/query/queryKeys';
@@ -160,7 +161,6 @@ const ProfilePage: React.FC = () => {
   } = useBrandProfile();
   
   const [drafts, setDrafts] = useState<CollectionDto[]>([]);
-  const [draftsLoading, setDraftsLoading] = useState(false);
   const [draftsError, setDraftsError] = useState<string | null>(null);
   const [draftsInitialized, setDraftsInitialized] = useState(false);
   const [isBrandQrOpen, setIsBrandQrOpen] = useState(false);
@@ -189,13 +189,8 @@ const ProfilePage: React.FC = () => {
   // State for inline collection viewer
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
 
-  // Handle URL params for tab, collection, and visibility filter
-  useEffect(() => {
-    const urlCollectionId = searchParams.get('collectionId');
-    if (urlCollectionId) {
-      setSelectedCollectionId(urlCollectionId);
-    }
-    const tab = String(searchParams.get('tab') ?? '').trim().toLowerCase();
+  const resolveTabFromQuery = useCallback((params: URLSearchParams): TabType => {
+    const tab = String(params.get('tab') ?? '').trim().toLowerCase();
     const tabAlias: Record<string, TabType> = {
       collections: 'Content',
       content: 'Content',
@@ -204,19 +199,56 @@ const ProfilePage: React.FC = () => {
       reviews: 'Reviews',
       us: 'Us',
     };
-    if (tabAlias[tab]) {
-      const normalized = tabAlias[tab];
-      setActiveTab(normalized as TabType);
+    return tabAlias[tab] ?? 'Content';
+  }, []);
+
+  const [activeTab, setActiveTab] = useState<TabType>(() => resolveTabFromQuery(searchParams));
+  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>(() => {
+    const fromQuery = resolveVisibilityFilterFromQuery(searchParams);
+    return fromQuery && OWNER_VISIBILITY_FILTERS.includes(fromQuery) ? fromQuery : 'Public';
+  });
+
+  const handleVisibilityFilterChange = useCallback(
+    (next: VisibilityFilter) => {
+      setVisibilityFilter(next);
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev);
+          params.set('visibility', next);
+          if (!params.get('tab')) {
+            params.set('tab', 'Content');
+          }
+          return params;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const myDraftsQuery = useMyDraftCollectionsQuery(ownerBrandId, {
+    enabled: Boolean(isOwner && ownerBrandId),
+  });
+
+  const deletedDesignsQuery = useBrandCollectionsQuery(
+    { ownerId: ownerBrandId, scope: 'design', visibility: 'all', onlyDeleted: true },
+    { enabled: Boolean(isOwner && ownerBrandId) },
+  );
+
+  // Handle URL params for tab, collection, and visibility filter
+  useEffect(() => {
+    const urlCollectionId = searchParams.get('collectionId');
+    if (urlCollectionId) {
+      setSelectedCollectionId(urlCollectionId);
     }
-    // Handle visibility/status filter from URL (e.g., after draft save or review submit redirect)
+    const nextTab = resolveTabFromQuery(searchParams);
+    setActiveTab((current) => (current === nextTab ? current : nextTab));
     const visibility = resolveVisibilityFilterFromQuery(searchParams);
     if (visibility && OWNER_VISIBILITY_FILTERS.includes(visibility)) {
-      setVisibilityFilter(visibility);
+      setVisibilityFilter((current) => (current === visibility ? current : visibility));
     }
-  }, [searchParams]);
+  }, [resolveTabFromQuery, searchParams]);
 
-  const [activeTab, setActiveTab] = useState<TabType>('Content');
-  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>('Public');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [pendingAccessConfirm, setPendingAccessConfirm] = useState<string | null>(null);
   const [collectionToDelete, setCollectionToDelete] = useState<string | null>(null);
@@ -225,8 +257,57 @@ const ProfilePage: React.FC = () => {
   const [recentlyDeletedDesign, setRecentlyDeletedDesign] = useState<{ isDraft: boolean } | null>(null);
   const [locallyRemovedCollectionIds, setLocallyRemovedCollectionIds] = useState<Set<string>>(new Set());
   const [deletedDesigns, setDeletedDesigns] = useState<CollectionDto[]>([]);
-  const [deletedDesignsLoading, setDeletedDesignsLoading] = useState(false);
   const [deletedDesignsError, setDeletedDesignsError] = useState<string | null>(null);
+  const [deletedDesignsInitialized, setDeletedDesignsInitialized] = useState(false);
+
+  const collectionListChanged = useCallback(
+    (current: CollectionDto[], next: CollectionDto[]) => {
+      if (current.length !== next.length) return true;
+      return current.some((entry, index) => entry.id !== next[index]?.id);
+    },
+    [],
+  );
+
+  // Sync react-query draft/deleted caches during render so tab switches paint
+  // cached data on the first frame — never a blocking skeleton on revisits.
+  if (isOwner && myDraftsQuery.data) {
+    const uniqueDrafts = myDraftsQuery.data.reduce((acc, draft) => {
+      if (!acc.some((entry) => entry.id === draft.id)) {
+        acc.push(draft);
+      }
+      return acc;
+    }, [] as CollectionDto[]);
+    if (collectionListChanged(drafts, uniqueDrafts)) {
+      setDrafts(uniqueDrafts);
+    }
+    if (!draftsInitialized) {
+      setDraftsInitialized(true);
+    }
+    if (draftsError) {
+      setDraftsError(null);
+    }
+  }
+
+  if (isOwner && deletedDesignsQuery.data) {
+    if (collectionListChanged(deletedDesigns, deletedDesignsQuery.data)) {
+      setDeletedDesigns(deletedDesignsQuery.data);
+    }
+    if (!deletedDesignsInitialized) {
+      setDeletedDesignsInitialized(true);
+    }
+    if (deletedDesignsError) {
+      setDeletedDesignsError(null);
+    }
+  }
+
+  if (isOwner && myDraftsQuery.error && !draftsInitialized) {
+    setDraftsError('Unable to connect to server. Please check your connection.');
+  }
+
+  if (isOwner && deletedDesignsQuery.error && !deletedDesignsInitialized) {
+    setDeletedDesignsError('Unable to load deleted designs.');
+  }
+
   // collectionType state removed; modal is opened with the selected type via handler
   const [storeStatus, setStoreStatus] = useState<StoreStatusResponse | null>(null);
   const [storeStatusLoading, setStoreStatusLoading] = useState(false);
@@ -293,7 +374,6 @@ const ProfilePage: React.FC = () => {
       }));
       if (kind === 'draft') {
         setDraftsInitialized(true);
-        setDraftsLoading(false);
       }
       navigate(`${location.pathname}${location.search}`, { replace: true });
       return;
@@ -369,57 +449,7 @@ const ProfilePage: React.FC = () => {
     user?.id,
   ]);
 
-  useEffect(() => {
-    if (visibilityFilter === 'Drafts' && isOwner) {
-      setDraftsLoading(true);
-      setDraftsError(null);
-      brandApi.getMyDraftCollections()
-        .then(items => {
-          // Deduplicate by ID to prevent showing duplicate draft cards
-          const uniqueDrafts = items.reduce((acc, draft) => {
-            if (!acc.some(d => d.id === draft.id)) {
-              acc.push(draft);
-            }
-            return acc;
-          }, [] as typeof items);
-          setDrafts(uniqueDrafts);
-          setDraftsInitialized(true);
-        })
-        .catch(err => {
-          console.error(err);
-          setDraftsError('Unable to connect to server. Please check your connection.');
-        })
-        .finally(() => setDraftsLoading(false));
-    }
-  }, [visibilityFilter, isOwner]);
 
-  useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      if (visibilityFilter !== 'Deleted' || !isOwner || !user?.id) return;
-      setDeletedDesignsLoading(true);
-      setDeletedDesignsError(null);
-      try {
-        const items = await brandApi.getCollections(user.id, {
-          scope: 'design',
-          visibility: 'all',
-          onlyDeleted: true,
-        });
-        if (!mounted) return;
-        setDeletedDesigns(items);
-      } catch (error) {
-        if (!mounted) return;
-        console.error(error);
-        setDeletedDesignsError('Unable to load deleted designs.');
-      } finally {
-        if (mounted) setDeletedDesignsLoading(false);
-      }
-    };
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [visibilityFilter, isOwner, user?.id]);
 
   const requiresProfileSetup = useMemo(() => {
     if (!isOwner || !user) {
@@ -799,17 +829,11 @@ const ProfilePage: React.FC = () => {
     let cancelled = false;
     const refreshDrafts = async () => {
       try {
-        const items = await brandApi.getMyDraftCollections();
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.brand.myDrafts(ownerBrandId),
+        });
         if (cancelled) return;
-        const uniqueDrafts = items.reduce((acc, draft) => {
-          if (!acc.some((entry) => entry.id === draft.id)) {
-            acc.push(draft);
-          }
-          return acc;
-        }, [] as typeof items);
-        setDrafts(uniqueDrafts);
         setDraftsInitialized(true);
-        setDraftsLoading(false);
         savedDraftTasks.forEach((task) => removePublishTask(task.id, publishTaskScope));
         setPublishingStates((prev) => {
           const next = { ...prev };
@@ -831,7 +855,7 @@ const ProfilePage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isOwner, publishTaskScope, publishTasks, visibilityFilter]);
+  }, [isOwner, ownerBrandId, publishTaskScope, publishTasks, queryClient, visibilityFilter]);
 
   // Auto-clear stale failed publish states for collections that exist on the server
   useEffect(() => {
@@ -1182,9 +1206,9 @@ const ProfilePage: React.FC = () => {
         : collectionsError;
   const ownerContentLoading =
     visibilityFilter === 'Drafts'
-      ? draftsLoading || (!draftsInitialized && !hasPendingDraftTask)
+      ? myDraftsQuery.isLoading && !draftsInitialized && !hasPendingDraftTask
       : visibilityFilter === 'Deleted'
-        ? deletedDesignsLoading
+        ? deletedDesignsQuery.isLoading && !deletedDesignsInitialized
         : collectionsLoading && !hasPendingLiveTask;
   const isDraftVisibility = visibilityFilter === 'Drafts';
   const isDeletedVisibility = visibilityFilter === 'Deleted';
@@ -1975,7 +1999,7 @@ const ProfilePage: React.FC = () => {
                         {(isOwner ? OWNER_VISIBILITY_FILTERS : VISIBILITY_FILTERS).map((opt) => (
                           <button
                             key={opt}
-                            onClick={() => setVisibilityFilter(opt as any)}
+                            onClick={() => handleVisibilityFilterChange(opt)}
                             aria-pressed={visibilityFilter === opt}
                             className={`relative flex shrink-0 items-center gap-2 pb-3 pt-2 text-sm font-semibold transition-colors ${
                               visibilityFilter === opt

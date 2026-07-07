@@ -7,6 +7,8 @@ import {
   buildVideoPreviewUrl,
   IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
   isPreviewUnavailableDataUrl,
+  MOBILE_PROACTIVE_NORMALIZE_MIN_BYTES,
+  prefersCanvasImagePreview,
   PREVIEW_STRATEGY_TIMEOUT_MS,
   probeImagePreviewUrl,
   revokeObjectPreviewUrl,
@@ -188,6 +190,48 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               normalizedSize: normalized.size,
             });
             return;
+          }
+
+          // Large camera JPEGs on phones: local canvas → huge data: URLs that
+          // Android Chrome fails to render in <img> even though the bytes are
+          // valid. Screenshots (~100 KB) pass; 2 MB+ gallery photos do not.
+          // Normalize on the server once — preview AND upload share the result.
+          if (
+            prefersCanvasImagePreview() &&
+            file.size >= MOBILE_PROACTIVE_NORMALIZE_MIN_BYTES
+          ) {
+            try {
+              const normalized = await getNormalizedImageFile(file);
+              dispatch({
+                type: 'setNormalized',
+                id: itemId,
+                file: normalized,
+                previewUrl: URL.createObjectURL(normalized),
+              });
+              addClientDiagnostic(
+                'info',
+                'media-store',
+                'Proactive server normalize for large mobile photo',
+                {
+                  fileName: file.name,
+                  sniffedFormat,
+                  originalSize: file.size,
+                  normalizedSize: normalized.size,
+                },
+              );
+              return;
+            } catch (error) {
+              addClientDiagnostic(
+                'warn',
+                'media-store',
+                'Proactive server normalize failed; falling back to local preview',
+                {
+                  fileName: file.name,
+                  sniffedFormat,
+                  error: error instanceof Error ? error.message : String(error),
+                },
+              );
+            }
           }
 
           let previewUrl = await Promise.race([

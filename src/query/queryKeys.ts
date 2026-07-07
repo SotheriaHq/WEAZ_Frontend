@@ -71,6 +71,8 @@ export const queryKeys = {
       ] as const,
     collectionDetail: (collectionId?: string | null, scope?: CollectionScopeKey) =>
       ['brand', 'collectionDetail', normalizeId(collectionId), scope ?? 'design'] as const,
+    myDrafts: (ownerId?: string | null) =>
+      ['brand', 'drafts', 'mine', normalizeId(ownerId)] as const,
   },
   brandPrivateAccess: {
     myStates: (brandId?: string | null, viewerId?: string | null) =>

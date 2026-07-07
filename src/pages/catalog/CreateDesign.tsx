@@ -1726,7 +1726,7 @@ const CreateDesignInner: React.FC = () => {
                           ) : (
                             <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-sm font-medium text-theme-secondary">
                               <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
-                              Preparing preview...
+                              Optimizing photo for preview...
                             </div>
                           )}
                         </motion.div>

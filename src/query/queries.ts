@@ -149,6 +149,18 @@ export function useBrandCollectionsQuery(args: BrandCollectionsArgs, options?: E
   });
 }
 
+export function useMyDraftCollectionsQuery(
+  ownerId?: string | null,
+  options?: EnabledOption,
+) {
+  return useQuery({
+    queryKey: queryKeys.brand.myDrafts(ownerId),
+    queryFn: () => brandApi.getMyDraftCollections(),
+    enabled: isEnabled(ownerId, options?.enabled ?? true),
+    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+  });
+}
+
 export function useBrandPrivateAccessStatesQuery(
   brandId?: string | null,
   viewerId?: string | null,
