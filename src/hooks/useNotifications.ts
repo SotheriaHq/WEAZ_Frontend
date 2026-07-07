@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import type { RootState, AppDispatch } from '@/store';
 import { useRealtime } from '@/realtime';
 import { toast } from 'sonner';
 import { determineNotificationRoute } from '@/utils/notificationRouting';
-import { useNotificationSettingsQuery } from '@/query/queries';
+import { refreshOwnerCatalogQueries, useNotificationSettingsQuery } from '@/query/queries';
+
+const CONTENT_REVIEW_NOTIFICATION_TYPES = new Set([
+  'CONTENT_REVIEW_APPROVED',
+  'CONTENT_PUBLISHED',
+  'CONTENT_CHANGES_REQUESTED',
+  'CONTENT_REVIEW_REJECTED',
+  'CONTENT_REVIEW_FAILED',
+  'CONTENT_RESUBMITTED',
+]);
 import {
   fetchNotifications,
   fetchUnreadCount,
@@ -23,6 +33,7 @@ import {
 export function useNotificationsBootstrap() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const userId = useSelector((s: RootState) => s.user.profile?.id);
   const initialized = useSelector((s: RootState) => s.notifications.initialized);
   const items = useSelector((s: RootState) => s.notifications.items);
@@ -117,6 +128,12 @@ export function useNotificationsBootstrap() {
       }
 
       const type = String(payload?.type || '').toUpperCase();
+      if (CONTENT_REVIEW_NOTIFICATION_TYPES.has(type)) {
+        refreshOwnerCatalogQueries(queryClient, userId);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('threadly:content-review-updated'));
+        }
+      }
       const isMessageSignal = type.includes('MESSAGE');
       const notVisible = document.visibilityState !== 'visible';
 
@@ -189,7 +206,7 @@ export function useNotificationsBootstrap() {
       unsub();
       unsubDeleted();
     };
-  }, [userId, realtime, dispatch, playMessageTone, navigate]);
+  }, [userId, realtime, dispatch, playMessageTone, navigate, queryClient]);
 
   // Lightweight debounce for unread fetches
   const maybeFetchUnread = useCallback(() => {

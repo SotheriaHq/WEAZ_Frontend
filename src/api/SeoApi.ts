@@ -2,6 +2,12 @@ import { apiClient } from './httpClient';
 
 export type SeoRobotsDirective = 'index,follow' | 'noindex,nofollow';
 
+export interface SeoExtraMetaTag {
+  attribute: 'name' | 'property';
+  key: string;
+  content: string;
+}
+
 export interface SeoPageMeta {
   canonicalUrl: string;
   title: string;
@@ -21,6 +27,7 @@ export interface SeoPageMeta {
     image?: string;
   };
   jsonLd?: Record<string, unknown>;
+  extraMeta?: SeoExtraMetaTag[];
   httpStatus: 200 | 404;
 }
 

@@ -290,7 +290,9 @@ const CreateDesignInner: React.FC = () => {
   const [fitPreference, setFitPreference] = useState<DesignFitPreference>('REGULAR');
   const [targetAgeGroup, setTargetAgeGroup] = useState<DesignTargetAgeGroup>('ADULT');
   const [metadataEditedAt, setMetadataEditedAt] = useState<Date | null>(null);
+  const [publicationStatus, setPublicationStatus] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState(false);
+  const [withdrawingFromReview, setWithdrawingFromReview] = useState(false);
   const [storeProcessingTime, setStoreProcessingTime] = useState('');
   const [storeCustomOrderLeadTime, setStoreCustomOrderLeadTime] = useState('');
   const [customMeasurementKeys, setCustomMeasurementKeys] = useState<string[]>(
@@ -383,16 +385,19 @@ const CreateDesignInner: React.FC = () => {
   const requiresEmailVerification = !isEditMode && user?.isEmailVerified === false;
 
   const disabled = false;
+  const isInReview = publicationStatus === 'IN_REVIEW';
   const titleDescriptionLocked = useMemo(() => {
-    if (!isEditMode || editingDraft || !metadataEditedAt) return false;
+    if (!isEditMode || editingDraft || publicationStatus !== 'PUBLISHED' || !metadataEditedAt) {
+      return false;
+    }
     const cooldownMs = 30 * 24 * 60 * 60 * 1000;
     return Date.now() < metadataEditedAt.getTime() + cooldownMs;
-  }, [editingDraft, metadataEditedAt, isEditMode]);
+  }, [editingDraft, metadataEditedAt, isEditMode, publicationStatus]);
   const nextTitleEditDate = useMemo(() => {
-    if (!metadataEditedAt || editingDraft) return null;
+    if (!metadataEditedAt || editingDraft || publicationStatus !== 'PUBLISHED') return null;
     const cooldownMs = 30 * 24 * 60 * 60 * 1000;
     return new Date(metadataEditedAt.getTime() + cooldownMs);
-  }, [editingDraft, metadataEditedAt]);
+  }, [editingDraft, metadataEditedAt, publicationStatus]);
   const picker = useFilePicker({
     accept: ["image/*", "video/*"],
     maxFiles: Math.max(0, DESIGN_MAX_MEDIA_COUNT - files.length),
@@ -503,7 +508,9 @@ const CreateDesignInner: React.FC = () => {
         setMetadataEditedAt(
           d.metadataEditedAt ? new Date(d.metadataEditedAt) : null,
         );
-        setEditingDraft(String(d.status ?? '').toUpperCase() === 'DRAFT');
+        const loadedStatus = normalizePublicationStatusValue(d.status) ?? 'DRAFT';
+        setPublicationStatus(loadedStatus);
+        setEditingDraft(loadedStatus === 'DRAFT');
 
         const draftFilters = Array.isArray((d as any).filters)
           ? ((d as any).filters as Array<{ dimensionId?: string; valueId?: string }>).reduce(
@@ -891,9 +898,33 @@ const CreateDesignInner: React.FC = () => {
     await executeSaveDraft();
   };
 
+  const handleWithdrawFromReview = async () => {
+    if (!isEditMode || !id || !isInReview || withdrawingFromReview) return;
+    setWithdrawingFromReview(true);
+    try {
+      await DesignApi.withdrawDesignFromReview(id);
+      setPublicationStatus('DRAFT');
+      setEditingDraft(true);
+      toast.success('Design moved back to drafts.');
+      refreshCatalogAfterMutation();
+      navigate('/profile?tab=Content&visibility=Drafts', { replace: true });
+    } catch (error) {
+      const message =
+        (error as { response?: { data?: { message?: string | string[] } } })?.response?.data
+          ?.message ?? 'Could not call design back from review.';
+      toast.error(Array.isArray(message) ? message[0] : String(message));
+    } finally {
+      setWithdrawingFromReview(false);
+    }
+  };
+
   const executeSaveDraft = async () => {
     // Guard: prevent double submission
     if (isSubmitting) return;
+    if (isInReview) {
+      toast.error('This design is in review. Call it back before saving as a draft.');
+      return;
+    }
 
     setSubmitIntent("draft");
     setIsSubmitting(true);
@@ -2315,19 +2346,30 @@ const CreateDesignInner: React.FC = () => {
             >
               Cancel
             </button>
-            <button
-              type="button"
-              onClick={handleSaveDraft}
-              disabled={disabled || isSubmitting}
-              className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-6 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isSubmitting && submitIntent === "draft" ? (
-                <VLoader size={16} phase="loading" showLabel={false} />
-              ) : (
-                <FiFile className="w-4 h-4" />
-              )}
-              {isSubmitting && submitIntent === "draft" ? "Saving..." : "Save Draft"}
-            </button>
+            {isInReview ? (
+              <button
+                type="button"
+                onClick={handleWithdrawFromReview}
+                disabled={disabled || withdrawingFromReview}
+                className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-6 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {withdrawingFromReview ? 'Calling back...' : '↩️ Call back from review'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                disabled={disabled || isSubmitting}
+                className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-6 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isSubmitting && submitIntent === "draft" ? (
+                  <VLoader size={16} phase="loading" showLabel={false} />
+                ) : (
+                  <FiFile className="w-4 h-4" />
+                )}
+                {isSubmitting && submitIntent === "draft" ? "Saving..." : "Save Draft"}
+              </button>
+            )}
             <button
               type="button"
               onClick={handleSaveDraft}

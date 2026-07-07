@@ -228,7 +228,10 @@ export function useCollectionDetailQuery(
   return useQuery({
     queryKey: queryKeys.brand.collectionDetail(collectionId, scope),
     queryFn: async () => {
-      const data = await brandApi.getCollectionDetail(String(collectionId), { scope });
+      const data =
+        scope === 'design'
+          ? await DesignApi.getDesignDetail(String(collectionId))
+          : await brandApi.getCollectionDetail(String(collectionId), { scope });
       if (scope === 'design') {
         queryClient.setQueryData(queryKeys.design.detail(collectionId), data);
       }
@@ -255,7 +258,10 @@ export async function fetchCollectionDetailQuery(
     }
   }
   if (options?.forceRefresh) {
-    const data = await brandApi.getCollectionDetail(collectionId, { scope, forceRefresh: true });
+    const data =
+      scope === 'design'
+        ? await DesignApi.getDesignDetail(collectionId, { forceRefresh: true })
+        : await brandApi.getCollectionDetail(collectionId, { scope, forceRefresh: true });
     queryClient.setQueryData(key, data);
     if (scope === 'design') {
       queryClient.setQueryData(queryKeys.design.detail(collectionId), data);
@@ -264,7 +270,10 @@ export async function fetchCollectionDetailQuery(
   }
   const data = await queryClient.fetchQuery({
     queryKey: key,
-    queryFn: () => brandApi.getCollectionDetail(collectionId, { scope }),
+    queryFn: () =>
+      scope === 'design'
+        ? DesignApi.getDesignDetail(collectionId)
+        : brandApi.getCollectionDetail(collectionId, { scope }),
   });
   if (scope === 'design') {
     queryClient.setQueryData(queryKeys.design.detail(collectionId), data);
@@ -679,6 +688,10 @@ export const refreshOwnerCatalogQueries = (
   });
   void queryClient.invalidateQueries({
     queryKey: queryKeys.brand.collections(ownerId),
+    refetchType: 'active',
+  });
+  void queryClient.invalidateQueries({
+    queryKey: ['design', 'detail'],
     refetchType: 'active',
   });
 };

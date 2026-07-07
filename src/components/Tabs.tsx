@@ -6,17 +6,18 @@ interface TabsProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   className?: string;
+  compact?: boolean;
 }
 
-const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, className = '' }) => {
+const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, className = '', compact = false }) => {
   return (
     <div className={`border-b border-gray-200 dark:border-gray-700 ${className}`}>
-      <nav className="-mb-px flex space-x-6" aria-label="Tabs">
+      <nav className={`-mb-px flex ${compact ? 'space-x-4' : 'space-x-6'}`} aria-label="Tabs">
         {tabs.map((tab) => (
           <button
             key={tab}
             onClick={() => onTabChange(tab)}
-            className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors
+            className={`whitespace-nowrap ${compact ? 'py-2 text-xs' : 'py-3 text-sm'} px-1 border-b-2 font-medium transition-colors
               ${
                 activeTab === tab
                   ? 'border-purple-500 text-purple-600'

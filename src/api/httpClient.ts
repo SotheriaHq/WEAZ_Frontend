@@ -9,6 +9,7 @@ import { unwrapApiResponse } from '../types/auth';
 import type { AuthTokensResponse } from '../types/auth';
 import { env } from '../config/env';
 import { finishNetworkTrace, startNetworkTrace } from './networkTrace';
+import { createRequestId } from '../utils/requestId';
 
 let consecutiveRefreshFailures = 0;
 let lastRefreshFailureAt = 0;
@@ -55,7 +56,9 @@ export const dropStoredAccessToken = () => {
 export const apiClient: AxiosInstance = axios.create(env.api.defaultConfig);
 const refreshClient: AxiosInstance = axios.create(env.api.defaultConfig);
 
-refreshClient.interceptors.request.use((config) => startNetworkTrace(config));
+refreshClient.interceptors.request.use((config) =>
+  startNetworkTrace(attachRequestMetadata(config)),
+);
 refreshClient.interceptors.response.use(
   (response) => {
     finishNetworkTrace(response.config, response);
@@ -113,19 +116,24 @@ export const refreshAccessToken = async (): Promise<string | null> => {
   return refreshPromise;
 };
 
-const attachAuthHeader = (config: InternalAxiosRequestConfig) => {
-  const token = volatileAccessToken;
-  if (!token) {
-    return config;
+const attachRequestMetadata = (config: InternalAxiosRequestConfig) => {
+  const headers = getHeaders(config);
+  if (!headers.get('x-request-id')) {
+    headers.set('x-request-id', createRequestId());
   }
 
-  const headers = getHeaders(config);
-  headers.set('Authorization', `Bearer ${token}`);
+  const token = volatileAccessToken;
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   config.headers = headers;
   return config;
 };
 
-apiClient.interceptors.request.use((config) => startNetworkTrace(attachAuthHeader(config)));
+apiClient.interceptors.request.use((config) =>
+  startNetworkTrace(attachRequestMetadata(config)),
+);
 
 apiClient.interceptors.response.use(
   (response) => {

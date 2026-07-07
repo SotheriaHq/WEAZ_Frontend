@@ -44,6 +44,18 @@ export const resolveApiBaseUrl = (env: PagesEnv): string => {
 export const isCrawlerRequest = (userAgent: string): boolean =>
   CRAWLER_UA_PATTERN.test(userAgent);
 
+const CANONICAL_REDIRECT_PREFIXES = ['/products/', '/profile/'];
+
+export const shouldCanonicalRedirect = (pathname: string): boolean => {
+  if (pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname === '/llms.txt') {
+    return false;
+  }
+  if (STATIC_FILE_EXTENSION_PATTERN.test(pathname)) {
+    return false;
+  }
+  return CANONICAL_REDIRECT_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+};
+
 export const shouldServeBotHtml = (pathname: string): boolean => {
   if (pathname === '/robots.txt' || pathname === '/sitemap.xml') {
     return false;

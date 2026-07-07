@@ -15,6 +15,9 @@ import { store } from './store';
 import { QueryProvider } from './query/QueryProvider';
 import RootErrorBoundary, { removeBootSplash } from './components/RootErrorBoundary';
 import { initClientDiagnostics } from './utils/clientDiagnostics';
+import { initSentry } from './observability/sentry';
+
+initSentry();
 
 const STALE_CHUNK_RELOAD_KEY = 'vite:preloadError:reloadedAt';
 

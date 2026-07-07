@@ -6,32 +6,12 @@ import {
   PRODUCT_DESCRIPTION,
   PUBLIC_WEB_URL,
 } from '@/config/productIdentity';
+import { trackPageView } from '@/observability/analytics';
+import { isSeoNoindexClientPath } from '@/utils/seoPaths';
 
 const DEFAULT_TITLE = APP_NAME;
 const DEFAULT_DESCRIPTION = PRODUCT_DESCRIPTION;
 const DEFAULT_IMAGE = '/brand/wiez-logo-mark.svg';
-
-const PRIVATE_PATH_PREFIXES = [
-  '/studio',
-  '/admin',
-  '/checkout',
-  '/bag',
-  '/orders',
-  '/messages',
-  '/dashboard',
-  '/login',
-  '/signup',
-  '/forgot-password',
-  '/reset-password',
-  '/verify-email',
-  '/search',
-  '/custom-orders',
-];
-
-const isPrivatePath = (pathname: string): boolean =>
-  PRIVATE_PATH_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
 
 const upsertMeta = (
   attribute: 'name' | 'property',
@@ -76,16 +56,24 @@ const upsertJsonLd = (payload?: Record<string, unknown>) => {
   document.head.appendChild(script);
 };
 
-const applyFallbackMeta = (pathname: string, robots: 'index,follow' | 'noindex,nofollow' = 'index,follow') => {
-  const origin = PUBLIC_WEB_URL.startsWith('http')
+const resolveOrigin = () =>
+  PUBLIC_WEB_URL.startsWith('http')
     ? PUBLIC_WEB_URL.replace(/\/+$/, '')
     : window.location.origin;
+
+const applyFallbackMeta = (
+  pathname: string,
+  robots: 'index,follow' | 'noindex,nofollow' = 'index,follow',
+) => {
+  const origin = resolveOrigin();
   const canonical = `${origin}${pathname === '/' ? '' : pathname}`;
 
   document.title = DEFAULT_TITLE;
   upsertMeta('name', 'description', DEFAULT_DESCRIPTION);
   upsertMeta('name', 'robots', robots);
   upsertLink('canonical', canonical);
+  upsertMeta('property', 'og:site_name', DEFAULT_TITLE);
+  upsertMeta('property', 'og:locale', 'en_US');
   upsertMeta('property', 'og:title', DEFAULT_TITLE);
   upsertMeta('property', 'og:description', DEFAULT_DESCRIPTION);
   upsertMeta('property', 'og:type', 'website');
@@ -103,6 +91,8 @@ const applyResolvedMeta = (meta: Awaited<ReturnType<typeof SeoApi.resolvePageMet
   upsertMeta('name', 'description', meta.description);
   upsertMeta('name', 'robots', meta.robots);
   upsertLink('canonical', meta.canonicalUrl);
+  upsertMeta('property', 'og:site_name', APP_NAME);
+  upsertMeta('property', 'og:locale', 'en_US');
   upsertMeta('property', 'og:title', meta.og.title);
   upsertMeta('property', 'og:description', meta.og.description);
   upsertMeta('property', 'og:type', meta.og.type);
@@ -112,6 +102,11 @@ const applyResolvedMeta = (meta: Awaited<ReturnType<typeof SeoApi.resolvePageMet
   upsertMeta('name', 'twitter:title', meta.twitter.title);
   upsertMeta('name', 'twitter:description', meta.twitter.description);
   upsertMeta('name', 'twitter:image', meta.twitter.image);
+
+  for (const tag of meta.extraMeta ?? []) {
+    upsertMeta(tag.attribute, tag.key, tag.content);
+  }
+
   upsertJsonLd(meta.jsonLd);
 };
 
@@ -122,8 +117,9 @@ const SeoHead: React.FC = () => {
     const path = `${location.pathname}${location.search}`;
     let active = true;
 
-    if (isPrivatePath(location.pathname)) {
+    if (isSeoNoindexClientPath(location.pathname)) {
       applyFallbackMeta(location.pathname, 'noindex,nofollow');
+      trackPageView(path);
       return () => {
         active = false;
       };
@@ -136,7 +132,14 @@ const SeoHead: React.FC = () => {
         applyResolvedMeta(meta);
       } catch {
         if (!active) return;
-        applyFallbackMeta(location.pathname, 'index,follow');
+        const robots = isSeoNoindexClientPath(location.pathname)
+          ? 'noindex,nofollow'
+          : 'index,follow';
+        applyFallbackMeta(location.pathname, robots);
+      } finally {
+        if (active) {
+          trackPageView(path);
+        }
       }
     })();
 

@@ -281,6 +281,12 @@ export async function submitDesignForReview(designId: string) {
   return unwrapData<unknown>(response.data);
 }
 
+export async function withdrawDesignFromReview(designId: string) {
+  const response = await apiClient.post(`/designs/${designId}/withdraw-review`);
+  clearDesignDetailCache(designId);
+  return unwrapData<unknown>(response.data);
+}
+
 export async function acknowledgeContentPolicy() {
   const legalAcceptances = await getRequiredLegalAcceptances(
     LEGAL_CONTENT_PUBLISH_DOCUMENT_KEYS,
@@ -327,6 +333,7 @@ export const DesignApi = {
   updateDesign,
   initializeDesignMediaUploads,
   submitDesignForReview,
+  withdrawDesignFromReview,
   acknowledgeContentPolicy,
   reorderDesignMedia,
   deleteDesignMedia,

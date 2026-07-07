@@ -158,8 +158,13 @@ function ProductDetailsSkeleton() {
   );
 }
 
-export default function ProductDetailsPage() {
-  const { id } = useParams<{ id: string }>();
+type ProductDetailsPageProps = {
+  resolvedProductId?: string;
+};
+
+export default function ProductDetailsPage({ resolvedProductId }: ProductDetailsPageProps = {}) {
+  const { id: routeProductId } = useParams<{ id: string }>();
+  const id = resolvedProductId ?? routeProductId;
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();

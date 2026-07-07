@@ -2,6 +2,7 @@ import {
   fetchWithTimeout,
   isCrawlerRequest,
   resolveApiBaseUrl,
+  shouldCanonicalRedirect,
   shouldServeBotHtml,
 } from './seo-shared';
 
@@ -19,6 +20,32 @@ import {
 export const onRequest: PagesFunction = async (context) => {
   const url = new URL(context.request.url);
   const userAgent = context.request.headers.get('user-agent') ?? '';
+  const path = `${url.pathname}${url.search}`;
+
+  if (shouldCanonicalRedirect(url.pathname)) {
+    try {
+      const apiBase = resolveApiBaseUrl(context.env as Record<string, string>);
+      const redirectResponse = await fetchWithTimeout(
+        `${apiBase}/public/seo/canonical-redirect?path=${encodeURIComponent(path)}`,
+        { redirect: 'manual' },
+      );
+
+      if (redirectResponse.status >= 300 && redirectResponse.status < 400) {
+        const location = redirectResponse.headers.get('location');
+        if (location) {
+          return new Response(null, {
+            status: 301,
+            headers: {
+              Location: location,
+              'Cache-Control': 'public, max-age=300',
+            },
+          });
+        }
+      }
+    } catch {
+      // Fail-open to SPA routing.
+    }
+  }
 
   if (!isCrawlerRequest(userAgent) || !shouldServeBotHtml(url.pathname)) {
     return context.next();
@@ -26,7 +53,6 @@ export const onRequest: PagesFunction = async (context) => {
 
   try {
     const apiBase = resolveApiBaseUrl(context.env as Record<string, string>);
-    const path = `${url.pathname}${url.search}`;
     const response = await fetchWithTimeout(
       `${apiBase}/public/seo/bot-html?path=${encodeURIComponent(path)}`,
       { headers: { Accept: 'text/html' } },

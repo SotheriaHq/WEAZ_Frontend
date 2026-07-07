@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
-import { useDispatch } from 'react-redux';
-import { useQueryClient } from '@tanstack/react-query';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectIsMobile } from '@/features/uiSlice';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { toast } from 'sonner';
 import ProfileHeader from '../../components/catalog/ProfileHeader';
@@ -25,7 +26,7 @@ import { setUser } from '../../features/userSlice';
 import { brandApi } from '../../api/BrandApi';
 import { ProfilePhotoViewApi } from '@/api/ProfilePhotoViewApi';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
-import { finalizeCollectionUploads } from '@/api/collectionUploads';
+import { finalizeDesignUploads } from '@/api/DesignApi';
 import ProfileHeaderQuickEditModal from '../../components/profile/ProfileHeaderQuickEditModal';
 import type { BrandProfileDto, CollectionDto } from '../../types/profile';
 import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedFileUrl';
@@ -55,7 +56,7 @@ import {
 import { canManageCatalog, getActiveBrandId } from '@/lib/brandAccess';
 import {
   fetchBrandCollectionsQuery,
-  fetchCollectionDetailQuery,
+  fetchDesignDetailQuery,
   useBrandPrivateAccessStatesQuery,
   useBrandCollectionsQuery,
   useBrandProfileQuery,
@@ -84,6 +85,38 @@ const REVIEW_VISIBILITY_STATUS: Partial<Record<VisibilityFilter, string>> = {
   'In Review': 'IN_REVIEW',
   'Changes Requested': 'CHANGES_REQUESTED',
   Rejected: 'REJECTED',
+};
+
+const VISIBILITY_SHORT_LABELS: Partial<Record<VisibilityFilter, string>> = {
+  'In Review': 'Review',
+  'Changes Requested': 'Changes',
+  Rejected: 'Rejected',
+  Deleted: 'Deleted',
+};
+
+const MODERATION_RESOLVED_STATUSES = new Set([
+  'PUBLISHED',
+  'IN_REVIEW',
+  'CHANGES_REQUESTED',
+  'REJECTED',
+]);
+
+type DesignPublishStatusDetail = {
+  status?: string | null;
+};
+
+const resolveDesignPublishStatus = async (
+  queryClient: QueryClient,
+  task: PublishTask | null | undefined,
+  fallbackId?: string | null,
+  options?: { forceRefresh?: boolean },
+): Promise<DesignPublishStatusDetail | null> => {
+  const designLookupId = task
+    ? getPublishTaskDesignId(task)
+    : fallbackId;
+  if (!designLookupId) return null;
+  const detail = await fetchDesignDetailQuery(queryClient, designLookupId, options);
+  return (detail ?? null) as DesignPublishStatusDetail | null;
 };
 
 type PrivateAccessState = {
@@ -185,6 +218,7 @@ const ProfilePage: React.FC = () => {
   
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
+  const isMobile = useSelector(selectIsMobile);
 
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -349,6 +383,15 @@ const ProfilePage: React.FC = () => {
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [isOwner, ownerBrandId, queryClient]);
+
+  useEffect(() => {
+    if (!isOwner || !user?.id) return;
+    const onContentReviewUpdated = () => {
+      void fetchCollections(user.id, { forceRefresh: true });
+    };
+    window.addEventListener('threadly:content-review-updated', onContentReviewUpdated);
+    return () => window.removeEventListener('threadly:content-review-updated', onContentReviewUpdated);
+  }, [fetchCollections, isOwner, user?.id]);
 
   const handleOpenAddModal = () => {
     // collection type passed from dropdown; modal uses internal defaults for now
@@ -1331,14 +1374,26 @@ const ProfilePage: React.FC = () => {
         },
       }));
 
-      const current = await fetchCollectionDetailQuery(queryClient, targetCollectionId);
-      const RETRY_RESOLVED = new Set(['PUBLISHED', 'IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED']);
-      if (!RETRY_RESOLVED.has(current?.status ?? '')) {
-        await finalizeCollectionUploads(targetCollectionId, [], true, { action: 'publish' });
+      const current = await resolveDesignPublishStatus(
+        queryClient,
+        linkedTask,
+        state?.designId ?? collectionId,
+      );
+      if (!MODERATION_RESOLVED_STATUSES.has(current?.status ?? '')) {
+        const designId =
+          (linkedTask ? getPublishTaskDesignId(linkedTask) : null) ??
+          state?.designId ??
+          collectionId;
+        await finalizeDesignUploads(designId, [], true, { action: 'publish' });
       }
 
-      const refreshedDetail = await fetchCollectionDetailQuery(queryClient, targetCollectionId, 'design', { forceRefresh: true });
-      if (!RETRY_RESOLVED.has(refreshedDetail?.status ?? '')) {
+      const refreshedDetail = await resolveDesignPublishStatus(
+        queryClient,
+        linkedTask,
+        state?.designId ?? collectionId,
+        { forceRefresh: true },
+      );
+      if (!MODERATION_RESOLVED_STATUSES.has(refreshedDetail?.status ?? '')) {
         setPublishingStates((prev) => ({
           ...prev,
           [collectionId]: {
@@ -1451,11 +1506,18 @@ const ProfilePage: React.FC = () => {
         }
 
         try {
-          const detail = await fetchCollectionDetailQuery(queryClient, resolvedCollectionId, 'design', { forceRefresh: true });
+          const linkedTask = state.taskId
+            ? publishTasks.find((entry) => entry.id === state.taskId)
+            : publishTasks.find((entry) => entry.id === id);
+          const detail = await resolveDesignPublishStatus(
+            queryClient,
+            linkedTask,
+            state.designId ?? resolvedCollectionId,
+            { forceRefresh: true },
+          );
           // Resolve on any moderation-terminal status, not just PUBLISHED.
           // IN_REVIEW means brand review picked it up; CHANGES_REQUESTED/REJECTED means moderation acted.
-          const MODERATION_RESOLVED = new Set(['PUBLISHED', 'IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED']);
-          if (!MODERATION_RESOLVED.has(detail?.status ?? '')) {
+          if (!MODERATION_RESOLVED_STATUSES.has(detail?.status ?? '')) {
             const attempts = state.attempts + 1;
             const tookTooLong = Date.now() - state.startedAt > 90_000;
             setPublishingStates((prev) => ({
@@ -1938,6 +2000,7 @@ const ProfilePage: React.FC = () => {
           <Tabs
             tabs={['Content', 'Store', 'Reviews', 'Us']}
             activeTab={activeTab}
+            compact={isMobile}
             onTabChange={(tab) => {
                 setActiveTab(tab as TabType);
                 setSearchParams((prev) => {
@@ -2021,7 +2084,9 @@ const ProfilePage: React.FC = () => {
                             key={opt}
                             onClick={() => handleVisibilityFilterChange(opt)}
                             aria-pressed={visibilityFilter === opt}
-                            className={`relative flex shrink-0 items-center gap-2 pb-3 pt-2 text-sm font-semibold transition-colors ${
+                            className={`relative flex shrink-0 items-center gap-2 pb-3 pt-2 ${
+                              isMobile ? 'text-xs font-medium' : 'text-sm font-semibold'
+                            } transition-colors ${
                               visibilityFilter === opt
                                 ? 'text-purple-700 dark:text-purple-300'
                                 : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
@@ -2042,7 +2107,7 @@ const ProfilePage: React.FC = () => {
                                             ? 'X'
                                             : '🗑️'}
                             </span>
-                            {opt}
+                            {isMobile ? (VISIBILITY_SHORT_LABELS[opt] ?? opt) : opt}
                             <span
                               aria-hidden="true"
                               className={`absolute inset-x-0 bottom-0 mx-auto h-0.5 w-7 rounded-full transition-all ${
@@ -2218,7 +2283,7 @@ const ProfilePage: React.FC = () => {
                       ) : decoratedCollections.length > 0 ? (
                         <CollectionsGrid
                           collections={decoratedCollections}
-                          compactCards
+                          compactCards={!isMobile}
                           isDraft={isDraftVisibility}
                           isDeleted={isDeletedVisibility}
                           onEdit={isOwner ? handleEditCollection : undefined}

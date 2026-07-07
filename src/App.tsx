@@ -36,11 +36,7 @@ import StudioScaffold from './components/studio/StudioScaffold';
 import StudioHandoffGate from './components/studio/StudioHandoffGate';
 import RequireStoreSetup from './components/store/RequireStoreSetup';
 import { BagFlowProvider } from './features/bagging/BagFlowProvider';
-import {
-  ProductAliasRedirect,
-  ProfileAliasRedirect,
-  StorefrontAliasRedirect,
-} from './pages/redirects/PublicAliasRedirects';
+import { ProfileAliasRedirect } from './pages/redirects/PublicAliasRedirects';
 import VerifiedBadgeMeaningPage from './pages/ui/VerifiedBadgeMeaningPage';
 import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
@@ -68,6 +64,8 @@ const CreateDesignPage = lazy(() => import('./pages/catalog/CreateDesign'));
 const DesignDetailsPage = lazy(() => import('./pages/catalog/DesignDetailsPage'));
 const CollectionRouter = lazy(() => import('./pages/catalog/CollectionRouter'));
 const ProductDetailsPage = lazy(() => import('./pages/catalog/ProductDetailsPage'));
+const BrandCanonicalPage = lazy(() => import('./pages/redirects/BrandCanonicalPage'));
+const ProductCanonicalPage = lazy(() => import('./pages/redirects/ProductCanonicalPage'));
 const SizeChartsPage = lazy(() => import('./pages/size-charts/SizeChartsPage'));
 const StudioHome = lazy(() => import('./pages/studio/StudioHome'));
 const EditProduct = lazy(() => import('./pages/studio/products/EditProduct'));
@@ -399,21 +397,33 @@ const StudioRedirect: React.FC<{ to: string; preserveCurrentQuery?: boolean }> =
   return <Navigate to={`${pathname}${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`} replace />;
 };
 
-const DesignCreateAliasRedirect: React.FC = () => {
+const LegacyProfileDesignCreateRedirect: React.FC = () => {
   const location = useLocation();
-  return <Navigate to={`/profile/collections/create${location.search}${location.hash}`} replace />;
+  return <Navigate to={`/designs/create${location.search}${location.hash}`} replace />;
 };
 
-const DesignEditAliasRedirect: React.FC = () => {
+const LegacyProfileDesignEditRedirect: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const location = useLocation();
   return (
     <Navigate
-      to={id ? `/profile/collections/edit/${encodeURIComponent(id)}${location.search}${location.hash}` : '/profile/collections/create'}
+      to={
+        id
+          ? `/designs/${encodeURIComponent(id)}/edit${location.search}${location.hash}`
+          : '/designs/create'
+      }
       replace
     />
   );
 };
+
+const designEditorRoute = (
+  <RequireAuthenticated>
+    <RequireBrand>
+      <Layout>{withRouteFallback(<CreateDesignPage />)}</Layout>
+    </RequireBrand>
+  </RequireAuthenticated>
+);
 
 const ProductEditAliasRedirect: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -447,8 +457,8 @@ const profileChildren = [
     path: 'collections',
     element: <RequireBrand />,
     children: [
-      { path: 'create', element: withRouteFallback(<CreateDesignPage />) },
-      { path: 'edit/:id', element: withRouteFallback(<CreateDesignPage />) },
+      { path: 'create', element: <LegacyProfileDesignCreateRedirect /> },
+      { path: 'edit/:id', element: <LegacyProfileDesignEditRedirect /> },
     ],
   },
   { path: 'success', element: <Success /> },
@@ -494,11 +504,11 @@ const router = createBrowserRouter([
       },
       {
         path: '/designs/create',
-        element: <DesignCreateAliasRedirect />,
+        element: designEditorRoute,
       },
       {
         path: '/designs/:id/edit',
-        element: <DesignEditAliasRedirect />,
+        element: designEditorRoute,
       },
       {
         path: '/designs/:id',
@@ -752,7 +762,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/brand/:slug',
-        element: <Layout><StorefrontAliasRedirect /></Layout>,
+        element: <Layout>{withRouteFallback(<BrandCanonicalPage />)}</Layout>,
       },
       {
         path: '/verify-email',
@@ -851,7 +861,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/p/:slug',
-        element: <Layout><ProductAliasRedirect /></Layout>,
+        element: <Layout>{withRouteFallback(<ProductCanonicalPage />)}</Layout>,
       },
       {
         path: '/admin/reset-password',

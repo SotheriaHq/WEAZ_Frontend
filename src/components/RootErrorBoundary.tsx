@@ -1,4 +1,5 @@
 import React from 'react';
+import { captureClientException } from '../observability/sentry';
 
 type RootErrorBoundaryProps = {
   children: React.ReactNode;
@@ -71,7 +72,10 @@ export class RootErrorBoundary extends React.Component<
     return { error };
   }
 
-  componentDidCatch(error: Error) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    captureClientException(error, {
+      componentStack: errorInfo.componentStack ?? 'unknown',
+    });
     showBootFailure(error.message || 'Unexpected startup error');
   }
 

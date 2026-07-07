@@ -13,9 +13,9 @@ import {
   useLocation,
   Navigate,
   Outlet,
-  useParams,
   useSearchParams,
 } from 'react-router-dom';
+import { useProfileRouteId } from '@/context/ProfileRouteContext';
 import { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
@@ -97,7 +97,7 @@ export const ProfileLayout: React.FC = () => {
   const isMobile = useSelector(selectIsMobile);
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { id: routeBrandId } = useParams<{ id?: string }>();
+  const routeBrandId = useProfileRouteId();
 
   const isVisitorRoute = Boolean(routeBrandId);
   const [isResendingVerification, setIsResendingVerification] = useState(false);

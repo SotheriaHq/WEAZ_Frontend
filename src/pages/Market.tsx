@@ -5,7 +5,6 @@ import { RefreshCcw, WifiOff, ServerCrash, SearchX, Sparkles, TrendingUp, Clock 
 import { motion } from 'framer-motion';
 import Masonry from 'react-masonry-css';
 import { useQuery } from '@tanstack/react-query';
-import { brandApi } from '@/api/BrandApi';
 import DesignApi from '@/api/DesignApi';
 import type { MarketItem } from '@/types/market';
 import DesignCard from '@/components/designs/DesignCard';
@@ -514,15 +513,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
           setViewItem(fallbackItem);
         }
       } catch {
-        try {
-          const detail = await brandApi.getCollectionDetail(openDesignId, { scope: 'design' });
-          const fallbackItem = toDesignMarketItem(detail, openMediaId);
-          if (!cancelled && fallbackItem) {
-            setViewItem(fallbackItem);
-          }
-        } catch {
-          // Keep current state if lookup fails; user can still browse feed.
-        }
+        // Keep current state if lookup fails; user can still browse feed.
       }
     };
 

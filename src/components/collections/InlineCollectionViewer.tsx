@@ -20,6 +20,7 @@ import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { CollectionCartPreviewModal } from '@/components/collections/CollectionCartPreviewModal';
 import { getCollectionCartPreview, type CollectionCartPreviewResponse } from '@/api/collectionUploads';
 import { buildCollectionUrl, shareOrCopyLink } from '@/utils/publicLinks';
+import { buildDesignRoute } from '@/utils/catalogRoutes';
 import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useBagging } from '@/hooks/useBagging';
@@ -800,7 +801,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                       ? [{ label: 'Cancel Discount Sale', onClick: handleCancelSale }]
                       : [{ label: 'Discount Sale', onClick: () => setShowDiscountModal(true) }]
                     ),
-                    { label: 'Edit Collection Details', onClick: () => { navigate(`/profile/collections/edit/${collectionId}`); } },
+                    { label: 'Edit Collection Details', onClick: () => { navigate(buildDesignRoute({ designId: collectionId, mode: 'edit' })); } },
                   ]}
                 />
               ) : undefined}
