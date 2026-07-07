@@ -3,6 +3,7 @@ import {
   buildDisplayableImagePreview,
   IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
   isLikelyImageFile,
+  isTrustedUpstreamImagePreview,
   normalizeImageFile,
   prefersCanvasImagePreview,
 } from '@/utils/imagePreview';
@@ -27,6 +28,20 @@ describe('imagePreview', () => {
   it('exposes a safe placeholder preview data url', () => {
     expect(IMAGE_PREVIEW_UNAVAILABLE_DATA_URL.startsWith('data:image/jpeg')).toBe(
       true,
+    );
+  });
+
+  it('trusts blob and probed data URLs from upstream preview producers', () => {
+    expect(isTrustedUpstreamImagePreview('blob:abc-123')).toBe(true);
+    expect(isTrustedUpstreamImagePreview('data:image/jpeg;base64,/9j/abc')).toBe(
+      true,
+    );
+    expect(isTrustedUpstreamImagePreview(IMAGE_PREVIEW_UNAVAILABLE_DATA_URL)).toBe(
+      false,
+    );
+    expect(isTrustedUpstreamImagePreview('')).toBe(false);
+    expect(isTrustedUpstreamImagePreview('https://cdn.example.com/a.jpg')).toBe(
+      false,
     );
   });
 

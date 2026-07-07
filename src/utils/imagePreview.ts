@@ -22,6 +22,19 @@ export const IMAGE_PREVIEW_UNAVAILABLE_DATA_URL =
 export const isPreviewUnavailableDataUrl = (url?: string | null): boolean =>
   typeof url === 'string' && url === IMAGE_PREVIEW_UNAVAILABLE_DATA_URL;
 
+/**
+ * True when useMediaStore (or equivalent) already produced a displayable preview.
+ * LocalMediaPreview must not re-sniff, re-probe, or re-upload these — that doubled
+ * Safari latency and re-failed Android data-URL probes on previews that worked once.
+ */
+export const isTrustedUpstreamImagePreview = (url?: string | null): boolean => {
+  if (typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith('blob:')) return true;
+  return trimmed.startsWith('data:image/') && !isPreviewUnavailableDataUrl(trimmed);
+};
+
 export const isLikelyImageFile = (file: File): boolean => {
   if (file.type.startsWith('image/')) return true;
   return /\.(jpe?g|png|webp|gif|heic|heif|bmp|avif)$/i.test(file.name);

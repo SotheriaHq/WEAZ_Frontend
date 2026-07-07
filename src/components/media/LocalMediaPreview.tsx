@@ -2,7 +2,11 @@ import React from 'react';
 import MediaRenderer, { type MediaKind } from './MediaRenderer';
 import { cn } from '@/lib/utils';
 import { addClientDiagnostic } from '@/utils/clientDiagnostics';
-import { isPreviewUnavailableDataUrl, probeImagePreviewUrl } from '@/utils/imagePreview';
+import {
+  isPreviewUnavailableDataUrl,
+  isTrustedUpstreamImagePreview,
+  probeImagePreviewUrl,
+} from '@/utils/imagePreview';
 import { uploadPreviewImage } from '@/api/UploadApi';
 import {
   sniffImageFormat,
@@ -83,18 +87,29 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
     kind === 'video' && normalizedSrc ? 'ready' : 'loading',
   );
   const [failureLabel, setFailureLabel] = React.useState<string>('');
+  const [retryWithFullPipeline, setRetryWithFullPipeline] = React.useState(false);
+
+  React.useEffect(() => {
+    setRetryWithFullPipeline(false);
+  }, [normalizedSrc, file?.name, file?.size, file?.lastModified]);
 
   React.useEffect(() => {
     if (kind !== 'image' || !file) {
       setObjectUrl('');
       return undefined;
     }
+
+    if (isTrustedUpstreamImagePreview(normalizedSrc)) {
+      setObjectUrl('');
+      return undefined;
+    }
+
     const url = URL.createObjectURL(file);
     setObjectUrl(url);
     return () => {
       URL.revokeObjectURL(url);
     };
-  }, [file, kind]);
+  }, [file, kind, normalizedSrc]);
 
   React.useEffect(() => {
     if (kind === 'video') {
@@ -105,6 +120,24 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
 
     let cancelled = false;
     let serverPreviewUrl = '';
+
+    if (
+      !retryWithFullPipeline &&
+      normalizedSrc &&
+      isTrustedUpstreamImagePreview(normalizedSrc)
+    ) {
+      setResolvedSrc(normalizedSrc);
+      setFailureLabel('');
+      setStatus('ready');
+      addClientDiagnostic('info', diagnosticScope, 'Using trusted upstream preview', {
+        candidateKind: normalizedSrc.startsWith('blob:') ? 'blob' : 'data',
+        fileName: file?.name,
+        fileType: file?.type,
+        fileSize: file?.size,
+      });
+      return;
+    }
+
     let candidates = Array.from(
       new Set(
         [normalizedSrc, objectUrl].filter(
@@ -121,9 +154,6 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
     setStatus(candidates.length > 0 || file ? 'loading' : 'failed');
 
     void (async () => {
-      // Sniff the REAL container from the file's magic bytes. Pickers lie:
-      // Android galleries hand over HEIC bytes named .jpg, and cloud-only
-      // photos can be unreadable — sniffing routes and explains both.
       let sniffedFormat: SniffedImageFormat | undefined;
       if (file) {
         sniffedFormat = await sniffImageFormat(file);
@@ -148,8 +178,6 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
           return;
         }
 
-        // Mislabeled HEIC/AVIF containers cannot decode locally — probing their
-        // data:/blob: candidates is wasted work while useMediaStore normalizes.
         if (!isBrowserDisplayableSniff(sniffedFormat)) {
           candidates = [];
         }
@@ -224,7 +252,7 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
         URL.revokeObjectURL(serverPreviewUrl);
       }
     };
-  }, [diagnosticScope, file, kind, normalizedSrc, objectUrl]);
+  }, [diagnosticScope, file, kind, normalizedSrc, objectUrl, retryWithFullPipeline]);
 
   if (status !== 'ready' || !resolvedSrc) {
     return (
@@ -251,6 +279,26 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
       controls={controls}
       muted={muted}
       onError={() => {
+        if (
+          !retryWithFullPipeline &&
+          normalizedSrc &&
+          isTrustedUpstreamImagePreview(normalizedSrc)
+        ) {
+          addClientDiagnostic(
+            'warn',
+            diagnosticScope,
+            'Trusted upstream preview failed during render; retrying full pipeline',
+            {
+              fileName: file?.name,
+              fileType: file?.type,
+              fileSize: file?.size,
+            },
+          );
+          setRetryWithFullPipeline(true);
+          setStatus('loading');
+          setResolvedSrc('');
+          return;
+        }
         setStatus('failed');
         addClientDiagnostic('warn', diagnosticScope, 'Verified local preview failed during render', {
           fileName: file?.name,
