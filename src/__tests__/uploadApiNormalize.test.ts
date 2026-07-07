@@ -19,7 +19,9 @@ describe('UploadApi server normalization', () => {
   beforeEach(() => {
     postMock.mockClear();
     postMock.mockImplementation(async () => ({
-      data: new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' }),
+      data: new Blob([new Uint8Array([0xff, 0xd8, 0xff])], {
+        type: 'image/jpeg',
+      }),
     }));
     objectUrlCounter = 0;
     URL.createObjectURL = vi.fn(() => `blob:mock-${objectUrlCounter++}`);
@@ -53,6 +55,19 @@ describe('UploadApi server normalization', () => {
     expect(postMock).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects a server preview blob that is not JPEG bytes', async () => {
+    postMock.mockImplementationOnce(async () => ({
+      data: new Blob([new Uint8Array([0x7b, 0x22, 0x64])], {
+        type: 'application/json',
+      }),
+    }));
+
+    await expect(
+      uploadPreviewImage(makeFile('json-envelope.jpg')),
+    ).rejects.toThrow(/did not return JPEG bytes/i);
+    expect(postMock).toHaveBeenCalledTimes(1);
+  });
+
   it('requests distinct files separately with a dedicated timeout', async () => {
     await uploadPreviewImage(makeFile('one.jpg'));
     await uploadPreviewImage(makeFile('two.jpg'));
@@ -67,8 +82,16 @@ describe('UploadApi server normalization', () => {
     // DIFFERENT photos — the content fingerprint must keep them apart, or one
     // photo's bytes would silently serve as the other's preview and upload.
     const metadata = { type: 'image/jpeg', lastModified: 777 } as const;
-    const photoA = new File([new Uint8Array(64).fill(0x01)], 'IMG.jpg', metadata);
-    const photoB = new File([new Uint8Array(64).fill(0x02)], 'IMG.jpg', metadata);
+    const photoA = new File(
+      [new Uint8Array(64).fill(0x01)],
+      'IMG.jpg',
+      metadata,
+    );
+    const photoB = new File(
+      [new Uint8Array(64).fill(0x02)],
+      'IMG.jpg',
+      metadata,
+    );
     expect(photoA.size).toBe(photoB.size);
 
     await uploadPreviewImage(photoA);

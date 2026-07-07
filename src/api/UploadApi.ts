@@ -1,6 +1,6 @@
 import { apiClient } from './httpClient';
 import { WEB_UPLOAD_POLICIES } from '@/utils/uploadValidation';
-import { fingerprintFileBytes } from '@/utils/imageByteSniff';
+import { fingerprintFileBytes, readBlobBytes } from '@/utils/imageByteSniff';
 
 /**
  * Server image transcodes upload the ORIGINAL file over a phone uplink —
@@ -108,16 +108,21 @@ const requestServerTranscode = async (
       formData.append('quality', String(options.quality));
       formData.append('maxBytes', String(options.maxBytes));
 
-      const response = await apiClient.post('/uploads/preview-image', formData, {
-        responseType: 'blob',
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: SERVER_IMAGE_TRANSCODE_TIMEOUT_MS,
-      });
+      const response = await apiClient.post(
+        '/uploads/preview-image',
+        formData,
+        {
+          responseType: 'blob',
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: SERVER_IMAGE_TRANSCODE_TIMEOUT_MS,
+        },
+      );
 
       const blob =
         response.data instanceof Blob
           ? response.data
           : new Blob([response.data], { type: 'image/jpeg' });
+      await assertServerJpegBlob(blob);
       rememberResolvedBlob(key, blob);
       return blob;
     } finally {
@@ -130,6 +135,18 @@ const requestServerTranscode = async (
     return await request;
   } finally {
     inFlightTranscodes.delete(key);
+  }
+};
+
+const assertServerJpegBlob = async (blob: Blob): Promise<void> => {
+  if (blob.size < 3) {
+    throw new Error('Server preview returned an empty image');
+  }
+
+  const head = new Uint8Array(await readBlobBytes(blob.slice(0, 3)));
+  const isJpeg = head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
+  if (!isJpeg) {
+    throw new Error('Server preview did not return JPEG bytes');
   }
 };
 
