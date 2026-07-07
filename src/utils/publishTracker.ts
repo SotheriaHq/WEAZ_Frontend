@@ -304,6 +304,43 @@ export const prunePublishTasks = () => {
   writePublishTasks(readRawPublishTasks());
 };
 
+/**
+ * Removes per-device "Failed - Retry" cards whose design row already exists on
+ * the server. Publish tasks live in localStorage, so without this every device
+ * that attempted a save keeps its own ghost even after another device succeeded.
+ */
+export const reconcilePublishTasksWithDraftIds = (
+  draftIds: Iterable<string>,
+  scope?: PublishTaskScope,
+): number => {
+  const draftIdSet =
+    draftIds instanceof Set ? draftIds : new Set(Array.from(draftIds));
+  if (draftIdSet.size === 0) return 0;
+
+  const scopeOwnerId = resolveScopeOwnerId(scope);
+  const tasks = readRawPublishTasks();
+  let removed = 0;
+  const next = tasks.filter((task) => {
+    if (task.status !== 'failed') return true;
+    if (!taskBelongsToScope(task, scopeOwnerId)) return true;
+    const designId = getPublishTaskDesignId(task);
+    const legacyCollectionId = getPublishTaskLegacyCollectionId(task);
+    const isGhost =
+      (designId && draftIdSet.has(designId)) ||
+      (legacyCollectionId && draftIdSet.has(legacyCollectionId));
+    if (isGhost) {
+      removed += 1;
+      return false;
+    }
+    return true;
+  });
+
+  if (removed > 0) {
+    writePublishTasks(next);
+  }
+  return removed;
+};
+
 export const subscribePublishTasks = (listener: () => void) => {
   if (typeof window === 'undefined') {
     return () => {};

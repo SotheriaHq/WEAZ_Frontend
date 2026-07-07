@@ -7,6 +7,8 @@ import {
   isLocalPublishTaskId,
   normalizePublishTaskIdentifiers,
   readPublishTasks,
+  reconcilePublishTasksWithDraftIds,
+  removePublishTask,
   type PublishTask,
 } from './publishTracker';
 
@@ -128,5 +130,37 @@ describe('publishTracker identifiers', () => {
     expect(
       readPublishTasks({ ownerId: 'owner-1' }).every((task) => !task.coverPreviewUrl),
     ).toBe(true);
+  });
+
+  it('reconciles failed local tasks when the server draft already exists', () => {
+    const scope = { ownerId: 'owner-1' };
+    const task = createPublishTask({
+      ownerId: 'owner-1',
+      title: 'Ghost draft',
+      kind: 'draft',
+    });
+    removePublishTask(task.id, scope);
+    createPublishTask({
+      ownerId: 'owner-1',
+      title: 'Ghost draft',
+      kind: 'draft',
+      designId: 'server-draft-uuid',
+      legacyCollectionId: 'server-draft-uuid',
+    });
+    const failedTask = readPublishTasks(scope).find((entry) => entry.status === 'uploading');
+    expect(failedTask).toBeTruthy();
+    if (!failedTask) return;
+
+    const stored = JSON.parse(window.localStorage.getItem('threadly.publish.designTasks.v2') || '[]') as PublishTask[];
+    const patched = stored.map((entry) =>
+      entry.id === failedTask.id
+        ? { ...entry, status: 'failed' as const, designId: 'server-draft-uuid', legacyCollectionId: 'server-draft-uuid' }
+        : entry,
+    );
+    window.localStorage.setItem('threadly.publish.designTasks.v2', JSON.stringify(patched));
+
+    expect(readPublishTasks(scope).some((entry) => entry.status === 'failed')).toBe(true);
+    expect(reconcilePublishTasksWithDraftIds(['server-draft-uuid'], scope)).toBe(1);
+    expect(readPublishTasks(scope).some((entry) => entry.status === 'failed')).toBe(false);
   });
 });

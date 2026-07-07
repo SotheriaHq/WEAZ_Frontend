@@ -40,6 +40,7 @@ import {
   readPublishTasks,
   subscribePublishTasks,
   prunePublishTasks,
+  reconcilePublishTasksWithDraftIds,
   removePublishTask,
   getPublishTaskDesignId,
   getPublishTaskLegacyCollectionId,
@@ -848,34 +849,29 @@ const ProfilePage: React.FC = () => {
   }, [activeCollections, publishTaskScope, publishingStates]);
 
   // A failed local task whose design row DID reach the server is a ghost:
-  // the server draft renders as its own card here AND on every other device,
-  // so the per-device "Failed - Retry" card would duplicate it forever.
+  // publish tasks live in per-device localStorage, so reconcile on every draft
+  // fetch to keep one truth across Android / iPad / laptop browsers.
   useEffect(() => {
-    if (drafts.length === 0 || publishTasks.length === 0) return;
-    const draftIds = new Set(drafts.map((entry) => entry.id));
-    const reconciled = publishTasks.filter((task) => {
-      if (task.status !== 'failed') return false;
-      const designId = getPublishTaskDesignId(task);
-      const legacyCollectionId = getPublishTaskLegacyCollectionId(task);
-      return Boolean(
-        (designId && draftIds.has(designId)) ||
-          (legacyCollectionId && draftIds.has(legacyCollectionId)),
-      );
-    });
-    if (reconciled.length === 0) return;
-    reconciled.forEach((task) => removePublishTask(task.id, publishTaskScope));
+    if (drafts.length === 0) return;
+    const draftIds = drafts.map((entry) => entry.id);
+    const removed = reconcilePublishTasksWithDraftIds(draftIds, publishTaskScope);
+    if (removed === 0) return;
+    const draftIdSet = new Set(draftIds);
     setPublishingStates((prev) => {
       const next = { ...prev };
-      reconciled.forEach((task) => {
-        delete next[task.id];
-        const designId = getPublishTaskDesignId(task);
-        const legacyCollectionId = getPublishTaskLegacyCollectionId(task);
-        if (designId) delete next[designId];
-        if (legacyCollectionId) delete next[legacyCollectionId];
-      });
+      for (const [key, state] of Object.entries(prev)) {
+        const designId = state.designId ?? key;
+        if (
+          state.status === 'failed' &&
+          draftIdSet.has(designId)
+        ) {
+          delete next[key];
+          if (state.taskId) delete next[state.taskId];
+        }
+      }
       return next;
     });
-  }, [drafts, publishTaskScope, publishTasks]);
+  }, [drafts, publishTaskScope]);
 
   const handleCollectionViewerBack = useCallback(() => {
     setSelectedCollectionId(null);

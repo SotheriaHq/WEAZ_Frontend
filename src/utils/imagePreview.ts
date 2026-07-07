@@ -355,6 +355,42 @@ export const buildDisplayableImagePreview = async (
     : new Error('Unable to build image preview');
 };
 
+/** Returns true when an <img> can decode the URL on this device. */
+export const probeImagePreviewUrl = (
+  src: string,
+  timeoutMs = 5_000,
+): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    let settled = false;
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error('Image probe timed out'));
+    }, timeoutMs);
+
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      callback();
+    };
+
+    image.onload = () => {
+      finish(() => {
+        if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+          resolve();
+        } else {
+          reject(new Error('Image decoded with empty dimensions'));
+        }
+      });
+    };
+    image.onerror = () => {
+      finish(() => reject(new Error('Image probe failed')));
+    };
+    image.src = src;
+  });
+
 export const buildVideoPreviewUrl = (file: File): string =>
   URL.createObjectURL(file);
 

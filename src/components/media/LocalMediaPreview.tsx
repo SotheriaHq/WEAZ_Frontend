@@ -2,10 +2,11 @@ import React from 'react';
 import MediaRenderer, { type MediaKind } from './MediaRenderer';
 import { cn } from '@/lib/utils';
 import { addClientDiagnostic } from '@/utils/clientDiagnostics';
-import { isPreviewUnavailableDataUrl } from '@/utils/imagePreview';
+import { isPreviewUnavailableDataUrl, probeImagePreviewUrl } from '@/utils/imagePreview';
 import { uploadPreviewImage } from '@/api/UploadApi';
 import {
   sniffImageFormat,
+  isBrowserDisplayableSniff,
   isUnreadableSniff,
   type SniffedImageFormat,
 } from '@/utils/imageByteSniff';
@@ -27,45 +28,11 @@ type LocalMediaPreviewProps = {
   diagnosticScope?: string;
 };
 
-const PROBE_TIMEOUT_MS = 5_000;
-
 const canRequestServerPreview = (file?: File) => {
   if (!file) return false;
   if (file.type.trim().toLowerCase().startsWith('image/')) return true;
   return /\.(jpe?g|png|webp|gif|heic|heif|avif|bmp)$/i.test(file.name);
 };
-
-const probeImage = (src: string): Promise<void> =>
-  new Promise((resolve, reject) => {
-    const image = new Image();
-    let settled = false;
-    const timer = window.setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      reject(new Error('Image probe timed out'));
-    }, PROBE_TIMEOUT_MS);
-
-    const finish = (callback: () => void) => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timer);
-      callback();
-    };
-
-    image.onload = () => {
-      finish(() => {
-        if (image.naturalWidth > 0 && image.naturalHeight > 0) {
-          resolve();
-        } else {
-          reject(new Error('Image decoded with empty dimensions'));
-        }
-      });
-    };
-    image.onerror = () => {
-      finish(() => reject(new Error('Image probe failed')));
-    };
-    image.src = src;
-  });
 
 const PreviewFallback: React.FC<{
   className?: string;
@@ -138,7 +105,7 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
 
     let cancelled = false;
     let serverPreviewUrl = '';
-    const candidates = Array.from(
+    let candidates = Array.from(
       new Set(
         [normalizedSrc, objectUrl].filter(
           (value) =>
@@ -180,6 +147,12 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
           setStatus('failed');
           return;
         }
+
+        // Mislabeled HEIC/AVIF containers cannot decode locally — probing their
+        // data:/blob: candidates is wasted work while useMediaStore normalizes.
+        if (!isBrowserDisplayableSniff(sniffedFormat)) {
+          candidates = [];
+        }
       }
       const fileDiag = {
         fileName: file?.name,
@@ -193,7 +166,7 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
             candidateKind: candidate.startsWith('blob:') ? 'blob' : candidate.startsWith('data:') ? 'data' : 'url',
             ...fileDiag,
           });
-          await probeImage(candidate);
+          await probeImagePreviewUrl(candidate);
           if (cancelled) return;
           setResolvedSrc(candidate);
           setStatus('ready');
@@ -219,7 +192,7 @@ const LocalMediaPreview: React.FC<LocalMediaPreviewProps> = ({
             serverPreviewUrl = '';
             return;
           }
-          await probeImage(serverPreviewUrl);
+          await probeImagePreviewUrl(serverPreviewUrl);
           if (cancelled) {
             URL.revokeObjectURL(serverPreviewUrl);
             serverPreviewUrl = '';

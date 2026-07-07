@@ -1,5 +1,6 @@
 import { apiClient } from './httpClient';
 import { WEB_UPLOAD_POLICIES } from '@/utils/uploadValidation';
+import { fingerprintFileBytes } from '@/utils/imageByteSniff';
 
 /**
  * Server image transcodes upload the ORIGINAL file over a phone uplink —
@@ -35,11 +36,16 @@ const CANONICAL_TRANSCODE_OPTIONS: TranscodeOptions = {
   maxBytes: NORMALIZED_IMAGE_MAX_BYTES,
 };
 
-const fileCacheKey = (file: File, options: TranscodeOptions) =>
+// Metadata alone is NOT file identity: Android content:// picks can stamp
+// identical lastModified (pick time, or 0) across different photos, and
+// generated gallery names recur. A content fingerprint keeps the cache from
+// ever serving one photo's bytes as another's preview or upload.
+const fileCacheKey = async (file: File, options: TranscodeOptions) =>
   [
     file.name,
     file.size,
     file.lastModified,
+    await fingerprintFileBytes(file),
     options.maxWidth,
     options.quality,
     options.maxBytes,
@@ -83,8 +89,10 @@ const requestServerTranscode = async (
   file: File,
   options: TranscodeOptions,
 ): Promise<Blob> => {
-  const key = fileCacheKey(file, options);
+  const key = await fileCacheKey(file, options);
 
+  // No awaits between the cache checks and inFlightTranscodes.set below —
+  // concurrent callers for the same key must observe the first one's entry.
   const cached = resolvedTranscodes.get(key);
   if (cached) return cached;
 

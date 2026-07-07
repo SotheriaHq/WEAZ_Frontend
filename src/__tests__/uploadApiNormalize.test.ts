@@ -62,6 +62,20 @@ describe('UploadApi server normalization', () => {
     expect(config).toMatchObject({ timeout: 90_000, responseType: 'blob' });
   });
 
+  it('never collides files that share metadata but differ in content', async () => {
+    // Android content:// picks can stamp identical name/size/lastModified on
+    // DIFFERENT photos — the content fingerprint must keep them apart, or one
+    // photo's bytes would silently serve as the other's preview and upload.
+    const metadata = { type: 'image/jpeg', lastModified: 777 } as const;
+    const photoA = new File([new Uint8Array(64).fill(0x01)], 'IMG.jpg', metadata);
+    const photoB = new File([new Uint8Array(64).fill(0x02)], 'IMG.jpg', metadata);
+    expect(photoA.size).toBe(photoB.size);
+
+    await uploadPreviewImage(photoA);
+    await uploadPreviewImage(photoB);
+    expect(postMock).toHaveBeenCalledTimes(2);
+  });
+
   it('sends the canonical transcode profile as multipart fields', async () => {
     await uploadPreviewImage(makeFile('profiled.jpg'));
     const [, body] = postMock.mock.calls[0];

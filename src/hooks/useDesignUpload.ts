@@ -16,7 +16,12 @@ import { WEB_UPLOAD_POLICIES, assertValidUploadFiles } from '@/utils/uploadValid
 import { addClientDiagnostic } from '@/utils/clientDiagnostics';
 import { preprocessImageFile } from '@/utils/imagePreprocess';
 import { getNormalizedImageFile } from '@/api/UploadApi';
-import { sniffImageFormat } from '@/utils/imageByteSniff';
+import {
+  sniffImageFormat,
+  isBrowserDisplayableSniff,
+  isUnreadableSniff,
+  type SniffedImageFormat,
+} from '@/utils/imageByteSniff';
 
 const MAX_RETRY_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 750;
@@ -122,14 +127,14 @@ const isImageUploadFile = (file: File) =>
 const prepareViaServerTranscode = async (
   file: File,
   maxSizeBytes: number,
+  sniffedFormat: SniffedImageFormat,
 ): Promise<File | null> => {
   if (!isImageUploadFile(file)) return null;
-  const sniffedFormat = await sniffImageFormat(file);
   addClientDiagnostic('info', 'design-upload', 'Requesting server media transcode', {
     file: fileDiagnostic(file),
     sniffedFormat,
   });
-  if (sniffedFormat === 'empty' || sniffedFormat === 'unreadable') {
+  if (isUnreadableSniff(sniffedFormat)) {
     return null;
   }
   try {
@@ -184,8 +189,26 @@ const prepareDesignUploadItems = async (
         localFailureReason = 'preprocess-failed';
       }
 
-      if (file.size > maxSizeBytes || localFailureReason === 'still-over-limit') {
-        const transcoded = await prepareViaServerTranscode(file, maxSizeBytes);
+      // Server-normalize when the file is oversized OR its bytes are not
+      // browser-decodable (HEIC named .jpg, unknown container) — size is not
+      // the test: an under-limit HEIC uploaded raw breaks direct display and
+      // can strand non-HEIC garbage in "rendering" at the variant worker.
+      const sniffedFormat = isImageUploadFile(file)
+        ? await sniffImageFormat(file)
+        : undefined;
+      const needsServerTranscode =
+        sniffedFormat !== undefined &&
+        (file.size > maxSizeBytes ||
+          localFailureReason === 'still-over-limit' ||
+          (localFailureReason === 'preprocess-failed' &&
+            !isBrowserDisplayableSniff(sniffedFormat)));
+
+      if (needsServerTranscode) {
+        const transcoded = await prepareViaServerTranscode(
+          file,
+          maxSizeBytes,
+          sniffedFormat,
+        );
         if (transcoded) {
           return {
             file: transcoded,

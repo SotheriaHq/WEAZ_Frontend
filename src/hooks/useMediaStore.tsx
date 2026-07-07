@@ -6,7 +6,9 @@ import {
   buildDisplayableImagePreview,
   buildVideoPreviewUrl,
   IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
+  isPreviewUnavailableDataUrl,
   PREVIEW_STRATEGY_TIMEOUT_MS,
+  probeImagePreviewUrl,
   revokeObjectPreviewUrl,
 } from '@/utils/imagePreview';
 import {
@@ -188,7 +190,7 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             return;
           }
 
-          const previewUrl = await Promise.race([
+          let previewUrl = await Promise.race([
             buildDisplayableImagePreview(file),
             new Promise<string>((_, reject) => {
               setTimeout(
@@ -197,6 +199,22 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               );
             }),
           ]);
+
+          // Android Chrome often accepts a raw data: URL from the canvas
+          // fallback but cannot actually decode it in <img>. Probe before we
+          // commit — otherwise LocalMediaPreview fails and we pay for a second
+          // server transcode from every thumbnail + main preview surface.
+          if (
+            isPreviewUnavailableDataUrl(previewUrl) ||
+            previewUrl.startsWith('data:')
+          ) {
+            try {
+              await probeImagePreviewUrl(previewUrl);
+            } catch {
+              throw new Error('Local preview probe failed');
+            }
+          }
+
           dispatch({ type: 'setPreview', id: itemId, previewUrl });
         } catch (error) {
           console.warn('[useMediaStore] preview generation failed', error);

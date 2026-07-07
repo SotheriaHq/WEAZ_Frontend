@@ -65,7 +65,7 @@ export const sniffImageFormatFromBytes = (
   return 'unknown';
 };
 
-const readBlobHead = async (blob: Blob): Promise<ArrayBuffer> => {
+export const readBlobBytes = async (blob: Blob): Promise<ArrayBuffer> => {
   if (typeof blob.arrayBuffer === 'function') {
     return blob.arrayBuffer();
   }
@@ -77,9 +77,9 @@ const readBlobHead = async (blob: Blob): Promise<ArrayBuffer> => {
         resolve(reader.result);
         return;
       }
-      reject(new Error('Blob head read failed'));
+      reject(new Error('Blob read failed'));
     };
-    reader.onerror = () => reject(reader.error ?? new Error('Blob head read failed'));
+    reader.onerror = () => reject(reader.error ?? new Error('Blob read failed'));
     reader.readAsArrayBuffer(blob);
   });
 };
@@ -88,11 +88,48 @@ export const sniffImageFormat = async (
   file: File,
 ): Promise<SniffedImageFormat> => {
   try {
-    const head = await readBlobHead(file.slice(0, 32));
+    const head = await readBlobBytes(file.slice(0, 32));
     return sniffImageFormatFromBytes(new Uint8Array(head));
   } catch {
     // The picker returned a handle whose bytes cannot be read (cloud-only
     // photo, revoked content:// URI). Nothing downstream can succeed.
+    return 'unreadable';
+  }
+};
+
+const FINGERPRINT_SAMPLE_BYTES = 64 * 1024;
+
+const fnv1a = (hash: number, bytes: Uint8Array): number => {
+  let next = hash;
+  for (let i = 0; i < bytes.length; i += 1) {
+    next ^= bytes[i];
+    next = Math.imul(next, 0x01000193);
+  }
+  return next;
+};
+
+/**
+ * Content fingerprint (FNV-1a over head + tail samples). File METADATA is not
+ * identity: Android content:// picks can stamp the same lastModified (pick
+ * time, or 0) on every file, so name/size/date keys can collide across
+ * different photos. Sampling the bytes makes cache keys track actual content.
+ * Returns 'unreadable' when the bytes cannot be read at all.
+ */
+export const fingerprintFileBytes = async (file: File): Promise<string> => {
+  try {
+    let hash = 0x811c9dc5;
+    const head = await readBlobBytes(file.slice(0, FINGERPRINT_SAMPLE_BYTES));
+    hash = fnv1a(hash, new Uint8Array(head));
+    if (file.size > FINGERPRINT_SAMPLE_BYTES) {
+      const tailStart = Math.max(
+        FINGERPRINT_SAMPLE_BYTES,
+        file.size - FINGERPRINT_SAMPLE_BYTES,
+      );
+      const tail = await readBlobBytes(file.slice(tailStart));
+      hash = fnv1a(hash, new Uint8Array(tail));
+    }
+    return (hash >>> 0).toString(16);
+  } catch {
     return 'unreadable';
   }
 };
