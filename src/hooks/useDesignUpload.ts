@@ -156,6 +156,21 @@ const prepareViaServerTranscode = async (
   }
 };
 
+const isAlreadyUploadReady = (file: File, maxSizeBytes: number) => {
+  if (!isImageUploadFile(file)) return file.size <= maxSizeBytes;
+  const type = file.type.trim().toLowerCase();
+  // Selection-time media-store normalization already produces browser-safe
+  // JPEG/PNG/WebP under the limit. Re-running createImageBitmap here was the
+  // multi-second mobile go-live stall.
+  if (file.size <= maxSizeBytes && /image\/(jpeg|png|webp|gif)/i.test(type)) {
+    return true;
+  }
+  if (file.size <= maxSizeBytes && /\.pre\.(jpe?g|png)$/i.test(file.name)) {
+    return true;
+  }
+  return false;
+};
+
 const prepareDesignUploadItems = async (
   items: UploadSource[],
 ): Promise<PreparedUploadItem[]> => {
@@ -165,6 +180,16 @@ const prepareDesignUploadItems = async (
       const file = resolveFile(item);
       if (!file) return null;
       const viewSlot = resolveViewSlot(item, index);
+
+      if (isAlreadyUploadReady(file, maxSizeBytes)) {
+        return {
+          file,
+          originalFile: file,
+          viewSlot,
+          optimized: false,
+          reason: 'already-ready',
+        };
+      }
 
       let localFailureReason: string | undefined;
       try {

@@ -56,7 +56,11 @@ import { useBrandProfile } from "../../hooks/UseBrandHook";
 import { useQueryClient } from "@tanstack/react-query";
 import { refreshOwnerCatalogQueries } from "@/query/queries";
 import { getActiveBrandId } from "@/lib/brandAccess";
-import { DesignApi, finalizeDesignUploads, resolveDesignId } from "@/api/DesignApi";
+import { DesignApi, resolveDesignId } from "@/api/DesignApi";
+import {
+  runDesignPublishJob,
+  unlockDocumentScroll,
+} from "@/features/designs/designPublishJob";
 import type { SizingMode } from '@/types/sizing';
 import {
   DESIGN_FIT_PREFERENCE_OPTIONS,
@@ -1220,8 +1224,6 @@ const CreateDesignInner: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      // Snapshot form state before leave — background work must not read
-      // unmounted component state after immediate catalog navigation.
       const pendingCustomOrderDraft =
         !isEditMode && isMadeToOrder
           ? customOrderEditorRef.current?.buildConfigurationDraft() ?? null
@@ -1233,11 +1235,27 @@ const CreateDesignInner: React.FC = () => {
         return;
       }
 
+      // Snapshot File blobs BEFORE unmount. Module-level job owns them so the
+      // upload survives CreateDesign teardown (mobile SPA navigate).
+      const jobFiles = files
+        .map((item) => {
+          const file = item.file instanceof File ? item.file : null;
+          if (!file) return null;
+          return { file, viewSlot: item.viewSlot ?? null };
+        })
+        .filter((entry): entry is { file: File; viewSlot: string | null } => Boolean(entry));
+
+      if (!isEditMode && jobFiles.length === 0) {
+        toast.error('Add media before going live.');
+        setIsSubmitting(false);
+        setSubmitIntent(null);
+        return;
+      }
+
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
       const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
       const finalTags = selectedTags.slice(0, 10);
       const filterValueIdsSnapshot = getSelectedFilterValueIds();
-      const filesSnapshot = [...files];
       const coverIndexSnapshot = coverIndex;
       const titleSnapshot = title;
       const descriptionSnapshot = description;
@@ -1251,23 +1269,18 @@ const CreateDesignInner: React.FC = () => {
       const fitPreferenceSnapshot = fitPreference;
       const targetAgeGroupSnapshot = targetAgeGroup;
       const measurementGenderSnapshot = measurementGender;
-      const originalItemIdsSnapshot = new Set(originalItemIds.current);
       const designIdSnapshot = id;
       const coverPreviewUrl: string | undefined = (() => {
-        const coverItem = filesSnapshot[coverIndexSnapshot];
+        const coverItem = files[coverIndexSnapshot];
         if (coverItem?.previewUrl) return coverItem.previewUrl;
         return undefined;
       })();
-      const optimisticCatalogUrl = `/profile?tab=content&visibility=${
-        visibilitySnapshot === 'PRIVATE' ? 'Private' : 'Public'
-      }`;
 
-      // Legal acknowledgement is fast and must complete before leaving so a
-      // denied policy cannot orphan a background upload after navigation.
-      await DesignApi.acknowledgeContentPolicy();
+      // Go-live always lands on In Review — content integrity review is the
+      // server outcome for new publishes. Never send users to Public mid-upload.
+      const inReviewCatalogUrl = '/profile?tab=content&contentStatus=in-review';
 
-      // Edit + made-to-order: persist custom-order config before leaving so a
-      // half-saved config cannot race the publish finalize.
+      // Edit + made-to-order: persist config before leave (needs editor mounted).
       if (isEditMode && designIdSnapshot && isMadeToOrderSnapshot) {
         const saved = await customOrderEditorRef.current?.saveConfiguration({
           silentSuccess: true,
@@ -1287,24 +1300,24 @@ const CreateDesignInner: React.FC = () => {
         designId: isEditMode ? designIdSnapshot : undefined,
         legacyCollectionId: isEditMode ? designIdSnapshot : undefined,
         collectionId: isEditMode ? designIdSnapshot : undefined,
-        message: 'Queued…',
+        message: 'Uploading…',
       });
 
       updatePublishTask(
         task.id,
         {
-          progress: 2,
+          progress: 3,
           message: 'Uploading…',
         },
         publishTaskScope,
       );
 
-      // Immediate UX: leave the form the moment go-live is confirmed. All
-      // heavy work (preprocess → S3 → finalize) continues in background and
-      // is reflected on the catalog progress card via publishTracker.
       setShowPublishModal(false);
-      toast.info('Going live — progress is on your catalog card.');
-      navigate(optimisticCatalogUrl, {
+      // Modal scroll-lock / focus traps can freeze the island nav if left behind
+      // after SPA navigation — hard unlock immediately.
+      unlockDocumentScroll();
+      toast.info('Submitting for review…');
+      navigate(inReviewCatalogUrl, {
         replace: true,
         state: {
           publishingTaskId: task.id,
@@ -1312,8 +1325,12 @@ const CreateDesignInner: React.FC = () => {
           publishingStartedAt: task.startedAt,
           publishingVisibility: visibilitySnapshot,
           publishingKind: 'publish',
+          publishingReviewStatus: 'IN_REVIEW',
         },
       });
+      // Second unlock after paint in case modal exit animation re-locks.
+      window.setTimeout(() => unlockDocumentScroll(), 0);
+      window.setTimeout(() => unlockDocumentScroll(), 320);
 
       const designMetadata = {
         title: titleSnapshot,
@@ -1333,279 +1350,34 @@ const CreateDesignInner: React.FC = () => {
         targetAgeGroup: targetAgeGroupSnapshot,
       };
 
-      const runPublishTask = async () => {
-        let uploadedDesignId: string | undefined = isEditMode
-          ? designIdSnapshot
-          : undefined;
-
-        try {
-          if (isEditMode && designIdSnapshot) {
-            updatePublishTask(
-              task.id,
-              { progress: 12, message: 'Updating…' },
-              publishTaskScope,
-            );
-
-            await DesignApi.updateDesign(designIdSnapshot, {
-              title: titleSnapshot,
-              description: descriptionSnapshot,
-              minPrice: parsedMinPrice,
-              maxPrice: parsedMaxPrice,
-              tags: finalTags,
-              categoryId: categoryIdSnapshot,
-              subCategoryId: categoryTypeIdSnapshot,
-              categoryTypeId: categoryTypeIdSnapshot,
-              type: typeSnapshot,
-              visibility: visibilitySnapshot,
-              coverMediaId: filesSnapshot[coverIndexSnapshot]?.remoteId || undefined,
-              filterValueIds: filterValueIdsSnapshot,
-              sizingMode: sizingModeSnapshot,
-              rtwSizeSystem: null,
-              customMeasurementKeys: customMeasurementKeysSnapshot,
-              customOrderEnabled: isMadeToOrderSnapshot,
-              fitPreference: fitPreferenceSnapshot,
-              targetAgeGroup: targetAgeGroupSnapshot,
-            } as any);
-
-            updatePublishTask(
-              task.id,
-              { progress: 40, message: 'Media…' },
-              publishTaskScope,
-            );
-
-            const currentIds = new Set(filesSnapshot.map((f) => f.id));
-            const toDelete = Array.from(originalItemIdsSnapshot).filter(
-              (oid) => !currentIds.has(oid),
-            );
-            if (toDelete.length > 0) {
-              await Promise.all(
-                toDelete.map((itemId) =>
-                  DesignApi.deleteDesignMedia(designIdSnapshot, itemId),
-                ),
-              );
-            }
-
-            updatePublishTask(
-              task.id,
-              { status: 'finalizing', progress: 75, message: 'Finishing…' },
-              publishTaskScope,
-            );
-
-            const finalizeResult = await finalizeDesignUploads(
-              designIdSnapshot,
-              [],
-              true,
-              {
-                action: 'publish',
-                coverIndex: coverIndexSnapshot,
-                designMetadata,
-              },
-            );
-
-            const profileRoute = getProfileRouteForPublication(
-              finalizeResult,
-              visibilitySnapshot,
-            );
-            updatePublishTask(
-              task.id,
-              {
-                status: 'published',
-                progress: 100,
-                designId: designIdSnapshot,
-                legacyCollectionId: designIdSnapshot,
-                collectionId: designIdSnapshot,
-                coverPreviewUrl: undefined,
-                message: profileRoute.taskMessage,
-              },
-              publishTaskScope,
-            );
-            toast.success(profileRoute.toastMessage);
-            // Re-route only when review tab differs from the optimistic public/private tab.
-            if (profileRoute.url !== optimisticCatalogUrl) {
-              navigate(profileRoute.url, {
-                replace: true,
-                state: {
-                  publishingTaskId: task.id,
-                  publishingTitle: titleSnapshot,
-                  publishingStartedAt: task.startedAt,
-                  publishingVisibility: visibilitySnapshot,
-                  publishingReviewStatus: profileRoute.reviewStatus,
-                },
-              });
-            }
-            window.setTimeout(
-              () => removePublishTask(task.id, publishTaskScope),
-              30_000,
-            );
-            return;
-          }
-
-          // Create path: single-shot publish when no custom-order config is
-          // needed (avoids draft finalize + second publish finalize). Made-to-
-          // order still drafts first so sourceId exists for config create.
-          const publishInOneShot = !pendingCustomOrderDraft;
-          updatePublishTask(
-            task.id,
-            { progress: 5, message: 'Uploading…' },
-            publishTaskScope,
-          );
-
-          const response = await uploadDesign(
-            filesSnapshot,
-            titleSnapshot,
-            descriptionSnapshot,
-            parsedMinPrice,
-            parsedMaxPrice,
-            false,
-            finalTags,
-            {
-              categoryId: categoryIdSnapshot,
-              subCategoryId: categoryTypeIdSnapshot,
-              categoryTypeId: categoryTypeIdSnapshot,
-              type: typeSnapshot,
-              visibility: visibilitySnapshot,
-              filterValueIds: filterValueIdsSnapshot,
-              coverIndex: coverIndexSnapshot,
-              sizingMode: sizingModeSnapshot,
-              rtwSizeSystem: undefined,
-              customMeasurementKeys: customMeasurementKeysSnapshot,
-              customOrderEnabled: isMadeToOrderSnapshot,
-              fitPreference: fitPreferenceSnapshot,
-              targetAgeGroup: targetAgeGroupSnapshot,
-            },
-            (value: number) => {
-              const mappedProgress = Math.max(
-                5,
-                Math.min(publishInOneShot ? 98 : 90, Math.round(value * (publishInOneShot ? 0.98 : 0.9))),
-              );
-              updatePublishTask(
-                task.id,
-                {
-                  status: value >= 100 ? 'finalizing' : 'uploading',
-                  progress: mappedProgress,
-                  message: value >= 100 ? 'Finishing…' : 'Uploading…',
-                },
-                publishTaskScope,
-              );
-            },
-            publishInOneShot,
-          );
-
-          uploadedDesignId = extractDesignId(response);
-          if (!uploadedDesignId) {
-            throw new Error(
-              'Upload completed but no design id was returned. Please retry go-live.',
-            );
-          }
-
-          if (pendingCustomOrderDraft) {
-            updatePublishTask(
-              task.id,
-              {
-                status: 'finalizing',
-                progress: 92,
-                designId: uploadedDesignId,
-                legacyCollectionId: uploadedDesignId,
-                collectionId: uploadedDesignId,
-                message: 'Setup…',
-              },
-              publishTaskScope,
-            );
-            await customOrderConfigurationsApi.create({
-              ...pendingCustomOrderDraft,
-              fabricRuleBasisId:
-                String(pendingCustomOrderDraft.fabricRuleBasisId ?? '').trim() ||
-                (
-                  await customOrderConfigurationsApi.createFabricRuleBasis({
-                    label: `${titleSnapshot.trim() || 'Custom order'} fabric rules`,
-                    measurementKeys: pendingCustomOrderDraft.requiredMeasurementKeys,
-                    gender: measurementGenderSnapshot,
-                  })
-                ).id,
-              sourceId: uploadedDesignId,
-            });
-
-            updatePublishTask(
-              task.id,
-              {
-                status: 'finalizing',
-                progress: 97,
-                designId: uploadedDesignId,
-                legacyCollectionId: uploadedDesignId,
-                collectionId: uploadedDesignId,
-                message: 'Finishing…',
-              },
-              publishTaskScope,
-            );
-
-            const finalizeResult = await finalizeDesignUploads(
-              uploadedDesignId,
-              [],
-              true,
-              {
-                action: 'publish',
-                coverIndex: coverIndexSnapshot,
-                designMetadata,
-              },
-            );
-
-            const profileRoute = getProfileRouteForPublication(
-              finalizeResult,
-              visibilitySnapshot,
-            );
-            updatePublishTask(
-              task.id,
-              {
-                status: 'published',
-                progress: 100,
-                designId: uploadedDesignId,
-                legacyCollectionId: uploadedDesignId,
-                collectionId: uploadedDesignId,
-                coverPreviewUrl: undefined,
-                message: profileRoute.taskMessage,
-              },
-              publishTaskScope,
-            );
-            toast.success(profileRoute.toastMessage);
-            if (profileRoute.url !== optimisticCatalogUrl) {
-              navigate(profileRoute.url, {
-                replace: true,
-                state: {
-                  publishingTaskId: task.id,
-                  publishingTitle: titleSnapshot,
-                  publishingStartedAt: task.startedAt,
-                  publishingVisibility: visibilitySnapshot,
-                  publishingReviewStatus: profileRoute.reviewStatus,
-                },
-              });
-            }
-            window.setTimeout(
-              () => removePublishTask(task.id, publishTaskScope),
-              30_000,
-            );
-            return;
-          }
-
-          // One-shot publish already finalized inside uploadDesign.
+      // Fire-and-forget module job — does not depend on CreateDesign mount.
+      void runDesignPublishJob({
+        taskId: task.id,
+        ownerId: user?.id,
+        title: titleSnapshot,
+        description: descriptionSnapshot,
+        minPrice: parsedMinPrice,
+        maxPrice: parsedMaxPrice,
+        tags: finalTags,
+        files: jobFiles,
+        coverIndex: coverIndexSnapshot,
+        designMetadata,
+        existingDesignId: isEditMode ? designIdSnapshot : undefined,
+        pendingCustomOrderDraft: pendingCustomOrderDraft as Record<string, unknown> | null,
+        measurementGender: measurementGenderSnapshot,
+        publishTaskScope,
+        onComplete: ({ payload }) => {
           const profileRoute = getProfileRouteForPublication(
-            response,
+            payload,
             visibilitySnapshot,
           );
-          updatePublishTask(
-            task.id,
-            {
-              status: 'published',
-              progress: 100,
-              designId: uploadedDesignId,
-              legacyCollectionId: uploadedDesignId,
-              collectionId: uploadedDesignId,
-              coverPreviewUrl: undefined,
-              message: profileRoute.taskMessage,
-            },
-            publishTaskScope,
-          );
-          toast.success(profileRoute.toastMessage);
-          if (profileRoute.url !== optimisticCatalogUrl) {
+          toast.success(profileRoute.toastMessage || 'Design submitted for review.');
+          // Stay on In Review; only re-route if status is a different review bucket.
+          if (
+            profileRoute.reviewStatus &&
+            profileRoute.reviewStatus !== 'IN_REVIEW' &&
+            profileRoute.url !== inReviewCatalogUrl
+          ) {
             navigate(profileRoute.url, {
               replace: true,
               state: {
@@ -1617,56 +1389,26 @@ const CreateDesignInner: React.FC = () => {
               },
             });
           }
-          window.setTimeout(
-            () => removePublishTask(task.id, publishTaskScope),
-            30_000,
-          );
-        } catch (backgroundError) {
-          const rawErrMsg =
-            (backgroundError as any)?.response?.data?.message ||
-            (backgroundError instanceof Error
-              ? backgroundError.message
-              : 'Failed to go live with design');
+          refreshCatalogAfterMutation();
+        },
+        onError: (error, failedDesignId) => {
           const errMsg = mapCreatorMetadataError(
-            rawErrMsg,
+            error.message,
             'Failed to go live with design',
           );
-          uploadedDesignId =
-            uploadedDesignId ||
-            (typeof (backgroundError as any)?.designId === 'string'
-              ? ((backgroundError as any).designId as string)
-              : undefined);
-          updatePublishTask(
-            task.id,
-            {
-              status: 'failed',
-              progress: 100,
-              designId: uploadedDesignId,
-              legacyCollectionId: uploadedDesignId,
-              collectionId: uploadedDesignId,
-              message: uploadedDesignId
-                ? 'Setup issue — open editor to finish'
-                : 'Go live failed',
-              error: errMsg,
-            },
-            publishTaskScope,
-          );
           toast.error(
-            uploadedDesignId
+            failedDesignId
               ? `${errMsg}. Media may already be uploaded — open the design editor to finish.`
               : errMsg,
           );
-        }
-      };
-
-      window.setTimeout(() => {
-        void runPublishTask();
-      }, 0);
+        },
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.toLowerCase().includes('cancelled')) {
         toast.info('Go-live cancelled');
         setShowPublishModal(false);
+        unlockDocumentScroll();
         return;
       }
       console.error(error);
@@ -1678,10 +1420,12 @@ const CreateDesignInner: React.FC = () => {
             ? 'Failed to update design'
             : 'Failed to go live with design',
       );
+      unlockDocumentScroll();
       throw error;
     } finally {
       setIsSubmitting(false);
       setSubmitIntent(null);
+      unlockDocumentScroll();
     }
   };
 

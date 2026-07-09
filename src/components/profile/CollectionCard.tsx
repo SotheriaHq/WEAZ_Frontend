@@ -12,7 +12,7 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
-import VLoader from '@/components/loaders/VLoader';
+
 import { getCatalogEntityCardCopy, resolveCatalogEntityCardBranch } from './catalogEntityCardModel';
 import { mapCatalogTargetForLegacyApi } from '@/utils/catalogTarget';
 import { getCompactPublishTaskStatusLabel, isLocalPublishTaskId } from '@/utils/publishTracker';
@@ -345,28 +345,22 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
         {(isPublishing || publishFailed) && (
           <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/70 px-4 text-center text-white backdrop-blur-sm">
             {isPublishing ? (
-              <>
-                <VLoader size={28} progress={publishProgress ?? undefined} phase="loading" showLabel={false} />
-                <div className="w-32 space-y-1.5">
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
-                    <div
-                      className="h-full rounded-full bg-white transition-[width] duration-300 ease-out"
-                      style={{
-                        width:
-                          publishProgress !== null
-                            ? `${Math.max(4, Math.min(100, publishProgress))}%`
-                            : '35%',
-                        ...(publishProgress === null
-                          ? { animation: 'pulse 1.2s ease-in-out infinite' }
-                          : null),
-                      }}
-                    />
-                  </div>
-                  <div className="text-center text-xs font-semibold tracking-wide text-white/90">
-                    {compactStatusLabel}
-                  </div>
+              <div className="w-36 space-y-2">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
+                  <div
+                    className="h-full rounded-full bg-white transition-[width] duration-300 ease-out"
+                    style={{
+                      width:
+                        publishProgress !== null
+                          ? `${Math.max(4, Math.min(100, publishProgress))}%`
+                          : '28%',
+                    }}
+                  />
                 </div>
-              </>
+                <div className="text-center text-sm font-semibold tracking-wide text-white">
+                  {compactStatusLabel}
+                </div>
+              </div>
             ) : (() => {
               const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
               return (

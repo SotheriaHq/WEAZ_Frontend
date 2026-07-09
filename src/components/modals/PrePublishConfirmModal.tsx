@@ -87,20 +87,20 @@ const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
     }
   }, [state, redirectCountdown, onViewPublished]);
 
-  // Scroll Locking
+  // Scroll Locking — always hard-clear on close/unmount so SPA navigation after
+  // go-live cannot leave body overflow:hidden (freezes island nav taps).
   useEffect(() => {
-    if (isOpen) {
-      const originalBodyOverflow = document.body.style.overflow;
-      const originalHtmlOverflow = document.documentElement.style.overflow;
-      
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
-      
-      return () => {
-        document.body.style.overflow = originalBodyOverflow;
-        document.documentElement.style.overflow = originalHtmlOverflow;
-      };
+    if (!isOpen) {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      return;
     }
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
   }, [isOpen]);
 
   useFocusTrap({

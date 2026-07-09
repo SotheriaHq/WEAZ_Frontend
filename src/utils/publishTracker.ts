@@ -37,6 +37,8 @@ const MAX_TOTAL_TASKS = 120;
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 const PUBLISHED_GRACE_MS = 30 * 1000;
 const SAVED_GRACE_MS = 2 * 60 * 1000;
+/** In-flight jobs die on full page refresh; after this window mark them failed. */
+const ABANDONED_IN_FLIGHT_MS = 3 * 60 * 1000;
 const MAX_PERSISTED_PREVIEW_URL_LENGTH = 4096;
 
 const clampProgress = (value: number) => {
@@ -188,6 +190,24 @@ export const getPublishTaskLegacyCollectionId = (task: Pick<PublishTask, 'legacy
 const normalizeTaskList = (tasks: PublishTask[]) => {
   const now = Date.now();
   const fresh = tasks
+    .map((task) => {
+      // Full page refresh kills module-level upload jobs. Don't leave a forever
+      // "Uploading…" ghost — surface a retryable failure after the abandon window.
+      if (
+        (task.status === 'uploading' || task.status === 'finalizing') &&
+        now - task.updatedAt > ABANDONED_IN_FLIGHT_MS
+      ) {
+        return {
+          ...task,
+          status: 'failed' as const,
+          progress: 100,
+          message: 'Interrupted — retry go-live',
+          error: 'Upload was interrupted (page closed or refreshed).',
+          updatedAt: now,
+        };
+      }
+      return task;
+    })
     .filter((task) => {
       if (now - task.updatedAt > STALE_AFTER_MS) return false;
       if (task.status === 'published' && now - task.updatedAt > PUBLISHED_GRACE_MS) return false;

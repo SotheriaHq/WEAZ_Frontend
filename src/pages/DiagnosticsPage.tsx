@@ -14,6 +14,10 @@ const DiagnosticsPage: React.FC = () => {
   const entries = useMemo(() => getClientDiagnostics(), [revision]);
   const text = useMemo(() => formatClientDiagnostics(), [revision]);
 
+  if (new URLSearchParams(window.location.search).has('sentry-test')) {
+    throw new Error('Sentry test error from DiagnosticsPage');
+  }
+
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
 
   useEffect(() => {

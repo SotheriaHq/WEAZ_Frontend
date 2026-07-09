@@ -244,19 +244,36 @@ export const useBrandProfile = () => {
   const { flags: reviewFlags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
   const queryClient = useQueryClient();
 
-  // Brand profile state
-  const [brandProfile, setBrandProfile] = useState<BrandProfileDto | null>(null);
-  const [brandProfileLoading, setBrandProfileLoading] = useState(false);
+  const ownerCollectionsQuery = useBrandCollectionsQuery(
+    { ownerId: ownerBrandId, visibility: 'all', scope: 'design' },
+    { enabled: Boolean(ownerBrandId) },
+  );
+  const ownerBrandProfileQuery = useBrandProfileQuery(ownerBrandId, {
+    enabled: Boolean(ownerBrandId && hasBrandMembership && brandDetailEndpointsEnabled),
+  });
+
+  // Brand profile state — seed from react-query cache so revisits never flash
+  // a full-page skeleton while the network revalidates.
+  const [brandProfile, setBrandProfile] = useState<BrandProfileDto | null>(
+    () => ownerBrandProfileQuery.data ?? null,
+  );
+  const [brandProfileLoading, setBrandProfileLoading] = useState(
+    () => Boolean(ownerBrandId && hasBrandMembership && !ownerBrandProfileQuery.data),
+  );
   const [brandProfileError, setBrandProfileError] = useState<string | null>(null);
-  const brandProfileRef = useRef<BrandProfileDto | null>(null);
+  const brandProfileRef = useRef<BrandProfileDto | null>(ownerBrandProfileQuery.data ?? null);
   const brandProfileFetchPromiseRef = useRef<Promise<void> | null>(null);
 
-  // Collections state
-  const [collections, setCollections] = useState<CollectionDto[]>([]);
-  const [collectionsLoading, setCollectionsLoading] = useState(true);
+  // Collections state — same cache-first seed as profile.
+  const [collections, setCollections] = useState<CollectionDto[]>(
+    () => ownerCollectionsQuery.data ?? [],
+  );
+  const [collectionsLoading, setCollectionsLoading] = useState(
+    () => Boolean(ownerBrandId) && !ownerCollectionsQuery.data,
+  );
   const [collectionsError, setCollectionsError] = useState<string | null>(null);
   const collectionsFetchPromiseRef = useRef<Promise<void> | null>(null);
-  const collectionsRef = useRef<CollectionDto[]>([]);
+  const collectionsRef = useRef<CollectionDto[]>(ownerCollectionsQuery.data ?? []);
 
   useEffect(() => {
     collectionsRef.current = collections;
@@ -274,13 +291,6 @@ export const useBrandProfile = () => {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
   const [loadedReviewsBrandId, setLoadedReviewsBrandId] = useState<string | null>(null);
-  const ownerCollectionsQuery = useBrandCollectionsQuery(
-    { ownerId: ownerBrandId, visibility: 'all', scope: 'design' },
-    { enabled: Boolean(ownerBrandId) },
-  );
-  const ownerBrandProfileQuery = useBrandProfileQuery(ownerBrandId, {
-    enabled: Boolean(ownerBrandId && hasBrandMembership && brandDetailEndpointsEnabled),
-  });
 
   // Render-phase mirror (NOT an effect): with a warm react-query cache the
   // first committed frame already carries the owner's collections. The effect
@@ -290,15 +300,27 @@ export const useBrandProfile = () => {
   if (ownerCollectionsQuery.data && collections !== ownerCollectionsQuery.data) {
     setCollections(ownerCollectionsQuery.data);
   }
+  if (
+    ownerBrandProfileQuery.data &&
+    brandProfile !== ownerBrandProfileQuery.data
+  ) {
+    setBrandProfile(ownerBrandProfileQuery.data);
+  }
 
   // Blocking-skeleton signal derived at render time: once any data exists
   // (cached rows or a resolved-empty response) the skeleton must never cover
   // it; background refetches stay silent per stale-while-revalidate.
   const collectionsBlockingLoading =
     Boolean(ownerBrandId) &&
-    collectionsLoading &&
     collections.length === 0 &&
-    !ownerCollectionsQuery.data;
+    !ownerCollectionsQuery.data &&
+    (collectionsLoading || ownerCollectionsQuery.isLoading);
+
+  const brandProfileBlockingLoading =
+    Boolean(ownerBrandId && hasBrandMembership && brandDetailEndpointsEnabled) &&
+    !brandProfile &&
+    !ownerBrandProfileQuery.data &&
+    (brandProfileLoading || ownerBrandProfileQuery.isLoading);
 
   // Fetch brand profile
   const fetchBrandProfile = useCallback(async (brandId: string, options?: { forceRefresh?: boolean }) => {
@@ -566,7 +588,8 @@ export const useBrandProfile = () => {
   return {
     user,
     brandProfile,
-    brandProfileLoading,
+    // Derived: never skeleton when cache already has a profile snapshot.
+    brandProfileLoading: brandProfileBlockingLoading,
     brandProfileError,
     collections,
     // Derived blocking flag (render-time), NOT the raw state: the raw state

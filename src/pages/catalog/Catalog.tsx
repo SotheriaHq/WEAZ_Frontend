@@ -426,7 +426,9 @@ const ProfilePage: React.FC = () => {
           reviewStatus:
             typeof navState.publishingReviewStatus === 'string'
               ? String(navState.publishingReviewStatus).toUpperCase()
-              : null,
+              : kind === 'publish'
+                ? 'IN_REVIEW'
+                : null,
           visibility:
             navState.publishingVisibility === 'PRIVATE'
               ? 'PRIVATE'
@@ -826,6 +828,9 @@ const ProfilePage: React.FC = () => {
         const nextDesignId = getPublishTaskDesignId(task);
         const nextPreviewUrl =
           task.coverPreviewUrl || getPublishTaskRuntimePreview(task.id) || current?.previewUrl;
+        const nextReviewStatus =
+          current?.reviewStatus ??
+          (!isDraftTask ? 'IN_REVIEW' : null);
         if (
           !current ||
           current.status !== nextStatus ||
@@ -835,7 +840,8 @@ const ProfilePage: React.FC = () => {
           current.taskId !== task.id ||
           current.designId !== nextDesignId ||
           current.title !== task.title ||
-          current.kind !== task.kind
+          current.kind !== task.kind ||
+          current.reviewStatus !== nextReviewStatus
         ) {
           next[key] = {
             status: nextStatus,
@@ -848,6 +854,7 @@ const ProfilePage: React.FC = () => {
             title: task.title,
             visibility: task.visibility,
             kind: task.kind,
+            reviewStatus: nextReviewStatus,
             message: nextMessage,
           };
           changed = true;
@@ -1164,7 +1171,12 @@ const ProfilePage: React.FC = () => {
           if (decoratedIds.has(key)) return false;
           if (state.kind === 'draft') return false;
           if (state.status !== 'publishing' && state.status !== 'failed') return false;
-          return String(state.reviewStatus ?? '').toUpperCase() === targetReviewStatus;
+          // Default go-live tasks to IN_REVIEW so they land on the review tab
+          // even before finalize returns a status.
+          const reviewStatus = String(
+            state.reviewStatus ?? (state.kind === 'publish' ? 'IN_REVIEW' : ''),
+          ).toUpperCase();
+          return reviewStatus === targetReviewStatus;
         })
         .map(([key, state]) => {
           const nowIso = new Date(state.startedAt || Date.now()).toISOString();
@@ -1214,6 +1226,16 @@ const ProfilePage: React.FC = () => {
         if (isDraftView) {
           if (state.kind !== 'draft') return false;
         } else if (state.kind === 'draft') {
+          return false;
+        }
+        // Go-live tasks belong on In Review, not Public/Private.
+        const reviewStatus = String(state.reviewStatus ?? '').toUpperCase();
+        if (
+          !isDraftView &&
+          (reviewStatus === 'IN_REVIEW' ||
+            reviewStatus === 'CHANGES_REQUESTED' ||
+            reviewStatus === 'REJECTED')
+        ) {
           return false;
         }
         if ((state.visibility ?? 'PUBLIC') !== targetVisibility) return false;
