@@ -46,6 +46,7 @@ import {
   getPublishTaskDesignId,
   getPublishTaskLegacyCollectionId,
   getCompactPublishTaskStatusLabel,
+  getPublishTaskRuntimePreview,
   isLocalPublishTaskId,
 } from '@/utils/publishTracker';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
@@ -415,9 +416,13 @@ const ProfilePage: React.FC = () => {
           startedAt,
           attempts: 0,
           progress: task?.progress,
-          previewUrl: task?.coverPreviewUrl,
+          previewUrl:
+            task?.coverPreviewUrl ||
+            getPublishTaskRuntimePreview(taskId) ||
+            undefined,
           taskId,
           kind,
+          title: task?.title || (typeof navState.publishingTitle === 'string' ? navState.publishingTitle : undefined),
           reviewStatus:
             typeof navState.publishingReviewStatus === 'string'
               ? String(navState.publishingReviewStatus).toUpperCase()
@@ -819,12 +824,14 @@ const ProfilePage: React.FC = () => {
             progress: task.progress,
           });
         const nextDesignId = getPublishTaskDesignId(task);
+        const nextPreviewUrl =
+          task.coverPreviewUrl || getPublishTaskRuntimePreview(task.id) || current?.previewUrl;
         if (
           !current ||
           current.status !== nextStatus ||
           current.progress !== task.progress ||
           current.message !== nextMessage ||
-          current.previewUrl !== task.coverPreviewUrl ||
+          current.previewUrl !== nextPreviewUrl ||
           current.taskId !== task.id ||
           current.designId !== nextDesignId ||
           current.title !== task.title ||
@@ -835,7 +842,7 @@ const ProfilePage: React.FC = () => {
             startedAt: task.startedAt,
             attempts: current?.attempts ?? 0,
             progress: task.progress,
-            previewUrl: task.coverPreviewUrl,
+            previewUrl: nextPreviewUrl,
             taskId: task.id,
             designId: nextDesignId,
             title: task.title,

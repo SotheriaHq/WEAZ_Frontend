@@ -63,27 +63,27 @@ describe('publishTracker identifiers', () => {
   });
 
   it('formats compact status labels for pending cards', () => {
-    expect(getCompactPublishTaskStatusLabel({ status: 'uploading', kind: 'publish', progress: 45 })).toBe('Uploading... 45%');
-    expect(getCompactPublishTaskStatusLabel({ status: 'finalizing', kind: 'publish' })).toBe('Finalizing...');
-    expect(getCompactPublishTaskStatusLabel({ status: 'publish-failed', kind: 'publish' })).toBe('Failed - Retry');
+    expect(getCompactPublishTaskStatusLabel({ status: 'uploading', kind: 'publish', progress: 45 })).toBe('45%');
+    expect(getCompactPublishTaskStatusLabel({ status: 'finalizing', kind: 'publish' })).toBe('Finishing…');
+    expect(getCompactPublishTaskStatusLabel({ status: 'publish-failed', kind: 'publish' })).toBe('Failed');
     expect(getCompactPublishTaskStatusLabel({ status: 'published', kind: 'publish' })).toBe('Live');
   });
 
   it('returns verb-only label when progress is undefined (indeterminate case)', () => {
     // No progress available — UI should render an indeterminate skeleton, not a stuck %
-    expect(getCompactPublishTaskStatusLabel({ status: 'uploading', kind: 'publish' })).toBe('Uploading...');
-    expect(getCompactPublishTaskStatusLabel({ status: 'uploading', kind: 'draft' })).toBe('Saving...');
+    expect(getCompactPublishTaskStatusLabel({ status: 'uploading', kind: 'publish' })).toBe('Uploading…');
+    expect(getCompactPublishTaskStatusLabel({ status: 'uploading', kind: 'draft' })).toBe('Saving…');
   });
 
   it('clamps progress to 99 max so the UI layer can detect and render indeterminate', () => {
     // progress=100 is clamped to 99 — CollectionCard renders shimmer skeleton for >=99
-    expect(getCompactPublishTaskStatusLabel({ status: 'uploading', kind: 'publish', progress: 100 })).toBe('Uploading... 99%');
-    expect(getCompactPublishTaskStatusLabel({ status: 'uploading', kind: 'publish', progress: 99 })).toBe('Uploading... 99%');
+    expect(getCompactPublishTaskStatusLabel({ status: 'uploading', kind: 'publish', progress: 100 })).toBe('99%');
+    expect(getCompactPublishTaskStatusLabel({ status: 'uploading', kind: 'publish', progress: 99 })).toBe('99%');
   });
 
   it('failed status label is stable regardless of progress value', () => {
-    expect(getCompactPublishTaskStatusLabel({ status: 'publish-failed', kind: 'publish', progress: 99 })).toBe('Failed - Retry');
-    expect(getCompactPublishTaskStatusLabel({ status: 'failed', kind: 'publish' })).toBe('Failed - Retry');
+    expect(getCompactPublishTaskStatusLabel({ status: 'publish-failed', kind: 'publish', progress: 99 })).toBe('Failed');
+    expect(getCompactPublishTaskStatusLabel({ status: 'failed', kind: 'publish' })).toBe('Failed');
   });
 
   it('resolves server design id after reconciliation (dedup invariant)', () => {
@@ -112,24 +112,33 @@ describe('publishTracker identifiers', () => {
     expect(isLocalPublishTaskId(null)).toBe(false);
   });
 
-  it('does not persist local data/blob preview URLs in publish tasks', () => {
-    createPublishTask({
+  it('keeps ephemeral data/blob previews in session memory but not localStorage', () => {
+    const dataUrl = 'data:image/jpeg;base64,' + 'a'.repeat(5000);
+    const dataTask = createPublishTask({
       ownerId: 'owner-1',
       title: 'Quota-safe task',
-      coverPreviewUrl: 'data:image/jpeg;base64,' + 'a'.repeat(5000),
+      coverPreviewUrl: dataUrl,
     });
 
-    expect(readPublishTasks({ ownerId: 'owner-1' })[0]?.coverPreviewUrl).toBeUndefined();
+    // In-memory read rehydrates session preview so catalog cards can show cover.
+    expect(readPublishTasks({ ownerId: 'owner-1' })[0]?.coverPreviewUrl).toBe(dataUrl);
+    // Persistence layer must never store data: / blob: URLs (Safari quota).
+    const persisted = JSON.parse(window.localStorage.getItem('threadly.publish.designTasks.v2') || '[]') as Array<{
+      id: string;
+      coverPreviewUrl?: string;
+    }>;
+    expect(persisted.find((entry) => entry.id === dataTask.id)?.coverPreviewUrl).toBeUndefined();
 
-    createPublishTask({
+    const blobTask = createPublishTask({
       ownerId: 'owner-1',
       title: 'Blob task',
       coverPreviewUrl: 'blob:https://weaz.me/local-preview',
     });
-
-    expect(
-      readPublishTasks({ ownerId: 'owner-1' }).every((task) => !task.coverPreviewUrl),
-    ).toBe(true);
+    expect(readPublishTasks({ ownerId: 'owner-1' }).some((task) => task.id === blobTask.id && task.coverPreviewUrl?.startsWith('blob:'))).toBe(true);
+    const persistedAfterBlob = JSON.parse(window.localStorage.getItem('threadly.publish.designTasks.v2') || '[]') as Array<{
+      coverPreviewUrl?: string;
+    }>;
+    expect(persistedAfterBlob.every((entry) => !entry.coverPreviewUrl?.startsWith('blob:') && !entry.coverPreviewUrl?.startsWith('data:'))).toBe(true);
   });
 
   it('reconciles failed local tasks when the server draft already exists', () => {

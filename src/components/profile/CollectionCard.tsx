@@ -346,17 +346,26 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
           <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/70 px-4 text-center text-white backdrop-blur-sm">
             {isPublishing ? (
               <>
-                <VLoader size={24} progress={publishProgress ?? undefined} phase="loading" showLabel={false} />
-                {publishProgress !== null && publishProgress < 99 ? (
-                  <div className="text-sm font-semibold">{compactStatusLabel}</div>
-                ) : (
-                  <div className="flex flex-col items-center gap-1.5">
-                    <div className="text-xs font-medium text-white/80">Uploading...</div>
-                    <div className="w-28 h-1 rounded-full bg-white/20 overflow-hidden">
-                      <div className="h-full w-1/2 rounded-full bg-white/70 animate-pulse" />
-                    </div>
+                <VLoader size={28} progress={publishProgress ?? undefined} phase="loading" showLabel={false} />
+                <div className="w-32 space-y-1.5">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+                    <div
+                      className="h-full rounded-full bg-white transition-[width] duration-300 ease-out"
+                      style={{
+                        width:
+                          publishProgress !== null
+                            ? `${Math.max(4, Math.min(100, publishProgress))}%`
+                            : '35%',
+                        ...(publishProgress === null
+                          ? { animation: 'pulse 1.2s ease-in-out infinite' }
+                          : null),
+                      }}
+                    />
                   </div>
-                )}
+                  <div className="text-center text-xs font-semibold tracking-wide text-white/90">
+                    {compactStatusLabel}
+                  </div>
+                </div>
               </>
             ) : (() => {
               const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;

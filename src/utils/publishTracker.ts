@@ -50,16 +50,49 @@ export const getCompactPublishTaskStatusLabel = ({
   progress,
 }: CompactPublishStatusInput) => {
   if (status === 'published') return 'Live';
-  if (status === 'saved') return 'Draft saved';
-  if (status === 'failed' || status === 'publish-failed') return 'Failed - Retry';
-  if (status === 'finalizing') return 'Finalizing...';
+  if (status === 'saved') return 'Saved';
+  if (status === 'failed' || status === 'publish-failed') return 'Failed';
+  if (status === 'finalizing') return 'Finishing…';
 
   const safeProgress =
     typeof progress === 'number' && Number.isFinite(progress)
       ? Math.max(0, Math.min(99, Math.round(progress)))
       : null;
-  const verb = kind === 'draft' ? 'Saving' : status === 'uploading' ? 'Uploading' : 'Publishing';
-  return safeProgress === null ? `${verb}...` : `${verb}... ${safeProgress}%`;
+  // Prefer percent-only labels on cards so progress bars carry the state.
+  if (safeProgress !== null) return `${safeProgress}%`;
+  return kind === 'draft' ? 'Saving…' : 'Uploading…';
+};
+
+/**
+ * Session-only preview URLs (blob:/data:) that must not enter localStorage.
+ * Wired so catalog cards can still show a cover while an upload is in flight.
+ */
+const runtimePreviewByTaskId = new Map<string, string>();
+
+export const setPublishTaskRuntimePreview = (
+  taskId: string,
+  previewUrl?: string | null,
+) => {
+  const id = String(taskId ?? '').trim();
+  if (!id) return;
+  const url = typeof previewUrl === 'string' ? previewUrl.trim() : '';
+  if (!url) {
+    runtimePreviewByTaskId.delete(id);
+    return;
+  }
+  runtimePreviewByTaskId.set(id, url);
+};
+
+export const getPublishTaskRuntimePreview = (taskId?: string | null) => {
+  const id = String(taskId ?? '').trim();
+  if (!id) return undefined;
+  return runtimePreviewByTaskId.get(id);
+};
+
+export const clearPublishTaskRuntimePreview = (taskId?: string | null) => {
+  const id = String(taskId ?? '').trim();
+  if (!id) return;
+  runtimePreviewByTaskId.delete(id);
 };
 
 const normalizeOwnerId = (ownerId?: string | null) => {
@@ -206,7 +239,13 @@ const taskBelongsToScope = (task: PublishTask, scopeOwnerId: string | undefined)
 
 export const readPublishTasks = (scope?: PublishTaskScope): PublishTask[] => {
   const scopeOwnerId = resolveScopeOwnerId(scope);
-  return readRawPublishTasks().filter((task) => taskBelongsToScope(task, scopeOwnerId));
+  return readRawPublishTasks()
+    .filter((task) => taskBelongsToScope(task, scopeOwnerId))
+    .map((task) => {
+      const runtimePreview = getPublishTaskRuntimePreview(task.id);
+      if (!runtimePreview || task.coverPreviewUrl) return task;
+      return { ...task, coverPreviewUrl: runtimePreview };
+    });
 };
 
 const writePublishTasks = (tasks: PublishTask[]) => {
@@ -244,6 +283,11 @@ export const createPublishTask = (payload: {
 }): PublishTask => {
   const id = `publish_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const now = Date.now();
+  // Keep ephemeral previews (blob:/data:) in session memory only — localStorage
+  // strips them, and without this map catalog cards lose cover while uploading.
+  if (payload.coverPreviewUrl) {
+    setPublishTaskRuntimePreview(id, payload.coverPreviewUrl);
+  }
   const task: PublishTask = {
     id,
     ownerId: normalizeOwnerId(payload.ownerId),
@@ -263,7 +307,9 @@ export const createPublishTask = (payload: {
 
   const existing = readRawPublishTasks().filter((entry) => entry.id !== id);
   writePublishTasks([task, ...existing]);
-  return task;
+  // Re-attach runtime preview after storage round-trip stripped ephemeral URLs.
+  const runtimePreview = getPublishTaskRuntimePreview(id);
+  return runtimePreview ? { ...task, coverPreviewUrl: runtimePreview } : task;
 };
 
 export const updatePublishTask = (
@@ -297,6 +343,7 @@ export const removePublishTask = (id: string, scope?: PublishTaskScope) => {
     if (task.id !== id) return true;
     return !taskBelongsToScope(task, scopeOwnerId);
   });
+  clearPublishTaskRuntimePreview(id);
   writePublishTasks(next);
 };
 
