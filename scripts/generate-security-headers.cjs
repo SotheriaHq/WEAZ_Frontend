@@ -15,6 +15,34 @@ const apiBaseUrl = String(process.env.VITE_API_BASE_URL ?? 'https://api.weaz.me'
 
 const gaMeasurementId = String(process.env.VITE_GA_MEASUREMENT_ID ?? '').trim();
 
+// This script runs under plain node, which does not load .env like Vite does.
+// The Sentry DSN normally lives only in .env, so fall back to reading it there
+// to keep the CSP in sync with the bundle Vite produces.
+const readDotEnvValue = (key) => {
+  try {
+    const text = fs.readFileSync(path.join(root, '.env'), 'utf8');
+    for (const line of text.split(/\r?\n/)) {
+      const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+      if (match && match[1] === key) {
+        return match[2].replace(/^['"]|['"]$/g, '');
+      }
+    }
+  } catch {
+    // no .env — env var only
+  }
+  return '';
+};
+
+const sentryDsn = String(process.env.VITE_SENTRY_DSN ?? readDotEnvValue('VITE_SENTRY_DSN')).trim();
+let sentryIngestOrigin = '';
+if (sentryDsn) {
+  try {
+    sentryIngestOrigin = new URL(sentryDsn).origin;
+  } catch {
+    console.warn('VITE_SENTRY_DSN is not a valid URL; Sentry host left out of CSP connect-src');
+  }
+}
+
 const apiWsBaseUrl = apiBaseUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
 
 const buildConnectSrc = () => {
@@ -38,6 +66,9 @@ const buildConnectSrc = () => {
     'https://www.google-analytics.com',
     'https://region1.google-analytics.com',
   ]);
+  if (sentryIngestOrigin) {
+    sources.add(sentryIngestOrigin);
+  }
   return Array.from(sources).join(' ');
 };
 
