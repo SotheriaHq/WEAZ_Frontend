@@ -646,12 +646,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         ) : null}
 
         {isOwnerView && onEdit ? (
-          <div
-            className={`
-              absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-all duration-300
-              ${isHovered ? 'opacity-100' : 'opacity-0'}
-            `}
-          >
+          <div className="hidden md:flex absolute inset-0 z-20 items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               type="button"
               onClick={(event) => {
@@ -682,7 +677,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           </div>
         ) : null}
 
-        <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/82 via-black/42 to-transparent px-4 pb-4 pt-16">
+        <div className="hidden md:block absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/82 via-black/42 to-transparent px-4 pb-4 pt-16">
           <h3 className="line-clamp-1 text-sm font-semibold leading-snug text-white drop-shadow-sm">
             {product.name}
           </h3>
@@ -762,6 +757,39 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               )}
             </div>
           </div>
+        </div>
+
+        {/* Mobile View Bottom Overlay */}
+        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-black/45 backdrop-blur-md z-10 flex items-center justify-between min-h-[32px] max-h-[38px] border-t border-white/10" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-1 min-w-0 flex flex-col justify-center pl-1">
+            <h3 
+              className="font-bold text-white truncate leading-none uppercase"
+              style={{ fontSize: '12px' }}
+            >
+              {product.name}
+            </h3>
+            <span className="text-white/85 leading-none mt-0.5" style={{ fontSize: '12px' }}>
+              {formatPrice(product.effectivePrice, product.brand.currency)}
+            </span>
+          </div>
+          
+          {/* Mobile Bag It/Add to Cart Feature inline in the bottom bar */}
+          {!isOwnerView && (
+            <button
+              type="button"
+              className="flex items-center justify-center p-0.5 text-white hover:scale-110 transition-transform mr-1 shrink-0"
+              onClick={handleQuickAddToCart}
+              disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
+              aria-label={BAG_IT_LABEL}
+            >
+              <BagPulseIcon
+                status={pulseStatus}
+                context="multi_card"
+                size={24}
+                disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
+              />
+            </button>
+          )}
         </div>
       </div>
     </article>

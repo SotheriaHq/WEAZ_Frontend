@@ -1016,7 +1016,7 @@ export default function CatalogShopTab({
                 </div>
               ) : null}
 
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(242px,1fr))] gap-4 sm:gap-5">
+              <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(242px,1fr))] gap-4 sm:gap-5">
                 {showProductsEmpty ? (
                   <div className="col-span-full">
                     <StoreEmptyState type="no-products" isOwner={isOwner} />

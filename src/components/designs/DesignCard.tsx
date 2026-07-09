@@ -18,6 +18,7 @@ import { BagApi } from '@/api/BagApi';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagFlow } from '@/features/bagging/BagFlowProvider';
 import { BAG_IT_LABEL } from '@/constants/bagging';
+import { formatPrice } from '@/utils/helpers';
 
 interface DesignCardProps {
   item: MarketItem;
@@ -324,7 +325,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
         {/* Tag Button */}
-        <div className="absolute top-2 left-2 z-20 scale-[0.72] origin-top-left sm:top-3 sm:left-3 sm:scale-100">
+        <div className="hidden md:block absolute top-2 left-2 z-20 scale-[0.72] origin-top-left sm:top-3 sm:left-3 sm:scale-100">
            <button
             onClick={(e) => {
               e.stopPropagation();
@@ -372,7 +373,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
         </div>
 
         {/* Context Menu (Three Dots) */}
-        <div className="absolute top-2 right-2 z-30 scale-[0.72] origin-top-right sm:top-3 sm:right-3 sm:scale-100">
+        <div className="hidden md:block absolute top-2 right-2 z-30 scale-[0.72] origin-top-right sm:top-3 sm:right-3 sm:scale-100">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -438,7 +439,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
         </div>
 
         {/* Vertical Action Bar (Right Side - Instagram/TikTok Style) */}
-        <div className="absolute bottom-10 right-1 z-10 flex flex-col items-center gap-1 sm:bottom-20 sm:right-3 sm:gap-2.5">
+        <div className="hidden md:flex absolute bottom-10 right-1 z-10 flex flex-col items-center gap-1 sm:bottom-20 sm:right-3 sm:gap-2.5">
           {isCustomAvailable ? (
             <button
               type="button"
@@ -483,9 +484,8 @@ export const DesignCard: React.FC<DesignCardProps> = ({
           </div>
         </div>
 
-        {/* Bottom Content Overlay */}
-        {/* FIX #6: Responsive padding for different screen sizes */}
-        <div className="absolute bottom-0 left-0 right-0 p-1.5 sm:p-3 md:p-4 text-white z-10">
+        {/* Desktop Bottom Content Overlay */}
+        <div className="hidden md:block absolute bottom-0 left-0 right-0 p-1.5 sm:p-3 md:p-4 text-white z-10">
           {/* Brand Info with Glassmorphism */}
           {/* FIX #6: Responsive padding and spacing */}
           <button
@@ -593,10 +593,49 @@ export const DesignCard: React.FC<DesignCardProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Mobile View Bottom Overlay */}
+        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-black/45 backdrop-blur-md z-10 flex items-center justify-between min-h-[32px] max-h-[38px] border-t border-white/10" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-1 min-w-0 flex flex-col justify-center pl-1">
+            <h3 
+              className="font-bold text-white truncate leading-none uppercase"
+              style={{ fontSize: '12px' }}
+            >
+              {item.collectionTitle}
+            </h3>
+            {(() => {
+              const min = typeof item.minPrice === 'number' ? formatPrice(item.minPrice) : undefined;
+              const max = typeof item.maxPrice === 'number' ? formatPrice(item.maxPrice) : undefined;
+              const displayPrice = min && max ? `${min} - ${max}` : min ? `${min}+` : max ? `Up to ${max}` : null;
+              return displayPrice ? (
+                <span className="text-white/85 leading-none mt-0.5" style={{ fontSize: '12px' }}>
+                  {displayPrice}
+                </span>
+              ) : null;
+            })()}
+          </div>
+          
+          {/* Mobile Bag It Feature inline in the bottom bar */}
+          {isCustomAvailable && (
+            <button
+              type="button"
+              className="flex items-center justify-center p-0.5 text-white hover:scale-110 transition-transform mr-1 shrink-0"
+              onClick={handleBagDesign}
+              disabled={bagBusy || ownsDesignBrand}
+              aria-label={BAG_IT_LABEL}
+            >
+              <BagPulseIcon
+                status={bagBusy ? 'bagging' : ownsDesignBrand ? 'disabled' : 'not_bagged'}
+                context="rail"
+                size={24}
+                disabled={bagBusy || ownsDesignBrand}
+              />
+            </button>
+          )}
+        </div>
       </div>
     </article>
   );
 };
 
 export default DesignCard;
-

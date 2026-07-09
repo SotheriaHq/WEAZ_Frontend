@@ -957,7 +957,7 @@ const MarketPlace: React.FC = () => {
             <>
               {visibleProducts.length > 0 ? (
                 <>
-                  <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 md:gap-5">
                     {visibleProducts.map((product) => (
                       <motion.div
                         key={product.id}
@@ -1002,7 +1002,7 @@ const MarketPlace: React.FC = () => {
                       These products are sold out for standard checkout, but brands still accept custom-order bags. If they are not restocked within 7 days, they leave the market automatically.
                     </p>
                   </div>
-                  <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 md:gap-5">
                     {outOfStockCustomOrderProducts.map((product) => (
                       <motion.div
                         key={`custom-order-only-${product.id}`}

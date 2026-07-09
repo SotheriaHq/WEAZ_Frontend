@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useRouteError, isRouteErrorResponse, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, RefreshCcw, AlertTriangle, WifiOff, ServerCrash, ShieldX } from 'lucide-react';
+import { captureClientException } from '@/observability/sentry';
 
 /**
  * ErrorPage - Premium error boundary page
@@ -17,6 +18,14 @@ const ErrorPage: React.FC = () => {
   const error = useRouteError();
   const navigate = useNavigate();
   console.error('ErrorPage caught:', error);
+
+  useEffect(() => {
+    // Router errorElement intercepts render errors before RootErrorBoundary,
+    // so this boundary must report to Sentry itself.
+    if (!isRouteErrorResponse(error)) {
+      captureClientException(error, { boundary: 'router-error-page' });
+    }
+  }, [error]);
 
   // Determine error type and customize display
   let status = 500;

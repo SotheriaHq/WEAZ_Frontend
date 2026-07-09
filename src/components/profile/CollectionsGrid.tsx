@@ -140,7 +140,7 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
     768: 2,
     640: 2,
     480: 2,
-    0: 1,
+    0: 2,
   };
 
   if (!collections || collections.length === 0) {

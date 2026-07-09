@@ -487,10 +487,24 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 via-black/35 to-transparent" />
         
         {/* Entity badge (top left) */}
-        <div className="absolute top-3 left-3 z-20">
+        <div className="hidden md:block absolute top-3 left-3 z-20">
           <div className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-500/80 backdrop-blur-sm text-white text-xs font-medium rounded-full">
             <span>{copy.badgeLabel}</span>
           </div>
+        </div>
+
+        {/* Mobile status badges (top left) */}
+        <div className="md:hidden absolute top-2 left-2 z-20 flex flex-col gap-1">
+          {reviewStatusLabel && (
+            <div className={`px-2 py-0.5 rounded-full text-[12px] font-bold border backdrop-blur-sm shadow-sm ${reviewStatusClassName}`}>
+              {reviewStatusLabel === 'In Review' ? 'Review' : reviewStatusLabel}
+            </div>
+          )}
+          {isDraft && (
+            <div className="px-2 py-0.5 rounded-full text-[12px] font-bold bg-amber-500/80 text-white border border-amber-400/30 backdrop-blur-sm shadow-sm">
+              Draft
+            </div>
+          )}
         </div>
         
         {/* Three-dot menu for owners (top right) */}
@@ -531,7 +545,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
 
         {/* Vertical Action Bar (like in Reels) - Right side */}
         {!isDraft && !isDeleted && hasPersistedCollectionId && (
-        <div className="absolute bottom-28 right-2 z-10 flex flex-col items-center gap-3">
+        <div className="hidden md:flex absolute bottom-28 right-2 z-10 flex-col items-center gap-3">
           {/* Legacy thread targets are still collection-backed for design rows. */}
           <ThreadButton
             contentType="COLLECTION"
@@ -559,8 +573,8 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
         </div>
         )}
 
-        {/* Bottom Info */}
-        <div className={`absolute bottom-0 left-0 right-0 text-white z-10 ${compact ? 'p-2' : 'p-3'}`}>
+        {/* Desktop Bottom Info */}
+        <div className={`hidden md:block absolute bottom-0 left-0 right-0 text-white z-10 ${compact ? 'p-2' : 'p-3'}`}>
           {/* Brand Info with Avatar */}
           <div className="flex items-center gap-2 mb-2">
             <div className="w-7 h-7 flex-shrink-0 ring-1 ring-white/30 rounded-sm overflow-hidden">
@@ -697,6 +711,23 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
                   {copy.viewLabel}
                 </button>
               </>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile Bottom Info */}
+        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-black/45 backdrop-blur-md z-10 flex items-center justify-between min-h-[32px] max-h-[38px] border-t border-white/10" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-1 min-w-0 flex flex-col justify-center pl-1">
+            <h3 
+              className="font-bold text-white truncate leading-none uppercase"
+              style={{ fontSize: '12px' }}
+            >
+              {displayTitle}
+            </h3>
+            {(baseBand || saleBand) && (
+              <span className="text-white/85 leading-none mt-0.5" style={{ fontSize: '12px' }}>
+                {singleBand}
+              </span>
             )}
           </div>
         </div>
