@@ -737,13 +737,17 @@ const EditProduct: React.FC = () => {
   }, []);
 
   const syncShippingRegions = useCallback(async (
-    options?: { persistPolicy?: boolean },
+    options?: { persistPolicy?: boolean; requireRegions?: boolean },
   ): Promise<string | undefined> => {
     if (!form.isPhysicalProduct) {
       return undefined;
     }
 
+    // Drafts must not require shipping countries — only go-live does.
     if (normalizedShippingRegions.length === 0) {
+      if (options?.requireRegions === false) {
+        return undefined;
+      }
       throw new Error("MISSING_SHIPPING_REGION");
     }
 
@@ -1608,7 +1612,7 @@ const EditProduct: React.FC = () => {
             ? `Supported sizes: ${PRODUCT_VARIANT_SIZE_LABELS}`
             : null,
           !form.title.trim() ? 'Please enter a product title' : null,
-          !form.description.trim() ? 'Please enter a product description' : null,
+          // Description is optional — do not block go-live/draft when empty.
           !form.taxonomyCategoryId ? 'Choose what this item is.' : null,
           !form.categoryTypeId ? 'Choose a garment type.' : null,
           !form.gender ? 'Choose who this item is for.' : null,
@@ -1719,7 +1723,8 @@ const EditProduct: React.FC = () => {
         }
         const resolvedCustomsRegion = await syncShippingRegions({
           // Collection flow should not block on store policy updates.
-          persistPolicy: !isCollectionContext,
+          persistPolicy: !isCollectionContext && !effectiveDraft,
+          requireRegions: !effectiveDraft,
         });
         const ensuredSku =
           form.sku?.trim() ||
@@ -2045,7 +2050,8 @@ const EditProduct: React.FC = () => {
       const payloadCategoryTypeId = form.categoryTypeId || undefined;
       const payloadCategoryId = form.taxonomyCategoryId || undefined;
       const resolvedCustomsRegion = await syncShippingRegions({
-        persistPolicy: !isCollectionContext,
+        persistPolicy: !isCollectionContext && !effectiveDraft,
+        requireRegions: !effectiveDraft,
       });
       const normalizedVariants =
         form.variants.length > 0
@@ -3146,13 +3152,18 @@ const EditProduct: React.FC = () => {
 
           {/* RIGHT COLUMN: Details (58% approx -> 7 cols) */}
           <div className="space-y-4 lg:col-span-8">
-            {/* Basic Info */}
-            <div className="surface-card rounded-xl border p-4 shadow-sm sm:p-5">
-              <h2 className="text-lg font-medium text-theme mb-6">
-                Basic Information
-              </h2>
+            {/* Basic Info — same collapsible card language as Create Design */}
+            <div className="surface-card relative rounded-2xl border border-[color:var(--border-default)] shadow-[0_14px_34px_rgba(15,23,42,0.08)] backdrop-blur">
+              <div className="flex items-center gap-3 border-b border-[color:var(--border-default)]/80 p-3 sm:p-4">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl gradient-primary text-base sm:h-10 sm:w-10 sm:text-lg">
+                  📝
+                </span>
+                <h2 className="text-base font-semibold text-theme sm:text-lg">
+                  Basic Information
+                </h2>
+              </div>
 
-              <div className="space-y-4">
+              <div className="space-y-4 px-3 py-4 sm:px-4">
                 <Input
                   label="Product Title"
                   required
@@ -3173,8 +3184,8 @@ const EditProduct: React.FC = () => {
                   <div className="lg:max-h-[340px] lg:overflow-y-auto lg:pr-1 scrollbar-threadly">
                     <div className="space-y-3">
                       <div className="space-y-3" id="product-category-section">
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                          <div className="md:col-span-6">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          <div className="min-w-0">
                             <UniversalSelect
                               label="What is it?"
                               value={form.taxonomyCategoryId}
@@ -3195,10 +3206,11 @@ const EditProduct: React.FC = () => {
                               emptyMessage="No categories available"
                               optionAllowWrap
                               selectedAllowWrap
+                              menuLayer="modal"
                             />
                           </div>
 
-                          <div className="md:col-span-6">
+                          <div className="min-w-0">
                             <UniversalSelect
                               label="Garment type"
                               value={form.categoryTypeId}
@@ -3227,25 +3239,27 @@ const EditProduct: React.FC = () => {
                               }
                               optionAllowWrap
                               selectedAllowWrap
+                              menuLayer="modal"
                             />
                           </div>
-                        </div>
 
-                        <UniversalSelect
-                          label="Who is it for?"
-                          value={form.gender}
-                          onChange={(value) =>
-                            updateForm("gender", value as CreatorAudience)
-                          }
-                          options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
-                            value: option.value,
-                            label: option.label,
-                          }))}
-                          disabled={saving}
-                        />
+                          <div className="min-w-0 sm:col-span-2">
+                            <UniversalSelect
+                              label="Who is it for?"
+                              value={form.gender}
+                              onChange={(value) =>
+                                updateForm("gender", value as CreatorAudience)
+                              }
+                              options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
+                                value: option.value,
+                                label: option.label,
+                              }))}
+                              disabled={saving}
+                              menuLayer="modal"
+                            />
+                          </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                          <div className="md:col-span-8">
+                          <div className="min-w-0 sm:col-span-2">
                             <UniversalSelect
                               label="Collection (optional)"
                               value={
@@ -3269,33 +3283,31 @@ const EditProduct: React.FC = () => {
                               emptyMessage="No collections available"
                               optionAllowWrap
                               selectedAllowWrap
+                              menuLayer="modal"
                             />
-                          </div>
-
-                          <div className="surface-control flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 md:col-span-4">
-                            <p className="text-[11px] text-theme-secondary">
+                            <p className="mt-1.5 text-[11px] text-theme-secondary">
                               {categoriesLoading
                                 ? 'Loading collections…'
                                 : categories.length
-                                  ? 'Collections are optional. Use one only if this product belongs in a store collection.'
-                                  : 'No collections yet. This product can stay standalone.'}
+                                  ? 'Optional. Use only if this product belongs in a store collection.'
+                                  : 'No collections yet — product can stay standalone.'}
+                              {!categoriesLoading && categories.length === 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const suffix = productId
+                                      ? `?productId=${encodeURIComponent(productId)}`
+                                      : '';
+                                    navigate(
+                                      `/studio/store/collections/new${suffix}`,
+                                    );
+                                  }}
+                                  className="ml-1 font-semibold text-purple-600 hover:text-purple-700"
+                                >
+                                  Create collection
+                                </button>
+                              ) : null}
                             </p>
-                            {!categoriesLoading && categories.length === 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const suffix = productId
-                                    ? `?productId=${encodeURIComponent(productId)}`
-                                    : '';
-                                  navigate(
-                                    `/studio/store/collections/new${suffix}`,
-                                  );
-                                }}
-                                className="text-[11px] font-semibold text-purple-600 hover:text-purple-700 transition-colors whitespace-nowrap"
-                              >
-                                Create collection
-                              </button>
-                            ) : null}
                           </div>
                         </div>
                       </div>
@@ -3405,16 +3417,21 @@ const EditProduct: React.FC = () => {
               </div>
             </div>
 
-            <div className="surface-card overflow-hidden rounded-xl border shadow-sm">
-              <div className="px-4 py-3 flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-theme-secondary">
-                  Product Operations
-                </p>
+            <div className="surface-card relative overflow-hidden rounded-2xl border border-[color:var(--border-default)] shadow-[0_14px_34px_rgba(15,23,42,0.08)] backdrop-blur">
+              <div className="flex items-center justify-between gap-3 border-b border-[color:var(--border-default)]/80 p-3 sm:p-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl gradient-primary text-base sm:h-10 sm:w-10 sm:text-lg">
+                    ⚙️
+                  </span>
+                  <p className="truncate text-base font-semibold text-theme sm:text-lg">
+                    Product Operations
+                  </p>
+                </div>
                 <span className="text-[10px] font-medium text-theme-secondary">
                   Scroll inside panel
                 </span>
               </div>
-              <div className="space-y-4 p-4 lg:max-h-[440px] lg:overflow-y-auto lg:pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="space-y-4 p-3 sm:p-4 lg:max-h-[440px] lg:overflow-y-auto lg:pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {/* Pricing */}
                 <div
                   id="product-pricing-section"

@@ -735,6 +735,8 @@ export const productApi = {
         data: { id: string; url: string; viewSlot?: string | null };
       }>(`/products/${productId}/media`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        // Mobile browsers need longer than the global 15s for multi-MB photos.
+        timeout: 90_000,
       });
       return (
         response.data?.data ??

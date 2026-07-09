@@ -348,7 +348,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
               <div className="w-36 space-y-2">
                 <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
                   <div
-                    className="h-full rounded-full bg-white transition-[width] duration-300 ease-out"
+                    className="h-full rounded-full bg-[color:var(--brand-primary,#a855f7)] transition-[width] duration-300 ease-out"
                     style={{
                       width:
                         publishProgress !== null

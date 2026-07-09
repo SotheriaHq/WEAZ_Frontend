@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
 import { useDispatch, useSelector } from 'react-redux';
@@ -371,12 +371,14 @@ const ProfilePage: React.FC = () => {
     });
   }, [publishTaskScope]);
 
-  // Industry-standard stale-while-revalidate: when the user returns from create/edit
-  // flows (or refocuses the tab), refresh owner catalog data in the background.
+  // Industry-standard stale-while-revalidate: refresh owner catalog when the
+  // path/search actually changes — not on every location.key (state-only nav
+  // clears used to re-key and spam refetch during go-live).
+  const catalogRouteKey = `${location.pathname}${location.search}`;
   useEffect(() => {
     if (!isOwner || !ownerBrandId) return;
     refreshOwnerCatalogQueries(queryClient, ownerBrandId);
-  }, [isOwner, location.key, ownerBrandId, queryClient]);
+  }, [isOwner, catalogRouteKey, ownerBrandId, queryClient]);
 
   useEffect(() => {
     if (!isOwner || !ownerBrandId) return;
@@ -406,7 +408,8 @@ const ProfilePage: React.FC = () => {
     if (navState.publishingTaskId) {
       const taskId = String(navState.publishingTaskId);
       const task = publishTasks.find((entry) => entry.id === taskId);
-      const lookupId = (task ? getPublishTaskDesignId(task) : null) || taskId;
+      // Always key by local task id so progress updates don't spawn a second card.
+      const lookupId = taskId;
       const kind: PublishTaskKind = navState.publishingKind === 'draft' || task?.kind === 'draft' ? 'draft' : 'publish';
       const startedAt = typeof navState.publishingStartedAt === 'number' ? navState.publishingStartedAt : task?.startedAt ?? Date.now();
       setPublishingStates((prev) => ({
@@ -415,12 +418,14 @@ const ProfilePage: React.FC = () => {
           status: task?.status === 'failed' ? 'failed' : 'publishing',
           startedAt,
           attempts: 0,
-          progress: task?.progress,
+          progress: task?.progress ?? prev[lookupId]?.progress ?? 0,
           previewUrl:
             task?.coverPreviewUrl ||
             getPublishTaskRuntimePreview(taskId) ||
+            prev[lookupId]?.previewUrl ||
             undefined,
           taskId,
+          designId: task ? getPublishTaskDesignId(task) : prev[lookupId]?.designId,
           kind,
           title: task?.title || (typeof navState.publishingTitle === 'string' ? navState.publishingTitle : undefined),
           reviewStatus:
@@ -445,7 +450,8 @@ const ProfilePage: React.FC = () => {
       if (kind === 'draft') {
         setDraftsInitialized(true);
       }
-      navigate(`${location.pathname}${location.search}`, { replace: true });
+      // Clear nav state without changing the search string (avoids location.key thrash).
+      navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
       return;
     }
 
@@ -803,16 +809,46 @@ const ProfilePage: React.FC = () => {
     [isVisitorView, visitorCollections, collections]
   );
 
+  // Single card key = local task.id for the whole in-flight lifetime. Never re-key
+  // to designId mid-upload (that was the double-card + remount flash).
   useEffect(() => {
     if (publishTasks.length === 0) return;
     setPublishingStates((prev) => {
       let changed = false;
       const next = { ...prev };
-      publishTasks.forEach((task) => {
-        const key = getPublishTaskDesignId(task) || task.id;
-        if (key !== task.id && next[task.id]) {
-          delete next[task.id];
+      const liveTaskIds = new Set(publishTasks.map((task) => task.id));
+
+      // Drop orphaned in-flight entries that no longer have a publish task.
+      for (const key of Object.keys(next)) {
+        const entry = next[key];
+        if (!entry) continue;
+        const taskId = entry.taskId ?? key;
+        if (
+          (entry.status === 'publishing' || entry.status === 'failed') &&
+          !liveTaskIds.has(taskId) &&
+          isLocalPublishTaskId(taskId)
+        ) {
+          delete next[key];
           changed = true;
+        }
+      }
+
+      publishTasks.forEach((task) => {
+        // Always key by local task id while in-flight / failed.
+        const key = task.id;
+        const nextDesignId = getPublishTaskDesignId(task);
+        // Remove any accidental secondary entry keyed by design id.
+        if (nextDesignId && next[nextDesignId] && nextDesignId !== key) {
+          delete next[nextDesignId];
+          changed = true;
+        }
+        if (task.status === 'published' || task.status === 'saved') {
+          // Terminal local statuses: drop the ghost card; server row owns display.
+          if (next[key]) {
+            delete next[key];
+            changed = true;
+          }
+          return;
         }
         const current = next[key];
         const nextStatus = task.status === 'failed' ? 'failed' : 'publishing';
@@ -821,16 +857,21 @@ const ProfilePage: React.FC = () => {
           task.error ||
           task.message ||
           getCompactPublishTaskStatusLabel({
-            status: task.status === 'failed' ? 'failed' : task.status === 'finalizing' ? 'finalizing' : 'uploading',
+            status:
+              task.status === 'failed'
+                ? 'failed'
+                : task.status === 'finalizing'
+                  ? 'finalizing'
+                  : 'uploading',
             kind: isDraftTask ? 'draft' : 'publish',
             progress: task.progress,
           });
-        const nextDesignId = getPublishTaskDesignId(task);
         const nextPreviewUrl =
-          task.coverPreviewUrl || getPublishTaskRuntimePreview(task.id) || current?.previewUrl;
+          task.coverPreviewUrl ||
+          getPublishTaskRuntimePreview(task.id) ||
+          current?.previewUrl;
         const nextReviewStatus =
-          current?.reviewStatus ??
-          (!isDraftTask ? 'IN_REVIEW' : null);
+          current?.reviewStatus ?? (!isDraftTask ? 'IN_REVIEW' : null);
         if (
           !current ||
           current.status !== nextStatus ||
@@ -864,39 +905,47 @@ const ProfilePage: React.FC = () => {
     });
   }, [publishTasks]);
 
+  // When a local task reaches published/saved, drop it after a single background
+  // catalog refresh — do not loop on collections identity every render.
+  const cleanedCompletedTaskIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const completed = publishTasks.filter((task) => task.kind !== 'draft' && task.status === 'published' && getPublishTaskDesignId(task));
+    const completed = publishTasks.filter(
+      (task) =>
+        (task.status === 'published' || task.status === 'saved') &&
+        getPublishTaskDesignId(task) &&
+        !cleanedCompletedTaskIdsRef.current.has(task.id),
+    );
     if (completed.length === 0) return;
 
-    const checkAndCleanup = async () => {
+    let cancelled = false;
+    const cleanup = async () => {
       for (const task of completed) {
-        const designId = getPublishTaskDesignId(task);
-        const legacyCollectionId = getPublishTaskLegacyCollectionId(task);
-        if (!designId) continue;
+        cleanedCompletedTaskIdsRef.current.add(task.id);
         try {
           if (!isVisitorView && user?.id) {
             await fetchCollections(user.id, { forceRefresh: true });
           }
-          const latest = !isVisitorView ? collections : visitorCollections;
-          const isLive = latest.some((entry) => entry.id === designId || entry.id === legacyCollectionId);
-          if (isLive) {
-            removePublishTask(task.id, publishTaskScope);
-            setPublishingStates((prev) => {
-              const next = { ...prev };
-              delete next[task.id];
-              delete next[designId];
-              if (legacyCollectionId) delete next[legacyCollectionId];
-              return next;
-            });
-          }
         } catch {
-          // Ignore transient failures; polling and task updates will retry.
+          /* best-effort */
         }
+        if (cancelled) return;
+        removePublishTask(task.id, publishTaskScope);
+        setPublishingStates((prev) => {
+          const next = { ...prev };
+          delete next[task.id];
+          const designId = getPublishTaskDesignId(task);
+          const legacyCollectionId = getPublishTaskLegacyCollectionId(task);
+          if (designId) delete next[designId];
+          if (legacyCollectionId) delete next[legacyCollectionId];
+          return next;
+        });
       }
     };
-
-    void checkAndCleanup();
-  }, [collections, fetchCollections, isVisitorView, publishTaskScope, publishTasks, user?.id, visitorCollections]);
+    void cleanup();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchCollections, isVisitorView, publishTaskScope, publishTasks, user?.id]);
 
   useEffect(() => {
     if (!isOwner || visibilityFilter !== 'Drafts') return;
@@ -1493,147 +1542,117 @@ const ProfilePage: React.FC = () => {
     }
   }, [fetchCollections, isVisitorView, publishTaskScope, publishTasks, publishingStates, queryClient, routeBrandId, user]);
 
-  // Poll publish status for any pending ids
-  useEffect(() => {
-    const pending = Object.entries(publishingStates)
+  // Poll only after a design id exists. Do NOT put publishingStates in deps —
+  // setState from poll would re-arm the effect and infinite-loop network calls
+  // (what produced 1000+ GETs and constant re-renders after go-live).
+  const publishingStatesRef = useRef(publishingStates);
+  publishingStatesRef.current = publishingStates;
+  const publishTasksRef = useRef(publishTasks);
+  publishTasksRef.current = publishTasks;
+  const pendingPublishPollKey = useMemo(() => {
+    return Object.entries(publishingStates)
       .filter(([, state]) => state.status === 'publishing' && state.kind !== 'draft')
-      .map(([id, state]) => {
-        const task = state.taskId
-          ? publishTasks.find((entry) => entry.id === state.taskId)
-          : publishTasks.find((entry) => entry.id === id);
-        const resolvedCollectionId = task
-          ? getPublishTaskLegacyCollectionId(task)
-          : (state.taskId && state.taskId === id ? null : id);
-        return { id, state, resolvedCollectionId };
-      });
+      .map(([id, state]) => `${id}:${state.designId ?? ''}`)
+      .sort()
+      .join('|');
+  }, [publishingStates]);
 
-    if (pending.length === 0) return;
+  useEffect(() => {
+    if (!pendingPublishPollKey) return;
 
+    let cancelled = false;
     const poll = async () => {
+      if (cancelled) return;
+      const snapshot = publishingStatesRef.current;
+      const tasks = publishTasksRef.current;
+      const pending = Object.entries(snapshot)
+        .filter(([, state]) => state.status === 'publishing' && state.kind !== 'draft')
+        .map(([id, state]) => {
+          const task = state.taskId
+            ? tasks.find((entry) => entry.id === state.taskId)
+            : tasks.find((entry) => entry.id === id);
+          const resolvedCollectionId =
+            state.designId ||
+            (task ? getPublishTaskLegacyCollectionId(task) : null) ||
+            (state.taskId && state.taskId === id ? null : id);
+          return { id, state, resolvedCollectionId, task };
+        })
+        // Wait for initialize to mint a real design id — no detail polling until then.
+        .filter((entry) => entry.resolvedCollectionId && !isLocalPublishTaskId(entry.resolvedCollectionId));
+
+      if (pending.length === 0) return;
+
       const offline = typeof navigator !== 'undefined' && !navigator.onLine;
-      if (offline) {
-        setPublishingStates((prev) => {
-          const next = { ...prev };
-          pending.forEach(({ id, state }) => {
-            next[id] = { ...state, message: 'Offline. We will resume when back online.' };
-          });
-          return next;
-        });
-        return;
-      }
+      if (offline) return;
 
-      await Promise.all(pending.map(async ({ id, state, resolvedCollectionId }) => {
-        if (!resolvedCollectionId) {
-          setPublishingStates((prev) => ({
-            ...prev,
-            [id]: {
-              ...state,
-              message: 'Upload session is still initializing. We will continue checking automatically.',
-            },
-          }));
-          return;
-        }
-
-        try {
-          const linkedTask = state.taskId
-            ? publishTasks.find((entry) => entry.id === state.taskId)
-            : publishTasks.find((entry) => entry.id === id);
-          const detail = await resolveDesignPublishStatus(
-            queryClient,
-            linkedTask,
-            state.designId ?? resolvedCollectionId,
-            { forceRefresh: true },
-          );
-          // Resolve on any moderation-terminal status, not just PUBLISHED.
-          // IN_REVIEW means brand review picked it up; CHANGES_REQUESTED/REJECTED means moderation acted.
-          if (!MODERATION_RESOLVED_STATUSES.has(detail?.status ?? '')) {
-            const attempts = state.attempts + 1;
-            const tookTooLong = Date.now() - state.startedAt > 90_000;
-            setPublishingStates((prev) => ({
-              ...prev,
-              [id]: {
-                ...state,
-                attempts,
-                status: tookTooLong ? 'failed' : 'publishing',
-                message: tookTooLong
-                  ? 'Publishing is taking longer than usual. Retry to force another publish attempt.'
-                  : 'Still processing your design...',
-              },
-            }));
-            return;
-          }
-
-          if (!isVisitorView && user?.id) {
-            await fetchCollections(user.id, { forceRefresh: true });
-          } else if (isVisitorView && routeBrandId) {
-            const cols = await fetchBrandCollectionsQuery(
+      await Promise.all(
+        pending.map(async ({ id, state, resolvedCollectionId, task }) => {
+          try {
+            const detail = await resolveDesignPublishStatus(
               queryClient,
-              { ownerId: routeBrandId, visibility: 'all', scope: 'design' },
+              task,
+              state.designId ?? resolvedCollectionId,
               { forceRefresh: true },
             );
-            setVisitorCollections(cols ?? []);
-          }
-
-          setPublishingStates((prev) => {
-            const next = { ...prev };
-            delete next[id];
-            delete next[resolvedCollectionId];
-            if (state.taskId) {
-              delete next[state.taskId];
+            if (cancelled) return;
+            if (!MODERATION_RESOLVED_STATUSES.has(detail?.status ?? '')) {
+              const tookTooLong = Date.now() - state.startedAt > 90_000;
+              if (!tookTooLong) return;
+              setPublishingStates((prev) => {
+                const current = prev[id];
+                if (!current || current.status !== 'publishing') return prev;
+                return {
+                  ...prev,
+                  [id]: {
+                    ...current,
+                    status: 'failed',
+                    message:
+                      'Publishing is taking longer than usual. Retry to force another publish attempt.',
+                  },
+                };
+              });
+              return;
             }
-            return next;
-          });
 
-          if (state.taskId) {
-            removePublishTask(state.taskId, publishTaskScope);
+            if (!isVisitorView && user?.id) {
+              await fetchCollections(user.id, { forceRefresh: true });
+            }
+
+            if (cancelled) return;
+            setPublishingStates((prev) => {
+              const next = { ...prev };
+              delete next[id];
+              if (resolvedCollectionId) delete next[resolvedCollectionId];
+              if (state.taskId) delete next[state.taskId];
+              return next;
+            });
+            if (state.taskId) {
+              removePublishTask(state.taskId, publishTaskScope);
+            }
+          } catch {
+            // Transient errors: leave the progress card; next interval retries.
           }
-        } catch {
-          const attempts = state.attempts + 1;
-          const tookTooLong = Date.now() - state.startedAt > 90_000;
-          setPublishingStates((prev) => ({
-            ...prev,
-            [id]: {
-              ...state,
-              attempts,
-              status: tookTooLong ? 'failed' : 'publishing',
-              message: tookTooLong
-                ? 'Publishing is taking longer than usual. Retry to force another publish attempt.'
-                : 'Still processing your design...',
-            },
-          }));
-        }
-      }));
+        }),
+      );
     };
 
+    void poll();
     const interval = setInterval(() => {
       void poll();
-    }, 5000);
+    }, 8_000);
 
-    void poll();
-
-    return () => clearInterval(interval);
-  }, [fetchCollections, isVisitorView, publishTaskScope, publishTasks, publishingStates, queryClient, routeBrandId, user]);
-
-  // Debug: track filtering pipeline when tab or lists change
-  useEffect(() => {
-    try {
-      const totals = activeCollections.reduce((acc, c) => {
-        acc.all += 1;
-        if (c.visibility === 'PRIVATE' || c.isPublic === false) acc.private += 1; else acc.public += 1;
-        return acc;
-      }, { all: 0, public: 0, private: 0 } as any);
-      console.debug('[BrandProfile] view', {
-        isOwner,
-        isVisitorView,
-        activeTab,
-        visibilityFilter,
-        total: activeCollections.length,
-        ...totals,
-        filtered: displayCollections.length,
-        searched: searchAndVisibilityFiltered.length,
-      });
-    } catch {}
-  }, [isOwner, isVisitorView, activeTab, visibilityFilter, activeCollections, displayCollections.length, searchAndVisibilityFiltered.length]);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [
+    fetchCollections,
+    isVisitorView,
+    pendingPublishPollKey,
+    publishTaskScope,
+    queryClient,
+    user?.id,
+  ]);
 
   // Resolve signed URLs for visitor profile assets if necessary
   const visitorBannerAsset = useMemo(

@@ -199,16 +199,32 @@ export async function runDesignPublishJob(input: DesignPublishJobInput): Promise
   const startedAt = Date.now();
   let designId: string | undefined = input.existingDesignId;
 
+  // Throttle localStorage writes: S3 progress events can fire dozens of times
+  // per second and each write re-renders Catalog via the subscribe event.
+  let lastProgressWriteAt = 0;
+  let lastWrittenProgress = -1;
   const setProgress = (
     progress: number,
     message: string,
     status: 'uploading' | 'finalizing' | 'published' | 'failed' = 'uploading',
   ) => {
+    const next = clamp(progress);
+    const now = Date.now();
+    const isTerminal = status === 'published' || status === 'failed';
+    const isMilestone =
+      status === 'finalizing' ||
+      next === 0 ||
+      next >= 100 ||
+      Math.abs(next - lastWrittenProgress) >= 3 ||
+      now - lastProgressWriteAt >= 280;
+    if (!isTerminal && !isMilestone) return;
+    lastProgressWriteAt = now;
+    lastWrittenProgress = next;
     updatePublishTask(
       input.taskId,
       {
         status,
-        progress: clamp(progress),
+        progress: next,
         message,
         designId,
         legacyCollectionId: designId,

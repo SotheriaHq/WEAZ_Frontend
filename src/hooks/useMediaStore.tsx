@@ -55,8 +55,12 @@ function detectKind(file: File): MediaItemKind {
 function createItemFromFile(f: File, index = 0): MediaItem {
   const id = genId();
   const kind = detectKind(f);
+  // Instant local blob preview for images so the form paints on the next frame.
+  // Background effect upgrades HEIC/large mobile photos when needed.
   const previewUrl =
-    kind === 'video' ? buildVideoPreviewUrl(f) : '';
+    kind === 'video'
+      ? buildVideoPreviewUrl(f)
+      : URL.createObjectURL(f);
   return { id, file: f, previewUrl, kind, viewSlot: normalizeMediaViewSlot(null, index) };
 }
 
@@ -140,25 +144,31 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   useEffect(() => {
     for (const it of state.items) {
-      if (
-        it.kind !== 'image' ||
-        !it.file ||
-        it.previewUrl ||
-        convertingRef.current.has(it.id)
-      ) {
+      if (it.kind !== 'image' || !it.file || convertingRef.current.has(it.id)) {
+        continue;
+      }
+
+      // Instant blob preview already set at add-time. Only re-process when we
+      // must (HEIC / undecodable / large mobile camera JPEG that Android won't paint).
+      const hasInstantBlob =
+        typeof it.previewUrl === 'string' && it.previewUrl.startsWith('blob:');
+      const claimedDisplayable =
+        it.file.type.trim().toLowerCase().startsWith('image/') &&
+        /image\/(jpeg|png|webp|gif|bmp)/i.test(it.file.type) &&
+        it.file.size < MOBILE_PROACTIVE_NORMALIZE_MIN_BYTES;
+
+      // Laptop / small images: keep the instant blob URL, skip sniff/network.
+      if (hasInstantBlob && claimedDisplayable && !prefersCanvasImagePreview()) {
         continue;
       }
 
       convertingRef.current.add(it.id);
       const itemId = it.id;
       const file = it.file;
+      const previousPreview = it.previewUrl;
 
       void (async () => {
         try {
-          // Route on the file's REAL bytes, not its claimed type: Android
-          // galleries hand over HEIC named .jpg, which no local strategy can
-          // decode — normalize those on the server ONCE, at selection, so
-          // preview, upload, and validation all use the same JPEG.
           const sniffedFormat = await sniffImageFormat(file);
           addClientDiagnostic('info', 'media-store', 'Sniffed selected file', {
             fileName: file.name,
@@ -168,6 +178,9 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           });
 
           if (isUnreadableSniff(sniffedFormat)) {
+            if (previousPreview?.startsWith('blob:')) {
+              revokeObjectPreviewUrl(previousPreview);
+            }
             dispatch({
               type: 'setPreview',
               id: itemId,
@@ -178,59 +191,48 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
           if (!isBrowserDisplayableSniff(sniffedFormat)) {
             const normalized = await getNormalizedImageFile(file);
+            if (previousPreview?.startsWith('blob:')) {
+              revokeObjectPreviewUrl(previousPreview);
+            }
             dispatch({
               type: 'setNormalized',
               id: itemId,
               file: normalized,
               previewUrl: URL.createObjectURL(normalized),
             });
-            addClientDiagnostic('info', 'media-store', 'Normalized undecodable file on server', {
-              fileName: file.name,
-              sniffedFormat,
-              normalizedSize: normalized.size,
-            });
             return;
           }
 
-          // Large camera JPEGs on phones: local canvas → huge data: URLs that
-          // Android Chrome fails to render in <img> even though the bytes are
-          // valid. Screenshots (~100 KB) pass; 2 MB+ gallery photos do not.
-          // Normalize on the server once — preview AND upload share the result.
+          // Large mobile camera JPEGs: upgrade via server only when needed.
           if (
             prefersCanvasImagePreview() &&
             file.size >= MOBILE_PROACTIVE_NORMALIZE_MIN_BYTES
           ) {
             try {
               const normalized = await getNormalizedImageFile(file);
+              if (previousPreview?.startsWith('blob:')) {
+                revokeObjectPreviewUrl(previousPreview);
+              }
               dispatch({
                 type: 'setNormalized',
                 id: itemId,
                 file: normalized,
                 previewUrl: URL.createObjectURL(normalized),
               });
-              addClientDiagnostic(
-                'info',
-                'media-store',
-                'Proactive server normalize for large mobile photo',
-                {
-                  fileName: file.name,
-                  sniffedFormat,
-                  originalSize: file.size,
-                  normalizedSize: normalized.size,
-                },
-              );
               return;
-            } catch (error) {
-              addClientDiagnostic(
-                'warn',
-                'media-store',
-                'Proactive server normalize failed; falling back to local preview',
-                {
-                  fileName: file.name,
-                  sniffedFormat,
-                  error: error instanceof Error ? error.message : String(error),
-                },
-              );
+            } catch {
+              // Keep instant blob if server normalize fails.
+              if (hasInstantBlob) return;
+            }
+          }
+
+          // Instant blob already works for most desktop/laptop picks.
+          if (hasInstantBlob) {
+            try {
+              await probeImagePreviewUrl(previousPreview);
+              return;
+            } catch {
+              /* fall through to rebuild */
             }
           }
 
@@ -244,10 +246,6 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             }),
           ]);
 
-          // Android Chrome often accepts a raw data: URL from the canvas
-          // fallback but cannot actually decode it in <img>. Probe before we
-          // commit — otherwise LocalMediaPreview fails and we pay for a second
-          // server transcode from every thumbnail + main preview surface.
           if (
             isPreviewUnavailableDataUrl(previewUrl) ||
             previewUrl.startsWith('data:')
@@ -259,17 +257,17 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             }
           }
 
+          if (previousPreview?.startsWith('blob:') && previousPreview !== previewUrl) {
+            revokeObjectPreviewUrl(previousPreview);
+          }
           dispatch({ type: 'setPreview', id: itemId, previewUrl });
         } catch (error) {
           console.warn('[useMediaStore] preview generation failed', error);
-          addClientDiagnostic('warn', 'media-store', 'Local preview failed; trying server normalize', {
-            fileName: file.name,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          // Last resort for browser-displayable files whose local pipeline
-          // still failed (blocked canvas + undecodable data URL, OOM, ...).
           try {
             const normalized = await getNormalizedImageFile(file);
+            if (previousPreview?.startsWith('blob:')) {
+              revokeObjectPreviewUrl(previousPreview);
+            }
             dispatch({
               type: 'setNormalized',
               id: itemId,
@@ -277,11 +275,13 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               previewUrl: URL.createObjectURL(normalized),
             });
           } catch {
-            dispatch({
-              type: 'setPreview',
-              id: itemId,
-              previewUrl: IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
-            });
+            if (!hasInstantBlob) {
+              dispatch({
+                type: 'setPreview',
+                id: itemId,
+                previewUrl: IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
+              });
+            }
           }
         } finally {
           convertingRef.current.delete(itemId);
