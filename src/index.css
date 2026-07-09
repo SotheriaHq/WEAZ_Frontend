@@ -92,6 +92,18 @@ html {
     --z-modal: 1200;
     --z-tooltip: 1300;
     --z-toast: 1400;
+
+    /* Neumorphic modal surface (light defaults). MUST be declared BEFORE the
+       .dark block: :root and .dark have equal specificity on <html>, so a
+       later :root silently overrides .dark and locks every modal to the
+       light surface regardless of theme (this exact bug shipped once). */
+    --neu-surface: #f0efee;           /* warm light surface — no lavender */
+    --neu-surface-soft: #e7e5e4;
+    --neu-text: #0d0d0d;
+    --neu-text-muted: #78716c;
+    --neu-border: rgba(163, 158, 153, 0.3);
+    --neu-shadow-dark: rgba(163, 158, 153, 0.32);
+    --neu-shadow-light: rgba(255, 255, 255, 0.9);
   }
 
   .dark {
@@ -119,15 +131,6 @@ html {
     --profile-photo-ring-viewed: color-mix(in srgb, var(--text-secondary) 48%, var(--surface-muted));
   }
 
-  :root {
-    --neu-surface: #f0efee;           /* warm light surface — no lavender */
-    --neu-surface-soft: #e7e5e4;
-    --neu-text: #0d0d0d;
-    --neu-text-muted: #78716c;
-    --neu-border: rgba(163, 158, 153, 0.3);
-    --neu-shadow-dark: rgba(163, 158, 153, 0.32);
-    --neu-shadow-light: rgba(255, 255, 255, 0.9);
-  }
 }
 
 @layer utilities {

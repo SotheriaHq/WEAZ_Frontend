@@ -282,6 +282,24 @@ export const useBrandProfile = () => {
     enabled: Boolean(ownerBrandId && hasBrandMembership && brandDetailEndpointsEnabled),
   });
 
+  // Render-phase mirror (NOT an effect): with a warm react-query cache the
+  // first committed frame already carries the owner's collections. The effect
+  // below still reconciles loading/error state, but effects run after paint —
+  // relying on them alone guaranteed a one-frame skeleton flash on EVERY
+  // owner profile visit even when cached data was already present.
+  if (ownerCollectionsQuery.data && collections !== ownerCollectionsQuery.data) {
+    setCollections(ownerCollectionsQuery.data);
+  }
+
+  // Blocking-skeleton signal derived at render time: once any data exists
+  // (cached rows or a resolved-empty response) the skeleton must never cover
+  // it; background refetches stay silent per stale-while-revalidate.
+  const collectionsBlockingLoading =
+    Boolean(ownerBrandId) &&
+    collectionsLoading &&
+    collections.length === 0 &&
+    !ownerCollectionsQuery.data;
+
   // Fetch brand profile
   const fetchBrandProfile = useCallback(async (brandId: string, options?: { forceRefresh?: boolean }) => {
     if (brandProfileFetchPromiseRef.current && !options?.forceRefresh) {
@@ -551,7 +569,10 @@ export const useBrandProfile = () => {
     brandProfileLoading,
     brandProfileError,
     collections,
-    collectionsLoading,
+    // Derived blocking flag (render-time), NOT the raw state: the raw state
+    // starts true and is only reconciled after paint, which skeleton-flashed
+    // every owner profile visit even with warm cached data.
+    collectionsLoading: collectionsBlockingLoading,
     collectionsError,
     reviews,
     averageRating,

@@ -933,9 +933,44 @@ const router = createBrowserRouter([
   },
 ]);
 
+/**
+ * Idle-time warmup of the route chunks reachable from the persistent chrome
+ * (navbar search emoji, bottom dock). React Router v7 wraps navigations in
+ * startTransition, and a suspending React.lazy chunk inside a transition
+ * keeps the OLD screen on screen (no Suspense fallback) until the chunk
+ * finishes downloading — on cold mobile caches that reads as a 10-20s dead
+ * tap. Warming these chunks makes those navigations instant. Vite dedupes
+ * the dynamic imports against the lazy() declarations above.
+ */
+const HotRouteChunkPrefetch: React.FC = () => {
+  useEffect(() => {
+    let cancelled = false;
+    const warm = () => {
+      if (cancelled) return;
+      void import('./pages/SearchResultsPage');
+      void import('./pages/MarketPlace');
+      void import('./pages/catalog/Catalog');
+    };
+    const canIdle = typeof window.requestIdleCallback === 'function';
+    const idleId = canIdle
+      ? window.requestIdleCallback(warm, { timeout: 4000 })
+      : window.setTimeout(warm, 2500);
+    return () => {
+      cancelled = true;
+      if (canIdle && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      } else {
+        window.clearTimeout(idleId);
+      }
+    };
+  }, []);
+  return null;
+};
+
 const App: React.FC = () => (
   <AuthProvider>
     <ThemeBackendSync />
+    <HotRouteChunkPrefetch />
     <ScrollRestoreProvider>
       <DropdownManagerProvider>
         <BrandPatchProvider>

@@ -245,12 +245,33 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
   );
 
   const loadReasons = useCallback(async () => {
+    // Mirrors backend CONTENT_REVIEW_REASON_LABELS. The decision modal must
+    // NEVER offer an empty reason list (reject/request-changes requires a
+    // reason), so this local list backstops endpoint failures or old deploys.
+    const FALLBACK_REASON_OPTIONS: Array<{ value: string; label: string }> = [
+      { value: 'POOR_IMAGE_QUALITY', label: 'Poor image quality' },
+      { value: 'MISSING_REQUIRED_VIEW', label: 'Missing required view' },
+      { value: 'DUPLICATE_ANGLE', label: 'Duplicate angle uploaded' },
+      { value: 'MODEL_FABRIC_MISMATCH', label: 'Media does not match product/design details' },
+      { value: 'PROHIBITED_CONTENT', label: 'Offensive or unsafe content' },
+      { value: 'AI_OR_MANIPULATED_IMAGE_SUSPECTED', label: 'Image looks AI-generated or heavily edited' },
+      { value: 'WRONG_CATEGORY_OR_METADATA_MISMATCH', label: 'Incomplete or misleading product/design information' },
+      { value: 'UNSAFE_OR_FALSE_CLAIM', label: 'Listing makes an unsafe or false claim' },
+      { value: 'INTELLECTUAL_PROPERTY_OR_BRAND_MISUSE', label: 'Possible stolen or copyrighted image' },
+      { value: 'NOT_A_PRODUCT_OR_DESIGN_LISTING', label: 'Wrong or unrelated image' },
+      { value: 'OTHER', label: 'Other' },
+    ];
     try {
       const response = await adminContentReviewApi.getReasonCodes();
       const payload = unwrapApiResponse(response.data as any) as Array<{ code: string; label: string }>;
-      setReasonOptions(payload.map((reason) => ({ value: reason.code, label: reason.label })));
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to load review reasons');
+      const options = Array.isArray(payload)
+        ? payload
+            .filter((reason) => reason?.code)
+            .map((reason) => ({ value: reason.code, label: reason.label || reason.code }))
+        : [];
+      setReasonOptions(options.length > 0 ? options : FALLBACK_REASON_OPTIONS);
+    } catch {
+      setReasonOptions(FALLBACK_REASON_OPTIONS);
     }
   }, []);
 

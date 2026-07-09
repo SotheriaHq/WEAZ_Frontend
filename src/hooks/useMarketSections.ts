@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { marketApi, type GetMarketSectionsParams, type GetMarketSectionDetailParams } from '@/api/MarketApi';
 import { queryKeys } from '@/query/queryKeys';
 
@@ -24,6 +24,9 @@ export const useMarketSections = (
       return await marketApi.getMarketSections(params, { signal });
     },
     enabled: options?.enabled !== false,
+    // Param changes (e.g. session id resolution) must not blank the grid;
+    // keep the previous sections painted while the new key loads.
+    placeholderData: keepPreviousData,
   });
 };
 

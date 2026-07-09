@@ -698,8 +698,8 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
 
   if (!configuration) {
     return (
-      <div className={embedded ? 'w-full px-2 py-2' : 'mx-auto max-w-3xl px-4 py-10'}>
-        <div className="rounded-3xl border border-black/10 bg-white/80 p-8 dark:border-white/10 dark:bg-white/5">
+      <div className={embedded ? 'w-full px-2 py-2' : 'mx-auto max-w-3xl px-3 py-6 sm:px-4 sm:py-10'}>
+        <div className="rounded-3xl border border-black/10 bg-white/80 p-5 sm:p-8 dark:border-white/10 dark:bg-white/5">
           <div className="text-lg font-semibold text-slate-900 dark:text-white">Custom order configuration unavailable</div>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
             Open this page from a product or design custom-order button so the locked configuration can be loaded.
@@ -723,7 +723,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   }
 
   return (
-    <div className={embedded ? 'w-full px-2 py-2' : 'mx-auto max-w-6xl px-4 py-10'}>
+    <div className={embedded ? 'w-full px-2 py-2' : 'mx-auto max-w-6xl px-3 py-6 sm:px-4 sm:py-10'}>
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600 dark:text-emerald-300">Custom Order</div>
@@ -755,7 +755,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
 
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
-          <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
+          <section className="rounded-3xl border border-black/10 bg-white/80 p-4 sm:p-6 dark:border-white/10 dark:bg-white/5">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Measurement profile</div>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
               Only the measurement points this brand requested are shown here. Any new values you confirm will be saved back to your profile so you do not need to type them again next time.
@@ -813,7 +813,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
                 </label>
               ))}
             </div>
-            <label className="mt-5 flex items-start gap-3 rounded-2xl border border-black/10 px-4 py-3 text-sm dark:border-white/10">
+            <label className="mt-5 flex items-start gap-3 rounded-2xl bg-black/[0.03] px-4 py-3 text-sm dark:bg-white/[0.04]">
               <input type="checkbox" checked={measurementConfirmed} onChange={(event) => setMeasurementConfirmed(event.target.checked)} />
               <span className="text-slate-700 dark:text-slate-200">I confirm these measurement values are the exact snapshot I want used for pricing, checkout, and brand production review.</span>
             </label>
@@ -825,9 +825,9 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
             ) : null}
           </section>
 
-          <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
+          <section className="rounded-3xl border border-black/10 bg-white/80 p-4 sm:p-6 dark:border-white/10 dark:bg-white/5">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Delivery details</div>
-            <div className="mt-4 rounded-2xl border border-black/10 bg-black/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="mt-4 rounded-2xl bg-black/[0.03] p-3 sm:p-4 dark:bg-white/[0.04]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-slate-900 dark:text-white">Saved delivery addresses</div>
@@ -850,7 +850,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
                             <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{address.contactPhone} · {address.contactEmail}</div>
                           </button>
                           <div className="relative">
-                            <button type="button" onClick={() => setOpenAddressMenuId((current) => (current === address.id ? null : address.id))} className="rounded-full border border-black/10 px-2 py-1 text-xs font-semibold text-slate-600 dark:border-white/10 dark:text-slate-300" aria-label="Open address actions">...</button>
+                            <button type="button" onClick={() => setOpenAddressMenuId((current) => (current === address.id ? null : address.id))} className="min-h-[36px] min-w-[36px] rounded-full border border-black/10 px-3 py-2 text-xs font-semibold text-slate-600 dark:border-white/10 dark:text-slate-300" aria-label="Open address actions">...</button>
                             {openAddressMenuId === address.id ? (
                               <div className="absolute right-0 top-10 z-10 w-36 rounded-2xl border border-black/10 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-slate-950">
                                 <button type="button" onClick={() => applySavedAddress(address)} className="w-full rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5">Use address</button>
@@ -867,7 +867,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
               ) : <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">No saved delivery addresses yet. Add a new address to continue with delivery details.</p>}
             </div>
             {showAddressForm ? (
-              <div className="mt-5 rounded-2xl border border-black/10 bg-black/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="mt-5 rounded-2xl bg-black/[0.03] p-3 sm:p-4 dark:bg-white/[0.04]">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-slate-900 dark:text-white">{editingAddressId ? 'Edit saved address' : 'Add new delivery address'}</div>
@@ -902,7 +902,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
+          <section className="rounded-3xl border border-black/10 bg-white/80 p-4 sm:p-6 dark:border-white/10 dark:bg-white/5">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Policy and delivery guidance</div>
             <dl className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
               <div className="flex items-start justify-between gap-4"><dt>Brand</dt><dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.brand?.name ?? 'Brand'}</dd></div>
@@ -913,13 +913,13 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
               <div className="flex items-start justify-between gap-4"><dt>Defect policy</dt><dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.defectPolicy}</dd></div>
             </dl>
             {configuration.buyerInstructionText ? <div className="mt-5 rounded-2xl bg-black/[0.04] p-4 text-sm text-slate-600 dark:bg-white/[0.04] dark:text-slate-300"><div className="mb-1 font-semibold text-slate-900 dark:text-white">Buyer instructions</div><p>{configuration.buyerInstructionText}</p></div> : null}
-            <label className="mt-5 flex items-center gap-3 rounded-2xl border border-black/10 px-4 py-3 text-sm dark:border-white/10">
+            <label className="mt-5 flex items-center gap-3 rounded-2xl bg-black/[0.03] px-4 py-3 text-sm dark:bg-white/[0.04]">
               <input type="checkbox" checked={rushSelected} disabled={!configuration.rushEnabled} onChange={(event) => setRushSelected(event.target.checked)} />
               <span className="text-slate-700 dark:text-slate-200">Rush production {configuration.rushEnabled ? `(extra ${formatCurrency(Number(configuration.rushFee ?? 0))})` : '(not available)'}</span>
             </label>
           </section>
 
-          <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
+          <section className="rounded-3xl border border-black/10 bg-white/80 p-4 sm:p-6 dark:border-white/10 dark:bg-white/5">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Bag preview</div>
             <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
               <div className="flex items-center justify-between"><span>Base production charge</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(Number(configuration.baseProductionCharge))}</span></div>

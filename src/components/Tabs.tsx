@@ -17,11 +17,11 @@ const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, className = '
           <button
             key={tab}
             onClick={() => onTabChange(tab)}
-            className={`whitespace-nowrap ${compact ? 'py-2 text-xs' : 'py-3 text-sm'} px-1 border-b-2 font-medium transition-colors
+            className={`whitespace-nowrap ${compact ? 'py-2.5 text-xs' : 'py-3 text-sm'} px-1 border-b-2 transition-colors
               ${
                 activeTab === tab
-                  ? 'border-purple-500 text-purple-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-500'
+                  ? 'border-purple-500 font-semibold text-purple-700 dark:border-purple-300 dark:text-purple-300'
+                  : 'border-transparent font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-500'
               }
             `}
             aria-current={activeTab === tab ? 'page' : undefined}

@@ -94,6 +94,20 @@ export function useNotificationsBootstrap() {
     };
   }, [notificationSettingsQuery.data]);
 
+  // Catch-up sync whenever the socket (re)connects: anything that happened
+  // while the tab was offline/backgrounded — approvals, new notifications —
+  // was never pushed, so pull it now and refresh review-status queries.
+  useEffect(() => {
+    if (!userId) return;
+    const onRestored = () => {
+      dispatch(fetchUnreadCount());
+      dispatch(fetchNotifications({ limit: 30 }));
+      refreshOwnerCatalogQueries(queryClient, userId);
+    };
+    window.addEventListener('ws:restored', onRestored);
+    return () => window.removeEventListener('ws:restored', onRestored);
+  }, [dispatch, queryClient, userId]);
+
   // Realtime subscription
   useEffect(() => {
     if (!userId) return;
@@ -120,8 +134,6 @@ export function useNotificationsBootstrap() {
           targetUrl: payload.targetUrl ?? payload.payload?.targetUrl ?? undefined,
         }),
       );
-      dispatch(fetchUnreadCount());
-      dispatch(fetchNotifications({ limit: 30 }));
       // Show toast for real-time notification
       if (payload.message) {
         toast.info(payload.message);
@@ -200,7 +212,15 @@ export function useNotificationsBootstrap() {
     });
     const unsubDeleted = onNotificationDeleted((payload: any) => {
       if (!payload?.id) return;
-      dispatch(removeNotification({ id: payload.id }));
+      dispatch(
+        removeNotification({
+          id: payload.id,
+          unreadDelta:
+            typeof payload.unreadDelta === 'number'
+              ? payload.unreadDelta
+              : undefined,
+        }),
+      );
     });
     return () => {
       unsub();

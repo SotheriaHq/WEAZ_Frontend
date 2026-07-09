@@ -116,7 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
   const mainLinks = [
     {
       emoji: '👗',
-      label: 'Designs',
+      label: 'Runway',
       path: '/',
       active: location.pathname === '/market' || location.pathname === '/',
     },

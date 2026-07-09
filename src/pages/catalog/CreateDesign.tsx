@@ -2621,7 +2621,7 @@ const FormSection: React.FC<{
 }> = ({ title, icon, isOpen, onToggle, children, className, id }) => (
   <div
     id={id}
-    className={`surface-card relative rounded-2xl border border-[color:var(--border-strong)] ring-1 ring-[color:var(--border-default)]/60 backdrop-blur transition-shadow ${
+    className={`surface-card relative rounded-2xl border border-[color:var(--border-default)] backdrop-blur transition-shadow ${
       isOpen ? "shadow-[0_14px_34px_rgba(15,23,42,0.08)]" : "shadow-sm"
     } ${className ?? ""}`}
   >

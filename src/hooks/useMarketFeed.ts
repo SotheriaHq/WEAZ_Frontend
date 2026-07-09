@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { marketApi, type GetMarketFeedParams } from '@/api/MarketApi';
 import { queryKeys } from '@/query/queryKeys';
 import type { MarketFeedResponse } from '@/types/market';
@@ -28,6 +28,10 @@ export const useMarketFeed = (
     },
     enabled: options?.enabled !== false,
     initialData: options?.initialData,
+    // Category/tag switches change this query key. Keep the previous feed
+    // painted while the new tag loads so the skeleton never replaces
+    // already-visible content mid-session.
+    placeholderData: keepPreviousData,
     // Use default staleTime/gcTime from queryClient
     // staleTime: 3 minutes
     // gcTime: 30 minutes
