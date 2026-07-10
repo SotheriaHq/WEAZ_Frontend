@@ -319,7 +319,16 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const dropdownManager = useDropdownManager();
   const isEmbeddedMobile = useEmbeddedSurface() === 'mobile-app';
 
-  const [filterStatus, setFilterStatus] = useState<ProductStatusFilter>('all');
+  const [filterStatus, setFilterStatus] = useState<ProductStatusFilter>(() => {
+    // Notification deep links preselect a status tab (?status=in_review etc.).
+    try {
+      const requested = new URLSearchParams(window.location.search).get('status');
+      const known = PRODUCT_FILTER_OPTIONS.some((opt) => opt.value === requested);
+      return known ? (requested as ProductStatusFilter) : 'all';
+    } catch {
+      return 'all';
+    }
+  });
   const [filterCollection, setFilterCollection] = useState<'all' | string>('all');
   const [filterStock, setFilterStock] = useState('all');
   const [productSortBy, setProductSortBy] = useState<ProductSortBy>('newest');

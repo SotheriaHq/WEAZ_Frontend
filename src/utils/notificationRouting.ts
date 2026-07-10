@@ -16,6 +16,79 @@ export function determineActorRoute(actorId: string): string {
     return `/profile/${actorId}`;
 }
 
+/** Content-review lifecycle notifications (brand-owner facing). */
+const CONTENT_REVIEW_TYPE_ROUTES = new Set([
+    'CONTENT_SUBMITTED_FOR_REVIEW',
+    'CONTENT_RESUBMITTED',
+    'CONTENT_REVIEW_APPROVED',
+    'CONTENT_PUBLISHED',
+    'CONTENT_CHANGES_REQUESTED',
+    'CONTENT_REVIEW_REJECTED',
+    'CONTENT_REVIEW_FAILED',
+]);
+
+/**
+ * Route content-review notifications by what the user must DO:
+ * - changes requested → the EDIT screen with the reviewer-feedback banner
+ *   (fix-it flow; data pre-populated).
+ * - submitted / approved / rejected → the status TAB where the card lives
+ *   (status flow; no action implied).
+ */
+function determineContentReviewRoute(notification: NormalizedNotification): string | null {
+    const { type, target, payload } = notification;
+    if (!CONTENT_REVIEW_TYPE_ROUTES.has(type)) return null;
+    const p = (payload ?? {}) as Record<string, unknown>;
+
+    const productId =
+        (typeof p.productId === 'string' && p.productId) ||
+        (target?.type === 'PRODUCT' ? target.id : null) ||
+        null;
+    const designId =
+        (typeof p.designId === 'string' && p.designId) ||
+        (typeof p.legacyCollectionId === 'string' && p.legacyCollectionId) ||
+        (typeof p.collectionId === 'string' && p.collectionId) ||
+        ((target?.type === 'DESIGN' || target?.type === 'COLLECTION') ? target.id : null) ||
+        null;
+    const isProduct =
+        Boolean(productId) ||
+        String(p.entityType ?? '').toUpperCase().includes('PRODUCT');
+
+    if (type === 'CONTENT_CHANGES_REQUESTED') {
+        const note =
+            typeof p.reasonNote === 'string' && p.reasonNote.trim()
+                ? p.reasonNote.trim().slice(0, 500)
+                : '';
+        const query =
+            `review=changes${note ? `&reviewNote=${encodeURIComponent(note)}` : ''}`;
+        if (isProduct && productId) {
+            return `/studio/store/products/${encodeURIComponent(productId)}/edit?${query}`;
+        }
+        if (designId) {
+            return `${buildDesignRoute({ designId, mode: 'edit' })}?${query}`;
+        }
+        return isProduct
+            ? '/studio/store?status=changes_requested'
+            : `/profile?tab=Content&visibility=${encodeURIComponent('Changes Requested')}`;
+    }
+
+    if (type === 'CONTENT_REVIEW_REJECTED') {
+        return isProduct
+            ? '/studio/store?status=rejected'
+            : '/profile?tab=Content&visibility=Rejected';
+    }
+
+    if (type === 'CONTENT_REVIEW_APPROVED' || type === 'CONTENT_PUBLISHED') {
+        return isProduct
+            ? '/studio/store?status=active'
+            : '/profile?tab=Content&visibility=Public';
+    }
+
+    // Submitted / resubmitted / review failed → the In Review tab.
+    return isProduct
+        ? '/studio/store?status=in_review'
+        : `/profile?tab=Content&visibility=${encodeURIComponent('In Review')}`;
+}
+
 /**
  * Determine the route for navigating to notification target content
  * Uses the registry pattern with fallback to legacy targetUrl
@@ -25,6 +98,11 @@ export function determineNotificationRoute(notification: NormalizedNotification)
 
     // Fallback URL if nothing else works
     const fallbackUrl = targetUrl || '/settings?tab=notifications';
+
+    // Content-review lifecycle routes take priority — these previously fell
+    // through to the notifications screen (client-reported).
+    const contentReviewRoute = determineContentReviewRoute(notification);
+    if (contentReviewRoute) return contentReviewRoute;
 
     // Try registry-based routing first
     const config = NotificationRegistry[type as keyof typeof NotificationRegistry];

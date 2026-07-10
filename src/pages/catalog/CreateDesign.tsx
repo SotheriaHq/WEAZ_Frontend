@@ -44,6 +44,7 @@ import useFilePicker from "../../components/upload/useFilePicker";
 import { PrePublishConfirmModal } from "@/components/modals";
 import TagsApi from "@/api/TagsApi";
 import HashtagPickerModal from "@/components/tags/HashtagPickerModal";
+import ReviewFeedbackBanner from "@/components/content-review/ReviewFeedbackBanner";
 import { brandApi } from "@/api/BrandApi";
 import FilterSelector, {
   type FilterSelection,
@@ -1597,6 +1598,8 @@ const CreateDesignInner: React.FC = () => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {isEditMode && id ? <ReviewFeedbackBanner designId={id} /> : null}
 
         <div className="mb-8 grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(360px,0.82fr)]">
           {/* Media Section */}

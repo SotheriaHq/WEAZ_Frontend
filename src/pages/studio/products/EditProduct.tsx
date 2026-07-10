@@ -17,7 +17,7 @@ import {
   X,
 
 } from "lucide-react";
-import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import VLoader from "@/components/loaders/VLoader";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
@@ -61,6 +61,7 @@ import FilterSelector, {
 } from "@/components/categories/FilterSelector";
 import SizingConfigurator from "@/components/sizing/SizingConfigurator";
 import HashtagPickerModal from "@/components/tags/HashtagPickerModal";
+import ReviewFeedbackBanner from "@/components/content-review/ReviewFeedbackBanner";
 import { PriceChangePreviewModal } from "@/components/collections/PriceChangePreviewModal";
 import {
   getProductPriceChangePreview,
@@ -492,6 +493,10 @@ const EditProduct: React.FC = () => {
   // State
   const [form, setForm] = useState<FormState>(defaultFormState);
   const [contentStatus, setContentStatus] = useState<string | null>(null);
+  const [reviewSearchParams] = useSearchParams();
+  // Reviewer note carried on the notification deep link — display fallback
+  // only; the banner itself is gated on the server-side review state.
+  const reviewNoteParam = reviewSearchParams.get('reviewNote')?.trim() || '';
   const [categories, setCategories] = useState<Category[]>([]);
   const [collectionCategoryById, setCollectionCategoryById] = useState<
     Record<string, string>
@@ -2892,6 +2897,10 @@ const EditProduct: React.FC = () => {
             {/* Action buttons removed - duplicate/archive/delete should be done from Store page */}
           </div>
         </div>
+
+        {isEditMode && productId ? (
+          <ReviewFeedbackBanner productId={productId} fallbackNote={reviewNoteParam} />
+        ) : null}
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           {/* LEFT COLUMN: Media (42% approx -> 5 cols) */}

@@ -512,8 +512,8 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                     className={
                       'group rounded-xl border backdrop-blur p-2 cursor-pointer transition ' +
                       (isUnread
-                        ? 'border-purple-300/50 dark:border-purple-500/20 bg-purple-50/40 dark:bg-purple-500/5'
-                        : 'border-theme surface-card surface-interactive-hover')
+                        ? 'border-purple-400/70 border-l-4 border-l-purple-500 bg-purple-100/80 shadow-sm dark:border-purple-400/40 dark:border-l-purple-400 dark:bg-purple-500/15'
+                        : 'border-theme surface-card surface-interactive-hover opacity-75 hover:opacity-100')
                     }
                     onClick={() => {
                       handleMarkRead(n.id);
@@ -582,7 +582,10 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                               <span className="text-xs" aria-hidden="true">🗑️</span>
                             </button>
                             {isUnread && (
-                              <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1" aria-hidden="true" />
+                              <div
+                                className="mt-1 h-2 w-2 rounded-full bg-purple-500 ring-2 ring-purple-500/25"
+                                aria-hidden="true"
+                              />
                             )}
                           </div>
                         </div>
