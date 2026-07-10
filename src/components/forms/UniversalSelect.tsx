@@ -160,15 +160,17 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
   }, [filteredOptions.length, menuLayer, optionAllowWrap, optionCompact, searchable]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
+    // Pointer events cover mouse + touch (iPad/iOS Safari often misses mousedown-only).
+    const handlePointerOutside = (event: Event) => {
+      const target = event.target as Node | null;
+      if (!target) return;
       if (containerRef.current?.contains(target)) return;
       if (menuRef.current?.contains(target)) return;
       setIsOpen(false);
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('pointerdown', handlePointerOutside, true);
+    return () => document.removeEventListener('pointerdown', handlePointerOutside, true);
   }, []);
 
   useEffect(() => {
@@ -260,9 +262,18 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                     key={option.value}
                     role="option"
                     aria-selected={isSelected}
-                    onClick={() => handleSelect(option.value)}
+                    onPointerDown={(event) => {
+                      // Prevent parent modal focus-trap / backdrop from stealing
+                      // the gesture on iPad before click fires.
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      handleSelect(option.value);
+                    }}
                     className={`
-                      relative cursor-pointer select-none rounded-xl ${optionCompact ? 'py-2 pl-2.5 pr-8' : 'py-2.5 pl-3 pr-9'} transition-colors
+                      relative cursor-pointer select-none rounded-xl touch-manipulation ${optionCompact ? 'min-h-[44px] py-2 pl-2.5 pr-8' : 'min-h-[48px] py-2.5 pl-3 pr-9'} transition-colors
                       ${
                         isSelected
                           ? 'menu-item-selected'

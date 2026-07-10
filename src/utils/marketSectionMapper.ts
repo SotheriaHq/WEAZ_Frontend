@@ -10,7 +10,9 @@ export const mapSectionProductToMarketplaceProduct = (
   if (item.sourceType !== 'PRODUCT' || item.entityType !== 'PRODUCT') return null;
   const id = String(item.sourceId || item.id || '').trim();
   const mediaUrl = item.media?.url || item.media?.thumbnailUrl || null;
-  if (!id || !mediaUrl) return null;
+  const mediaFileId = item.media?.fileId ?? null;
+  // Allow product open when we have a fileId even if the raw URL is unsigned/unusable.
+  if (!id || (!mediaUrl && !mediaFileId)) return null;
 
   return normalizeMarketProduct({
     id,
@@ -20,9 +22,17 @@ export const mapSectionProductToMarketplaceProduct = (
     price: item.price?.amount ?? item.price?.effectiveAmount ?? 0,
     salePrice: item.price?.saleAmount ?? null,
     currency: item.price?.currency ?? 'NGN',
-    thumbnail: item.media?.thumbnailUrl ?? mediaUrl,
-    images: [mediaUrl],
-    media: [{ id, url: mediaUrl, type: 'image', isPrimary: true }],
+    thumbnail: item.media?.thumbnailUrl ?? mediaUrl ?? undefined,
+    images: mediaUrl ? [mediaUrl] : [],
+    media: [
+      {
+        id: mediaFileId || id,
+        url: mediaUrl || '',
+        type: 'image',
+        isPrimary: true,
+      },
+    ],
+    mediaIds: mediaFileId ? [mediaFileId] : undefined,
     totalStock: item.availability?.totalStock ?? 0,
     customOrderEnabled: Boolean(item.availability?.customOrderEnabled),
     customAvailable: Boolean(item.availability?.customOrderEnabled),

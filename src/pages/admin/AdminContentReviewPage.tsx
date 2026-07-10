@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   XCircle,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import UniversalSelect from '@/components/forms/UniversalSelect';
@@ -19,6 +20,7 @@ import {
 } from '@/api/AdminApi';
 import { unwrapApiResponse } from '@/types/auth';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { queryKeys } from '@/query/queryKeys';
 import type {
   AdminContentReport,
   AdminContentReportListResponse,
@@ -194,6 +196,7 @@ const buildReviewLifecycle = (submission: AdminContentSubmission) => {
 const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedded = false }) => {
   const { hasPermission } = useAdminPermissions();
   const canManage = hasPermission('CONTENT_REVIEW_MANAGE');
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState<ReviewFilters>({
     status: 'ALL',
     entityType: 'ALL',
@@ -368,6 +371,14 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
       if (action === 'approve') {
         await adminContentReviewApi.approveSubmission(submission.id);
         toast.success('Content approved and published');
+        // Fresh catalog/market data must paint after publish without a hard refresh.
+        await Promise.allSettled([
+          queryClient.invalidateQueries({ queryKey: ['market'] }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.market.sections() }),
+          queryClient.invalidateQueries({ queryKey: ['designs'] }),
+          queryClient.invalidateQueries({ queryKey: ['products'] }),
+          queryClient.invalidateQueries({ queryKey: ['catalog'] }),
+        ]);
       } else if (action === 'reject') {
         await adminContentReviewApi.rejectSubmission(submission.id, {
           reasonCode: decisionReason as ContentReviewReasonCode,
@@ -861,6 +872,9 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
             error={decisionError ?? undefined}
             selectedAllowWrap
             optionAllowWrap
+            // Nested inside Modal (z-modal). Default dropdown layer sits under the
+            // modal and appears empty/unresponsive on iPad Safari / touch devices.
+            menuLayer="modal"
           />
           <textarea
             value={decisionNote}

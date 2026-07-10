@@ -20,6 +20,7 @@ import FeaturedSection from '@/components/FeaturedSection';
 import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
 import { buildDesignRoute, buildProductRoute } from '@/utils/catalogRoutes';
+import { buildBrandProfilePathFromMarketItem } from '@/utils/brandProfileRoute';
 import { unwrapApiResponse, type ApiSuccessPayload } from '@/types/auth';
 import {
   normalizeMarketProduct,
@@ -637,12 +638,16 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   };
 
   const handleViewBrand = (brandId: string, item: MarketItem) => {
-    if (!brandId) return;
+    if (!brandId && !item.username) return;
     saveScrollPosition('MARKET_FEED', window.scrollY);
-    navigate(`/profile/${brandId}`, {
+    const path =
+      buildBrandProfilePathFromMarketItem(item) ||
+      (brandId ? `/profile/${encodeURIComponent(brandId)}` : null);
+    if (!path) return;
+    navigate(path, {
       state: {
         brandPreview: {
-          id: brandId,
+          id: brandId || item.brandId,
           brandFullName: item.brandName ?? item.username ?? 'Brand',
           brandCity: undefined,
           brandCountry: undefined,

@@ -118,8 +118,18 @@ export async function fetchMyUserProfileQuery(
 export function useBrandProfileQuery(brandId?: string | null, options?: EnabledOption) {
   return useQuery({
     queryKey: queryKeys.brand.profile(brandId),
-    queryFn: () => brandApi.getBrandProfile(String(brandId)),
+    queryFn: async () => {
+      // BrandApi historically returned null on 404/error, which RQ treats as
+      // a successful empty result — callers then sat on permanent skeletons
+      // waiting for collections that never enabled. Throw so isError settles.
+      const profile = await brandApi.getBrandProfile(String(brandId));
+      if (!profile || typeof (profile as { id?: unknown }).id !== 'string') {
+        throw new Error('Brand not found');
+      }
+      return profile;
+    },
     enabled: isEnabled(brandId, options?.enabled ?? true),
+    retry: 1,
   });
 }
 

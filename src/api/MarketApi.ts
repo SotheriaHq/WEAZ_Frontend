@@ -66,6 +66,7 @@ export interface MarketSectionItem {
   media?: {
     url?: string | null;
     thumbnailUrl?: string | null;
+    fileId?: string | null;
     type?: 'IMAGE' | 'VIDEO' | 'UNKNOWN';
     alt?: string | null;
   } | null;

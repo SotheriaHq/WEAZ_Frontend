@@ -708,9 +708,17 @@ const ProfilePage: React.FC = () => {
   const visitorProfileQuery = useBrandProfileQuery(normalizedRouteBrandId, {
     enabled: Boolean(isVisitorView && normalizedRouteBrandId),
   });
+  // Brand profile `id` is always the owner user id (getBrandOrThrow returns User).
+  // Collections are keyed by Collection.ownerId = User.id. Prefer resolved owner
+  // id; backend also accepts Brand.id, so do not block the list fetch on profile.
+  const visitorOwnerUserId =
+    (typeof visitorProfileQuery.data?.id === 'string' && visitorProfileQuery.data.id.trim()) ||
+    normalizedRouteBrandId;
   const visitorCollectionsQuery = useBrandCollectionsQuery(
-    { ownerId: normalizedRouteBrandId, visibility: 'all', scope: 'design' },
-    { enabled: Boolean(isVisitorView && normalizedRouteBrandId) },
+    { ownerId: visitorOwnerUserId, visibility: 'all', scope: 'design' },
+    {
+      enabled: Boolean(isVisitorView && visitorOwnerUserId),
+    },
   );
 
   // Reset mirrors when routing to a DIFFERENT brand so brand A's data never
@@ -741,16 +749,19 @@ const ProfilePage: React.FC = () => {
     setVisitorCollections([]);
   }
 
-  // Derived, never state: the full-page skeleton is justified only while there
-  // is genuinely nothing to show yet. Cached visits skip it entirely; the
-  // background refetch still runs silently per stale-while-revalidate.
+  // Full-page skeleton only while the brand profile has never settled.
+  // Do NOT wait on collections (grid can skeleton in-place) and do NOT use
+  // isFetching (background refetch would re-trap the whole page for minutes).
   const visitorLoading =
     isVisitorView &&
     Boolean(normalizedRouteBrandId) &&
     !visitorProfile &&
-    (visitorProfileQuery.isLoading || visitorCollectionsQuery.isLoading);
+    visitorProfileQuery.isPending;
   const visitorError =
-    isVisitorView && (visitorProfileQuery.error || visitorCollectionsQuery.error)
+    isVisitorView &&
+    !visitorProfile &&
+    !visitorLoading &&
+    (visitorProfileQuery.isError || visitorProfileQuery.isFetched)
       ? 'Failed to load profile data'
       : null;
   const {
@@ -1926,7 +1937,27 @@ const ProfilePage: React.FC = () => {
   }
 
   if (!isOwner && isVisitorView && !visitorProfile) {
-    return <div className="max-w-screen-xl mx-auto p-6">Catalog not found.</div>;
+    return (
+      <div className="mx-auto max-w-lg p-8 text-center">
+        <p className="text-4xl" aria-hidden="true">🧭</p>
+        <h2 className="mt-4 text-xl font-bold text-gray-900 dark:text-white">
+          {visitorError || 'Catalog not found'}
+        </h2>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          This brand catalog could not be loaded. Check your connection and try again.
+        </p>
+        <button
+          type="button"
+          className="mt-6 rounded-full bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-purple-700"
+          onClick={() => {
+            void visitorProfileQuery.refetch();
+            void visitorCollectionsQuery.refetch();
+          }}
+        >
+          Try again
+        </button>
+      </div>
+    );
   }
 
   if (!user && !isVisitorView) {

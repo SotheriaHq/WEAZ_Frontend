@@ -16,10 +16,17 @@ import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { formatPrice } from '@/utils/helpers';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import VLoader from '@/components/loaders/VLoader';
-import { BagApi } from '@/api/BagApi';
 import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagFlow } from '@/features/bagging/BagFlowProvider';
+import {
+  ownsDesignBrand,
+  runDesignBagFlow,
+} from '@/features/bagging/designBagActions';
+import {
+  BRAND_BAG_BLOCKED_MESSAGE,
+  isBrandAccountBlockedFromBagging,
+} from '@/lib/baggingAccess';
 import { BAG_IT_LABEL } from '@/constants/bagging';
 import type { CommentV2Dto } from '@/types/comments';
 import {
@@ -29,6 +36,7 @@ import {
 } from '@/components/media/contentDisplayPresets';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
 import { buildDesignUrl } from '@/utils/publicUrlBuilder';
+import { buildBrandProfilePathFromMarketItem } from '@/utils/brandProfileRoute';
 import {
   fetchActiveCustomOrderConfigurationQuery,
   fetchCollectionDetailQuery,
@@ -106,7 +114,8 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   } = useBrandPatchState();
   const isPatched = brandId ? getPatched(brandId) : false;
   const patchBusy = brandId ? isPatchLoading(brandId) : false;
-  const isOwnBrandContent = Boolean(currentUserId && item?.brandId && currentUserId === item.brandId);
+  const isOwnBrandContent = ownsDesignBrand(authProfile, item?.brandId);
+  const brandBagBlocked = isBrandAccountBlockedFromBagging(authProfile);
   const canPatchBrand = Boolean(isAuth && isPatchCapable && isRegularViewer && item?.brandId && !isOwnBrandContent);
 
   useFocusTrap({
@@ -357,28 +366,8 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   };
 
   const handleOpenDesignCustomOrder = async () => {
-    if (isOwnBrandContent) {
-      toast.info('Brands cannot place custom orders on their own designs.');
-      return;
-    }
-    if (!item.collectionId) {
-      toast.error('Design reference is unavailable for custom order.');
-      return;
-    }
-    const designName = item.collectionTitle || 'this design';
-    const designTarget = {
-      id: item.collectionId,
-      name: designName,
-      sourceType: 'DESIGN' as const,
-      sourceId: item.collectionId,
-    };
-    if (!isAuth) {
-      bagFlow?.openAuthPrompt(designTarget, 'OPEN_CUSTOM_FLOW');
-      return;
-    }
-    if (openingCustomComposer) {
-      return;
-    }
+    if (!item) return;
+    if (openingCustomComposer) return;
     if (resolvingCustomConfiguration) {
       toast.info('Checking custom-order setup...');
       return;
@@ -386,66 +375,26 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
     setOpeningCustomComposer(true);
     try {
-      const sourceStatus = await BagApi.getSourceBagStatus('DESIGN', item.collectionId);
-      const duplicateClasses = sourceStatus.duplicateState?.classifications ?? [];
-      if (sourceStatus.custom.alreadyBagged || duplicateClasses.includes('IN_BAG')) {
-        bagFlow?.openExistingBag(designTarget, sourceStatus);
-        toast.info('This custom request is already in your bag.');
-        return;
-      }
-      if (duplicateClasses.includes('SUBMITTED_UNPAID')) {
-        bagFlow?.openExistingBag(designTarget, sourceStatus);
-        toast.info('Resume this custom request from My Bag.');
-        return;
-      }
-      if (duplicateClasses.includes('PAID_ACTIVE')) {
-        toast.error('You already have an active paid custom order for this design.');
-        return;
-      }
-      if (duplicateClasses.includes('COMPLETED_BLOCKED')) {
-        toast.error(sourceStatus.duplicateState?.reason || 'This completed custom order cannot be repeated.');
-        return;
-      }
-      if (sourceStatus.ui.defaultAction === 'OPEN_FITTINGS') {
-        bagFlow?.openFittings(designTarget, sourceStatus);
-        return;
-      }
-      if (
-        sourceStatus.ui.defaultAction === 'CONFIRM_STALE_FITTINGS' ||
-        sourceStatus.custom.requiresStaleConfirmation ||
-        sourceStatus.custom.freshnessState === 'STALE' ||
-        sourceStatus.custom.freshnessState === 'VERY_STALE'
-      ) {
-        bagFlow?.openStaleConfirmation(designTarget, sourceStatus);
-        return;
-      }
-
-      let resolvedConfigurationId = sourceStatus.custom.configurationId || customConfigurationId;
-      if (!resolvedConfigurationId) {
-        const activeConfiguration = await fetchActiveCustomOrderConfigurationQuery(
-          queryClient,
-          'DESIGN',
-          item.collectionId,
-        );
-        resolvedConfigurationId = activeConfiguration?.id ?? null;
-      }
-      if (!resolvedConfigurationId) {
-        toast.error('This design is not configured for custom orders yet. Ask the brand to complete custom-order setup.');
-        return;
-      }
-      setCustomConfigurationId(resolvedConfigurationId);
-      setCustomComposerOpen(true);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Unable to bag this design.');
+      await runDesignBagFlow({
+        item,
+        user: authProfile,
+        isAuthenticated: isAuth,
+        bagFlow,
+        onOpenCustomComposer: async (configurationId) => {
+          setCustomConfigurationId(configurationId);
+          setCustomComposerOpen(true);
+        },
+      });
     } finally {
       setOpeningCustomComposer(false);
     }
   };
 
   const handleOpenBrandCatalog = () => {
-    if (!item.brandId) return;
+    const path = buildBrandProfilePathFromMarketItem(item, 'Store');
+    if (!path) return;
     onClose();
-    navigate(`/profile/${item.brandId}?tab=Store`);
+    navigate(path);
   };
 
   const handleCustomOrderComposerDismiss = () => {
@@ -685,20 +634,23 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     disabled={
                       openingCustomComposer ||
                       resolvingCustomConfiguration ||
-                      isOwnBrandContent
+                      isOwnBrandContent ||
+                      brandBagBlocked
                     }
                     className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none dark:disabled:bg-slate-700 dark:disabled:text-slate-300"
                     onClick={() => {
                       void handleOpenDesignCustomOrder();
                     }}
                     title={
-                      isOwnBrandContent
-                        ? 'Brands cannot place custom orders on their own designs'
+                      brandBagBlocked
+                        ? BRAND_BAG_BLOCKED_MESSAGE
+                        : isOwnBrandContent
+                          ? 'Brands cannot place custom orders on their own designs'
                           : resolvingCustomConfiguration
                             ? 'Checking custom-order setup for this design'
                             : !customConfigurationId
                               ? 'Check custom-order setup for this design'
-                          : 'Bag this design as a custom order'
+                              : 'Bag this design as a custom order'
                     }
                     aria-label={BAG_IT_LABEL}
                   >
@@ -706,13 +658,20 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                       status={
                         openingCustomComposer || resolvingCustomConfiguration
                           ? 'bagging'
-                          : isOwnBrandContent || (!customConfigurationId && !resolvingCustomConfiguration)
+                          : isOwnBrandContent ||
+                              brandBagBlocked ||
+                              (!customConfigurationId && !resolvingCustomConfiguration)
                             ? 'disabled'
                             : 'not_bagged'
                       }
                       context="detail"
                       size={28}
-                      disabled={openingCustomComposer || resolvingCustomConfiguration || isOwnBrandContent}
+                      disabled={
+                        openingCustomComposer ||
+                        resolvingCustomConfiguration ||
+                        isOwnBrandContent ||
+                        brandBagBlocked
+                      }
                     />
                     {openingCustomComposer ? 'Loading...' : BAG_IT_LABEL}
                   </button>

@@ -13,10 +13,16 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
 import { useNavigate } from 'react-router-dom';
-import { isBrandOwner } from '@/lib/brandAccess';
-import { BagApi } from '@/api/BagApi';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagFlow } from '@/features/bagging/BagFlowProvider';
+import {
+  ownsDesignBrand as checkOwnsDesignBrand,
+  runDesignBagFlow,
+} from '@/features/bagging/designBagActions';
+import {
+  BRAND_BAG_BLOCKED_MESSAGE,
+  isBrandAccountBlockedFromBagging,
+} from '@/lib/baggingAccess';
 import { BAG_IT_LABEL } from '@/constants/bagging';
 import { formatPrice } from '@/utils/helpers';
 
@@ -188,84 +194,28 @@ export const DesignCard: React.FC<DesignCardProps> = ({
 
   const isCustomAvailable = item.customAvailable === true;
   const brandId = typeof item.brandId === 'string' ? item.brandId.trim() : '';
-  const ownsDesignBrand = Boolean(brandId && (user?.id === brandId || isBrandOwner(user, brandId)));
+  const ownsDesignBrand = checkOwnsDesignBrand(user, brandId);
+  const brandBagBlocked = isBrandAccountBlockedFromBagging(user);
+  const bagDisabled = bagBusy || ownsDesignBrand || brandBagBlocked;
   const canMessageBrand = Boolean(brandId) && !ownsDesignBrand;
-  const designBagTarget = {
-    id: item.collectionId,
-    name: item.collectionTitle || 'this design',
-    sourceType: 'DESIGN' as const,
-    sourceId: item.collectionId,
-  };
 
   const handleBagDesign = async (event: React.MouseEvent) => {
     event.stopPropagation();
     if (!isCustomAvailable) return;
-    if (ownsDesignBrand) {
-      toast.info('Brands cannot place custom orders on their own designs.');
-      return;
-    }
-    if (!item.collectionId) {
-      toast.error('Design reference is unavailable for bagging.');
-      return;
-    }
-    if (!bagFlow) {
-      toast.error('Bag is unavailable right now.');
-      return;
-    }
-    if (!isAuth) {
-      bagFlow.openAuthPrompt(designBagTarget, 'OPEN_CUSTOM_FLOW');
-      return;
-    }
     if (bagBusy) return;
+    if (brandBagBlocked) {
+      toast.info(BRAND_BAG_BLOCKED_MESSAGE);
+      return;
+    }
 
     setBagBusy(true);
     try {
-      const status = await BagApi.getSourceBagStatus('DESIGN', item.collectionId);
-      const duplicateClasses = status.duplicateState?.classifications ?? [];
-
-      if (status.custom.alreadyBagged || duplicateClasses.includes('IN_BAG')) {
-        bagFlow.openExistingBag(designBagTarget, status);
-        toast.info('This custom request is already in your bag.');
-        return;
-      }
-      if (duplicateClasses.includes('SUBMITTED_UNPAID')) {
-        bagFlow.openExistingBag(designBagTarget, status);
-        toast.info('Resume this custom request from My Bag.');
-        return;
-      }
-      if (duplicateClasses.includes('PAID_ACTIVE')) {
-        toast.error('You already have an active paid custom order for this design.');
-        return;
-      }
-      if (duplicateClasses.includes('COMPLETED_BLOCKED')) {
-        toast.error(status.duplicateState?.reason || 'This completed custom order cannot be repeated.');
-        return;
-      }
-
-      if (!status.canBag || status.ui.defaultAction === 'DISABLED') {
-        toast.error(status.ui.disabledReason || 'This design cannot be bagged right now.');
-        return;
-      }
-      if (status.ui.defaultAction === 'OPEN_FITTINGS') {
-        bagFlow.openFittings(designBagTarget, status);
-        return;
-      }
-      if (
-        status.ui.defaultAction === 'CONFIRM_STALE_FITTINGS' ||
-        status.custom.requiresStaleConfirmation ||
-        status.custom.freshnessState === 'STALE' ||
-        status.custom.freshnessState === 'VERY_STALE'
-      ) {
-        bagFlow.openStaleConfirmation(designBagTarget, status);
-        return;
-      }
-      if (status.ui.defaultAction === 'OPEN_CUSTOM_FLOW') {
-        bagFlow.openCustomFlow(designBagTarget, status);
-        return;
-      }
-      toast.error(status.ui.disabledReason || 'This design cannot be bagged right now.');
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Unable to bag this design.');
+      await runDesignBagFlow({
+        item,
+        user,
+        isAuthenticated: isAuth,
+        bagFlow,
+      });
     } finally {
       setBagBusy(false);
     }
@@ -445,15 +395,21 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               type="button"
               className="flex origin-bottom-right scale-[0.95] flex-col items-center text-white transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60 sm:scale-100"
               onClick={handleBagDesign}
-              disabled={bagBusy || ownsDesignBrand}
+              disabled={bagDisabled}
               aria-label={BAG_IT_LABEL}
-              title={ownsDesignBrand ? 'Brands cannot bag their own designs' : BAG_IT_LABEL}
+              title={
+                brandBagBlocked
+                  ? BRAND_BAG_BLOCKED_MESSAGE
+                  : ownsDesignBrand
+                    ? 'Brands cannot bag their own designs'
+                    : BAG_IT_LABEL
+              }
             >
               <BagPulseIcon
-                status={bagBusy ? 'bagging' : ownsDesignBrand ? 'disabled' : 'not_bagged'}
+                status={bagBusy ? 'bagging' : bagDisabled ? 'disabled' : 'not_bagged'}
                 context="rail"
                 size={34}
-                disabled={bagBusy || ownsDesignBrand}
+                disabled={bagDisabled}
               />
               <span className="text-[9px] font-bold mt-0.5 drop-shadow sm:text-xs sm:mt-1">{BAG_IT_LABEL}</span>
             </button>
@@ -621,14 +577,21 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               type="button"
               className="flex items-center justify-center p-0.5 text-white hover:scale-110 transition-transform mr-1 shrink-0"
               onClick={handleBagDesign}
-              disabled={bagBusy || ownsDesignBrand}
+              disabled={bagDisabled}
               aria-label={BAG_IT_LABEL}
+              title={
+                brandBagBlocked
+                  ? BRAND_BAG_BLOCKED_MESSAGE
+                  : ownsDesignBrand
+                    ? 'Brands cannot bag their own designs'
+                    : BAG_IT_LABEL
+              }
             >
               <BagPulseIcon
-                status={bagBusy ? 'bagging' : ownsDesignBrand ? 'disabled' : 'not_bagged'}
+                status={bagBusy ? 'bagging' : bagDisabled ? 'disabled' : 'not_bagged'}
                 context="rail"
                 size={24}
-                disabled={bagBusy || ownsDesignBrand}
+                disabled={bagDisabled}
               />
             </button>
           )}

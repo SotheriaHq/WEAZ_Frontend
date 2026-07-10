@@ -24,7 +24,11 @@ import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { setUser } from '@/features/userSlice';
 import { unwrapApiResponse } from '@/types/auth';
 import type { AuthProfileResponse, AuthUserDto } from '@/types/auth';
-import { getPublicProfileUserType, usePublicUserProfileQuery } from '@/query/queries';
+import {
+  getPublicProfileUserType,
+  useBrandProfileQuery,
+  usePublicUserProfileQuery,
+} from '@/query/queries';
 import { AuthApi } from '@/api/AuthApi';
 import EmailVerificationBanner from '@/components/auth/EmailVerificationBanner';
 
@@ -105,15 +109,36 @@ export const ProfileLayout: React.FC = () => {
   const visitorProfileQuery = usePublicUserProfileQuery(routeBrandId, {
     enabled: Boolean(isVisitorRoute && routeBrandId),
   });
-  const visitorType = useMemo(
-    () => getPublicProfileUserType(visitorProfileQuery.data),
-    [visitorProfileQuery.data],
-  );
-  const visitorLoading = Boolean(
-    isVisitorRoute &&
-      !visitorProfileQuery.data &&
-      !visitorProfileQuery.error,
-  );
+  // Resolve brand profile in PARALLEL with public user profile. Sequential
+  // fallback waited on a failed/hung user lookup and left a permanent skeleton
+  // (client reported 30+ minutes of skeleton on brand→brand catalog open).
+  const visitorBrandProfileQuery = useBrandProfileQuery(routeBrandId, {
+    enabled: Boolean(isVisitorRoute && routeBrandId),
+  });
+  const visitorType = useMemo(() => {
+    const fromUser = getPublicProfileUserType(visitorProfileQuery.data);
+    if (fromUser) return fromUser;
+    if (visitorBrandProfileQuery.data) return 'BRAND' as const;
+    return null;
+  }, [visitorBrandProfileQuery.data, visitorProfileQuery.data]);
+  // Only block on initial pending. Never use isFetching — background refetch
+  // would re-trap the whole shell on skeleton.
+  const visitorIdentityPending =
+    Boolean(isVisitorRoute && routeBrandId) &&
+    !visitorType &&
+    (visitorProfileQuery.isPending || visitorBrandProfileQuery.isPending) &&
+    !visitorProfileQuery.isError &&
+    !visitorBrandProfileQuery.isError;
+  const [visitorLoadTimedOut, setVisitorLoadTimedOut] = useState(false);
+  useEffect(() => {
+    if (!isVisitorRoute || !routeBrandId || visitorType || !visitorIdentityPending) {
+      setVisitorLoadTimedOut(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setVisitorLoadTimedOut(true), 20_000);
+    return () => window.clearTimeout(timer);
+  }, [isVisitorRoute, routeBrandId, visitorIdentityPending, visitorType]);
+  const visitorLoading = visitorIdentityPending && !visitorLoadTimedOut;
 
   const verificationPromptContext = searchParams.get('verifyEmailPrompt') ?? '';
   const isBrandSetupPrompt = searchParams.get('modal') === 'brand-setup';
@@ -354,6 +379,54 @@ export const ProfileLayout: React.FC = () => {
                   <CollectionsSkeleton />
                 </div>
               </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (
+    isVisitorRoute &&
+    routeBrandId &&
+    !visitorType &&
+    !visitorLoading &&
+    (visitorLoadTimedOut ||
+      visitorProfileQuery.isError ||
+      visitorBrandProfileQuery.isError ||
+      visitorProfileQuery.isFetched ||
+      visitorBrandProfileQuery.isFetched)
+  ) {
+    return (
+      <div className="min-h-screen bg-[color:var(--surface-primary)] text-gray-900 dark:text-white">
+        {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
+        <Navbar />
+        <main className={PROFILE_MAIN_CLASS} style={{ marginLeft: mainMarginLeft }}>
+          <div className="mx-auto max-w-lg p-8 text-center">
+            <p className="text-4xl" aria-hidden="true">🧭</p>
+            <h1 className="mt-4 text-xl font-bold">Brand profile unavailable</h1>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              We could not load this catalog. The link may be outdated, or the network request timed out.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                className="rounded-full bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-purple-700"
+                onClick={() => {
+                  void visitorProfileQuery.refetch();
+                  void visitorBrandProfileQuery.refetch();
+                  setVisitorLoadTimedOut(false);
+                }}
+              >
+                Try again
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-800 dark:border-white/15 dark:text-gray-100"
+                onClick={() => window.history.back()}
+              >
+                Go back
+              </button>
             </div>
           </div>
         </main>

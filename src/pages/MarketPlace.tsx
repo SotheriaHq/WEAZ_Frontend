@@ -172,10 +172,12 @@ const ProductCarousel: React.FC<{
 const MarketSectionPreviewRail: React.FC<{
   section: MarketSection;
   onViewProduct: (product: MarketplaceProduct) => void;
+  onOpenItem: (item: MarketSectionItem) => void;
   onTrackSignal: (event: MarketSignalEvent) => void;
   onHideItem: (section: MarketSection, item: MarketSectionItem) => void;
   onViewAll: (section: MarketSection) => void;
-}> = ({ section, onViewProduct, onTrackSignal, onHideItem, onViewAll }) => {
+  compact?: boolean;
+}> = ({ section, onViewProduct, onOpenItem, onTrackSignal, onHideItem, onViewAll, compact = false }) => {
   const sectionRef = useRef<HTMLElement | null>(null);
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const observedKeysRef = useRef<Set<string>>(new Set());
@@ -252,12 +254,16 @@ const MarketSectionPreviewRail: React.FC<{
   if (!section.items?.length) return null;
 
   return (
-    <section ref={sectionRef} className="space-y-3">
+    <section ref={sectionRef} className={compact ? 'space-y-2' : 'space-y-3'}>
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{section.title}</h2>
+          <h2 className={`font-bold text-gray-900 dark:text-white ${compact ? 'text-base sm:text-xl' : 'text-xl'}`}>
+            {section.title}
+          </h2>
           {section.subtitle ? (
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{section.subtitle}</p>
+            <p className={`mt-1 text-gray-600 dark:text-gray-400 ${compact ? 'hidden text-xs sm:block sm:text-sm' : 'text-sm'}`}>
+              {section.subtitle}
+            </p>
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -279,12 +285,14 @@ const MarketSectionPreviewRail: React.FC<{
       </div>
 
       <div className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex gap-4">
+        <div className={`flex ${compact ? 'gap-3' : 'gap-4'}`}>
           {section.items.map((item, index) => {
             const product = mapSectionProductToMarketplaceProduct(item);
             const mediaUrl = item.media?.thumbnailUrl || item.media?.url || null;
+            const mediaFileId = item.media?.fileId ?? null;
             const signalKey = getSectionItemSignalKey(section.key, item, index);
             const targetId = getSectionItemTargetId(item);
+            const canOpen = Boolean(product || item.target?.route || targetId);
             const priceLabel = item.price?.effectiveAmount
               ? new Intl.NumberFormat('en-NG', {
                   style: 'currency',
@@ -306,43 +314,52 @@ const MarketSectionPreviewRail: React.FC<{
                 key={`${section.key}-${item.sourceType}-${item.sourceId}`}
                 ref={(node) => setItemRef(signalKey, node)}
                 data-market-signal-key={signalKey}
-                className="group relative w-[260px] shrink-0 overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-gray-200/70 transition hover:-translate-y-0.5 hover:shadow-md dark:bg-white/[0.04] dark:ring-white/10"
+                className={`group relative shrink-0 overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-gray-200/70 transition hover:-translate-y-0.5 hover:shadow-md dark:bg-white/[0.04] dark:ring-white/10 ${
+                  compact ? 'w-[200px] sm:w-[240px]' : 'w-[260px]'
+                }`}
               >
                 <button
                   type="button"
-                  disabled={!product}
+                  disabled={!canOpen}
                   onClick={() => {
-                    if (!product || !targetId) return;
-                    onTrackSignal({
-                      targetType: item.entityType,
-                      targetId,
-                      signalType: 'OPEN',
-                      surface: 'MARKET_HOME',
-                      sectionKey: section.key,
-                      position: index,
-                    });
-                    onViewProduct(product);
+                    if (!canOpen) return;
+                    if (targetId) {
+                      onTrackSignal({
+                        targetType: item.entityType,
+                        targetId,
+                        signalType: 'OPEN',
+                        surface: 'MARKET_HOME',
+                        sectionKey: section.key,
+                        position: index,
+                      });
+                    }
+                    if (product) {
+                      onViewProduct(product);
+                      return;
+                    }
+                    onOpenItem(item);
                   }}
                   className="block w-full text-left disabled:cursor-default"
                 >
-                  {mediaUrl ? (
+                  {mediaUrl || mediaFileId ? (
                     <ImageWithFallback
                       src={mediaUrl}
+                      fileId={mediaFileId}
                       alt={item.media?.alt || item.title}
                       fit="cover"
                       rounded="none"
-                      containerClassName="h-40 w-full bg-gray-100 dark:bg-white/5"
+                      containerClassName={`${compact ? 'h-32 sm:h-36' : 'h-40'} w-full bg-gray-100 dark:bg-white/5`}
                       className="h-full w-full transition-transform duration-500 group-hover:scale-105"
                       maxHeightClassName="max-h-full"
                       fallbackName={item.title}
                     />
                   ) : (
-                    <div className="flex h-40 w-full items-center justify-center bg-gray-100 text-3xl dark:bg-white/5">
+                    <div className={`flex w-full items-center justify-center bg-gray-100 text-3xl dark:bg-white/5 ${compact ? 'h-32 sm:h-36' : 'h-40'}`}>
                       #
                     </div>
                   )}
-                  <div className="space-y-1 p-3">
-                    <p className="line-clamp-1 text-sm font-bold text-gray-900 dark:text-white">{item.title}</p>
+                  <div className={`space-y-1 ${compact ? 'p-2.5' : 'p-3'}`}>
+                    <p className={`line-clamp-1 font-bold text-gray-900 dark:text-white ${compact ? 'text-xs sm:text-sm' : 'text-sm'}`}>{item.title}</p>
                     {item.subtitle || item.brand?.name ? (
                       <p className="line-clamp-1 text-xs text-gray-500 dark:text-gray-400">
                         {item.subtitle || item.brand?.name}
@@ -534,6 +551,41 @@ const MarketPlace: React.FC = () => {
     [flushMarketSignals, saveScrollPosition],
   );
 
+  const handleOpenSectionItem = useCallback(
+    (item: MarketSectionItem) => {
+      saveScrollPosition('MARKET_PLACE', window.scrollY);
+      void flushMarketSignals();
+      const route = typeof item.target?.route === 'string' ? item.target.route.trim() : '';
+      if (route.startsWith('/')) {
+        navigate(route);
+        return;
+      }
+      const targetId = getSectionItemTargetId(item);
+      if (item.entityType === 'DESIGN' && targetId) {
+        navigate(`/designs/${encodeURIComponent(targetId)}`);
+        return;
+      }
+      if (item.entityType === 'BRAND' && targetId) {
+        // Prefer target.route when present; brand section cards often use Brand.id.
+        const brandRoute =
+          (typeof item.target?.route === 'string' && item.target.route.startsWith('/')
+            ? item.target.route
+            : null) ||
+          `/profile/${encodeURIComponent(targetId)}?tab=Store`;
+        navigate(brandRoute);
+        return;
+      }
+      if (item.entityType === 'COLLECTION' && targetId) {
+        navigate(`/collections/${encodeURIComponent(targetId)}`);
+        return;
+      }
+      if (item.entityType === 'PRODUCT' && targetId) {
+        navigate(`/products/${encodeURIComponent(targetId)}`);
+      }
+    },
+    [flushMarketSignals, navigate, saveScrollPosition],
+  );
+
   const handleHideMarketSectionItem = useCallback(
     async (section: MarketSection, item: MarketSectionItem) => {
       const targetId = getSectionItemTargetId(item);
@@ -672,8 +724,19 @@ const MarketPlace: React.FC = () => {
     return byKey;
   }, [marketSections]);
 
-  const previewSections = useMemo(
-    () => marketSections.filter((section) => section.key !== 'fresh-drops' && section.items?.length > 0),
+  // Client feedback: reach Explore Market faster; push personalization rails lower.
+  const primaryPreviewSections = useMemo(
+    () =>
+      marketSections.filter(
+        (section) =>
+          section.key !== 'fresh-drops' &&
+          section.key !== 'picked-for-you' &&
+          section.items?.length > 0,
+      ),
+    [marketSections],
+  );
+  const pickedForYouSection = useMemo(
+    () => marketSections.find((section) => section.key === 'picked-for-you' && section.items?.length > 0) ?? null,
     [marketSections],
   );
 
@@ -836,21 +899,6 @@ const MarketPlace: React.FC = () => {
           onSeeAll={() => setGalleryOpen(true)}
         />
 
-        {!loading && previewSections.length > 0 ? (
-          <div className="space-y-6">
-            {previewSections.map((section) => (
-              <MarketSectionPreviewRail
-                key={section.key}
-                section={section}
-                onViewProduct={handleOpenSectionProduct}
-                onTrackSignal={trackMarketSignal}
-                onHideItem={handleHideMarketSectionItem}
-                onViewAll={handleViewAllSection}
-              />
-            ))}
-          </div>
-        ) : null}
-
         {loading ? (
           <section>
             <div className="mb-3 h-7 w-40 animate-pulse rounded-lg bg-gray-200/80 dark:bg-white/10" />
@@ -869,8 +917,6 @@ const MarketPlace: React.FC = () => {
             onViewProduct={(product) => handleOpenProduct(product, { source: 'fresh_drops' })}
           />
         )}
-
-
 
         <section className="space-y-5">
           <div className="sticky top-16 z-20 rounded-2xl border border-gray-200/70 bg-white/72 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-[#0f0b13]/78">
@@ -1027,6 +1073,37 @@ const MarketPlace: React.FC = () => {
             </>
           )}
         </section>
+
+        {/* Discovery rails after Explore Market so users reach the product grid faster.
+            Picked For You is intentionally last among these rails. */}
+        {!loading && primaryPreviewSections.length > 0 ? (
+          <div className="space-y-5 sm:space-y-6">
+            {primaryPreviewSections.map((section) => (
+              <MarketSectionPreviewRail
+                key={section.key}
+                section={section}
+                compact
+                onViewProduct={handleOpenSectionProduct}
+                onOpenItem={handleOpenSectionItem}
+                onTrackSignal={trackMarketSignal}
+                onHideItem={handleHideMarketSectionItem}
+                onViewAll={handleViewAllSection}
+              />
+            ))}
+          </div>
+        ) : null}
+
+        {!loading && pickedForYouSection ? (
+          <MarketSectionPreviewRail
+            section={pickedForYouSection}
+            compact
+            onViewProduct={handleOpenSectionProduct}
+            onOpenItem={handleOpenSectionItem}
+            onTrackSignal={trackMarketSignal}
+            onHideItem={handleHideMarketSectionItem}
+            onViewAll={handleViewAllSection}
+          />
+        ) : null}
       </div>
 
       <AnimatePresence>

@@ -16,6 +16,10 @@ import {
   type BagStatus,
 } from '@/api/StoreApi';
 import type { SizingMode } from '@/types/sizing';
+import {
+  BRAND_BAG_BLOCKED_MESSAGE,
+  isBrandAccountBlockedFromBagging,
+} from '@/lib/baggingAccess';
 
 type BagProductInput = {
   id: string;
@@ -77,8 +81,10 @@ const readableError = (error: unknown, fallback: string) => {
 export function useBagging() {
   const dispatch = useDispatch<AppDispatch>();
   const isAuthenticated = useSelector((state: RootState) => state.user.isAuthenticated);
+  const userProfile = useSelector((state: RootState) => state.user.profile);
   const cartItems = useSelector((state: RootState) => state.cart.items);
   const bagFlow = useBagFlow();
+  const brandBagBlocked = isBrandAccountBlockedFromBagging(userProfile);
   const [statusByProductId, setStatusByProductId] = useState<Record<string, BagStatus>>({});
   const [loadingByProductId, setLoadingByProductId] = useState<Record<string, boolean>>({});
   const [errorByProductId, setErrorByProductId] = useState<Record<string, string | null>>({});
@@ -142,6 +148,10 @@ export function useBagging() {
   const addStandard = useCallback(
     async (productId: string, options: StandardBagOptions = {}) => {
       if (loadingByProductId[productId]) return null;
+      if (brandBagBlocked) {
+        toast.info(BRAND_BAG_BLOCKED_MESSAGE);
+        return null;
+      }
       setLoading(productId, true);
       try {
         await dispatch(
@@ -170,7 +180,7 @@ export function useBagging() {
         setLoading(productId, false);
       }
     },
-    [dispatch, loadingByProductId, refreshBagCounts, setLoading],
+    [brandBagBlocked, dispatch, loadingByProductId, refreshBagCounts, setLoading],
   );
 
   const beginSelectorFlow = useCallback(
@@ -279,6 +289,10 @@ export function useBagging() {
       product: BagProductInput,
       options: StandardBagOptions & BagInteractionCallbacks = {},
     ): Promise<BagActionResult> => {
+      if (brandBagBlocked) {
+        toast.info(BRAND_BAG_BLOCKED_MESSAGE);
+        return null;
+      }
       if (!isAuthenticated) {
         if (options.suppressAuthPrompt) return null;
         const resume = () => {
@@ -404,11 +418,12 @@ export function useBagging() {
       }
       return { action: status.ui.defaultAction, status };
     },
-    [addStandard, bagFlow, dispatch, isAuthenticated, prepareBag],
+    [addStandard, bagFlow, brandBagBlocked, dispatch, isAuthenticated, prepareBag],
   );
 
   const getPulseStatus = useCallback(
     (productId: string, fallbackDisabled = false): BagPulseStatus => {
+      if (brandBagBlocked) return 'disabled';
       if (loadingByProductId[productId]) return 'bagging';
       const status = statusByProductId[productId];
       if (status) return status.ui.heartbeatState;
@@ -416,7 +431,7 @@ export function useBagging() {
       if (cartProductIds.has(productId)) return 'currently_bagged';
       return 'not_bagged';
     },
-    [cartProductIds, loadingByProductId, statusByProductId],
+    [brandBagBlocked, cartProductIds, loadingByProductId, statusByProductId],
   );
 
   return {
