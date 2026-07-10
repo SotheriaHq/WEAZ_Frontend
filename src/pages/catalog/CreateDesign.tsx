@@ -870,6 +870,22 @@ const CreateDesignInner: React.FC = () => {
     addTag(cleaned);
   };
 
+  // Warn before tab close/refresh when a NEW design has unsaved content —
+  // protects long forms (incl. custom-order settings that attach on save).
+  // Edit mode is excluded: the design already exists and re-prompting on
+  // every close would be noise.
+  useEffect(() => {
+    const hasUnsavedNewContent =
+      !isEditMode && !lastSaved && (title.trim().length > 0 || files.length > 0);
+    if (!hasUnsavedNewContent) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [files.length, isEditMode, lastSaved, title]);
+
   const handleCategoryChange = (value: string) => {
     setCategoryId(value);
     const nextCategory = filteredCategories.find((category) => category.id === value);
@@ -1887,6 +1903,17 @@ const CreateDesignInner: React.FC = () => {
                         disabled={disabled}
                         onTagSuggestions={handleFilterTagSuggestions}
                       />
+                      {(() => {
+                        const styleDetailCount = Object.values(filterSelection).flatMap(
+                          (values) => (Array.isArray(values) ? values : values ? [values] : []),
+                        ).length;
+                        return styleDetailCount > 8 ? (
+                          <p className="text-[11px] font-medium text-amber-600 dark:text-amber-300">
+                            ⚠️ {styleDetailCount} style details selected — fewer, precise
+                            details improve discovery and buyer trust.
+                          </p>
+                        ) : null;
+                      })()}
 
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-theme flex items-center">

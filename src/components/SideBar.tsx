@@ -161,7 +161,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
   ];
 
   const mobileDockLinks = [
-    ...mainLinks.slice(0, 4),
+    // Dock tabs are ~60px wide — "Subscriptions" cannot fit and clipped to
+    // "Subscri…"; show the short label on the phone dock only.
+    ...mainLinks.slice(0, 4).map((link) =>
+      link.label === 'Subscriptions' ? { ...link, label: 'Subs' } : link,
+    ),
     {
       emoji: isAdminConsoleUser ? '🛡️' : '👤',
       label: isAdminConsoleUser ? 'Admin' : 'Profile',

@@ -1885,16 +1885,26 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           )}
                         </>
                       ) : (
-                        <ImageWithFallback
-                          src={activePreview.src}
-                          fileId={activePreview.fileId}
-                          alt={activePreview.alt}
-                          fit="cover"
-                          rounded="none"
-                          containerClassName="h-full w-full relative z-10"
-                          className="h-full w-full"
-                          fallbackName={collection.name}
-                        />
+                        <>
+                          <ImageWithFallback
+                            src={activePreview.src}
+                            fileId={activePreview.fileId}
+                            alt={activePreview.alt}
+                            fit="cover"
+                            rounded="none"
+                            containerClassName="h-full w-full relative z-10"
+                            className="h-full w-full"
+                            fallbackName={collection.name}
+                          />
+                          {!activePreview.src && !activePreview.fileId && (
+                            <div className="pointer-events-none absolute inset-x-0 top-1/3 z-20 flex -translate-y-1/2 items-center justify-center gap-1 px-2">
+                              <span className="text-sm" aria-hidden="true">📷</span>
+                              <span className="text-[10px] font-semibold text-white/90 drop-shadow-sm">
+                                No cover yet
+                              </span>
+                            </div>
+                          )}
+                        </>
                       )}
 
                       {/* Frosted Glass Text Component - Bottom Overlay */}
@@ -2101,12 +2111,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             >
               🎨 Create Look
             </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-white/5 px-3 py-2 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"
-            >
-              📥 Import
-            </button>
+            {/* Import action hidden until the bulk-import feature is implemented
+                (button previously rendered with no handler — read as broken). */}
             {onToggleLayoutMode && (
               <button
                 type="button"

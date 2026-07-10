@@ -515,6 +515,18 @@ const EditProduct: React.FC = () => {
   const submitLockRef = useRef(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Warn before tab close/refresh with unsaved edits — protects long forms
+  // (incl. custom-order settings that attach on save).
+  useEffect(() => {
+    if (!hasChanges) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasChanges]);
   const [tagInput, setTagInput] = useState("");
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [showDiscardPrompt, setShowDiscardPrompt] = useState(false);
@@ -3367,6 +3379,12 @@ const EditProduct: React.FC = () => {
                           entityType="PRODUCT"
                           onTagSuggestions={setTagSuggestions}
                         />
+                        {selectedFilterValueIds.length > 8 && (
+                          <p className="mt-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-300">
+                            ⚠️ {selectedFilterValueIds.length} style details selected — fewer,
+                            precise details improve discovery and buyer trust.
+                          </p>
+                        )}
                       </div>
 
                       <div>
