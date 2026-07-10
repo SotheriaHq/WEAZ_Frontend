@@ -1814,12 +1814,13 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
   const clearDetailSelection = useCallback(() => {
     setLocalSelection(null);
     setSelectedCustomPreview(null);
+    // Close must REPLACE — a push here makes browser-back reopen the detail.
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete('orderId');
       next.delete('kind');
       return next;
-    });
+    }, { replace: true });
   }, [setSearchParams]);
 
   const handleViewChange = useCallback(
@@ -1829,12 +1830,13 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
 
       setLocalSelection(null);
       setSelectedCustomPreview(null);
+      // View toggle is UI state — replace so mobile back doesn't replay it.
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set('kind', view);
         next.delete('orderId');
         return next;
-      });
+      }, { replace: true });
     },
     [mode, setSearchParams],
   );

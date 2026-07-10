@@ -481,7 +481,8 @@ export default function CatalogShopTab({
     } else {
       next.delete('storeView');
     }
-    setSearchParams(next, { replace: false });
+    // View toggle is UI state — replace so mobile back doesn't replay it.
+    setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
   const storeClosedPlaceholder = useMemo(() => {

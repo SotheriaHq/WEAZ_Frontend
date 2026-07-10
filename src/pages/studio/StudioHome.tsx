@@ -27,7 +27,8 @@ const StudioHome: React.FC = () => {
   const active = raw === 'shop' || raw === 'products' ? 'store' : raw;
 
   const setActive = (key: string) => {
-    setSearchParams({ tab: key });
+    // Tab switches are UI state — replace so mobile back doesn't replay them.
+    setSearchParams({ tab: key }, { replace: true });
   };
 
   return (

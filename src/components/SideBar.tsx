@@ -185,7 +185,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
           active: link.active,
           disabled: link.disabled,
         }))}
-        onSelect={(item) => navigate(item.path)}
+        onSelect={(item) => navigate(item.path, { replace: true })}
       />
     );
   }

@@ -95,7 +95,16 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
                 onPointerDown={item.disabled ? undefined : () => markOptimisticActive(item)}
                 onMouseDown={item.disabled ? undefined : () => markOptimisticActive(item)}
                 onTouchStart={item.disabled ? undefined : () => markOptimisticActive(item)}
-                onClick={item.disabled ? undefined : () => onSelect(item)}
+                onClick={
+                  item.disabled
+                    ? undefined
+                    : () => {
+                        // Re-tapping the current tab must not stack another
+                        // history entry (mobile back-button pollution).
+                        if (itemMatchesLocation(item)) return;
+                        onSelect(item);
+                      }
+                }
                 aria-current={isSelected ? 'page' : undefined}
                 aria-label={item.label}
                 title={item.disabled ? `${item.label} is locked` : item.label}

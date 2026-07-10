@@ -7,6 +7,7 @@ import { brandStaffApi, type BrandStaffInvite, type BrandStaffMember } from '@/a
 import type { RootState } from '@/store';
 import type { BrandMemberRole, BrandMemberStatus } from '@/types/auth';
 import { canManageStaff, getActiveBrandId } from '@/lib/brandAccess';
+import { BRAND_STAFF_COMING_SOON } from '@/config/featureFlags';
 
 const ROLE_OPTIONS: Array<{ value: BrandMemberRole; label: string; description: string }> = [
   { value: 'MANAGER', label: 'Manager', description: 'Catalog, orders, messages, settings' },
@@ -59,6 +60,10 @@ const BrandStaffPage: React.FC = () => {
   );
 
   const load = useCallback(async () => {
+    if (BRAND_STAFF_COMING_SOON) {
+      setLoading(false);
+      return;
+    }
     if (!brandId || !canManage) {
       setLoading(false);
       return;
@@ -78,6 +83,19 @@ const BrandStaffPage: React.FC = () => {
   useEffect(() => {
     void load();
   }, [load]);
+
+  if (BRAND_STAFF_COMING_SOON) {
+    return (
+      <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white/80 p-8 text-center shadow-sm dark:border-white/10 dark:bg-white/5">
+        <div className="text-4xl" aria-hidden="true">👥</div>
+        <h1 className="mt-3 text-lg font-bold text-theme">Brand staff is coming soon</h1>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-theme-secondary">
+          Invite teammates, assign roles, and manage store permissions from one
+          workspace. We're finishing this feature — it will unlock here shortly.
+        </p>
+      </div>
+    );
+  }
 
   const handleInvite = async (event: React.FormEvent) => {
     event.preventDefault();

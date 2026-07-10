@@ -119,7 +119,8 @@ const SearchResultsPage: React.FC = () => {
     } else {
       next.set('type', type);
     }
-    setSearchParams(next);
+    // Filter chips are UI state — replace. New queries (submitQuery) still push.
+    setSearchParams(next, { replace: true });
   };
 
   const submitQuery = (nextQuery: string) => {

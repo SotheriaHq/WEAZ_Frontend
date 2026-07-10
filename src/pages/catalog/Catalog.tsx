@@ -1052,11 +1052,12 @@ const ProfilePage: React.FC = () => {
 
   const handleCollectionViewerBack = useCallback(() => {
     setSelectedCollectionId(null);
+    // Close must REPLACE — a push here makes browser-back reopen the viewer.
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete('collectionId');
       return next;
-    });
+    }, { replace: true });
   }, [setSearchParams]);
 
   const handleDismissFailedCard = useCallback((id: string) => {
@@ -1103,7 +1104,7 @@ const ProfilePage: React.FC = () => {
       const next = new URLSearchParams(prev);
       next.delete('collectionId');
       return next;
-    });
+    }, { replace: true });
   }, [setSearchParams]);
 
   const restoreCollectionInView = useCallback((

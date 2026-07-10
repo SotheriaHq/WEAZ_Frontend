@@ -47,6 +47,7 @@ import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { ThemeBackendSync } from '@/components/theme/ThemeBackendSync';
 import ScrollRestoreProvider from '@/components/ScrollRestoreProvider';
+import MobileExitGuard from '@/components/navigation/MobileExitGuard';
 
 const Market = lazy(() => import('./pages/Market'));
 const CartDrawer = lazy(() => import('./components/designs/CartDrawer'));
@@ -343,6 +344,8 @@ const RootLayout: React.FC = () => {
           </div>
         )}
         <ViewportSync watchKey={location.pathname} />
+        {/* Native app webview owns its own back behavior — guard browser only. */}
+        {!isEmbeddedMobile ? <MobileExitGuard /> : null}
         {!isEmbeddedMobile ? (
           <Suspense fallback={null}>
             <CartDrawer />

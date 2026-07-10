@@ -393,7 +393,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     next.delete('feedMode');
     next.delete('query');
     next.delete('anchorDesignId');
-    setSearchParams(next);
+    setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
   const broadenPinnedSearch = useCallback(() => {

@@ -10,6 +10,7 @@ import type { AuthProfileResponse, AuthUserDto } from '@/types/auth';
 import { setUser } from '@/features/userSlice';
 import type { RootState } from '@/store';
 import { FrostedButton } from '@/components/ui/FrostedButton';
+import { BRAND_STAFF_COMING_SOON } from '@/config/featureFlags';
 
 const BrandStaffInvitePage: React.FC = () => {
   const [params] = useSearchParams();
@@ -82,6 +83,27 @@ const BrandStaffInvitePage: React.FC = () => {
       setMessage('This invite link is missing a token.');
     }
   }, [token]);
+
+  if (BRAND_STAFF_COMING_SOON) {
+    return (
+      <main className="min-h-screen threadly-shell-bg px-4 py-16 text-theme">
+        <section className="mx-auto max-w-lg rounded-2xl border border-gray-200 bg-white/80 p-8 text-center shadow-sm dark:border-white/10 dark:bg-white/5">
+          <div className="text-4xl" aria-hidden="true">👥</div>
+          <h1 className="mt-3 text-lg font-bold">Brand staff is coming soon</h1>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-theme-secondary">
+            Team invites are paused while we finish the staff workspace. Keep
+            this link — you can accept it once the feature unlocks.
+          </p>
+          <Link
+            to="/"
+            className="mt-5 inline-flex min-h-10 items-center justify-center rounded-full bg-purple-600 px-5 text-sm font-semibold text-white transition hover:bg-purple-500"
+          >
+            Back to Runway
+          </Link>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen threadly-shell-bg px-4 py-16 text-theme">

@@ -62,9 +62,9 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
     return unsub;
   }, [onNotification, refreshUnreadCount]);
 
-  const handleSelect = (key: string, path: string) => {
+  const handleSelect = (key: string, path: string, options?: { replace?: boolean }) => {
     onSelect(key);
-    navigate(path);
+    navigate(path, options);
   };
 
   const flatItems = groups.flatMap((group) => group.items);
@@ -141,7 +141,9 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
         }))}
         onSelect={(item) => {
           if (item.disabled) return;
-          handleSelect(item.key, item.path);
+          // Dock tab switches replace history — phone/tablet back should exit
+          // quickly, not replay every tab hop.
+          handleSelect(item.key, item.path, { replace: true });
         }}
       />
     </>

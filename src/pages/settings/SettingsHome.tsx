@@ -268,7 +268,8 @@ const SettingsHome: React.FC = () => {
   }, [active, isBrandUser, setSearchParams]);
 
   const setActive = (key: string) => {
-    setSearchParams({ tab: key });
+    // Tab switches are UI state — replace so mobile back doesn't replay them.
+    setSearchParams({ tab: key }, { replace: true });
   };
 
   return (

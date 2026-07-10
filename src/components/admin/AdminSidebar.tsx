@@ -67,8 +67,8 @@ const AdminSidebar: React.FC = () => {
     return location.pathname.startsWith(path);
   };
 
-  const handleNavigate = (path: string) => {
-    navigate(path);
+  const handleNavigate = (path: string, options?: { replace?: boolean }) => {
+    navigate(path, options);
     dispatch(closeSidebar());
   };
 
@@ -114,7 +114,7 @@ const AdminSidebar: React.FC = () => {
           emoji: item.emoji,
           active: getIsActive(item),
         }))}
-        onSelect={(item) => handleNavigate(item.path)}
+        onSelect={(item) => handleNavigate(item.path, { replace: true })}
       />
     </>
   );
