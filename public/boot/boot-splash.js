@@ -13,13 +13,16 @@
  *   then a manual "Tap to reload" fallback if still stuck.
  */
 (function () {
-  var BOOT_VERSION = '2026-07-05-mobile-boot-v3';
+  var BOOT_VERSION = '2026-07-10-mobile-boot-v4';
   var BOOT_TIMEOUT_MS = 15000;
   var AUTO_RECOVER_KEY = 'wiez:boot-auto-recovered';
   var BOOT_VERSION_KEY = 'wiez:boot-version';
+  var MAX_AUTO_RECOVER = 3;
+  var RETRY_DELAY_MS = 5000;
   var progress = 8;
   var recovering = false;
   var booted = false;
+  var retryCountdownTimer = null;
 
   try {
     if (sessionStorage.getItem(BOOT_VERSION_KEY) !== BOOT_VERSION) {
@@ -76,11 +79,13 @@
     paintProgress();
   }, 320);
 
-  function hasAutoRecovered() {
+  function autoRecoverCount() {
     try {
-      return sessionStorage.getItem(AUTO_RECOVER_KEY) === '1';
+      var parsed = parseInt(sessionStorage.getItem(AUTO_RECOVER_KEY) || '0', 10);
+      return isNaN(parsed) ? 0 : parsed;
     } catch (_e) {
-      return false;
+      // Storage unavailable: never risk an infinite reload loop.
+      return MAX_AUTO_RECOVER;
     }
   }
 
@@ -91,7 +96,7 @@
     if (recovering) return;
     recovering = true;
     try {
-      sessionStorage.setItem(AUTO_RECOVER_KEY, '1');
+      sessionStorage.setItem(AUTO_RECOVER_KEY, String(autoRecoverCount() + 1));
     } catch (_e) {}
     try {
       var url = new URL(window.location.href);
@@ -102,30 +107,69 @@
     }
   }
 
-  function showManualReload(message) {
+  // Single fallback frame — repeated failure signals (asset error + timeout)
+  // must UPDATE the message, not stack duplicate prompts.
+  function ensureFallbackNote(message) {
     var splash = document.getElementById('boot-splash');
-    if (!splash || !document.body.contains(splash)) return;
+    if (!splash || !document.body.contains(splash)) return null;
     window.clearInterval(progressTimer);
 
     var gauge = document.getElementById('boot-splash-gauge');
     if (gauge) gauge.style.display = 'none';
 
-    var frame = document.createElement('div');
-    frame.style.cssText = 'text-align:center;padding:0 1.5rem;';
+    var note = document.getElementById('boot-splash-note');
+    if (!note) {
+      var frame = document.createElement('div');
+      frame.id = 'boot-splash-fallback';
+      frame.style.cssText = 'text-align:center;padding:0 1.5rem;';
 
-    var note = document.createElement('p');
-    note.style.cssText = 'margin:0 0 12px;font-size:14px;font-weight:600;';
+      note = document.createElement('p');
+      note.id = 'boot-splash-note';
+      note.style.cssText = 'margin:0 0 12px;font-size:14px;font-weight:600;';
+
+      var retry = document.createElement('button');
+      retry.type = 'button';
+      retry.style.cssText =
+        'border:0;border-radius:9999px;padding:10px 18px;background:#7c3aed;color:#fff;font-weight:600;font-size:14px;';
+      retry.textContent = 'Tap to reload';
+      retry.addEventListener('click', cacheBustReload);
+
+      frame.append(note, retry);
+      splash.append(frame);
+    }
     note.textContent = message || 'Still loading…';
+    return note;
+  }
 
-    var retry = document.createElement('button');
-    retry.type = 'button';
-    retry.style.cssText =
-      'border:0;border-radius:9999px;padding:10px 18px;background:#7c3aed;color:#fff;font-weight:600;font-size:14px;';
-    retry.textContent = 'Tap to reload';
-    retry.addEventListener('click', cacheBustReload);
-
-    frame.append(note, retry);
-    splash.append(frame);
+  function scheduleAutoRetry(message, attempt) {
+    if (retryCountdownTimer) return;
+    var seconds = Math.ceil(RETRY_DELAY_MS / 1000);
+    var label = function () {
+      return (
+        message +
+        ' Reloading in ' +
+        seconds +
+        's… (attempt ' +
+        attempt +
+        ' of ' +
+        MAX_AUTO_RECOVER +
+        ')'
+      );
+    };
+    if (!ensureFallbackNote(label())) return;
+    retryCountdownTimer = window.setInterval(function () {
+      if (booted) {
+        window.clearInterval(retryCountdownTimer);
+        return;
+      }
+      seconds -= 1;
+      if (seconds <= 0) {
+        window.clearInterval(retryCountdownTimer);
+        cacheBustReload();
+        return;
+      }
+      ensureFallbackNote(label());
+    }, 1000);
   }
 
   function recoverOrShow(message) {
@@ -133,11 +177,16 @@
     // stale-chunk handling belongs to the in-app handlers (main.tsx), and a
     // boot-script reload mid-session would throw the user out of their flow.
     if (booted) return;
-    if (!hasAutoRecovered()) {
+    var count = autoRecoverCount();
+    if (count === 0) {
       cacheBustReload();
       return;
     }
-    showManualReload(message);
+    if (count < MAX_AUTO_RECOVER) {
+      scheduleAutoRetry(message, count + 1);
+      return;
+    }
+    ensureFallbackNote(message + ' Automatic retries failed — tap to try again.');
   }
 
   function isAppAssetUrl(value) {

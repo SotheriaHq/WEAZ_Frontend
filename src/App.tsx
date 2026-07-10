@@ -48,6 +48,7 @@ import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { ThemeBackendSync } from '@/components/theme/ThemeBackendSync';
 import ScrollRestoreProvider from '@/components/ScrollRestoreProvider';
 import MobileExitGuard from '@/components/navigation/MobileExitGuard';
+import { isNewBuildAvailable } from '@/utils/buildVersionGuard';
 
 const Market = lazy(() => import('./pages/Market'));
 const CartDrawer = lazy(() => import('./components/designs/CartDrawer'));
@@ -239,6 +240,23 @@ const RequireAdminPermission: React.FC<{
  * Contains global overlays like CartDrawer and WishlistDrawer
  * that need Router context (useNavigate)
  */
+/**
+ * Applies a detected new deploy (see utils/buildVersionGuard) on the next
+ * route navigation — a full document reload picks up the fresh build before
+ * the user can hit a dead lazy chunk. Never fires mid-screen.
+ */
+const BuildVersionReload: React.FC<{ pathname: string }> = ({ pathname }) => {
+  const lastPathRef = React.useRef(pathname);
+  useEffect(() => {
+    if (pathname === lastPathRef.current) return;
+    lastPathRef.current = pathname;
+    if (isNewBuildAvailable()) {
+      window.location.reload();
+    }
+  }, [pathname]);
+  return null;
+};
+
 const ViewportSync: React.FC<{ watchKey?: string }> = ({ watchKey }) => {
   const dispatch = useDispatch<AppDispatch>();
 
@@ -344,6 +362,7 @@ const RootLayout: React.FC = () => {
           </div>
         )}
         <ViewportSync watchKey={location.pathname} />
+        <BuildVersionReload pathname={location.pathname} />
         {/* Native app webview owns its own back behavior — guard browser only. */}
         {!isEmbeddedMobile ? <MobileExitGuard /> : null}
         {!isEmbeddedMobile ? (

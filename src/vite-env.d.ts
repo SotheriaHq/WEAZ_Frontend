@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 
+/** Build id stamped by vite.config.ts (define) — matches /version.json buildId. */
+declare const __WIEZ_BUILD_ID__: string;
+
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string;
   readonly VITE_APP_URL?: string;
