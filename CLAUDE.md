@@ -1,6 +1,7 @@
 # Threadly Frontend — Agent Context
 
 > You are in `fthreadly/` — the React frontend. See root `CODEMAP.md` for task routing.
+> **Ground truth**: this folder is its OWN git repo (`SotheriaHq/WEAZ_Frontend`); the parent workspace folder is NOT a repo. Sibling apps `../bthreadly` (API) and `../threadly-mobile` (Expo) are separate repos. "Threadly" = codename, WIEZ/WEAZ = public brand. Full facts: root `CLAUDE.md` → "Workspace Ground Truth". Typecheck: `npx tsc -b`. Axios default timeout is 15s (`src/config/env.ts`) — override for long requests. Full Vitest fails for pre-existing env reasons; run focused tests only.
 
 ## Stack
 

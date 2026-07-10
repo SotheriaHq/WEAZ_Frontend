@@ -43,6 +43,7 @@ import LocalMediaPreview from "../../components/media/LocalMediaPreview";
 import useFilePicker from "../../components/upload/useFilePicker";
 import { PrePublishConfirmModal } from "@/components/modals";
 import TagsApi from "@/api/TagsApi";
+import HashtagPickerModal from "@/components/tags/HashtagPickerModal";
 import { brandApi } from "@/api/BrandApi";
 import FilterSelector, {
   type FilterSelection,
@@ -280,6 +281,7 @@ const CreateDesignInner: React.FC = () => {
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   const [tagSearch, setTagSearch] = useState("");
   const [tagSearchResults, setTagSearchResults] = useState<string[]>([]);
+  const [showTagPicker, setShowTagPicker] = useState(false);
   const [showAllTags, setShowAllTags] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
@@ -853,6 +855,19 @@ const CreateDesignInner: React.FC = () => {
 
   const removeTag = (tag: string) => {
     setSelectedTags(selectedTags.filter((t) => t !== tag));
+  };
+
+  const handleToggleTagFromPicker = (tag: string) => {
+    const cleaned = tag.replace(/#/g, "").trim();
+    if (!cleaned) return;
+    const existing = selectedTags.find(
+      (t) => t.toLowerCase() === cleaned.toLowerCase(),
+    );
+    if (existing) {
+      removeTag(existing);
+      return;
+    }
+    addTag(cleaned);
   };
 
   const handleCategoryChange = (value: string) => {
@@ -1981,6 +1996,23 @@ const CreateDesignInner: React.FC = () => {
                               <span className="font-semibold">Add</span> to create it (sent for admin approval).
                             </p>
                           ) : null}
+
+                          <button
+                            type="button"
+                            onClick={() => setShowTagPicker(true)}
+                            disabled={disabled}
+                            className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1.5 text-[12px] font-semibold text-purple-700 transition hover:bg-purple-100 disabled:opacity-50 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+                          >
+                            🔎 See more hashtags ({selectedTags.length}/10)
+                          </button>
+                          <HashtagPickerModal
+                            open={showTagPicker}
+                            onClose={() => setShowTagPicker(false)}
+                            selected={selectedTags}
+                            onToggle={handleToggleTagFromPicker}
+                            maxTags={10}
+                            extraSuggestions={tagSuggestions}
+                          />
                         </div>
                       </div>
                     </div>

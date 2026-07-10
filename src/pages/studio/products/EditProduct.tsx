@@ -60,6 +60,7 @@ import FilterSelector, {
   type FilterSelection,
 } from "@/components/categories/FilterSelector";
 import SizingConfigurator from "@/components/sizing/SizingConfigurator";
+import HashtagPickerModal from "@/components/tags/HashtagPickerModal";
 import { PriceChangePreviewModal } from "@/components/collections/PriceChangePreviewModal";
 import {
   getProductPriceChangePreview,
@@ -170,6 +171,8 @@ const PRODUCT_VARIANT_SIZE_ALIAS_MAP: Record<string, string> = {
 };
 
 const MIN_PUBLISH_VARIANT_COUNT = 5;
+
+const MAX_PRODUCT_TAGS = 20;
 
 const PRODUCT_VARIANT_SIZE_LABELS = PRODUCT_VARIANT_SIZE_OPTIONS.join(", ");
 
@@ -513,6 +516,7 @@ const EditProduct: React.FC = () => {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
   const [tagInput, setTagInput] = useState("");
+  const [showTagPicker, setShowTagPicker] = useState(false);
   const [showDiscardPrompt, setShowDiscardPrompt] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<{
     pricing: boolean;
@@ -655,6 +659,14 @@ const EditProduct: React.FC = () => {
       (sum, v) => sum + (Number.isFinite(v.stock) ? v.stock : 0),
       0,
     );
+  }, [form.variants]);
+
+  /** Fallback base price so drafts priced only at variant level don't render ₦0 on catalog cards. */
+  const minVariantPrice = useMemo(() => {
+    const prices = form.variants
+      .map((v) => (typeof v.price === "number" && v.price > 0 ? v.price : null))
+      .filter((p): p is number => p !== null);
+    return prices.length ? Math.min(...prices) : 0;
   }, [form.variants]);
 
   const variantKeyCounts = useMemo(() => {
@@ -1449,10 +1461,37 @@ const EditProduct: React.FC = () => {
     const cleaned = raw.replace(/#/g, "").trim();
     if (!cleaned) return;
     if (!form.tags.includes(cleaned)) {
+      if (form.tags.length >= MAX_PRODUCT_TAGS) {
+        toast.error(`You can add up to ${MAX_PRODUCT_TAGS} hashtags`);
+        return;
+      }
       updateForm("tags", [...form.tags, cleaned]);
     }
     setTagInput("");
   }, [tagInput, form.tags, updateForm]);
+
+  const handleToggleTagFromPicker = useCallback(
+    (tag: string) => {
+      const cleaned = tag.replace(/#/g, "").trim();
+      if (!cleaned) return;
+      const existing = form.tags.find(
+        (t) => t.toLowerCase() === cleaned.toLowerCase(),
+      );
+      if (existing) {
+        updateForm(
+          "tags",
+          form.tags.filter((t) => t !== existing),
+        );
+        return;
+      }
+      if (form.tags.length >= MAX_PRODUCT_TAGS) {
+        toast.error(`You can add up to ${MAX_PRODUCT_TAGS} hashtags`);
+        return;
+      }
+      updateForm("tags", [...form.tags, cleaned]);
+    },
+    [form.tags, updateForm],
+  );
 
   const handleRemoveTag = useCallback(
     (tagToRemove: string) => {
@@ -1766,7 +1805,7 @@ const EditProduct: React.FC = () => {
           price: effectiveDraft
             ? form.price > 0
               ? form.price
-              : 0
+              : minVariantPrice
             : form.price,
           compareAtPrice:
             form.onSale && form.compareAtPrice > 0
@@ -2084,7 +2123,11 @@ const EditProduct: React.FC = () => {
         gender: form.gender,
         tags: form.tags,
         filterValueIds: selectedFilterValueIds,
-        price: effectiveDraft ? (form.price > 0 ? form.price : 0) : form.price,
+        price: effectiveDraft
+          ? form.price > 0
+            ? form.price
+            : minVariantPrice
+          : form.price,
         compareAtPrice:
           form.onSale && form.compareAtPrice > 0
             ? form.compareAtPrice
@@ -3328,7 +3371,7 @@ const EditProduct: React.FC = () => {
 
                       <div>
                         <label className="text-[11px] font-semibold text-theme-secondary mb-1.5 flex items-center">
-                          Hashtags
+                          Hashtags (up to {MAX_PRODUCT_TAGS})
                           <InfoTooltip text={CREATOR_METADATA_HELP.hashtags} />
                         </label>
                         {tagSuggestions.length > 0 && (
@@ -3346,6 +3389,10 @@ const EditProduct: React.FC = () => {
                                     type="button"
                                     onClick={() => {
                                       if (!form.tags.includes(suggestion)) {
+                                        if (form.tags.length >= MAX_PRODUCT_TAGS) {
+                                          toast.error(`You can add up to ${MAX_PRODUCT_TAGS} hashtags`);
+                                          return;
+                                        }
                                         updateForm("tags", [
                                           ...form.tags,
                                           suggestion,
@@ -3360,6 +3407,13 @@ const EditProduct: React.FC = () => {
                             </div>
                           </div>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => setShowTagPicker(true)}
+                          className="mb-2 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1.5 text-[12px] font-semibold text-purple-700 transition hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+                        >
+                          🔎 See more hashtags ({form.tags.length}/{MAX_PRODUCT_TAGS})
+                        </button>
                         <div className="surface-control flex min-h-[42px] items-center gap-2 rounded-lg border border-gray-200/60 px-3 py-2 shadow-sm dark:border-white/10">
                           <input
                             type="text"
@@ -3399,6 +3453,14 @@ const EditProduct: React.FC = () => {
                         <p className="text-[11px] text-theme-secondary mt-1">
                           Add one tag at a time. Use Enter or the Add button.
                         </p>
+                        <HashtagPickerModal
+                          open={showTagPicker}
+                          onClose={() => setShowTagPicker(false)}
+                          selected={form.tags}
+                          onToggle={handleToggleTagFromPicker}
+                          maxTags={MAX_PRODUCT_TAGS}
+                          extraSuggestions={tagSuggestions}
+                        />
                       </div>
 
                       <Textarea
@@ -3849,6 +3911,18 @@ const EditProduct: React.FC = () => {
                     updateForm("customMeasurementKeys", keys)
                   }
                 />
+                {form.variants.length > 0 &&
+                normalizeSizingMode(form.sizingMode) === "NONE" ? (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                    <span aria-hidden="true">ℹ️</span>
+                    <span>
+                      You added {form.variants.length} size variant
+                      {form.variants.length === 1 ? "" : "s"} but the sizing
+                      mode is "No Sizing". Switch it to RTW so buyers get size
+                      guidance that matches your stocked sizes.
+                    </span>
+                  </div>
+                ) : null}
 
                 {/* Custom order toggle — keeps form hidden until brand opts in */}
                 <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">

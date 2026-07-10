@@ -2081,8 +2081,10 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             <span className="text-sm">⚡</span>
           </button>
           <div
-            className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ease-out ${
-              showQuickActions ? 'max-w-[calc(100vw-7rem)] opacity-100 sm:max-w-[800px]' : 'max-w-0 opacity-0'
+            className={`flex items-center gap-2 transition-all duration-300 ease-out ${
+              showQuickActions
+                ? 'max-w-[calc(100vw-7rem)] overflow-x-auto scrollbar-hide opacity-100 sm:max-w-[800px]'
+                : 'max-w-0 overflow-hidden opacity-0'
             }`}
           >
             <button
@@ -2138,8 +2140,10 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 <span className="text-[10px] font-bold tabular-nums">{storeDraftCollections.length}</span>
               </button>
               <div
-                className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ease-out ${
-                  showDrafts ? 'max-w-[calc(100vw-7rem)] opacity-100 sm:max-w-[600px]' : 'max-w-0 opacity-0'
+                className={`flex items-center gap-2 transition-all duration-300 ease-out ${
+                  showDrafts
+                    ? 'max-w-[calc(100vw-7rem)] overflow-x-auto scrollbar-hide opacity-100 sm:max-w-[600px]'
+                    : 'max-w-0 overflow-hidden opacity-0'
                 }`}
               >
                 {draftCollectionsLoading ? (
@@ -2411,16 +2415,26 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                               )}
                             </>
                           ) : (
-                            <ImageWithFallback
-                              src={activePreview.src}
-                              fileId={activePreview.fileId}
-                              alt={activePreview.alt}
-                              fit="cover"
-                              rounded="none"
-                              containerClassName="h-full w-full relative z-10"
-                              className="h-full w-full"
-                              fallbackName={collection.name}
-                            />
+                            <>
+                              <ImageWithFallback
+                                src={activePreview.src}
+                                fileId={activePreview.fileId}
+                                alt={activePreview.alt}
+                                fit="cover"
+                                rounded="none"
+                                containerClassName="h-full w-full relative z-10"
+                                className="h-full w-full"
+                                fallbackName={collection.name}
+                              />
+                              {!activePreview.src && !activePreview.fileId && (
+                                <div className="pointer-events-none absolute inset-x-0 top-1/3 z-20 flex -translate-y-1/2 flex-col items-center gap-1 px-4 text-center">
+                                  <span className="text-xl" aria-hidden="true">📷</span>
+                                  <span className="text-[11px] font-semibold text-white/90 drop-shadow-sm">
+                                    No cover yet — add products or a cover image
+                                  </span>
+                                </div>
+                              )}
+                            </>
                           )}
 
                           {/* Menu host — Top Right */}

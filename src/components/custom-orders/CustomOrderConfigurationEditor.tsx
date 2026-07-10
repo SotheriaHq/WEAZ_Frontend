@@ -1369,7 +1369,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
 
       {!sourceId ? (
         <div className="mt-5 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-4 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">
-          Save this item first so the custom-order settings can attach to it.
+          You can fill everything in now — these custom-order settings save together with the item when you save or publish it. Just don't leave this page before saving.
         </div>
       ) : null}
 
