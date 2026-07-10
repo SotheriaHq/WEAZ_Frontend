@@ -15,6 +15,7 @@ import { store } from './store';
 import { QueryProvider } from './query/QueryProvider';
 import RootErrorBoundary, { removeBootSplash } from './components/RootErrorBoundary';
 import { initClientDiagnostics } from './utils/clientDiagnostics';
+import { initBuildVersionGuard } from './utils/buildVersionGuard';
 import { initSentry } from './observability/sentry';
 
 initSentry();
@@ -22,6 +23,7 @@ initSentry();
 const STALE_CHUNK_RELOAD_KEY = 'vite:preloadError:reloadedAt';
 
 initClientDiagnostics();
+initBuildVersionGuard();
 
 const isStaleChunkLoadError = (value: unknown): boolean => {
   const message =
@@ -48,7 +50,15 @@ const reloadForStaleChunks = (): boolean => {
     return false;
   }
   sessionStorage.setItem(STALE_CHUNK_RELOAD_KEY, String(Date.now()));
-  window.location.reload();
+  // Cache-busted navigation (same technique as boot-splash.js): a plain
+  // reload can re-serve a stale cached document on some mobile browsers.
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set('_r', String(Date.now()));
+    window.location.replace(url.toString());
+  } catch {
+    window.location.reload();
+  }
   return true;
 };
 

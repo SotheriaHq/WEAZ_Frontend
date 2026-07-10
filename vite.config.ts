@@ -31,6 +31,21 @@ const resolveOptionalHttpsConfig = (env: Record<string, string>) => {
   };
 };
 
+// Stamped into the bundle AND emitted as /version.json so live clients can
+// detect a newer deploy (stale-session self-heal). One id per build.
+const BUILD_ID = String(Date.now());
+
+const versionManifestPlugin = () => ({
+  name: 'wiez-version-manifest',
+  writeBundle(options: { dir?: string }) {
+    const outDir = options.dir ?? path.resolve(process.cwd(), 'dist');
+    fs.writeFileSync(
+      path.join(outDir, 'version.json'),
+      JSON.stringify({ buildId: BUILD_ID, builtAt: new Date().toISOString() }),
+    );
+  },
+});
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -39,8 +54,12 @@ export default defineConfig(({ mode }) => {
   const isProd = mode === 'production';
 
   return {
+    define: {
+      __WIEZ_BUILD_ID__: JSON.stringify(BUILD_ID),
+    },
     plugins: [
       react(),
+      versionManifestPlugin(),
       sentryVitePlugin({
         org: process.env.SENTRY_ORG,
         project: process.env.SENTRY_PROJECT,
