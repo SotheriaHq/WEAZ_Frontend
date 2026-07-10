@@ -381,14 +381,13 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
         });
         toast.success('Changes requested');
       }
+      // A decision is terminal for this submission — close every modal in
+      // the flow (decision dialog AND the review modal) and refresh the list.
       setPendingDecision(null);
       setDecisionReason('');
       setDecisionNote('');
+      setSelected(null);
       await loadSubmissions();
-      if (selected?.id === submission.id) {
-        const response = await adminContentReviewApi.getSubmission(submission.id);
-        setSelected(unwrapApiResponse<AdminContentSubmission>(response.data as any));
-      }
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to update submission');
     } finally {

@@ -531,18 +531,24 @@ const ProfilePage: React.FC = () => {
     if (!isOwner || !user) {
       return false;
     }
-    const description = (brandProfile?.description ?? user.brandDescription ?? '').trim();
-    const tags =
-      brandProfile?.tags ??
-      brandProfile?.hashtags ??
-      user.brandTags ??
-      [];
+    // Treat empty profile fields as missing and fall through to the redux
+    // user, which is updated synchronously on save — a stale profile
+    // snapshot must never flag a completed setup as incomplete.
+    const description = (
+      brandProfile?.description?.trim() ||
+      user.brandDescription ||
+      ''
+    ).trim();
+    const profileTags = brandProfile?.tags?.length
+      ? brandProfile.tags
+      : brandProfile?.hashtags;
+    const tags = profileTags?.length ? profileTags : (user.brandTags ?? []);
     const hasLocation =
-      Boolean((brandProfile?.country ?? user.brandCountry ?? '').trim()) ||
-      Boolean((brandProfile?.state ?? user.brandState ?? '').trim());
+      Boolean((brandProfile?.country?.trim() || user.brandCountry || '').trim()) ||
+      Boolean((brandProfile?.state?.trim() || user.brandState || '').trim());
 
     const needsSetup = description.length < 20 || tags.length === 0 || !hasLocation;
-    
+
     return needsSetup;
   }, [isOwner, user, brandProfile]);
 
@@ -609,7 +615,12 @@ const ProfilePage: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [isStoreSetupNavigating]);
 
+  // Auto-prompt fires at most once per catalog visit. Re-asserting on every
+  // render fought the modal's own close (save/close cleared the URL param and
+  // this effect immediately re-added it, so the modal appeared to never close).
+  const hasAutoPromptedSetupRef = useRef(false);
   useEffect(() => {
+    if (hasAutoPromptedSetupRef.current) return;
     const hasDismissedSetup = getHasDismissedBrandSetup();
     if (
       isOwner &&
@@ -618,10 +629,12 @@ const ProfilePage: React.FC = () => {
       !hasDismissedSetup &&
       !isEditModalOpen
     ) {
+      hasAutoPromptedSetupRef.current = true;
       const next = new URLSearchParams(searchParams);
       next.set('modal', 'brand-setup');
       next.set('modalOrigin', 'prompt');
-      setSearchParams(next);
+      // replace: the prompt is not a user navigation — Back must not reopen it.
+      setSearchParams(next, { replace: true });
     }
   }, [
     isOwner,

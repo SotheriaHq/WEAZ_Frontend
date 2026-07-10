@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { useQueryClient } from '@tanstack/react-query';
 
 import type { RootState } from '@/store';
 import { setUser } from '@/features/userSlice';
 import { brandApi } from '@/api/BrandApi';
 import type { BrandProfileDto } from '@/types/profile';
 import { invalidateStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
+import { fetchBrandProfileQuery } from '@/query/queries';
 import { getActiveBrandId, hasActiveBrandMembership } from '@/lib/brandAccess';
 
 import EditProfileModal from '@/components/profile/EditProfileModal';
@@ -40,6 +42,7 @@ function sanitizeNextPath(path: string): string | null {
 export const GlobalModalRouter: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const user = useSelector((state: RootState) => state.user.profile);
   const [searchParams, setSearchParams] = useSearchParams();
   const modal = searchParams.get('modal');
@@ -117,6 +120,18 @@ export const GlobalModalRouter: React.FC = () => {
           dispatch(setUser(updatedUser));
           invalidateStoreSetupStatusCache();
           localStorage.removeItem(BRAND_SETUP_DISMISS_KEY);
+          try {
+            // Refresh the cached brand profile BEFORE closing. Catalog's
+            // setup-completeness check reads this cache; leaving it stale
+            // made the auto-prompt re-open this modal right after save.
+            await fetchBrandProfileQuery(
+              queryClient,
+              getActiveBrandId(updatedUser) ?? updatedUser.id,
+              { forceRefresh: true },
+            );
+          } catch {
+            // Non-fatal — the modal must still close after a successful save.
+          }
           closeModal();
           if (nextPath) {
             navigate(nextPath, { replace: true });

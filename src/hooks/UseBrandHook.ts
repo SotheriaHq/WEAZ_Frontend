@@ -554,7 +554,13 @@ export const useBrandProfile = () => {
     bannerImageMeta: brandProfile?.bannerImageMeta ?? null,
     logoImage: brandProfile?.logoImage ?? null,
     logoImageMeta: brandProfile?.logoImageMeta ?? null,
-    hashtags: brandProfile?.tags ?? brandProfile?.hashtags ?? defaultFallbackTags,
+    // Empty arrays fall through: a profile snapshot with no tags must not
+    // mask real tags on the fresher redux user (e.g. right after a save).
+    hashtags: brandProfile?.tags?.length
+      ? brandProfile.tags
+      : brandProfile?.hashtags?.length
+        ? brandProfile.hashtags
+        : defaultFallbackTags,
     description: brandProfile?.description ?? user?.brandDescription ?? null,
     socialLinks: {
       instagram: brandProfile?.socialLinks?.instagram ?? socialFallback.instagram,

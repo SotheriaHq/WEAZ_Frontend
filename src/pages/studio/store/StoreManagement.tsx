@@ -362,7 +362,7 @@ export default function StoreManagement() {
   }
 
   return (
-    <div className="animate-in fade-in space-y-8 duration-500">
+    <div className="animate-in fade-in space-y-4 duration-500 sm:space-y-8">
       {returnTo ? (
         <div className="flex items-center gap-3">
           <button
@@ -503,25 +503,25 @@ export default function StoreManagement() {
       </div>
 
       {showVerificationPrompt ? (
-        <section className="rounded-3xl border border-sky-200/80 bg-gradient-to-r from-sky-50 via-white to-indigo-50 p-5 shadow-sm dark:border-sky-500/20 dark:from-sky-500/10 dark:via-white/5 dark:to-indigo-500/10">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className={isEmbeddedMobile ? 'max-w-none' : 'max-w-3xl'}>
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700 dark:text-sky-200">
+        <section className="rounded-2xl border border-sky-200/80 bg-gradient-to-r from-sky-50 via-white to-indigo-50 p-3 shadow-sm dark:border-sky-500/20 dark:from-sky-500/10 dark:via-white/5 dark:to-indigo-500/10 sm:rounded-3xl sm:p-5">
+          <div className="flex flex-row items-center justify-between gap-3 sm:flex-col sm:items-start sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className={`min-w-0 ${isEmbeddedMobile ? 'max-w-none' : 'sm:max-w-3xl'}`}>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-700 dark:text-sky-200 sm:text-xs">
                 {verificationPrompt.eyebrow}
               </div>
-              <h2 className="mt-2 text-xl font-semibold text-theme">
+              <h2 className="mt-1 line-clamp-2 text-sm font-semibold text-theme sm:mt-2 sm:text-xl">
                 {verificationPrompt.title}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-theme-secondary">
+              <p className="mt-2 hidden text-sm leading-6 text-theme-secondary sm:block">
                 {verificationPrompt.description}
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex shrink-0 flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => navigate('/studio/verification')}
-                className="inline-flex items-center rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+                className="inline-flex min-h-10 items-center justify-center rounded-full bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700 sm:px-4 sm:py-2.5 sm:text-sm"
               >
                 {verificationPrompt.primaryLabel}
               </button>
@@ -529,7 +529,7 @@ export default function StoreManagement() {
                 <button
                   type="button"
                   onClick={() => navigate('/settings?tab=notifications')}
-                  className="inline-flex items-center rounded-full border border-sky-200 bg-white/80 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-white dark:border-sky-500/20 dark:bg-white/5 dark:text-sky-200"
+                  className="hidden min-h-10 items-center justify-center rounded-full border border-sky-200 bg-white/80 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-white dark:border-sky-500/20 dark:bg-white/5 dark:text-sky-200 sm:inline-flex"
                 >
                   Manage reminders
                 </button>

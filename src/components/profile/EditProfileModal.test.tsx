@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import type React from 'react';
 import type { AuthUserDto } from '@/types/auth';
@@ -139,11 +140,13 @@ describe('EditProfileModal brand setup blocker flow', () => {
     brandApiMock.getBrandProfile.mockResolvedValue(null);
 
     render(
-      <MemoryRouter initialEntries={['/profile?modal=brand-setup&modalOrigin=prompt']}>
-        <Routes>
-          <Route path="/profile" element={<GlobalModalRouter />} />
-        </Routes>
-      </MemoryRouter>,
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/profile?modal=brand-setup&modalOrigin=prompt']}>
+          <Routes>
+            <Route path="/profile" element={<GlobalModalRouter />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     expect(await screen.findByRole('dialog', { name: 'Brand setup' })).toBeInTheDocument();

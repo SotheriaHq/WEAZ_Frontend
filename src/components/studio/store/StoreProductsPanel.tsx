@@ -1779,8 +1779,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         <div className="space-y-3 p-3 sm:p-4 lg:p-6 lg:space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white sm:text-lg">Collections Quick Access</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white sm:text-lg">Collections Quick Access</h3>
+              <p className="hidden text-xs text-gray-500 dark:text-gray-400 sm:block sm:text-sm">
                 Slow carousel preview with cover images always visible.
               </p>
             </div>
@@ -1788,14 +1788,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               <button
                 type="button"
                 onClick={() => navigate('/studio/store/collections/new')}
-                className="rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
+                className="min-h-9 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
               >
                 Create collection
               </button>
               <button
                 type="button"
                 onClick={() => navigate('/studio/store?view=collections')}
-                className="rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
+                className="min-h-9 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
               >
                 Manage collections
               </button>
@@ -1838,7 +1838,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         setHoveredCollectionId((prev) => (prev === collection.id ? null : prev));
                         setHoverPreviewFrame((prev) => ({ ...prev, [collection.id]: 0 }));
                       }}
-                      className="group relative h-28 w-40 shrink-0 snap-start overflow-hidden rounded-xl border border-gray-200 bg-gray-100 text-left shadow-sm transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-zinc-900/80 sm:h-36 sm:w-52 lg:h-44 lg:w-64"
+                      className="group relative h-24 w-36 shrink-0 snap-start overflow-hidden rounded-xl border border-gray-200 bg-gray-100 text-left shadow-sm transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-zinc-900/80 sm:h-36 sm:w-52 lg:h-44 lg:w-64"
                     >
                       {/* Opacity-based crossfade stack — fills entire card */}
                       {previewSources.length > 0 ? (
@@ -1898,11 +1898,11 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       )}
 
                       {/* Frosted Glass Text Component - Bottom Overlay */}
-                      <div className="absolute bottom-0 left-0 right-0 z-30 border-t border-white/20 bg-white/60 p-2 backdrop-blur-md transition-transform duration-300 dark:border-white/10 dark:bg-black/60 sm:p-3">
+                      <div className="absolute bottom-0 left-0 right-0 z-30 border-t border-white/20 bg-white/60 p-1.5 backdrop-blur-md transition-transform duration-300 dark:border-white/10 dark:bg-black/60 sm:p-3">
                         <p className="line-clamp-1 text-xs font-bold text-gray-900 drop-shadow-sm dark:text-white sm:text-sm">
                           {collection.name}
                         </p>
-                        <p className="mt-0.5 text-[10px] font-medium text-gray-700 dark:text-gray-300 sm:text-xs">
+                        <p className="mt-0.5 hidden text-[10px] font-medium text-gray-700 dark:text-gray-300 sm:block sm:text-xs">
                           {collection.itemCount ?? 0} items
                         </p>
                       </div>
@@ -2596,7 +2596,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     type="button"
                     onClick={() => setCollectionPage((prev) => Math.max(1, prev - 1))}
                     disabled={collectionPage === 1}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                    className="min-h-10 rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 sm:min-h-0"
                   >
                     Prev
                   </button>
@@ -2609,7 +2609,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       setCollectionPage((prev) => Math.min(managedCollectionsPages, prev + 1))
                     }
                     disabled={collectionPage === managedCollectionsPages}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                    className="min-h-10 rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 sm:min-h-0"
                   >
                     Next
                   </button>
@@ -2639,7 +2639,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     type="button"
                     onClick={() => setActiveCollectionProductsPage((prev) => Math.max(1, prev - 1))}
                     disabled={activeCollectionProductsPage === 1 || activeCollectionProductsLoading}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                    className="min-h-10 rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 sm:min-h-0"
                   >
                     Prev
                   </button>
@@ -2657,7 +2657,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       activeCollectionProductsPage === activeCollectionProductsPages ||
                       activeCollectionProductsLoading
                     }
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                    className="min-h-10 rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 sm:min-h-0"
                   >
                     Next
                   </button>
@@ -2757,7 +2757,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       toggleSelect(product.id);
                     }}
                     onClick={(e) => e.stopPropagation()}
-                    className="absolute left-2 top-2 z-20 h-4 w-4 rounded border-gray-300 bg-white/90 text-purple-600 focus:ring-purple-500/30 dark:border-zinc-600 dark:bg-zinc-800/90 cursor-pointer"
+                    className="absolute left-2 top-2 z-20 h-5 w-5 rounded border-gray-300 bg-white/90 text-purple-600 focus:ring-purple-500/30 dark:border-zinc-600 dark:bg-zinc-800/90 cursor-pointer sm:h-4 sm:w-4"
                   />
                   
                   {/* Actions menu button (replaces star) */}
@@ -2774,7 +2774,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           dropdownManager.openId === menuId ? null : menuId,
                         );
                       }}
-                      className={`flex h-7 w-7 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm shadow-sm transition-all duration-200 ${
+                      className={`flex h-9 w-9 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm shadow-sm transition-all duration-200 sm:h-7 sm:w-7 ${
                         dropdownManager.openId === `product-menu-${product.id}`
                           ? 'text-white bg-purple-600/80'
                           : 'text-white hover:bg-black/60'
@@ -2816,7 +2816,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           void handleProductAction('edit', product);
                         }}
                         title="Edit product"
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-purple-600 sm:h-8 sm:w-8"
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-purple-600 sm:h-8 sm:w-8"
                       >
                         <span className="text-sm">✏️</span>
                       </button>
@@ -2827,7 +2827,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           void handleProductAction('delete', product);
                         }}
                         title="Delete product"
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-red-500 sm:h-8 sm:w-8"
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-red-500 sm:h-8 sm:w-8"
                       >
                         <span className="text-sm">🗑️</span>
                       </button>

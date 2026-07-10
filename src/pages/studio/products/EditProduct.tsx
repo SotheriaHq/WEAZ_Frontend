@@ -558,6 +558,7 @@ const EditProduct: React.FC = () => {
   const [mediaUrls, setMediaUrls] = useState<ProductMediaPreview[]>([]);
 
   const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
+  const quickAddSizeInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const pendingUploadSlotRef = useRef<MediaViewSlot | null>(null);
   const [pendingMediaFiles, setPendingMediaFiles] = useState<
     Array<{
@@ -3184,7 +3185,7 @@ const EditProduct: React.FC = () => {
                   <div className="lg:max-h-[340px] lg:overflow-y-auto lg:pr-1 scrollbar-threadly">
                     <div className="space-y-3">
                       <div className="space-y-3" id="product-category-section">
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
                           <div className="min-w-0">
                             <UniversalSelect
                               label="What is it?"
@@ -3332,7 +3333,7 @@ const EditProduct: React.FC = () => {
                         </label>
                         {tagSuggestions.length > 0 && (
                           <div className="mb-2">
-                            <p className="text-[10px] text-theme-secondary mb-1">
+                            <p className="text-xs text-theme-secondary mb-1.5">
                               Suggested tags from filters:
                             </p>
                             <div className="flex flex-wrap gap-1.5">
@@ -3351,9 +3352,7 @@ const EditProduct: React.FC = () => {
                                         ]);
                                       }
                                     }}
-                                    className="px-2 py-1 rounded-lg text-[10px] font-medium bg-purple-50 dark:bg-purple-500/10
-                                      text-purple-600 dark:text-purple-300 border border-purple-200/60 dark:border-purple-500/20
-                                      hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
+                                    className="tag-badge-outline px-2.5 py-1.5 rounded-full text-[12px] font-medium sm:py-1"
                                   >
                                     + {normalizeHashtagLabel(suggestion)}
                                   </button>
@@ -3385,10 +3384,10 @@ const EditProduct: React.FC = () => {
                                 key={tag}
                                 label={normalizeHashtagLabel(tag)}
                                 color={getTagColor(tag, index)}
-                                size="xs"
+                                size="sm"
                                 rightIcon={
                                   <X
-                                    className="w-3 h-3 cursor-pointer"
+                                    className="w-3.5 h-3.5 cursor-pointer"
                                     onClick={() => handleRemoveTag(tag)}
                                   />
                                 }
@@ -3471,7 +3470,7 @@ const EditProduct: React.FC = () => {
                   </div>
 
                   {!collapsedSections.pricing && (
-                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="mt-4 grid grid-cols-2 gap-3">
                       <Input
                         label="Price"
                         required
@@ -3575,7 +3574,11 @@ const EditProduct: React.FC = () => {
                       )}
                     </div>
                     <p
-                      className={`mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                      className={`inline-flex items-center gap-2 rounded-full border font-semibold ${
+                        collapsedSections.variants
+                          ? 'mt-2 px-2 py-0.5 text-[10px]'
+                          : 'mt-3 px-3 py-1 text-[11px]'
+                      } ${
                         form.variants.length >= MIN_PUBLISH_VARIANT_COUNT
                           ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100'
                           : 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100'
@@ -3584,9 +3587,11 @@ const EditProduct: React.FC = () => {
                       <span aria-hidden="true">
                         {form.variants.length >= MIN_PUBLISH_VARIANT_COUNT ? '✅' : 'ℹ️'}
                       </span>
-                      {form.variants.length >= MIN_PUBLISH_VARIANT_COUNT
-                        ? `Go-live ready: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants.`
-                        : `Progress: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants added. Add ${MIN_PUBLISH_VARIANT_COUNT - form.variants.length} more to go live.`}
+                      {collapsedSections.variants
+                        ? `${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} sizes`
+                        : form.variants.length >= MIN_PUBLISH_VARIANT_COUNT
+                          ? `Go-live ready: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants.`
+                          : `Progress: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants added. Add ${MIN_PUBLISH_VARIANT_COUNT - form.variants.length} more to go live.`}
                     </p>
                   </div>
 
@@ -3665,16 +3670,21 @@ const EditProduct: React.FC = () => {
                                 </div>
                               </div>
 
-                              {/* Quick-add sizes */}
+                              {/* Quick-add sizes — tap the Add button (mobile) or press Enter */}
                               <div className="px-3 py-1.5 border-b border-theme bg-gray-50/40 dark:bg-white/[0.02]">
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] text-gray-500 shrink-0">
                                     Quick add:
                                   </span>
                                   <input
+                                    ref={(el) => {
+                                      quickAddSizeInputRefs.current[group.stableKey] = el;
+                                    }}
                                     type="text"
+                                    enterKeyHint="done"
+                                    autoCapitalize="characters"
                                     placeholder="e.g. XXS, XS, S, M, L, XL"
-                                    className="flex-1 text-xs bg-transparent border-none outline-none text-theme-secondary placeholder:text-gray-400"
+                                    className="min-h-9 flex-1 min-w-0 text-xs bg-transparent border-none outline-none text-theme-secondary placeholder:text-gray-400 sm:min-h-0"
                                     onKeyDown={(e) => {
                                       if (e.key === "Enter") {
                                         e.preventDefault();
@@ -3687,7 +3697,24 @@ const EditProduct: React.FC = () => {
                                       }
                                     }}
                                   />
-                                  <span className="text-[9px] text-gray-400 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const input =
+                                        quickAddSizeInputRefs.current[group.stableKey];
+                                      if (!input) return;
+                                      addMultipleSizesForColor(
+                                        group.color,
+                                        input.value,
+                                      );
+                                      input.value = "";
+                                      input.focus();
+                                    }}
+                                    className="inline-flex min-h-8 shrink-0 items-center justify-center rounded-md bg-purple-600 px-2.5 text-[11px] font-semibold text-white transition hover:bg-purple-500"
+                                  >
+                                    Add
+                                  </button>
+                                  <span className="hidden text-[9px] text-gray-400 shrink-0 sm:inline">
                                     Enter to add
                                   </span>
                                 </div>
@@ -3900,7 +3927,7 @@ const EditProduct: React.FC = () => {
                           </h2>
                         </div>
                         <div className="space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="grid grid-cols-2 gap-3">
                             <Input
                               label="SKU (Stock Keeping Unit)"
                               type="text"
@@ -4035,7 +4062,7 @@ const EditProduct: React.FC = () => {
                                 </span>
                                 .
                               </p>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div className="grid grid-cols-2 gap-2">
                                 {SHIPPING_REGION_OPTIONS.map((opt) => {
                                   const isSelected =
                                     normalizedShippingRegions.includes(opt.code);
@@ -4094,7 +4121,7 @@ const EditProduct: React.FC = () => {
 
                   {!collapsedSections.additional && (
                     <>
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4">
                         <Input
                           label="Materials"
                           type="text"
@@ -4187,7 +4214,7 @@ const EditProduct: React.FC = () => {
               </>
             )}
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex w-full flex-wrap items-stretch gap-2 md:w-auto md:items-center md:gap-4">
             {!isEditMode && !isCollectionContext && (
               <button
                 onClick={() =>
@@ -4197,7 +4224,7 @@ const EditProduct: React.FC = () => {
                   })
                 }
                 disabled={saving || submitLocked}
-                className="surface-control surface-interactive-hover relative inline-flex min-h-10 items-center justify-center rounded-lg border px-4 py-2 text-sm font-semibold transition disabled:opacity-60"
+                className="surface-control surface-interactive-hover relative inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:opacity-60 md:min-h-10 md:flex-initial md:px-4 md:text-sm"
               >
                 {(saving || submitLocked) && saveAction === "draft" && (
                   <span className="absolute inset-0 flex items-center justify-center">
@@ -4218,7 +4245,7 @@ const EditProduct: React.FC = () => {
                   })
                 }
                 disabled={saving || submitLocked}
-                className="surface-control surface-interactive-hover relative inline-flex min-h-10 items-center justify-center rounded-lg border px-4 py-2 text-sm font-semibold transition disabled:opacity-60"
+                className="surface-control surface-interactive-hover relative inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:opacity-60 md:min-h-10 md:flex-initial md:px-4 md:text-sm"
               >
                 {(saving || submitLocked) && saveAction === "draft" && (
                   <span className="absolute inset-0 flex items-center justify-center">
@@ -4232,7 +4259,7 @@ const EditProduct: React.FC = () => {
             )}
             <button
               onClick={handleDiscard}
-              className="surface-control surface-interactive-hover inline-flex min-h-10 items-center justify-center rounded-lg border px-4 py-2 text-sm font-semibold transition"
+              className="surface-control surface-interactive-hover inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold transition md:min-h-10 md:flex-initial md:px-4 md:text-sm"
             >
               {hasChanges
                 ? "Discard Changes"
@@ -4254,7 +4281,7 @@ const EditProduct: React.FC = () => {
                 })
               }
                 disabled={saving || submitLocked}
-              className="relative inline-flex min-h-10 items-center justify-center rounded-lg bg-purple-600 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 disabled:bg-purple-600/50"
+              className="relative inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 disabled:bg-purple-600/50 md:min-h-10 md:flex-initial md:px-6 md:text-sm"
             >
                 {(saving || submitLocked) && saveAction === "publish" && (
                 <span className="absolute inset-0 flex items-center justify-center">
