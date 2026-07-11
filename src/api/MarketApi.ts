@@ -269,6 +269,36 @@ export interface GetMarketSuggestionsParams {
   excludeIds?: string[];
 }
 
+// ── Early-flight adoption ────────────────────────────────────────────────
+// /boot/early-data.js (classic script, runs before the React bundle even
+// downloads) starts the primary market fetches for anonymous visitors and
+// stashes the promises on window.__WIEZ_EARLY__. Fetchers adopt them once
+// instead of paying the full boot-then-fetch waterfall.
+const consumeEarlyFlight = async (key: string): Promise<unknown | null> => {
+  try {
+    const early = (window as unknown as {
+      __WIEZ_EARLY__?: Record<string, Promise<Response>>;
+    }).__WIEZ_EARLY__;
+    const pending = early?.[key];
+    if (!pending) return null;
+    delete early![key];
+    const response = await pending;
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+};
+
+/** The early flight only covers the default anonymous feed request shape. */
+const isDefaultFeedParams = (params?: GetMarketFeedParams): boolean => {
+  if (!params) return false;
+  const activeKeys = Object.entries(params as Record<string, unknown>)
+    .filter(([, value]) => value !== undefined && value !== null)
+    .map(([key]) => key);
+  return activeKeys.length === 1 && (params as Record<string, unknown>).counts === 'combined';
+};
+
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
@@ -690,13 +720,24 @@ export const marketApi = {
     params?: GetMarketFeedParams,
     options?: { signal?: AbortSignal },
   ): Promise<MarketFeedResponse> {
-    const response = await apiClient.get('/collections/market', {
-      params,
-      signal: options?.signal,
-    });
-    const payload = unwrapApiResponse<MarketFeedResponse | { items?: unknown }>(response.data);
+    // Early flight: /boot/early-data.js starts this exact fetch during JS boot
+    // for anonymous visitors, so the payload is often already downloading (or
+    // done) by the time React mounts. Adopt it instead of refetching.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let responseData: any = null;
+    if (isDefaultFeedParams(params)) {
+      responseData = await consumeEarlyFlight('feed:combined');
+    }
+    if (responseData == null) {
+      const response = await apiClient.get('/collections/market', {
+        params,
+        signal: options?.signal,
+      });
+      responseData = response.data;
+    }
+    const payload = unwrapApiResponse<MarketFeedResponse | { items?: unknown }>(responseData);
     const data =
-      (payload && 'items' in payload ? payload : response.data) as MarketFeedResponse & {
+      (payload && 'items' in payload ? payload : responseData) as MarketFeedResponse & {
         items?: RawMarketItem[];
       };
 
@@ -794,14 +835,27 @@ export const marketApi = {
     params?: GetMarketSectionsParams,
     options?: { signal?: AbortSignal },
   ): Promise<MarketSectionsResponse> {
-    const response = await apiClient.get('/market/sections', {
-      params,
-      signal: options?.signal,
-    });
-    const payload = unwrapApiResponse<MarketSectionsResponse>(response.data);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let responseData: any = null;
+    const hasParams =
+      params &&
+      Object.values(params as Record<string, unknown>).some(
+        (value) => value !== undefined && value !== null,
+      );
+    if (!hasParams) {
+      responseData = await consumeEarlyFlight('sections');
+    }
+    if (responseData == null) {
+      const response = await apiClient.get('/market/sections', {
+        params,
+        signal: options?.signal,
+      });
+      responseData = response.data;
+    }
+    const payload = unwrapApiResponse<MarketSectionsResponse>(responseData);
     const data = payload && Array.isArray(payload.sections)
       ? payload
-      : (response.data as MarketSectionsResponse);
+      : (responseData as MarketSectionsResponse);
     return normalizeMarketSectionsResponse(data);
   },
 

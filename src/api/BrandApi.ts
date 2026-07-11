@@ -75,6 +75,78 @@ type SignedUrlResolveOptions = {
   forceRefresh?: boolean;
 };
 
+// ── Public-URL micro-batching ────────────────────────────────────────────
+// A screen full of cards resolves many fileIds in the same tick; instead of
+// one API round trip PER image (~300-400ms each before the image download can
+// even start), collect ids for a short window and resolve them in ONE
+// POST /uploads/public-urls call. Falls back to the per-id endpoint when the
+// batch endpoint is unavailable (older deployed API).
+const PUBLIC_URL_BATCH_WINDOW_MS = 25;
+const PUBLIC_URL_BATCH_MAX = 50;
+const PUBLIC_URL_BATCH_FAILED = Symbol('public-url-batch-failed');
+type PublicUrlBatchResult = string | null | typeof PUBLIC_URL_BATCH_FAILED;
+let publicUrlBatchQueue: Array<{
+  fileId: string;
+  resolve: (url: PublicUrlBatchResult) => void;
+}> = [];
+let publicUrlBatchTimer: number | null = null;
+let publicUrlBatchEndpointUnavailable = false;
+
+const flushPublicUrlBatch = async () => {
+  publicUrlBatchTimer = null;
+  const queue = publicUrlBatchQueue;
+  publicUrlBatchQueue = [];
+  if (queue.length === 0) return;
+  const ids = Array.from(new Set(queue.map((entry) => entry.fileId)));
+  try {
+    const response = await apiClient.post('/uploads/public-urls', { fileIds: ids });
+    const payload = unwrapApiResponse<{
+      items?: Array<{ fileId?: string; url?: string | null }>;
+    }>(response.data);
+    const items =
+      (payload as { items?: Array<{ fileId?: string; url?: string | null }> })?.items ??
+      (response.data as { items?: Array<{ fileId?: string; url?: string | null }> })?.items ??
+      [];
+    const byId = new Map<string, string | null>();
+    for (const item of items) {
+      if (item && typeof item.fileId === 'string') {
+        byId.set(item.fileId, typeof item.url === 'string' ? item.url : null);
+      }
+    }
+    queue.forEach((entry) => {
+      entry.resolve(byId.has(entry.fileId) ? (byId.get(entry.fileId) as string | null) : null);
+    });
+  } catch (error) {
+    const status =
+      error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { status?: number } }).response?.status
+        : undefined;
+    if (status === 404 || status === 405) {
+      // Older API without the batch endpoint — stop batching this session.
+      publicUrlBatchEndpointUnavailable = true;
+    }
+    queue.forEach((entry) => entry.resolve(PUBLIC_URL_BATCH_FAILED));
+  }
+};
+
+const requestPublicUrlBatched = (fileId: string): Promise<PublicUrlBatchResult> =>
+  new Promise((resolve) => {
+    publicUrlBatchQueue.push({ fileId, resolve });
+    if (publicUrlBatchQueue.length >= PUBLIC_URL_BATCH_MAX) {
+      if (publicUrlBatchTimer !== null) {
+        window.clearTimeout(publicUrlBatchTimer);
+        publicUrlBatchTimer = null;
+      }
+      void flushPublicUrlBatch();
+      return;
+    }
+    if (publicUrlBatchTimer === null) {
+      publicUrlBatchTimer = window.setTimeout(() => {
+        void flushPublicUrlBatch();
+      }, PUBLIC_URL_BATCH_WINDOW_MS);
+    }
+  });
+
 const getPublicUrlCacheKey = (fileId: string) => `public:${fileId}`;
 const getPrivateSignedUrlCacheKey = (fileId: string) => `private:${fileId}`;
 
@@ -1619,7 +1691,26 @@ export const brandApi = {
 
     const request = (async (): Promise<string | null> => {
       try {
-        // Try public endpoint first (no auth required)
+        // Batched resolution first — one round trip for the whole screen.
+        if (!publicUrlBatchEndpointUnavailable && !forceRefresh) {
+          const batched = await requestPublicUrlBatched(cacheKey);
+          if (batched !== PUBLIC_URL_BATCH_FAILED) {
+            if (typeof batched === 'string' && batched) {
+              signedUrlCache.set(publicCacheKey, {
+                url: batched,
+                expiresAt: getSignedUrlCacheExpiresAt(batched),
+              });
+              return batched;
+            }
+            // Batch answered authoritatively: file not publicly resolvable.
+            signedUrlMissingCache.set(
+              publicCacheKey,
+              Date.now() + MISSING_SIGNED_URL_TTL_MS,
+            );
+            return null;
+          }
+          // Batch transport failed — fall through to the per-id endpoint.
+        }
         const response = await apiClient.get(`/uploads/public-url/${cacheKey}`);
         const payload = unwrapApiResponse<{ url?: string }>(response.data);
         const directUrl =

@@ -2,6 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Warm the API connection during JS boot: saves DNS+TCP+TLS (~300-600ms)
+         on the first data request of every session. -->
+    <link rel="preconnect" href="https://api.weaz.me" crossorigin />
+    <link rel="dns-prefetch" href="https://api.weaz.me" />
     <link rel="icon" type="image/svg+xml" href="/brand/wiez-favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="color-scheme" content="light dark" />
@@ -25,6 +29,9 @@
          weaz.me (this froze the boot splash on mobile once already).
          Pre-paint logic lives in external files under /boot/. -->
     <script src="/boot/theme-init.js"></script>
+    <!-- Kick off primary data fetches in parallel with the JS bundle
+         (anonymous visitors) — adopted by the app via window.__WIEZ_EARLY__. -->
+    <script src="/boot/early-data.js"></script>
     <script src="/boot/analytics.js" defer></script>
     <!-- Google Fonts: Playfair Display for elegant product titles -->
     <link rel="preconnect" href="https://fonts.googleapis.com">

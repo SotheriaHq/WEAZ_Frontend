@@ -138,20 +138,14 @@ const StoreEssentials: React.FC = () => {
             )
           : [];
 
-        const prefillCategories = Array.isArray(prefill.brand?.tags)
-          ? normalizeSpecializationSelection(
-              prefill.brand.tags.filter((entry): entry is string => typeof entry === 'string'),
-              BRAND_SPECIALIZATION_OPTIONS,
-            )
-          : [];
-
-        const resolvedCategories =
-          localCategories.length > 0 ? localCategories : prefillCategories;
+        // Chips must NEVER come pre-selected unless the user picked them in
+        // THIS flow (saved store progress). Brand-profile hashtags used to be
+        // mapped onto these chips — users had to unselect choices they never
+        // made (client-reported).
+        const resolvedCategories = localCategories;
 
         if (localCategories.length > 0) {
           setSelected(localCategories);
-        } else if (prefillCategories.length > 0) {
-          setSelected(prefillCategories);
         }
 
         const resolvedDescription =
