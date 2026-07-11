@@ -8,6 +8,8 @@ import OrderChatDrawer from '@/components/messaging/OrderChatDrawer';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { useRealtime } from '@/realtime/RealtimeProvider';
+import useDebounce from '@/hooks/useDebounce';
+import { useCachedResource } from '@/hooks/useCachedResource';
 
 type OrderLineItem = {
   id?: string;
@@ -242,7 +244,6 @@ const OrderManagement: React.FC = () => {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [summaryByOrderId, setSummaryByOrderId] = useState<Record<string, ThreadSummaryByContextItem['summary']>>({});
   const [summary, setSummary] = useState<OrdersSummary>(EMPTY_SUMMARY);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(() => {
     const parsed = Number(searchParams.get('page') || 1);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
@@ -282,65 +283,70 @@ const OrderManagement: React.FC = () => {
     };
   }, []);
 
-  const fetchOrders = useCallback(async () => {
-    if (!brandId) return;
-
-    setLoading(true);
-    try {
-      const data = await brandApi.getOrders(brandId, {
+  // Cache-first orders list: revisiting the Orders tab paints instantly from
+  // the shared query cache (skeleton only on true first load / new filters).
+  // Search stays debounced by keying the query on the debounced value.
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+  const ordersQueryEnabled = Boolean(brandId);
+  const {
+    data: ordersPage,
+    loading: ordersQueryLoading,
+    refetch: refetchOrders,
+  } = useCachedResource<{
+    orders: OrderRecord[];
+    summary: OrdersSummary;
+    totalPages: number;
+    summaryByOrderId: Record<string, ThreadSummaryByContextItem['summary']>;
+  }>({
+    queryKey: ['studio', 'orders', brandId ?? 'none', page, statusFilter, debouncedSearchQuery],
+    enabled: ordersQueryEnabled,
+    queryFn: async () => {
+      const data = await brandApi.getOrders(brandId!, {
         page,
         limit: 10,
         status: statusFilter,
-        q: searchQuery,
+        q: debouncedSearchQuery,
       });
-
-      if (data) {
-        const nextOrders = Array.isArray(data.items) ? data.items : [];
-        setOrders(nextOrders);
-        setSummary(data.summary || EMPTY_SUMMARY);
-        setTotalPages(Number(data.totalPages || data.meta?.totalPages || 1));
-
-        const orderIds = nextOrders.map((order: OrderRecord) => order.id).filter(Boolean);
-        if (orderIds.length > 0) {
-          try {
-            const summaries = await messagingApi.getBulkOrderSummariesForBrand(brandId, orderIds, true);
-            setSummaryByOrderId(
-              (summaries.items || []).reduce<Record<string, ThreadSummaryByContextItem['summary']>>((acc, item) => {
-                acc[item.contextId] = item.summary;
-                return acc;
-              }, {}),
-            );
-          } catch (summaryError) {
-            console.warn('Failed to fetch order message summaries', summaryError);
-            setSummaryByOrderId({});
-          }
-        } else {
-          setSummaryByOrderId({});
-        }
-      } else {
-        setOrders([]);
-        setSummary(EMPTY_SUMMARY);
-        setTotalPages(1);
-        setSummaryByOrderId({});
+      if (!data) {
+        return { orders: [], summary: EMPTY_SUMMARY, totalPages: 1, summaryByOrderId: {} };
       }
-    } catch (error) {
-      console.error('Failed to fetch orders', error);
-      setOrders([]);
-      setSummary(EMPTY_SUMMARY);
-      setTotalPages(1);
-      setSummaryByOrderId({});
-    } finally {
-      setLoading(false);
-    }
-  }, [brandId, page, searchQuery, statusFilter]);
+      const nextOrders = Array.isArray(data.items) ? data.items : [];
+      let nextSummaryByOrderId: Record<string, ThreadSummaryByContextItem['summary']> = {};
+      const orderIds = nextOrders.map((order: OrderRecord) => order.id).filter(Boolean);
+      if (orderIds.length > 0) {
+        try {
+          const summaries = await messagingApi.getBulkOrderSummariesForBrand(brandId!, orderIds, true);
+          nextSummaryByOrderId = (summaries.items || []).reduce<
+            Record<string, ThreadSummaryByContextItem['summary']>
+          >((acc, item) => {
+            acc[item.contextId] = item.summary;
+            return acc;
+          }, {});
+        } catch (summaryError) {
+          console.warn('Failed to fetch order message summaries', summaryError);
+        }
+      }
+      return {
+        orders: nextOrders,
+        summary: data.summary || EMPTY_SUMMARY,
+        totalPages: Number(data.totalPages || data.meta?.totalPages || 1),
+        summaryByOrderId: nextSummaryByOrderId,
+      };
+    },
+  });
+  const loading = ordersQueryEnabled && ordersQueryLoading;
 
   useEffect(() => {
-    const debounce = window.setTimeout(() => {
-      void fetchOrders();
-    }, 300);
+    if (!ordersPage) return;
+    setOrders(ordersPage.orders);
+    setSummary(ordersPage.summary);
+    setTotalPages(ordersPage.totalPages);
+    setSummaryByOrderId(ordersPage.summaryByOrderId);
+  }, [ordersPage]);
 
-    return () => window.clearTimeout(debounce);
-  }, [fetchOrders]);
+  const fetchOrders = useCallback(async () => {
+    refetchOrders();
+  }, [refetchOrders]);
 
   useEffect(() => {
     if (!preselectedOrderId) return;
