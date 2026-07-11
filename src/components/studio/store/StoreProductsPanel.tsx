@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
@@ -12,6 +13,7 @@ import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { unwrapApiResponse } from '@/types/auth';
 import type { CollectionDto } from '@/types/profile';
 import { useDropdownManager } from '@/context/DropdownManagerContext';
+import { useCachedResource } from '@/hooks/useCachedResource';
 import {
   DeleteProductModal,
   ArchiveProductModal,
@@ -315,6 +317,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const user = useSelector((state: RootState) => state.user.profile);
   const dropdownManager = useDropdownManager();
   const isEmbeddedMobile = useEmbeddedSurface() === 'mobile-app';
@@ -336,9 +339,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
 
   const [products, setProducts] = useState<BackendProduct[]>([]);
+  // NOTE: `loading` and `collectionsLoading` come from useCachedResource below
+  // (true only when no cached data exists) — never re-add useState loaders here.
   const [collections, setCollections] = useState<CollectionOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [collectionsLoading, setCollectionsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
   const [total, setTotal] = useState(0);
@@ -394,7 +397,6 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   } | null>(null);
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [activeCollectionProducts, setActiveCollectionProducts] = useState<BackendProduct[]>([]);
-  const [activeCollectionProductsLoading, setActiveCollectionProductsLoading] = useState(false);
   const [activeCollectionProductsPage, setActiveCollectionProductsPage] = useState(1);
   const [activeCollectionProductsLimit, setActiveCollectionProductsLimit] = useState(8);
   const [activeCollectionProductsTotal, setActiveCollectionProductsTotal] = useState(0);
@@ -493,11 +495,6 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     );
   }, [draftCollections]);
 
-  const showDraftCollectionsInProductArea =
-    !loading &&
-    filterStatus === 'draft' &&
-    filteredProducts.length === 0 &&
-    storeDraftCollections.length > 0;
   const primaryProductActionLabel = products.length === 0 ? 'Create Product' : 'Add Product';
 
   const visibleCollections = useMemo(
@@ -720,23 +717,23 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     return () => window.clearInterval(timer);
   }, [hoveredCollectionId, previewSourcesByCollectionId]);
 
-  useEffect(() => {
-    let mounted = true;
+  // Cache-first collections list: revisits paint instantly (no skeleton);
+  // local state stays the render source so the draft-merge effect and other
+  // in-place mutations keep working unchanged.
+  const storeCollectionsQueryKey = useMemo(
+    () => ['store', 'panel', 'collections', user?.id ?? 'anon'] as const,
+    [user?.id],
+  );
 
-    const run = async () => {
-      if (!user?.id) {
-        setCollections([]);
-        setCollectionsLoading(false);
-        return;
-      }
-
-      try {
-        setCollectionsLoading(true);
-        const collectionsRes = await brandApi.getCollections(user.id, {
+  const { data: cachedStoreCollections, loading: collectionsQueryLoading } =
+    useCachedResource<CollectionOption[]>({
+      queryKey: storeCollectionsQueryKey,
+      enabled: Boolean(user?.id),
+      queryFn: async () => {
+        const collectionsRes = await brandApi.getCollections(user!.id, {
           visibility: 'all',
           scope: 'store',
         });
-        if (!mounted) return;
         const mappedCollections: CollectionOption[] = (collectionsRes || [])
           .map((c: CollectionDto) => ({
             id: String(c.id),
@@ -756,20 +753,29 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             updatedAt: typeof c.updatedAt === 'string' ? c.updatedAt : undefined,
             createdAt: typeof c.createdAt === 'string' ? c.createdAt : undefined,
           }));
-        setCollections(mappedCollections.filter((collection) => !isSystemStoreCollection(collection)));
-      } catch {
-        if (!mounted) return;
-        setCollections([]);
-      } finally {
-        if (mounted) setCollectionsLoading(false);
-      }
-    };
+        return mappedCollections.filter((collection) => !isSystemStoreCollection(collection));
+      },
+    });
+  const collectionsLoading = Boolean(user?.id) && collectionsQueryLoading;
 
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [user?.id]);
+  useEffect(() => {
+    if (cachedStoreCollections) {
+      setCollections(cachedStoreCollections);
+    } else if (!user?.id) {
+      setCollections([]);
+    }
+  }, [cachedStoreCollections, user?.id]);
+
+  const updateStoreCollections = useCallback(
+    (updater: (current: CollectionOption[]) => CollectionOption[]) => {
+      setCollections((current) => {
+        const next = updater(current);
+        queryClient.setQueryData(storeCollectionsQueryKey, next);
+        return next;
+      });
+    },
+    [queryClient, storeCollectionsQueryKey],
+  );
 
   useEffect(() => {
     if (!Array.isArray(draftCollections) || draftCollections.length === 0) return;
@@ -812,129 +818,172 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   }, [draftCollections]);
 
   const currentPageCursor = page > 1 ? cursorByPage[page] : undefined;
+  const storeProductsQueryKey = useMemo(
+    () =>
+      [
+        'store',
+        'panel',
+        'products',
+        user?.id ?? 'anon',
+        page,
+        limit,
+        productSortBy,
+        currentPageCursor ?? null,
+        searchQuery.trim(),
+        filterCollection,
+        filterStatus,
+      ] as const,
+    [
+      currentPageCursor,
+      filterCollection,
+      filterStatus,
+      limit,
+      page,
+      productSortBy,
+      searchQuery,
+      user?.id,
+    ],
+  );
+
+  // Cache-first products list: revisits paint instantly from the shared query
+  // cache (skeleton only on true first load / new filter combinations).
+  // Local `products` state stays the render source so optimistic mutations
+  // (delete filtering, sync-event refresh) keep working unchanged.
+  const productsQueryEnabled = outletView === 'products' && Boolean(user?.id);
+  const {
+    data: productsPage,
+    loading: productsQueryLoading,
+    error: productsQueryError,
+    refetch: refetchProducts,
+  } = useCachedResource<{
+    items: BackendProduct[];
+    total: number;
+    nextCursor: string | null;
+  }>({
+    queryKey: storeProductsQueryKey,
+    enabled: productsQueryEnabled,
+    queryFn: async ({ signal }) => {
+      const productsRes = await apiClient.get<Partial<ProductsResponse>>(`/brands/${user!.id}/products`, {
+        signal,
+        params: {
+          page,
+          limit,
+          sortBy: productSortBy,
+          cursor: currentPageCursor ?? undefined,
+          search: searchQuery.trim() ? searchQuery.trim() : undefined,
+          collectionId: filterCollection !== 'all' ? filterCollection : undefined,
+          isActive:
+            filterStatus === 'active'
+              ? true
+              : filterStatus === 'draft'
+                ? false
+                : undefined,
+          isFeatured: filterStatus === 'featured' ? true : undefined,
+          includeDeleted: filterStatus === 'deleted' ? true : undefined,
+          onlyDeleted: filterStatus === 'deleted' ? true : undefined,
+        },
+      });
+      const productsPayload = unwrapApiResponse<Partial<ProductsResponse>>(productsRes.data);
+      const items = Array.isArray(productsPayload?.items)
+        ? (productsPayload.items as BackendProduct[])
+        : [];
+      return {
+        items,
+        total: typeof productsPayload?.total === 'number' ? productsPayload.total : items.length,
+        nextCursor:
+          typeof productsPayload?.nextCursor === 'string' && productsPayload.nextCursor.length > 0
+            ? productsPayload.nextCursor
+            : null,
+      };
+    },
+  });
+  const loading = productsQueryEnabled && productsQueryLoading;
 
   useEffect(() => {
-    let mounted = true;
+    if (!productsPage) return;
+    setProducts(productsPage.items);
+    setTotal(productsPage.total);
+    const nextCursor = productsPage.nextCursor;
+    if (nextCursor) {
+      setCursorByPage((prev) =>
+        prev[page + 1] === nextCursor ? prev : { ...prev, [page + 1]: nextCursor },
+      );
+    }
+  }, [productsPage, page]);
 
-    const run = async () => {
-      if (outletView !== 'products') {
-        if (mounted) setLoading(false);
-        return;
-      }
+  useEffect(() => {
+    if (!productsQueryError) return;
+    const message =
+      (productsQueryError as any)?.response?.data?.message ?? 'Failed to load products';
+    toast.error(typeof message === 'string' ? message : 'Failed to load products');
+  }, [productsQueryError]);
 
-      if (!user?.id) {
-        setLoading(false);
-        return;
-      }
+  const showDraftCollectionsInProductArea =
+    !loading &&
+    filterStatus === 'draft' &&
+    filteredProducts.length === 0 &&
+    storeDraftCollections.length > 0;
 
-      try {
-        setLoading(true);
-
-        const productsRes = await apiClient.get<Partial<ProductsResponse>>(`/brands/${user.id}/products`, {
+  const activeCollectionProductsQueryEnabled =
+    outletView === 'collections' && Boolean(user?.id && activeCollectionId);
+  const {
+    data: activeCollectionProductsPageData,
+    loading: activeCollectionProductsLoading,
+    error: activeCollectionProductsError,
+  } = useCachedResource<{
+    items: BackendProduct[];
+    total: number;
+  }>({
+    queryKey: [
+      'store',
+      'panel',
+      'collectionProducts',
+      user?.id ?? 'anon',
+      activeCollectionId ?? 'none',
+      activeCollectionProductsPage,
+      activeCollectionProductsLimit,
+    ],
+    enabled: activeCollectionProductsQueryEnabled,
+    queryFn: async ({ signal }) => {
+      const response = await apiClient.get<Partial<ProductsResponse>>(
+        `/brands/${user!.id}/products`,
+        {
+          signal,
           params: {
-            page,
-            limit,
-            sortBy: productSortBy,
-            cursor: currentPageCursor ?? undefined,
-            search: searchQuery.trim() ? searchQuery.trim() : undefined,
-            collectionId: filterCollection !== 'all' ? filterCollection : undefined,
-            isActive:
-              filterStatus === 'active'
-                ? true
-                : filterStatus === 'draft'
-                  ? false
-                  : undefined,
-            isFeatured: filterStatus === 'featured' ? true : undefined,
-            includeDeleted: filterStatus === 'deleted' ? true : undefined,
-            onlyDeleted: filterStatus === 'deleted' ? true : undefined,
+            page: activeCollectionProductsPage,
+            limit: activeCollectionProductsLimit,
+            sortBy: 'newest',
+            collectionId: activeCollectionId,
+            includeDeleted: false,
           },
-        });
-
-        if (!mounted) return;
-
-        const productsPayload = unwrapApiResponse<Partial<ProductsResponse>>(productsRes.data);
-        const items = Array.isArray(productsPayload?.items)
-          ? (productsPayload.items as BackendProduct[])
-          : [];
-        setProducts(items);
-        setTotal(typeof productsPayload?.total === 'number' ? productsPayload.total : items.length);
-
-        const nextCursor = productsPayload?.nextCursor;
-        if (typeof nextCursor === 'string' && nextCursor.length > 0) {
-          setCursorByPage((prev) => ({ ...prev, [page + 1]: nextCursor }));
-        }
-      } catch (e) {
-        const message = (e as any)?.response?.data?.message ?? 'Failed to load products';
-        toast.error(typeof message === 'string' ? message : 'Failed to load products');
-        if (!mounted) return;
-        setProducts([]);
-        setTotal(0);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [currentPageCursor, filterCollection, filterStatus, limit, outletView, page, productSortBy, searchQuery, user?.id]);
+        },
+      );
+      const payload = unwrapApiResponse<Partial<ProductsResponse>>(response.data);
+      const items = Array.isArray(payload?.items) ? (payload.items as BackendProduct[]) : [];
+      return {
+        items,
+        total: typeof payload?.total === 'number' ? payload.total : items.length,
+      };
+    },
+  });
 
   useEffect(() => {
-    let mounted = true;
+    if (!activeCollectionProductsQueryEnabled) {
+      setActiveCollectionProducts([]);
+      setActiveCollectionProductsTotal(0);
+      return;
+    }
+    if (!activeCollectionProductsPageData) return;
+    setActiveCollectionProducts(activeCollectionProductsPageData.items);
+    setActiveCollectionProductsTotal(activeCollectionProductsPageData.total);
+  }, [activeCollectionProductsPageData, activeCollectionProductsQueryEnabled]);
 
-    const run = async () => {
-      if (!user?.id || !activeCollectionId || outletView !== 'collections') {
-        if (mounted) {
-          setActiveCollectionProducts([]);
-          setActiveCollectionProductsTotal(0);
-        }
-        return;
-      }
-
-      try {
-        setActiveCollectionProductsLoading(true);
-        const response = await apiClient.get<Partial<ProductsResponse>>(
-          `/brands/${user.id}/products`,
-          {
-            params: {
-              page: activeCollectionProductsPage,
-              limit: activeCollectionProductsLimit,
-              sortBy: 'newest',
-              collectionId: activeCollectionId,
-              includeDeleted: false,
-            },
-          },
-        );
-
-        if (!mounted) return;
-        const payload = unwrapApiResponse<Partial<ProductsResponse>>(response.data);
-        const items = Array.isArray(payload?.items) ? (payload.items as BackendProduct[]) : [];
-        setActiveCollectionProducts(items);
-        setActiveCollectionProductsTotal(
-          typeof payload?.total === 'number' ? payload.total : items.length,
-        );
-      } catch {
-        if (!mounted) return;
-        setActiveCollectionProducts([]);
-        setActiveCollectionProductsTotal(0);
-        toast.error('Failed to load products for this collection.');
-      } finally {
-        if (mounted) setActiveCollectionProductsLoading(false);
-      }
-    };
-
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [
-    activeCollectionId,
-    activeCollectionProductsLimit,
-    activeCollectionProductsPage,
-    outletView,
-    user?.id,
-  ]);
+  useEffect(() => {
+    if (!activeCollectionProductsError) return;
+    setActiveCollectionProducts([]);
+    setActiveCollectionProductsTotal(0);
+    toast.error('Failed to load products for this collection.');
+  }, [activeCollectionProductsError]);
 
   useEffect(() => {
     if (outletView !== 'products') return;
@@ -1053,49 +1102,12 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     }
   }, [loading, outletView, products]);
 
+  // Revalidate through the shared cache — the sync effect above applies the
+  // fresh page to local state.
   const refresh = useCallback(async () => {
     if (!user?.id) return;
-    const productsRes = await apiClient.get<Partial<ProductsResponse>>(`/brands/${user.id}/products`, {
-      params: {
-        page,
-        limit,
-        sortBy: productSortBy,
-        cursor: currentPageCursor ?? undefined,
-        search: searchQuery.trim() ? searchQuery.trim() : undefined,
-        collectionId: filterCollection !== 'all' ? filterCollection : undefined,
-        isActive:
-          filterStatus === 'active'
-            ? true
-            : filterStatus === 'draft'
-              ? false
-              : undefined,
-        isFeatured: filterStatus === 'featured' ? true : undefined,
-        includeDeleted: filterStatus === 'deleted' ? true : undefined,
-        onlyDeleted: filterStatus === 'deleted' ? true : undefined,
-      },
-    });
-
-    const productsPayload = unwrapApiResponse<Partial<ProductsResponse>>(productsRes.data);
-    const items = Array.isArray(productsPayload?.items)
-      ? (productsPayload.items as BackendProduct[])
-      : [];
-    setProducts(items);
-    setTotal(typeof productsPayload?.total === 'number' ? productsPayload.total : items.length);
-
-    const nextCursor = productsPayload?.nextCursor;
-    if (typeof nextCursor === 'string' && nextCursor.length > 0) {
-      setCursorByPage((prev) => ({ ...prev, [page + 1]: nextCursor }));
-    }
-  }, [
-    currentPageCursor,
-    filterCollection,
-    filterStatus,
-    limit,
-    page,
-    productSortBy,
-    searchQuery,
-    user?.id,
-  ]);
+    await refetchProducts();
+  }, [refetchProducts, user?.id]);
 
   useEffect(() => {
     if (outletView !== 'products') return;
@@ -1483,7 +1495,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         toast.error('Unable to archive collection.');
         return;
       }
-      setCollections((prev) =>
+      updateStoreCollections((prev) =>
         prev.map((item) =>
           item.id === collection.id ? { ...item, status: 'ARCHIVED', isAvailableInStore: false } : item,
         ),
@@ -1505,7 +1517,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         toast.error('Unable to unarchive collection.');
         return;
       }
-      setCollections((prev) =>
+      updateStoreCollections((prev) =>
         prev.map((item) =>
           item.id === collection.id ? { ...item, status: item.status === 'ARCHIVED' ? 'DRAFT' : item.status } : item,
         ),
@@ -1527,7 +1539,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         toast.error('Unable to delete collection.');
         return;
       }
-      setCollections((prev) => prev.filter((item) => item.id !== collection.id));
+      updateStoreCollections((prev) => prev.filter((item) => item.id !== collection.id));
       toast.success('Collection deleted. Products are unchanged.');
     } catch (error) {
       const message = (error as any)?.response?.data?.message ?? 'Unable to delete collection.';
@@ -1574,7 +1586,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         toast.success('Collection duplicated.');
         return;
       }
-      setCollections((prev) => [mapped, ...prev.filter((item) => item.id !== mapped.id)]);
+      updateStoreCollections((prev) => [mapped, ...prev.filter((item) => item.id !== mapped.id)]);
       toast.success('Collection duplicated.');
     } catch (error) {
       const message = (error as any)?.response?.data?.message ?? 'Unable to duplicate collection.';
@@ -1627,7 +1639,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         }
       });
 
-      setCollections((prev) => prev.filter((collection) => !deletedIds.has(collection.id)));
+      updateStoreCollections((prev) => prev.filter((collection) => !deletedIds.has(collection.id)));
       if (activeCollectionId && deletedIds.has(activeCollectionId)) {
         handleCloseActiveCollectionView();
       }

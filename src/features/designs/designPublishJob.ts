@@ -104,17 +104,24 @@ async function prepareFiles(
         return { file, viewSlot };
       }
 
+      let localFailureReason: 'preprocess-failed' | 'still-over-limit' | null = null;
       try {
         const processed = await preprocessImageFile(file, 'detail', { maxSizeBytes });
         if (processed.file.size <= maxSizeBytes) {
           return { file: processed.file, viewSlot };
         }
+        localFailureReason = 'still-over-limit';
       } catch {
-        /* fall through to server transcode */
+        localFailureReason = 'preprocess-failed';
       }
 
       const sniffed = await sniffImageFormat(file);
-      if (!isUnreadableSniff(sniffed) && !isBrowserDisplayableSniff(sniffed)) {
+      if (
+        !isUnreadableSniff(sniffed) &&
+        (file.size > maxSizeBytes ||
+          localFailureReason === 'still-over-limit' ||
+          !isBrowserDisplayableSniff(sniffed))
+      ) {
         try {
           const transcoded = await getNormalizedImageFile(file);
           if (transcoded.size <= maxSizeBytes) {

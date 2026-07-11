@@ -28,7 +28,8 @@ import { ProfilePhotoViewApi } from '@/api/ProfilePhotoViewApi';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
 import { finalizeDesignUploads } from '@/api/DesignApi';
 import ProfileHeaderQuickEditModal from '../../components/profile/ProfileHeaderQuickEditModal';
-import type { BrandProfileDto, CollectionDto } from '../../types/profile';
+import type { BrandProfileDto, CollectionDto, ReviewRatingDistributionItem } from '../../types/profile';
+import type { ProductReviewResponse } from '../../api/ReviewsApi';
 import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedFileUrl';
 import type { StoreStatusResponse } from '../../api/StoreApi';
 import CatalogShopTab from '@/components/catalog/CatalogShopTab';
@@ -72,6 +73,12 @@ import ComingSoon from '../placeholders/ComingSoon';
 
 type TabType = 'Content' | 'Store' | 'Reviews' | 'Us' | 'Drafts';
 type VisibilityFilter = CatalogVisibilityFilter;
+type BrandReviewsCache = {
+  reviews: ProductReviewResponse[];
+  averageRating: number;
+  totalReviews: number;
+  ratingDistribution: ReviewRatingDistributionItem[];
+};
 const VISIBILITY_FILTERS: VisibilityFilter[] = ['Public', 'Private'];
 const OWNER_VISIBILITY_FILTERS: VisibilityFilter[] = [
   'Public',
@@ -491,6 +498,29 @@ const ProfilePage: React.FC = () => {
   }, [fetchCollections, isOwner, location.pathname, location.search, location.state, navigate, publishTasks, user?.id]);
 
   const isEditModalOpen = searchParams.get('modal') === 'brand-setup';
+  const activeReviewsBrandId = isOwner
+    ? user?.id ?? null
+    : isVisitorView
+      ? routeBrandId ?? null
+      : null;
+  const cachedReviewsForActiveBrand = activeReviewsBrandId
+    ? queryClient.getQueryData<BrandReviewsCache>(queryKeys.reviews.brand(activeReviewsBrandId))
+    : undefined;
+  const hasLoadedActiveReviews =
+    Boolean(activeReviewsBrandId) && loadedReviewsBrandId === activeReviewsBrandId;
+  const reviewsDisplayData: BrandReviewsCache = hasLoadedActiveReviews
+    ? { reviews, averageRating, totalReviews, ratingDistribution }
+    : cachedReviewsForActiveBrand ?? {
+        reviews: [],
+        averageRating: 0,
+        totalReviews: 0,
+        ratingDistribution: [],
+      };
+  const reviewsTabLoading =
+    Boolean(activeReviewsBrandId) &&
+    !hasLoadedActiveReviews &&
+    !cachedReviewsForActiveBrand &&
+    reviewsLoading;
 
   const getHasDismissedBrandSetup = useCallback(() => {
     const DISMISS_KEY = 'threadly.brandProfileSetup.dismissedUntil';
@@ -505,24 +535,17 @@ const ProfilePage: React.FC = () => {
       return;
     }
 
-    if (isOwner && user?.id && loadedReviewsBrandId !== user.id && !reviewsLoading) {
-      void fetchReviews(user.id);
-    }
-
-    if (isVisitorView && routeBrandId && loadedReviewsBrandId !== routeBrandId && !reviewsLoading) {
-      void fetchReviews(routeBrandId);
+    if (activeReviewsBrandId && loadedReviewsBrandId !== activeReviewsBrandId && !reviewsLoading) {
+      void fetchReviews(activeReviewsBrandId);
     }
   }, [
     activeTab,
+    activeReviewsBrandId,
     fetchReviews,
-    isOwner,
-    isVisitorView,
     loadedReviewsBrandId,
     reviewFlags.readEnabled,
     reviewFlagsLoading,
     reviewsLoading,
-    routeBrandId,
-    user?.id,
   ]);
 
 
@@ -2431,11 +2454,11 @@ const ProfilePage: React.FC = () => {
                 <ReviewsTab
                   brandId={shopBrandId || routeBrandId || user?.id || null}
                   currentUserId={user?.id || null}
-                  reviews={reviews}
-                  averageRating={averageRating}
-                  totalReviews={totalReviews}
-                  ratingDistribution={ratingDistribution}
-                  isLoading={reviewsLoading}
+                  reviews={reviewsDisplayData.reviews}
+                  averageRating={reviewsDisplayData.averageRating}
+                  totalReviews={reviewsDisplayData.totalReviews}
+                  ratingDistribution={reviewsDisplayData.ratingDistribution}
+                  isLoading={reviewsTabLoading}
                   isOwner={isOwner}
                   brandRepliesEnabled={reviewFlags.brandRepliesEnabled}
                 />

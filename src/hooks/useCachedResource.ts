@@ -60,7 +60,7 @@ export interface CachedResource<T> {
   fetching: boolean;
   error: Error | null;
   /** Force an immediate revalidation (e.g. a manual "Retry"/"Refresh" button). */
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 
 export function useCachedResource<T>(
@@ -82,8 +82,8 @@ export function useCachedResource<T>(
     loading: query.isLoading,
     fetching: query.isFetching,
     error: (query.error as Error | null) ?? null,
-    refetch: () => {
-      void query.refetch();
+    refetch: async () => {
+      await query.refetch();
     },
   };
 }

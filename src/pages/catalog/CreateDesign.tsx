@@ -54,6 +54,7 @@ import InfoTooltip from "@/components/ui/InfoTooltip";
 import type { MediaItem } from "@/types/media";
 import { MediaProvider, useMediaStore } from "../../hooks/useMediaStore";
 import useDesignUpload from "../../hooks/useDesignUpload";
+import useCachedResource from "@/hooks/useCachedResource";
 import { useBrandProfile } from "../../hooks/UseBrandHook";
 import { useQueryClient } from "@tanstack/react-query";
 import { refreshOwnerCatalogQueries } from "@/query/queries";
@@ -279,13 +280,13 @@ const CreateDesignInner: React.FC = () => {
   const [maxPrice, setMaxPrice] = useState("");
   const [isMadeToOrder, setIsMadeToOrder] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>(
+    () => [...DEFAULT_HASHTAG_SUGGESTIONS],
+  );
   const [tagSearch, setTagSearch] = useState("");
   const [tagSearchResults, setTagSearchResults] = useState<string[]>([]);
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [showAllTags, setShowAllTags] = useState(false);
-  const [loadingCategories, setLoadingCategories] = useState(true);
-  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [categoryId, setCategoryId] = useState<string>("");
   const [categoryTypeId, setCategoryTypeId] = useState<string>("");
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({});
@@ -391,6 +392,72 @@ const CreateDesignInner: React.FC = () => {
   }, [location.pathname, location.search]);
   const requiresEmailVerification = !isEditMode && user?.isEmailVerified === false;
 
+  const { data: categories = [], loading: loadingCategories } =
+    useCachedResource<CategoryOption[]>({
+      queryKey: ['design-create', 'categories-with-subcategories'],
+      queryFn: async () => {
+        const cats = await brandApi.getCategoriesWithSubCategories(false);
+        if (!Array.isArray(cats)) return [];
+        return cats.map((c) => ({
+          id: c.id,
+          slug: c.slug,
+          name: c.name,
+          types: Array.isArray(c.types)
+            ? c.types.map((t) => ({
+                id: t.id,
+                slug: t.slug,
+                name: t.name,
+                categoryId: t.categoryId,
+              }))
+            : [],
+        }));
+      },
+      staleTime: 30 * 60 * 1000,
+      gcTime: 60 * 60 * 1000,
+    });
+
+  const { data: cachedTagSuggestions } = useCachedResource<string[]>({
+    queryKey: ['design-create', 'tag-suggestions', 80],
+    queryFn: async () => {
+      const suggestions = await TagsApi.getSuggestions(80);
+      return Array.isArray(suggestions) && suggestions.length > 0
+        ? suggestions
+        : DEFAULT_HASHTAG_SUGGESTIONS;
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+  });
+
+  const { data: storePolicyDefaults } = useCachedResource<{
+    processingTime: string;
+    customOrderLeadTime: string;
+  }>({
+    queryKey: ['design-create', 'store-policy-defaults', user?.id ?? 'anon'],
+    enabled: Boolean(user?.id),
+    queryFn: async () => {
+      const policies = await getStorePolicies();
+      return {
+        processingTime: policies.processingTime || '',
+        customOrderLeadTime: policies.shippingRules?.customOrderSettings?.leadTime || '',
+      };
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  useEffect(() => {
+    if (!cachedTagSuggestions) return;
+    setTagSuggestions((current) =>
+      Array.from(new Set([...cachedTagSuggestions, ...current])),
+    );
+  }, [cachedTagSuggestions]);
+
+  useEffect(() => {
+    if (!storePolicyDefaults) return;
+    setStoreProcessingTime(storePolicyDefaults.processingTime);
+    setStoreCustomOrderLeadTime(storePolicyDefaults.customOrderLeadTime);
+  }, [storePolicyDefaults]);
+
   const disabled = false;
   const isInReview = publicationStatus === 'IN_REVIEW';
   const titleDescriptionLocked = useMemo(() => {
@@ -428,61 +495,6 @@ const CreateDesignInner: React.FC = () => {
   // this effect and spamming APIs; run only on mount or when edit id changes.
   useEffect(() => {
     let mounted = true;
-
-    const loadTagSuggestions = async () => {
-      try {
-        // `/tags` returns the full approved tag catalog. Only fall back to the
-        // curated default pool if the catalog is genuinely empty/unreachable
-        // (e.g. an environment whose tag seed hasn't been run yet).
-        const s = await TagsApi.getSuggestions(80);
-        const list = Array.isArray(s) && s.length > 0 ? s : DEFAULT_HASHTAG_SUGGESTIONS;
-        if (mounted) setTagSuggestions(list);
-      } catch (error) {
-        console.warn("Failed to load tag suggestions", error);
-        if (mounted) setTagSuggestions([...DEFAULT_HASHTAG_SUGGESTIONS]);
-      }
-    };
-
-    const loadCategories = async () => {
-      try {
-        const cats = await brandApi.getCategoriesWithSubCategories(true);
-        if (!mounted || !Array.isArray(cats)) return;
-        const mapped = cats.map((c) => ({
-          id: c.id,
-          slug: c.slug,
-          name: c.name,
-          types: Array.isArray(c.types)
-            ? c.types.map((t) => ({
-                id: t.id,
-                slug: t.slug,
-                name: t.name,
-                categoryId: t.categoryId,
-              }))
-            : [],
-        }));
-        setCategories(mapped);
-      } catch (error) {
-        console.warn("Failed to load categories", error);
-        if (mounted) setCategories([]);
-      } finally {
-        if (mounted) setLoadingCategories(false);
-      }
-    };
-
-    const loadStoreProcessingDefaults = async () => {
-      try {
-        const policies = await getStorePolicies();
-        if (!mounted) return;
-        setStoreProcessingTime(policies.processingTime || '');
-        setStoreCustomOrderLeadTime(
-          policies.shippingRules?.customOrderSettings?.leadTime || '',
-        );
-      } catch {
-        if (!mounted) return;
-        setStoreProcessingTime('');
-        setStoreCustomOrderLeadTime('');
-      }
-    };
 
     const loadDesignDetail = async () => {
       if (!isEditMode || !id) return;
@@ -569,10 +581,7 @@ const CreateDesignInner: React.FC = () => {
     };
 
     void Promise.all([
-      loadTagSuggestions(),
-      loadCategories(),
       loadDesignDetail(),
-      loadStoreProcessingDefaults(),
     ]);
 
     return () => {

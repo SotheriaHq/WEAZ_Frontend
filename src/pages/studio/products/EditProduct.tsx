@@ -18,6 +18,7 @@ import {
 
 } from "lucide-react";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import VLoader from "@/components/loaders/VLoader";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
@@ -28,6 +29,7 @@ import MediaRenderer from "@/components/media/MediaRenderer";
 import {
   productApi,
   type ProductCreateDto,
+  type ProductDto,
   type Category,
   type ProductVariant,
 } from "@/api/ProductApi";
@@ -81,6 +83,11 @@ import {
   getStoreProcessingTimeLabel,
 } from "@/utils/storeProcessing";
 import { preprocessImageFile } from "@/utils/imagePreprocess";
+import {
+  isBrowserDisplayableSniff,
+  isUnreadableSniff,
+  sniffImageFormat,
+} from "@/utils/imageByteSniff";
 import { WEB_UPLOAD_POLICIES } from "@/utils/uploadValidation";
 import { getNormalizedImageFile } from "@/api/UploadApi";
 import {
@@ -100,6 +107,7 @@ import {
   toBackendMediaViewSlot,
   type MediaViewSlot,
 } from "@/utils/contentIntegrity";
+import { queryKeys } from "@/query/queryKeys";
 
 function toSkuToken(input: string): string {
   const cleaned = input
@@ -462,6 +470,7 @@ const EditProduct: React.FC = () => {
     [location.search],
   );
   const user = useSelector((state: RootState) => state.user.profile);
+  const queryClient = useQueryClient();
 
   const isEditMode = Boolean(productId);
   const isCollectionContext = returnContext === "collection";
@@ -489,6 +498,13 @@ const EditProduct: React.FC = () => {
     !isEditMode && user?.type === "BRAND" && user?.isEmailVerified === false;
   const requiresCatalogProfileSetup =
     !isEditMode && user?.type === "BRAND" && !isBrandProfileComplete(user);
+  const productDetailQueryKey = useMemo(
+    () => queryKeys.store.product(productId, { includeDeleted }),
+    [includeDeleted, productId],
+  );
+  const cachedProductDetail = productId
+    ? queryClient.getQueryData<ProductDto | null>(productDetailQueryKey)
+    : undefined;
 
   // State
   const [form, setForm] = useState<FormState>(defaultFormState);
@@ -502,7 +518,9 @@ const EditProduct: React.FC = () => {
     Record<string, string>
   >({});
   const [categoryTypes, setCategoryTypes] = useState<CategoryTypeOption[]>([]);
-  const [loading, setLoading] = useState(isEditMode);
+  const [loading, setLoading] = useState(
+    () => isEditMode && cachedProductDetail === undefined,
+  );
   const [saving, setSaving] = useState(false);
   const [shippingRegions, setShippingRegions] = useState<string[]>([
     defaultFormState.customsRegion,
@@ -983,11 +1001,16 @@ const EditProduct: React.FC = () => {
     let mounted = true;
     const loadProduct = async () => {
       try {
-        setLoading(true);
-        const product = await productApi.getProduct(
-          productId,
-          includeDeleted ? { includeDeleted: true } : undefined,
-        );
+        const cached = queryClient.getQueryData<ProductDto | null>(productDetailQueryKey);
+        setLoading(cached === undefined);
+        const product = await queryClient.fetchQuery({
+          queryKey: productDetailQueryKey,
+          queryFn: () =>
+            productApi.getProduct(
+              productId,
+              includeDeleted ? { includeDeleted: true } : undefined,
+            ),
+        });
         if (!product || !mounted) return;
         const resolvedStatus = (() => {
           const rawStatus = String((product as any).status || "").toUpperCase();
@@ -1136,7 +1159,7 @@ const EditProduct: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [includeDeleted, isEditMode, productId, navigate]);
+  }, [includeDeleted, isEditMode, productDetailQueryKey, productId, navigate, queryClient]);
 
   const effectiveCollectionId = useMemo(
     () => (isCollectionFlow ? collectionContextId || form.categoryId : form.categoryId),
@@ -2431,8 +2454,21 @@ const EditProduct: React.FC = () => {
 
   const preprocessProductMediaFiles = useCallback(async (files: File[]) => {
     const maxSizeBytes = WEB_UPLOAD_POLICIES.productMedia.maxSizeBytes;
+    const isAlreadyUploadReady = (file: File) => {
+      const type = file.type.trim().toLowerCase();
+      if (file.size > maxSizeBytes) return false;
+      if (/image\/(jpeg|png|webp|gif)/i.test(type)) return true;
+      if (/\.pre\.(jpe?g|png)$/i.test(file.name)) return true;
+      return false;
+    };
+
     const prepResults = await Promise.all(
       files.map(async (file) => {
+        if (isAlreadyUploadReady(file)) {
+          return { ok: true as const, file, optimized: false };
+        }
+
+        let localFailureReason: 'preprocess-failed' | 'still-over-limit' | null = null;
         try {
           const processed = await preprocessImageFile(file, "detail", {
             maxSizeBytes,
@@ -2440,17 +2476,29 @@ const EditProduct: React.FC = () => {
           if (processed.file.size <= maxSizeBytes) {
             return { ok: true as const, file: processed.file, optimized: !processed.skipped };
           }
+          localFailureReason = 'still-over-limit';
         } catch {
-          /* Local decode failed (HEIC named .jpg, blocked canvas) — try server. */
+          localFailureReason = 'preprocess-failed';
         }
+
         try {
-          const transcoded = await getNormalizedImageFile(file);
-          if (transcoded.size <= maxSizeBytes) {
-            return { ok: true as const, file: transcoded, optimized: true };
+          const sniffedFormat = await sniffImageFormat(file);
+          const needsServerTranscode =
+            !isUnreadableSniff(sniffedFormat) &&
+            (file.size > maxSizeBytes ||
+              localFailureReason === 'still-over-limit' ||
+              !isBrowserDisplayableSniff(sniffedFormat));
+
+          if (needsServerTranscode) {
+            const transcoded = await getNormalizedImageFile(file);
+            if (transcoded.size <= maxSizeBytes) {
+              return { ok: true as const, file: transcoded, optimized: true };
+            }
           }
         } catch {
           /* Server normalize unavailable — fall through to raw checks. */
         }
+
         return file.size <= maxSizeBytes
           ? { ok: true as const, file, optimized: false }
           : { ok: false as const, file };

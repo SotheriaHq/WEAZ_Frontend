@@ -21,6 +21,20 @@ import {
 } from '@/query/queries';
 import { queryKeys } from '@/query/queryKeys';
 
+type BrandReviewsData = {
+  reviews: ProductReviewResponse[];
+  averageRating: number;
+  totalReviews: number;
+  ratingDistribution: ReviewRatingDistributionItem[];
+};
+
+const EMPTY_BRAND_REVIEWS: BrandReviewsData = {
+  reviews: [],
+  averageRating: 0,
+  totalReviews: 0,
+  ratingDistribution: [],
+};
+
 const areStringArraysEqual = (left: string[] | null | undefined, right: string[] | null | undefined) => {
   if (left === right) return true;
   if (!left || !right) return left === right;
@@ -243,6 +257,9 @@ export const useBrandProfile = () => {
   const brandDetailEndpointsEnabled = env.featureFlags.brandDetailEndpoints;
   const { flags: reviewFlags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
   const queryClient = useQueryClient();
+  const initialOwnerReviews = ownerBrandId
+    ? queryClient.getQueryData<BrandReviewsData>(queryKeys.reviews.brand(ownerBrandId))
+    : undefined;
 
   const ownerCollectionsQuery = useBrandCollectionsQuery(
     { ownerId: ownerBrandId, visibility: 'all', scope: 'design' },
@@ -284,13 +301,23 @@ export const useBrandProfile = () => {
   }, [brandProfile]);
 
   // Reviews state
-  const [reviews, setReviews] = useState<ProductReviewResponse[]>([]);
-  const [averageRating, setAverageRating] = useState(0);
-  const [totalReviews, setTotalReviews] = useState(0);
-  const [ratingDistribution, setRatingDistribution] = useState<ReviewRatingDistributionItem[]>([]);
+  const [reviews, setReviews] = useState<ProductReviewResponse[]>(
+    () => initialOwnerReviews?.reviews ?? [],
+  );
+  const [averageRating, setAverageRating] = useState(
+    () => initialOwnerReviews?.averageRating ?? 0,
+  );
+  const [totalReviews, setTotalReviews] = useState(
+    () => initialOwnerReviews?.totalReviews ?? 0,
+  );
+  const [ratingDistribution, setRatingDistribution] = useState<ReviewRatingDistributionItem[]>(
+    () => initialOwnerReviews?.ratingDistribution ?? [],
+  );
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
-  const [loadedReviewsBrandId, setLoadedReviewsBrandId] = useState<string | null>(null);
+  const [loadedReviewsBrandId, setLoadedReviewsBrandId] = useState<string | null>(
+    () => (initialOwnerReviews ? ownerBrandId : null),
+  );
 
   // Render-phase mirror (NOT an effect): with a warm react-query cache the
   // first committed frame already carries the owner's collections. The effect
@@ -398,30 +425,45 @@ export const useBrandProfile = () => {
 
   // Fetch reviews
   const fetchReviews = useCallback(async (brandId: string) => {
+    const applyReviews = (data: BrandReviewsData) => {
+      setReviews(data.reviews);
+      setAverageRating(data.averageRating);
+      setTotalReviews(data.totalReviews);
+      setRatingDistribution(data.ratingDistribution);
+      setLoadedReviewsBrandId(brandId);
+    };
+
     if (reviewFlagsLoading) {
       return;
     }
 
     if (!reviewFlags.readEnabled) {
-      setReviews([]);
-      setAverageRating(0);
-      setTotalReviews(0);
-      setRatingDistribution([]);
+      applyReviews(EMPTY_BRAND_REVIEWS);
       setReviewsError(null);
       setReviewsLoading(false);
       setLoadedReviewsBrandId(null);
       return;
     }
 
-    setReviewsLoading(true);
+    const cacheKey = queryKeys.reviews.brand(brandId);
+    const cached = queryClient.getQueryData<BrandReviewsData>(cacheKey);
+    if (cached) {
+      applyReviews(cached);
+      setReviewsLoading(false);
+    } else {
+      setReviews([]);
+      setAverageRating(0);
+      setTotalReviews(0);
+      setRatingDistribution([]);
+      setReviewsLoading(true);
+    }
     setReviewsError(null);
     try {
-      const data = await brandApi.getReviews(brandId);
-      setReviews(data.reviews);
-      setAverageRating(data.averageRating);
-      setTotalReviews(data.totalReviews);
-      setRatingDistribution(data.ratingDistribution);
-      setLoadedReviewsBrandId(brandId);
+      const data = await queryClient.fetchQuery({
+        queryKey: cacheKey,
+        queryFn: () => brandApi.getReviews(brandId),
+      });
+      applyReviews(data);
     } catch (error) {
       setReviewsError('Failed to load reviews');
       setLoadedReviewsBrandId(null);
@@ -429,7 +471,7 @@ export const useBrandProfile = () => {
     } finally {
       setReviewsLoading(false);
     }
-  }, [reviewFlags.readEnabled, reviewFlagsLoading]);
+  }, [queryClient, reviewFlags.readEnabled, reviewFlagsLoading]);
 
   // Create collection
   const createCollection = useCallback(async (data: { name: string; description?: string; isPublic?: boolean }) => {

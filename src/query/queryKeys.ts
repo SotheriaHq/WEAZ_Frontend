@@ -89,6 +89,8 @@ export const queryKeys = {
     status: () => ['store', 'status'] as const,
     cart: (userId?: string | null) => ['store', 'cart', normalizeId(userId)] as const,
     wishlistRoot: (userId?: string | null) => ['store', 'wishlist', normalizeId(userId)] as const,
+    product: (productId?: string | null, params?: object | null) =>
+      ['store', 'product', normalizeId(productId), normalizeRecord(params)] as const,
     wishlist: (userIdOrParams?: string | null | WishlistParams, params?: WishlistParams) => {
       const resolved = resolveWishlistArgs(userIdOrParams, params);
       return ['store', 'wishlist', resolved.userId, normalizeRecord(resolved.params)] as const;
@@ -179,6 +181,7 @@ export const queryKeys = {
       ['customOrders', 'brandQueue', normalizeRecord(params)] as const,
   },
   reviews: {
+    brand: (brandId?: string | null) => ['reviews', 'brand', normalizeId(brandId)] as const,
     mine: () => ['reviews', 'mine'] as const,
   },
   market: {
