@@ -81,7 +81,6 @@ const initialData: StoreWizardData = {
   responseTimeSla: '24h',
   contactEmail: '',
   customOrdersEnabled: false,
-  customOrderConsultationMode: 'required',
   customOrderLeadTime: '2-4',
   customOrderRushSupported: false,
 
@@ -254,7 +253,6 @@ const StoreCreationWizard: React.FC = () => {
           },
           customOrderSettings: {
             customOrdersEnabled: wizardData.customOrdersEnabled,
-            consultationMode: wizardData.customOrderConsultationMode,
             leadTime: wizardData.customOrderLeadTime,
             rushSupported: wizardData.customOrderRushSupported,
           },
@@ -427,9 +425,6 @@ const StoreCreationWizard: React.FC = () => {
               typeof policy.shippingRules?.customOrderSettings?.customOrdersEnabled === 'boolean'
                 ? policy.shippingRules.customOrderSettings.customOrdersEnabled
                 : nextData.customOrdersEnabled,
-            customOrderConsultationMode:
-              policy.shippingRules?.customOrderSettings?.consultationMode ||
-              nextData.customOrderConsultationMode,
             customOrderLeadTime: sanitizeCustomOrderLeadTime(
               policy.shippingRules?.customOrderSettings?.leadTime || nextData.customOrderLeadTime,
             ),

@@ -674,7 +674,12 @@ export interface StoreStatusResponse {
   isEmailVerified?: boolean;
   isProfileComplete?: boolean;
   profileMissingFields?: string[];
+  /** True only after the owner pressed Publish AND data is complete. */
   isSetupComplete: boolean;
+  /** Data completeness only — enables the Publish button, never the studio. */
+  isReadyToPublish?: boolean;
+  /** Owner has pressed Publish at least once (survives pausing). */
+  isPublished?: boolean;
   missingFields: string[];
   profile: {
     name: string;
@@ -905,7 +910,12 @@ export interface StoreGeneralSettingsResponse {
   contactEmail: string;
   isEmailVerified: boolean;
   isStoreOpen: boolean;
+  /** True only after the owner pressed Publish AND data is complete. */
   isSetupComplete: boolean;
+  /** Data completeness only — enables the Publish button, never the studio. */
+  isReadyToPublish?: boolean;
+  /** Owner has pressed Publish at least once (survives pausing). */
+  isPublished?: boolean;
   missingFields: string[];
   storeNameLastChangedAt: string | null;
   storeNameNextAllowedAt: string | null;

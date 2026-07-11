@@ -55,14 +55,6 @@ const CUSTOM_ORDER_LEAD_TIME_LABELS: Record<StoreWizardData['customOrderLeadTime
   '4-7': '4-7 days',
 };
 
-const CUSTOM_ORDER_CONSULTATION_LABELS: Record<
-  StoreWizardData['customOrderConsultationMode'],
-  string
-> = {
-  required: 'Required before quote',
-  optional: 'Optional consultation',
-};
-
 /**
  * Store Review Step (Screen 1.10)
  * Final review before publishing
@@ -135,7 +127,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
       {/* Header */}
       <div className="border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-[#1a1a1a]/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-3 py-4 sm:px-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -171,7 +163,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8 flex-1">
+      <div className="w-full max-w-7xl mx-auto px-3 py-5 sm:px-6 sm:py-8 flex-1">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Store Preview & Sections */}
           <div className="lg:col-span-2 space-y-6">
@@ -338,14 +330,6 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                   <InfoItem
                     label="Custom Orders"
                     value={data.customOrdersEnabled ? 'Enabled' : 'Disabled'}
-                  />
-                  <InfoItem
-                    label="Custom Consultation"
-                    value={
-                      data.customOrdersEnabled
-                        ? CUSTOM_ORDER_CONSULTATION_LABELS[data.customOrderConsultationMode]
-                        : 'Not applicable'
-                    }
                   />
                   <InfoItem
                     label="Custom Lead Time"

@@ -101,7 +101,6 @@ export const getStorePoliciesStepValidation = (
     | 'contactEmail'
     | 'customOrdersEnabled'
     | 'customOrderLeadTime'
-    | 'customOrderConsultationMode'
   >,
 ): StorePoliciesStepValidation => {
   const missing: string[] = [];
@@ -127,7 +126,6 @@ export const getStorePoliciesStepValidation = (
   }
 
   if (data.customOrdersEnabled) {
-    if (!data.customOrderConsultationMode) missing.push('Custom-order consultation mode');
     const leadTime = String(data.customOrderLeadTime ?? '').trim();
     if (!(ALLOWED_CUSTOM_ORDER_LEAD_TIMES as readonly string[]).includes(leadTime)) {
       missing.push('Custom-order lead time (max 7 days)');

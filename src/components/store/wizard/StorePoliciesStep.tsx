@@ -61,11 +61,6 @@ const ORDER_CANCELLATION_WINDOWS = [
 
 const CUSTOM_ORDER_LEAD_TIMES = STORE_CUSTOM_ORDER_LEAD_TIME_OPTIONS;
 
-const CUSTOM_ORDER_CONSULTATION_MODES = [
-  { value: 'required', label: 'Required before quote' },
-  { value: 'optional', label: 'Optional consultation' },
-];
-
 const SELECT_WRAP_PROPS = {
   selectedAllowWrap: true,
   optionAllowWrap: true,
@@ -139,7 +134,6 @@ const RECOMMENDED_DEFAULTS: Partial<StoreWizardData> = {
   refundMethod: 'original',
   responseTimeSla: '24h',
   customOrdersEnabled: true,
-  customOrderConsultationMode: 'required',
   customOrderLeadTime: '2-4',
   customOrderRushSupported: false,
 };
@@ -604,22 +598,6 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                     <>
                       <div className="space-y-2">
                         <UniversalSelect
-                          label="Consultation Mode"
-                          value={data.customOrderConsultationMode}
-                          onChange={(value) =>
-                            onChange({
-                              customOrderConsultationMode:
-                                value as StoreWizardData['customOrderConsultationMode'],
-                            })
-                          }
-                          options={[...CUSTOM_ORDER_CONSULTATION_MODES]}
-                          placeholder="Select consultation mode"
-                          {...SELECT_WRAP_PROPS}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <UniversalSelect
                           label="Typical Custom-Order Lead Time"
                           value={data.customOrderLeadTime}
                           onChange={(value) =>
@@ -749,8 +727,10 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       </div>
                     </div>
 
-                    {/* Preview */}
-                    <div className="rounded-xl border border-dashed border-gray-300 dark:border-white/10 bg-white dark:bg-black/10 p-5 h-full min-h-[280px]">
+                    {/* Preview — min-w-0 is LOAD-BEARING: without it the grid
+                        column stretches to the table's min width on phones and
+                        the whole page overflows instead of the table scrolling. */}
+                    <div className="min-w-0 rounded-xl border border-dashed border-gray-300 dark:border-white/10 bg-white dark:bg-black/10 p-3 sm:p-5 h-full min-h-[280px]">
                       {data.sizeChartUrl ? (
                         <div className="relative">
                           <div className="text-xs text-gray-500 mb-2 flex items-center gap-2">
@@ -785,22 +765,22 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                             </div>
                           </div>
                           <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/10">
-                            <table className="min-w-[560px] w-full text-xs text-left text-gray-700 dark:text-gray-200">
-                              <thead className="bg-gray-100 dark:bg-white/5 text-[11px] uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                            <table className="min-w-[420px] w-full text-[11px] sm:text-xs text-left text-gray-700 dark:text-gray-200">
+                              <thead className="bg-gray-100 dark:bg-white/5 text-[10px] sm:text-[11px] uppercase tracking-wide text-gray-600 dark:text-gray-400">
                                 <tr>
-                                  <th className="px-4 py-3">Size</th>
-                                  <th className="px-4 py-3">Bust</th>
-                                  <th className="px-4 py-3">Waist</th>
-                                  <th className="px-4 py-3">Hip</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Size</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Bust</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Waist</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Hip</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {selectedPreset.rows.map((row) => (
                                   <tr key={row.size} className="odd:bg-white even:bg-gray-50 dark:odd:bg-black/30 dark:even:bg-black/20">
-                                    <td className="px-4 py-3 font-medium">{row.size}</td>
-                                    <td className="px-4 py-3">{row.bust}</td>
-                                    <td className="px-4 py-3">{row.waist}</td>
-                                    <td className="px-4 py-3">{row.hip}</td>
+                                    <td className="px-2.5 py-2 font-medium sm:px-4 sm:py-3">{row.size}</td>
+                                    <td className="px-2.5 py-2 sm:px-4 sm:py-3">{row.bust}</td>
+                                    <td className="px-2.5 py-2 sm:px-4 sm:py-3">{row.waist}</td>
+                                    <td className="px-2.5 py-2 sm:px-4 sm:py-3">{row.hip}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -821,7 +801,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 
 
 {/* Size Chart Card - Collapsible - lg:col-span-2 for wide modern layout */}
-                <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-gray-50/80 to-white/50 dark:from-white/[0.02] dark:to-white/[0.01] border border-gray-200/80 dark:border-white/10 p-6 space-y-6 shadow-sm overflow-hidden relative">
+                <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-gray-50/80 to-white/50 dark:from-white/[0.02] dark:to-white/[0.01] border border-gray-200/80 dark:border-white/10 p-3 sm:p-6 space-y-4 sm:space-y-6 shadow-sm overflow-hidden relative">
                   {/* Decorative modern background element */}
                   <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-emerald-400/5 dark:bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
                   
@@ -982,27 +962,27 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                           </div>
                         ) : selectedPreset ? (
                           <div className="flex flex-col w-full h-full bg-transparent overflow-hidden">
-                            <div className="overflow-x-auto p-4">
-                              <table className="w-full text-sm text-left">
+                            <div className="min-w-0 overflow-x-auto p-2 sm:p-4">
+                              <table className="w-full text-xs sm:text-sm text-left">
                                 <thead>
                                   <tr className="border-b border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400">
-                                    <th className="px-6 py-4 font-semibold text-gray-900 dark:text-white bg-gray-50/50 dark:bg-white/5 rounded-tl-xl w-1/4">Size Standard</th>
-                                    <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Bust</th>
-                                    <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Waist</th>
-                                    <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider bg-gray-50/50 dark:bg-white/5 rounded-tr-xl">Hip</th>
+                                    <th className="px-3 py-2.5 sm:px-6 sm:py-4 font-semibold text-gray-900 dark:text-white bg-gray-50/50 dark:bg-white/5 rounded-tl-xl w-1/4">Size Standard</th>
+                                    <th className="px-3 py-2.5 sm:px-6 sm:py-4 font-medium text-[10px] sm:text-xs uppercase tracking-wider">Bust</th>
+                                    <th className="px-3 py-2.5 sm:px-6 sm:py-4 font-medium text-[10px] sm:text-xs uppercase tracking-wider">Waist</th>
+                                    <th className="px-3 py-2.5 sm:px-6 sm:py-4 font-medium text-[10px] sm:text-xs uppercase tracking-wider bg-gray-50/50 dark:bg-white/5 rounded-tr-xl">Hip</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                                   {selectedPreset.rows.map((row) => (
                                     <tr key={row.size} className="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors group">
-                                      <td className="px-6 py-4">
-                                        <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-bold text-sm border border-gray-200/50 dark:border-white/5 shadow-sm group-hover:border-emerald-500/30 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-500/10 transition-colors">
+                                      <td className="px-3 py-2.5 sm:px-6 sm:py-4">
+                                        <span className="inline-flex items-center justify-center px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-bold text-xs sm:text-sm border border-gray-200/50 dark:border-white/5 shadow-sm group-hover:border-emerald-500/30 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-500/10 transition-colors">
                                           {row.size}
                                         </span>
                                       </td>
-                                      <td className="px-6 py-4 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">{row.bust}</td>
-                                      <td className="px-6 py-4 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">{row.waist}</td>
-                                      <td className="px-6 py-4 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap bg-gray-50/30 dark:bg-white/[0.01]">{row.hip}</td>
+                                      <td className="px-3 py-2.5 sm:px-6 sm:py-4 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">{row.bust}</td>
+                                      <td className="px-3 py-2.5 sm:px-6 sm:py-4 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">{row.waist}</td>
+                                      <td className="px-3 py-2.5 sm:px-6 sm:py-4 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap bg-gray-50/30 dark:bg-white/[0.01]">{row.hip}</td>
                                     </tr>
                                   ))}
                                 </tbody>
@@ -1124,8 +1104,10 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       </div>
                     </div>
 
-                    {/* Preview */}
-                    <div className="rounded-xl border border-dashed border-gray-300 dark:border-white/10 bg-white dark:bg-black/10 p-5 h-full min-h-[280px]">
+                    {/* Preview — min-w-0 is LOAD-BEARING: without it the grid
+                        column stretches to the table's min width on phones and
+                        the whole page overflows instead of the table scrolling. */}
+                    <div className="min-w-0 rounded-xl border border-dashed border-gray-300 dark:border-white/10 bg-white dark:bg-black/10 p-3 sm:p-5 h-full min-h-[280px]">
                       {data.sizeChartUrl ? (
                         <div className="relative">
                           <div className="text-xs text-gray-500 mb-2 flex items-center gap-2">
@@ -1160,22 +1142,22 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                             </div>
                           </div>
                           <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/10">
-                            <table className="min-w-[560px] w-full text-xs text-left text-gray-700 dark:text-gray-200">
-                              <thead className="bg-gray-100 dark:bg-white/5 text-[11px] uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                            <table className="min-w-[420px] w-full text-[11px] sm:text-xs text-left text-gray-700 dark:text-gray-200">
+                              <thead className="bg-gray-100 dark:bg-white/5 text-[10px] sm:text-[11px] uppercase tracking-wide text-gray-600 dark:text-gray-400">
                                 <tr>
-                                  <th className="px-4 py-3">Size</th>
-                                  <th className="px-4 py-3">Bust</th>
-                                  <th className="px-4 py-3">Waist</th>
-                                  <th className="px-4 py-3">Hip</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Size</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Bust</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Waist</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Hip</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {selectedPreset.rows.map((row) => (
                                   <tr key={row.size} className="odd:bg-white even:bg-gray-50 dark:odd:bg-black/30 dark:even:bg-black/20">
-                                    <td className="px-4 py-3 font-medium">{row.size}</td>
-                                    <td className="px-4 py-3">{row.bust}</td>
-                                    <td className="px-4 py-3">{row.waist}</td>
-                                    <td className="px-4 py-3">{row.hip}</td>
+                                    <td className="px-2.5 py-2 font-medium sm:px-4 sm:py-3">{row.size}</td>
+                                    <td className="px-2.5 py-2 sm:px-4 sm:py-3">{row.bust}</td>
+                                    <td className="px-2.5 py-2 sm:px-4 sm:py-3">{row.waist}</td>
+                                    <td className="px-2.5 py-2 sm:px-4 sm:py-3">{row.hip}</td>
                                   </tr>
                                 ))}
                               </tbody>

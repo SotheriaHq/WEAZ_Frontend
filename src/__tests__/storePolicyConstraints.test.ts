@@ -44,7 +44,6 @@ describe('storePolicyConstraints', () => {
       contactEmail: '',
       customOrdersEnabled: true,
       customOrderLeadTime: '2-4',
-      customOrderConsultationMode: 'required',
     });
 
     expect(incomplete.valid).toBe(false);
