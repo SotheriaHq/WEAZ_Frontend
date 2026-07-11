@@ -476,7 +476,9 @@ const DashboardHome: React.FC = () => {
       </section>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
-        <div className="flex flex-col rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-[#1a1a1a] sm:p-4 lg:col-span-2 lg:min-h-[620px] lg:p-6">
+        {/* Action Required column renders FIRST on phones (order-1) — urgent
+            items must not hide below the activity feed (client-requested). */}
+        <div className="order-2 flex flex-col rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-[#1a1a1a] sm:p-4 lg:order-1 lg:col-span-2 lg:min-h-[620px] lg:p-6">
           <div className="mb-3 flex items-center justify-between sm:mb-4 lg:mb-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h2>
             <Link
@@ -525,7 +527,7 @@ const DashboardHome: React.FC = () => {
           )}
         </div>
 
-        <div className="space-y-4 lg:space-y-6">
+        <div className="order-1 space-y-4 lg:order-2 lg:space-y-6">
           <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-[#1a1a1a] sm:p-4 lg:p-6">
             <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white lg:mb-4">
               <span aria-hidden="true">🔔</span>
@@ -594,7 +596,9 @@ const DashboardHome: React.FC = () => {
             </div>
           </div>
 
-          {draftStats && draftStats.totalDrafts > 0 ? (
+          {/* Always render draft counts — a 0 is information, not absence
+              (client-requested: numbers should show even when zero). */}
+          {draftStats ? (
             <DraftExpiryStatsComponent
               total={draftStats.totalDrafts}
               expiringSoon={draftStats.expiringIn7Days}
@@ -688,35 +692,31 @@ const ActivityItem: React.FC<ActivityItemViewModel & { onAction?: () => void }> 
 
   const { marker, bg, color } = iconMap[type] || iconMap.order;
 
+  // Compact single-line rows (client-requested): marker · title · meta · action.
+  // The old stacked card layout wasted a full card per event.
   return (
-    <div className="rounded-xl border border-gray-200/80 bg-gray-50/70 p-3 transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-white/[0.025] dark:hover:bg-white/[0.05] sm:rounded-2xl sm:p-4">
-      <div className="flex items-start gap-3 sm:gap-4">
-        <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-base sm:h-11 sm:w-11 sm:rounded-2xl sm:text-lg ${bg} ${color}`}>
+    <div className="rounded-lg border border-gray-200/80 bg-gray-50/70 px-2.5 py-2 transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-white/[0.025] dark:hover:bg-white/[0.05] sm:rounded-xl sm:px-3">
+      <div className="flex items-center gap-2.5">
+        <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-sm ${bg} ${color}`}>
           <span aria-hidden="true">{marker}</span>
         </div>
-        <div className="flex-1">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-400 sm:px-2.5 sm:py-1 sm:tracking-[0.16em]">
-                  {category}
-                </span>
-                <span className="text-xs text-gray-400 dark:text-gray-500">{time}</span>
-              </div>
-              <p className="mt-1.5 line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white sm:mt-2">{title}</p>
-            </div>
-          </div>
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-500 dark:text-gray-400 sm:mt-1.5">{description}</p>
-          {action ? (
-            <button
-              type="button"
-              onClick={onAction}
-              className="mt-2 rounded-full bg-gray-100 px-3 py-1.5 text-xs text-gray-700 transition-colors hover:bg-gray-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 sm:mt-3"
-            >
-              {action}
-            </button>
-          ) : null}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-gray-900 dark:text-white" title={description || title}>
+            {title}
+          </p>
+          <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
+            {category} • {time}
+          </p>
         </div>
+        {action ? (
+          <button
+            type="button"
+            onClick={onAction}
+            className="flex-shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+          >
+            {action}
+          </button>
+        ) : null}
       </div>
     </div>
   );

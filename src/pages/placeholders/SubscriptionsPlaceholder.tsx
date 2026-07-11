@@ -10,7 +10,7 @@ const SubscriptionsPlaceholder: React.FC = () => (
     description="Connect with your favorite brands and creators to get exclusive content, early access to drops, and special member perks."
     emoji="🔧"
     variant="social"
-    eta="Q1 2025"
+    eta="Coming soon"
     features={[
       'Exclusive Content',
       'Early Drop Access',

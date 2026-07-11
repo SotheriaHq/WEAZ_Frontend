@@ -22,6 +22,7 @@ import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildStorefrontUrl } from '@/utils/publicLinks';
 import type { VerificationStatusResponse } from '@/types/verification';
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
+import { useCachedResource } from '@/hooks/useCachedResource';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 
@@ -33,18 +34,107 @@ export default function StoreManagement() {
   const isEmbeddedMobile = embeddedSurface === 'mobile-app';
   const showStudioFloatingControls = location.pathname.startsWith('/studio');
 
-  const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<StoreStatusResponse | null>(null);
-  const [verification, setVerification] = useState<VerificationStatusResponse | null>(null);
-  const [overview, setOverview] = useState<any>(null);
-  const [overviewLoading, setOverviewLoading] = useState(false);
-  const [analytics, setAnalytics] = useState<any>(null);
   const [analyticsOpen] = useState(true);
   const [analyticsCollapsed, setAnalyticsCollapsed] = useState(true);
   const [layoutMode, setLayoutMode] = useState(false);
-  const [draftCollections, setDraftCollections] = useState<any[]>([]);
-  const [draftCollectionsLoading, setDraftCollectionsLoading] = useState(false);
   const [showStoreQr, setShowStoreQr] = useState(false);
+
+  // Cached screen data: revisits paint instantly from the shared query cache
+  // (skeleton ONLY on the true first load); stale data revalidates silently.
+  // This replaces the legacy useState+useEffect fetches that re-skeletoned the
+  // Store tab on every navigation (client-reported).
+  const {
+    data: statusBundle,
+    loading,
+    error: statusError,
+  } = useCachedResource<{
+    status: StoreStatusResponse;
+    verification: VerificationStatusResponse | null;
+  }>({
+    queryKey: ['store', 'management', 'status', user?.id ?? 'anon'],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const verificationRequest = user?.id
+        ? brandApi.getVerificationStatus(user.id, { force: true }).catch(() => null)
+        : Promise.resolve<VerificationStatusResponse | null>(null);
+      let s = await getStoreStatus();
+
+      if (!s?.isStoreOpen && isStoreOpenPending(user?.id)) {
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          await sleep(500);
+          try {
+            const retryStatus = await getStoreStatus();
+            s = retryStatus;
+            if (retryStatus?.isStoreOpen) {
+              break;
+            }
+          } catch {
+            // Keep trying while in pending-open grace period.
+          }
+        }
+      }
+
+      const verificationData = await verificationRequest;
+      return { status: s, verification: verificationData };
+    },
+  });
+  const status = statusBundle?.status ?? null;
+  const verification = statusBundle?.verification ?? null;
+
+  const { data: overviewBundle, loading: overviewLoading } = useCachedResource<{
+    overview: any;
+    analytics: any;
+  }>({
+    queryKey: ['store', 'management', 'overview', user?.id ?? 'anon'],
+    enabled: Boolean(user?.id),
+    queryFn: async () => {
+      try {
+        const [overviewData, analyticsData] = await Promise.all([
+          brandApi.getDashboardOverview(user!.id),
+          brandApi.getDashboardAnalytics(user!.id, '7d'),
+        ]);
+        return { overview: overviewData, analytics: analyticsData };
+      } catch {
+        return {
+          overview: {
+            kpis: {
+              totalRevenue: 0,
+              totalOrders: 0,
+              conversionRate: 0,
+              storeViews: 0,
+              reviewScore: 0,
+              reviewCount: 0,
+            },
+            recentOrders: [],
+            store: {
+              name: user?.brandFullName || user?.username || 'Your Store',
+              slug: user?.username || 'your-store',
+              isLive: false,
+            },
+          },
+          analytics: { salesChart: [] },
+        };
+      }
+    },
+  });
+  const overview = overviewBundle?.overview ?? null;
+  const analytics = overviewBundle?.analytics ?? null;
+
+  const { data: draftCollections = [], loading: draftCollectionsLoading } =
+    useCachedResource<any[]>({
+      queryKey: ['store', 'management', 'draft-collections', user?.id ?? 'anon'],
+      enabled: Boolean(user?.id),
+      queryFn: async () => {
+        const collections = await brandApi.getCollections(user!.id, {
+          visibility: 'all',
+          scope: 'store',
+        });
+        return (collections || []).filter((collection: any) => {
+          const collectionStatus = String(collection?.status || '').toUpperCase();
+          return collectionStatus === 'DRAFT' && collection?.isSystemGenerated !== true;
+        });
+      },
+    });
 
   const resolvedAvatar = useMemo(
     () =>
@@ -182,153 +272,35 @@ export default function StoreManagement() {
     return String(val);
   };
 
+  // Redirects derive from the cached status — they run on both fresh fetches
+  // and instant cache paints, so draft stores still bounce to setup.
   useEffect(() => {
-    let mounted = true;
+    if (statusBundle) {
+      const s = statusBundle.status;
+      if (s?.isStoreOpen) {
+        clearStoreOpenPending(user?.id);
+        return;
+      }
+      if (isStoreOpenPending(user?.id)) return;
+      if (s?.profile == null) {
+        navigate('/studio/store/setup', { replace: true });
+        return;
+      }
+      navigate(resolveStoreSetupDestination(user?.id), { replace: true });
+      return;
+    }
 
-    const run = async () => {
-      try {
-        setLoading(true);
-        const verificationRequest = user?.id
-          ? brandApi.getVerificationStatus(user.id, { force: true }).catch(() => null)
-          : Promise.resolve<VerificationStatusResponse | null>(null);
-        let s = await getStoreStatus();
-
-        if (!s?.isStoreOpen && isStoreOpenPending(user?.id)) {
-          for (let attempt = 0; attempt < 5; attempt += 1) {
-            await sleep(500);
-            try {
-              const retryStatus = await getStoreStatus();
-              s = retryStatus;
-              if (retryStatus?.isStoreOpen) {
-                break;
-              }
-            } catch {
-              // Keep trying while in pending-open grace period.
-            }
-          }
-        }
-
-        if (!mounted) return;
-        setStatus(s);
-
-        if (s?.isStoreOpen) {
-          clearStoreOpenPending(user?.id);
-        }
-
-        if (s?.profile == null) {
-          if (isStoreOpenPending(user?.id)) {
-            return;
-          }
+    if (statusError) {
+      const code = (statusError as any)?.response?.status;
+      if (code === 404) {
+        if (!isStoreOpenPending(user?.id)) {
           navigate('/studio/store/setup', { replace: true });
-          return;
         }
-
-        if (!s?.isStoreOpen) {
-          if (isStoreOpenPending(user?.id)) {
-            return;
-          }
-
-          navigate(resolveStoreSetupDestination(user?.id), { replace: true });
-        }
-
-        const verificationData = await verificationRequest;
-        if (!mounted) return;
-
-        setVerification(verificationData);
-      } catch (e) {
-        const code = (e as any)?.response?.status;
-        if (code === 404) {
-          if (isStoreOpenPending(user?.id)) {
-            return;
-          }
-          navigate('/studio/store/setup', { replace: true });
-          return;
-        }
-        toast.error('Failed to load store status');
-      } finally {
-        if (mounted) setLoading(false);
+        return;
       }
-    };
-
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [navigate, user?.id]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const run = async () => {
-      if (!user?.id) return;
-      setOverviewLoading(true);
-      try {
-        const [overviewData, analyticsData] = await Promise.all([
-          brandApi.getDashboardOverview(user.id),
-          brandApi.getDashboardAnalytics(user.id, '7d'),
-        ]);
-        if (!mounted) return;
-        setOverview(overviewData);
-        setAnalytics(analyticsData);
-      } catch {
-        if (!mounted) return;
-        setOverview({
-          kpis: {
-            totalRevenue: 0,
-            totalOrders: 0,
-            conversionRate: 0,
-            storeViews: 0,
-            reviewScore: 0,
-            reviewCount: 0,
-          },
-          recentOrders: [],
-          store: {
-            name: brandName,
-            slug: user?.username || 'your-store',
-            isLive: status?.isStoreOpen ?? false,
-          },
-        });
-        setAnalytics({ salesChart: [] });
-      } finally {
-        if (mounted) setOverviewLoading(false);
-      }
-    };
-
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [brandName, status?.isStoreOpen, user?.id, user?.username]);
-
-  useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      if (!user?.id) return;
-      setDraftCollectionsLoading(true);
-      try {
-        const collections = await brandApi.getCollections(user.id, {
-          visibility: 'all',
-          scope: 'store',
-        });
-        const drafts = (collections || []).filter((collection: any) => {
-          const status = String(collection?.status || '').toUpperCase();
-          return status === 'DRAFT' && collection?.isSystemGenerated !== true;
-        });
-        if (!mounted) return;
-        setDraftCollections(drafts || []);
-      } catch {
-        if (!mounted) return;
-        setDraftCollections([]);
-      } finally {
-        if (mounted) setDraftCollectionsLoading(false);
-      }
-    };
-
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [user?.id]);
+      toast.error('Failed to load store status');
+    }
+  }, [statusBundle, statusError, navigate, user?.id]);
 
   if (loading) {
     return <StudioPageSkeleton variant="dashboard" />;
