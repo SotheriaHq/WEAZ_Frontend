@@ -1,8 +1,29 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouteError, isRouteErrorResponse, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, RefreshCcw, AlertTriangle, WifiOff, ServerCrash, ShieldX } from 'lucide-react';
 import { captureClientException } from '@/observability/sentry';
+
+const STALE_BUNDLE_RELOAD_KEY = 'wiez:error-page-auto-recovered';
+
+/**
+ * Stale-deploy render crashes: React.lazy resolving a mixed-version chunk
+ * throws "Cannot read properties of undefined (reading 'default')" (Sentry
+ * 2026-07-11, /studio/store on release V2026.07.09). A fresh cache-busted
+ * document fixes it — showing users a dead error page does not.
+ */
+const isLikelyStaleBundleError = (value: unknown): boolean => {
+  if (!(value instanceof Error)) return false;
+  const message = value.message || '';
+  return (
+    message.includes("reading 'default'") ||
+    message.includes('Failed to fetch dynamically imported module') ||
+    message.includes('Importing a module script failed') ||
+    message.includes('error loading dynamically imported module') ||
+    message.includes('Loading chunk') ||
+    message.includes('ChunkLoadError')
+  );
+};
 
 /**
  * ErrorPage - Premium error boundary page
@@ -19,13 +40,42 @@ const ErrorPage: React.FC = () => {
   const navigate = useNavigate();
   console.error('ErrorPage caught:', error);
 
+  // Auto-recover ONCE per session from stale-bundle render crashes with a
+  // cache-busted reload instead of stranding the user on this page.
+  const [recovering] = useState<boolean>(() => {
+    if (isRouteErrorResponse(error) || !isLikelyStaleBundleError(error)) {
+      return false;
+    }
+    try {
+      if (sessionStorage.getItem(STALE_BUNDLE_RELOAD_KEY) === '1') return false;
+      sessionStorage.setItem(STALE_BUNDLE_RELOAD_KEY, '1');
+    } catch {
+      return false;
+    }
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('_r', String(Date.now()));
+      window.location.replace(url.toString());
+    } catch {
+      window.location.reload();
+    }
+    return true;
+  });
+
   useEffect(() => {
     // Router errorElement intercepts render errors before RootErrorBoundary,
     // so this boundary must report to Sentry itself.
     if (!isRouteErrorResponse(error)) {
-      captureClientException(error, { boundary: 'router-error-page' });
+      captureClientException(error, {
+        boundary: recovering ? 'router-error-page-auto-recovery' : 'router-error-page',
+      });
     }
-  }, [error]);
+  }, [error, recovering]);
+
+  if (recovering) {
+    // Reload is in flight — a blank surface beats flashing an error page.
+    return <div className="min-h-screen bg-[#0a0a0a]" aria-busy="true" />;
+  }
 
   // Determine error type and customize display
   let status = 500;

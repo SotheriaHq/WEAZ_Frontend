@@ -77,6 +77,13 @@ window.addEventListener('unhandledrejection', (event) => {
 const BootSplashCleanup: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useEffect(() => {
     removeBootSplash();
+    // Booted cleanly — re-arm the ErrorPage stale-bundle auto-recovery for a
+    // future stale deploy.
+    try {
+      sessionStorage.removeItem('wiez:error-page-auto-recovered');
+    } catch {
+      // ignore
+    }
   }, []);
   return <>{children}</>;
 };
