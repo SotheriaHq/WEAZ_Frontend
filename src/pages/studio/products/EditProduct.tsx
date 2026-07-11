@@ -108,6 +108,7 @@ import {
   type MediaViewSlot,
 } from "@/utils/contentIntegrity";
 import { queryKeys } from "@/query/queryKeys";
+import useCachedResource from "@/hooks/useCachedResource";
 
 function toSkuToken(input: string): string {
   const cleaned = input
@@ -366,6 +367,25 @@ type ProductMediaPreview = {
   viewSlot?: MediaViewSlot | string | null;
 };
 
+type TaxonomyCategoryOption = {
+  id: string;
+  name: string;
+  types: { id: string; name: string }[];
+};
+
+type ProductEditorSupportData = {
+  categories: Category[];
+  collectionCategoryById: Record<string, string>;
+  taxonomyCategories: TaxonomyCategoryOption[];
+  categoryTypes: CategoryTypeOption[];
+};
+
+type ProductEditorPolicyDefaults = {
+  shippingRegions: string[];
+  processingTime: string;
+  customOrderLeadTime: string;
+};
+
 const defaultFormState: FormState = {
   title: "",
   description: "",
@@ -505,6 +525,115 @@ const EditProduct: React.FC = () => {
   const cachedProductDetail = productId
     ? queryClient.getQueryData<ProductDto | null>(productDetailQueryKey)
     : undefined;
+  const defaultShippingRegion =
+    normalizeShippingRegionCode(defaultFormState.customsRegion) ??
+    defaultFormState.customsRegion;
+  const productEditorSupportQueryKey = useMemo(
+    () => ['product-editor', 'support-data', user?.id ?? 'anon'] as const,
+    [user?.id],
+  );
+  const storePolicyDefaultsQueryKey = useMemo(
+    () => ['product-editor', 'store-policy-defaults', user?.id ?? 'anon'] as const,
+    [user?.id],
+  );
+
+  const { data: productEditorSupportData, loading: categoriesLoading } =
+    useCachedResource<ProductEditorSupportData>({
+      queryKey: productEditorSupportQueryKey,
+      queryFn: async () => {
+        const [collectionsResult, categoryTypesResult, categoriesWithSubResult] =
+          await Promise.allSettled([
+            user?.id
+              ? brandApi.getCollections(user.id, { visibility: "all", scope: "store" })
+              : Promise.resolve(null),
+            brandApi.getCategoryTypes(undefined, true),
+            brandApi.getCategoriesWithSubCategories(true),
+          ]);
+
+        const collections =
+          collectionsResult.status === "fulfilled" ? collectionsResult.value : null;
+        const mappedCollections: Category[] = user?.id
+          ? (collections || [])
+              .filter((c: any) => Boolean(c?.isAvailableInStore))
+              .map((c: any) => ({
+                id: String(c.id),
+                name: String(c.title || c.name || "Untitled collection"),
+                slug: String(c.id),
+              }))
+          : [];
+
+        const categoryByCollection: Record<string, string> = {};
+        (collections || []).forEach((c: any) => {
+          if (c?.id && c?.categoryId) {
+            categoryByCollection[String(c.id)] = String(c.categoryId);
+          }
+        });
+
+        const categoriesWithSub =
+          categoriesWithSubResult.status === "fulfilled"
+            ? categoriesWithSubResult.value
+            : null;
+        const taxonomyCategories: TaxonomyCategoryOption[] = Array.isArray(categoriesWithSub)
+          ? categoriesWithSub.map((c: any) => ({
+              id: String(c.id),
+              name: String(c.name || ""),
+              types: (c.types || []).map((t: any) => ({
+                id: String(t.id),
+                name: String(t.name || ""),
+              })),
+            }))
+          : [];
+
+        let resolvedTypes =
+          categoryTypesResult.status === "fulfilled" &&
+          Array.isArray(categoryTypesResult.value)
+            ? categoryTypesResult.value
+            : [];
+        if (resolvedTypes.length === 0 && Array.isArray(categoriesWithSub)) {
+          resolvedTypes = categoriesWithSub
+            .flatMap((category: any) => category.types ?? [])
+            .filter((type: any) => Boolean(type?.id) && Boolean(type?.name));
+        }
+
+        return {
+          categories: mappedCollections,
+          collectionCategoryById: categoryByCollection,
+          taxonomyCategories,
+          categoryTypes: resolvedTypes,
+        };
+      },
+      staleTime: 30 * 60 * 1000,
+      gcTime: 60 * 60 * 1000,
+    });
+
+  const { data: storePolicyDefaults, loading: shippingRegionsLoading } =
+    useCachedResource<ProductEditorPolicyDefaults>({
+      queryKey: storePolicyDefaultsQueryKey,
+      enabled: Boolean(user?.id),
+      queryFn: async () => {
+        try {
+          const policies = await getStorePolicies();
+          const fromPolicy = normalizeShippingRegionCodes(
+            policies.shippingRegions || [],
+          );
+          return {
+            shippingRegions: fromPolicy.length > 0 ? fromPolicy : [defaultShippingRegion],
+            processingTime: policies.processingTime || '',
+            customOrderLeadTime:
+              policies.shippingRules?.customOrderSettings?.leadTime || '',
+          };
+        } catch (error) {
+          console.error("Failed to load store shipping regions", error);
+          return {
+            shippingRegions: [defaultShippingRegion],
+            processingTime: '',
+            customOrderLeadTime: '',
+          };
+        }
+      },
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+    });
 
   // State
   const [form, setForm] = useState<FormState>(defaultFormState);
@@ -513,22 +642,25 @@ const EditProduct: React.FC = () => {
   // Reviewer note carried on the notification deep link — display fallback
   // only; the banner itself is gated on the server-side review state.
   const reviewNoteParam = reviewSearchParams.get('reviewNote')?.trim() || '';
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>(
+    () => productEditorSupportData?.categories ?? [],
+  );
   const [collectionCategoryById, setCollectionCategoryById] = useState<
     Record<string, string>
-  >({});
-  const [categoryTypes, setCategoryTypes] = useState<CategoryTypeOption[]>([]);
+  >(() => productEditorSupportData?.collectionCategoryById ?? {});
+  const [categoryTypes, setCategoryTypes] = useState<CategoryTypeOption[]>(
+    () => productEditorSupportData?.categoryTypes ?? [],
+  );
   const [loading, setLoading] = useState(
     () => isEditMode && cachedProductDetail === undefined,
   );
   const [saving, setSaving] = useState(false);
   const [shippingRegions, setShippingRegions] = useState<string[]>([
-    defaultFormState.customsRegion,
+    ...(storePolicyDefaults?.shippingRegions ?? [defaultShippingRegion]),
   ]);
   const [savedShippingRegions, setSavedShippingRegions] = useState<string[]>([
-    defaultFormState.customsRegion,
+    ...(storePolicyDefaults?.shippingRegions ?? [defaultShippingRegion]),
   ]);
-  const [shippingRegionsLoading, setShippingRegionsLoading] = useState(true);
   const [storeProcessingTime, setStoreProcessingTime] = useState('');
   const [storeCustomOrderLeadTime, setStoreCustomOrderLeadTime] = useState('');
   const [saveAction, setSaveAction] = useState<"draft" | "publish" | null>(
@@ -536,7 +668,6 @@ const EditProduct: React.FC = () => {
   );
   const [submitLocked, setSubmitLocked] = useState(false);
   const submitLockRef = useRef(false);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
 
   // Warn before tab close/refresh with unsaved edits — protects long forms
@@ -581,15 +712,9 @@ const EditProduct: React.FC = () => {
   }, []);
   const { confirm, ConfirmDialog: ConfirmModal } = useConfirm();
 
-  // Taxonomy state (standalone category/sub-category/filters)
-  type TaxonomyCategoryOption = {
-    id: string;
-    name: string;
-    types: { id: string; name: string }[];
-  };
   const [taxonomyCategories, setTaxonomyCategories] = useState<
     TaxonomyCategoryOption[]
-  >([]);
+  >(() => productEditorSupportData?.taxonomyCategories ?? []);
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({});
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
 
@@ -853,143 +978,24 @@ const EditProduct: React.FC = () => {
   // =====================
 
   useEffect(() => {
-    let mounted = true;
+    if (!storePolicyDefaults) return;
+    setShippingRegions(storePolicyDefaults.shippingRegions);
+    setSavedShippingRegions(storePolicyDefaults.shippingRegions);
+    setStoreProcessingTime(storePolicyDefaults.processingTime);
+    setStoreCustomOrderLeadTime(storePolicyDefaults.customOrderLeadTime);
+    setForm((prev) => ({
+      ...prev,
+      customsRegion: storePolicyDefaults.shippingRegions[0] ?? prev.customsRegion,
+    }));
+  }, [storePolicyDefaults]);
 
-    const loadStoreShippingRegions = async () => {
-      try {
-        setShippingRegionsLoading(true);
-        const policies = await getStorePolicies();
-        if (!mounted) return;
-
-        const fromPolicy = normalizeShippingRegionCodes(
-          policies.shippingRegions || [],
-        );
-        const fallbackRegion =
-          normalizeShippingRegionCode(defaultFormState.customsRegion) ??
-          defaultFormState.customsRegion;
-        const resolved = fromPolicy.length > 0 ? fromPolicy : [fallbackRegion];
-
-        setShippingRegions(resolved);
-        setSavedShippingRegions(resolved);
-        setStoreProcessingTime(policies.processingTime || '');
-        setStoreCustomOrderLeadTime(
-          policies.shippingRules?.customOrderSettings?.leadTime || '',
-        );
-        setForm((prev) => ({
-          ...prev,
-          customsRegion: resolved[0] ?? prev.customsRegion,
-        }));
-      } catch (error) {
-        console.error("Failed to load store shipping regions", error);
-        if (!mounted) return;
-        const fallbackRegion =
-          normalizeShippingRegionCode(defaultFormState.customsRegion) ??
-          defaultFormState.customsRegion;
-        setShippingRegions([fallbackRegion]);
-        setSavedShippingRegions([fallbackRegion]);
-        setStoreProcessingTime('');
-        setStoreCustomOrderLeadTime('');
-        setForm((prev) => ({
-          ...prev,
-          customsRegion: fallbackRegion,
-        }));
-      } finally {
-        if (mounted) setShippingRegionsLoading(false);
-      }
-    };
-
-    void loadStoreShippingRegions();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // Load collections (optional for products; standalone products are allowed)
   useEffect(() => {
-    let mounted = true;
-    const loadCollections = async () => {
-      try {
-        // Run all three API calls in parallel to minimize total load time.
-        // getCategoriesWithSubCategories is shared so it's only called once.
-        const [collectionsResult, categoryTypesResult, categoriesWithSubResult] =
-          await Promise.allSettled([
-            user?.id
-              ? brandApi.getCollections(user.id, { visibility: "all", scope: "store" })
-              : Promise.resolve(null),
-            brandApi.getCategoryTypes(undefined, true),
-            brandApi.getCategoriesWithSubCategories(true),
-          ]);
-
-        if (!mounted) return;
-
-        // Process collections
-        if (user?.id) {
-          const collections =
-            collectionsResult.status === "fulfilled" ? collectionsResult.value : null;
-          const mapped: Category[] = (collections || [])
-            .filter((c: any) => Boolean(c?.isAvailableInStore))
-            .map((c: any) => ({
-              id: String(c.id),
-              name: String(c.title || c.name || "Untitled collection"),
-              slug: String(c.id),
-            }));
-          setCategories(mapped);
-          const categoryByCollection: Record<string, string> = {};
-          (collections || []).forEach((c: any) => {
-            if (c?.id && c?.categoryId) {
-              categoryByCollection[String(c.id)] = String(c.categoryId);
-            }
-          });
-          setCollectionCategoryById(categoryByCollection);
-        } else {
-          setCategories([]);
-        }
-
-        // Process taxonomy categories (from shared fetch)
-        const categoriesWithSub =
-          categoriesWithSubResult.status === "fulfilled"
-            ? categoriesWithSubResult.value
-            : null;
-        if (Array.isArray(categoriesWithSub)) {
-          setTaxonomyCategories(
-            categoriesWithSub.map((c: any) => ({
-              id: String(c.id),
-              name: String(c.name || ""),
-              types: (c.types || []).map((t: any) => ({
-                id: String(t.id),
-                name: String(t.name || ""),
-              })),
-            })),
-          );
-        }
-
-        // Process category types (with fallback to shared categories result)
-        let resolvedTypes =
-          categoryTypesResult.status === "fulfilled" &&
-          Array.isArray(categoryTypesResult.value)
-            ? categoryTypesResult.value
-            : [];
-        if (resolvedTypes.length === 0 && Array.isArray(categoriesWithSub)) {
-          resolvedTypes = categoriesWithSub
-            .flatMap((category: any) => category.types ?? [])
-            .filter((type: any) => Boolean(type?.id) && Boolean(type?.name));
-        }
-        setCategoryTypes(resolvedTypes);
-      } catch (error) {
-        console.error("Failed to load collections", error);
-        if (mounted) {
-          setCategories([]);
-          setCollectionCategoryById({});
-        }
-      } finally {
-        if (mounted) setCategoriesLoading(false);
-      }
-    };
-    void loadCollections();
-    return () => {
-      mounted = false;
-    };
-  }, [user?.id]);
+    if (!productEditorSupportData) return;
+    setCategories(productEditorSupportData.categories);
+    setCollectionCategoryById(productEditorSupportData.collectionCategoryById);
+    setTaxonomyCategories(productEditorSupportData.taxonomyCategories);
+    setCategoryTypes(productEditorSupportData.categoryTypes);
+  }, [productEditorSupportData]);
 
   // Load product if editing
   useEffect(() => {
@@ -1909,6 +1915,7 @@ const EditProduct: React.FC = () => {
           }
 
           const updated = await productApi.updateProduct(productId, payload);
+          queryClient.setQueryData(productDetailQueryKey, updated);
           setContentStatus(
             String((updated as any).publicationStatus || (updated as any).status || finalStatus),
           );
@@ -2014,6 +2021,10 @@ const EditProduct: React.FC = () => {
                 status: finalStatus,
                 media: uploadedMedia,
               });
+              queryClient.setQueryData(
+                queryKeys.store.product(created.id, { includeDeleted: false }),
+                updated,
+              );
               setContentStatus(
                 String((updated as any).publicationStatus || (updated as any).status || finalStatus),
               );
@@ -2090,6 +2101,8 @@ const EditProduct: React.FC = () => {
       syncShippingRegions,
       user,
       buildStructuredMediaPayload,
+      productDetailQueryKey,
+      queryClient,
     ],
   );
 
@@ -2231,6 +2244,7 @@ const EditProduct: React.FC = () => {
         }
 
         const updated = await productApi.updateProduct(productId, payload);
+        queryClient.setQueryData(productDetailQueryKey, updated);
         setContentStatus(
           String((updated as any).publicationStatus || (updated as any).status || statusToPersist),
         );
@@ -2301,6 +2315,8 @@ const EditProduct: React.FC = () => {
     notifyProductStudioSync,
     rollbackCreatedProduct,
     buildStructuredMediaPayload,
+    productDetailQueryKey,
+    queryClient,
   ]);
 
   const triggerSave = useCallback(
@@ -2845,30 +2861,6 @@ const EditProduct: React.FC = () => {
 
   if (requiresCatalogProfileSetup) {
     return <Navigate to={catalogProfileSetupRedirect} replace />;
-  }
-
-  const createScreenInitializing =
-    !isEditMode && (categoriesLoading || shippingRegionsLoading);
-
-  if (createScreenInitializing) {
-    return (
-      <div className="min-h-[560px] animate-pulse">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
-          <div className="mb-6 h-8 w-64 rounded-xl surface-control-muted" />
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-4 lg:col-span-2">
-              <div className="h-44 rounded-2xl surface-control-muted" />
-              <div className="h-44 rounded-2xl surface-control-muted" />
-              <div className="h-44 rounded-2xl surface-control-muted" />
-            </div>
-            <div className="space-y-4">
-              <div className="h-36 rounded-2xl surface-control-muted" />
-              <div className="h-36 rounded-2xl surface-control-muted" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   if (loading) {

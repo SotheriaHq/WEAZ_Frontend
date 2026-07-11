@@ -51,11 +51,14 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const highlightCommentId = searchParams.get('commentId');
-  const [loading, setLoading] = useState(true);
+  const cachedDetail =
+    queryClient.getQueryData<any>(queryKeys.brand.collectionDetail(collectionId, 'design')) ??
+    queryClient.getQueryData<any>(queryKeys.design.detail(collectionId));
+  const [loading, setLoading] = useState(() => Boolean(collectionId && !cachedDetail));
   const [locked, setLocked] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [detail, setDetail] = useState<any | null>(null);
-  const detailRef = useRef<any | null>(null);
+  const [detail, setDetail] = useState<any | null>(() => cachedDetail ?? null);
+  const detailRef = useRef<any | null>(cachedDetail ?? null);
   const onBackRef = useRef(onBack);
   const [requestState, setRequestState] = useState<AccessState | null>(null);
   const [isThreaded, setIsThreaded] = useState(false);

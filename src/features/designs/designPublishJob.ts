@@ -31,6 +31,7 @@ import {
   removePublishTask,
   type PublishTaskKind,
 } from '@/utils/publishTracker';
+import { removeDesignPublishRecovery } from './designPublishRecovery';
 
 export type DesignPublishJobInput = {
   taskId: string;
@@ -274,6 +275,7 @@ export async function runDesignPublishJob(input: DesignPublishJobInput): Promise
         designMetadata: input.designMetadata,
       });
       setProgress(100, 'In review', 'published');
+      void removeDesignPublishRecovery(input.taskId);
       input.onComplete?.({ designId, payload: finalized });
       window.setTimeout(() => removePublishTask(input.taskId, scope), 30_000);
       return;
@@ -387,6 +389,7 @@ export async function runDesignPublishJob(input: DesignPublishJobInput): Promise
         designMetadata: input.designMetadata,
       });
       setProgress(100, 'In review', 'published');
+      void removeDesignPublishRecovery(input.taskId);
       input.onComplete?.({ designId, payload: finalized });
     } else {
       setProgress(92, 'Finishing…', 'finalizing');
@@ -397,6 +400,7 @@ export async function runDesignPublishJob(input: DesignPublishJobInput): Promise
         designMetadata: input.designMetadata,
       });
       setProgress(100, 'In review', 'published');
+      void removeDesignPublishRecovery(input.taskId);
       input.onComplete?.({ designId, payload: finalized });
     }
 

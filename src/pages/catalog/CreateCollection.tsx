@@ -19,6 +19,7 @@ import WizardLayout from '../../components/layouts/WizardLayout';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { MediaItem } from '@/types/media';
 import { DraftConflictWarningModal } from '@/components/collections/DraftConflictWarningModal';
+import useCachedResource from '@/hooks/useCachedResource';
 
 type CategoryTypeOption = { id: string; name: string };
 type CategoryOption = {
@@ -49,9 +50,6 @@ const CreateCollectionInner: React.FC = () => {
   const [isAvailableInStore, setIsAvailableInStore] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
-  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [categoryId, setCategoryId] = useState<string>('');
   const [categoryTypeId, setCategoryTypeId] = useState<string>('');
   const [type, setType] = useState<'MALE' | 'FEMALE' | 'EVERYBODY'>('EVERYBODY');
@@ -74,6 +72,43 @@ const CreateCollectionInner: React.FC = () => {
   const { uploadCollection, isUploading, progress, perFileProgress } = useCollectionUpload();
   const { user, fetchCollections } = useBrandProfile();
   const navigate = useNavigate();
+  const { data: tagSuggestions = [] } = useCachedResource<string[]>({
+    queryKey: ['design-collection-create', 'tag-suggestions', 80],
+    queryFn: async () => {
+      try {
+        const suggestions = await TagsApi.getSuggestions(80);
+        return Array.isArray(suggestions) ? suggestions : [];
+      } catch (error) {
+        console.warn('Failed to load tag suggestions', error);
+        return [];
+      }
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+  });
+  const { data: categories = [], loading: loadingCategories } =
+    useCachedResource<CategoryOption[]>({
+      queryKey: ['design-collection-create', 'categories', true],
+      queryFn: async () => {
+        try {
+          const cats = await brandApi.getCategories(true);
+          if (!Array.isArray(cats)) return [];
+          return cats.map((c) => ({
+            id: c.id,
+            slug: c.slug,
+            name: c.name,
+            types: Array.isArray(c.types)
+              ? c.types.map((t) => ({ id: t.id, name: t.name }))
+              : [],
+          }));
+        } catch (error) {
+          console.warn('Failed to load categories', error);
+          return [];
+        }
+      },
+      staleTime: 30 * 60 * 1000,
+      gcTime: 60 * 60 * 1000,
+    });
 
   const disabled = readOnly;
   const titleDescriptionLocked = isEditMode && collectionCreatedAt
@@ -83,56 +118,6 @@ const CreateCollectionInner: React.FC = () => {
 
   useEffect(() => {
     let mounted = true;
-    const loadTags = async () => {
-      try {
-        const s = await TagsApi.getSuggestions(80);
-        if (mounted) setTagSuggestions(Array.isArray(s) ? s : []);
-      } catch (error) {
-        console.warn('Failed to load tag suggestions', error);
-        if (mounted) setTagSuggestions([]);
-      }
-    };
-
-    const loadCategories = async () => {
-      try {
-        const cats = await brandApi.getCategories(true);
-        if (mounted && Array.isArray(cats)) {
-          const mapped = cats.map((c) => ({
-            id: c.id,
-            slug: c.slug,
-            name: c.name,
-            types: Array.isArray(c.types)
-              ? c.types.map((t) => ({ id: t.id, name: t.name }))
-              : [],
-          }));
-          setCategories(mapped);
-          if (mapped.length) {
-            setCategoryId((prev) =>
-              prev && mapped.some((category) => category.id === prev)
-                ? prev
-                : mapped[0].id,
-            );
-            setCategoryTypeId((prev) => {
-              if (
-                prev &&
-                mapped.some((category) =>
-                  category.types.some((categoryType) => categoryType.id === prev),
-                )
-              ) {
-                return prev;
-              }
-              return mapped[0].types[0]?.id ?? '';
-            });
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to load categories', error);
-        if (mounted) setCategories([]);
-      } finally {
-        if (mounted) setLoadingCategories(false);
-      }
-    };
-
     const loadEditDetail = async () => {
       if (!isEditMode || !id) return;
       try {
@@ -197,12 +182,32 @@ const CreateCollectionInner: React.FC = () => {
       }
     };
 
-    void Promise.all([loadTags(), loadCategories(), loadEditDetail()]);
+    void loadEditDetail();
 
     return () => {
       mounted = false;
     };
   }, [id, isEditMode, setMediaItems]);
+
+  useEffect(() => {
+    if (!categories.length) return;
+    setCategoryId((prev) =>
+      prev && categories.some((category) => category.id === prev)
+        ? prev
+        : categories[0].id,
+    );
+    setCategoryTypeId((prev) => {
+      if (
+        prev &&
+        categories.some((category) =>
+          category.types.some((categoryType) => categoryType.id === prev),
+        )
+      ) {
+        return prev;
+      }
+      return categories[0].types[0]?.id ?? '';
+    });
+  }, [categories]);
 
   useEffect(() => {
     if (!categoryId) {

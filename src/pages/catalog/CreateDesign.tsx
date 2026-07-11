@@ -64,6 +64,7 @@ import {
   runDesignPublishJob,
   unlockDocumentScroll,
 } from "@/features/designs/designPublishJob";
+import { saveDesignPublishRecovery } from "@/features/designs/designPublishRecovery";
 import type { SizingMode } from '@/types/sizing';
 import {
   DESIGN_FIT_PREFERENCE_OPTIONS,
@@ -1333,6 +1334,24 @@ const CreateDesignInner: React.FC = () => {
         }
       }
 
+      const designMetadata = {
+        title: titleSnapshot,
+        description: descriptionSnapshot,
+        visibility: visibilitySnapshot,
+        type: typeSnapshot,
+        categoryId: categoryIdSnapshot,
+        subCategoryId: categoryTypeIdSnapshot,
+        categoryTypeId: categoryTypeIdSnapshot,
+        tags: finalTags,
+        filterValueIds: filterValueIdsSnapshot,
+        sizingMode: sizingModeSnapshot,
+        rtwSizeSystem: undefined as string | undefined,
+        customMeasurementKeys: customMeasurementKeysSnapshot,
+        customOrderEnabled: isMadeToOrderSnapshot,
+        fitPreference: fitPreferenceSnapshot,
+        targetAgeGroup: targetAgeGroupSnapshot,
+      };
+
       const task = createPublishTask({
         ownerId: user?.id,
         title: titleSnapshot,
@@ -1353,6 +1372,30 @@ const CreateDesignInner: React.FC = () => {
         publishTaskScope,
       );
 
+      try {
+        await saveDesignPublishRecovery({
+          taskId: task.id,
+          ownerId: user?.id,
+          title: titleSnapshot,
+          description: descriptionSnapshot,
+          minPrice: parsedMinPrice,
+          maxPrice: parsedMaxPrice,
+          tags: finalTags,
+          files: jobFiles,
+          coverIndex: coverIndexSnapshot,
+          designMetadata,
+          existingDesignId: isEditMode ? designIdSnapshot : undefined,
+          pendingCustomOrderDraft: pendingCustomOrderDraft as Record<string, unknown> | null,
+          measurementGender: measurementGenderSnapshot,
+          kind: 'publish',
+        });
+      } catch (recoveryError) {
+        addClientDiagnostic('warn', 'create-design', 'Publish recovery snapshot could not be saved', {
+          taskId: task.id,
+          error: recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
+        });
+      }
+
       setShowPublishModal(false);
       // Modal scroll-lock / focus traps can freeze the island nav if left behind
       // after SPA navigation — hard unlock immediately.
@@ -1372,24 +1415,6 @@ const CreateDesignInner: React.FC = () => {
       // Second unlock after paint in case modal exit animation re-locks.
       window.setTimeout(() => unlockDocumentScroll(), 0);
       window.setTimeout(() => unlockDocumentScroll(), 320);
-
-      const designMetadata = {
-        title: titleSnapshot,
-        description: descriptionSnapshot,
-        visibility: visibilitySnapshot,
-        type: typeSnapshot,
-        categoryId: categoryIdSnapshot,
-        subCategoryId: categoryTypeIdSnapshot,
-        categoryTypeId: categoryTypeIdSnapshot,
-        tags: finalTags,
-        filterValueIds: filterValueIdsSnapshot,
-        sizingMode: sizingModeSnapshot,
-        rtwSizeSystem: undefined as string | undefined,
-        customMeasurementKeys: customMeasurementKeysSnapshot,
-        customOrderEnabled: isMadeToOrderSnapshot,
-        fitPreference: fitPreferenceSnapshot,
-        targetAgeGroup: targetAgeGroupSnapshot,
-      };
 
       // Fire-and-forget module job — does not depend on CreateDesign mount.
       void runDesignPublishJob({

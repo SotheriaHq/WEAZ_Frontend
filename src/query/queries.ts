@@ -231,9 +231,10 @@ export function useCollectionDetailQuery(
 ) {
   const queryClient = useQueryClient();
   const initialData =
-    scope === 'design'
+    queryClient.getQueryData(queryKeys.brand.collectionDetail(collectionId, scope)) ??
+    (scope === 'design'
       ? queryClient.getQueryData(queryKeys.design.detail(collectionId))
-      : undefined;
+      : undefined);
 
   return useQuery({
     queryKey: queryKeys.brand.collectionDetail(collectionId, scope),

@@ -27,6 +27,11 @@ import { brandApi } from '../../api/BrandApi';
 import { ProfilePhotoViewApi } from '@/api/ProfilePhotoViewApi';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
 import { finalizeDesignUploads } from '@/api/DesignApi';
+import {
+  isDesignPublishJobRunning,
+  runDesignPublishJob,
+} from '@/features/designs/designPublishJob';
+import { readDesignPublishRecovery } from '@/features/designs/designPublishRecovery';
 import ProfileHeaderQuickEditModal from '../../components/profile/ProfileHeaderQuickEditModal';
 import type { BrandProfileDto, CollectionDto, ReviewRatingDistributionItem } from '../../types/profile';
 import type { ProductReviewResponse } from '../../api/ReviewsApi';
@@ -44,6 +49,7 @@ import {
   prunePublishTasks,
   reconcilePublishTasksWithDraftIds,
   removePublishTask,
+  updatePublishTask,
   getPublishTaskDesignId,
   getPublishTaskLegacyCollectionId,
   getCompactPublishTaskStatusLabel,
@@ -1457,14 +1463,66 @@ const ProfilePage: React.FC = () => {
     const targetCollectionId = linkedTask
       ? getPublishTaskLegacyCollectionId(linkedTask)
       : (state?.taskId && state.taskId === collectionId ? null : collectionId);
+    const recoveryTaskId = linkedTask?.id ?? state?.taskId ?? collectionId;
 
     if (!targetCollectionId) {
+      const recoveredJob = await readDesignPublishRecovery(recoveryTaskId).catch(() => null);
+      if (recoveredJob) {
+        if (isDesignPublishJobRunning(recoveredJob.taskId)) {
+          toast.info('Upload is already retrying.');
+          return;
+        }
+
+        updatePublishTask(
+          recoveredJob.taskId,
+          {
+            status: 'uploading',
+            progress: 1,
+            message: 'Retrying upload...',
+            error: undefined,
+          },
+          publishTaskScope,
+        );
+        setPublishingStates((prev) => ({
+          ...prev,
+          [collectionId]: {
+            status: 'publishing',
+            startedAt: prev[collectionId]?.startedAt ?? Date.now(),
+            attempts: (prev[collectionId]?.attempts ?? 0) + 1,
+            progress: 1,
+            previewUrl: prev[collectionId]?.previewUrl,
+            taskId: recoveredJob.taskId,
+            title: recoveredJob.title,
+            visibility: recoveredJob.designMetadata.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC',
+            kind: 'publish',
+            reviewStatus: 'IN_REVIEW',
+            message: 'Retrying upload...',
+          },
+        }));
+
+        void runDesignPublishJob({
+          ...recoveredJob,
+          publishTaskScope,
+          onComplete: () => {
+            toast.success('Design submitted for review.');
+            if (!isVisitorView && user?.id) {
+              void fetchCollections(user.id, { forceRefresh: true });
+            }
+          },
+          onError: (error) => {
+            toast.error(error.message || 'Upload retry failed.');
+          },
+        });
+        toast.info('Retrying upload from saved recovery data.');
+        return;
+      }
+
       // A FAILED task with no server design id means initialize never
-      // succeeded — nothing exists server-side and the selected files only
-      // lived in the editor session. Retrying can never work; be honest.
+      // succeeded and no recovery snapshot exists. Retrying can never work;
+      // be honest instead of showing a fake retry.
       if (linkedTask?.status === 'failed' || state?.status === 'failed') {
         toast.error(
-          'This save never reached the server, so it cannot be retried. Dismiss this card and create the design again.',
+          'This save never reached the server and no recovery data is available. Dismiss this card and create the design again.',
         );
         return;
       }

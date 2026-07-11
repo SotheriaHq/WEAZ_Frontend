@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSelector } from "react-redux";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { X } from "lucide-react";
 import VLoader from "@/components/loaders/VLoader";
@@ -44,6 +45,7 @@ import {
   mapCreatorMetadataError,
   normalizeHashtagLabel,
 } from "@/utils/creatorMetadata";
+import useCachedResource from "@/hooks/useCachedResource";
 
 const MAX_PRODUCTS = 5;
 const MAX_TAGS = 20;
@@ -62,6 +64,25 @@ type CategoryOption = {
   id: string;
   name: string;
   types: CategoryTypeOption[];
+};
+
+const extractStoreProducts = (res: unknown): StoreProduct[] => {
+  const payload = res as any;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.data?.items)) return payload.data.items;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+};
+
+const mergeStoreProducts = (
+  current: StoreProduct[],
+  incoming: StoreProduct[],
+): StoreProduct[] => {
+  const merged = new Map(current.map((product) => [product.id, product]));
+  incoming.forEach((product) => {
+    merged.set(product.id, product);
+  });
+  return Array.from(merged.values());
 };
 
 const FILTER_SELECTION_STORAGE_PREFIX = "storeCollectionFilterSelection:";
@@ -365,6 +386,14 @@ const StoreCollectionCreate: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useSelector((state: RootState) => state.user.profile);
+  const queryClient = useQueryClient();
+  const storeCollectionProductsQueryKey = useMemo(
+    () => ['store-collection-create', 'products', user?.id ?? 'anon', 200] as const,
+    [user?.id],
+  );
+  const cachedStoreProducts = user?.id
+    ? queryClient.getQueryData<StoreProduct[]>(storeCollectionProductsQueryKey)
+    : undefined;
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -376,7 +405,6 @@ const StoreCollectionCreate: React.FC = () => {
   const [tags, setTags] = useState<string[]>([]);
 
   const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({});
   const [hasManualFilterEdits, setHasManualFilterEdits] = useState(false);
   const [hasManualTagEdits, setHasManualTagEdits] = useState(false);
@@ -384,8 +412,12 @@ const StoreCollectionCreate: React.FC = () => {
   const [hasManualSubCategoryEdit, setHasManualSubCategoryEdit] = useState(false);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
 
-  const [products, setProducts] = useState<StoreProduct[]>([]);
-  const [productsLoading, setProductsLoading] = useState(true);
+  const [products, setProducts] = useState<StoreProduct[]>(
+    () => cachedStoreProducts ?? [],
+  );
+  const [productsLoading, setProductsLoading] = useState(
+    () => Boolean(user?.id) && cachedStoreProducts === undefined,
+  );
   const [productsError, setProductsError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [creationMode, setCreationMode] = useState<"existing" | "new">(
@@ -434,6 +466,27 @@ const StoreCollectionCreate: React.FC = () => {
     autoCleanupParam === "1" || returnMode === "new" || returnMode === "existing",
   );
   const restoredDraftSnapshotRef = useRef(false);
+  const { data: cachedCategories = [], loading: loadingCategories } =
+    useCachedResource<CategoryOption[]>({
+      queryKey: ['store-collection-create', 'categories-with-subcategories'],
+      queryFn: async () => {
+        try {
+          const cats = await brandApi.getCategoriesWithSubCategories(true);
+          if (!Array.isArray(cats)) return [];
+          return cats.map((c) => ({
+            id: c.id,
+            name: c.name,
+            types: Array.isArray(c.types)
+              ? c.types.map((t) => ({ id: t.id, name: t.name }))
+              : [],
+          }));
+        } catch {
+          return [];
+        }
+      },
+      staleTime: 30 * 60 * 1000,
+      gcTime: 60 * 60 * 1000,
+    });
 
   const clearSessionFilterCache = useCallback((sessionId?: string | null) => {
     if (!sessionId) return;
@@ -506,45 +559,21 @@ const StoreCollectionCreate: React.FC = () => {
   );
 
   useEffect(() => {
-    let mounted = true;
-    const loadCategories = async () => {
-      setLoadingCategories(true);
-      try {
-        const cats = await brandApi.getCategoriesWithSubCategories(true);
-        if (!mounted) return;
-        const mapped = cats.map((c) => ({
-          id: c.id,
-          name: c.name,
-          types: Array.isArray(c.types)
-            ? c.types.map((t) => ({ id: t.id, name: t.name }))
-            : [],
-        }));
-        setCategories(mapped);
-        if (mapped.length) {
-          setCategoryId((prev) => prev || mapped[0].id);
-          setCategoryTypeId((prev) => {
-            if (
-              prev &&
-              mapped.some((category) =>
-                category.types.some((categoryType) => categoryType.id === prev),
-              )
-            ) {
-              return prev;
-            }
-            return mapped[0].types[0]?.id ?? "";
-          });
-        }
-      } catch {
-        if (mounted) setCategories([]);
-      } finally {
-        if (mounted) setLoadingCategories(false);
+    setCategories(cachedCategories);
+    if (!cachedCategories.length) return;
+    setCategoryId((prev) => prev || cachedCategories[0].id);
+    setCategoryTypeId((prev) => {
+      if (
+        prev &&
+        cachedCategories.some((category) =>
+          category.types.some((categoryType) => categoryType.id === prev),
+        )
+      ) {
+        return prev;
       }
-    };
-    void loadCategories();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+      return cachedCategories[0].types[0]?.id ?? "";
+    });
+  }, [cachedCategories]);
 
   useEffect(() => {
     if (!prefillCollectionId) return;
@@ -958,30 +987,32 @@ const StoreCollectionCreate: React.FC = () => {
     }
   }, [collectionSessionId, filterSelection]);
 
-  const loadProducts = useCallback(async () => {
+  const loadProducts = useCallback(async (options?: { forceRefresh?: boolean }) => {
     if (!user?.id) {
       setProducts([]);
       setProductsLoading(false);
       return;
     }
-    setProductsLoading(true);
+    const cached = queryClient.getQueryData<StoreProduct[]>(storeCollectionProductsQueryKey);
+    if (cached) {
+      setProducts((prev) => mergeStoreProducts(prev, cached));
+      setProductsLoading(false);
+    } else {
+      setProductsLoading(true);
+    }
     setProductsError(null);
     try {
-      const res = await getBrandProductsForOwner(user.id, 200);
-      const items = Array.isArray((res as any)?.items)
-        ? (res as any).items
-        : Array.isArray((res as any)?.data?.items)
-          ? (res as any).data.items
-          : Array.isArray((res as any)?.data)
-            ? (res as any).data
-            : [];
-      setProducts((prev) => {
-        const merged = new Map(prev.map((product) => [product.id, product]));
-        items.forEach((product: StoreProduct) => {
-          merged.set(product.id, product);
+      if (options?.forceRefresh) {
+        await queryClient.invalidateQueries({
+          queryKey: storeCollectionProductsQueryKey,
         });
-        return Array.from(merged.values());
+      }
+      const items = await queryClient.fetchQuery({
+        queryKey: storeCollectionProductsQueryKey,
+        queryFn: async () => extractStoreProducts(await getBrandProductsForOwner(user.id, 200)),
+        staleTime: options?.forceRefresh ? 0 : 3 * 60 * 1000,
       });
+      setProducts((prev) => mergeStoreProducts(prev, items));
     } catch (error: any) {
       setProductsError(
         error?.response?.data?.message ?? "Failed to load products.",
@@ -989,7 +1020,7 @@ const StoreCollectionCreate: React.FC = () => {
     } finally {
       setProductsLoading(false);
     }
-  }, [user?.id]);
+  }, [queryClient, storeCollectionProductsQueryKey, user?.id]);
 
   useEffect(() => {
     void loadProducts();
@@ -997,7 +1028,7 @@ const StoreCollectionCreate: React.FC = () => {
 
   useEffect(() => {
     if (!preselectProductId) return;
-    void loadProducts();
+    void loadProducts({ forceRefresh: true });
     setSessionFlowProductIds((prev) =>
       prev.includes(preselectProductId) ? prev : [...prev, preselectProductId],
     );
@@ -1311,7 +1342,7 @@ const StoreCollectionCreate: React.FC = () => {
     });
 
     if (replacedTempIds) {
-      void loadProducts();
+      void loadProducts({ forceRefresh: true });
     }
 
     readyItems.forEach((item) => {
@@ -2494,7 +2525,7 @@ const StoreCollectionCreate: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void loadProducts()}
+                    onClick={() => void loadProducts({ forceRefresh: true })}
                     className="surface-control surface-interactive-hover rounded-lg border px-4 py-2 text-xs font-semibold"
                   >
                     Refresh Products
