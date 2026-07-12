@@ -1,26 +1,26 @@
 import React from 'react';
 
 /**
- * PinchZoomImage — mobile pinch-to-zoom + double-tap-zoom for a single image.
+ * PinchZoomImage — lightweight pinch + double-tap zoom for a single inline
+ * image. Designed for the mobile design modal: the image keeps its natural
+ * aspect ratio (`w-full h-auto object-contain`, no letterbox background) and
+ * only transforms on gesture.
  *
- * DESIGN NOTES:
- * - Gestures mutate `transform` imperatively (no per-frame setState) so zoom
- *   stays at 60fps and never re-decodes the underlying <img>.
- * - `enabled` gates all gesture handling. When it flips to false (e.g. the
- *   metadata drawer expands), the transform resets to identity so the image is
- *   never left zoomed behind other UI. This is how the caller keeps zoom and
- *   the bottom-sheet gesture from fighting each other.
- * - object-contain preserves the original aspect ratio; the image is centered.
+ * PERFORMANCE / GESTURE NOTES:
+ * - Gestures mutate `transform` imperatively (no per-frame setState) → 60fps,
+ *   and the underlying <img> is never re-decoded.
+ * - `touch-action` is `pan-y` at 1x so the parent card still scrolls vertically
+ *   and a one-finger drag never hijacks scroll; it flips to `none` only while
+ *   zoomed so panning the enlarged image works. Two-finger pinch is captured at
+ *   any zoom level.
+ * - Resets to identity when the source changes.
  */
 
 export interface PinchZoomImageProps {
   src: string;
   alt: string;
-  enabled: boolean;
   className?: string;
   onZoomChange?: (zoomed: boolean) => void;
-  onLoad?: () => void;
-  onError?: () => void;
 }
 
 const MAX_SCALE = 4;
@@ -31,26 +31,24 @@ const DOUBLE_TAP_MS = 300;
 const PinchZoomImage: React.FC<PinchZoomImageProps> = ({
   src,
   alt,
-  enabled,
   className,
   onZoomChange,
-  onLoad,
-  onError,
 }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const imgRef = React.useRef<HTMLImageElement>(null);
 
   const view = React.useRef({ scale: 1, tx: 0, ty: 0 });
-  const pointers = React.useRef<Map<number, { x: number; y: number }>>(
-    new Map(),
-  );
-  const pinch = React.useRef<{ startDist: number; startScale: number } | null>(
-    null,
-  );
-  const pan = React.useRef<{ startX: number; startY: number; tx: number; ty: number } | null>(
-    null,
-  );
+  const pointers = React.useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinch = React.useRef<{ startDist: number; startScale: number } | null>(null);
+  const pan = React.useRef<{ startX: number; startY: number; tx: number; ty: number } | null>(null);
   const lastTap = React.useRef(0);
+
+  const syncTouchAction = () => {
+    const el = containerRef.current;
+    if (!el) return;
+    // At 1x let the parent scroll (pan-y). Zoomed → take over for free panning.
+    el.style.touchAction = view.current.scale > 1.01 ? 'none' : 'pan-y';
+  };
 
   const apply = (withTransition: boolean) => {
     const el = imgRef.current;
@@ -60,37 +58,29 @@ const PinchZoomImage: React.FC<PinchZoomImageProps> = ({
       : 'none';
     const { scale, tx, ty } = view.current;
     el.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`;
+    syncTouchAction();
   };
 
   const clampPan = () => {
     const container = containerRef.current;
-    const el = imgRef.current;
-    if (!container || !el) return;
+    if (!container) return;
     const cw = container.clientWidth;
     const ch = container.clientHeight;
     const { scale } = view.current;
-    // Allowed pan is half the overflow in each axis.
     const maxX = Math.max(0, (cw * scale - cw) / 2);
     const maxY = Math.max(0, (ch * scale - ch) / 2);
     view.current.tx = Math.min(maxX, Math.max(-maxX, view.current.tx));
     view.current.ty = Math.min(maxY, Math.max(-maxY, view.current.ty));
   };
 
-  const reset = React.useCallback((withTransition: boolean) => {
-    view.current = { scale: 1, tx: 0, ty: 0 };
-    apply(withTransition);
-    onZoomChange?.(false);
-  }, [onZoomChange]);
-
-  // Reset when disabled (drawer expanded) or the media source changes.
-  React.useEffect(() => {
-    if (!enabled) {
-      pointers.current.clear();
-      pinch.current = null;
-      pan.current = null;
-      reset(true);
-    }
-  }, [enabled, reset]);
+  const reset = React.useCallback(
+    (withTransition: boolean) => {
+      view.current = { scale: 1, tx: 0, ty: 0 };
+      apply(withTransition);
+      onZoomChange?.(false);
+    },
+    [onZoomChange],
+  );
 
   React.useEffect(() => {
     reset(false);
@@ -100,38 +90,33 @@ const PinchZoomImage: React.FC<PinchZoomImageProps> = ({
     Math.hypot(a.x - b.x, a.y - b.y);
 
   const onPointerDown = (event: React.PointerEvent) => {
-    if (!enabled) return;
-    pointers.current.set(event.pointerId, {
-      x: event.clientX,
-      y: event.clientY,
-    });
-    try {
-      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-    } catch {
-      /* no-op */
-    }
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
     if (pointers.current.size === 2) {
       const [a, b] = Array.from(pointers.current.values());
-      pinch.current = {
-        startDist: distance(a, b),
-        startScale: view.current.scale,
-      };
+      pinch.current = { startDist: distance(a, b), startScale: view.current.scale };
       pan.current = null;
-    } else if (pointers.current.size === 1) {
-      if (view.current.scale > 1) {
-        pan.current = {
-          startX: event.clientX,
-          startY: event.clientY,
-          tx: view.current.tx,
-          ty: view.current.ty,
-        };
+      try {
+        (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+      } catch {
+        /* no-op */
+      }
+    } else if (pointers.current.size === 1 && view.current.scale > 1) {
+      pan.current = {
+        startX: event.clientX,
+        startY: event.clientY,
+        tx: view.current.tx,
+        ty: view.current.ty,
+      };
+      try {
+        (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+      } catch {
+        /* no-op */
       }
     }
   };
 
   const onPointerMove = (event: React.PointerEvent) => {
-    if (!enabled) return;
     const tracked = pointers.current.get(event.pointerId);
     if (!tracked) return;
     tracked.x = event.clientX;
@@ -139,16 +124,14 @@ const PinchZoomImage: React.FC<PinchZoomImageProps> = ({
 
     if (pinch.current && pointers.current.size === 2) {
       const [a, b] = Array.from(pointers.current.values());
-      const dist = distance(a, b);
-      const ratio = dist / (pinch.current.startDist || dist);
-      const nextScale = Math.min(
+      const ratio = distance(a, b) / (pinch.current.startDist || 1);
+      view.current.scale = Math.min(
         MAX_SCALE,
         Math.max(MIN_SCALE, pinch.current.startScale * ratio),
       );
-      view.current.scale = nextScale;
       clampPan();
       apply(false);
-      if (nextScale > 1.02) onZoomChange?.(true);
+      onZoomChange?.(view.current.scale > 1.02);
       return;
     }
 
@@ -161,28 +144,22 @@ const PinchZoomImage: React.FC<PinchZoomImageProps> = ({
   };
 
   const onPointerUp = (event: React.PointerEvent) => {
-    if (!enabled) return;
     const hadTwo = pointers.current.size === 2;
     pointers.current.delete(event.pointerId);
     try {
-      (event.currentTarget as HTMLElement).releasePointerCapture(
-        event.pointerId,
-      );
+      (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
     } catch {
       /* no-op */
     }
 
     if (hadTwo) {
       pinch.current = null;
-      // Snap back to identity if the pinch settled near 1x.
-      if (view.current.scale <= 1.05) {
-        reset(true);
-      }
+      if (view.current.scale <= 1.05) reset(true);
+      return;
     }
 
     if (pointers.current.size === 0) {
       pan.current = null;
-      // Double-tap detection (only meaningful for single-finger taps).
       const now = performance.now();
       if (now - lastTap.current < DOUBLE_TAP_MS) {
         lastTap.current = 0;
@@ -200,7 +177,6 @@ const PinchZoomImage: React.FC<PinchZoomImageProps> = ({
       reset(true);
       return;
     }
-    // Zoom toward the tap point.
     const rect = container.getBoundingClientRect();
     const px = event.clientX - rect.left - rect.width / 2;
     const py = event.clientY - rect.top - rect.height / 2;
@@ -215,21 +191,20 @@ const PinchZoomImage: React.FC<PinchZoomImageProps> = ({
   return (
     <div
       ref={containerRef}
-      className={['relative flex h-full w-full items-center justify-center overflow-hidden', className || ''].join(' ')}
-      style={{ touchAction: enabled ? 'none' : 'auto' }}
+      className={['relative w-full overflow-hidden', className || ''].join(' ')}
+      style={{ touchAction: 'pan-y' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      onDoubleClick={(e) => toggleDoubleTap(e as unknown as React.PointerEvent)}
     >
       <img
         ref={imgRef}
         src={src}
         alt={alt}
         draggable={false}
-        onLoad={onLoad}
-        onError={onError}
-        className="max-h-full max-w-full select-none object-contain will-change-transform"
+        className="block h-auto w-full select-none object-contain will-change-transform"
         style={{ transformOrigin: 'center center' }}
       />
     </div>

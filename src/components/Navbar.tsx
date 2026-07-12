@@ -37,7 +37,7 @@ import { generateUserUid } from '@/utils/userUid';
 import { resolveProfileImageSource } from '@/utils/profileImage';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import { COMPANY_NAME } from '@/lib/brand';
-import { hasActiveBrandMembership } from '@/lib/brandAccess';
+import { hasActiveBrandMembership, resolveAccountDisplayName } from '@/lib/brandAccess';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
 import { MY_BAG_EMOJI, MY_BAG_LABEL } from '@/constants/bagging';
@@ -84,6 +84,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const userUid = user ? generateUserUid(user.id, user.firstName) : null;
+  // Brand accounts display the brand identity (name + initials), never the
+  // creator's personal name — keeps the fallback initials aligned with the
+  // brand-logo avatar. See resolveAccountDisplayName (Rule 28).
+  const accountDisplayName = resolveAccountDisplayName(user);
 
   const isAdmin = user?.role === 'SuperAdmin' || user?.role === 'Admin';
 
@@ -155,8 +159,8 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
               <ImageWithFallback
                 src={userAvatar.src}
                 fileId={userAvatar.fileId}
-                alt={`${user.firstName} ${user.lastName}`}
-                fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
+                alt={accountDisplayName}
+                fallbackName={accountDisplayName}
                 fit="cover"
                 className="h-full w-full object-cover"
                 containerClassName="h-full w-full"
@@ -175,8 +179,8 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
               <ImageWithFallback
                 src={userAvatar.src}
                 fileId={userAvatar.fileId}
-                alt={`${user.firstName} ${user.lastName}`}
-                fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
+                alt={accountDisplayName}
+                fallbackName={accountDisplayName}
                 fit="cover"
                 className="h-full w-full object-cover"
                 containerClassName="h-full w-full"
@@ -187,7 +191,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2">
                 <div className="min-w-0 flex-1 truncate text-base font-semibold text-[color:var(--text-primary)]">
-                  {user.firstName} {user.lastName}
+                  {accountDisplayName}
                 </div>
               </div>
               <button

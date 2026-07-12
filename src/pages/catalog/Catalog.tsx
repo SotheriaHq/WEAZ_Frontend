@@ -645,12 +645,24 @@ const ProfilePage: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [isStoreSetupNavigating]);
 
-  // Auto-prompt fires at most once per catalog visit. Re-asserting on every
-  // render fought the modal's own close (save/close cleared the URL param and
-  // this effect immediately re-added it, so the modal appeared to never close).
+  // Auto-prompt fires at most once per BROWSER SESSION (not once per mount).
+  // A mount-scoped ref re-fired on every catalog remount, so a hard refresh
+  // re-popped the profile modal. sessionStorage survives refresh but resets for
+  // a new session, so the nudge shows once and then leaves the user alone.
+  const AUTO_PROMPT_SESSION_KEY = 'threadly.brandProfileSetup.promptedSession';
   const hasAutoPromptedSetupRef = useRef(false);
   useEffect(() => {
     if (hasAutoPromptedSetupRef.current) return;
+    let promptedThisSession = false;
+    try {
+      promptedThisSession = sessionStorage.getItem(AUTO_PROMPT_SESSION_KEY) === '1';
+    } catch {
+      promptedThisSession = false;
+    }
+    if (promptedThisSession) {
+      hasAutoPromptedSetupRef.current = true;
+      return;
+    }
     const hasDismissedSetup = getHasDismissedBrandSetup();
     if (
       isOwner &&
@@ -660,6 +672,11 @@ const ProfilePage: React.FC = () => {
       !isEditModalOpen
     ) {
       hasAutoPromptedSetupRef.current = true;
+      try {
+        sessionStorage.setItem(AUTO_PROMPT_SESSION_KEY, '1');
+      } catch {
+        // Non-fatal: without sessionStorage the ref still guards this mount.
+      }
       const next = new URLSearchParams(searchParams);
       next.set('modal', 'brand-setup');
       next.set('modalOrigin', 'prompt');

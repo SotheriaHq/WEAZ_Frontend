@@ -16,8 +16,6 @@ import { setEngagementState } from '@/features/engagementSlice';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
-import FeaturedSection from '@/components/FeaturedSection';
-import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
 import { buildDesignRoute, buildProductRoute } from '@/utils/catalogRoutes';
 import { buildBrandProfilePathFromMarketItem } from '@/utils/brandProfileRoute';
@@ -278,7 +276,6 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('discover');
   const [viewItem, setViewItem] = useState<MarketItem | null>(null);
-  const [galleryOpen, setGalleryOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
@@ -824,15 +821,6 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
 
   return (
     <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 px-4">
-      <FeaturedSection
-        filterType="DESIGN"
-        onViewDesign={(collectionId) => {
-          const item = filteredItems.find((i) => i.id === collectionId);
-          if (item) setViewItem(item);
-        }}
-        onSeeAll={() => setGalleryOpen(true)}
-      />
-
       <div className="sticky top-16 z-20 mb-1 overflow-x-auto no-scrollbar px-2 py-1">
         <div className="flex items-center gap-2 border-b border-[color:var(--border-default)]/70 pb-1 text-sm min-w-max justify-start md:justify-center md:mx-auto">
         {feedCategories.map((cat) => {
@@ -970,8 +958,6 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
           }
         }}
       />
-
-      <FeaturedGalleryModal open={galleryOpen} onClose={() => setGalleryOpen(false)} />
     </div>
   );
 };

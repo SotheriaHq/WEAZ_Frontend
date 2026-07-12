@@ -13,9 +13,9 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 import PinchZoomImage from '@/components/media/PinchZoomImage';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
-import BottomSheet, { type SheetState } from '@/components/ui/BottomSheet';
 import { selectIsMobile } from '@/features/uiSlice';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useOverlayBackClose } from '@/hooks/useOverlayBackClose';
 import { formatPrice } from '@/utils/helpers';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import VLoader from '@/components/loaders/VLoader';
@@ -83,10 +83,10 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   const isMobile = useSelector(selectIsMobile);
   const currentUserId = authProfile?.id;
   const dialogRef = React.useRef<HTMLDivElement>(null);
-  // Mobile media-first drawer state. Starts half-open so the design dominates
-  // while brand/price/actions stay reachable; collapse for the full image,
-  // expand for comments.
-  const [sheetState, setSheetState] = React.useState<SheetState>('half');
+  // Mobile modal keeps a compact, image-first view: brand/price/actions are
+  // always visible and the heavier metadata (description, tags, comments)
+  // collapses. Starts collapsed so the design dominates.
+  const [mobileDetailsOpen, setMobileDetailsOpen] = React.useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const bagFlow = useBagFlow();
@@ -131,6 +131,11 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     active: open,
     onEscape: onClose,
   });
+
+  // On mobile, the back gesture must close this overlay in place rather than
+  // popping the underlying route (which used to dump the user into their
+  // catalog when a design was opened from the Runway).
+  useOverlayBackClose(open, onClose, isMobile);
 
   React.useEffect(() => {
     if (!open || !itemId) return;
@@ -289,9 +294,9 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     onCommentCountChangeRef.current?.(commentCount);
   }, [commentCount, open]);
 
-  // Fresh open (or navigating to a new item) starts the mobile drawer half-open.
+  // Fresh open (or navigating to a new item) starts the mobile drawer collapsed.
   React.useEffect(() => {
-    if (open) setSheetState('half');
+    if (open) setMobileDetailsOpen(false);
   }, [open, itemId]);
 
   React.useEffect(() => {
@@ -554,285 +559,286 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     return (
       <OverlayPortal>
         <div
-          ref={dialogRef}
-          className="fixed inset-0 z-layer-modal overflow-hidden bg-black"
+          className="fixed inset-0 z-layer-modal flex items-end justify-center bg-black/75 backdrop-blur-sm sm:items-center sm:p-3"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
           role="dialog"
           aria-modal="true"
           aria-label={item.collectionTitle || 'Design'}
         >
-          {/* Blurred backdrop fill so letterboxed images look premium */}
-          <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-            {activeMedia?.url && !isVideoMedia ? (
-              <img
-                src={activeMedia.url}
-                alt=""
-                className="h-full w-full scale-125 object-cover opacity-30 blur-2xl"
-              />
-            ) : null}
-            <div className="absolute inset-0 bg-black/50" />
-          </div>
+          <div
+            ref={dialogRef}
+            className="relative flex max-h-[94vh] w-full max-w-[560px] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl dark:bg-[#0f0b11] sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close */}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="absolute right-3 top-3 z-30 flex size-9 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm"
+            >
+              <span aria-hidden="true" className="text-lg">×</span>
+            </button>
 
-          {/* Media layer — fills the viewport behind the sheet */}
-          <div className="absolute inset-0">
-            {isVideoMedia ? (
-              <MediaRenderer
-                kind="video"
-                src={activeMedia?.url || ''}
-                fit="contain"
-                className="flex h-full w-full items-center justify-center"
-                mediaClassName="max-h-full max-w-full object-contain"
-                maxHeightClassName=""
-                controls={true}
-              />
-            ) : (
-              <PinchZoomImage
-                src={activeMedia?.url || ''}
-                alt={item.collectionTitle || 'Design image'}
-                enabled={sheetState === 'collapsed'}
-              />
-            )}
+            {/* Scroll region — image + metadata scroll together inside the card */}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain no-scrollbar">
+              {/* Media — fills the card width edge-to-edge, original aspect
+                  respected, no background/blur padding on any side. */}
+              <div className="relative w-full">
+                {isVideoMedia ? (
+                  <MediaRenderer
+                    kind="video"
+                    src={activeMedia?.url || ''}
+                    fit="contain"
+                    className="w-full"
+                    mediaClassName="block h-auto w-full"
+                    maxHeightClassName=""
+                    controls={true}
+                  />
+                ) : (
+                  <PinchZoomImage
+                    src={activeMedia?.url || ''}
+                    alt={item.collectionTitle || 'Design image'}
+                  />
+                )}
 
-            {loadingMedia ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/25">
-                <VLoader size={30} phase="loading" showLabel={false} />
+                {loadingMedia ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                    <VLoader size={28} phase="loading" showLabel={false} />
+                  </div>
+                ) : null}
+
+                {showMediaNav ? (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Previous image"
+                      className="absolute left-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
+                      onClick={() =>
+                        setActiveMediaIndex(
+                          (prev) => (prev - 1 + mediaItems.length) % mediaItems.length,
+                        )
+                      }
+                    >
+                      <span aria-hidden="true" className="text-lg">‹</span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Next image"
+                      className="absolute right-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
+                      onClick={() =>
+                        setActiveMediaIndex((prev) => (prev + 1) % mediaItems.length)
+                      }
+                    >
+                      <span aria-hidden="true" className="text-lg">›</span>
+                    </button>
+                    <div className="absolute bottom-2 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
+                      {activeMediaIndex + 1} / {mediaItems.length}
+                    </div>
+                  </>
+                ) : null}
               </div>
-            ) : null}
 
-            {showMediaNav ? (
-              <>
-                <button
-                  type="button"
-                  aria-label="Previous image"
-                  className="absolute left-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
-                  onClick={() =>
-                    setActiveMediaIndex(
-                      (prev) => (prev - 1 + mediaItems.length) % mediaItems.length,
-                    )
-                  }
-                >
-                  <span aria-hidden="true" className="text-lg">‹</span>
-                </button>
-                <button
-                  type="button"
-                  aria-label="Next image"
-                  className="absolute right-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
-                  onClick={() =>
-                    setActiveMediaIndex((prev) => (prev + 1) % mediaItems.length)
-                  }
-                >
-                  <span aria-hidden="true" className="text-lg">›</span>
-                </button>
-                <div className="absolute left-1/2 top-[max(0.75rem,env(safe-area-inset-top))] z-20 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
-                  {activeMediaIndex + 1} / {mediaItems.length}
-                </div>
-              </>
-            ) : null}
-          </div>
-
-          {/* Close */}
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-40 flex size-9 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm"
-          >
-            <span aria-hidden="true" className="text-lg">×</span>
-          </button>
-
-          {/* Metadata bottom sheet */}
-          <BottomSheet
-            open={open}
-            state={sheetState}
-            onStateChange={setSheetState}
-            onDismiss={onClose}
-            role="group"
-            ariaLabel="Design details"
-            peek={
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-3 px-4 pb-2 pt-1 text-left"
-                aria-label={
-                  sheetState === 'collapsed' ? 'Expand details' : 'Collapse details'
-                }
-              >
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <span className="size-8 shrink-0 overflow-hidden rounded-xl ring-1 ring-black/10 dark:ring-white/15">
-                    <ImageWithFallback
-                      src={avatar.src}
-                      fileId={avatar.fileId}
-                      alt={brandLabel}
-                      fit="cover"
-                      rounded="xl"
-                      fallbackName={avatarFallback}
-                      containerClassName="size-8 rounded-xl"
-                      className="size-8 object-cover"
-                    />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold">{brandLabel}</span>
-                    <span className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-white/50">
-                      <span aria-hidden="true">↕</span> Details
-                    </span>
-                  </span>
-                </span>
-                <span className="shrink-0 text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                  {saleBand || baseBand || 'Price on request'}
-                </span>
-              </button>
-            }
-          >
-            {/* Title + description */}
-            <div className="pt-1">
-              <h1 className="text-base font-bold leading-snug">{item.collectionTitle}</h1>
-              {item.collectionDescription ? (
-                <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-white/60">
-                  {item.collectionDescription}
-                </p>
-              ) : null}
-            </div>
-
-            {/* Tags */}
-            {item.tags?.length ? (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {item.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-700 dark:border dark:border-white/10 dark:bg-slate-800 dark:text-slate-100"
+              {/* Always-visible essentials: brand, title, price, actions */}
+              <div className="px-4 pb-4 pt-3">
+                <div className="flex items-center justify-between gap-2 pr-8">
+                  <button
+                    type="button"
+                    onClick={handleOpenBrandCatalog}
+                    className="group flex min-w-0 items-center gap-2.5 text-left"
+                    title={`Open ${brandLabel} catalog`}
                   >
-                    {tag}
+                    <span className="size-9 shrink-0 overflow-hidden rounded-2xl ring-1 ring-black/8 dark:ring-white/12">
+                      <ImageWithFallback
+                        src={avatar.src}
+                        fileId={avatar.fileId}
+                        alt={brandLabel}
+                        fit="cover"
+                        rounded="xl"
+                        fallbackName={avatarFallback}
+                        containerClassName="size-9 rounded-2xl"
+                        className="size-9 object-cover"
+                      />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[13px] font-semibold">{brandLabel}</span>
+                      {item.username ? (
+                        <span className="block truncate text-[11px] text-slate-400 dark:text-white/40">@{item.username}</span>
+                      ) : null}
+                    </span>
+                  </button>
+                  {canPatchBrand ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleTogglePatch();
+                      }}
+                      disabled={patchBusy}
+                      className={`shrink-0 inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide transition ${
+                        isPatched
+                          ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                          : 'border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300'
+                      } ${patchBusy ? 'cursor-not-allowed opacity-60' : ''}`}
+                    >
+                      {patchBusy ? '...' : isPatched ? 'Patched' : 'Patch'}
+                    </button>
+                  ) : null}
+                </div>
+
+                <h1 className="mt-2 text-base font-bold leading-snug">{item.collectionTitle}</h1>
+
+                <div className="mt-1.5 flex items-center gap-2">
+                  <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                    {saleBand || baseBand || 'Price on request'}
                   </span>
-                ))}
-              </div>
-            ) : null}
+                  {saleBand && baseBand ? (
+                    <span className="text-[10px] text-slate-400 line-through">{baseBand}</span>
+                  ) : null}
+                  {item.customAvailable ? (
+                    <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-500/15 dark:text-purple-300">
+                      <span aria-hidden="true">✂️</span>
+                      Custom
+                    </span>
+                  ) : null}
+                </div>
 
-            {/* Price + custom badge */}
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                {saleBand || baseBand || 'Price on request'}
-              </span>
-              {saleBand && baseBand ? (
-                <span className="text-[10px] text-slate-400 line-through">{baseBand}</span>
-              ) : null}
-              {item.customAvailable ? (
-                <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-500/15 dark:text-purple-300">
-                  <span aria-hidden="true">✂️</span>
-                  Custom
-                </span>
-              ) : null}
-              {canPatchBrand ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={bagDisabled}
+                    onClick={() => {
+                      void handleOpenDesignCustomOrder();
+                    }}
+                    title={bagTitle}
+                    aria-label={BAG_IT_LABEL}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none dark:disabled:bg-slate-700 dark:disabled:text-slate-300"
+                  >
+                    <BagPulseIcon status={bagStatus} context="detail" size={26} disabled={bagDisabled} />
+                    {openingCustomComposer ? 'Loading...' : BAG_IT_LABEL}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleToggleSave}
+                    disabled={saveBusy}
+                    title={isOwnBrandContent ? 'Brands cannot save their own products' : isSaved ? 'Unsave' : 'Save'}
+                    className={`${mobileActionBtn} disabled:opacity-50`}
+                  >
+                    <span aria-hidden="true">🔖</span>
+                    {isSaved ? 'Saved' : 'Save'}
+                  </button>
+                  <button type="button" onClick={handleShare} className={mobileActionBtn}>
+                    <span aria-hidden="true">🔗</span>
+                    Share
+                  </button>
+                  {item ? (
+                    <ReportContentButton
+                      targetType={item.designId ? 'DESIGN' : 'COLLECTION'}
+                      targetId={item.designId ?? item.collectionId ?? item.id}
+                      label="Report"
+                      className={mobileActionBtn}
+                    />
+                  ) : null}
+                  <button type="button" onClick={handleOpenBrandCatalog} className={mobileActionBtn}>
+                    <span aria-hidden="true">🏬</span>
+                    Store
+                  </button>
+                </div>
+
+                {/* Collapse toggle for the heavier metadata */}
                 <button
                   type="button"
-                  onClick={() => {
-                    void handleTogglePatch();
-                  }}
-                  disabled={patchBusy}
-                  className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide transition ${
-                    isPatched
-                      ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                      : 'border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300'
-                  } ${patchBusy ? 'cursor-not-allowed opacity-60' : ''} ${item.customAvailable ? '' : 'ml-auto'}`}
+                  onClick={() => setMobileDetailsOpen((v) => !v)}
+                  aria-expanded={mobileDetailsOpen}
+                  className="mt-3 flex w-full items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
                 >
-                  {patchBusy ? '...' : isPatched ? 'Patched' : 'Patch'}
+                  <span>
+                    Details &amp; comments{commentCount > 0 ? ` · ${commentCount}` : ''}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className={`transition-transform duration-300 ${mobileDetailsOpen ? 'rotate-180' : ''}`}
+                  >
+                    ▾
+                  </span>
                 </button>
-              ) : null}
-            </div>
 
-            {/* Actions */}
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                disabled={bagDisabled}
-                onClick={() => {
-                  void handleOpenDesignCustomOrder();
-                }}
-                title={bagTitle}
-                aria-label={BAG_IT_LABEL}
-                className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none dark:disabled:bg-slate-700 dark:disabled:text-slate-300"
-              >
-                <BagPulseIcon
-                  status={bagStatus}
-                  context="detail"
-                  size={26}
-                  disabled={bagDisabled}
-                />
-                {openingCustomComposer ? 'Loading...' : BAG_IT_LABEL}
-              </button>
-              <button
-                type="button"
-                onClick={handleToggleSave}
-                disabled={saveBusy}
-                title={isOwnBrandContent ? 'Brands cannot save their own products' : isSaved ? 'Unsave' : 'Save'}
-                className={`${mobileActionBtn} disabled:opacity-50`}
-              >
-                <span aria-hidden="true">🔖</span>
-                {isSaved ? 'Saved' : 'Save'}
-              </button>
-              <button type="button" onClick={handleShare} className={mobileActionBtn}>
-                <span aria-hidden="true">🔗</span>
-                Share
-              </button>
-              {item ? (
-                <ReportContentButton
-                  targetType={item.designId ? 'DESIGN' : 'COLLECTION'}
-                  targetId={item.designId ?? item.collectionId ?? item.id}
-                  label="Report"
-                  className={mobileActionBtn}
-                />
-              ) : null}
-              <button type="button" onClick={handleOpenBrandCatalog} className={mobileActionBtn}>
-                <span aria-hidden="true">🏬</span>
-                Store
-              </button>
-            </div>
-
-            {/* Comments (revealed as the sheet is fully expanded) */}
-            <div className="mt-4 border-t border-slate-200/80 pt-3 dark:border-white/10">
-              <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-white/50">
-                Comments
-              </div>
-              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 dark:border-white/15 dark:bg-black/25">
-                <input
-                  type="text"
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      void handleCommentSubmit();
-                    }
-                  }}
-                  disabled={postingComment}
-                  placeholder="Add a comment..."
-                  maxLength={500}
-                  className="flex-1 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-white/40"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleCommentSubmit();
-                  }}
-                  disabled={postingComment || !commentText.trim()}
-                  className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-slate-900"
-                  aria-label="Post comment"
+                {/* Smooth CSS grid-rows collapse — GPU-cheap, no drag, no freeze */}
+                <div
+                  className="grid transition-[grid-template-rows] duration-300 ease-out"
+                  style={{ gridTemplateRows: mobileDetailsOpen ? '1fr' : '0fr' }}
                 >
-                  {postingComment ? '...' : 'Post'}
-                </button>
-              </div>
-              <div className="mt-3 h-[48vh]">
-                <DesignCommentsPanel
-                  mediaId={activeMediaId ?? item.id}
-                  collectionId={item.collectionId}
-                  contentOwnerId={item.brandId}
-                  currentUserId={currentUserId}
-                  className="h-full"
-                  onCommentAdded={() => setCommentCount((c) => c + 1)}
-                  onCommentRemoved={() => setCommentCount((c) => Math.max(0, c - 1))}
-                  showComposer={false}
-                  externalComment={externalComment}
-                />
+                  <div className="overflow-hidden">
+                    <div className="pt-3">
+                      {item.collectionDescription ? (
+                        <p className="text-xs leading-relaxed text-slate-500 dark:text-white/60">
+                          {item.collectionDescription}
+                        </p>
+                      ) : null}
+
+                      {item.tags?.length ? (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {item.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-700 dark:border dark:border-white/10 dark:bg-slate-800 dark:text-slate-100"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <div className="mt-4 border-t border-slate-200/80 pt-3 dark:border-white/10">
+                        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 dark:border-white/15 dark:bg-black/25">
+                          <input
+                            type="text"
+                            value={commentText}
+                            onChange={(e) => setCommentText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                void handleCommentSubmit();
+                              }
+                            }}
+                            disabled={postingComment}
+                            placeholder="Add a comment..."
+                            maxLength={500}
+                            className="flex-1 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-white/40"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void handleCommentSubmit();
+                            }}
+                            disabled={postingComment || !commentText.trim()}
+                            className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-slate-900"
+                            aria-label="Post comment"
+                          >
+                            {postingComment ? '...' : 'Post'}
+                          </button>
+                        </div>
+                        <div className="mt-3 max-h-[42vh] overflow-hidden">
+                          <DesignCommentsPanel
+                            mediaId={activeMediaId ?? item.id}
+                            collectionId={item.collectionId}
+                            contentOwnerId={item.brandId}
+                            currentUserId={currentUserId}
+                            className="h-full"
+                            onCommentAdded={() => setCommentCount((c) => c + 1)}
+                            onCommentRemoved={() => setCommentCount((c) => Math.max(0, c - 1))}
+                            showComposer={false}
+                            externalComment={externalComment}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </BottomSheet>
+          </div>
         </div>
         {customComposerOverlay}
       </OverlayPortal>

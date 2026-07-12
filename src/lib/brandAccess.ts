@@ -107,6 +107,42 @@ export function hasActiveBrandMembership(user?: Pick<AuthUserDto, 'brandMembersh
   return Boolean(getActiveBrandMembership(user));
 }
 
+/**
+ * Canonical identity display name for the AUTHENTICATED account (Rule 1 + Rule 28).
+ *
+ * A brand account (`type === 'BRAND'`) IS the brand: its avatar shows the brand
+ * logo, so its name and fallback initials must be the BRAND name — never the
+ * personal name of the user who created the brand. Personal (REGULAR) accounts
+ * use their own name. Use this everywhere the logged-in account's name or
+ * avatar-fallback initials are rendered so identity never diverges per surface.
+ */
+export function resolveAccountDisplayName(
+  user?:
+    | Pick<
+        AuthUserDto,
+        | 'type'
+        | 'brandFullName'
+        | 'firstName'
+        | 'lastName'
+        | 'username'
+        | 'brandMemberships'
+        | 'activeBrandId'
+        | 'storeId'
+      >
+    | null,
+): string {
+  if (user?.type === 'BRAND') {
+    const brandName = (
+      user.brandFullName ||
+      getActiveBrandMembership(user)?.brandName ||
+      ''
+    ).trim();
+    if (brandName) return brandName;
+  }
+  const personal = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim();
+  return personal || (user?.username ?? '').trim();
+}
+
 export function isBrandOwner(
   user?: Pick<AuthUserDto, 'brandMemberships' | 'activeBrandId' | 'storeId' | 'type' | 'brandFullName'> | null,
   brandId?: string | null,

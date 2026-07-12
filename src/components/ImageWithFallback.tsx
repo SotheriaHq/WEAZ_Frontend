@@ -244,6 +244,11 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     return src ?? null;
   });
   const [hadError, setHadError] = useState(false);
+  // Sticky "this source has failed at least once" flag. After a first failure we
+  // keep the stable fallback avatar visible during the silent retry instead of
+  // re-flashing the shimmer, which produced the jarring
+  // skeleton -> initials -> skeleton -> initials sequence on market cards.
+  const [everErrored, setEverErrored] = useState(false);
   const [loaded, setLoaded] = useState(() => {
     if (canUseSourceDirectly(src, fileId)) return true;
     if (fileId) return !!(getCachedUrl(fileId));
@@ -262,8 +267,10 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     retryCountRef.current = 0;
 
     const run = async () => {
-      // If src/fileId changed, reset error
+      // If src/fileId changed, reset error state (new image starts fresh, so it
+      // is allowed to show the shimmer again).
       setHadError(false);
+      setEverErrored(false);
       if (sourceCacheKey) {
         const cachedLastGood = lastGoodUrlCache.get(sourceCacheKey);
         if (cachedLastGood) {
@@ -371,6 +378,10 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     };
   }, [fileId, sourceCacheKey, src]);
 
+  useEffect(() => {
+    if (hadError) setEverErrored(true);
+  }, [hadError]);
+
   // Auto-retry once on error after a short delay
   useEffect(() => {
     if (!hadError || retryCountRef.current >= 1) return;
@@ -419,9 +430,18 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   // Without this, there is a white flash between "URL resolved" and "image onLoad" because the
   // <img> is opacity-0 with no background behind it during that window.
   const showFallback = !hasSource || hadError || isKnownUnavailableSource;
+  // Once a source has errored, a silent retry may be in flight (hadError back to
+  // false while a fresh signed URL loads). Keep the stable fallback painted
+  // during that window instead of re-showing the shimmer.
+  const showRetryFallback = everErrored && !showFallback && !loaded;
   const showPreviousImage =
     keepPreviousOnReload && Boolean(lastGoodUrl) && !showFallback && hasSource && (isResolving || !loaded);
-  const showShimmer = !showPreviousImage && !showFallback && (isResolving || (hasSource && !hadError && !loaded));
+  const showShimmer =
+    !showPreviousImage &&
+    !showFallback &&
+    !showRetryFallback &&
+    !everErrored &&
+    (isResolving || (hasSource && !hadError && !loaded));
   const wrapperClassName = cn('overflow-hidden', roundClass(rounded), containerClassName);
 
   useEffect(() => {
@@ -457,6 +477,11 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       )}
       {showFallback && (
         <DefaultAvatar name={fallbackName ?? alt} className={cn('w-full h-full', roundClass(rounded), className)} />
+      )}
+      {showRetryFallback && (
+        /* Silent-retry placeholder: overlay the fallback so the reloading image
+           can mount underneath and swap in on load — no shimmer re-flash. */
+        <DefaultAvatar name={fallbackName ?? alt} className={cn('absolute inset-0 w-full h-full', roundClass(rounded), className)} />
       )}
       {showPreviousImage && lastGoodUrl ? (
         <MediaRenderer

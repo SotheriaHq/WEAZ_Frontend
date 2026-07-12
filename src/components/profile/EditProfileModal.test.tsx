@@ -135,7 +135,26 @@ const renderModal = (props: Partial<React.ComponentProps<typeof EditProfileModal
 };
 
 describe('EditProfileModal brand setup blocker flow', () => {
-  it('renders from the brand setup route query', async () => {
+  it('renders from the brand setup route query (non-prompt deep link persists)', async () => {
+    userState.profile = makeBrandUser();
+    brandApiMock.getBrandProfile.mockResolvedValue(null);
+
+    // A user-opened / deep-linked modal (no modalOrigin=prompt) survives a load;
+    // only the ephemeral auto-prompt is stripped on refresh.
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/profile?modal=brand-setup']}>
+          <Routes>
+            <Route path="/profile" element={<GlobalModalRouter />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole('dialog', { name: 'Brand setup' })).toBeInTheDocument();
+  });
+
+  it('strips an auto-prompt modal carried in from a hard refresh (no reopen)', async () => {
     userState.profile = makeBrandUser();
     brandApiMock.getBrandProfile.mockResolvedValue(null);
 
@@ -149,7 +168,10 @@ describe('EditProfileModal brand setup blocker flow', () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByRole('dialog', { name: 'Brand setup' })).toBeInTheDocument();
+    // The auto-prompt modal must not reopen after a reload.
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Brand setup' })).not.toBeInTheDocument(),
+    );
   });
 
   it('allows seven selected tags and blocks the eighth tag', async () => {
