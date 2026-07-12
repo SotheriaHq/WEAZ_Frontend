@@ -1573,7 +1573,7 @@ const CreateDesignInner: React.FC = () => {
   return (
     <div className="min-h-screen overflow-x-clip bg-transparent text-[var(--text-primary)] transition-colors duration-300">
       {/* Main Content */}
-      <main className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-24 sm:pb-32">
+      <main className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-24 sm:pb-32">
         <div className="mb-4 flex items-center justify-between sm:mb-6">
           <button
             type="button"
@@ -2162,7 +2162,7 @@ const CreateDesignInner: React.FC = () => {
               </div>
 
               {isMadeToOrder && (
-                <div className="max-h-[38vh] min-h-[260px] overflow-y-auto rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-secondary)]/60 p-2 pr-1 shadow-inner scrollbar-hide">
+                <div className="max-h-none overflow-y-visible rounded-none border-0 bg-transparent p-0 sm:max-h-[38vh] sm:min-h-[260px] sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-[color:var(--border-default)] sm:bg-[color:var(--surface-secondary)]/60 sm:p-2 sm:pr-1 sm:shadow-inner scrollbar-hide">
                   <CustomOrderConfigurationEditor
                     ref={customOrderEditorRef}
                     sourceType="DESIGN"
@@ -2282,7 +2282,7 @@ const CreateDesignInner: React.FC = () => {
       </main>
 
       {/* Actions Footer - Integrated into flow */}
-      <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 pb-12">
+      <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 pb-12">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-sm text-theme-secondary">
             {lastSaved
@@ -2575,7 +2575,7 @@ const FormSection: React.FC<{
 }> = ({ title, icon, isOpen, onToggle, children, className, id }) => (
   <div
     id={id}
-    className={`surface-card relative rounded-2xl border border-[color:var(--border-default)] backdrop-blur transition-shadow ${
+    className={`surface-card relative rounded-xl sm:rounded-2xl border border-[color:var(--border-default)] backdrop-blur transition-shadow ${
       isOpen ? "shadow-[0_14px_34px_rgba(15,23,42,0.08)]" : "shadow-sm"
     } ${className ?? ""}`}
   >

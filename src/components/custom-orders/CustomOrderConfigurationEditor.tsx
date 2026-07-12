@@ -1530,7 +1530,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         tabIndex={-1}
         aria-invalid={Boolean(fieldErrors.requiredMeasurementKeys)}
         aria-describedby={fieldErrors.requiredMeasurementKeys ? getFieldErrorId('requiredMeasurementKeys') : undefined}
-        className={`mt-4 rounded-2xl border p-4 ${fieldErrors.requiredMeasurementKeys ? 'border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-black/10 dark:border-white/10'}`}
+        className={`mt-4 rounded-xl sm:rounded-2xl border p-3 sm:p-4 ${fieldErrors.requiredMeasurementKeys ? 'border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-black/10 dark:border-white/10'}`}
       >
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
           Measurement points <span className="text-rose-500">*</span>
@@ -1592,7 +1592,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         </div>
 
         {/* Left in pool */}
-        <div className="mt-4 max-h-44 overflow-y-auto rounded-xl border border-black/5 p-3 pr-2 dark:border-white/10">
+        <div className="mt-4 max-h-none overflow-y-visible rounded-xl border border-black/5 p-3 pr-2 dark:border-white/10 sm:max-h-44 sm:overflow-y-auto">
           <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Left in pool
             {selectableMeasurementKeys.length > 0 && (
@@ -1645,19 +1645,19 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             </button>
           ) : null}
         </div>
-        <div className="mt-4 grid gap-2 md:grid-cols-[1fr_auto]">
+        <div className="mt-4 flex gap-2">
           <input
             value={manualMeasurementKeyInput}
             onChange={(event) => setManualMeasurementKeyInput(event.target.value)}
             disabled={disabled}
-            className={fieldClassName}
+            className={`${fieldClassName} flex-1`}
             placeholder="Add missing measurement key"
           />
           <button
             type="button"
             onClick={addManualMeasurementKey}
             disabled={disabled || !manualMeasurementKeyInput.trim()}
-            className="rounded-full border border-black/10 px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:border-white/10 dark:text-slate-200"
+            className="rounded-full border border-black/10 px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:border-white/10 dark:text-slate-200 whitespace-nowrap"
           >
             Add key
           </button>
