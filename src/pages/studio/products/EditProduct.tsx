@@ -495,6 +495,8 @@ const EditProduct: React.FC = () => {
   const isEditMode = Boolean(productId);
   const [draggingSlot, setDraggingSlot] = useState<string | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
+  const [touchSourceSlot, setTouchSourceSlot] = useState<MediaViewSlot | null>(null);
+  const [touchActiveOverSlot, setTouchActiveOverSlot] = useState<MediaViewSlot | null>(null);
   const isCollectionContext = returnContext === "collection";
   const isCollectionFlow = isCollectionContext && !isEditMode;
   const pageTitle = isCollectionFlow
@@ -2541,15 +2543,7 @@ const EditProduct: React.FC = () => {
     return validFiles;
   }, []);
 
-  const handleMediaFilesSelected: React.ChangeEventHandler<
-    HTMLInputElement
-  > = async (e) => {
-    const selectedFiles = Array.from(e.target.files ?? []).filter((f) =>
-      f.type.startsWith("image/"),
-    );
-    e.target.value = "";
-    if (!selectedFiles.length) return;
-
+  const processAndUploadFiles = async (selectedFiles: File[], targetSlot?: MediaViewSlot) => {
     if (!canAddMoreMedia) {
       toast.error(`You can upload up to ${maxMediaCount} images`);
       return;
@@ -2557,6 +2551,10 @@ const EditProduct: React.FC = () => {
 
     const files = await preprocessProductMediaFiles(selectedFiles);
     if (!files.length) return;
+
+    if (targetSlot) {
+      pendingUploadSlotRef.current = targetSlot;
+    }
 
     if (isEditMode && productId) {
       const uploadQueue = files.slice(0, maxMediaCount - mediaUrls.length);
@@ -2645,6 +2643,17 @@ const EditProduct: React.FC = () => {
     pushMediaPreviews(files, { makePrimary });
   };
 
+  const handleMediaFilesSelected: React.ChangeEventHandler<
+    HTMLInputElement
+  > = async (e) => {
+    const selectedFiles = Array.from(e.target.files ?? []).filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    e.target.value = "";
+    if (!selectedFiles.length) return;
+    await processAndUploadFiles(selectedFiles);
+  };
+
 
 
   const handleSwapMediaSlots = useCallback(
@@ -2695,8 +2704,19 @@ const EditProduct: React.FC = () => {
     setDraggingSlot(slot);
   };
 
-  const handleDrop = (e: React.DragEvent, targetSlot: string) => {
+  const handleDrop = async (e: React.DragEvent, targetSlot: string) => {
     e.preventDefault();
+    setDraggingSlot(null);
+    setDragOverSlot(null);
+
+    const files = Array.from(e.dataTransfer.files).filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    if (files.length > 0) {
+      await processAndUploadFiles(files, targetSlot as MediaViewSlot);
+      return;
+    }
+
     const sourceSlot = e.dataTransfer.getData("text/plain") || draggingSlot;
     if (!sourceSlot || sourceSlot === targetSlot) return;
 
@@ -2706,6 +2726,41 @@ const EditProduct: React.FC = () => {
     if (hasSourceMedia || hasTargetMedia) {
       handleSwapMediaSlots(sourceSlot, targetSlot);
     }
+  };
+
+  const handleTouchStart = (_e: React.TouchEvent, slot: MediaViewSlot) => {
+    if (saving || !mediaBySlot.has(slot)) return;
+    setTouchSourceSlot(slot);
+    setDraggingSlot(slot);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchSourceSlot) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!element) return;
+
+    const slotEl = element.closest("[data-slot]");
+    if (slotEl) {
+      const targetSlot = slotEl.getAttribute("data-slot") as MediaViewSlot | null;
+      if (targetSlot && targetSlot !== touchSourceSlot) {
+        setTouchActiveOverSlot(targetSlot);
+        setDragOverSlot(targetSlot);
+        return;
+      }
+    }
+    setTouchActiveOverSlot(null);
+    setDragOverSlot(null);
+  };
+
+  const handleTouchEnd = (_e: React.TouchEvent) => {
+    if (touchSourceSlot && touchActiveOverSlot) {
+      handleSwapMediaSlots(touchSourceSlot, touchActiveOverSlot);
+    }
+    setTouchSourceSlot(null);
+    setTouchActiveOverSlot(null);
     setDraggingSlot(null);
     setDragOverSlot(null);
   };
@@ -2976,7 +3031,7 @@ const EditProduct: React.FC = () => {
             {/* Media Gallery */}
             <div
               id="product-media-section"
-              className="surface-card rounded-xl border p-4 shadow-sm sm:p-5 scroll-mt-24"
+              className="scroll-mt-24 space-y-4"
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-theme">
@@ -3124,20 +3179,21 @@ const EditProduct: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => mediaFileInputRef.current?.click()}
-                  className="group aspect-[4/3] w-full rounded-2xl border-2 border-dashed border-gray-300/80 bg-gray-50/50 hover:bg-purple-50/5 hover:border-purple-500/50 dark:border-white/15 dark:bg-white/[0.02] p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    const files = Array.from(e.dataTransfer.files).filter((f) =>
+                      f.type.startsWith("image/"),
+                    );
+                    if (files.length > 0) {
+                      await processAndUploadFiles(files);
+                    }
+                  }}
+                  className="group aspect-[4/3] w-full rounded-2xl border-2 border-dashed border-gray-300/80 bg-gray-50/50 hover:bg-purple-50/5 hover:border-purple-500/50 dark:border-white/15 dark:bg-white/[0.02] flex items-center justify-center transition-all cursor-pointer"
                 >
-                  <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-white/10 flex items-center justify-center mb-3 text-purple-600 transition-colors group-hover:bg-purple-200">
+                  <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-white/10 flex items-center justify-center text-purple-600 transition-colors group-hover:bg-purple-200">
                     <Plus className="w-6 h-6" />
                   </div>
-                  <p className="text-sm font-semibold text-theme">
-                    Add product images
-                  </p>
-                  <p className="text-xs text-theme-secondary mt-1">
-                    Tap or drag images here to upload
-                  </p>
-                  <p className="text-[10px] text-theme-secondary mt-3">
-                    Front, left, right, back views recommended • Max 6 images
-                  </p>
                 </button>
               )}
 
@@ -3154,6 +3210,7 @@ const EditProduct: React.FC = () => {
                   return (
                     <div
                       key={slotOption.value}
+                      data-slot={slotOption.value}
                       draggable={Boolean(assigned) && !saving}
                       onDragStart={(e) => handleDragStart(e, slotOption.value)}
                       onDragOver={(e) => {
@@ -3168,7 +3225,12 @@ const EditProduct: React.FC = () => {
                         setDragOverSlot(null);
                       }}
                       onDrop={(e) => handleDrop(e, slotOption.value)}
+                      onTouchStart={(e) => handleTouchStart(e, slotOption.value)}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
                       className={`relative rounded-xl overflow-hidden aspect-[4/3] w-full border transition-all duration-200 group ${
+                        assigned && !saving ? "touch-none" : ""
+                      } ${
                         isDragging
                           ? "border-dashed border-purple-400 opacity-50 scale-95"
                           : isDragOver
@@ -3220,12 +3282,9 @@ const EditProduct: React.FC = () => {
                           type="button"
                           onClick={() => openMediaPickerForSlot(slotOption.value)}
                           disabled={!canAddMoreMedia || saving}
-                          className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-3 text-center transition-colors hover:bg-purple-50/5 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="flex h-full w-full items-center justify-center p-3 transition-colors hover:bg-purple-50/5 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <Plus className="h-5 w-5 text-theme-secondary hover:text-purple-500 transition-colors" />
-                          <span className="text-[10px] font-semibold text-theme-secondary uppercase tracking-wider">
-                            Add {slotOption.label} {slotOption.required && <span className="text-amber-400">*</span>}
-                          </span>
                         </button>
                       )}
                     </div>
@@ -3257,7 +3316,7 @@ const EditProduct: React.FC = () => {
             </div>
 
             {/* Video Section */}
-            <div className="surface-card rounded-xl border p-4 shadow-sm sm:p-5">
+            <div className="py-2 space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-theme">
                   Product Video
@@ -4005,37 +4064,26 @@ const EditProduct: React.FC = () => {
 
                 {/* Custom order toggle */}
                 <div className="py-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-base font-medium text-theme">
-                        Custom Order
-                      </h2>
-                      <p className="mt-0.5 text-xs text-theme-secondary">
-                        Allow buyers to request this product with their own measurements. Custom order does not replace the required stocked size variants.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={form.customOrderEnabled}
-                      onClick={() => {
-                        const nextValue = !form.customOrderEnabled;
+                  <label className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/5 cursor-pointer transition-colors hover:border-purple-500/30">
+                    <input
+                      type="checkbox"
+                      checked={form.customOrderEnabled}
+                      onChange={(e) => {
+                        const nextValue = e.target.checked;
                         updateForm("customOrderEnabled", nextValue);
                         setShowCustomOrderForm(nextValue);
                       }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
-                        form.customOrderEnabled
-                          ? 'bg-purple-600'
-                          : 'bg-gray-200 dark:bg-gray-700'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                          form.customOrderEnabled ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
+                      className="w-5 h-5 mt-0.5 rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500 bg-white dark:bg-slate-900"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-semibold text-theme">
+                        Custom Order
+                      </span>
+                      <p className="mt-0.5 text-xs text-theme-secondary leading-relaxed">
+                        Allow buyers to request this product with their own measurements. Custom order does not replace the required stocked size variants.
+                      </p>
+                    </div>
+                  </label>
 
                   {showCustomOrderForm && (
                     <div className="mt-4">
