@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { getStoreStatus } from '@/api/StoreApi';
+import { MeasurementPointsApi } from '@/api/MeasurementPointsApi';
 import { useMeasurementPoints } from '@/hooks/useMeasurementPoints';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
@@ -420,6 +421,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   ]);
   const [showFabricRules, setShowFabricRules] = useState(false);
   const [manualMeasurementKeyInput, setManualMeasurementKeyInput] = useState('');
+  const [isSubmittingManualKey, setIsSubmittingManualKey] = useState(false);
   const [hasEditedBaseCharge, setHasEditedBaseCharge] = useState(false);
   const [showAllSelectedKeys, setShowAllSelectedKeys] = useState(false);
   const [showAllPoolKeys, setShowAllPoolKeys] = useState(false);
@@ -903,23 +905,92 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     );
   };
 
-  const addManualMeasurementKey = () => {
-    const normalized = manualMeasurementKeyInput
-      .trim()
-      .toUpperCase()
-      .replace(/\s+/g, '_');
+  const addManualMeasurementKey = async () => {
+    const rawLabel = manualMeasurementKeyInput.trim();
+    if (!rawLabel) {
+      return;
+    }
+    const normalized = rawLabel.toUpperCase().replace(/\s+/g, '_');
 
-    if (!normalized) {
+    const alreadySelected = (candidateKey: string) =>
+      form.requiredMeasurementKeys.some(
+        (key) => key.trim().toUpperCase() === candidateKey.trim().toUpperCase(),
+      );
+
+    // Reuse an existing point (system, approved-global, or this brand's own
+    // freeform) instead of resubmitting it — match by key or display label.
+    const existing = measurementPoints.find((point) => {
+      const keyUpper = String(point.key ?? '').trim().toUpperCase();
+      const labelUpper = String(point.label ?? '').trim().toUpperCase();
+      return keyUpper === normalized || labelUpper === rawLabel.toUpperCase();
+    });
+
+    if (existing) {
+      if (alreadySelected(existing.key)) {
+        toast.error('Measurement key already selected.');
+        return;
+      }
+      updateForm('requiredMeasurementKeys', [
+        ...form.requiredMeasurementKeys,
+        existing.key,
+      ]);
+      setManualMeasurementKeyInput('');
       return;
     }
 
-    if (form.requiredMeasurementKeys.includes(normalized)) {
+    if (alreadySelected(normalized)) {
       toast.error('Measurement key already selected.');
       return;
     }
 
-    updateForm('requiredMeasurementKeys', [...form.requiredMeasurementKeys, normalized]);
-    setManualMeasurementKeyInput('');
+    // Genuinely new key: register it as a freeform measurement point so admins
+    // can review it for the shared standards, AND add it to this order. Adding
+    // it locally only (the old behavior) meant brand-invented keys like this
+    // never reached the admin approval queue. Use the server-assigned key so the
+    // config references the exact point that was created.
+    const genderForSubmit =
+      measurementGender === 'MEN' ||
+      measurementGender === 'WOMEN' ||
+      measurementGender === 'UNISEX'
+        ? measurementGender
+        : undefined;
+    try {
+      setIsSubmittingManualKey(true);
+      const { point } = await MeasurementPointsApi.submitFreeform({
+        label: rawLabel,
+        category: 'GENERAL',
+        gender: genderForSubmit,
+      });
+      updateForm('requiredMeasurementKeys', [
+        ...form.requiredMeasurementKeys,
+        point.key,
+      ]);
+      setManualMeasurementKeyInput('');
+      toast.success(
+        'Measurement key added and sent to admin for global approval.',
+      );
+    } catch (error: any) {
+      const message = String(
+        error?.response?.data?.message ?? error?.message ?? '',
+      );
+      // Already exists globally (e.g. a system/approved point outside this
+      // gender filter). Add the key so the order still works.
+      if (/already exists/i.test(message)) {
+        updateForm('requiredMeasurementKeys', [
+          ...form.requiredMeasurementKeys,
+          normalized,
+        ]);
+        setManualMeasurementKeyInput('');
+        toast.info('That measurement already exists — added it to this order.');
+        return;
+      }
+      toast.error(
+        message ||
+          'Could not add this measurement key. Use letters, numbers, spaces, or hyphens.',
+      );
+    } finally {
+      setIsSubmittingManualKey(false);
+    }
   };
 
   const updateRuleCondition = (
@@ -1649,17 +1720,17 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           <input
             value={manualMeasurementKeyInput}
             onChange={(event) => setManualMeasurementKeyInput(event.target.value)}
-            disabled={disabled}
+            disabled={disabled || isSubmittingManualKey}
             className={`${fieldClassName} flex-1`}
             placeholder="Add missing measurement key"
           />
           <button
             type="button"
-            onClick={addManualMeasurementKey}
-            disabled={disabled || !manualMeasurementKeyInput.trim()}
+            onClick={() => void addManualMeasurementKey()}
+            disabled={disabled || isSubmittingManualKey || !manualMeasurementKeyInput.trim()}
             className="rounded-full border border-black/10 px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:border-white/10 dark:text-slate-200 whitespace-nowrap"
           >
-            Add key
+            {isSubmittingManualKey ? 'Adding…' : 'Add key'}
           </button>
         </div>
 

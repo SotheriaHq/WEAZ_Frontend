@@ -26,6 +26,13 @@ export interface ProductVariant {
   price?: number;
   stock: number;
   lowStock?: boolean;
+  /**
+   * UI-only stable identity for the color group in the editor. Lets two
+   * as-yet-unnamed colors stay separate cards (grouping otherwise collapses by
+   * color string). Never sent to the backend — `buildStoreProductPayload`
+   * only forwards size/color/colorHex/sku/price/stock.
+   */
+  colorGroupId?: string;
 }
 
 export interface ProductMediaSlotInput {

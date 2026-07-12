@@ -33,6 +33,21 @@ import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
 import { PRODUCT_STUDIO_SYNC_EVENT } from '@/utils/productStudioEvents';
 import {
+  readPublishTasks,
+  subscribePublishTasks,
+  removePublishTask,
+  updatePublishTask,
+  getPublishTaskDesignId,
+  type PublishTask,
+} from '@/utils/publishTracker';
+import {
+  runProductPublishJob,
+  isProductPublishJobRunning,
+  getRetryableProductPublishJob,
+  clearRetryableProductPublishJob,
+} from '@/features/products/productPublishJob';
+import { ProductPublishFillerCard } from '@/components/studio/store/ProductPublishFillerCard';
+import {
   getProductStockState,
   isCustomOrderOnlyProduct,
 } from '@/lib/productAvailability';
@@ -321,6 +336,16 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const user = useSelector((state: RootState) => state.user.profile);
   const dropdownManager = useDropdownManager();
   const isEmbeddedMobile = useEmbeddedSurface() === 'mobile-app';
+
+  // Live "creating product" filler cards (parity with the design catalog).
+  const productPublishScope = useMemo(() => ({ ownerId: user?.id }), [user?.id]);
+  const [productPublishTasks, setProductPublishTasks] = useState<PublishTask[]>([]);
+  useEffect(() => {
+    const sync = () =>
+      setProductPublishTasks(readPublishTasks(productPublishScope, 'product'));
+    sync();
+    return subscribePublishTasks(sync);
+  }, [productPublishScope]);
 
   const [filterStatus, setFilterStatus] = useState<ProductStatusFilter>(() => {
     // Notification deep links preselect a status tab (?status=in_review etc.).
@@ -1108,6 +1133,75 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     if (!user?.id) return;
     await refetchProducts();
   }, [refetchProducts, user?.id]);
+
+  // Filler cards for in-flight/failed product creation. Hide once the real
+  // product row has been fetched (reconciled by id) or the task is terminal.
+  const productIdSet = useMemo(
+    () => new Set(products.map((p) => p.id)),
+    [products],
+  );
+  const visibleProductFillers = useMemo(() => {
+    return productPublishTasks.filter((task) => {
+      const productId = getPublishTaskDesignId(task);
+      if (productId && productIdSet.has(productId)) return false; // reconciled
+      // Terminal-success: the real product row takes over (a refetch is already
+      // in flight from the job) — don't leave a stale filler on the wrong tab.
+      if (task.status === 'saved' || task.status === 'published') return false;
+      const kind = task.kind ?? 'publish';
+      if (filterStatus === 'draft') return kind === 'draft';
+      if (filterStatus === 'in_review') return kind === 'publish';
+      if (filterStatus === 'all') return true;
+      return false; // active/archived/deleted/etc. never show fillers
+    });
+  }, [productPublishTasks, productIdSet, filterStatus]);
+
+  const handleRetryProductPublish = useCallback(
+    (task: PublishTask) => {
+      const productId = getPublishTaskDesignId(task);
+      // A draft product already exists on the server (create succeeded, upload/
+      // publish failed) — open it to finish rather than re-creating a duplicate.
+      if (productId) {
+        clearRetryableProductPublishJob(task.id);
+        removePublishTask(task.id, productPublishScope);
+        navigate(`/studio/store/products/${productId}/edit`);
+        return;
+      }
+      const input = getRetryableProductPublishJob(task.id);
+      if (!input) {
+        toast.error(
+          "This upload can't be retried on this device. Remove it and create the product again.",
+        );
+        return;
+      }
+      if (isProductPublishJobRunning(task.id)) {
+        toast.info('Already retrying.');
+        return;
+      }
+      updatePublishTask(
+        task.id,
+        { status: 'uploading', progress: 1, message: 'Retrying…', error: undefined },
+        productPublishScope,
+      );
+      void runProductPublishJob(input);
+    },
+    [navigate, productPublishScope],
+  );
+
+  const handleRemoveProductFiller = useCallback(
+    (task: PublishTask) => {
+      const productId = getPublishTaskDesignId(task);
+      clearRetryableProductPublishJob(task.id);
+      removePublishTask(task.id, productPublishScope);
+      if (productId) {
+        // Best-effort: delete the stranded draft product left by a failed job.
+        void productApi
+          .deleteProduct(productId)
+          .then(() => refresh())
+          .catch(() => {});
+      }
+    },
+    [productPublishScope, refresh],
+  );
 
   useEffect(() => {
     if (outletView !== 'products') return;
@@ -2761,6 +2855,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             className={`transition-opacity duration-300 ease-out ${loading ? 'opacity-50' : 'opacity-100'}`}
           >
             <div className="grid grid-cols-2 gap-2 transition-all duration-300 min-[520px]:grid-cols-3 lg:grid-cols-4">
+            {visibleProductFillers.map((task) => (
+              <ProductPublishFillerCard
+                key={task.id}
+                task={task}
+                onRetry={handleRetryProductPublish}
+                onRemove={handleRemoveProductFiller}
+              />
+            ))}
             {filteredProducts.map((product) => {
               const collectionLabel =
                 product.collection?.title ||
@@ -3065,14 +3167,15 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               </div>
             )}
             {/* Filter empty — products exist but none match the filter */}
-            {!loading && filteredProducts.length === 0 && products.length > 0 && !showDraftCollectionsInProductArea && (
+            {!loading && filteredProducts.length === 0 && products.length > 0 && !showDraftCollectionsInProductArea && visibleProductFillers.length === 0 && (
               <div className="col-span-full py-16 text-center text-gray-500 dark:text-gray-400">
                 No products match this filter.
               </div>
             )}
             {/* Absolute empty — no products at all. Rendered here so it sits inside
-                the same card container rather than creating a second orphan box. */}
-            {!loading && products.length === 0 && !showDraftCollectionsInProductArea && (() => {
+                the same card container rather than creating a second orphan box.
+                Suppressed while a creation filler card is showing. */}
+            {!loading && products.length === 0 && !showDraftCollectionsInProductArea && visibleProductFillers.length === 0 && (() => {
               const getEmptyStateType = (): EmptyStateType => {
                 switch (filterStatus) {
                   case 'archived': return 'no-archived';

@@ -693,16 +693,21 @@ export const refreshOwnerCatalogQueries = (
   ownerId: string | null | undefined,
 ) => {
   if (!ownerId) return;
+  // `refetchType: 'all'` (not just 'active') so the catalog list/detail queries
+  // are refreshed even while the catalog is UNMOUNTED — e.g. a cover/media edit
+  // made on the create/edit screen. With the global `refetchOnMount: false`, an
+  // 'active'-only invalidation left the now-inactive query stale, so the catalog
+  // painted the OLD cover on reroute until a manual browser refresh.
   void queryClient.invalidateQueries({
     queryKey: queryKeys.brand.myDrafts(ownerId),
-    refetchType: 'active',
+    refetchType: 'all',
   });
   void queryClient.invalidateQueries({
     queryKey: queryKeys.brand.collections(ownerId),
-    refetchType: 'active',
+    refetchType: 'all',
   });
   void queryClient.invalidateQueries({
     queryKey: ['design', 'detail'],
-    refetchType: 'active',
+    refetchType: 'all',
   });
 };

@@ -1,5 +1,8 @@
 export type PublishTaskStatus = 'uploading' | 'finalizing' | 'published' | 'saved' | 'failed';
 export type PublishTaskKind = 'publish' | 'draft';
+/** Which studio surface owns the task. Designs render in the catalog; products
+ *  render in the store products panel. Defaults to 'design' for older tasks. */
+export type PublishTaskEntity = 'design' | 'product';
 
 export interface PublishTask {
   id: string;
@@ -9,6 +12,7 @@ export interface PublishTask {
   startedAt: number;
   status: PublishTaskStatus;
   kind?: PublishTaskKind;
+  entity?: PublishTaskEntity;
   progress: number;
   coverPreviewUrl?: string;
   designId?: string;
@@ -162,6 +166,7 @@ export const normalizePublishTaskIdentifiers = (task: PublishTask): PublishTask 
     ...task,
     ownerId: normalizeOwnerId(task.ownerId),
     kind: task.kind === 'draft' ? 'draft' : 'publish',
+    entity: task.entity === 'product' ? 'product' : 'design',
     designId,
     legacyCollectionId,
     // Compatibility only: older profile cards still key publish state by the
@@ -257,10 +262,16 @@ const taskBelongsToScope = (task: PublishTask, scopeOwnerId: string | undefined)
   return task.ownerId === scopeOwnerId;
 };
 
-export const readPublishTasks = (scope?: PublishTaskScope): PublishTask[] => {
+export const readPublishTasks = (
+  scope?: PublishTaskScope,
+  entity?: PublishTaskEntity,
+): PublishTask[] => {
   const scopeOwnerId = resolveScopeOwnerId(scope);
   return readRawPublishTasks()
     .filter((task) => taskBelongsToScope(task, scopeOwnerId))
+    .filter((task) =>
+      entity ? (task.entity ?? 'design') === entity : true,
+    )
     .map((task) => {
       const runtimePreview = getPublishTaskRuntimePreview(task.id);
       if (!runtimePreview || task.coverPreviewUrl) return task;
@@ -300,6 +311,7 @@ export const createPublishTask = (payload: {
   collectionId?: string;
   message?: string;
   kind?: PublishTaskKind;
+  entity?: PublishTaskEntity;
 }): PublishTask => {
   const id = `publish_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const now = Date.now();
@@ -316,6 +328,7 @@ export const createPublishTask = (payload: {
     startedAt: now,
     status: 'uploading',
     kind: payload.kind === 'draft' ? 'draft' : 'publish',
+    entity: payload.entity === 'product' ? 'product' : 'design',
     progress: 0,
     coverPreviewUrl: payload.coverPreviewUrl,
     designId: normalizeEntityId(payload.designId) ?? normalizeEntityId(payload.legacyCollectionId) ?? normalizeEntityId(payload.collectionId),

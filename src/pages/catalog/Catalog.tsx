@@ -388,7 +388,7 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     prunePublishTasks();
     const sync = () => {
-      setPublishTasks(readPublishTasks(publishTaskScope));
+      setPublishTasks(readPublishTasks(publishTaskScope, 'design'));
       setFailedPublishDesignIds((prev) => {
         const next = readPublishFailedDesignIds(publishTaskScope);
         if (prev.size === next.size && [...next].every((id) => prev.has(id))) {

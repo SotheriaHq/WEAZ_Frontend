@@ -72,6 +72,8 @@ import {
   type CollectionPriceImpact,
 } from "@/api/StoreApi";
 import { emitProductStudioSync } from "@/utils/productStudioEvents";
+import { createPublishTask } from "@/utils/publishTracker";
+import { runProductPublishJob } from "@/features/products/productPublishJob";
 import { TourOverlay, type TourStep } from "@/components/ui/TourOverlay";
 import StudioPageSkeleton from "@/components/studio/StudioPageSkeleton";
 import {
@@ -148,6 +150,41 @@ function buildBaseSku(opts: { brandInitials: string; title?: string }): string {
   const shortTitle = titleToken ? titleToken.slice(0, 4) : "PRD";
   return `${prefix}-${shortTitle}-${randomSkuSuffix(5)}`;
 }
+
+// ── Variant color-group identity (UI only) ──────────────────────────────────
+// The editor groups size rows under a color. Grouping used to key purely on the
+// color STRING, so two not-yet-named colors both collapsed into one group (and
+// every keystroke re-grouped, dropping focus). A stable per-group id fixes both.
+let colorGroupIdSeq = 0;
+const nextColorGroupId = (): string =>
+  `cg_${Date.now().toString(36)}_${(colorGroupIdSeq++).toString(36)}`;
+
+/** Backfill a stable colorGroupId onto loaded variants — one per distinct color,
+ *  and a unique group for each blank color so unnamed colors never merge. */
+const withColorGroupIds = (variants: ProductVariant[]): ProductVariant[] => {
+  const byColor = new Map<string, string>();
+  return variants.map((v) => {
+    if (v.colorGroupId && v.colorGroupId.trim()) return v;
+    const color = (v.color ?? "").trim().toLowerCase();
+    if (!color) return { ...v, colorGroupId: nextColorGroupId() };
+    let gid = byColor.get(color);
+    if (!gid) {
+      gid = nextColorGroupId();
+      byColor.set(color, gid);
+    }
+    return { ...v, colorGroupId: gid };
+  });
+};
+
+const variantMatchesGroup = (
+  v: ProductVariant,
+  group: { colorGroupId?: string; color: string },
+): boolean => {
+  if (group.colorGroupId) return v.colorGroupId === group.colorGroupId;
+  return (
+    (v.color ?? "").trim().toLowerCase() === group.color.trim().toLowerCase()
+  );
+};
 
 function buildVariantSku(
   baseSku: string,
@@ -1084,7 +1121,7 @@ const EditProduct: React.FC = () => {
           mediaIds: product.mediaIds || [],
           variants:
             product.variants && product.variants.length
-              ? product.variants
+              ? withColorGroupIds(product.variants)
               : (() => {
                   const sizeStock = (product as any).sizeStock as
                     | Record<string, number>
@@ -1374,33 +1411,49 @@ const EditProduct: React.FC = () => {
     [updateForm],
   );
 
-  const addVariant = useCallback(() => {
+  // "+ Add Color" — always a brand-new, independent color group (its own stable
+  // id), so a second unnamed color does NOT merge into the first empty one.
+  const addColorGroup = useCallback(() => {
     const next: ProductVariant = {
       size: "",
       color: "",
       sku: "",
       price: undefined,
       stock: 0,
+      colorGroupId: nextColorGroupId(),
     };
     updateForm("variants", [...form.variants, next]);
   }, [form.variants, updateForm]);
 
-  const addVariantForColor = useCallback(
-    (color: string) => {
+  const addSizeToGroup = useCallback(
+    (group: { colorGroupId?: string; color: string }) => {
       const next: ProductVariant = {
         size: "",
-        color,
+        color: group.color,
         sku: "",
         price: undefined,
         stock: 0,
+        colorGroupId: group.colorGroupId ?? nextColorGroupId(),
       };
       updateForm("variants", [...form.variants, next]);
     },
     [form.variants, updateForm],
   );
 
-  const addMultipleSizesForColor = useCallback(
-    (color: string, sizesStr: string) => {
+  const setGroupColor = useCallback(
+    (group: { colorGroupId?: string; color: string }, newColor: string) => {
+      // Update every size row in this group at once, keyed by the stable group
+      // id — grouping no longer shifts mid-type, so the field keeps focus.
+      const next = form.variants.map((v) =>
+        variantMatchesGroup(v, group) ? { ...v, color: newColor } : v,
+      );
+      updateForm("variants", next);
+    },
+    [form.variants, updateForm],
+  );
+
+  const addMultipleSizesForGroup = useCallback(
+    (group: { colorGroupId?: string; color: string }, sizesStr: string) => {
       const rawSizes = sizesStr
         .split(",")
         .map((s) => s.trim())
@@ -1416,20 +1469,22 @@ const EditProduct: React.FC = () => {
       const sizes = rawSizes
         .map((size) => normalizeProductVariantSize(size))
         .filter((size): size is string => Boolean(size));
-      const existing = form.variants.filter(
-        (v) => (v.color ?? "").trim().toLowerCase() === color.trim().toLowerCase(),
+      const existing = form.variants.filter((v) =>
+        variantMatchesGroup(v, group),
       );
       const existingSizes = new Set(
         existing.map((v) => (v.size ?? "").trim().toLowerCase()),
       );
+      const groupId = group.colorGroupId ?? nextColorGroupId();
       const newVariants = sizes
         .filter((s) => !existingSizes.has(s.toLowerCase()))
         .map((size) => ({
           size,
-          color,
+          color: group.color,
           sku: "",
           price: undefined as number | undefined,
           stock: 0,
+          colorGroupId: groupId,
         }));
       if (newVariants.length === 0) {
         toast.warning("All sizes already exist for this color");
@@ -1459,38 +1514,41 @@ const EditProduct: React.FC = () => {
   );
 
   const removeColorGroup = useCallback(
-    (color: string) => {
-      const next = form.variants.filter(
-        (v) =>
-          (v.color ?? "").trim().toLowerCase() !== color.trim().toLowerCase(),
-      );
+    (group: { colorGroupId?: string; color: string }) => {
+      const next = form.variants.filter((v) => !variantMatchesGroup(v, group));
       updateForm("variants", next);
     },
     [form.variants, updateForm],
   );
 
-  /** Group variants by color for the grouped editor view */
+  /**
+   * Group variants into color cards for the editor. Keyed by the stable
+   * colorGroupId (falling back to color string for any legacy variant) so
+   * multiple unnamed colors stay as separate cards and renaming a color never
+   * re-shuffles the cards mid-keystroke.
+   */
   const variantColorGroups = useMemo(() => {
     const groups: Array<{
       stableKey: string;
+      colorGroupId?: string;
       color: string;
       variants: Array<{ variant: ProductVariant; originalIndex: number }>;
     }> = [];
-    const colorMap = new Map<string, typeof groups[number]>();
+    const keyMap = new Map<string, (typeof groups)[number]>();
     form.variants.forEach((v, idx) => {
-      const colorKey = (v.color ?? "").trim().toLowerCase() || "__no_color__";
-      let group = colorMap.get(colorKey);
+      const colorGroupId = v.colorGroupId?.trim() || undefined;
+      const key = colorGroupId
+        ? `id:${colorGroupId}`
+        : (v.color ?? "").trim().toLowerCase() || `__idx_${idx}`;
+      let group = keyMap.get(key);
       if (!group) {
-        const stableId =
-          typeof v.id === "string" && v.id.trim().length > 0
-            ? v.id
-            : String(idx);
         group = {
-          stableKey: `group-${stableId}`,
+          stableKey: key,
+          colorGroupId,
           color: v.color ?? "",
           variants: [],
         };
-        colorMap.set(colorKey, group);
+        keyMap.set(key, group);
         groups.push(group);
       }
       group.variants.push({ variant: v, originalIndex: idx });
@@ -1597,12 +1655,28 @@ const EditProduct: React.FC = () => {
 
   const notifyProductStudioSync = useCallback(
     (reason: string, syncedProductId?: string) => {
+      const targetProductId = syncedProductId || productId || undefined;
       emitProductStudioSync({
-        productId: syncedProductId || productId || undefined,
+        productId: targetProductId,
         reason,
       });
+      // The Store panel only hears the window event while it is mounted. A
+      // cover/media change made here and then a reroute back to the Store would
+      // otherwise paint STALE cached data (global refetchOnMount is off), which
+      // is why the old cover stuck until a manual browser refresh. Invalidate
+      // AND refetch (`refetchType: 'all'` reaches the now-inactive list query)
+      // so the fresh cover is in cache before the panel remounts.
+      void queryClient.invalidateQueries({
+        queryKey: ['store', 'panel'],
+        refetchType: 'all',
+      });
+      if (targetProductId) {
+        void queryClient.invalidateQueries({
+          queryKey: ['store', 'product', targetProductId],
+        });
+      }
     },
-    [productId],
+    [productId, queryClient],
   );
 
   const rollbackCreatedProduct = useCallback(
@@ -1927,8 +2001,93 @@ const EditProduct: React.FC = () => {
             return;
           }
         } else {
+          // Ordered pending media uploads — shared by the instant-reroute path
+          // and the legacy inline path below.
+          const pendingUploads = (() => {
+            if (pendingMediaFiles.length === 0)
+              return [] as Array<{
+                file: File;
+                isPrimary: boolean;
+                viewSlot: MediaViewSlot;
+                previewUrl?: string;
+              }>;
+            const pendingById = new Map(
+              pendingMediaFiles.map((p) => [p.tempId, p]),
+            );
+            const orderedPending = mediaUrls
+              .map((m) => pendingById.get(m.id))
+              .filter(Boolean)
+              .map((p) => ({
+                ...(p as {
+                  id: string;
+                  tempId: string;
+                  file: File;
+                  previewUrl: string;
+                  isPrimary: boolean;
+                  viewSlot: MediaViewSlot;
+                }),
+                id:
+                  (p as { id: string }).id ||
+                  (p as { tempId: string }).tempId,
+              }));
+            return normalizePrimary(orderedPending);
+          })();
+
+          // ── New product (go-live OR draft): reroute NOW, finish in a job ──
+          // Parity with design creation — the store shows a live filler card
+          // while create → upload → publish runs in the background instead of
+          // blocking on the button loader. The synchronous inline path below is
+          // kept ONLY for the collection builder, which must hand the new
+          // product id straight back to the collection (async can't do that).
+          if (!isCollectionContext && !isCollectionFlow) {
+            const goingLive = !effectiveDraft;
+            const productTitle =
+              payload.title || form.title.trim() || "New product";
+            const coverPreviewUrl =
+              pendingUploads.find((u) => u.isPrimary)?.previewUrl ||
+              pendingUploads[0]?.previewUrl;
+            const task = createPublishTask({
+              ownerId: user?.id,
+              title: productTitle,
+              visibility: "PUBLIC",
+              coverPreviewUrl,
+              entity: "product",
+              kind: goingLive ? "publish" : "draft",
+              message: goingLive ? "Uploading…" : "Saving…",
+            });
+            setSaving(false);
+            setHasChanges(false);
+            toast.info(
+              goingLive ? "Submitting for review…" : "Saving draft…",
+            );
+            navigate(
+              goingLive
+                ? "/studio/store?status=in_review"
+                : "/studio/store?status=draft",
+              { state: { publishingProductTaskId: task.id } },
+            );
+            void runProductPublishJob({
+              taskId: task.id,
+              ownerId: user?.id,
+              title: productTitle,
+              payload,
+              finalStatus,
+              pendingUploads: pendingUploads.map((u) => ({
+                file: u.file,
+                isPrimary: u.isPrimary,
+                viewSlot: u.viewSlot,
+              })),
+              pendingCustomOrderDraft,
+              // ack + shipping policy already ran synchronously above.
+              acknowledgeContentPolicy: false,
+              shippingRegionsToPersist: null,
+              publishTaskScope: { ownerId: user?.id },
+            });
+            return;
+          }
+
           const shouldCreateAsDraftForUploads =
-            pendingMediaFiles.length > 0 && finalStatus === "ACTIVE";
+            pendingUploads.length > 0 && finalStatus === "ACTIVE";
           const created = await productApi.createProduct(
             shouldCreateAsDraftForUploads
               ? { ...payload, status: "DRAFT" }
@@ -1937,34 +2096,6 @@ const EditProduct: React.FC = () => {
           createdProductId = created.id;
 
           try {
-            // Build media upload list after product creation.
-            let pendingUploads: Array<{
-              file: File;
-              isPrimary: boolean;
-              viewSlot: MediaViewSlot;
-            }> = [];
-            if (pendingMediaFiles.length > 0) {
-              const pendingById = new Map(
-                pendingMediaFiles.map((p) => [p.tempId, p]),
-              );
-              const orderedPending = mediaUrls
-                .map((m) => pendingById.get(m.id))
-                .filter(Boolean)
-                .map((p) => ({
-                  ...(p as {
-                    id: string;
-                    tempId: string;
-                    file: File;
-                    previewUrl: string;
-                    isPrimary: boolean;
-                    viewSlot: MediaViewSlot;
-                  }),
-                  id:
-                    (p as { id: string }).id || (p as { tempId: string }).tempId,
-                }));
-              pendingUploads = normalizePrimary(orderedPending);
-            }
-
             const [customOrderSaveResult, mediaUploadResult] =
               await Promise.allSettled([
                 pendingCustomOrderDraft
@@ -3821,10 +3952,10 @@ const EditProduct: React.FC = () => {
                       {!collapsedSections.variants && (
                         <button
                           type="button"
-                          onClick={addVariant}
+                          onClick={addColorGroup}
                           className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-semibold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition"
                         >
-                          + Add Color Group
+                          + Add Color
                         </button>
                       )}
                     </div>
@@ -3864,10 +3995,12 @@ const EditProduct: React.FC = () => {
                     (form.variants.length === 0 ? (
                       <div className="p-6 text-center">
                         <p className="text-theme-secondary text-sm mb-2">
-                          No variants yet
+                          No colors yet
                         </p>
                         <p className="text-theme-secondary text-xs">
-                          Add a color group, then add multiple sizes to it
+                          Tap <span className="font-semibold">+ Add Color</span>{" "}
+                          to name a color (e.g. Green), then add the sizes it
+                          comes in. Add another color for each colorway.
                         </p>
                       </div>
                     ) : (
@@ -3878,23 +4011,18 @@ const EditProduct: React.FC = () => {
                               key={group.stableKey}
                               className="overflow-hidden bg-transparent py-2 border-b border-gray-100 dark:border-white/5 last:border-0"
                             >
-                              {/* Color group header */}
+                              {/* Color group header — step 1: name the color */}
                               <div className="py-1.5 flex items-center gap-2 justify-between bg-transparent">
                                 <div className="flex items-center gap-2 flex-1 min-w-0">
                                   <span className="text-[10px] font-semibold uppercase text-theme-secondary shrink-0">
-                                    Color:
+                                    Color
                                   </span>
                                   <Input
                                     type="text"
                                     value={group.color}
-                                    onChange={(e) => {
-                                      const newColor = e.target.value;
-                                      group.variants.forEach(({ originalIndex }) => {
-                                        updateVariant(originalIndex, {
-                                          color: newColor,
-                                        });
-                                      });
-                                    }}
+                                    onChange={(e) =>
+                                      setGroupColor(group, e.target.value)
+                                    }
                                     placeholder="e.g. Green"
                                     inputSize="sm"
                                     fullWidth={false}
@@ -3905,34 +4033,21 @@ const EditProduct: React.FC = () => {
                                     {group.variants.length !== 1 ? "s" : ""}
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      addVariantForColor(group.color)
-                                    }
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition"
-                                  >
-                                    <Plus className="w-3 h-3" /> Size
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      removeColorGroup(group.color)
-                                    }
-                                    className="inline-flex items-center justify-center h-6 w-6 rounded-full text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition"
-                                    title="Remove all sizes for this color"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeColorGroup(group)}
+                                  className="inline-flex items-center justify-center h-6 w-6 rounded-full text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition shrink-0"
+                                  title="Remove this color and all its sizes"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
                               </div>
 
-                              {/* Quick-add sizes */}
+                              {/* Step 2: add the sizes available in this color */}
                               <div className="py-1.5 bg-transparent border-b border-gray-100 dark:border-white/5">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-[10px] text-gray-500 shrink-0">
-                                    Quick add:
+                                  <span className="text-[10px] font-semibold uppercase text-theme-secondary shrink-0">
+                                    Add sizes
                                   </span>
                                   <input
                                     ref={(el) => {
@@ -3941,14 +4056,14 @@ const EditProduct: React.FC = () => {
                                     type="text"
                                     enterKeyHint="done"
                                     autoCapitalize="characters"
-                                    placeholder="e.g. XXS, XS, S, M, L, XL"
+                                    placeholder="e.g. S, M, L, XL"
                                     className="min-h-9 flex-1 min-w-0 text-xs bg-transparent border-none outline-none text-theme-secondary placeholder:text-gray-400 sm:min-h-0"
                                     onKeyDown={(e) => {
                                       if (e.key === "Enter") {
                                         e.preventDefault();
                                         const input = e.currentTarget;
-                                        addMultipleSizesForColor(
-                                          group.color,
+                                        addMultipleSizesForGroup(
+                                          group,
                                           input.value,
                                         );
                                         input.value = "";
@@ -3961,8 +4076,8 @@ const EditProduct: React.FC = () => {
                                       const input =
                                         quickAddSizeInputRefs.current[group.stableKey];
                                       if (!input) return;
-                                      addMultipleSizesForColor(
-                                        group.color,
+                                      addMultipleSizesForGroup(
+                                        group,
                                         input.value,
                                       );
                                       input.value = "";
@@ -3979,6 +4094,14 @@ const EditProduct: React.FC = () => {
                               </div>
 
                               {/* Size rows */}
+                              {group.variants.length > 0 && (
+                                <div className="px-3 pt-1.5 flex items-center gap-2 text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                                  <span className="w-20">Size</span>
+                                  <span className="w-24">Price (₦)</span>
+                                  <span className="w-16">Stock</span>
+                                  <span className="flex-1" />
+                                </div>
+                              )}
                               <div className="divide-y divide-gray-100 dark:divide-white/5">
                                 {group.variants.map(
                                   ({ variant, originalIndex }) => (
@@ -4065,6 +4188,15 @@ const EditProduct: React.FC = () => {
                                   ),
                                 )}
                               </div>
+
+                              {/* Manual add for a one-off / custom size */}
+                              <button
+                                type="button"
+                                onClick={() => addSizeToGroup(group)}
+                                className="mt-1 inline-flex items-center gap-1 px-3 py-1 text-[10px] font-medium text-purple-600 dark:text-purple-400 hover:underline"
+                              >
+                                <Plus className="w-3 h-3" /> Add size row
+                              </button>
                             </div>
                           );
                         })}
@@ -4464,14 +4596,19 @@ const EditProduct: React.FC = () => {
       <footer className="surface-menu sticky bottom-0 z-20 w-full border-t px-4 py-3 backdrop-blur-xl sm:px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs text-theme-secondary">
-            {hasChanges ? (
-              <span className="text-orange-400">Unsaved changes</span>
-            ) : (
-              <>
-                <CheckCircle className="w-3 h-3 text-green-500" />
-                <span>All changes saved</span>
-              </>
-            )}
+            {/* The "changes" concept only means something when editing an entity
+                that already exists (draft or active). For a first-time create
+                there is no saved version to have unsaved changes against — the
+                indicator would just be noise next to "Save as Draft". */}
+            {isEditMode &&
+              (hasChanges ? (
+                <span className="text-orange-400">Unsaved changes</span>
+              ) : (
+                <>
+                  <CheckCircle className="w-3 h-3 text-green-500" />
+                  <span>All changes saved</span>
+                </>
+              ))}
           </div>
           <div className="flex w-full flex-wrap items-stretch gap-2 md:w-auto md:items-center md:gap-4">
             {!isEditMode && !isCollectionContext && (
@@ -4520,10 +4657,10 @@ const EditProduct: React.FC = () => {
               onClick={handleDiscard}
               className="surface-control surface-interactive-hover inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold transition md:min-h-10 md:flex-initial md:px-4 md:text-sm"
             >
-              {hasChanges
-                ? "Discard Changes"
-                : isCollectionContext
-                  ? "Back to Collection"
+              {isCollectionContext
+                ? "Back to Collection"
+                : isEditMode && hasChanges
+                  ? "Discard Changes"
                   : "Cancel"}
             </button>
             <button
