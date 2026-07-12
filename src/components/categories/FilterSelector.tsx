@@ -292,7 +292,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                         />
                       )}
                       <div className="max-h-44 overflow-y-auto pr-1 scrollbar-threadly-strong">
-                        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                        <div className="grid grid-cols-2 gap-1.5">
                           {filteredValues.map((val) => {
                             const isSelected = selectedValues.includes(val.id);
                             return (
