@@ -73,6 +73,10 @@ export const queryKeys = {
       ['brand', 'collectionDetail', normalizeId(collectionId), scope ?? 'design'] as const,
     myDrafts: (ownerId?: string | null) =>
       ['brand', 'drafts', 'mine', normalizeId(ownerId)] as const,
+    finance: (userId?: string | null) =>
+      ['brand', 'finance', normalizeId(userId)] as const,
+    reviewsDashboard: (params?: object | null) =>
+      ['brand', 'reviewsDashboard', normalizeRecord(params)] as const,
   },
   brandPrivateAccess: {
     myStates: (brandId?: string | null, viewerId?: string | null) =>
@@ -120,6 +124,7 @@ export const queryKeys = {
   },
   messaging: {
     unreadCount: () => ['messaging', 'unreadCount'] as const,
+    inbox: (userId?: string | null) => ['messaging', 'inbox', normalizeId(userId)] as const,
   },
   comments: {
     listRoot: (targetType?: string | null, targetId?: string | null) =>
@@ -214,6 +219,11 @@ export const PRIVATE_QUERY_ROOTS = new Set<string>([
   'sizeFit',
   'customOrders',
   'reviews',
+  // Inline-keyed screen caches (MyOrders, OrderDetail, profile OrdersPanel,
+  // studio OrderManagement) — user-private, must not survive logout.
+  'orders',
+  'profile',
+  'studio',
 ]);
 
 export const isPersistableThreadlyQueryKey = (queryKey: readonly unknown[]) => {

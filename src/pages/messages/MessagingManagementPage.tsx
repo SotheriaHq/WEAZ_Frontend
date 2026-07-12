@@ -14,6 +14,8 @@ import ChatContactSidebar from '@/components/messaging/ChatContactSidebar';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
+import { useCachedResource } from '@/hooks/useCachedResource';
+import { queryKeys } from '@/query/queryKeys';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -364,12 +366,36 @@ const MessagingManagementPage: React.FC = () => {
   const { onNotification, onMessageEvent } = useRealtime();
 
   /* ---- Conversation state ---- */
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'unread' | 'orders' | 'custom' | 'inquiry' | 'archived'>('all');
   const [query, setQuery] = useState('');
+  // Hybrid cache-first inbox: the cached resource paints instantly on revisits,
+  // while local state stays the working copy for optimistic updates
+  // (thread prefs, sent-message previews). Cache updates re-seed local state.
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [activeId, setActiveId] = useState<string>('');
   const highlightedMessageId = params.get('messageId');
+
+  const inboxResource = useCachedResource<ConversationItem[]>({
+    queryKey: queryKeys.messaging.inbox(actorId),
+    queryFn: async () => {
+      const inbox = await messagingApi.getInbox({ limit: 100, contextType: 'all', filter: 'all' });
+      return (inbox.items || []).map(mapInboxItem);
+    },
+    enabled: Boolean(actorId),
+  });
+  const loading = inboxResource.loading;
+  const inboxData = inboxResource.data;
+  const inboxError = inboxResource.error;
+  const refetchInboxResource = inboxResource.refetch;
+
+  useEffect(() => {
+    if (inboxData) setConversations(inboxData);
+  }, [inboxData]);
+
+  useEffect(() => {
+    if (!inboxError) return;
+    toast.error((inboxError as any)?.response?.data?.message || 'Unable to load conversations');
+  }, [inboxError]);
 
   /* ---- Message state ---- */
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
@@ -513,32 +539,11 @@ const MessagingManagementPage: React.FC = () => {
   /* ---- Load conversations ---- */
   const refreshInbox = useCallback(async () => {
     try {
-      const inbox = await messagingApi.getInbox({ limit: 100, contextType: 'all', filter: 'all' });
-      setConversations((inbox.items || []).map(mapInboxItem));
+      await refetchInboxResource();
     } catch {
       /* silently ignore background inbox refresh errors */
     }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const inbox = await messagingApi.getInbox({ limit: 100, contextType: 'all', filter: 'all' });
-        if (!cancelled) setConversations((inbox.items || []).map(mapInboxItem));
-      } catch (error: any) {
-        if (!cancelled) {
-          toast.error(error?.response?.data?.message || 'Unable to load conversations');
-          setConversations([]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void load();
-    return () => { cancelled = true; };
-  }, [brandId, surface]);
+  }, [refetchInboxResource]);
 
   /* ---- Auto-select from URL params ---- */
   useEffect(() => {

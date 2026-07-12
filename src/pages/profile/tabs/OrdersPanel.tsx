@@ -50,6 +50,7 @@ import {
 } from '@/pages/checkout/paymentFlow';
 import { useConfirm } from '@/components/ui/useConfirm';
 import { useCachedResource } from '@/hooks/useCachedResource';
+import { queryClient } from '@/query/queryClient';
 
 const STANDARD_STATUS_OPTIONS = ['ALL', 'PENDING', 'PROCESSING', 'SHIPPED'] as const;
 const CUSTOM_STATUS_OPTIONS = ['ALL', 'PENDING', 'ACTIVE', 'COMPLETED', 'ISSUES'] as const;
@@ -436,40 +437,23 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
   orderId,
   onBack,
 }) => {
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
   const [confirmingDelivery, setConfirmingDelivery] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-
-    const run = async () => {
-      setLoading(true);
-      try {
-        const data = await getMyOrder(orderId);
-        if (!mounted) return;
-        setOrder(data as Order);
-      } catch {
-        if (!mounted) return;
-        setOrder(null);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    void run();
-
-    return () => {
-      mounted = false;
-    };
-  }, [orderId]);
+  // Shares the cache entry with the standalone /orders/:orderId page, so a
+  // revisit from either surface paints instantly with silent revalidation.
+  const orderQueryKey = useMemo(() => ['orders', 'detail', orderId] as const, [orderId]);
+  const { data: order = null, loading } = useCachedResource<Order | null>({
+    queryKey: orderQueryKey,
+    queryFn: async () => (await getMyOrder(orderId)) as Order,
+    enabled: Boolean(orderId),
+  });
 
   const handleConfirmDelivery = async () => {
     if (!order) return;
     setConfirmingDelivery(true);
     try {
       const updated = await confirmMyOrderDelivery(order.id);
-      setOrder(updated as Order);
+      queryClient.setQueryData(orderQueryKey, updated as Order);
       toast.success('Delivery confirmed.');
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to confirm delivery.');
@@ -711,8 +695,6 @@ export const BuyerCustomOrderDetailView: React.FC<{
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
   const profile = useSelector((state: RootState) => state.user.profile);
-  const [order, setOrder] = useState<CustomOrderDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [paymentVerification, setPaymentVerification] =
     useState<CustomOrderPaymentVerificationResult | null>(null);
@@ -791,33 +773,40 @@ export const BuyerCustomOrderDetailView: React.FC<{
     }
   }, [location.state]);
 
+  // Cache-first custom-order detail: cached revisits paint instantly while a
+  // silent revalidation runs; mutations write refreshed data into the cache.
+  const customOrderQueryKey = useMemo(
+    () => ['orders', 'customDetail', orderId] as const,
+    [orderId],
+  );
+  const {
+    data: order = null,
+    loading,
+    error: orderLoadError,
+  } = useCachedResource<CustomOrderDetail | null>({
+    queryKey: customOrderQueryKey,
+    queryFn: () => customOrdersBuyerApi.getById(orderId),
+    enabled: Boolean(orderId),
+  });
+  const setOrder = useCallback(
+    (next: CustomOrderDetail) => {
+      queryClient.setQueryData(customOrderQueryKey, next);
+    },
+    [customOrderQueryKey],
+  );
+
   useEffect(() => {
-    let mounted = true;
+    if (order?.paymentStatus === 'PAID') {
+      setPaymentVerification(null);
+    }
+  }, [order?.paymentStatus]);
 
-    const run = async () => {
-      setLoading(true);
-      try {
-        const data = await customOrdersBuyerApi.getById(orderId);
-        if (!mounted) return;
-        setOrder(data);
-        if (data.paymentStatus === 'PAID') {
-          setPaymentVerification(null);
-        }
-      } catch (error: any) {
-        if (!mounted) return;
-        setOrder(null);
-        toast.error(error?.response?.data?.message || 'Unable to load custom order');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    void run();
-
-    return () => {
-      mounted = false;
-    };
-  }, [orderId]);
+  useEffect(() => {
+    if (!orderLoadError) return;
+    toast.error(
+      (orderLoadError as any)?.response?.data?.message || 'Unable to load custom order',
+    );
+  }, [orderLoadError]);
 
   const latestOpenExtension = useMemo(
     () =>

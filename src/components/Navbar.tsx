@@ -40,7 +40,6 @@ import BrandWordmark from '@/components/brand/BrandWordmark';
 import { COMPANY_NAME } from '@/lib/brand';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
-import { readStoreProgressLocally, resolveStoreSetupDestination } from '@/utils/storeSetup';
 import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
 import { MY_BAG_EMOJI, MY_BAG_LABEL } from '@/constants/bagging';
 import {
@@ -271,22 +270,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
               }}
             >
               Dashboard
-            </DropdownItem>
-          ) : null}
-
-          {/* Draft setups keep a guiding entry until Publish is pressed —
-              the Dashboard entry above only exists after publishing. */}
-          {!isStudioProfileMenu && hasBrandAccess && storeSetupComplete === false ? (
-            <DropdownItem
-              leftIcon="🧵"
-              onClick={() => {
-                navigate(resolveStoreSetupDestination(user?.id));
-                setShowProfileMenu(false);
-              }}
-            >
-              {readStoreProgressLocally(user?.id)
-                ? 'Continue your store setup'
-                : 'Set up your store'}
             </DropdownItem>
           ) : null}
 

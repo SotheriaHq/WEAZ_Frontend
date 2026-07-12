@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import { brandApi } from '@/api/BrandApi';
@@ -6,6 +6,8 @@ import { customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderA
 import { getStoreStatus } from '@/api/StoreApi';
 import VLoader from '@/components/loaders/VLoader';
 import Modal from '@/components/ui/Modal';
+import { useCachedResource } from '@/hooks/useCachedResource';
+import { queryKeys } from '@/query/queryKeys';
 import type { RootState } from '@/store';
 
 const STATUS_THEME: Record<string, string> = {
@@ -173,17 +175,20 @@ const buildSellerReceiptStates = (transaction: IncomingTransaction) => {
   ];
 };
 
+type FinancePageData = {
+  brandId: string;
+  overview: FinanceOverview | null;
+  payouts: any[];
+  incomingTransactions: IncomingTransaction[];
+  heldFunds: HeldFundsItem[];
+};
+
+const toArrayOrItems = <T,>(value: any): T[] =>
+  Array.isArray(value?.items) ? value.items : Array.isArray(value) ? value : [];
+
 const FinancePage: React.FC = () => {
   const user = useSelector((state: RootState) => state.user.profile);
-  const requestRef = useRef(0);
-  const mountedRef = useRef(true);
-  const [brandId, setBrandId] = useState<string | null>(null);
-  const [payouts, setPayouts] = useState<any[]>([]);
-  const [incomingTransactions, setIncomingTransactions] = useState<IncomingTransaction[]>([]);
-  const [heldFunds, setHeldFunds] = useState<HeldFundsItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
-  const [overview, setOverview] = useState<FinanceOverview | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<IncomingTransaction | null>(null);
   const [selectedHeldFund, setSelectedHeldFund] = useState<HeldFundsItem | null>(null);
   const [selectedHeldStandardOrder, setSelectedHeldStandardOrder] = useState<any | null>(null);
@@ -191,16 +196,12 @@ const FinancePage: React.FC = () => {
   const [heldDetailLoading, setHeldDetailLoading] = useState(false);
   const [heldDetailError, setHeldDetailError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
-    if (!user?.id) return;
-
-    const requestId = requestRef.current + 1;
-    requestRef.current = requestId;
-    setLoading(true);
-    try {
+  // Cache-first screen data: cached revisits paint instantly (no loader flash)
+  // while a silent background revalidation runs when stale.
+  const financeResource = useCachedResource<FinancePageData>({
+    queryKey: queryKeys.brand.finance(user?.id),
+    queryFn: async () => {
       const storeStatus = await getStoreStatus();
-      if (!mountedRef.current || requestRef.current !== requestId) return;
-      setBrandId(storeStatus.brandId);
 
       const [overviewData, payoutsData, incomingData, heldFundsData] = await Promise.all([
         brandApi.getPayoutOverview(storeStatus.brandId),
@@ -208,10 +209,10 @@ const FinancePage: React.FC = () => {
         brandApi.getIncomingTransactions(storeStatus.brandId, { page: 1, limit: 20 }),
         brandApi.getHeldFunds(storeStatus.brandId, { page: 1, limit: 20 }),
       ]);
-      if (!mountedRef.current || requestRef.current !== requestId) return;
 
-      setOverview(
-        overviewData
+      return {
+        brandId: storeStatus.brandId,
+        overview: overviewData
           ? {
               currency: overviewData.currency || 'NGN',
               availableBalance: Number(overviewData.availableBalance || 0),
@@ -225,49 +226,28 @@ const FinancePage: React.FC = () => {
               negativeBalance: Boolean(overviewData.negativeBalance),
             }
           : null,
-      );
+        payouts: toArrayOrItems(payoutsData),
+        incomingTransactions: toArrayOrItems<IncomingTransaction>(incomingData),
+        heldFunds: toArrayOrItems<HeldFundsItem>(heldFundsData),
+      };
+    },
+    enabled: Boolean(user?.id),
+  });
 
-      setPayouts(
-        Array.isArray(payoutsData?.items)
-          ? payoutsData.items
-          : Array.isArray(payoutsData)
-            ? payoutsData
-            : [],
-      );
-
-      setIncomingTransactions(
-        Array.isArray(incomingData?.items)
-          ? incomingData.items
-          : Array.isArray(incomingData)
-            ? incomingData
-            : [],
-      );
-
-      setHeldFunds(
-        Array.isArray(heldFundsData?.items)
-          ? heldFundsData.items
-          : Array.isArray(heldFundsData)
-            ? heldFundsData
-            : [],
-      );
-    } catch (error) {
-      if (!mountedRef.current || requestRef.current !== requestId) return;
-      console.error('Failed to fetch finance data', error);
-      toast.error('Failed to load finance data');
-    } finally {
-      if (mountedRef.current && requestRef.current === requestId) {
-        setLoading(false);
-      }
-    }
-  }, [user?.id]);
+  const loading = financeResource.loading;
+  const brandId = financeResource.data?.brandId ?? null;
+  const overview = financeResource.data?.overview ?? null;
+  const payouts = financeResource.data?.payouts ?? [];
+  const incomingTransactions = financeResource.data?.incomingTransactions ?? [];
+  const heldFunds = financeResource.data?.heldFunds ?? [];
+  const financeError = financeResource.error;
+  const refetchFinance = financeResource.refetch;
 
   useEffect(() => {
-    mountedRef.current = true;
-    void fetchData();
-    return () => {
-      mountedRef.current = false;
-    };
-  }, [fetchData]);
+    if (!financeError) return;
+    console.error('Failed to fetch finance data', financeError);
+    toast.error('Failed to load finance data');
+  }, [financeError]);
 
   const availableBalance = overview?.availableBalance ?? 0;
   const currency = overview?.currency || 'NGN';
@@ -565,7 +545,7 @@ const FinancePage: React.FC = () => {
     try {
       await brandApi.requestPayout(brandId, availableBalance);
       toast.success('Payout requested successfully');
-      void fetchData();
+      void refetchFinance();
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to request payout');
     } finally {

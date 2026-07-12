@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import { useCachedResource } from '@/hooks/useCachedResource';
+import { queryKeys } from '@/query/queryKeys';
 import reviewApi, {
   type BrandLifecycleBreakdownTargetDto,
   type BrandLifecycleDashboardDto,
@@ -117,6 +119,8 @@ function buildTargetParams(target: BrandLifecycleBreakdownTargetDto | null) {
 }
 
 export default function BrandReviewsDashboardPage() {
+  // Hybrid cache-first dashboard: cached revisits paint instantly; local state
+  // stays the working copy so the report action can update rows optimistically.
   const [dashboard, setDashboard] = useState<BrandLifecycleDashboardDto>(emptyDashboard);
   const [filters, setFilters] = useState<DashboardFilters>({
     status: 'ALL',
@@ -124,8 +128,6 @@ export default function BrandReviewsDashboardPage() {
     rating: 'ALL',
   });
   const [selectedTarget, setSelectedTarget] = useState<BrandLifecycleBreakdownTargetDto | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [reportingReview, setReportingReview] = useState<ReviewDto | null>(null);
   const [reportReason, setReportReason] = useState<ReviewReportReason>('OFF_TOPIC');
   const [reportDetails, setReportDetails] = useState('');
@@ -139,23 +141,25 @@ export default function BrandReviewsDashboardPage() {
     ...buildTargetParams(selectedTarget),
   }), [filters, selectedTarget]);
 
-  const loadDashboard = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await reviewApi.getBrandLifecycleDashboard(query);
-      setDashboard(response);
-    } catch (nextError) {
-      setDashboard(emptyDashboard);
-      setError(nextError instanceof Error ? nextError.message : 'Unable to load review dashboard');
-    } finally {
-      setLoading(false);
-    }
-  }, [query]);
+  const dashboardResource = useCachedResource<BrandLifecycleDashboardDto>({
+    queryKey: queryKeys.brand.reviewsDashboard(query),
+    queryFn: () => reviewApi.getBrandLifecycleDashboard(query),
+  });
+  const loading = dashboardResource.loading;
+  const error = dashboardResource.error
+    ? dashboardResource.error.message || 'Unable to load review dashboard'
+    : null;
+  const loadDashboard = dashboardResource.refetch;
+  const dashboardData = dashboardResource.data;
+  const dashboardErrored = Boolean(dashboardResource.error);
 
   useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
+    if (dashboardData) setDashboard(dashboardData);
+  }, [dashboardData]);
+
+  useEffect(() => {
+    if (dashboardErrored) setDashboard(emptyDashboard);
+  }, [dashboardErrored]);
 
   const activeFilterCount =
     Number(filters.status !== 'ALL') +

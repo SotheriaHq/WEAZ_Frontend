@@ -10,8 +10,11 @@ import { apiClient } from '@/api/httpClient';
 import { brandApi } from '@/api/BrandApi';
 import DesignCommentsPanel from '@/components/designs/DesignCommentsPanel';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import PinchZoomImage from '@/components/media/PinchZoomImage';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import BottomSheet, { type SheetState } from '@/components/ui/BottomSheet';
+import { selectIsMobile } from '@/features/uiSlice';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { formatPrice } from '@/utils/helpers';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
@@ -77,8 +80,13 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const authProfile = useSelector((s: RootState) => s.user.profile);
+  const isMobile = useSelector(selectIsMobile);
   const currentUserId = authProfile?.id;
   const dialogRef = React.useRef<HTMLDivElement>(null);
+  // Mobile media-first drawer state. Starts half-open so the design dominates
+  // while brand/price/actions stay reachable; collapse for the full image,
+  // expand for comments.
+  const [sheetState, setSheetState] = React.useState<SheetState>('half');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const bagFlow = useBagFlow();
@@ -281,6 +289,11 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     onCommentCountChangeRef.current?.(commentCount);
   }, [commentCount, open]);
 
+  // Fresh open (or navigating to a new item) starts the mobile drawer half-open.
+  React.useEffect(() => {
+    if (open) setSheetState('half');
+  }, [open, itemId]);
+
   React.useEffect(() => {
     if (!open) return;
     const originalBodyOverflow = document.body.style.overflow;
@@ -470,6 +483,361 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   };
 
   const showMediaNav = mediaItems.length > 1;
+  const isVideoMedia = activeMedia?.type === 'POST_VIDEO';
+
+  // Shared bag-button semantics (identical on desktop + mobile).
+  const bagDisabled =
+    openingCustomComposer ||
+    resolvingCustomConfiguration ||
+    isOwnBrandContent ||
+    brandBagBlocked;
+  const bagTitle = brandBagBlocked
+    ? BRAND_BAG_BLOCKED_MESSAGE
+    : isOwnBrandContent
+      ? 'Brands cannot place custom orders on their own designs'
+      : resolvingCustomConfiguration
+        ? 'Checking custom-order setup for this design'
+        : !customConfigurationId
+          ? 'Check custom-order setup for this design'
+          : 'Bag this design as a custom order';
+  const bagStatus: 'bagging' | 'disabled' | 'not_bagged' =
+    openingCustomComposer || resolvingCustomConfiguration
+      ? 'bagging'
+      : isOwnBrandContent ||
+          brandBagBlocked ||
+          (!customConfigurationId && !resolvingCustomConfiguration)
+        ? 'disabled'
+        : 'not_bagged';
+
+  // Custom-order composer overlay — shared between the desktop and mobile
+  // layouts so the composer logic lives in exactly one place.
+  const customComposerOverlay =
+    customComposerOpen && customConfigurationId ? (
+      <OverlayPortal>
+        <div
+          className="fixed inset-0 z-layer-modal flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setCustomComposerOpen(false);
+            }
+          }}
+        >
+          <div className="relative h-[92vh] w-[98vw] max-w-[1280px] overflow-y-auto rounded-3xl border border-white/20 bg-white/90 p-4 text-slate-900 shadow-2xl dark:bg-[#0d0b12] dark:text-white">
+            <button
+              type="button"
+              aria-label="Close custom order composer"
+              onClick={() => setCustomComposerOpen(false)}
+              className="sticky top-2 float-right z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white/80 text-slate-700 shadow-sm hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+            >
+              <span aria-hidden="true" className="text-base">×</span>
+            </button>
+            <LazyCustomOrderComposerPage
+              embedded
+              configurationIdOverride={customConfigurationId}
+              onClose={handleCustomOrderComposerDismiss}
+              onOrderCreated={handleCustomOrderComposerDismiss}
+            />
+          </div>
+        </div>
+      </OverlayPortal>
+    ) : null;
+
+  // ------------------------------------------------------------------
+  // MOBILE: media-first viewer with a gesture bottom sheet.
+  // The image fills the screen and decodes once; the metadata drawer
+  // slides over it without ever touching the media element.
+  // ------------------------------------------------------------------
+  if (isMobile) {
+    const mobileActionBtn =
+      'inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10';
+
+    return (
+      <OverlayPortal>
+        <div
+          ref={dialogRef}
+          className="fixed inset-0 z-layer-modal overflow-hidden bg-black"
+          role="dialog"
+          aria-modal="true"
+          aria-label={item.collectionTitle || 'Design'}
+        >
+          {/* Blurred backdrop fill so letterboxed images look premium */}
+          <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
+            {activeMedia?.url && !isVideoMedia ? (
+              <img
+                src={activeMedia.url}
+                alt=""
+                className="h-full w-full scale-125 object-cover opacity-30 blur-2xl"
+              />
+            ) : null}
+            <div className="absolute inset-0 bg-black/50" />
+          </div>
+
+          {/* Media layer — fills the viewport behind the sheet */}
+          <div className="absolute inset-0">
+            {isVideoMedia ? (
+              <MediaRenderer
+                kind="video"
+                src={activeMedia?.url || ''}
+                fit="contain"
+                className="flex h-full w-full items-center justify-center"
+                mediaClassName="max-h-full max-w-full object-contain"
+                maxHeightClassName=""
+                controls={true}
+              />
+            ) : (
+              <PinchZoomImage
+                src={activeMedia?.url || ''}
+                alt={item.collectionTitle || 'Design image'}
+                enabled={sheetState === 'collapsed'}
+              />
+            )}
+
+            {loadingMedia ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/25">
+                <VLoader size={30} phase="loading" showLabel={false} />
+              </div>
+            ) : null}
+
+            {showMediaNav ? (
+              <>
+                <button
+                  type="button"
+                  aria-label="Previous image"
+                  className="absolute left-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
+                  onClick={() =>
+                    setActiveMediaIndex(
+                      (prev) => (prev - 1 + mediaItems.length) % mediaItems.length,
+                    )
+                  }
+                >
+                  <span aria-hidden="true" className="text-lg">‹</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next image"
+                  className="absolute right-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
+                  onClick={() =>
+                    setActiveMediaIndex((prev) => (prev + 1) % mediaItems.length)
+                  }
+                >
+                  <span aria-hidden="true" className="text-lg">›</span>
+                </button>
+                <div className="absolute left-1/2 top-[max(0.75rem,env(safe-area-inset-top))] z-20 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
+                  {activeMediaIndex + 1} / {mediaItems.length}
+                </div>
+              </>
+            ) : null}
+          </div>
+
+          {/* Close */}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-40 flex size-9 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm"
+          >
+            <span aria-hidden="true" className="text-lg">×</span>
+          </button>
+
+          {/* Metadata bottom sheet */}
+          <BottomSheet
+            open={open}
+            state={sheetState}
+            onStateChange={setSheetState}
+            onDismiss={onClose}
+            role="group"
+            ariaLabel="Design details"
+            peek={
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 px-4 pb-2 pt-1 text-left"
+                aria-label={
+                  sheetState === 'collapsed' ? 'Expand details' : 'Collapse details'
+                }
+              >
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <span className="size-8 shrink-0 overflow-hidden rounded-xl ring-1 ring-black/10 dark:ring-white/15">
+                    <ImageWithFallback
+                      src={avatar.src}
+                      fileId={avatar.fileId}
+                      alt={brandLabel}
+                      fit="cover"
+                      rounded="xl"
+                      fallbackName={avatarFallback}
+                      containerClassName="size-8 rounded-xl"
+                      className="size-8 object-cover"
+                    />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">{brandLabel}</span>
+                    <span className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-white/50">
+                      <span aria-hidden="true">↕</span> Details
+                    </span>
+                  </span>
+                </span>
+                <span className="shrink-0 text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                  {saleBand || baseBand || 'Price on request'}
+                </span>
+              </button>
+            }
+          >
+            {/* Title + description */}
+            <div className="pt-1">
+              <h1 className="text-base font-bold leading-snug">{item.collectionTitle}</h1>
+              {item.collectionDescription ? (
+                <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-white/60">
+                  {item.collectionDescription}
+                </p>
+              ) : null}
+            </div>
+
+            {/* Tags */}
+            {item.tags?.length ? (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {item.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-700 dark:border dark:border-white/10 dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            {/* Price + custom badge */}
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                {saleBand || baseBand || 'Price on request'}
+              </span>
+              {saleBand && baseBand ? (
+                <span className="text-[10px] text-slate-400 line-through">{baseBand}</span>
+              ) : null}
+              {item.customAvailable ? (
+                <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-500/15 dark:text-purple-300">
+                  <span aria-hidden="true">✂️</span>
+                  Custom
+                </span>
+              ) : null}
+              {canPatchBrand ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleTogglePatch();
+                  }}
+                  disabled={patchBusy}
+                  className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide transition ${
+                    isPatched
+                      ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                      : 'border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300'
+                  } ${patchBusy ? 'cursor-not-allowed opacity-60' : ''} ${item.customAvailable ? '' : 'ml-auto'}`}
+                >
+                  {patchBusy ? '...' : isPatched ? 'Patched' : 'Patch'}
+                </button>
+              ) : null}
+            </div>
+
+            {/* Actions */}
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={bagDisabled}
+                onClick={() => {
+                  void handleOpenDesignCustomOrder();
+                }}
+                title={bagTitle}
+                aria-label={BAG_IT_LABEL}
+                className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none dark:disabled:bg-slate-700 dark:disabled:text-slate-300"
+              >
+                <BagPulseIcon
+                  status={bagStatus}
+                  context="detail"
+                  size={26}
+                  disabled={bagDisabled}
+                />
+                {openingCustomComposer ? 'Loading...' : BAG_IT_LABEL}
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleSave}
+                disabled={saveBusy}
+                title={isOwnBrandContent ? 'Brands cannot save their own products' : isSaved ? 'Unsave' : 'Save'}
+                className={`${mobileActionBtn} disabled:opacity-50`}
+              >
+                <span aria-hidden="true">🔖</span>
+                {isSaved ? 'Saved' : 'Save'}
+              </button>
+              <button type="button" onClick={handleShare} className={mobileActionBtn}>
+                <span aria-hidden="true">🔗</span>
+                Share
+              </button>
+              {item ? (
+                <ReportContentButton
+                  targetType={item.designId ? 'DESIGN' : 'COLLECTION'}
+                  targetId={item.designId ?? item.collectionId ?? item.id}
+                  label="Report"
+                  className={mobileActionBtn}
+                />
+              ) : null}
+              <button type="button" onClick={handleOpenBrandCatalog} className={mobileActionBtn}>
+                <span aria-hidden="true">🏬</span>
+                Store
+              </button>
+            </div>
+
+            {/* Comments (revealed as the sheet is fully expanded) */}
+            <div className="mt-4 border-t border-slate-200/80 pt-3 dark:border-white/10">
+              <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-white/50">
+                Comments
+              </div>
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 dark:border-white/15 dark:bg-black/25">
+                <input
+                  type="text"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      void handleCommentSubmit();
+                    }
+                  }}
+                  disabled={postingComment}
+                  placeholder="Add a comment..."
+                  maxLength={500}
+                  className="flex-1 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-white/40"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleCommentSubmit();
+                  }}
+                  disabled={postingComment || !commentText.trim()}
+                  className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-slate-900"
+                  aria-label="Post comment"
+                >
+                  {postingComment ? '...' : 'Post'}
+                </button>
+              </div>
+              <div className="mt-3 h-[48vh]">
+                <DesignCommentsPanel
+                  mediaId={activeMediaId ?? item.id}
+                  collectionId={item.collectionId}
+                  contentOwnerId={item.brandId}
+                  currentUserId={currentUserId}
+                  className="h-full"
+                  onCommentAdded={() => setCommentCount((c) => c + 1)}
+                  onCommentRemoved={() => setCommentCount((c) => Math.max(0, c - 1))}
+                  showComposer={false}
+                  externalComment={externalComment}
+                />
+              </div>
+            </div>
+          </BottomSheet>
+        </div>
+        {customComposerOverlay}
+      </OverlayPortal>
+    );
+  }
 
   return (
     <OverlayPortal>
@@ -781,35 +1149,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         </div>
       </div>
 
-      {customComposerOpen && customConfigurationId ? (
-        <OverlayPortal>
-          <div
-            className="fixed inset-0 z-layer-modal flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-            onClick={(event) => {
-              if (event.target === event.currentTarget) {
-                setCustomComposerOpen(false);
-              }
-            }}
-          >
-            <div className="relative h-[92vh] w-[98vw] max-w-[1280px] overflow-y-auto rounded-3xl border border-white/20 bg-white/90 p-4 text-slate-900 shadow-2xl dark:bg-[#0d0b12] dark:text-white">
-              <button
-                type="button"
-                aria-label="Close custom order composer"
-                onClick={() => setCustomComposerOpen(false)}
-                className="sticky top-2 float-right z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white/80 text-slate-700 shadow-sm hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
-              >
-                <span aria-hidden="true" className="text-base">×</span>
-              </button>
-              <LazyCustomOrderComposerPage
-                embedded
-                configurationIdOverride={customConfigurationId}
-                onClose={handleCustomOrderComposerDismiss}
-                onOrderCreated={handleCustomOrderComposerDismiss}
-              />
-            </div>
-          </div>
-        </OverlayPortal>
-      ) : null}
+      {customComposerOverlay}
     </OverlayPortal>
   );
 };
