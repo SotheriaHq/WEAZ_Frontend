@@ -3282,13 +3282,84 @@ const EditProduct: React.FC = () => {
                 <div className="surface-subtle rounded-lg border border-gray-200/60 p-3 dark:border-white/10">
                   <div className="mb-3 flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-wide text-theme-secondary">
-                      Product Metadata
+                        Product Metadata
                     </p>
                   </div>
 
                   <div className="lg:max-h-[340px] lg:overflow-y-auto lg:pr-1 scrollbar-threadly">
                     <div className="space-y-3">
                       <div className="space-y-3" id="product-category-section">
+                        {/* Group 1: Audience & Collection */}
+                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                          <div className="min-w-0">
+                            <UniversalSelect
+                              label="Who is it for?"
+                              value={form.gender}
+                              onChange={(value) =>
+                                updateForm("gender", value as CreatorAudience)
+                              }
+                              options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
+                                value: option.value,
+                                label: option.label,
+                              }))}
+                              disabled={saving}
+                              menuLayer="modal"
+                            />
+                          </div>
+
+                          <div className="min-w-0">
+                            <UniversalSelect
+                              label="Collection (optional)"
+                              value={
+                                form.categoryId || STANDALONE_COLLECTION_VALUE
+                              }
+                              onChange={(value) =>
+                                handleCollectionChange(
+                                  value === STANDALONE_COLLECTION_VALUE
+                                    ? ''
+                                    : value,
+                                )
+                              }
+                              options={collectionSelectOptions}
+                              placeholder={
+                                categoriesLoading
+                                  ? 'Loading collections...'
+                                  : 'No collection (standalone)'
+                              }
+                              disabled={categoriesLoading || isCollectionFlow}
+                              searchable
+                              emptyMessage="No collections available"
+                              optionAllowWrap
+                              selectedAllowWrap
+                              menuLayer="modal"
+                            />
+                            <p className="mt-1.5 text-[11px] text-theme-secondary">
+                              {categoriesLoading
+                                ? 'Loading collections…'
+                                : categories.length
+                                  ? 'Optional. Use only if this product belongs in a store collection.'
+                                  : 'No collections yet — product can stay standalone.'}
+                              {!categoriesLoading && categories.length === 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const suffix = productId
+                                      ? `?productId=${encodeURIComponent(productId)}`
+                                      : '';
+                                    navigate(
+                                      `/studio/store/collections/new${suffix}`,
+                                    );
+                                  }}
+                                  className="ml-1 font-semibold text-purple-600 hover:text-purple-700"
+                                >
+                                  Create collection
+                                </button>
+                              ) : null}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Group 2: Category & Subcategory */}
                         <div className="grid grid-cols-2 gap-3 sm:gap-4">
                           <div className="min-w-0">
                             <UniversalSelect
@@ -3346,73 +3417,6 @@ const EditProduct: React.FC = () => {
                               selectedAllowWrap
                               menuLayer="modal"
                             />
-                          </div>
-
-                          <div className="min-w-0 sm:col-span-2">
-                            <UniversalSelect
-                              label="Who is it for?"
-                              value={form.gender}
-                              onChange={(value) =>
-                                updateForm("gender", value as CreatorAudience)
-                              }
-                              options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
-                                value: option.value,
-                                label: option.label,
-                              }))}
-                              disabled={saving}
-                              menuLayer="modal"
-                            />
-                          </div>
-
-                          <div className="min-w-0 sm:col-span-2">
-                            <UniversalSelect
-                              label="Collection (optional)"
-                              value={
-                                form.categoryId || STANDALONE_COLLECTION_VALUE
-                              }
-                              onChange={(value) =>
-                                handleCollectionChange(
-                                  value === STANDALONE_COLLECTION_VALUE
-                                    ? ''
-                                    : value,
-                                )
-                              }
-                              options={collectionSelectOptions}
-                              placeholder={
-                                categoriesLoading
-                                  ? 'Loading collections...'
-                                  : 'No collection (standalone)'
-                              }
-                              disabled={categoriesLoading || isCollectionFlow}
-                              searchable
-                              emptyMessage="No collections available"
-                              optionAllowWrap
-                              selectedAllowWrap
-                              menuLayer="modal"
-                            />
-                            <p className="mt-1.5 text-[11px] text-theme-secondary">
-                              {categoriesLoading
-                                ? 'Loading collections…'
-                                : categories.length
-                                  ? 'Optional. Use only if this product belongs in a store collection.'
-                                  : 'No collections yet — product can stay standalone.'}
-                              {!categoriesLoading && categories.length === 0 ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const suffix = productId
-                                      ? `?productId=${encodeURIComponent(productId)}`
-                                      : '';
-                                    navigate(
-                                      `/studio/store/collections/new${suffix}`,
-                                    );
-                                  }}
-                                  className="ml-1 font-semibold text-purple-600 hover:text-purple-700"
-                                >
-                                  Create collection
-                                </button>
-                              ) : null}
-                            </p>
                           </div>
                         </div>
                       </div>

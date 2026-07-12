@@ -13,6 +13,7 @@ export interface UniversalSelectOption {
   label: string;
   icon?: React.ReactNode;
   description?: string;
+  disabled?: boolean;
 }
 
 interface UniversalSelectProps {
@@ -221,8 +222,8 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
-  const handleSelect = (optionValue: string) => {
-    if (disabled) return;
+  const handleSelect = (optionValue: string, optionDisabled?: boolean) => {
+    if (disabled || optionDisabled) return;
     onChange(optionValue);
     setIsOpen(false);
   };
@@ -257,6 +258,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
             >
               {filteredOptions.map((option) => {
                 const isSelected = option.value === value;
+                const optionDisabled = option.disabled;
                 return (
                   <div
                     key={option.value}
@@ -270,14 +272,22 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      handleSelect(option.value);
+                      if (optionDisabled) return;
+                      handleSelect(option.value, optionDisabled);
                     }}
                     className={`
-                      relative cursor-pointer select-none rounded-xl touch-manipulation ${optionCompact ? 'min-h-[44px] py-2 pl-2.5 pr-8' : 'min-h-[48px] py-2.5 pl-3 pr-9'} transition-colors
+                      relative select-none rounded-xl touch-manipulation ${optionCompact ? 'min-h-[44px] py-2 pl-2.5 pr-8' : 'min-h-[48px] py-2.5 pl-3 pr-9'} transition-colors
                       ${
-                        isSelected
+                        optionDisabled
+                          ? 'opacity-40 cursor-not-allowed text-[color:var(--text-secondary)] bg-transparent'
+                          : 'cursor-pointer'
+                      }
+                      ${
+                        !optionDisabled && isSelected
                           ? 'menu-item-selected'
-                          : 'menu-item-interactive'
+                          : !optionDisabled
+                            ? 'menu-item-interactive'
+                            : ''
                       }
                     `}
                   >

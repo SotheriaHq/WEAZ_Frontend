@@ -83,10 +83,10 @@ const BRAND_TAG_CHIP_PALETTE = [
   'bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-indigo-500/25',
 ];
 const BUSINESS_TYPE_OPTIONS = [
-  { value: 'Retailer', label: 'Retailer' },
+  { value: 'Retailer', label: 'Retailer', disabled: true },
   { value: 'Designer', label: 'Designer' },
-  { value: 'Wholesaler', label: 'Wholesaler' },
-  { value: 'Boutique', label: 'Boutique' },
+  { value: 'Wholesaler', label: 'Wholesaler', disabled: true },
+  { value: 'Boutique', label: 'Boutique', disabled: true },
 ];
 
 const getFirstErrorMessage = (errors: unknown): string | null => {

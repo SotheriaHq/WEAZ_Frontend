@@ -388,34 +388,49 @@ export default function StoreVerificationPage() {
                   signal aligned with the real store state.
                 </p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[280px]">
-                <div className="rounded-3xl border border-sky-200 bg-sky-50 px-4 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-600">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-2 xl:grid-cols-2 xl:min-w-[280px]">
+                {/* Card 1: Status */}
+                <div className="col-span-1 rounded-2xl border border-sky-200 bg-sky-50 px-2 py-3 text-center sm:rounded-3xl sm:px-4 sm:py-4">
+                  <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.16em] sm:tracking-[0.22em] text-sky-600">
                     Status
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-sky-900">
+                  <p className="mt-1 text-xs sm:mt-2 sm:text-sm font-semibold text-sky-900 truncate">
                     {statusDisplayLabel}
                   </p>
                 </div>
-                <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">
+
+                {/* Card 2: Attempt */}
+                <div className="col-span-1 rounded-2xl border border-gray-200 bg-gray-50 px-2 py-3 text-center sm:rounded-3xl sm:px-4 sm:py-4">
+                  <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.16em] sm:tracking-[0.22em] text-gray-500">
                     Attempt
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-gray-900">
+                  <p className="mt-1 text-xs sm:mt-2 sm:text-sm font-semibold text-gray-900 truncate">
                     {status?.verificationAttemptNumber ?? 0}
                   </p>
                 </div>
-                <div className={`rounded-3xl border px-4 py-4 ${
+
+                {/* Card 3: Reminders (moved to 3rd to keep side-by-side on mobile) */}
+                <div className="col-span-1 rounded-2xl border border-emerald-200 bg-emerald-50 px-2 py-3 text-center sm:rounded-3xl sm:px-4 sm:py-4">
+                  <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.16em] sm:tracking-[0.22em] text-emerald-600">
+                    Reminders
+                  </p>
+                  <p className="mt-1 text-xs sm:mt-2 sm:text-sm font-semibold text-emerald-900 truncate">
+                    {status?.nudgeOptOut ? 'Off' : 'On'}
+                  </p>
+                </div>
+
+                {/* Card 4: Cooldown (placed last to occupy own row on mobile) */}
+                <div className={`col-span-3 sm:col-span-2 rounded-2xl sm:rounded-3xl border px-3 py-3 sm:px-4 sm:py-4 ${
                   status?.cooldownRemainingDays
                     ? 'border-amber-200 bg-amber-50'
                     : 'border-emerald-200 bg-emerald-50'
                 }`}>
-                  <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${
+                  <p className={`text-[10px] sm:text-xs font-semibold uppercase tracking-[0.16em] sm:tracking-[0.22em] ${
                     status?.cooldownRemainingDays ? 'text-amber-600' : 'text-emerald-600'
                   }`}>
                     Cooldown
                   </p>
-                  <p className={`mt-2 text-sm font-semibold ${
+                  <p className={`mt-1 text-xs sm:mt-2 sm:text-sm font-semibold ${
                     status?.cooldownRemainingDays ? 'text-amber-900' : 'text-emerald-900'
                   }`}>
                     {status?.cooldownRemainingDays
@@ -423,18 +438,10 @@ export default function StoreVerificationPage() {
                       : 'No lockout'}
                   </p>
                   {status?.cooldownRemainingDays && cooldownTarget ? (
-                    <p className="mt-1 text-xs text-amber-700">
+                    <p className="mt-1 text-[10px] sm:text-xs text-amber-700">
                       Reapply on {cooldownTarget.toLocaleString()}
                     </p>
                   ) : null}
-                </div>
-                <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-600">
-                    Reminders
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-emerald-900">
-                    {status?.nudgeOptOut ? 'Off' : 'On'}
-                  </p>
                 </div>
               </div>
             </div>
