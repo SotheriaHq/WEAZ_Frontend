@@ -408,13 +408,122 @@ export const reconcilePublishTasksWithDraftIds = (
   return removed;
 };
 
+/**
+ * Persistent "this server draft is a FAILED go-live" marker.
+ *
+ * A publish that dies mid-upload leaves a real, media-less DRAFT on the server.
+ * Once the local `publish_…` task is reconciled away, nothing else tells the
+ * catalog that the surviving draft is a failure needing attention — this marker
+ * (keyed by the persisted design id, not the ephemeral task id) survives that
+ * reconcile so the draft card can render the "Open editor / Retry / Remove"
+ * state instead of looking like a plain, intentional draft.
+ */
+const FAILED_PUBLISH_STORAGE_KEY = 'threadly.publish.failedDesignIds.v1';
+const FAILED_PUBLISH_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+const MAX_FAILED_PUBLISH_ENTRIES = 60;
+
+interface FailedPublishEntry {
+  designId: string;
+  ownerId?: string;
+  title?: string;
+  at: number;
+}
+
+const readRawFailedPublishEntries = (): FailedPublishEntry[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(FAILED_PUBLISH_STORAGE_KEY) || '[]',
+    );
+    if (!Array.isArray(parsed)) return [];
+    const now = Date.now();
+    return parsed
+      .filter(
+        (entry): entry is FailedPublishEntry =>
+          Boolean(entry) &&
+          typeof entry === 'object' &&
+          typeof (entry as FailedPublishEntry).designId === 'string' &&
+          typeof (entry as FailedPublishEntry).at === 'number',
+      )
+      .filter((entry) => now - entry.at <= FAILED_PUBLISH_STALE_AFTER_MS)
+      .map((entry) => ({
+        designId: entry.designId,
+        ownerId: normalizeOwnerId(entry.ownerId),
+        title: typeof entry.title === 'string' ? entry.title : undefined,
+        at: entry.at,
+      }));
+  } catch {
+    return [];
+  }
+};
+
+const writeFailedPublishEntries = (entries: FailedPublishEntry[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(
+      FAILED_PUBLISH_STORAGE_KEY,
+      JSON.stringify(entries.slice(0, MAX_FAILED_PUBLISH_ENTRIES)),
+    );
+  } catch {
+    // Private-mode quota failures are non-fatal for a UI decoration marker.
+  }
+  emitTasksUpdated();
+};
+
+export const markPublishFailedDesignId = (
+  designId: string | null | undefined,
+  info?: { ownerId?: string | null; title?: string | null },
+) => {
+  const id = normalizeEntityId(designId);
+  if (!id) return;
+  const ownerId = normalizeOwnerId(info?.ownerId);
+  const title =
+    typeof info?.title === 'string' && info.title.trim()
+      ? info.title.trim()
+      : undefined;
+  const existing = readRawFailedPublishEntries().filter(
+    (entry) => entry.designId !== id,
+  );
+  writeFailedPublishEntries([
+    { designId: id, ownerId, title, at: Date.now() },
+    ...existing,
+  ]);
+};
+
+export const readPublishFailedDesignIds = (
+  scope?: PublishTaskScope,
+): Set<string> => {
+  const scopeOwnerId = resolveScopeOwnerId(scope);
+  const ids = readRawFailedPublishEntries()
+    .filter((entry) =>
+      scopeOwnerId ? entry.ownerId === scopeOwnerId : !entry.ownerId,
+    )
+    .map((entry) => entry.designId);
+  return new Set(ids);
+};
+
+export const clearPublishFailedDesignId = (
+  designId: string | null | undefined,
+) => {
+  const id = normalizeEntityId(designId);
+  if (!id) return;
+  const remaining = readRawFailedPublishEntries().filter(
+    (entry) => entry.designId !== id,
+  );
+  writeFailedPublishEntries(remaining);
+};
+
 export const subscribePublishTasks = (listener: () => void) => {
   if (typeof window === 'undefined') {
     return () => {};
   }
 
   const onStorage = (event: StorageEvent) => {
-    if (event.key === STORAGE_KEY || event.key === LEGACY_STORAGE_KEY) {
+    if (
+      event.key === STORAGE_KEY ||
+      event.key === LEGACY_STORAGE_KEY ||
+      event.key === FAILED_PUBLISH_STORAGE_KEY
+    ) {
       listener();
     }
   };

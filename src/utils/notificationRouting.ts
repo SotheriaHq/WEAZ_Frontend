@@ -25,6 +25,7 @@ const CONTENT_REVIEW_TYPE_ROUTES = new Set([
     'CONTENT_CHANGES_REQUESTED',
     'CONTENT_REVIEW_REJECTED',
     'CONTENT_REVIEW_FAILED',
+    'CONTENT_PUBLISH_FAILED',
 ]);
 
 /**
@@ -52,6 +53,15 @@ function determineContentReviewRoute(notification: NormalizedNotification): stri
     const isProduct =
         Boolean(productId) ||
         String(p.entityType ?? '').toUpperCase().includes('PRODUCT');
+
+    // Client-side go-live failure: the design is saved as a draft. Route to the
+    // Drafts tab and highlight the exact card so the owner lands on the item
+    // that needs finishing.
+    if (type === 'CONTENT_PUBLISH_FAILED') {
+        const params = new URLSearchParams({ tab: 'Content', visibility: 'Drafts' });
+        if (designId) params.set('highlightDesign', designId);
+        return `/profile?${params.toString()}`;
+    }
 
     if (type === 'CONTENT_CHANGES_REQUESTED') {
         const note =

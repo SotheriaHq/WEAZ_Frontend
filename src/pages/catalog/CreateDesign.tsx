@@ -1453,13 +1453,21 @@ const CreateDesignInner: React.FC = () => {
           refreshCatalogAfterMutation();
         },
         onError: (error, failedDesignId) => {
+          // A fresh go-live that reached the server (a draft was created) now
+          // surfaces as a durable, clickable notification that routes to the
+          // draft — no fast, unreadable error toast. Only when nothing reached
+          // the server (no draft, so no notification is possible) do we fall
+          // back to an inline error the user can actually act on.
+          if (failedDesignId && !isEditMode) {
+            return;
+          }
           const errMsg = mapCreatorMetadataError(
             error.message,
             'Failed to go live with design',
           );
           toast.error(
             failedDesignId
-              ? `${errMsg}. Media may already be uploaded — open the design editor to finish.`
+              ? `${errMsg}. Open the design editor to finish.`
               : errMsg,
           );
         },

@@ -25,6 +25,8 @@ interface CollectionsGridProps {
   isDeleted?: boolean;
   onRetryPublish?: (id: string) => void;
   onDismiss?: (id: string) => void;
+  /** Transiently ring + scroll to a specific card (e.g. from a notification). */
+  highlightId?: string | null;
 }
 
 const areSavedMapsEqual = (left: Record<string, boolean>, right: Record<string, boolean>) => {
@@ -46,8 +48,15 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
   isDeleted,
   onRetryPublish,
   onDismiss,
+  highlightId,
 }) => {
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const highlightRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (highlightId && highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlightId]);
   const queryClient = useQueryClient();
   const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
@@ -153,8 +162,18 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
       className="catalog-masonry-grid flex w-full -ml-3 sm:-ml-6"
       columnClassName="catalog-masonry-column pl-3 sm:pl-6 bg-clip-padding"
     >
-      {collections.map((collection) => (
-        <div key={collection.id} className="catalog-masonry-item mb-3 sm:mb-6 w-full">
+      {collections.map((collection) => {
+        const isHighlighted = Boolean(highlightId) && collection.id === highlightId;
+        return (
+        <div
+          key={collection.id}
+          ref={isHighlighted ? highlightRef : undefined}
+          className={`catalog-masonry-item mb-3 sm:mb-6 w-full rounded-xl transition-shadow ${
+            isHighlighted
+              ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-white dark:ring-offset-[#0a0a0a]'
+              : ''
+          }`}
+        >
           <CatalogEntityCard
             collection={collection}
             compact={compactCards}
@@ -172,7 +191,8 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
             saveBusy={savingIds.has(collection.id)}
           />
         </div>
-      ))}
+        );
+      })}
     </Masonry>
   );
 };

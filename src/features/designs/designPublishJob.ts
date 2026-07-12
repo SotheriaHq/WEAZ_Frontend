@@ -29,6 +29,7 @@ import { WEB_UPLOAD_POLICIES, assertValidUploadFiles } from '@/utils/uploadValid
 import {
   updatePublishTask,
   removePublishTask,
+  markPublishFailedDesignId,
   type PublishTaskKind,
 } from '@/utils/publishTracker';
 import { removeDesignPublishRecovery } from './designPublishRecovery';
@@ -206,6 +207,10 @@ export async function runDesignPublishJob(input: DesignPublishJobInput): Promise
   const scope = input.publishTaskScope ?? { ownerId: input.ownerId };
   const startedAt = Date.now();
   let designId: string | undefined = input.existingDesignId;
+  // Which pipeline stage we're in, so a failure can be reported precisely and
+  // the catch can tell "draft exists but media never uploaded" apart from
+  // "nothing reached the server".
+  let stage: 'initialize' | 'upload' | 'finalize' = 'initialize';
 
   // Throttle localStorage writes: S3 progress events can fire dozens of times
   // per second and each write re-renders Catalog via the subscribe event.
@@ -304,6 +309,9 @@ export async function runDesignPublishJob(input: DesignPublishJobInput): Promise
     if (!designId) {
       throw new Error('Server did not return a design id');
     }
+    // Draft now exists server-side; any later failure is recoverable from the
+    // draft rather than a total loss.
+    stage = 'upload';
     setProgress(20, 'Uploading…');
 
     const uploads = Array.isArray(initResp.uploads) ? initResp.uploads : [];
@@ -355,6 +363,7 @@ export async function runDesignPublishJob(input: DesignPublishJobInput): Promise
       }),
     );
 
+    stage = 'finalize';
     // Custom-order: draft finalize already ran with draftOnly, then config, then publish.
     if (input.pendingCustomOrderDraft) {
       setProgress(90, 'Setup…', 'finalizing');
@@ -417,9 +426,17 @@ export async function runDesignPublishJob(input: DesignPublishJobInput): Promise
     addClientDiagnostic('error', 'design-publish-job', 'Publish job failed', {
       taskId: input.taskId,
       designId,
+      stage,
       durationMs: Date.now() - startedAt,
       error: err.message,
     });
+    // A fresh go-live that got as far as creating the server draft (designId)
+    // must NOT keep haunting the In Review tab as an unopenable ghost. Flip the
+    // local task to a draft-kind failure so it leaves In Review, mark the draft
+    // as a failed publish (survives task reconcile so the Drafts card can show
+    // Open editor / Retry / Remove), and emit the durable cross-device
+    // notification that replaces the transient, unreadable error toast.
+    const isFreshDraftFailure = Boolean(designId) && !input.existingDesignId;
     updatePublishTask(
       input.taskId,
       {
@@ -428,13 +445,39 @@ export async function runDesignPublishJob(input: DesignPublishJobInput): Promise
         designId,
         legacyCollectionId: designId,
         collectionId: designId,
+        ...(isFreshDraftFailure ? { kind: 'draft' as PublishTaskKind } : {}),
         message: designId
-          ? 'Setup issue — open editor to finish'
+          ? "Publish didn't finish — open the draft to try again"
           : 'Go live failed',
         error: err.message,
       },
       scope,
     );
+    if (isFreshDraftFailure && designId) {
+      markPublishFailedDesignId(designId, {
+        ownerId: scope.ownerId,
+        title: input.title,
+      });
+      void DesignApi.reportDesignPublishFailure(designId, {
+        title: input.title,
+        reason: err.message,
+        stage,
+      }).catch((reportError) => {
+        addClientDiagnostic(
+          'warn',
+          'design-publish-job',
+          'Publish-failure report could not be sent',
+          {
+            taskId: input.taskId,
+            designId,
+            error:
+              reportError instanceof Error
+                ? reportError.message
+                : String(reportError),
+          },
+        );
+      });
+    }
     input.onError?.(err, designId);
   } finally {
     activeJobs.delete(input.taskId);

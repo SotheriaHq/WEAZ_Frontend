@@ -5,6 +5,9 @@ import {
   getPublishTaskLegacyCollectionId,
   getCompactPublishTaskStatusLabel,
   isLocalPublishTaskId,
+  markPublishFailedDesignId,
+  readPublishFailedDesignIds,
+  clearPublishFailedDesignId,
   normalizePublishTaskIdentifiers,
   readPublishTasks,
   reconcilePublishTasksWithDraftIds,
@@ -171,5 +174,53 @@ describe('publishTracker identifiers', () => {
     expect(readPublishTasks(scope).some((entry) => entry.status === 'failed')).toBe(true);
     expect(reconcilePublishTasksWithDraftIds(['server-draft-uuid'], scope)).toBe(1);
     expect(readPublishTasks(scope).some((entry) => entry.status === 'failed')).toBe(false);
+  });
+});
+
+describe('publishTracker failed-publish markers', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('marks and reads a failed-publish design id within its owner scope', () => {
+    const scope = { ownerId: 'owner-1' };
+    markPublishFailedDesignId('design-1', { ownerId: 'owner-1', title: 'Jacket' });
+
+    const ids = readPublishFailedDesignIds(scope);
+    expect(ids.has('design-1')).toBe(true);
+    // Survives the local-task reconcile invariant: the marker lives in its own
+    // store, independent of the ephemeral publish task list.
+    expect(readPublishTasks(scope)).toHaveLength(0);
+  });
+
+  it('scopes markers by owner so brands never see each other failures', () => {
+    markPublishFailedDesignId('design-a', { ownerId: 'owner-1' });
+    markPublishFailedDesignId('design-b', { ownerId: 'owner-2' });
+
+    expect(readPublishFailedDesignIds({ ownerId: 'owner-1' }).has('design-a')).toBe(true);
+    expect(readPublishFailedDesignIds({ ownerId: 'owner-1' }).has('design-b')).toBe(false);
+    expect(readPublishFailedDesignIds({ ownerId: 'owner-2' }).has('design-b')).toBe(true);
+  });
+
+  it('clears a marker once the draft is finished or removed', () => {
+    const scope = { ownerId: 'owner-1' };
+    markPublishFailedDesignId('design-1', { ownerId: 'owner-1' });
+    expect(readPublishFailedDesignIds(scope).has('design-1')).toBe(true);
+
+    clearPublishFailedDesignId('design-1');
+    expect(readPublishFailedDesignIds(scope).has('design-1')).toBe(false);
+  });
+
+  it('ignores blank ids and de-dupes repeated marks of the same design', () => {
+    const scope = { ownerId: 'owner-1' };
+    markPublishFailedDesignId('   ', { ownerId: 'owner-1' });
+    markPublishFailedDesignId('design-1', { ownerId: 'owner-1' });
+    markPublishFailedDesignId('design-1', { ownerId: 'owner-1', title: 'Updated' });
+
+    expect(readPublishFailedDesignIds(scope).size).toBe(1);
+    const stored = JSON.parse(
+      window.localStorage.getItem('threadly.publish.failedDesignIds.v1') || '[]',
+    ) as Array<{ designId: string }>;
+    expect(stored.filter((entry) => entry.designId === 'design-1')).toHaveLength(1);
   });
 });

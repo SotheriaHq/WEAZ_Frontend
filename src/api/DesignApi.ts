@@ -287,6 +287,32 @@ export async function withdrawDesignFromReview(designId: string) {
   return unwrapData<unknown>(response.data);
 }
 
+/**
+ * Report a client-side go-live failure (media upload/finalize died after the
+ * draft was created) so the backend emits a durable, cross-device notification
+ * routing the owner back to the draft. Best-effort — callers run this in a
+ * failure path and must not let it throw.
+ */
+export async function reportDesignPublishFailure(
+  designId: string,
+  info?: {
+    title?: string;
+    reason?: string;
+    stage?: 'initialize' | 'upload' | 'finalize';
+  },
+): Promise<void> {
+  await apiClient.post(
+    `/designs/${designId}/report-publish-failure`,
+    {
+      title: info?.title,
+      reason: info?.reason,
+      stage: info?.stage,
+    },
+    // Failure path: keep it short so a bad connection doesn't hang the report.
+    { timeout: 8000 },
+  );
+}
+
 export async function acknowledgeContentPolicy() {
   const legalAcceptances = await getRequiredLegalAcceptances(
     LEGAL_CONTENT_PUBLISH_DOCUMENT_KEYS,
@@ -334,6 +360,7 @@ export const DesignApi = {
   initializeDesignMediaUploads,
   submitDesignForReview,
   withdrawDesignFromReview,
+  reportDesignPublishFailure,
   acknowledgeContentPolicy,
   reorderDesignMedia,
   deleteDesignMedia,

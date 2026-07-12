@@ -493,6 +493,8 @@ const EditProduct: React.FC = () => {
   const queryClient = useQueryClient();
 
   const isEditMode = Boolean(productId);
+  const [draggingSlot, setDraggingSlot] = useState<string | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
   const isCollectionContext = returnContext === "collection";
   const isCollectionFlow = isCollectionContext && !isEditMode;
   const pageTitle = isCollectionFlow
@@ -2672,7 +2674,7 @@ const EditProduct: React.FC = () => {
       );
       setPendingMediaFiles((prev) =>
         normalizePending(
-          prev.map((item) =>
+        prev.map((item) =>
             item.tempId === mediaId ? { ...item, viewSlot: nextSlot } : item,
           ),
         ),
@@ -2681,6 +2683,69 @@ const EditProduct: React.FC = () => {
     },
     [mediaUrls, normalizePending],
   );
+
+  const handleSwapMediaSlots = useCallback(
+    (sourceSlot: string, targetSlot: string) => {
+      const sourceSlotNormalized = normalizeMediaViewSlot(sourceSlot);
+      const targetSlotNormalized = normalizeMediaViewSlot(targetSlot);
+
+      setMediaUrls((prev) => {
+        return normalizePrimary(
+          prev.map((item, index) => {
+            const itemSlot = normalizeMediaViewSlot(item.viewSlot, index);
+            if (itemSlot === sourceSlotNormalized) {
+              return { ...item, viewSlot: targetSlotNormalized };
+            }
+            if (itemSlot === targetSlotNormalized) {
+              return { ...item, viewSlot: sourceSlotNormalized };
+            }
+            return item;
+          })
+        );
+      });
+
+      setPendingMediaFiles((prev) => {
+        return normalizePending(
+          prev.map((item, index) => {
+            const itemSlot = normalizeMediaViewSlot(item.viewSlot, index);
+            if (itemSlot === sourceSlotNormalized) {
+              return { ...item, viewSlot: targetSlotNormalized };
+            }
+            if (itemSlot === targetSlotNormalized) {
+              return { ...item, viewSlot: sourceSlotNormalized };
+            }
+            return item;
+          })
+        );
+      });
+
+      setHasChanges(true);
+      toast.success(
+        `Swapped positions: ${getMediaViewSlotLabel(sourceSlotNormalized)} and ${getMediaViewSlotLabel(targetSlotNormalized)}`
+      );
+    },
+    [normalizePending]
+  );
+
+  const handleDragStart = (e: React.DragEvent, slot: string) => {
+    e.dataTransfer.setData("text/plain", slot);
+    setDraggingSlot(slot);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetSlot: string) => {
+    e.preventDefault();
+    const sourceSlot = e.dataTransfer.getData("text/plain") || draggingSlot;
+    if (!sourceSlot || sourceSlot === targetSlot) return;
+
+    const hasSourceMedia = mediaUrls.some((m, idx) => normalizeMediaViewSlot(m.viewSlot, idx) === sourceSlot);
+    const hasTargetMedia = mediaUrls.some((m, idx) => normalizeMediaViewSlot(m.viewSlot, idx) === targetSlot);
+
+    if (hasSourceMedia || hasTargetMedia) {
+      handleSwapMediaSlots(sourceSlot, targetSlot);
+    }
+    setDraggingSlot(null);
+    setDragOverSlot(null);
+  };
 
   const handleSetCover = useCallback(
     async (mediaId: string) => {
@@ -2866,354 +2931,6 @@ const EditProduct: React.FC = () => {
   if (loading) {
     return <StudioPageSkeleton variant="form" />;
   }
-
-  // =====================
-  // Render
-  // =====================
-  const isDraftEditMode = isEditMode && form.status === "DRAFT";
-
-  return (
-    <div className="flex flex-col min-h-full bg-transparent text-theme font-sans">
-      {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-3 py-3 sm:px-5 sm:py-5">
-        <div className="mb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:mb-6">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center text-xs text-theme-secondary gap-2">
-              {isCollectionContext ? (
-                <>
-                  <button
-                    onClick={() => navigate("/studio/store?view=collections")}
-                    className="hover:text-theme transition-colors flex items-center"
-                  >
-                    <ArrowLeft className="w-3 h-3 mr-1" /> Collections
-                  </button>
-                  <span>/</span>
-                  <button
-                    onClick={() =>
-                      navigate(returnTo || "/studio/store/collections/new")
-                    }
-                    className="hover:text-theme transition-colors"
-                  >
-                    Create Collection
-                  </button>
-                  <span>/</span>
-                  <span>{isEditMode ? "Edit Product" : "Add Product"}</span>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => navigate("/studio/store")}
-                    className="hover:text-theme transition-colors flex items-center"
-                  >
-                    <ArrowLeft className="w-3 h-3 mr-1" /> Store
-                  </button>
-                  <span>/</span>
-                  <span>{pageTitle}</span>
-                </>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold text-theme flex items-center gap-2">
-                {pageTitle}
-              </h1>
-              {isEditMode && form.title && (
-                <span className="text-sm text-theme-secondary">• {form.title}</span>
-              )}
-              {isEditMode && (
-                <div className="relative group">
-                  <button
-                    className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${getContentStatusTone(contentStatus ?? form.status)}`}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                    {getContentStatusLabel(contentStatus ?? form.status)}
-                    <ChevronDown className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-            {/* Action buttons removed - duplicate/archive/delete should be done from Store page */}
-          </div>
-        </div>
-
-        {isEditMode && productId ? (
-          <ReviewFeedbackBanner productId={productId} fallbackNote={reviewNoteParam} />
-        ) : null}
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          {/* LEFT COLUMN: Media (42% approx -> 5 cols) */}
-          <div className="space-y-4 lg:col-span-4">
-            {/* Media Gallery */}
-            <div
-              id="product-media-section"
-              className="surface-card rounded-xl border p-4 shadow-sm sm:p-5 scroll-mt-24"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-theme">
-                  Media
-                </h3>
-                <span className="text-xs text-theme-secondary">
-                  {mediaUrls.length} of {maxMediaCount} used
-                </span>
-              </div>
-
-              <input
-                ref={mediaFileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                data-testid="product-media-input"
-                onChange={handleMediaFilesSelected}
-              />
-
-              {/* Carousel for media (shows one at a time with navigation) */}
-              {mediaUrls.length > 0 ? (
-                <div className="relative">
-                  {/* Main carousel view */}
-                  <div className="relative rounded-xl bg-theme-muted aspect-[4/5] overflow-hidden">
-                    {mediaUrls[carouselIndex] && (
-                      <>
-                        <MediaRenderer
-                          kind="image"
-                          src={mediaUrls[carouselIndex].url}
-                          alt="Product"
-                          fit="contain"
-                          maxHeightClassName="max-h-full"
-                          maxWidthClassName="max-w-full"
-                          className="w-full h-full"
-                          mediaClassName="w-full h-full object-contain"
-                        />
-
-                        {/* Slot label overlay */}
-                        <div className="absolute top-2 left-2 flex items-center gap-1.5">
-                          {mediaUrls[carouselIndex].isPrimary && (
-                            <span className="px-2 py-1 bg-black/70 backdrop-blur-sm rounded text-[10px] font-semibold text-white">
-                              Cover
-                            </span>
-                          )}
-                          <span className="px-2 py-1 bg-black/60 backdrop-blur-sm rounded text-[10px] font-medium text-white/90">
-                            {carouselIndex + 1}. {getMediaViewSlotLabel(
-                              normalizeMediaViewSlot(
-                                mediaUrls[carouselIndex].viewSlot,
-                                carouselIndex,
-                              ),
-                            )}
-                          </span>
-                        </div>
-
-                        {/* Action buttons - Set cover + Delete only */}
-                        <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-2 px-3 py-3 bg-gradient-to-t from-black/80 to-transparent">
-                          {!mediaUrls[carouselIndex].isPrimary && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleSetCover(mediaUrls[carouselIndex].id)
-                              }
-                              className="px-3 py-1.5 rounded-lg bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white text-sm font-medium flex items-center gap-1.5"
-                              title="Set this image as the product cover"
-                            >
-                              <span>⭐</span>
-                              <span>Set Cover</span>
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleDeleteMedia(mediaUrls[carouselIndex].id);
-                              setCarouselIndex(Math.max(0, carouselIndex - 1));
-                            }}
-                            className="p-2 rounded-lg bg-red-500/80 backdrop-blur-sm hover:bg-red-600 text-white"
-                            title="Delete this image"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </>
-                    )}
-
-                    {/* Navigation arrows */}
-                    {mediaUrls.length > 1 && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCarouselIndex(Math.max(0, carouselIndex - 1))
-                          }
-                          disabled={carouselIndex === 0}
-                          className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                          aria-label="Previous image"
-                        >
-                          <ChevronLeft className="w-5 h-5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCarouselIndex(
-                              Math.min(mediaUrls.length - 1, carouselIndex + 1),
-                            )
-                          }
-                          disabled={carouselIndex === mediaUrls.length - 1}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                          aria-label="Next image"
-                        >
-                          <ChevronRight className="w-5 h-5" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Dot indicators + add button */}
-                  <div className="flex items-center justify-center gap-2 mt-3">
-                    {mediaUrls.map((_, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setCarouselIndex(idx)}
-                        className={`w-2.5 h-2.5 rounded-full transition-all ${
-                          idx === carouselIndex
-                            ? "bg-purple-600 scale-110"
-                            : "surface-control-muted hover:bg-gray-400"
-                        }`}
-                        aria-label={`Go to image ${idx + 1}`}
-                      />
-                    ))}
-                    {canAddMoreMedia && (
-                      <button
-                        type="button"
-                        onClick={() => mediaFileInputRef.current?.click()}
-                        className="w-6 h-6 rounded-full border-2 border-dashed border-theme-strong flex items-center justify-center text-gray-400 hover:border-purple-400 hover:text-purple-500 transition-all"
-                        aria-label="Add more images"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => mediaFileInputRef.current?.click()}
-                  className="group aspect-[4/5] w-full rounded-2xl border border-dashed border-slate-300/80 dark:border-white/15 bg-gradient-to-br from-white via-sky-50/80 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900 p-5 text-left shadow-[0_20px_50px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:border-sky-400/70 hover:shadow-[0_24px_70px_rgba(56,189,248,0.18)] dark:hover:shadow-[0_24px_70px_rgba(56,189,248,0.12)]"
-                >
-                  <div className="flex h-full flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 text-sky-700 dark:text-sky-200">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-500/10 text-xl group-hover:bg-sky-500/15 transition-colors">
-                          ✦
-                        </span>
-                        <div>
-                          <p className="text-sm font-semibold">Add your first product images</p>
-                          <p className="text-xs text-theme-secondary">
-                            Clear photos help buyers trust the listing.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-5 space-y-2">
-                        {[
-                          'Front, left, right, and back views',
-                          'One cover image so the product stands out',
-                          'Up to 6 images total',
-                        ].map((item) => (
-                          <div key={item} className="flex items-start gap-2 rounded-xl surface-subtle px-3 py-2 text-sm text-theme-secondary">
-                            <span className="mt-0.5 text-sky-600">•</span>
-                            <span>{item}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="surface-subtle mt-4 flex items-center justify-between rounded-xl px-3 py-2">
-                      <div>
-                        <p className="text-xs font-medium text-theme-secondary">
-                          Tap to upload
-                        </p>
-                        <p className="text-[11px] text-theme-secondary">
-                          Start with images, then add a video if needed.
-                        </p>
-                      </div>
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500 text-white shadow-sm">
-                        <Plus className="h-4 w-4" />
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              )}
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                {MEDIA_VIEW_SLOT_OPTIONS.slice(0, maxMediaCount).map((slotOption, index) => {
-                  const assigned = mediaBySlot.get(slotOption.value);
-                  const isMissing =
-                    slotOption.required &&
-                    missingRequiredProductMediaSlots.includes(slotOption.value);
-                  return (
-                    <div
-                      key={slotOption.value}
-                      className={`rounded-xl border p-2 ${
-                        isMissing
-                          ? "border-amber-400/50 bg-amber-500/10"
-                          : "border-theme surface-subtle"
-                      }`}
-                    >
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-semibold text-theme">
-                          {slotOption.label}
-                        </span>
-                        {slotOption.required && (
-                          <span className="text-[10px] font-medium text-amber-500">
-                            Required
-                          </span>
-                        )}
-                      </div>
-                      {assigned ? (
-                        <div className="space-y-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCarouselIndex(
-                                Math.max(0, mediaUrls.findIndex((item) => item.id === assigned.id)),
-                              )
-                            }
-                            className="h-20 w-full overflow-hidden rounded-lg bg-black/5 dark:bg-white/5"
-                          >
-                            <MediaRenderer
-                              kind="image"
-                              src={assigned.url}
-                              alt={`${slotOption.label} media`}
-                              fit="cover"
-                              className="h-full w-full"
-                              mediaClassName="h-full w-full object-cover"
-                            />
-                          </button>
-                          <UniversalSelect
-                            value={normalizeMediaViewSlot(assigned.viewSlot, index)}
-                            onChange={(value) => handleMediaSlotChange(assigned.id, value)}
-                            options={productMediaSlotOptions}
-                            className="text-xs"
-                            optionCompact
-                          />
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => openMediaPickerForSlot(slotOption.value)}
-                          disabled={!canAddMoreMedia}
-                          className="flex h-20 w-full items-center justify-center rounded-lg border border-dashed border-theme text-xs font-semibold text-theme-secondary transition hover:text-theme disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Add {slotOption.label}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {mediaUrls.length > 0 &&
-                missingRequiredProductMediaSlots.length > 0 && (
-                <p className="mt-3 text-xs text-orange-500">
                   Add {missingRequiredProductMediaSlots.map(getMediaViewSlotLabel).join(", ")} media before going live.
                 </p>
               )}

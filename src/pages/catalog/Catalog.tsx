@@ -56,6 +56,8 @@ import {
   getCompactPublishTaskStatusLabel,
   getPublishTaskRuntimePreview,
   isLocalPublishTaskId,
+  readPublishFailedDesignIds,
+  clearPublishFailedDesignId,
 } from '@/utils/publishTracker';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
 import {
@@ -216,6 +218,12 @@ const ProfilePage: React.FC = () => {
   const [isBrandQrOpen, setIsBrandQrOpen] = useState(false);
   const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; designId?: string; title?: string; visibility?: 'PUBLIC' | 'PRIVATE'; kind?: PublishTaskKind; reviewStatus?: string | null }>>({});
   const [publishTasks, setPublishTasks] = useState<PublishTask[]>([]);
+  // Persisted markers for drafts that are actually failed go-lives — survives
+  // the local-task reconcile so the surviving Drafts card renders the
+  // "Open editor / Retry / Remove" state instead of a plain draft.
+  const [failedPublishDesignIds, setFailedPublishDesignIds] = useState<Set<string>>(new Set());
+  // Transient card highlight (e.g. arriving from a publish-failed notification).
+  const [highlightDesignId, setHighlightDesignId] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -379,10 +387,18 @@ const ProfilePage: React.FC = () => {
 
   useEffect(() => {
     prunePublishTasks();
-    setPublishTasks(readPublishTasks(publishTaskScope));
-    return subscribePublishTasks(() => {
+    const sync = () => {
       setPublishTasks(readPublishTasks(publishTaskScope));
-    });
+      setFailedPublishDesignIds((prev) => {
+        const next = readPublishFailedDesignIds(publishTaskScope);
+        if (prev.size === next.size && [...next].every((id) => prev.has(id))) {
+          return prev;
+        }
+        return next;
+      });
+    };
+    sync();
+    return subscribePublishTasks(sync);
   }, [publishTaskScope]);
 
   // Industry-standard stale-while-revalidate: refresh owner catalog when the
@@ -1097,6 +1113,76 @@ const ProfilePage: React.FC = () => {
     });
   }, [drafts, publishTaskScope]);
 
+  // A go-live that failed mid-upload left a media-less DRAFT on the server. Pull
+  // the draft list forward the moment we learn of the failure so the reconcile
+  // above can drop the local in-review ghost and the single Drafts card can take
+  // over — never leave the user stranded between an unopenable card and an empty
+  // draft. Refetch at most once per failed id (until it appears in drafts).
+  const refetchedFailedDesignIdsRef = useRef<Set<string>>(new Set());
+  const refetchMyDrafts = myDraftsQuery.refetch;
+  useEffect(() => {
+    if (!isOwner || failedPublishDesignIds.size === 0) return;
+    const draftIdSet = new Set(drafts.map((entry) => entry.id));
+    let shouldRefetch = false;
+    failedPublishDesignIds.forEach((id) => {
+      if (draftIdSet.has(id)) {
+        refetchedFailedDesignIdsRef.current.delete(id);
+        return;
+      }
+      if (!refetchedFailedDesignIdsRef.current.has(id)) {
+        refetchedFailedDesignIdsRef.current.add(id);
+        shouldRefetch = true;
+      }
+    });
+    if (shouldRefetch) {
+      void refetchMyDrafts();
+    }
+  }, [failedPublishDesignIds, drafts, isOwner, refetchMyDrafts]);
+
+  // Once a failed draft is successfully finished (leaves DRAFT — published or
+  // resubmitted for review), retire its failure marker so the card stops
+  // rendering the failed state on this and every other device.
+  useEffect(() => {
+    if (failedPublishDesignIds.size === 0) return;
+    const progressedPastDraft = new Set(
+      activeCollections
+        .filter((c) => {
+          const status = String(c.publicationStatus ?? c.status ?? '').toUpperCase();
+          return status.length > 0 && status !== 'DRAFT';
+        })
+        .map((c) => c.id),
+    );
+    failedPublishDesignIds.forEach((id) => {
+      if (progressedPastDraft.has(id)) {
+        clearPublishFailedDesignId(id);
+      }
+    });
+  }, [activeCollections, failedPublishDesignIds]);
+
+  // Deep-link from a notification: ?highlightDesign=<id> rings + scrolls to the
+  // exact card once, then the param is stripped so refresh/back never re-fires.
+  const appliedHighlightRef = useRef<string | null>(null);
+  useEffect(() => {
+    const hid = searchParams.get('highlightDesign');
+    if (!hid || appliedHighlightRef.current === hid) return;
+    appliedHighlightRef.current = hid;
+    setHighlightDesignId(hid);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('highlightDesign');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!highlightDesignId) return;
+    const timer = window.setTimeout(() => setHighlightDesignId(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [highlightDesignId]);
+
   const handleCollectionViewerBack = useCallback(() => {
     setSelectedCollectionId(null);
     // Close must REPLACE — a push here makes browser-back reopen the viewer.
@@ -1115,6 +1201,12 @@ const ProfilePage: React.FC = () => {
     }
     if (isLocalPublishTaskId(id)) {
       removePublishTask(id, publishTaskScope);
+    } else if (failedPublishDesignIds.has(id)) {
+      // "Remove" on a stranded failed-publish DRAFT means get rid of the draft
+      // itself (it never got its media). Drop the failure marker and route into
+      // the normal delete confirmation so nothing is destroyed silently.
+      clearPublishFailedDesignId(id);
+      setCollectionToDelete(id);
     }
     setPublishingStates((prev) => {
       if (!prev[id]) return prev;
@@ -1126,11 +1218,12 @@ const ProfilePage: React.FC = () => {
       delete next[id];
       return next;
     });
-  }, [publishTaskScope, publishingStates]);
+  }, [publishTaskScope, publishingStates, failedPublishDesignIds]);
 
   const removeCollectionFromView = useCallback((collectionId: string) => {
     if (!collectionId) return;
 
+    clearPublishFailedDesignId(collectionId);
     setLocallyRemovedCollectionIds((prev) => {
       if (prev.has(collectionId)) return prev;
       const next = new Set(prev);
@@ -1256,7 +1349,26 @@ const ProfilePage: React.FC = () => {
   const decoratedCollections = useMemo(() => {
     const decorated = searchAndVisibilityFiltered.map((c) => {
       const pub = publishingStates[c.id];
-      if (!pub) return c;
+      if (!pub) {
+        // No in-flight state, but this real draft is a marked failed go-live:
+        // paint the same "publish-failed" affordance (Open editor / Retry /
+        // Remove) directly on the surviving server-draft card.
+        const status = String(c.publicationStatus ?? c.status ?? '').toUpperCase();
+        if (failedPublishDesignIds.has(c.id) && status !== 'PUBLISHED') {
+          return {
+            ...c,
+            clientStatus: 'publish-failed',
+            clientStatusMessage: "Publish didn't finish",
+            clientStatusMeta: {
+              startedAt: Date.now(),
+              attempts: 0,
+              offline: !navigator.onLine,
+              kind: 'draft',
+            },
+          } as CollectionDto;
+        }
+        return c;
+      }
       // If the collection already exists on the server (has real data)
       // and the publish state is failed, the server-side publish actually
       // succeeded — skip the stale failed overlay.
@@ -1342,6 +1454,10 @@ const ProfilePage: React.FC = () => {
     const placeholders: CollectionDto[] = Object.entries(publishingStates)
       .filter(([key, state]) => {
         if (decoratedIds.has(key)) return false;
+        // The real server draft (keyed by design id) already renders this card
+        // — don't also show the transient local placeholder (keyed by task id)
+        // for the same design, or a failed go-live briefly double-cards.
+        if (state.designId && decoratedIds.has(state.designId)) return false;
         // Show both in-progress uploads AND failed tasks (so failed tasks surface as ghost cards)
         if (state.status !== 'publishing' && state.status !== 'failed') return false;
         if (isDraftView) {
@@ -1400,7 +1516,7 @@ const ProfilePage: React.FC = () => {
       });
 
     return [...placeholders, ...decorated];
-  }, [publishingStates, searchAndVisibilityFiltered, searchQuery, user?.id, visibilityFilter]);
+  }, [publishingStates, searchAndVisibilityFiltered, searchQuery, user?.id, visibilityFilter, failedPublishDesignIds]);
 
   const hasPendingDraftTask = useMemo(
     () => Object.values(publishingStates).some((state) => state.kind === 'draft' && (state.status === 'publishing' || state.status === 'failed')),
@@ -2496,6 +2612,7 @@ const ProfilePage: React.FC = () => {
                           onCollectionClick={handleCollectionClick}
                           onRetryPublish={handleRetryPublishCheck}
                           onDismiss={isOwner ? handleDismissFailedCard : undefined}
+                          highlightId={highlightDesignId}
                         />
                       ) : (
                         isOwner ? (
