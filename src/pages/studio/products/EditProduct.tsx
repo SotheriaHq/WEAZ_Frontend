@@ -493,6 +493,8 @@ const EditProduct: React.FC = () => {
   const queryClient = useQueryClient();
 
   const isEditMode = Boolean(productId);
+  const [draggingSlot, setDraggingSlot] = useState<string | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
   const isCollectionContext = returnContext === "collection";
   const isCollectionFlow = isCollectionContext && !isEditMode;
   const pageTitle = isCollectionFlow
@@ -767,14 +769,7 @@ const EditProduct: React.FC = () => {
     () => getMissingRequiredMediaSlots(mediaUrls),
     [mediaUrls],
   );
-  const productMediaSlotOptions = useMemo(
-    () =>
-      MEDIA_VIEW_SLOT_OPTIONS.slice(0, maxMediaCount).map((option) => ({
-        value: option.value,
-        label: option.required ? `${option.label} *` : option.label,
-      })),
-    [maxMediaCount],
-  );
+
   const mediaBySlot = useMemo(() => {
     const next = new Map<MediaViewSlot, ProductMediaPreview>();
     mediaUrls.forEach((item, index) => {
@@ -2650,37 +2645,70 @@ const EditProduct: React.FC = () => {
     pushMediaPreviews(files, { makePrimary });
   };
 
-  const handleMediaSlotChange = useCallback(
-    (mediaId: string, slotValue: string) => {
-      const nextSlot = normalizeMediaViewSlot(slotValue);
-      const duplicate = mediaUrls.find(
-        (item, index) =>
-          item.id !== mediaId &&
-          normalizeMediaViewSlot(item.viewSlot, index) === nextSlot,
-      );
-      if (duplicate) {
-        toast.error(`${getMediaViewSlotLabel(nextSlot)} is already assigned.`);
-        return;
-      }
 
-      setMediaUrls((prev) =>
-        normalizePrimary(
-          prev.map((item) =>
-            item.id === mediaId ? { ...item, viewSlot: nextSlot } : item,
-          ),
-        ),
-      );
-      setPendingMediaFiles((prev) =>
-        normalizePending(
-          prev.map((item) =>
-            item.tempId === mediaId ? { ...item, viewSlot: nextSlot } : item,
-          ),
-        ),
-      );
+
+  const handleSwapMediaSlots = useCallback(
+    (sourceSlot: string, targetSlot: string) => {
+      const sourceSlotNormalized = normalizeMediaViewSlot(sourceSlot);
+      const targetSlotNormalized = normalizeMediaViewSlot(targetSlot);
+
+      setMediaUrls((prev) => {
+        return normalizePrimary(
+          prev.map((item, index) => {
+            const itemSlot = normalizeMediaViewSlot(item.viewSlot, index);
+            if (itemSlot === sourceSlotNormalized) {
+              return { ...item, viewSlot: targetSlotNormalized };
+            }
+            if (itemSlot === targetSlotNormalized) {
+              return { ...item, viewSlot: sourceSlotNormalized };
+            }
+            return item;
+          })
+        );
+      });
+
+      setPendingMediaFiles((prev) => {
+        return normalizePending(
+          prev.map((item, index) => {
+            const itemSlot = normalizeMediaViewSlot(item.viewSlot, index);
+            if (itemSlot === sourceSlotNormalized) {
+              return { ...item, viewSlot: targetSlotNormalized };
+            }
+            if (itemSlot === targetSlotNormalized) {
+              return { ...item, viewSlot: sourceSlotNormalized };
+            }
+            return item;
+          })
+        );
+      });
+
       setHasChanges(true);
+      toast.success(
+        `Swapped positions: ${getMediaViewSlotLabel(sourceSlotNormalized)} and ${getMediaViewSlotLabel(targetSlotNormalized)}`
+      );
     },
-    [mediaUrls, normalizePending],
+    [normalizePending]
   );
+
+  const handleDragStart = (e: React.DragEvent, slot: string) => {
+    e.dataTransfer.setData("text/plain", slot);
+    setDraggingSlot(slot);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetSlot: string) => {
+    e.preventDefault();
+    const sourceSlot = e.dataTransfer.getData("text/plain") || draggingSlot;
+    if (!sourceSlot || sourceSlot === targetSlot) return;
+
+    const hasSourceMedia = mediaUrls.some((m, idx) => normalizeMediaViewSlot(m.viewSlot, idx) === sourceSlot);
+    const hasTargetMedia = mediaUrls.some((m, idx) => normalizeMediaViewSlot(m.viewSlot, idx) === targetSlot);
+
+    if (hasSourceMedia || hasTargetMedia) {
+      handleSwapMediaSlots(sourceSlot, targetSlot);
+    }
+    setDraggingSlot(null);
+    setDragOverSlot(null);
+  };
 
   const handleSetCover = useCallback(
     async (mediaId: string) => {
@@ -3143,67 +3171,91 @@ const EditProduct: React.FC = () => {
                 </button>
               )}
 
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                {MEDIA_VIEW_SLOT_OPTIONS.slice(0, maxMediaCount).map((slotOption, index) => {
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                {MEDIA_VIEW_SLOT_OPTIONS.slice(0, maxMediaCount).map((slotOption) => {
                   const assigned = mediaBySlot.get(slotOption.value);
                   const isMissing =
                     slotOption.required &&
                     missingRequiredProductMediaSlots.includes(slotOption.value);
+                  const isDragging = draggingSlot === slotOption.value;
+                  const isDragOver = dragOverSlot === slotOption.value;
+                  const isSelected = assigned && mediaUrls[carouselIndex]?.id === assigned.id;
+
                   return (
                     <div
                       key={slotOption.value}
-                      className={`rounded-xl border p-2 ${
-                        isMissing
-                          ? "border-amber-400/50 bg-amber-500/10"
-                          : "border-theme surface-subtle"
-                      }`}
+                      draggable={Boolean(assigned) && !saving}
+                      onDragStart={(e) => handleDragStart(e, slotOption.value)}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (draggingSlot !== slotOption.value) {
+                          setDragOverSlot(slotOption.value);
+                        }
+                      }}
+                      onDragLeave={() => setDragOverSlot(null)}
+                      onDragEnd={() => {
+                        setDraggingSlot(null);
+                        setDragOverSlot(null);
+                      }}
+                      onDrop={(e) => handleDrop(e, slotOption.value)}
+                      className={`relative rounded-xl overflow-hidden aspect-[4/3] w-full border transition-all duration-200 group ${
+                        isDragging
+                          ? "border-dashed border-purple-400 opacity-50 scale-95"
+                          : isDragOver
+                            ? "border-purple-500 bg-purple-500/5 scale-[1.02] shadow-md shadow-purple-500/5"
+                            : isSelected
+                              ? "border-purple-600 ring-2 ring-purple-600/30"
+                              : isMissing
+                                ? "border-amber-400 bg-amber-500/5"
+                                : "border-gray-200 dark:border-white/10 surface-subtle hover:border-purple-500/40"
+                      } ${saving ? "opacity-60 cursor-not-allowed" : assigned ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
                     >
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-semibold text-theme">
-                          {slotOption.label}
-                        </span>
-                        {slotOption.required && (
-                          <span className="text-[10px] font-medium text-amber-500">
-                            Required
-                          </span>
-                        )}
-                      </div>
                       {assigned ? (
-                        <div className="space-y-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCarouselIndex(
-                                Math.max(0, mediaUrls.findIndex((item) => item.id === assigned.id)),
-                              )
-                            }
-                            className="h-20 w-full overflow-hidden rounded-lg bg-black/5 dark:bg-white/5"
-                          >
-                            <MediaRenderer
-                              kind="image"
-                              src={assigned.url}
-                              alt={`${slotOption.label} media`}
-                              fit="cover"
-                              className="h-full w-full"
-                              mediaClassName="h-full w-full object-cover"
-                            />
-                          </button>
-                          <UniversalSelect
-                            value={normalizeMediaViewSlot(assigned.viewSlot, index)}
-                            onChange={(value) => handleMediaSlotChange(assigned.id, value)}
-                            options={productMediaSlotOptions}
-                            className="text-xs"
-                            optionCompact
+                        <div
+                          className="relative h-full w-full"
+                          onClick={() => {
+                            const idx = mediaUrls.findIndex((item) => item.id === assigned.id);
+                            if (idx !== -1) setCarouselIndex(idx);
+                          }}
+                        >
+                          <MediaRenderer
+                            kind="image"
+                            src={assigned.url}
+                            alt={`${slotOption.label} media`}
+                            fit="cover"
+                            className="h-full w-full"
+                            mediaClassName="h-full w-full object-cover"
                           />
+                          {/* Label with blur bg */}
+                          <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/60 backdrop-blur-sm text-[10px] font-bold text-white/90 tracking-wide uppercase select-none">
+                            {slotOption.label} {slotOption.required && <span className="text-amber-400">*</span>}
+                          </div>
+                          {/* Delete button with blur bg */}
+                          {!saving && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteMedia(assigned.id);
+                              }}
+                              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 backdrop-blur-sm hover:bg-red-500 flex items-center justify-center text-white transition-colors"
+                              aria-label="Remove"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <button
                           type="button"
                           onClick={() => openMediaPickerForSlot(slotOption.value)}
-                          disabled={!canAddMoreMedia}
-                          className="flex h-20 w-full items-center justify-center rounded-lg border border-dashed border-theme text-xs font-semibold text-theme-secondary transition hover:text-theme disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={!canAddMoreMedia || saving}
+                          className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-3 text-center transition-colors hover:bg-purple-50/5 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          Add {slotOption.label}
+                          <Plus className="h-5 w-5 text-theme-secondary hover:text-purple-500 transition-colors" />
+                          <span className="text-[10px] font-semibold text-theme-secondary uppercase tracking-wider">
+                            Add {slotOption.label} {slotOption.required && <span className="text-amber-400">*</span>}
+                          </span>
                         </button>
                       )}
                     </div>
@@ -3279,7 +3331,7 @@ const EditProduct: React.FC = () => {
                   data-testid="product-title-input"
                 />
 
-                <div className="surface-subtle rounded-lg border border-gray-200/60 p-3 dark:border-white/10">
+                <div className="rounded-lg border border-gray-200/40 bg-transparent p-3 dark:border-white/10">
                   <div className="mb-3 flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-wide text-theme-secondary">
                         Product Metadata
