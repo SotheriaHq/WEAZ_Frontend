@@ -2662,41 +2662,93 @@ const EditProduct: React.FC = () => {
       const targetSlotNormalized = normalizeMediaViewSlot(targetSlot);
 
       setMediaUrls((prev) => {
-        return normalizePrimary(
-          prev.map((item, index) => {
-            const itemSlot = normalizeMediaViewSlot(item.viewSlot, index);
-            if (itemSlot === sourceSlotNormalized) {
-              return { ...item, viewSlot: targetSlotNormalized };
-            }
-            if (itemSlot === targetSlotNormalized) {
-              return { ...item, viewSlot: sourceSlotNormalized };
-            }
-            return item;
-          })
+        const sourceIdx = prev.findIndex(
+          (item, idx) =>
+            normalizeMediaViewSlot(item.viewSlot, idx) === sourceSlotNormalized,
         );
+        const targetIdx = prev.findIndex(
+          (item, idx) =>
+            normalizeMediaViewSlot(item.viewSlot, idx) === targetSlotNormalized,
+        );
+
+        if (sourceIdx === -1 && targetIdx === -1) return prev;
+
+        const next = [...prev];
+
+        if (sourceIdx !== -1 && targetIdx !== -1) {
+          const temp = next[sourceIdx];
+          next[sourceIdx] = next[targetIdx];
+          next[targetIdx] = temp;
+
+          const sourceSlotVal = next[sourceIdx].viewSlot;
+          next[sourceIdx] = {
+            ...next[sourceIdx],
+            viewSlot: next[targetIdx].viewSlot,
+          };
+          next[targetIdx] = { ...next[targetIdx], viewSlot: sourceSlotVal };
+        } else if (sourceIdx !== -1) {
+          next[sourceIdx] = {
+            ...next[sourceIdx],
+            viewSlot: targetSlotNormalized as MediaViewSlot,
+          };
+        } else if (targetIdx !== -1) {
+          next[targetIdx] = {
+            ...next[targetIdx],
+            viewSlot: sourceSlotNormalized as MediaViewSlot,
+          };
+        }
+
+        const normalized = normalizePrimary(next);
+        syncPersistedMediaIds(normalized);
+        return normalized;
       });
 
       setPendingMediaFiles((prev) => {
-        return normalizePending(
-          prev.map((item, index) => {
-            const itemSlot = normalizeMediaViewSlot(item.viewSlot, index);
-            if (itemSlot === sourceSlotNormalized) {
-              return { ...item, viewSlot: targetSlotNormalized };
-            }
-            if (itemSlot === targetSlotNormalized) {
-              return { ...item, viewSlot: sourceSlotNormalized };
-            }
-            return item;
-          })
+        const sourceIdx = prev.findIndex(
+          (item, idx) =>
+            normalizeMediaViewSlot(item.viewSlot, idx) === sourceSlotNormalized,
         );
+        const targetIdx = prev.findIndex(
+          (item, idx) =>
+            normalizeMediaViewSlot(item.viewSlot, idx) === targetSlotNormalized,
+        );
+
+        if (sourceIdx === -1 && targetIdx === -1) return prev;
+
+        const next = [...prev];
+
+        if (sourceIdx !== -1 && targetIdx !== -1) {
+          const temp = next[sourceIdx];
+          next[sourceIdx] = next[targetIdx];
+          next[targetIdx] = temp;
+
+          const sourceSlotVal = next[sourceIdx].viewSlot;
+          next[sourceIdx] = {
+            ...next[sourceIdx],
+            viewSlot: next[targetIdx].viewSlot,
+          };
+          next[targetIdx] = { ...next[targetIdx], viewSlot: sourceSlotVal };
+        } else if (sourceIdx !== -1) {
+          next[sourceIdx] = {
+            ...next[sourceIdx],
+            viewSlot: targetSlotNormalized as MediaViewSlot,
+          };
+        } else if (targetIdx !== -1) {
+          next[targetIdx] = {
+            ...next[targetIdx],
+            viewSlot: sourceSlotNormalized as MediaViewSlot,
+          };
+        }
+
+        return normalizePending(next);
       });
 
       setHasChanges(true);
       toast.success(
-        `Swapped positions: ${getMediaViewSlotLabel(sourceSlotNormalized)} and ${getMediaViewSlotLabel(targetSlotNormalized)}`
+        `Swapped positions: ${getMediaViewSlotLabel(sourceSlotNormalized)} and ${getMediaViewSlotLabel(targetSlotNormalized)}`,
       );
     },
-    [normalizePending]
+    [normalizePending, syncPersistedMediaIds],
   );
 
   const handleDragStart = (e: React.DragEvent, slot: string) => {
@@ -2713,6 +2765,10 @@ const EditProduct: React.FC = () => {
       f.type.startsWith("image/"),
     );
     if (files.length > 0) {
+      const existing = mediaBySlot.get(targetSlot as MediaViewSlot);
+      if (existing) {
+        await handleDeleteMedia(existing.id);
+      }
       await processAndUploadFiles(files, targetSlot as MediaViewSlot);
       return;
     }
@@ -3026,8 +3082,8 @@ const EditProduct: React.FC = () => {
         ) : null}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
-          {/* LEFT COLUMN: Media (60% approx -> 7 cols) */}
-          <div className="space-y-4 lg:col-span-7">
+          {/* LEFT COLUMN: Media (50% approx -> 6 cols) */}
+          <div className="space-y-4 lg:col-span-6">
             {/* Media Gallery */}
             <div
               id="product-media-section"
@@ -3336,8 +3392,8 @@ const EditProduct: React.FC = () => {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Details (40% approx -> 5 cols) */}
-          <div className="space-y-6 lg:col-span-5">
+          {/* RIGHT COLUMN: Details (50% approx -> 6 cols) */}
+          <div className="space-y-6 lg:col-span-6">
             {/* Basic Info — same collapsible card language as Create Design */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-2">
@@ -3360,7 +3416,7 @@ const EditProduct: React.FC = () => {
 
                 <div className="space-y-4" id="product-category-section">
                         {/* Group 1: Audience & Collection */}
-                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                           <div className="min-w-0">
                             <UniversalSelect
                               label="Who is it for?"
@@ -3432,7 +3488,7 @@ const EditProduct: React.FC = () => {
                         </div>
 
                         {/* Group 2: Category & Subcategory */}
-                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                           <div className="min-w-0">
                             <UniversalSelect
                               label="What is it?"

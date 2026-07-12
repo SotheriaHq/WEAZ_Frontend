@@ -31,7 +31,7 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
   }, [isEmbeddedMobile]);
 
   return (
-    <div className="studio-shell min-h-dvh overflow-x-clip bg-[color:var(--surface-primary)] text-[color:var(--text-primary)]">
+    <div className="studio-shell min-h-dvh bg-[color:var(--surface-primary)] text-[color:var(--text-primary)]">
       {!isEmbeddedMobile ? <Navbar minimal={false} profileMenuContext="studio" /> : null}
       {!isEmbeddedMobile ? <Sidebar overlayOnly /> : null}
 
