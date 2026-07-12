@@ -214,7 +214,8 @@ const syncBrandProfileWithUser = (
       website: user.socialWebsite,
     },
     contactInfo: {
-      email: user.email,
+      // Owner-only mirror: public brand API redacts email for visitors.
+      email: user.email ?? null,
       phone: user.phoneNumber,
       businessType: user.brandBusinessType,
     },
@@ -576,22 +577,29 @@ export const useBrandProfile = () => {
     website: user?.socialWebsite ?? 'https://example.com',
   };
 
+  // Prefer brand profile API for public identity (username/location/tags), then
+  // auth user fallbacks — same fields visitors resolve for catalog headers.
+  const profileUsername =
+    ((brandProfile as unknown) as { username?: string | null } | null)?.username?.trim() ||
+    user?.username ||
+    '';
+  const profileLocation =
+    brandProfile?.location ||
+    user?.companyLocation ||
+    [user?.brandCity, user?.brandState, user?.brandCountry]
+      .filter((segment) => segment && segment.length > 0)
+      .join(', ') ||
+    user?.address ||
+    '';
   const displayData = {
     brandName:
       user?.brandFullName ||
+      brandProfile?.brandFullName ||
       `${user?.firstName || ''} ${user?.lastName || ''}`.trim() ||
-      user?.username ||
+      profileUsername ||
       'Brand Name',
-  // brandProfile type may not include username in some API shapes; use a safe access here
-  username: ((brandProfile as unknown) as { username?: string })?.username ?? user?.username ?? '',
-    location:
-      brandProfile?.location ||
-      user?.companyLocation ||
-      [user?.brandCity, user?.brandState, user?.brandCountry]
-        .filter((segment) => segment && segment.length > 0)
-        .join(', ') ||
-      user?.address ||
-      'Lagos, Nigeria',
+    username: profileUsername,
+    location: profileLocation,
     bannerImage: brandProfile?.bannerImage ?? null,
     bannerImageMeta: brandProfile?.bannerImageMeta ?? null,
     logoImage: brandProfile?.logoImage ?? null,

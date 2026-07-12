@@ -78,6 +78,8 @@ export interface BrandMediaAssetDto {
 
 export interface BrandProfileDto {
   id: string;
+  /** Public handle for `/u/:username` links. */
+  username?: string | null;
   brandFullName: string;
   description: string | null;
   isStoreOpen?: boolean;
@@ -98,7 +100,8 @@ export interface BrandProfileDto {
     website?: string | null;
   };
   contactInfo: {
-    email: string;
+    /** Null for public/QR viewers — account email is owner-only. */
+    email: string | null;
     phone?: string | null;
     businessType?: string | null;
   };

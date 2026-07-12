@@ -41,6 +41,7 @@ import CatalogShopTab from '@/components/catalog/CatalogShopTab';
 import BrandQrModal from '@/components/qr/BrandQrModal';
 import { resolveBannerImageSource, resolveProfileImageSource } from '@/utils/profileImage';
 import { buildProfileUrl } from '@/utils/publicLinks';
+import { resolvePublicBrandIdentity } from '@/utils/brandPublicIdentity';
 import {
   type PublishTask,
   type PublishTaskKind,
@@ -1784,18 +1785,17 @@ const ProfilePage: React.FC = () => {
 
   const viewDisplayData = useMemo(() => {
     if (isVisitorView && visitorProfile) {
+      // Same public identity fields the owner sees — never blank when the
+      // brand profile (or /u/ share URL) has usable name/handle/location/tags.
+      const identity = resolvePublicBrandIdentity(visitorProfile);
       return {
-        brandName: visitorProfile.brandFullName,
-        location:
-          visitorProfile.location ??
-          [visitorProfile.city, visitorProfile.state, visitorProfile.country]
-            .filter(Boolean)
-            .join(', '),
-        username: '',
+        brandName: identity.brandName,
+        location: identity.location,
+        username: identity.username,
         logoImage: visitorLogoUrl ?? undefined,
         bannerImage: visitorBannerUrl ?? undefined,
-        hashtags: visitorProfile.hashtags ?? visitorProfile.tags ?? [],
-        description: visitorProfile.description ?? '',
+        hashtags: identity.tags,
+        description: identity.description || visitorProfile.description || '',
         socialLinks: visitorProfile.socialLinks,
         contactInfo: visitorProfile.contactInfo,
         country: visitorProfile.country,
@@ -1812,14 +1812,26 @@ const ProfilePage: React.FC = () => {
 
   const activeBrandProfile = isVisitorView ? visitorProfile : brandProfile;
   const fallbackProfileUrl = useMemo(() => {
-    const profileId = isVisitorView ? routeBrandId : user?.id;
+    const profileId = isVisitorView
+      ? visitorProfile?.id || routeBrandId
+      : user?.id;
     if (!profileId) return null;
 
     return buildProfileUrl({
       id: profileId,
-      username: viewDisplayData.username || undefined,
+      username:
+        viewDisplayData.username ||
+        activeBrandProfile?.username ||
+        undefined,
     });
-  }, [isVisitorView, routeBrandId, user?.id, viewDisplayData.username]);
+  }, [
+    activeBrandProfile?.username,
+    isVisitorView,
+    routeBrandId,
+    user?.id,
+    viewDisplayData.username,
+    visitorProfile?.id,
+  ]);
   const profileShareUrl =
     activeBrandProfile?.shareUrl ??
     activeBrandProfile?.publicProfileUrl ??

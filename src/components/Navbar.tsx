@@ -1,6 +1,6 @@
 import { useLanguage } from '../context/LanguageContext';
 import { useSelector, useDispatch } from 'react-redux';
-import { clearUser, setUser } from '../features/userSlice';
+import { clearUser } from '../features/userSlice';
 import { resetUnreadCount } from '../features/notificationsSlice';
 import { closeSidebar, toggleSidebar } from '../features/uiSlice';
 import {
@@ -21,7 +21,6 @@ import {
   resetWishlistState,
 } from '../features/wishlistSlice';
 import type { RootState, AppDispatch } from '../store';
-import type { AuthUserDto } from '../types/auth';
 import '../styles/scrollbar-hide.css';
 import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
 import { apiClient, dropStoredAccessToken } from '../api/httpClient';
@@ -96,19 +95,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
     }
   }, [dispatch, isAuthenticated, isAdmin]);
 
-  React.useEffect(() => {
-    if (!user && typeof window !== 'undefined') {
-      const persisted = localStorage.getItem(env.userStorageKey);
-      if (persisted) {
-        try {
-          const parsed = JSON.parse(persisted) as AuthUserDto;
-          if (parsed?.id) dispatch(setUser(parsed));
-        } catch (error) {
-          void error;
-        }
-      }
-    }
-  }, [dispatch, user]);
+  // AuthContext is the single source of truth for session bootstrap/logout.
+  // Do NOT rehydrate localStorage here — that recreates ghost sessions after
+  // logout/expiry and can show another user's email/uid in the navbar while
+  // the catalog renders a public brand from a QR scan.
 
   useEffect(() => {
     if (!user) {

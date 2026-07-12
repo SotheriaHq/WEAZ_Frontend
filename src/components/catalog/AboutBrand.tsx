@@ -23,9 +23,9 @@ interface AboutBrandProps {
       website?: string;
     };
     contactInfo: {
-      email: string;
-      phone: string;
-      businessType: string;
+      email?: string | null;
+      phone?: string | null;
+      businessType?: string | null;
     };
   };
 }
@@ -45,19 +45,26 @@ const InfoCard: React.FC<{ title: string; children: React.ReactNode; className?:
   </div>
 );
 
-const ContactItem: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({
-  icon,
-  label,
-  value,
-}) => (
-  <div>
-    <div className="mb-1 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-      {icon}
-      <span>{label}</span>
+const ContactItem: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value?: string | null;
+}> = ({ icon, label, value }) => {
+  const display = typeof value === 'string' ? value.trim() : '';
+  if (!display) return null;
+
+  return (
+    <div>
+      <div className="mb-1 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <p className="break-words text-sm font-medium text-gray-900 dark:text-gray-100">
+        {display}
+      </p>
     </div>
-    <p className="break-words text-sm font-medium text-gray-900 dark:text-gray-100">{value}</p>
-  </div>
-);
+  );
+};
 
 export const AboutBrand: React.FC<AboutBrandProps> = ({ brandData }) => (
   <div className="flex flex-col gap-4">
@@ -123,17 +130,29 @@ export const AboutBrand: React.FC<AboutBrandProps> = ({ brandData }) => (
       </div>
     </InfoCard>
 
-    <InfoCard title="Contact Information" className="bg-gray-50 dark:bg-gray-900/50">
-      <div className="space-y-4">
-        <ContactItem icon={<Mail className="h-3.5 w-3.5" />} label="Email Address" value={brandData.contactInfo.email} />
-        <ContactItem icon={<Phone className="h-3.5 w-3.5" />} label="Phone Number" value={brandData.contactInfo.phone} />
-        <ContactItem
-          icon={<Building2 className="h-3.5 w-3.5" />}
-          label="Business Type"
-          value={brandData.contactInfo.businessType}
-        />
-      </div>
-    </InfoCard>
+    {brandData.contactInfo.email ||
+    brandData.contactInfo.phone ||
+    brandData.contactInfo.businessType ? (
+      <InfoCard title="Contact Information" className="bg-gray-50 dark:bg-gray-900/50">
+        <div className="space-y-4">
+          <ContactItem
+            icon={<Mail className="h-3.5 w-3.5" />}
+            label="Email Address"
+            value={brandData.contactInfo.email}
+          />
+          <ContactItem
+            icon={<Phone className="h-3.5 w-3.5" />}
+            label="Phone Number"
+            value={brandData.contactInfo.phone}
+          />
+          <ContactItem
+            icon={<Building2 className="h-3.5 w-3.5" />}
+            label="Business Type"
+            value={brandData.contactInfo.businessType}
+          />
+        </div>
+      </InfoCard>
+    ) : null}
 
     <InfoCard
       title="Brand Policies"

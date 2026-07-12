@@ -292,19 +292,23 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
               ) : null}
               </span>
             </h1>
-            {/* LOCATION: one line, always — FitText scales it down to fit. */}
-            <p className={`flex w-full min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 font-semibold text-gray-700 dark:text-gray-300`}>
-              <span aria-hidden="true" className="flex-shrink-0 text-sm">📍</span>
-              <FitText
-                text={profile.location || profile.address || 'Location not set'}
-                maxPx={14}
-                minPx={9}
-                className="font-semibold"
-              />
-            </p>
-            <span className={`inline-flex w-fit rounded-md px-1 py-0.5 text-sm font-semibold italic tracking-[0.01em] text-indigo-600 dark:text-indigo-300`}>
-              @{profile.username}
-            </span>
+            {/* LOCATION + @username + tags — public identity (visitors + owners). */}
+            {(profile.location || profile.address) ? (
+              <p className={`flex w-full min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 font-semibold text-gray-700 dark:text-gray-300`}>
+                <span aria-hidden="true" className="flex-shrink-0 text-sm">📍</span>
+                <FitText
+                  text={(profile.location || profile.address || '').trim()}
+                  maxPx={14}
+                  minPx={9}
+                  className="font-semibold"
+                />
+              </p>
+            ) : null}
+            {profile.username?.trim() ? (
+              <span className={`inline-flex w-fit rounded-md px-1 py-0.5 text-sm font-semibold italic tracking-[0.01em] text-indigo-600 dark:text-indigo-300`}>
+                @{profile.username.trim().replace(/^@+/, '')}
+              </span>
+            ) : null}
             {tags.length > 0 ? (
               // STRICT 3-up: a real grid (grid-cols-3), not flex-wrap — wrap
               // layouts drop chips to 2/1 rows on narrow widths, a grid cannot.
