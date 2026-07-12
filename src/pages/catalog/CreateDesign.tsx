@@ -287,7 +287,7 @@ const CreateDesignInner: React.FC = () => {
   const [tagSearch, setTagSearch] = useState("");
   const [tagSearchResults, setTagSearchResults] = useState<string[]>([]);
   const [showTagPicker, setShowTagPicker] = useState(false);
-  const [showAllTags, setShowAllTags] = useState(false);
+
   const [categoryId, setCategoryId] = useState<string>("");
   const [categoryTypeId, setCategoryTypeId] = useState<string>("");
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({});
@@ -703,9 +703,7 @@ const CreateDesignInner: React.FC = () => {
     };
   }, [tagSearch]);
 
-  useEffect(() => {
-    if (isSearchingTags && showAllTags) setShowAllTags(false);
-  }, [isSearchingTags, showAllTags]);
+
 
   const availableTagSuggestions = useMemo(() => {
     const search = tagSearch.toLowerCase().trim();
@@ -722,14 +720,11 @@ const CreateDesignInner: React.FC = () => {
   }, [tagSearch, tagSuggestions, selectedTags, tagSearchResults]);
 
   const filteredSuggestions = useMemo(() => {
-    const limit = isSearchingTags || showAllTags ? 60 : 24;
+    const limit = isSearchingTags ? 60 : 24;
     return availableTagSuggestions.slice(0, limit);
-  }, [availableTagSuggestions, isSearchingTags, showAllTags]);
+  }, [availableTagSuggestions, isSearchingTags]);
 
-  const hiddenTagCount = Math.max(
-    availableTagSuggestions.length - filteredSuggestions.length,
-    0,
-  );
+
 
   const handleFilterTagSuggestions = useCallback((suggestions: string[]) => {
     if (!Array.isArray(suggestions) || suggestions.length === 0) {
@@ -2044,15 +2039,7 @@ const CreateDesignInner: React.FC = () => {
                                   );
                                 })}
                               </div>
-                              {!isSearchingTags && (hiddenTagCount > 0 || showAllTags) && (
-                                <button
-                                  type="button"
-                                  onClick={() => setShowAllTags((v) => !v)}
-                                  className="mt-2 text-xs font-semibold text-purple-600 transition-colors hover:text-purple-500 dark:text-purple-400"
-                                >
-                                  {showAllTags ? 'Show less' : `Show more (${hiddenTagCount})`}
-                                </button>
-                              )}
+
                             </div>
                           ) : isSearchingTags ? (
                             <p className="mt-3 text-xs text-theme-secondary">

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import TagsApi from '@/api/TagsApi';
 import { normalizeHashtagLabel } from '@/utils/creatorMetadata';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import useOverlayBackClose from '@/hooks/useOverlayBackClose';
 
 interface HashtagPickerModalProps {
   open: boolean;
@@ -43,6 +44,8 @@ export default function HashtagPickerModal({
   const trimmedQuery = query.trim();
   const isSearching = trimmedQuery.length > 0;
   const atCap = selected.length >= maxTags;
+
+  useOverlayBackClose(open, onClose);
 
   useEffect(() => {
     if (!open) return;
@@ -149,7 +152,7 @@ export default function HashtagPickerModal({
       <AnimatePresence>
         {open && (
           <div
-            className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:justify-center"
+            className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6"
             role="dialog"
             aria-modal="true"
             aria-label="Choose hashtags"
@@ -165,11 +168,11 @@ export default function HashtagPickerModal({
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
             <motion.div
-              initial={{ y: '100%', opacity: 0.8 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '100%', opacity: 0.8 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl dark:bg-zinc-900 sm:h-auto sm:max-h-[80vh] sm:w-[560px] sm:max-w-[92vw] sm:rounded-2xl sm:border sm:border-gray-200 sm:dark:border-white/10"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+              className="relative flex max-h-[85vh] w-full max-w-[500px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-900"
             >
               {/* Header */}
               <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-white/10 bg-white dark:bg-zinc-900 z-10">
@@ -183,9 +186,10 @@ export default function HashtagPickerModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="inline-flex min-h-9 items-center justify-center rounded-full bg-purple-600 px-4 text-xs font-semibold text-white transition hover:bg-purple-500"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 transition hover:bg-gray-200"
+                  aria-label="Close"
                 >
-                  Done
+                  ✕
                 </button>
               </div>
 
@@ -294,6 +298,21 @@ export default function HashtagPickerModal({
                     No other hashtags match "{trimmedQuery}".
                   </p>
                 ) : null}
+              </div>
+
+              {/* Bottom Sticky Action Button */}
+              <div className="border-t border-gray-100 p-3.5 dark:border-white/10 bg-white dark:bg-zinc-900 z-10 flex gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full inline-flex min-h-[44px] items-center justify-center rounded-xl bg-purple-600 px-4 text-sm font-semibold text-white transition hover:bg-purple-500 shadow-md shadow-purple-500/20"
+                >
+                  {selected.length > 1
+                    ? `Add Tags (${selected.length})`
+                    : selected.length === 1
+                      ? 'Add Tag'
+                      : 'Tag'}
+                </button>
               </div>
             </motion.div>
           </div>
