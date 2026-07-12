@@ -11,9 +11,9 @@ interface StudioSidebarProps {
 }
 
 const ALL_ITEMS = [
-  { key: 'reviews', label: 'Reviews', path: '/studio?tab=reviews', emoji: '⭐', requiresSetup: true },
   { key: 'overview', label: 'Dashboard', path: '/studio', emoji: '📊', requiresSetup: true },
   { key: 'store', label: 'Store', path: '/studio/store', emoji: '🛍️', requiresSetup: false },
+  { key: 'reviews', label: 'Reviews', path: '/studio?tab=reviews', emoji: '⭐', requiresSetup: true },
   { key: 'orders', label: 'Orders', path: '/studio?tab=orders', emoji: '📦', requiresSetup: true },
   { key: 'messages', label: 'Messages', path: '/studio/messages', emoji: '💬', requiresSetup: true },
   { key: 'staff', label: 'Staff', path: '/studio/staff', emoji: '👥', requiresSetup: true },
@@ -71,9 +71,9 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
 
   return (
     <>
-      <aside className="w-full border-r border-purple-200/20 dark:border-white/10 bg-transparent h-full pr-3">
-        <div className="py-4 px-2">
-          <div className="px-3 mb-4">
+      <aside className="w-full border-r border-purple-200/20 dark:border-white/10 bg-transparent h-full">
+        <div className="py-4 pr-2 pl-0">
+          <div className="pl-5 pr-3 mb-4">
             <h2 className="text-sm font-bold text-black dark:text-white uppercase tracking-wider">Studio</h2>
           </div>
 
@@ -95,17 +95,17 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
                             handleSelect(key, path);
                           }
                         }}
-                        className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-all duration-150 flex items-center gap-2 group ${
+                        className={`w-full text-left pl-5 pr-3 py-2.5 text-sm rounded-r-lg rounded-l-none transition-all duration-150 flex items-center gap-2 group ${
                           isLocked
                             ? 'cursor-not-allowed opacity-50'
                             : isActive
                               ? 'font-medium text-primary border-l-4 border-primary bg-primary/10'
-                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 border-l-4 border-transparent'
                         }`}
                         title={isLocked ? 'Complete store setup to unlock this section' : label}
                       >
                         <span className="text-base leading-none">{emoji}</span>
-                        <span className="text-sm truncate flex-1">{label}</span>
+                        <span className="text-sm flex-1">{label}</span>
                         {key === 'messages' && unreadMessages > 0 && (
                           <span className="ml-auto min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
                             {unreadMessages > 99 ? '99+' : unreadMessages}

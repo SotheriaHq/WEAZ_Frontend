@@ -3373,6 +3373,8 @@ const EditProduct: React.FC = () => {
                                 label: option.label,
                               }))}
                               disabled={saving}
+                              optionAllowWrap
+                              selectedAllowWrap
                               menuLayer="modal"
                             />
                           </div>
