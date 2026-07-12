@@ -2970,9 +2970,9 @@ const EditProduct: React.FC = () => {
           <ReviewFeedbackBanner productId={productId} fallbackNote={reviewNoteParam} />
         ) : null}
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          {/* LEFT COLUMN: Media (42% approx -> 5 cols) */}
-          <div className="space-y-4 lg:col-span-4">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
+          {/* LEFT COLUMN: Media (60% approx -> 7 cols) */}
+          <div className="space-y-4 lg:col-span-7">
             {/* Media Gallery */}
             <div
               id="product-media-section"
@@ -3124,50 +3124,20 @@ const EditProduct: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => mediaFileInputRef.current?.click()}
-                  className="group aspect-[4/5] w-full rounded-2xl border border-dashed border-slate-300/80 dark:border-white/15 bg-gradient-to-br from-white via-sky-50/80 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900 p-5 text-left shadow-[0_20px_50px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:border-sky-400/70 hover:shadow-[0_24px_70px_rgba(56,189,248,0.18)] dark:hover:shadow-[0_24px_70px_rgba(56,189,248,0.12)]"
+                  className="group aspect-[4/3] w-full rounded-2xl border-2 border-dashed border-gray-300/80 bg-gray-50/50 hover:bg-purple-50/5 hover:border-purple-500/50 dark:border-white/15 dark:bg-white/[0.02] p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer"
                 >
-                  <div className="flex h-full flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 text-sky-700 dark:text-sky-200">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-500/10 text-xl group-hover:bg-sky-500/15 transition-colors">
-                          ✦
-                        </span>
-                        <div>
-                          <p className="text-sm font-semibold">Add your first product images</p>
-                          <p className="text-xs text-theme-secondary">
-                            Clear photos help buyers trust the listing.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-5 space-y-2">
-                        {[
-                          'Front, left, right, and back views',
-                          'One cover image so the product stands out',
-                          'Up to 6 images total',
-                        ].map((item) => (
-                          <div key={item} className="flex items-start gap-2 rounded-xl surface-subtle px-3 py-2 text-sm text-theme-secondary">
-                            <span className="mt-0.5 text-sky-600">•</span>
-                            <span>{item}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="surface-subtle mt-4 flex items-center justify-between rounded-xl px-3 py-2">
-                      <div>
-                        <p className="text-xs font-medium text-theme-secondary">
-                          Tap to upload
-                        </p>
-                        <p className="text-[11px] text-theme-secondary">
-                          Start with images, then add a video if needed.
-                        </p>
-                      </div>
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500 text-white shadow-sm">
-                        <Plus className="h-4 w-4" />
-                      </span>
-                    </div>
+                  <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-white/10 flex items-center justify-center mb-3 text-purple-600 transition-colors group-hover:bg-purple-200">
+                    <Plus className="w-6 h-6" />
                   </div>
+                  <p className="text-sm font-semibold text-theme">
+                    Add product images
+                  </p>
+                  <p className="text-xs text-theme-secondary mt-1">
+                    Tap or drag images here to upload
+                  </p>
+                  <p className="text-[10px] text-theme-secondary mt-3">
+                    Front, left, right, back views recommended • Max 6 images
+                  </p>
                 </button>
               )}
 
@@ -3307,20 +3277,18 @@ const EditProduct: React.FC = () => {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Details (58% approx -> 7 cols) */}
-          <div className="space-y-4 lg:col-span-8">
+          {/* RIGHT COLUMN: Details (40% approx -> 5 cols) */}
+          <div className="space-y-6 lg:col-span-5">
             {/* Basic Info — same collapsible card language as Create Design */}
-            <div className="surface-card relative rounded-2xl border border-[color:var(--border-default)] shadow-[0_14px_34px_rgba(15,23,42,0.08)] backdrop-blur">
-              <div className="flex items-center gap-3 border-b border-[color:var(--border-default)]/80 p-3 sm:p-4">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl gradient-primary text-base sm:h-10 sm:w-10 sm:text-lg">
-                  📝
-                </span>
-                <h2 className="text-base font-semibold text-theme sm:text-lg">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-base">📝</span>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
                   Basic Information
                 </h2>
               </div>
 
-              <div className="space-y-4 px-3 py-4 sm:px-4">
+              <div className="space-y-4">
                 <Input
                   label="Product Title"
                   required
@@ -3331,16 +3299,7 @@ const EditProduct: React.FC = () => {
                   data-testid="product-title-input"
                 />
 
-                <div className="rounded-lg border border-gray-200/40 bg-transparent p-3 dark:border-white/10">
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-theme-secondary">
-                        Product Metadata
-                    </p>
-                  </div>
-
-                  <div className="lg:max-h-[340px] lg:overflow-y-auto lg:pr-1 scrollbar-threadly">
-                    <div className="space-y-3">
-                      <div className="space-y-3" id="product-category-section">
+                <div className="space-y-4" id="product-category-section">
                         {/* Group 1: Audience & Collection */}
                         <div className="grid grid-cols-2 gap-3 sm:gap-4">
                           <div className="min-w-0">
@@ -3597,29 +3556,19 @@ const EditProduct: React.FC = () => {
                       />
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
 
-            <div className="surface-card relative overflow-hidden rounded-2xl border border-[color:var(--border-default)] shadow-[0_14px_34px_rgba(15,23,42,0.08)] backdrop-blur">
-              <div className="flex items-center justify-between gap-3 border-b border-[color:var(--border-default)]/80 p-3 sm:p-4">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl gradient-primary text-base sm:h-10 sm:w-10 sm:text-lg">
-                    ⚙️
-                  </span>
-                  <p className="truncate text-base font-semibold text-theme sm:text-lg">
-                    Product Operations
-                  </p>
-                </div>
-                <span className="text-[10px] font-medium text-theme-secondary">
-                  Scroll inside panel
-                </span>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-base">⚙️</span>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                  Product Operations
+                </h2>
               </div>
-              <div className="space-y-4 p-3 sm:p-4 lg:max-h-[440px] lg:overflow-y-auto lg:pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="space-y-4">
                 {/* Pricing */}
                 <div
                   id="product-pricing-section"
-                  className="surface-subtle rounded-xl border p-4 scroll-mt-24"
+                  className="scroll-mt-24 py-2 space-y-4"
                 >
                   <div className="flex items-center justify-between gap-4">
                     <button
@@ -3655,7 +3604,7 @@ const EditProduct: React.FC = () => {
                   </div>
 
                   {!collapsedSections.pricing && (
-                    <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                       <Input
                         label="Price"
                         required
@@ -3729,9 +3678,9 @@ const EditProduct: React.FC = () => {
                 </div>
 
                 {/* Variants */}
-                <div className="surface-subtle overflow-hidden rounded-xl border">
+                <div className="space-y-4 py-2">
                   <div
-                    className={`p-4 ${collapsedSections.variants ? "" : "border-b border-theme"}`}
+                    className={`pb-2 ${collapsedSections.variants ? "" : "border-b border-gray-100 dark:border-white/5"}`}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <button
@@ -3739,14 +3688,18 @@ const EditProduct: React.FC = () => {
                         onClick={() => toggleSection("variants")}
                         className="flex items-center gap-2 text-left"
                       >
-                        <h2 className="text-base font-medium text-theme">
-                          Variants
-                        </h2>
-                        {collapsedSections.variants ? (
-                          <ChevronDown className="h-4 w-4 text-[color:var(--text-secondary)]" />
-                        ) : (
-                          <ChevronUp className="h-4 w-4 text-[color:var(--text-secondary)]" />
-                        )}
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            <h2 className="text-base font-medium text-theme">
+                              Variants
+                            </h2>
+                            {collapsedSections.variants ? (
+                              <ChevronDown className="h-4 w-4 text-[color:var(--text-secondary)]" />
+                            ) : (
+                              <ChevronUp className="h-4 w-4 text-[color:var(--text-secondary)]" />
+                            )}
+                          </div>
+                        </div>
                       </button>
                       {!collapsedSections.variants && (
                         <button
@@ -3758,6 +3711,9 @@ const EditProduct: React.FC = () => {
                         </button>
                       )}
                     </div>
+                    <span className="text-[10px] text-theme-secondary mt-0.5 font-medium tracking-wide">
+                      Supported sizes: XXS, XS, S, M, L, XL, XXL, XXXL, XXXXL
+                    </span>
                     <p
                       className={`inline-flex items-center gap-2 rounded-full border font-semibold ${
                         collapsedSections.variants
@@ -3803,10 +3759,10 @@ const EditProduct: React.FC = () => {
                           return (
                             <div
                               key={group.stableKey}
-                              className="surface-card rounded-lg border overflow-hidden"
+                              className="overflow-hidden bg-transparent py-2 border-b border-gray-100 dark:border-white/5 last:border-0"
                             >
                               {/* Color group header */}
-                              <div className="surface-control px-3 py-2 flex items-center gap-2 justify-between">
+                              <div className="py-1.5 flex items-center gap-2 justify-between bg-transparent">
                                 <div className="flex items-center gap-2 flex-1 min-w-0">
                                   <span className="text-[10px] font-semibold uppercase text-theme-secondary shrink-0">
                                     Color:
@@ -3855,8 +3811,8 @@ const EditProduct: React.FC = () => {
                                 </div>
                               </div>
 
-                              {/* Quick-add sizes — tap the Add button (mobile) or press Enter */}
-                              <div className="px-3 py-1.5 border-b border-theme bg-gray-50/40 dark:bg-white/[0.02]">
+                              {/* Quick-add sizes */}
+                              <div className="py-1.5 bg-transparent border-b border-gray-100 dark:border-white/5">
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] text-gray-500 shrink-0">
                                     Quick add:
@@ -4047,8 +4003,8 @@ const EditProduct: React.FC = () => {
                   </div>
                 ) : null}
 
-                {/* Custom order toggle — keeps form hidden until brand opts in */}
-                <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
+                {/* Custom order toggle */}
+                <div className="py-2">
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="text-base font-medium text-theme">
@@ -4098,7 +4054,7 @@ const EditProduct: React.FC = () => {
                   )}
                 </div>
 
-                <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
+                <div className="py-2">
                   <button
                     type="button"
                     onClick={() => toggleSection("fulfillment")}
@@ -4117,8 +4073,8 @@ const EditProduct: React.FC = () => {
                   {!collapsedSections.fulfillment && (
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Inventory */}
-                      <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
-                        <div className="flex items-center justify-between mb-4">
+                      <div className="py-2 space-y-4">
+                        <div className="flex items-center justify-between">
                           <h2 className="text-base font-medium text-theme">
                             Inventory
                           </h2>
@@ -4196,8 +4152,8 @@ const EditProduct: React.FC = () => {
                       </div>
 
                       {/* Shipping */}
-                      <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
-                        <h2 className="text-base font-medium text-theme mb-4">
+                      <div className="space-y-4">
+                        <h2 className="text-base font-medium text-theme">
                           Shipping
                         </h2>
                         <div className="space-y-4">

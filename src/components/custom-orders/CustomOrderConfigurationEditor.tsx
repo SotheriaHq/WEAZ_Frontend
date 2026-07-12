@@ -1920,7 +1920,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             <div
               ref={registerFieldErrorRef('revisionPolicy')}
               tabIndex={-1}
-              className={`space-y-1.5 rounded-xl border p-3 ${fieldErrors.revisionPolicy ? 'border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-black/10 dark:border-white/10'}`}
+              className="space-y-1.5"
             >
               <span className={requiredFieldLabelClassName}>
                 Revision <span className="text-rose-500">*</span>
@@ -1955,7 +1955,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             <div
               ref={registerFieldErrorRef('returnPolicy')}
               tabIndex={-1}
-              className={`space-y-1.5 rounded-xl border p-3 ${fieldErrors.returnPolicy ? 'border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-black/10 dark:border-white/10'}`}
+              className="space-y-1.5"
             >
               <span className={requiredFieldLabelClassName}>
                 Returns <span className="text-rose-500">*</span>
@@ -1990,7 +1990,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             <div
               ref={registerFieldErrorRef('defectPolicy')}
               tabIndex={-1}
-              className={`space-y-1.5 rounded-xl border p-3 ${fieldErrors.defectPolicy ? 'border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-black/10 dark:border-white/10'}`}
+              className="space-y-1.5"
             >
               <span className={requiredFieldLabelClassName}>
                 Defects <span className="text-rose-500">*</span>
