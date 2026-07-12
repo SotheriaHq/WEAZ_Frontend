@@ -177,6 +177,10 @@ const isRawStorageKey = (value?: string | null) => {
 
 const shouldPreferFileIdResolution = (value?: string | null, fileId?: string | null) => {
   if (!value || !fileId) return false;
+  // Market rails and catalog cards often ship a freshly signed URL alongside
+  // a fileId. Prefer the usable signed src so we don't re-hit /public-url
+  // (which 400s for some product images and blanks the card).
+  if (isUsableInitialUrl(value)) return false;
   return isS3LikeUrl(value);
 };
 

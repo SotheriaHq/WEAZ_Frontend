@@ -7,6 +7,10 @@ import { toast } from 'sonner';
 const MOBILE_MAX_WIDTH = 1024;
 const DOUBLE_BACK_WINDOW_MS = 2000;
 
+/** Runway + Market are the app "home" surfaces for the double-back exit prompt. */
+const isHomePath = (pathname: string) =>
+  pathname === '/' || pathname === '/market' || pathname === '/marketplace';
+
 const isMobileViewport = () =>
   typeof window !== 'undefined' && window.innerWidth < MOBILE_MAX_WIDTH;
 
@@ -17,9 +21,12 @@ const historyIndex = (): number | null => {
 };
 
 /**
- * Industry-standard mobile back behavior: back/swipe unwinds in-app history;
- * when it reaches the session's first entry the user sees
- * "Press back again to exit" and a second back within 2s actually leaves.
+ * Mobile back model (web browser + PWA-style shell):
+ * 1. Open overlays consume Back first (`useOverlayBackClose`) — not this guard.
+ * 2. In-app history unwinds normally while idx > 0.
+ * 3. At the root of the stack (idx === 0):
+ *    - if not on home → navigate to home
+ *    - if on home → "Press back again to exit"; second back within 2s leaves
  */
 export default function MobileExitGuard() {
   const location = useLocation();
@@ -44,9 +51,26 @@ export default function MobileExitGuard() {
     if (navigationType !== 'POP') return;
     if (historyIndex() !== 0) return;
 
+    const path = location.pathname;
     const now = Date.now();
+
+    // Root of the stack but not home: first Back lands on home (not exit).
+    if (!isHomePath(path)) {
+      lastExitPromptAtRef.current = 0;
+      navigate('/', { replace: true });
+      // Re-arm so the next back on home can show the exit prompt.
+      window.setTimeout(() => {
+        if (!isMobileViewport()) return;
+        if (historyIndex() !== 0) return;
+        navigate(`${window.location.pathname}${window.location.search}${window.location.hash}`, {
+          replace: false,
+        });
+      }, 0);
+      return;
+    }
+
+    // On home at root: double-back exit prompt.
     if (now - lastExitPromptAtRef.current < DOUBLE_BACK_WINDOW_MS) {
-      // Second back inside the window: actually leave the app.
       window.history.back();
       return;
     }

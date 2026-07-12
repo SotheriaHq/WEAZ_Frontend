@@ -261,6 +261,19 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     const seen = new Set<string>();
     const sources: GallerySource[] = [];
 
+    const resolveMediaFileId = (item?: {
+      id?: string;
+      fileUploadId?: string | null;
+      url?: string | null;
+    } | null) => {
+      // Prefer FileUpload id — ProductMedia.id is a different table UUID and
+      // causes /uploads/signed-url/:id → 400 "File not found".
+      const fromUpload =
+        typeof item?.fileUploadId === 'string' ? item.fileUploadId.trim() : '';
+      if (fromUpload) return fromUpload;
+      return undefined;
+    };
+
     const appendSource = (source: { fileId?: string; url?: string | null }) => {
       const fileId = typeof source.fileId === 'string' && source.fileId.trim().length > 0
         ? source.fileId.trim()
@@ -285,36 +298,24 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       : undefined;
 
     appendSource({
-      fileId:
-        typeof primaryMedia?.id === 'string' && !primaryMedia.id.startsWith('http')
-          ? primaryMedia.id
-          : undefined,
+      fileId: resolveMediaFileId(primaryMedia),
       url: primaryMedia?.url || product.thumbnail || product.images[0] || null,
     });
 
     appendSource({
-      fileId:
-        typeof secondaryMedia?.id === 'string' && !secondaryMedia.id.startsWith('http')
-          ? secondaryMedia.id
-          : undefined,
+      fileId: resolveMediaFileId(secondaryMedia),
       url: secondaryMedia?.url || (product.images.length > 1 ? product.images[1] : null),
     });
 
     product.media?.forEach((item) => {
       appendSource({
-        fileId:
-          typeof item.id === 'string' && !item.id.startsWith('http')
-            ? item.id
-            : undefined,
+        fileId: resolveMediaFileId(item),
         url: item.url,
       });
     });
 
-    product.mediaIds?.forEach((mediaId) => {
-      if (typeof mediaId === 'string' && mediaId.trim().length > 0) {
-        appendSource({ fileId: mediaId });
-      }
-    });
+    // mediaIds are ProductMedia row ids, NOT FileUpload ids — do not pass them
+    // to /uploads/signed-url. Prefer URLs / fileUploadId from media slots above.
 
     product.images.forEach((imageUrl) => {
       appendSource({ url: imageUrl });
@@ -334,23 +335,36 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 
       const resolved = await Promise.all(
         gallerySources.map(async (source) => {
-          if (source.fileId) {
+          // Prefer signing raw S3 URLs by key first — this is the market/admin
+          // hot path and does not require ownership of the FileUpload row.
+          const rawUrl = source.url ?? '';
+          const isUnsignedS3 =
+            rawUrl.includes('.s3.') ||
+            rawUrl.includes('amazonaws.com');
+          const alreadySigned =
+            rawUrl.includes('X-Amz-Signature') ||
+            rawUrl.includes('X-Amz-Credential') ||
+            rawUrl.includes('Signature=');
+
+          if (rawUrl && isUnsignedS3 && !alreadySigned) {
             try {
-              const signed = await brandApi.getSignedFileUrl(source.fileId);
-              if (signed) {
-                return signed;
-              }
+              const signed = await brandApi.getSignedS3Url(rawUrl);
+              if (signed) return signed;
             } catch {
+              /* fall through */
             }
           }
 
-          if (source.url && source.url.includes('.s3.') && !source.url.includes('?')) {
+          if (alreadySigned && rawUrl) {
+            return rawUrl;
+          }
+
+          if (source.fileId) {
             try {
-              const signed = await brandApi.getSignedS3Url(source.url);
-              if (signed) {
-                return signed;
-              }
+              const signed = await brandApi.getSignedFileUrl(source.fileId);
+              if (signed) return signed;
             } catch {
+              /* fall through */
             }
           }
 

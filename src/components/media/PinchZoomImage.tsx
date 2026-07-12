@@ -204,8 +204,8 @@ const PinchZoomImage: React.FC<PinchZoomImageProps> = ({
         src={src}
         alt={alt}
         draggable={false}
-        className="block h-auto w-full select-none object-contain will-change-transform"
-        style={{ transformOrigin: 'center center' }}
+        className="block h-auto w-full max-h-[inherit] select-none object-contain will-change-transform"
+        style={{ transformOrigin: 'center center', maxHeight: 'inherit' }}
       />
     </div>
   );

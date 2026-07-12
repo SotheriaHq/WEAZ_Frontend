@@ -1822,8 +1822,47 @@ export const brandApi = {
   },
 
   /**
+   * Resolve a storage key via public endpoint, then authenticated owner/admin
+   * endpoint. Public-first keeps market rails guest-friendly; auth fallback
+   * covers content-review drafts that public-url-by-key used to 400 on.
+   */
+  async resolveSignedUrlForStorageKey(
+    s3Key: string,
+    cacheKey: string,
+  ): Promise<string | null> {
+    const key = String(s3Key ?? '').trim().replace(/^\/+/, '');
+    if (!key) return null;
+
+    const tryEndpoints = [
+      '/uploads/public-url-by-key',
+      '/uploads/signed-url-by-key',
+    ] as const;
+
+    for (const path of tryEndpoints) {
+      try {
+        const response = await apiClient.get(path, { params: { key } });
+        const payload = unwrapApiResponse<{ url?: string }>(response.data);
+        const signedUrl =
+          (payload as { url?: string })?.url ??
+          (response.data as { url?: string })?.url ??
+          null;
+        if (typeof signedUrl === 'string' && signedUrl.length > 0) {
+          signedUrlCache.set(cacheKey, {
+            url: signedUrl,
+            expiresAt: Date.now() + SIGNED_URL_TTL_MS,
+          });
+          return signedUrl;
+        }
+      } catch {
+        // try next endpoint
+      }
+    }
+    return null;
+  },
+
+  /**
    * Resolve a raw unsigned S3 URL into a signed/accessible URL.
-   * Extracts the S3 key from the URL and calls the public-url-by-key endpoint.
+   * Extracts the S3 key from the URL and calls public then authenticated key signers.
    * Returns null if signing fails so private/raw bucket URLs are not rendered.
    */
   async getSignedS3Url(
@@ -1854,24 +1893,7 @@ export const brandApi = {
         // Extract the S3 key from the URL (supports malformed legacy URL snapshots).
         const s3Key = extractS3KeyFromMaybeMalformedUrl(cacheKey);
         if (!s3Key) return null;
-
-        // Use the key-based signing endpoint (query param, not path param)
-        const response = await apiClient.get('/uploads/public-url-by-key', {
-          params: { key: s3Key },
-        });
-        const payload = unwrapApiResponse<{ url?: string }>(response.data);
-        const signedUrl =
-          (payload as { url?: string })?.url ??
-          (response.data as { url?: string })?.url ??
-          null;
-        if (typeof signedUrl === 'string' && signedUrl.length > 0) {
-          signedUrlCache.set(cacheKey, {
-            url: signedUrl,
-            expiresAt: Date.now() + SIGNED_URL_TTL_MS,
-          });
-          return signedUrl;
-        }
-        return null;
+        return this.resolveSignedUrlForStorageKey(s3Key, cacheKey);
       } catch {
         return null;
       } finally {
@@ -1906,22 +1928,7 @@ export const brandApi = {
 
     const request = (async (): Promise<string | null> => {
       try {
-        const response = await apiClient.get('/uploads/public-url-by-key', {
-          params: { key: normalizedKey },
-        });
-        const payload = unwrapApiResponse<{ url?: string }>(response.data);
-        const signedUrl =
-          (payload as { url?: string })?.url ??
-          (response.data as { url?: string })?.url ??
-          null;
-        if (typeof signedUrl === 'string' && signedUrl.length > 0) {
-          signedUrlCache.set(normalizedKey, {
-            url: signedUrl,
-            expiresAt: Date.now() + SIGNED_URL_TTL_MS,
-          });
-          return signedUrl;
-        }
-        return null;
+        return this.resolveSignedUrlForStorageKey(normalizedKey, normalizedKey);
       } catch {
         return null;
       } finally {

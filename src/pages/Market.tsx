@@ -11,7 +11,6 @@ import DesignCard from '@/components/designs/DesignCard';
 import DesignSkeleton from '@/components/designs/DesignSkeleton';
 import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreProductCard';
 import DesignViewModal from '@/components/designs/DesignViewModal';
-import VLoader from '@/components/loaders/VLoader';
 import { setEngagementState } from '@/features/engagementSlice';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
@@ -341,7 +340,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
       counts: 'combined',
   });
 
-  const { data: feedData, isLoading, isFetching, error: queryError, refetch } = feedQuery;
+  const { data: feedData, isLoading, error: queryError, refetch } = feedQuery;
   const loadFeed = useCallback(() => {
     setError(null);
     return refetch();
@@ -449,12 +448,6 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   });
 
   const fallbackProducts = fallbackProductsQuery.data ?? [];
-  const loading =
-    (isLoading && !feedData) ||
-    (shouldUseProductFallback && fallbackProductsQuery.isLoading && fallbackProducts.length === 0);
-  const refreshing =
-    (isFetching && Boolean(feedData)) ||
-    (shouldUseProductFallback && fallbackProductsQuery.isFetching && fallbackProducts.length > 0);
 
   // Show query error as state error (convert React Query error to display error)
   useEffect(() => {
@@ -844,9 +837,9 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
         </div>
       </div>
 
-      {/* Content + soft overlay wrapper for smooth transitions */}
+      {/* Content — never dim or spinner-overlay already-painted cached data. */}
       <div className="relative min-h-[240px]">
-      <div className={`transition-opacity duration-300 ${isFetching && feedData ? 'opacity-60' : 'opacity-100'}`}>
+      <div>
       {isLoading && !feedData ? (
         <Masonry
           breakpointCols={{
@@ -940,12 +933,9 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
         />
       )}
       </div>
-      {/* Soft overlay while refreshing/filtering (keeps layout stable) */}
-      {(!loading && (refreshing || isPending)) && (
-        <div className="surface-overlay-soft pointer-events-none absolute inset-0 flex items-center justify-center backdrop-blur-[2px] transition-opacity duration-300">
-          <VLoader size={24} phase="loading" showLabel={false} />
-        </div>
-      )}
+      {/* Intentionally no spinner/backdrop over cached cards on revalidate.
+          Background refetch is silent; only the true first-load skeleton above
+          paints when feedData is absent. */}
       </div>
       {/* View modal */}
       <DesignViewModal

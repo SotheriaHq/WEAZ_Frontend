@@ -13,6 +13,7 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 import PinchZoomImage from '@/components/media/PinchZoomImage';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import CollapsibleMetaSheet from '@/components/ui/CollapsibleMetaSheet';
 import { selectIsMobile } from '@/features/uiSlice';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useOverlayBackClose } from '@/hooks/useOverlayBackClose';
@@ -548,18 +549,21 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     ) : null;
 
   // ------------------------------------------------------------------
-  // MOBILE: media-first viewer with a gesture bottom sheet.
-  // The image fills the screen and decodes once; the metadata drawer
-  // slides over it without ever touching the media element.
+  // MOBILE: keep a true MODAL (open/close, backdrop), image fills the
+  // modal edge-to-edge at native aspect (no square crop, no letterbox
+  // blur/bg), metadata is a collapsible overlay sheet (drag + tap).
+  // Tap the image (outside controls) closes the modal. Back gesture
+  // closes the overlay in place via useOverlayBackClose.
   // ------------------------------------------------------------------
   if (isMobile) {
     const mobileActionBtn =
       'inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10';
+    const metaSnap = mobileDetailsOpen ? 'expanded' : 'collapsed';
 
     return (
       <OverlayPortal>
         <div
-          className="fixed inset-0 z-layer-modal flex items-end justify-center bg-black/75 backdrop-blur-sm sm:items-center sm:p-3"
+          className="fixed inset-0 z-layer-modal flex items-end justify-center bg-black/70 sm:items-center sm:p-3"
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose();
           }}
@@ -569,208 +573,200 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         >
           <div
             ref={dialogRef}
-            className="relative flex max-h-[94vh] w-full max-w-[560px] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl dark:bg-[#0f0b11] sm:rounded-3xl"
+            className="relative w-full max-w-[560px] overflow-hidden rounded-t-3xl bg-black shadow-2xl sm:rounded-3xl"
+            style={{ maxHeight: '94vh' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close */}
+            {/* Spacer so short landscape images still leave room for the
+                metadata sheet without clipping or forced letterboxing. */}
+            {/* Close chip */}
             <button
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="absolute right-3 top-3 z-30 flex size-9 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm"
+              className="absolute right-3 top-3 z-30 flex size-9 items-center justify-center rounded-full bg-black/50 text-white"
             >
               <span aria-hidden="true" className="text-lg">×</span>
             </button>
 
-            {/* Scroll region — image + metadata scroll together inside the card */}
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain no-scrollbar">
-              {/* Media — fills the card width edge-to-edge, original aspect
-                  respected, no background/blur padding on any side. */}
-              <div className="relative w-full">
-                {isVideoMedia ? (
-                  <MediaRenderer
-                    kind="video"
-                    src={activeMedia?.url || ''}
-                    fit="contain"
-                    className="w-full"
-                    mediaClassName="block h-auto w-full"
-                    maxHeightClassName=""
-                    controls={true}
-                  />
-                ) : (
-                  <PinchZoomImage
-                    src={activeMedia?.url || ''}
-                    alt={item.collectionTitle || 'Design image'}
-                  />
-                )}
+            {/* Image fills the modal width; height follows native aspect up to
+                94vh. No side/top/bottom letterbox padding or blur fill. */}
+            <div
+              className="relative w-full"
+              onClick={(e) => {
+                // Tap image background closes; ignore interactive controls.
+                const t = e.target as HTMLElement | null;
+                if (t?.closest('button, a, input, textarea, video, [data-meta-sheet-handle], [data-meta-sheet-scroll]')) {
+                  return;
+                }
+                // Don't close when the meta sheet itself was the target.
+                if (t?.closest('[data-meta-sheet-root]')) return;
+                onClose();
+              }}
+            >
+              {isVideoMedia ? (
+                <MediaRenderer
+                  kind="video"
+                  src={activeMedia?.url || ''}
+                  fit="contain"
+                  className="w-full"
+                  mediaClassName="block h-auto w-full max-h-[94vh]"
+                  maxHeightClassName="max-h-[94vh]"
+                  controls={true}
+                />
+              ) : (
+                <PinchZoomImage
+                  src={activeMedia?.url || ''}
+                  alt={item.collectionTitle || 'Design image'}
+                  className="max-h-[94vh]"
+                />
+              )}
 
-                {loadingMedia ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                    <VLoader size={28} phase="loading" showLabel={false} />
-                  </div>
-                ) : null}
+              {/* Only show media spinner when we have no usable preview yet */}
+              {loadingMedia && !activeMedia?.url ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <VLoader size={28} phase="loading" showLabel={false} />
+                </div>
+              ) : null}
 
-                {showMediaNav ? (
-                  <>
-                    <button
-                      type="button"
-                      aria-label="Previous image"
-                      className="absolute left-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
-                      onClick={() =>
-                        setActiveMediaIndex(
-                          (prev) => (prev - 1 + mediaItems.length) % mediaItems.length,
-                        )
-                      }
-                    >
-                      <span aria-hidden="true" className="text-lg">‹</span>
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Next image"
-                      className="absolute right-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
-                      onClick={() =>
-                        setActiveMediaIndex((prev) => (prev + 1) % mediaItems.length)
-                      }
-                    >
-                      <span aria-hidden="true" className="text-lg">›</span>
-                    </button>
-                    <div className="absolute bottom-2 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
-                      {activeMediaIndex + 1} / {mediaItems.length}
-                    </div>
-                  </>
-                ) : null}
-              </div>
-
-              {/* Always-visible essentials: brand, title, price, actions */}
-              <div className="px-4 pb-4 pt-3">
-                <div className="flex items-center justify-between gap-2 pr-8">
+              {showMediaNav ? (
+                <>
                   <button
                     type="button"
-                    onClick={handleOpenBrandCatalog}
-                    className="group flex min-w-0 items-center gap-2.5 text-left"
-                    title={`Open ${brandLabel} catalog`}
-                  >
-                    <span className="size-9 shrink-0 overflow-hidden rounded-2xl ring-1 ring-black/8 dark:ring-white/12">
-                      <ImageWithFallback
-                        src={avatar.src}
-                        fileId={avatar.fileId}
-                        alt={brandLabel}
-                        fit="cover"
-                        rounded="xl"
-                        fallbackName={avatarFallback}
-                        containerClassName="size-9 rounded-2xl"
-                        className="size-9 object-cover"
-                      />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-semibold">{brandLabel}</span>
-                      {item.username ? (
-                        <span className="block truncate text-[11px] text-slate-400 dark:text-white/40">@{item.username}</span>
-                      ) : null}
-                    </span>
-                  </button>
-                  {canPatchBrand ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void handleTogglePatch();
-                      }}
-                      disabled={patchBusy}
-                      className={`shrink-0 inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide transition ${
-                        isPatched
-                          ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                          : 'border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300'
-                      } ${patchBusy ? 'cursor-not-allowed opacity-60' : ''}`}
-                    >
-                      {patchBusy ? '...' : isPatched ? 'Patched' : 'Patch'}
-                    </button>
-                  ) : null}
-                </div>
-
-                <h1 className="mt-2 text-base font-bold leading-snug">{item.collectionTitle}</h1>
-
-                <div className="mt-1.5 flex items-center gap-2">
-                  <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                    {saleBand || baseBand || 'Price on request'}
-                  </span>
-                  {saleBand && baseBand ? (
-                    <span className="text-[10px] text-slate-400 line-through">{baseBand}</span>
-                  ) : null}
-                  {item.customAvailable ? (
-                    <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-500/15 dark:text-purple-300">
-                      <span aria-hidden="true">✂️</span>
-                      Custom
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={bagDisabled}
-                    onClick={() => {
-                      void handleOpenDesignCustomOrder();
+                    aria-label="Previous image"
+                    className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveMediaIndex(
+                        (prev) => (prev - 1 + mediaItems.length) % mediaItems.length,
+                      );
                     }}
-                    title={bagTitle}
-                    aria-label={BAG_IT_LABEL}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none dark:disabled:bg-slate-700 dark:disabled:text-slate-300"
                   >
-                    <BagPulseIcon status={bagStatus} context="detail" size={26} disabled={bagDisabled} />
-                    {openingCustomComposer ? 'Loading...' : BAG_IT_LABEL}
+                    <span aria-hidden="true" className="text-lg">‹</span>
                   </button>
                   <button
                     type="button"
-                    onClick={handleToggleSave}
-                    disabled={saveBusy}
-                    title={isOwnBrandContent ? 'Brands cannot save their own products' : isSaved ? 'Unsave' : 'Save'}
-                    className={`${mobileActionBtn} disabled:opacity-50`}
+                    aria-label="Next image"
+                    className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveMediaIndex((prev) => (prev + 1) % mediaItems.length);
+                    }}
                   >
-                    <span aria-hidden="true">🔖</span>
-                    {isSaved ? 'Saved' : 'Save'}
+                    <span aria-hidden="true" className="text-lg">›</span>
                   </button>
-                  <button type="button" onClick={handleShare} className={mobileActionBtn}>
-                    <span aria-hidden="true">🔗</span>
-                    Share
-                  </button>
-                  {item ? (
-                    <ReportContentButton
-                      targetType={item.designId ? 'DESIGN' : 'COLLECTION'}
-                      targetId={item.designId ?? item.collectionId ?? item.id}
-                      label="Report"
-                      className={mobileActionBtn}
-                    />
-                  ) : null}
-                  <button type="button" onClick={handleOpenBrandCatalog} className={mobileActionBtn}>
-                    <span aria-hidden="true">🏬</span>
-                    Store
-                  </button>
-                </div>
+                  <div className="absolute bottom-24 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
+                    {activeMediaIndex + 1} / {mediaItems.length}
+                  </div>
+                </>
+              ) : null}
 
-                {/* Collapse toggle for the heavier metadata */}
-                <button
-                  type="button"
-                  onClick={() => setMobileDetailsOpen((v) => !v)}
-                  aria-expanded={mobileDetailsOpen}
-                  className="mt-3 flex w-full items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
-                >
-                  <span>
-                    Details &amp; comments{commentCount > 0 ? ` · ${commentCount}` : ''}
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    className={`transition-transform duration-300 ${mobileDetailsOpen ? 'rotate-180' : ''}`}
-                  >
-                    ▾
-                  </span>
-                </button>
+              {/* Metadata overlays the image — drag/tap to expand or collapse */}
+              <div data-meta-sheet-root>
+                <CollapsibleMetaSheet
+                  snap={metaSnap}
+                  onSnapChange={(next) => setMobileDetailsOpen(next === 'expanded')}
+                  peek={
+                    <>
+                      <div className="flex items-center justify-between gap-2 pr-1">
+                        <button
+                          type="button"
+                          onClick={handleOpenBrandCatalog}
+                          className="group flex min-w-0 items-center gap-2.5 text-left"
+                          title={`Open ${brandLabel} catalog`}
+                        >
+                          <span className="size-9 shrink-0 overflow-hidden rounded-2xl ring-1 ring-black/8 dark:ring-white/12">
+                            <ImageWithFallback
+                              src={avatar.src}
+                              fileId={avatar.fileId}
+                              alt={brandLabel}
+                              fit="cover"
+                              rounded="xl"
+                              fallbackName={avatarFallback}
+                              containerClassName="size-9 rounded-2xl"
+                              className="size-9 object-cover"
+                            />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-[13px] font-semibold text-slate-900 dark:text-white">
+                              {brandLabel}
+                            </span>
+                            {item.username ? (
+                              <span className="block truncate text-[11px] text-slate-400 dark:text-white/40">
+                                @{item.username}
+                              </span>
+                            ) : null}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMobileDetailsOpen((v) => !v)}
+                          aria-expanded={mobileDetailsOpen}
+                          className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-200"
+                        >
+                          {mobileDetailsOpen ? 'Hide' : 'Details'}
+                          {commentCount > 0 && !mobileDetailsOpen ? ` · ${commentCount}` : ''}
+                        </button>
+                      </div>
 
-                {/* Smooth CSS grid-rows collapse — GPU-cheap, no drag, no freeze */}
-                <div
-                  className="grid transition-[grid-template-rows] duration-300 ease-out"
-                  style={{ gridTemplateRows: mobileDetailsOpen ? '1fr' : '0fr' }}
-                >
-                  <div className="overflow-hidden">
-                    <div className="pt-3">
+                      <h1 className="mt-2 text-base font-bold leading-snug text-slate-900 dark:text-white">
+                        {item.collectionTitle}
+                      </h1>
+
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                          {saleBand || baseBand || 'Price on request'}
+                        </span>
+                        {saleBand && baseBand ? (
+                          <span className="text-[10px] text-slate-400 line-through">{baseBand}</span>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={bagDisabled}
+                          onClick={() => {
+                            void handleOpenDesignCustomOrder();
+                          }}
+                          title={bagTitle}
+                          aria-label={BAG_IT_LABEL}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none dark:disabled:bg-slate-700 dark:disabled:text-slate-300"
+                        >
+                          <BagPulseIcon status={bagStatus} context="detail" size={26} disabled={bagDisabled} />
+                          {openingCustomComposer ? 'Loading...' : BAG_IT_LABEL}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleToggleSave}
+                          disabled={saveBusy}
+                          title={isOwnBrandContent ? 'Brands cannot save their own products' : isSaved ? 'Unsave' : 'Save'}
+                          className={`${mobileActionBtn} disabled:opacity-50`}
+                        >
+                          <span aria-hidden="true">🔖</span>
+                          {isSaved ? 'Saved' : 'Save'}
+                        </button>
+                        <button type="button" onClick={handleShare} className={mobileActionBtn}>
+                          <span aria-hidden="true">🔗</span>
+                          Share
+                        </button>
+                        {item ? (
+                          <ReportContentButton
+                            targetType={item.designId ? 'DESIGN' : 'COLLECTION'}
+                            targetId={item.designId ?? item.collectionId ?? item.id}
+                            label="Report"
+                            className={mobileActionBtn}
+                          />
+                        ) : null}
+                        <button type="button" onClick={handleOpenBrandCatalog} className={mobileActionBtn}>
+                          <span aria-hidden="true">🏬</span>
+                          Store
+                        </button>
+                      </div>
+                    </>
+                  }
+                  body={
+                    <div className="space-y-3 pt-1">
                       {item.collectionDescription ? (
                         <p className="text-xs leading-relaxed text-slate-500 dark:text-white/60">
                           {item.collectionDescription}
@@ -778,7 +774,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                       ) : null}
 
                       {item.tags?.length ? (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-1.5">
                           {item.tags.map((tag) => (
                             <span
                               key={tag}
@@ -790,7 +786,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                         </div>
                       ) : null}
 
-                      <div className="mt-4 border-t border-slate-200/80 pt-3 dark:border-white/10">
+                      <div className="border-t border-slate-200/80 pt-3 dark:border-white/10">
                         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 dark:border-white/15 dark:bg-black/25">
                           <input
                             type="text"
@@ -819,7 +815,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                             {postingComment ? '...' : 'Post'}
                           </button>
                         </div>
-                        <div className="mt-3 max-h-[42vh] overflow-hidden">
+                        <div className="mt-3">
                           <DesignCommentsPanel
                             mediaId={activeMediaId ?? item.id}
                             collectionId={item.collectionId}
@@ -834,8 +830,8 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  }
+                />
               </div>
             </div>
           </div>
