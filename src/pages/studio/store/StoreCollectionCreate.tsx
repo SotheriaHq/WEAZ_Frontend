@@ -2722,10 +2722,6 @@ const StoreCollectionCreate: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-theme-secondary mb-2 flex items-center">
-                      Style details
-                      <InfoTooltip text={CREATOR_METADATA_HELP.style} />
-                    </label>
                     <FilterSelector
                       value={filterSelection}
                       onChange={handleFilterSelectionChange}

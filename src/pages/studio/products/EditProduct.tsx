@@ -3546,7 +3546,68 @@ const EditProduct: React.FC = () => {
                 />
 
                 <div className="space-y-4" id="product-category-section">
-                        {/* Group 1: Audience & Collection */}
+                        {/* Group 1: Category & Subcategory */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                          <div className="min-w-0">
+                            <UniversalSelect
+                              label="What is it?"
+                              value={form.taxonomyCategoryId}
+                              onChange={(value) =>
+                                updateForm("taxonomyCategoryId", value)
+                              }
+                              options={taxonomyCategorySelectOptions}
+                              placeholder={
+                                categoriesLoading
+                                  ? 'Loading categories...'
+                                  : 'Choose what this item is'
+                              }
+                              disabled={
+                                categoriesLoading ||
+                                taxonomyCategorySelectOptions.length === 0
+                              }
+                              searchable
+                              emptyMessage="No categories available"
+                              optionAllowWrap
+                              selectedAllowWrap
+                              menuLayer="modal"
+                            />
+                          </div>
+
+                          <div className="min-w-0">
+                            <UniversalSelect
+                              label="Garment type"
+                              value={form.categoryTypeId}
+                              onChange={(value) =>
+                                updateForm("categoryTypeId", value)
+                              }
+                              options={subCategorySelectOptions}
+                              placeholder={
+                                form.taxonomyCategoryId ||
+                                availableCategoryTypes.length > 0
+                                  ? 'Choose a garment type'
+                                  : 'Select a category first'
+                              }
+                              disabled={
+                                (!form.taxonomyCategoryId &&
+                                  availableCategoryTypes.length === 0 &&
+                                  subCategorySelectOptions.length === 0) ||
+                                categoriesLoading
+                              }
+                              searchable
+                              emptyMessage={
+                                form.taxonomyCategoryId ||
+                                availableCategoryTypes.length > 0
+                                  ? 'No sub-categories available'
+                                  : 'Select a category first'
+                              }
+                              optionAllowWrap
+                              selectedAllowWrap
+                              menuLayer="modal"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Group 2: Audience & Collection */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                           <div className="min-w-0">
                             <UniversalSelect
@@ -3617,74 +3678,9 @@ const EditProduct: React.FC = () => {
                             </p>
                           </div>
                         </div>
-
-                        {/* Group 2: Category & Subcategory */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                          <div className="min-w-0">
-                            <UniversalSelect
-                              label="What is it?"
-                              value={form.taxonomyCategoryId}
-                              onChange={(value) =>
-                                updateForm("taxonomyCategoryId", value)
-                              }
-                              options={taxonomyCategorySelectOptions}
-                              placeholder={
-                                categoriesLoading
-                                  ? 'Loading categories...'
-                                  : 'Choose what this item is'
-                              }
-                              disabled={
-                                categoriesLoading ||
-                                taxonomyCategorySelectOptions.length === 0
-                              }
-                              searchable
-                              emptyMessage="No categories available"
-                              optionAllowWrap
-                              selectedAllowWrap
-                              menuLayer="modal"
-                            />
-                          </div>
-
-                          <div className="min-w-0">
-                            <UniversalSelect
-                              label="Garment type"
-                              value={form.categoryTypeId}
-                              onChange={(value) =>
-                                updateForm("categoryTypeId", value)
-                              }
-                              options={subCategorySelectOptions}
-                              placeholder={
-                                form.taxonomyCategoryId ||
-                                availableCategoryTypes.length > 0
-                                  ? 'Choose a garment type'
-                                  : 'Select a category first'
-                              }
-                              disabled={
-                                (!form.taxonomyCategoryId &&
-                                  availableCategoryTypes.length === 0 &&
-                                  subCategorySelectOptions.length === 0) ||
-                                categoriesLoading
-                              }
-                              searchable
-                              emptyMessage={
-                                form.taxonomyCategoryId ||
-                                availableCategoryTypes.length > 0
-                                  ? 'No sub-categories available'
-                                  : 'Select a category first'
-                              }
-                              optionAllowWrap
-                              selectedAllowWrap
-                              menuLayer="modal"
-                            />
-                          </div>
-                        </div>
                       </div>
 
                       <div>
-                        <label className="mb-2 flex items-center text-[11px] font-semibold text-theme-secondary">
-                          Style details
-                          <InfoTooltip text={CREATOR_METADATA_HELP.style} />
-                        </label>
                         <FilterSelector
                           value={filterSelection}
                           onChange={setFilterSelection}

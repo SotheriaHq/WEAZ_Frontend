@@ -539,20 +539,30 @@ export default function VerificationWizardPage() {
 
   return (
     <div className="space-y-6">
-      <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-        <Link to={originPath} className="transition hover:text-gray-700">
-          {originLabel}
-        </Link>
-        <span>/</span>
-        <Link
-          to="/studio/verification"
-          className="transition hover:text-gray-700"
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => navigate('/studio/verification', { state: { from: originPath } })}
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-white/10 dark:bg-zinc-800 dark:text-gray-300 dark:hover:border-white/20 dark:hover:bg-zinc-700"
+          aria-label="Back to verification"
         >
-          Verification
-        </Link>
-        <span>/</span>
-        <span className="text-gray-800">Apply</span>
-      </nav>
+          ←
+        </button>
+        <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+          <Link to={originPath} className="transition hover:text-gray-700">
+            {originLabel}
+          </Link>
+          <span>/</span>
+          <Link
+            to="/studio/verification"
+            className="transition hover:text-gray-700"
+          >
+            Verification
+          </Link>
+          <span>/</span>
+          <span className="text-gray-800">Apply</span>
+        </nav>
+      </div>
 
       <VerificationHero
         eyebrow="Verification application"

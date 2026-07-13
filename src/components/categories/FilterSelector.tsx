@@ -320,7 +320,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                                     <span className="h-1.5 w-1.5 rounded-full bg-white" />
                                   ) : null}
                                 </span>
-                                <span className="truncate">{val.name}</span>
+                                <span className="whitespace-normal break-words leading-tight text-left">{val.name}</span>
                               </button>
                             );
                           })}
