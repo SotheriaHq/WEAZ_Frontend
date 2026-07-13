@@ -729,7 +729,9 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
               className="flex -ml-6 w-auto"
               columnClassName="pl-6 space-y-6 bg-clip-padding"
             >
-              <DesignSkeleton />
+              {Array.from({ length: 9 }).map((_, i) => (
+                <DesignSkeleton key={i} />
+              ))}
             </Masonry>
           ) : pinnedItems.length > 0 ? (
             <Masonry
@@ -854,7 +856,9 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
           className="flex -ml-6 w-auto"
           columnClassName="pl-6 space-y-6 bg-clip-padding"
         >
-          <DesignSkeleton />
+          {Array.from({ length: 9 }).map((_, i) => (
+            <DesignSkeleton key={i} />
+          ))}
         </Masonry>
       ) : error ? (
         // Smart error state - detects error type for appropriate messaging

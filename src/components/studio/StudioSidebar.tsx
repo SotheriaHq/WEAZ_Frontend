@@ -71,9 +71,9 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
 
   return (
     <>
-      <aside className="w-full border-r border-purple-200/20 dark:border-white/10 bg-transparent h-full">
-        <div className="py-4 pr-2 pl-0">
-          <div className="pl-5 pr-3 mb-4">
+      <aside className="hidden lg:block fixed left-0 top-20 z-20 h-[calc(100vh-5rem)] w-[220px] overflow-y-auto scrollbar-hide border-r border-purple-200/20 dark:border-white/10 bg-[color:var(--surface-primary)]">
+        <div className="py-4">
+          <div className="px-4 mb-4">
             <h2 className="text-sm font-bold text-black dark:text-white uppercase tracking-wider">Studio</h2>
           </div>
 
@@ -95,19 +95,19 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
                             handleSelect(key, path);
                           }
                         }}
-                        className={`w-full text-left pl-5 pr-3 py-2.5 text-sm rounded-r-lg rounded-l-none transition-all duration-150 flex items-center gap-2 group ${
+                        className={`group flex w-full items-center gap-2.5 border-l-[3px] px-4 py-2.5 text-left text-sm transition-colors ${
                           isLocked
-                            ? 'cursor-not-allowed opacity-50'
+                            ? 'cursor-not-allowed border-transparent opacity-50'
                             : isActive
-                              ? 'font-medium text-primary border-l-4 border-primary bg-primary/10'
-                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 border-l-4 border-transparent'
+                              ? 'border-primary bg-primary/10 font-medium text-primary'
+                              : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-black dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white'
                         }`}
                         title={isLocked ? 'Complete store setup to unlock this section' : label}
                       >
-                        <span className="text-base leading-none">{emoji}</span>
-                        <span className="text-sm flex-1">{label}</span>
+                        <span className="shrink-0 text-base leading-none">{emoji}</span>
+                        <span className="flex-1 truncate">{label}</span>
                         {key === 'messages' && unreadMessages > 0 && (
-                          <span className="ml-auto min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 leading-none">
+                          <span className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
                             {unreadMessages > 99 ? '99+' : unreadMessages}
                           </span>
                         )}

@@ -259,7 +259,11 @@ export const DesignCard: React.FC<DesignCardProps> = ({
           />
         ) : (
           <ImageWithFallback
-              src={item.media.url ?? ''}
+              /* Grid cards must use the small 640px CARD variant (previewUrl),
+                 NOT the 1440–2048px full-screen `url` — loading the high-res
+                 image into a ~300px card is what made the runway render one
+                 card at a time. The modal still opens the full-res `url`. */
+              src={item.media.previewUrl ?? item.media.url ?? ''}
               fileId={item.media.fileId || null}
               alt={item.collectionTitle}
               fit="contain"

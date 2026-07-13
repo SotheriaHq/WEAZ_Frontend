@@ -150,8 +150,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
                 <button
                   key={key}
                   onClick={() => handleSelect(key, path)}
-            className={`flex w-full items-center gap-1.5 py-1 text-left text-[10px] leading-tight transition-colors md:gap-2.5 md:py-2 md:text-sm ${
-                    group.collapsible ? 'pl-2 pr-1.5 md:pl-6 md:pr-4' : 'px-2 md:px-4'
+            className={`flex w-full items-center gap-2 py-2.5 text-left text-[11px] leading-snug transition-colors md:gap-2.5 md:py-2 md:text-sm ${
+                    group.collapsible ? 'pl-3 pr-2 md:pl-6 md:pr-4' : 'px-3 md:px-4'
                   } ${
                     isActive
                       ? '-ml-[1px] border-l-[3px] border-primary bg-primary/10 font-medium text-primary'
@@ -160,8 +160,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
                         : 'text-gray-600 hover:bg-gray-100 hover:text-black dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'
                   }`}
                 >
-                  <span className="shrink-0" aria-hidden="true">{icon}</span>
-                  {label}
+                  <span className="shrink-0 text-sm md:text-base" aria-hidden="true">{icon}</span>
+                  <span className="min-w-0">{label}</span>
                 </button>
               );
             })}
