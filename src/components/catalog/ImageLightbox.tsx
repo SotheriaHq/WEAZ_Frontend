@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
@@ -111,12 +111,42 @@ export default function ImageLightbox({
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     document.body.style.overflow = 'hidden';
-    
+
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
     };
   }, [handleKeyDown]);
+
+  // Touch swipe navigation. Previously the only way to move between images on a
+  // touch device was the arrow buttons — which were invisible (opacity-0 until
+  // :hover, and touch has no hover), so users felt "stuck".
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStartXRef.current = t.clientX;
+    touchStartYRef.current = t.clientY;
+  }, []);
+
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      const startX = touchStartXRef.current;
+      const startY = touchStartYRef.current;
+      touchStartXRef.current = null;
+      touchStartYRef.current = null;
+      if (startX === null || startY === null) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      // Only treat as a horizontal swipe (ignore vertical scroll/close intent).
+      if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy)) return;
+      if (dx < 0) onNext();
+      else onPrevious();
+    },
+    [onNext, onPrevious],
+  );
 
   const currentImage = images[currentIndex];
   if (!currentImage) return null;
@@ -150,13 +180,18 @@ export default function ImageLightbox({
       </div>
 
       {/* Main Content Area */}
-      <div className="relative flex flex-1 items-center justify-center w-full max-w-7xl mx-auto my-6 group">
-        {/* Left Arrow */}
+      <div
+        className="relative flex flex-1 items-center justify-center w-full max-w-7xl mx-auto my-6 group"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        style={{ touchAction: 'pan-y' }}
+      >
+        {/* Left Arrow — always visible (touch devices have no :hover) */}
         {images.length > 1 && (
           <button
             type="button"
             onClick={onPrevious}
-            className="absolute left-0 z-10 size-12 md:size-14 rounded-full flex items-center justify-center bg-white/5 border border-white/10 backdrop-blur-sm hover:bg-purple-600/20 hover:border-purple-600/50 transition-all -translate-x-2 md:-translate-x-8 opacity-0 group-hover:opacity-100 focus:opacity-100"
+            className="absolute left-0 z-10 size-12 md:size-14 rounded-full flex items-center justify-center bg-white/10 border border-white/10 backdrop-blur-sm hover:bg-purple-600/20 hover:border-purple-600/50 transition-all -translate-x-2 md:-translate-x-8 opacity-80 hover:opacity-100 focus:opacity-100"
             aria-label="Previous image"
           >
             <ChevronLeft className="text-white" size={28} />
@@ -168,16 +203,29 @@ export default function ImageLightbox({
           <LightboxImage media={currentImage} alt={`${productName} - Image ${currentIndex + 1}`} />
         </div>
 
-        {/* Right Arrow */}
+        {/* Right Arrow — always visible (touch devices have no :hover) */}
         {images.length > 1 && (
           <button
             type="button"
             onClick={onNext}
-            className="absolute right-0 z-10 size-12 md:size-14 rounded-full flex items-center justify-center bg-white/5 border border-white/10 backdrop-blur-sm hover:bg-purple-600/20 hover:border-purple-600/50 transition-all translate-x-2 md:translate-x-8 opacity-0 group-hover:opacity-100 focus:opacity-100"
+            className="absolute right-0 z-10 size-12 md:size-14 rounded-full flex items-center justify-center bg-white/10 border border-white/10 backdrop-blur-sm hover:bg-purple-600/20 hover:border-purple-600/50 transition-all translate-x-2 md:translate-x-8 opacity-80 hover:opacity-100 focus:opacity-100"
             aria-label="Next image"
           >
             <ChevronRight className="text-white" size={28} />
           </button>
+        )}
+
+        {/* Preload every other gallery image (resolves its signed URL + decodes
+            it off-screen) so arrow/swipe/thumbnail navigation swaps to an
+            already-ready image instead of stalling on a fresh fetch. */}
+        {images.length > 1 && (
+          <div aria-hidden className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0">
+            {images.map((img, idx) =>
+              idx === currentIndex ? null : (
+                <LightboxImage key={`preload-${img.id || idx}`} media={img} alt="" />
+              ),
+            )}
+          </div>
         )}
       </div>
 

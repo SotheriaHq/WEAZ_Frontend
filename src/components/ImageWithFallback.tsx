@@ -20,6 +20,16 @@ interface ImageWithFallbackProps {
   draggable?: boolean;
   onClick?: () => void;
   keepPreviousOnReload?: boolean;
+  /**
+   * Native <img> loading hint. Defaults to 'eager' to preserve existing
+   * behavior. Pass 'lazy' for grid/feed cards in a DOCUMENT-scrolled layout so
+   * off-screen images defer instead of all firing at once and queuing behind
+   * the browser's ~6-connection cap (the "cards render one at a time" symptom).
+   * Do NOT use 'lazy' inside a custom overflow-scroll container.
+   */
+  loading?: 'lazy' | 'eager';
+  /** Fetch priority hint forwarded to the underlying <img>. */
+  fetchPriority?: 'high' | 'low' | 'auto';
 }
 
 const roundClass = (rounded: ImageWithFallbackProps['rounded']) => {
@@ -233,6 +243,8 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   draggable: _draggable = false,
   onClick,
   keepPreviousOnReload = false,
+  loading = 'eager',
+  fetchPriority,
 }) => {
   const sourceCacheKey = resolveSourceCacheKey(fileId, src);
   const cachedLastGoodUrl = sourceCacheKey ? lastGoodUrlCache.get(sourceCacheKey) ?? null : null;
@@ -509,7 +521,8 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           imgRef={imgRef}
           onError={() => setHadError(true)}
           onLoad={handleImageLoaded}
-          loading="eager"
+          loading={loading}
+          fetchPriority={fetchPriority}
           className="w-full h-full"
           mediaClassName={`transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${className ?? ''}`}
           maxHeightClassName={maxHeightClassName ?? 'max-h-[70vh]'}

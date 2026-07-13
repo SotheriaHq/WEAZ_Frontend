@@ -272,6 +272,11 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               maxHeightClassName="max-h-none"
               className="h-full w-full object-contain"
               fallbackName={item.collectionTitle}
+              /* Document-scrolled feed: defer off-screen card images so the
+                 first screenful loads immediately instead of all cards
+                 contending and painting one at a time. In-viewport cards still
+                 load right away (native lazy loads what's already visible). */
+              loading="lazy"
             />
         )}
         

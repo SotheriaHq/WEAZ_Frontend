@@ -60,6 +60,13 @@ export interface MediaRendererProps {
    */
   loading?: 'lazy' | 'eager';
 
+  /**
+   * Priority hint for the image fetch. "high" for above-the-fold hero/first-row
+   * media; "low" for off-screen or preload-only images so they don't contend
+   * with visible content on the (browser-capped) connection pool.
+   */
+  fetchPriority?: 'high' | 'low' | 'auto';
+
   /** Optional direct access to the underlying element (for playback control, etc.) */
   imgRef?: React.Ref<HTMLImageElement>;
   videoRef?: React.Ref<HTMLVideoElement>;
@@ -95,6 +102,7 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
   srcSet,
   sizes,
   loading,
+  fetchPriority,
   imgRef,
   videoRef,
 }) => {
@@ -197,6 +205,11 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
         alt={alt ?? ''}
         className={elementClassName}
         loading={loading}
+        // Decode off the main thread so a large image swapping in never blocks
+        // paint/scroll (a key cause of the "cards render one at a time" feel and
+        // the frozen-swipe stutter when flipping through gallery images).
+        decoding="async"
+        fetchPriority={fetchPriority}
         onLoad={onLoad}
         onError={() => {
           setHasLoadError(true);

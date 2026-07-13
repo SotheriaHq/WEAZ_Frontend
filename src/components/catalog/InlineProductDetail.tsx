@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useImagePreload } from '@/hooks/useImagePreload';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
@@ -240,6 +241,37 @@ export default function InlineProductDetail({
       if (next >= productImages.length) return 0;
       return next;
     });
+  };
+
+  // Warm the browser cache for every gallery image so flipping left/right (or
+  // tapping a thumbnail) swaps to an already-decoded image instead of stalling.
+  useImagePreload(productImages.map((img) => img.url));
+
+  // Touch swipe on the main image. Suppress the "open lightbox" click that would
+  // otherwise fire at the end of a swipe gesture.
+  const swipeStartXRef = useRef<number | null>(null);
+  const swipeStartYRef = useRef<number | null>(null);
+  const suppressImageClickRef = useRef(false);
+
+  const handleImageTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    swipeStartXRef.current = t.clientX;
+    swipeStartYRef.current = t.clientY;
+    suppressImageClickRef.current = false;
+  };
+
+  const handleImageTouchEnd = (e: React.TouchEvent) => {
+    const startX = swipeStartXRef.current;
+    const startY = swipeStartYRef.current;
+    swipeStartXRef.current = null;
+    swipeStartYRef.current = null;
+    if (startX === null || startY === null || productImages.length <= 1) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy)) return;
+    suppressImageClickRef.current = true;
+    moveImage(dx < 0 ? 1 : -1);
   };
 
   const formatCurrency = (price?: number | null) => {
@@ -510,9 +542,18 @@ export default function InlineProductDetail({
         {/* Image Gallery */}
         <div className="space-y-4">
           {/* Main Image */}
-          <div 
+          <div
             className="relative w-full overflow-hidden rounded-2xl cursor-zoom-in group"
-            onClick={() => productImages.length > 0 && setLightboxOpen(true)}
+            onClick={() => {
+              if (suppressImageClickRef.current) {
+                suppressImageClickRef.current = false;
+                return;
+              }
+              if (productImages.length > 0) setLightboxOpen(true);
+            }}
+            onTouchStart={handleImageTouchStart}
+            onTouchEnd={handleImageTouchEnd}
+            style={{ touchAction: 'pan-y' }}
           >
             {currentImage ? (
               <ImageWithFallback
@@ -589,6 +630,28 @@ export default function InlineProductDetail({
                   />
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* Off-screen preloaders: resolve the signed URL + decode every
+              non-visible gallery image (including fileId-signed ones the main
+              <ImageWithFallback> would otherwise re-resolve on each swap) so
+              flipping the main image is instant instead of frozen. */}
+          {productImages.length > 1 && (
+            <div aria-hidden className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0">
+              {productImages.map((img, idx) =>
+                idx === selectedImageIndex ? null : (
+                  <ImageWithFallback
+                    key={`preload-${img.id}`}
+                    src={img.url || undefined}
+                    fileId={img.fileId}
+                    alt=""
+                    fit="cover"
+                    containerClassName="h-2 w-2"
+                    className="h-2 w-2"
+                  />
+                ),
+              )}
             </div>
           )}
         </div>
