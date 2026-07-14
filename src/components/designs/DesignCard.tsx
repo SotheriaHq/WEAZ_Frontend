@@ -12,6 +12,7 @@ import { Link, Tag } from 'lucide-react';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
+import { patchMenuRowColorClasses, patchToastMessage } from '@/lib/patchPresentation';
 import { useNavigate } from 'react-router-dom';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagFlow } from '@/features/bagging/BagFlowProvider';
@@ -183,7 +184,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
     if (!isPatchCapable || !item.brandId) return;
     try {
       const nextPatched = await toggleStatus(item.brandId);
-      toast.success(nextPatched ? 'Brand patched.' : 'Brand unpatched.');
+      toast.success(patchToastMessage(nextPatched, item.brandName));
     } catch {
       toast.error('Unable to update patch.');
     }
@@ -374,9 +375,11 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                   <button
                     onClick={handleTogglePatch}
                     disabled={resolvedPatchBusy}
-                    className="w-full text-left px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 transition-colors disabled:opacity-60"
+                    className={`w-full text-left px-3 py-2 text-xs font-medium flex items-center gap-2 transition-colors disabled:opacity-60 ${patchMenuRowColorClasses(
+                      resolvedPatched,
+                    )}`}
                   >
-                    <Tag className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span aria-hidden="true">{resolvedPatched ? '✓' : '🧵'}</span>
                     {resolvedPatched ? 'Unpatch brand' : 'Patch brand'}
                   </button>
                 </>

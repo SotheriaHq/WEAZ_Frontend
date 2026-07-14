@@ -7,6 +7,7 @@ import AvatarCard from '../profile/AvatarCard';
 import VLoader from '../loaders/VLoader';
 import ImageWithFallback from '../ImageWithFallback';
 import ThreadActivityIndicator from '../ui/ThreadActivityIndicator';
+import { patchButtonColorClasses } from '@/lib/patchPresentation';
 import type { ProfilePhotoViewState } from '@/types/profilePhoto';
 
 interface ProfileHeaderProps {
@@ -384,17 +385,15 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                 type="button"
                 onClick={onTogglePatch}
                 disabled={patchLoading}
-                className={`group relative inline-flex items-center gap-2 rounded-2xl border-2 border-dashed px-4 py-2 text-xs font-semibold tracking-wide shadow-lg transition ${
-                  isPatched
-                    ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                    : 'border-fuchsia-300 bg-fuchsia-50 text-fuchsia-900 hover:bg-fuchsia-100'
-                } ${patchLoading ? 'opacity-70 cursor-not-allowed' : 'hover:-translate-y-0.5 active:translate-y-0'}`}
+                className={`group relative inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-semibold tracking-wide shadow-lg transition ${patchButtonColorClasses(
+                  isPatched,
+                )} ${patchLoading ? 'opacity-70 cursor-not-allowed' : 'hover:-translate-y-0.5 active:translate-y-0'}`}
                 aria-live="polite"
               >
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/80 text-sm shadow-sm ring-1 ring-black/5">
                   <ThreadActivityIndicator active={isPatched} size={18} state={patchLoading ? 'pending' : 'idle'} />
                 </span>
-                <span>{patchLoading ? 'Updating...' : isPatched ? 'Unpatch' : 'Patch'}</span>
+                <span>{patchLoading ? 'Updating…' : isPatched ? 'Patched' : 'Patch'}</span>
               </button>
             ) : null}
           </div>

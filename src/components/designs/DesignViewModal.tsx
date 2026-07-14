@@ -10,6 +10,7 @@ import { apiClient } from '@/api/httpClient';
 import { brandApi } from '@/api/BrandApi';
 import DesignCommentsPanel from '@/components/designs/DesignCommentsPanel';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import useImagePreload from '@/hooks/useImagePreload';
 import PinchZoomImage from '@/components/media/PinchZoomImage';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
@@ -39,6 +40,11 @@ import {
   CONTENT_DISPLAY_RENDERER_CLASS,
 } from '@/components/media/contentDisplayPresets';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
+import {
+  patchButtonColorClasses,
+  patchButtonLabel,
+  patchToastMessage,
+} from '@/lib/patchPresentation';
 import { buildDesignUrl } from '@/utils/publicUrlBuilder';
 import { buildBrandProfilePathFromMarketItem } from '@/utils/brandProfileRoute';
 import {
@@ -111,6 +117,16 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   const savedStatusQuery = useSavedStatusQuery('COLLECTION_MEDIA', activeMediaId, {
     enabled: Boolean(open && activeMediaId && isAuth),
   });
+
+  // Every image in this creation already had its display URL resolved once by
+  // loadAllDesignMedia. Warm the browser cache + decode for ALL of them up front
+  // so flipping left/right is instant and swiping back never re-downloads an
+  // already-viewed image (fixes the "swipe stalls / repeated per-image calls").
+  const mediaPreloadUrls = React.useMemo(
+    () => mediaItems.map((m) => m.url),
+    [mediaItems],
+  );
+  useImagePreload(mediaPreloadUrls);
 
   const isRegularViewer = authProfile?.type === 'REGULAR';
   const brandId = item?.brandId ?? null;
@@ -430,7 +446,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
     try {
       const next = await toggleStatus(item.brandId);
-      toast.success(next ? 'Patched successfully.' : 'Unpatched successfully.');
+      toast.success(patchToastMessage(next, item.brandName));
     } catch {
       toast.error('Unable to update patch status right now.');
     }
@@ -951,13 +967,12 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                           void handleTogglePatch();
                         }}
                         disabled={patchBusy}
-                        className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide shadow-sm transition ${
-                          isPatched
-                            ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 dark:text-emerald-300'
-                            : 'border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-700 hover:bg-fuchsia-500/25 dark:text-fuchsia-300'
-                        } ${patchBusy ? 'cursor-not-allowed opacity-60' : ''}`}
+                        aria-live="polite"
+                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide shadow-sm transition ${patchButtonColorClasses(
+                          isPatched,
+                        )} ${patchBusy ? 'cursor-not-allowed opacity-60' : ''}`}
                       >
-                        {patchBusy ? '...' : isPatched ? 'Patched' : 'Patch'}
+                        {patchButtonLabel(isPatched, patchBusy)}
                       </button>
                     ) : null}
                   </div>

@@ -10,6 +10,8 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import useCachedResource from '@/hooks/useCachedResource';
 import { queryClient } from '@/query/queryClient';
+import { useBrandPatchState } from '@/context/BrandPatchContext';
+import { patchToastMessage } from '@/lib/patchPresentation';
 
 type ViewMode = 'grid' | 'list' | 'compact';
 
@@ -38,6 +40,7 @@ interface PatchesTabProps {
 export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibility }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [unpatchingBrandId, setUnpatchingBrandId] = useState<string | null>(null);
+  const { markPatched } = useBrandPatchState();
   const currentUserId = useSelector((state: RootState) => state.user.profile?.id);
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
@@ -83,10 +86,13 @@ export const PatchesTab: React.FC<PatchesTabProps> = ({ isOwner, profileVisibili
     try {
       setUnpatchingBrandId(brandId);
       await apiClient.delete(`/brands/${brandId}/patches`);
+      // Keep the shared patch cache in sync so the brand's catalog, feed cards,
+      // and design modal immediately reflect the unpatch (Rule 1).
+      markPatched(brandId, false);
       queryClient.setQueryData<PatchedBrand[]>(patchesQueryKey, (prev) =>
         (prev ?? []).filter((b) => b.id !== brandId),
       );
-      toast.success('Brand unpatched successfully.');
+      toast.success(patchToastMessage(false));
     } catch (err) {
       console.error('Error unpatching brand:', err);
       toast.error('Failed to unpatch brand.');

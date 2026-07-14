@@ -16,6 +16,7 @@ import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
+import { patchToastMessage } from '@/lib/patchPresentation';
 import { buildDesignRoute, buildProductRoute } from '@/utils/catalogRoutes';
 import { buildBrandProfilePathFromMarketItem } from '@/utils/brandProfileRoute';
 import { unwrapApiResponse, type ApiSuccessPayload } from '@/types/auth';
@@ -694,7 +695,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     if (!isPatchCapable) return;
     try {
       const nextPatched = await toggleStatus(brandId);
-      toast.success(nextPatched ? 'Brand patched.' : 'Brand unpatched.');
+      toast.success(patchToastMessage(nextPatched));
     } catch {
       toast.error('Unable to update patch.');
     }

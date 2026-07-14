@@ -114,6 +114,27 @@ export function determineNotificationRoute(notification: NormalizedNotification)
     const contentReviewRoute = determineContentReviewRoute(notification);
     if (contentReviewRoute) return contentReviewRoute;
 
+    // Patch (user↔brand) routing is action-aware and must beat the generic
+    // USER-target routePattern below (which would send everyone to the brand
+    // profile regardless of who the notification is for).
+    if (type === NotificationTypes.PATCH) {
+        const action = (payload as Record<string, unknown> | undefined)?.action;
+        const brandId = target?.type === 'USER' ? target.id : null;
+        if (action === 'USER_PATCH_CONFIRMED' && brandId) {
+            // The buyer's own confirmation opens the patched brand's catalog.
+            return `/profile/${brandId}`;
+        }
+        if (action === 'PROFILE_PATCHED' || action === 'PROFILE_UNPATCHED') {
+            // Brand-facing patch notification opens the patcher's profile.
+            return actor?.id
+                ? determineActorRoute(actor.id)
+                : brandId
+                    ? `/profile/${brandId}`
+                    : fallbackUrl;
+        }
+        // COLLECTION_COLLAB / legacy patch payloads fall through to the registry.
+    }
+
     // Try registry-based routing first
     const config = NotificationRegistry[type as keyof typeof NotificationRegistry];
     if (config?.routePattern) {

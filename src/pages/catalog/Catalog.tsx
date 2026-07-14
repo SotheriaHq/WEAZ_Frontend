@@ -42,6 +42,7 @@ import BrandQrModal from '@/components/qr/BrandQrModal';
 import { resolveBannerImageSource, resolveProfileImageSource } from '@/utils/profileImage';
 import { buildProfileUrl } from '@/utils/publicLinks';
 import { resolvePublicBrandIdentity } from '@/utils/brandPublicIdentity';
+import { patchToastMessage } from '@/lib/patchPresentation';
 import {
   type PublishTask,
   type PublishTaskKind,
@@ -851,11 +852,7 @@ const ProfilePage: React.FC = () => {
     }
     try {
       const nextPatchedState = await toggleStatus(routeBrandId);
-      toast.success(
-        nextPatchedState
-          ? 'Patched successfully. You will now receive brand updates.'
-          : 'Unpatched successfully. You will no longer receive patch-only updates.',
-      );
+      toast.success(patchToastMessage(nextPatchedState));
     } catch {
       toast.error('Failed to update patch status.');
     }
