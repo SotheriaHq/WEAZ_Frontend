@@ -20,6 +20,7 @@ import type { BrandProfileDto, CollectionDto } from '@/types/profile';
 import { THREADLY_QUERY_STALE_TIME_MS } from './queryClient';
 import { queryKeys } from './queryKeys';
 import { isUuidV4, normalizeUuidV4List } from '@/utils/uuid';
+import type { SizingRegion } from '@/types/sizeFit';
 
 type EnabledOption = { enabled?: boolean };
 type ThreadContentType = 'COLLECTION' | 'COLLECTION_MEDIA';
@@ -557,6 +558,27 @@ export async function fetchMySizeFitProfileQuery(
   return queryClient.fetchQuery({
     queryKey: key,
     queryFn: () => SizeFitApi.getMyProfile(),
+    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+  });
+}
+
+export async function fetchMyComputedSizeFitQuery(
+  queryClient: QueryClient,
+  userId?: string | null,
+  region?: string | null,
+  options?: { forceRefresh?: boolean },
+) {
+  if (!userId) return null;
+  const key = queryKeys.sizeFit.computed(userId, region);
+  if (options?.forceRefresh) {
+    await queryClient.removeQueries({ queryKey: key, exact: true });
+  }
+  return queryClient.fetchQuery({
+    queryKey: key,
+    queryFn: () =>
+      SizeFitApi.getComputedProfile(
+        region ? { region: region as SizingRegion } : undefined,
+      ),
     staleTime: THREADLY_QUERY_STALE_TIME_MS,
   });
 }

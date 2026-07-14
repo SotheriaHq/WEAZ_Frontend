@@ -160,6 +160,10 @@ export function determineNotificationRoute(notification: NormalizedNotification)
 
     // Fallback: type-specific routing for edge cases
     switch (type) {
+        case 'BAG_ITEM_ADDED':
+        case 'BAG_CHECKOUT_REMINDER':
+            return '/bag';
+
         case NotificationTypes.THREAD:
             if (target?.type === 'COLLECTION') {
                 return `/market?openDesign=${target.id}`;

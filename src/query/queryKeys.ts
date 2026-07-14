@@ -175,6 +175,8 @@ export const queryKeys = {
   },
   sizeFit: {
     myProfile: (userId?: string | null) => ['sizeFit', 'myProfile', normalizeId(userId)] as const,
+    computed: (userId?: string | null, region?: string | null) =>
+      ['sizeFit', 'computed', normalizeId(userId), normalizeId(region)] as const,
     shares: (userId?: string | null) => ['sizeFit', 'shares', normalizeId(userId)] as const,
   },
   customOrders: {

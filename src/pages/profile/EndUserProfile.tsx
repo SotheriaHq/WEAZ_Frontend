@@ -17,11 +17,16 @@ import { EndUserSizeFitQuickShareModal } from './EndUserSizeFitQuickShareModal';
 import { EndUserProfileQrModal } from './EndUserProfileQrModal';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
-import type { SizeFitProfile, SizeFitSharesPayload } from '@/types/sizeFit';
+import type {
+  ComputedSizeFitProfile,
+  SizeFitProfile,
+  SizeFitSharesPayload,
+  SizingRegion,
+} from '@/types/sizeFit';
 import ProfileActionsBar, { type ProfileAction } from '@/components/profile/ProfileActionsBar';
 import { buildProfileUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomOrderApi';
-import { deriveSizeRecommendation, DISPLAY_CHART_OPTIONS } from '@/lib/sizeCharts';
+import { DISPLAY_CHART_OPTIONS } from '@/lib/sizeCharts';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import ProfileImageModal from '@/components/profile/ProfileImageModal';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
@@ -31,6 +36,7 @@ import {
 } from '@/types/profilePhoto';
 import {
   fetchDisplayChartPreferenceQuery,
+  fetchMyComputedSizeFitQuery,
   fetchMySizeFitProfileQuery,
   fetchMySizeFitSharesQuery,
   fetchMyUserProfileQuery,
@@ -120,6 +126,47 @@ const describeAlphaFit = (value?: string | null): string | null => {
   return labels[normalized] ? `${labels[normalized]} (${normalized})` : normalized;
 };
 
+const sizeFitRegionForDisplayChart = (family: CustomOrderChartFamily): SizingRegion => {
+  switch (family) {
+    case 'UK':
+      return 'UK';
+    case 'US':
+      return 'US';
+    case 'NIGERIA':
+    case 'HYBRID_UK_NIGERIA':
+    case 'HYBRID_US_NIGERIA':
+      return 'NG_WEST_AFRICA';
+    case 'ASIA':
+    default:
+      return 'INTERNATIONAL';
+  }
+};
+
+const resolveComputedSizeLabel = (computed?: ComputedSizeFitProfile | null): string | null => {
+  if (!computed) return null;
+  const primaryBreakdown =
+    computed.categoryBreakdown?.tops ??
+    Object.values(computed.categoryBreakdown ?? {}).find(
+      (entry) => entry?.recommendedSize || entry?.estimatedSize || entry?.displayRange,
+    ) ??
+    null;
+
+  return (
+    computed.estimatedSize ??
+    primaryBreakdown?.recommendedSize ??
+    primaryBreakdown?.estimatedSize ??
+    computed.displayRange ??
+    primaryBreakdown?.displayRange ??
+    null
+  );
+};
+
+const extractAlphaSizeFromLabel = (value?: string | null): string | null => {
+  if (!value) return null;
+  const match = value.toUpperCase().match(/\b(4XL|3XL|2XL|XXXL|XXL|XL|L|M|S|XS|XXS)\b/);
+  return match?.[1] ?? null;
+};
+
 export const EndUserProfile: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
@@ -158,6 +205,10 @@ export const EndUserProfile: React.FC = () => {
     enabled: Boolean(!isOwner && profileId),
   });
   const availableTabs = useMemo(() => (isOwner ? ['Saved', 'Patches', 'Orders'] : ['Patches']), [isOwner]);
+  const computedSizingRegion = useMemo(
+    () => sizeFitRegionForDisplayChart(displayChartFamily),
+    [displayChartFamily],
+  );
   const tabParam = searchParams.get('tab');
   const derivedTab = (() => {
     if (tabParam === 'orders' && isOwner) return 'Orders';
@@ -302,10 +353,37 @@ export const EndUserProfile: React.FC = () => {
     }
   }, [currentUser?.id, isOwner, queryClient]);
 
+  const loadComputedSizeFit = useCallback(async (forceRefresh = false) => {
+    if (!isOwner || !currentUser?.id) return;
+    setChartLoading(true);
+    try {
+      const computed = await fetchMyComputedSizeFitQuery(
+        queryClient,
+        currentUser.id,
+        computedSizingRegion,
+        { forceRefresh },
+      );
+      const nextComputedSize = resolveComputedSizeLabel(computed);
+      setComputedSize(nextComputedSize);
+      setComputedAlphaSize(extractAlphaSizeFromLabel(nextComputedSize));
+    } catch (err) {
+      setComputedSize(null);
+      setComputedAlphaSize(null);
+      console.error('Failed to load computed size fit', err);
+    } finally {
+      setChartLoading(false);
+    }
+  }, [computedSizingRegion, currentUser?.id, isOwner, queryClient]);
+
   useEffect(() => {
     if (!isOwner) return;
     void loadSizeFit();
   }, [isOwner, loadSizeFit]);
+
+  useEffect(() => {
+    if (!isOwner) return;
+    void loadComputedSizeFit();
+  }, [isOwner, loadComputedSizeFit]);
 
   useEffect(() => {
     let active = true;
@@ -320,9 +398,6 @@ export const EndUserProfile: React.FC = () => {
           setDisplayChartFamily(preference.displayChartFamily);
         }
       } catch (err) {
-        if (active) {
-          setComputedSize(null);
-        }
         console.error('Failed to load display chart/computed size', err);
       } finally {
         if (active) {
@@ -336,18 +411,6 @@ export const EndUserProfile: React.FC = () => {
       active = false;
     };
   }, [currentUser?.id, isOwner, queryClient]);
-
-  useEffect(() => {
-    if (!isOwner) return;
-    const measurements = (sizeFitProfile?.measurements as Record<string, unknown> | undefined) ?? {};
-    const recommendation = deriveSizeRecommendation(
-      measurements,
-      displayChartFamily,
-      sizeFitProfile?.measurementGender ?? null,
-    );
-    setComputedSize(recommendation.computedSize);
-    setComputedAlphaSize(recommendation.alphaSize);
-  }, [displayChartFamily, isOwner, sizeFitProfile?.measurementGender, sizeFitProfile?.measurements]);
 
   useEffect(() => {
     setActiveTab((prev) => (availableTabs.includes(prev) ? prev : availableTabs[0]));
@@ -444,6 +507,7 @@ export const EndUserProfile: React.FC = () => {
         if (currentUser?.id) {
           queryClient.setQueryData(queryKeys.sizeFit.myProfile(currentUser.id), updated);
         }
+        await loadComputedSizeFit(true);
         toast.success('Size fitting profile updated.');
       } catch (err) {
         console.error('Failed to update size fitting profile', err);
@@ -452,7 +516,7 @@ export const EndUserProfile: React.FC = () => {
         setSizeFitSaving(false);
       }
     },
-    [currentUser?.id, queryClient],
+    [currentUser?.id, loadComputedSizeFit, queryClient],
   );
 
   const handleSaveSizeFitSettings = useCallback(
