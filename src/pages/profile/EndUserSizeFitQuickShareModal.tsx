@@ -4,6 +4,7 @@ import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import type { SizeFitShareDto, SizeFitSharePolicy, SizeFitSharesPayload } from '@/types/sizeFit';
 import SearchApi from '@/api/SearchApi';
 import type { SearchItem } from '@/types/search';
+import { motion } from 'framer-motion';
 
 interface EndUserSizeFitQuickShareModalProps {
   open: boolean;
@@ -117,7 +118,7 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
 
   return (
     <OverlayPortal>
-      <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6">
+      <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-2 sm:p-6">
         <button
           type="button"
           className="absolute inset-0 z-0 bg-black/55 backdrop-blur-sm"
@@ -125,7 +126,7 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
           aria-label="Close quick share modal"
         />
 
-        <section className="relative z-10 w-full max-w-2xl rounded-3xl neu-modal-surface shadow-2xl overflow-hidden">
+        <section className="relative z-10 w-full max-w-2xl rounded-3xl neu-modal-surface shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] sm:max-h-[min(88vh,720px)]">
           <button
             type="button"
             onClick={onClose}
@@ -135,7 +136,7 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
             <span aria-hidden="true" className="text-[color:var(--neu-text-muted)]">✕</span>
           </button>
 
-          <div className="p-5">
+          <div className="p-5 shrink-0">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0 pr-10">
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-indigo-500 text-white grid place-items-center text-base" aria-hidden="true">
@@ -151,38 +152,52 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
             </div>
           </div>
 
-          {/* Premium tabs system with active bottom borders */}
-          <div className="mx-5 mb-4 flex border-b border-gray-100 dark:border-white/10">
+          {/* Premium tabs system with active bottom borders using Framer Motion (no shaking) */}
+          <div className="mx-5 mb-4 flex border-b border-gray-100 dark:border-white/10 relative shrink-0">
             <button
               type="button"
               onClick={() => setActiveTab('share')}
-              className={`border-b-2 px-4 pb-2 text-xs font-bold transition-all ${
+              className={`relative px-4 pb-2 text-xs font-bold transition-colors focus:outline-none ${
                 activeTab === 'share'
-                  ? 'border-fuchsia-500 text-fuchsia-600 dark:text-fuchsia-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
+                  ? 'text-fuchsia-600 dark:text-fuchsia-400'
+                  : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
               }`}
             >
-              Share Settings & Send
+              <span className="relative z-10">Share Settings & Send</span>
+              {activeTab === 'share' ? (
+                <motion.div
+                  layoutId="activeShareTabIndicator"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-fuchsia-500"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              ) : null}
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('incoming')}
-              className={`border-b-2 px-4 pb-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`relative px-4 pb-2 text-xs font-bold transition-colors focus:outline-none flex items-center gap-1.5 ${
                 activeTab === 'incoming'
-                  ? 'border-fuchsia-500 text-fuchsia-600 dark:text-fuchsia-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
+                  ? 'text-fuchsia-600 dark:text-fuchsia-400'
+                  : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
               }`}
             >
-              Incoming Requests
+              <span className="relative z-10">Incoming Requests</span>
               {incomingPending.length > 0 ? (
-                <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-fuchsia-500 text-[10px] font-black text-white">
+                <span className="relative z-10 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-fuchsia-500 text-[10px] font-black text-white">
                   {incomingPending.length}
                 </span>
+              ) : null}
+              {activeTab === 'incoming' ? (
+                <motion.div
+                  layoutId="activeShareTabIndicator"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-fuchsia-500"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
               ) : null}
             </button>
           </div>
 
-          <div className="px-5 pb-5 space-y-4 max-h-[calc(100vh-12rem)] overflow-y-auto scrollbar-hide">
+          <div className="px-5 pb-5 space-y-4 flex-1 overflow-y-auto scrollbar-hide">
             {activeTab === 'share' ? (
               <div className="rounded-2xl neu-modal-inset p-4">
                 <p className="text-xs uppercase tracking-wide font-semibold text-[color:var(--neu-text-muted)]">

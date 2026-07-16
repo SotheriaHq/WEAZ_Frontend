@@ -152,7 +152,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
           aria-label="Close custom size fits modal"
         />
 
-        <section className="relative z-10 w-full max-w-5xl max-h-[min(calc(100dvh-2rem),calc(100vh-4rem))] overflow-hidden rounded-3xl neu-modal-surface shadow-2xl">
+        <section className="relative z-10 w-full max-w-5xl max-h-[85dvh] sm:max-h-[min(calc(100vh-4rem),720px)] overflow-hidden rounded-3xl neu-modal-surface shadow-2xl flex flex-col">
           <button
             type="button"
             onClick={onClose}
@@ -162,7 +162,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
             <span className="text-[color:var(--neu-text-muted)]" aria-hidden="true">✕</span>
           </button>
 
-          <div className="p-3.5 sm:p-5 flex items-start justify-between gap-4">
+          <div className="p-3.5 sm:p-5 flex items-start justify-between gap-4 shrink-0">
             <div className="flex items-center gap-3 min-w-0 pr-10">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white grid place-items-center">
                 <span aria-hidden="true">📏</span>
@@ -179,12 +179,12 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
           </div>
 
           {loading ? (
-            <div className="p-10 flex items-center justify-center text-[color:var(--neu-text-muted)]">
-              <span className="mr-2 animate-pulse" aria-hidden="true">⏳</span>
-              Loading fitting profile...
+            <div className="p-10 flex flex-col items-center justify-center text-[color:var(--neu-text-muted)] flex-1">
+              <span className="mr-2 animate-pulse text-xl" aria-hidden="true">⏳</span>
+              <span>Loading fitting profile...</span>
             </div>
           ) : (
-            <div className="px-3.5 pb-3.5 space-y-3.5 max-h-[calc(100dvh-9rem)] overflow-y-auto scrollbar-hide overscroll-contain sm:px-5 sm:pb-5 sm:space-y-4">
+            <div className="px-3.5 pb-3.5 space-y-3.5 flex-1 overflow-y-auto scrollbar-hide overscroll-contain sm:px-5 sm:pb-5 sm:space-y-4">
               <details
                 open
                 className="rounded-2xl neu-modal-inset p-4"

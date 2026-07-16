@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -1901,7 +1902,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
           </div>
         </div>
 
-        <div className="mb-4 flex items-center border-b border-gray-100 dark:border-white/10 overflow-x-auto scrollbar-hide">
+        <div className="mb-4 flex items-center border-b border-gray-100 dark:border-white/10 overflow-x-auto scrollbar-hide relative">
           {(activeView === 'standard' ? STANDARD_STATUS_OPTIONS : CUSTOM_STATUS_OPTIONS).map((opt) => {
             const active = activeView === 'standard' ? standardStatus === opt : customStatus === opt;
             return (
@@ -1915,17 +1916,26 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                   }
                   setCustomStatus(opt as CustomStatusFilter);
                 }}
-                className={`shrink-0 border-b-2 px-3 pb-2 text-[10px] sm:text-xs font-bold transition-all ${
+                className={`relative shrink-0 px-3 pb-2 text-[10px] sm:text-xs font-bold transition-colors focus:outline-none ${
                   active
-                    ? 'border-fuchsia-500 text-fuchsia-600 dark:text-fuchsia-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
+                    ? 'text-fuchsia-600 dark:text-fuchsia-400'
+                    : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
                 }`}
               >
-                {opt === 'ALL'
-                  ? 'All'
-                  : opt === 'PROCESSING'
-                    ? 'Processing'
-                    : opt.charAt(0) + opt.slice(1).toLowerCase()}
+                <span className="relative z-10">
+                  {opt === 'ALL'
+                    ? 'All'
+                    : opt === 'PROCESSING'
+                      ? 'Processing'
+                      : opt.charAt(0) + opt.slice(1).toLowerCase()}
+                </span>
+                {active ? (
+                  <motion.div
+                    layoutId="activeOrderTabIndicator"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-fuchsia-500"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                ) : null}
               </button>
             );
           })}
