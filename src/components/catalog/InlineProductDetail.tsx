@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import { useImagePreload } from '@/hooks/useImagePreload';
+import { productApi } from '@/api/ProductApi';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
@@ -145,6 +147,7 @@ export default function InlineProductDetail({
     setMeasurementValues({});
     setModalMeasurementValues({});
     setShowMeasurementModal(false);
+    setSelectedImageIndex(0);
   }, [product.id]);
 
   useEffect(() => {
@@ -187,13 +190,54 @@ export default function InlineProductDetail({
     };
   }, [isAuth, requiredMeasurementKeys]);
 
+  // Feed/market-section payloads are slim: they carry only the cover image.
+  // Fetch the FULL product exactly once (single request, cached 5 min) so the
+  // gallery has every photo. Swiping never fires additional API calls — it just
+  // moves an index over the already-loaded (and preloaded) image list.
+  const propMediaCount = Array.isArray((product as any)?.media)
+    ? ((product as any).media as unknown[]).length
+    : Array.isArray(product.images)
+      ? product.images.length
+      : 0;
+  const productDetailQuery = useQuery({
+    queryKey: ['market', 'product-detail', product.id],
+    queryFn: () => productApi.getProduct(product.id),
+    enabled: Boolean(product.id) && propMediaCount <= 1,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+  const galleryProduct = useMemo(() => {
+    const detail = productDetailQuery.data;
+    if (!detail) return product;
+    const detailMedia = Array.isArray(detail.media) ? detail.media : [];
+    const detailImages = Array.isArray(detail.images) ? detail.images : [];
+    if (detailMedia.length <= propMediaCount && detailImages.length <= propMediaCount) {
+      return product;
+    }
+    return {
+      ...product,
+      // Prefer fileUploadId so per-image signed-URL resolution targets a real
+      // FileUpload id (media.id is the ProductMedia row id on detail payloads).
+      media: detailMedia.length > 0
+        ? detailMedia.map((m) => ({
+            id: (m as { fileUploadId?: string | null }).fileUploadId || m.id,
+            url: m.url,
+            type: m.type,
+            isPrimary: m.isPrimary,
+          }))
+        : (product as any).media,
+      images: detailImages.length > 0 ? detailImages : product.images,
+      thumbnail: detail.thumbnail ?? product.thumbnail,
+    } as StoreProduct;
+  }, [product, productDetailQuery.data, propMediaCount]);
+
   // Get product images
   const getProductImages = () => {
     const images: Array<{ id: string; url: string; type?: string; fileId?: string }> = [];
-    
+
     // Add media items
-    if (Array.isArray((product as any)?.media)) {
-      const media = (product as any).media as Array<{ id?: string; url?: string; type?: string }>;
+    if (Array.isArray((galleryProduct as any)?.media)) {
+      const media = (galleryProduct as any).media as Array<{ id?: string; url?: string; type?: string }>;
       media.forEach((m, idx) => {
         if (m.url) {
           const candidateId = typeof m.id === 'string' ? m.id.trim() : '';
@@ -215,11 +259,11 @@ export default function InlineProductDetail({
     
     // Fallback to thumbnail/images array
     if (images.length === 0) {
-      if (product.thumbnail) {
-        images.push({ id: 'thumb-0', url: product.thumbnail });
+      if (galleryProduct.thumbnail) {
+        images.push({ id: 'thumb-0', url: galleryProduct.thumbnail });
       }
-      if (Array.isArray(product.images)) {
-        product.images.forEach((img, idx) => {
+      if (Array.isArray(galleryProduct.images)) {
+        galleryProduct.images.forEach((img, idx) => {
           if (img && !images.some(i => i.url === img)) {
             images.push({ id: `img-${idx}`, url: img });
           }

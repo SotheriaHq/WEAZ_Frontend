@@ -1,6 +1,35 @@
 import { useEffect, useRef } from 'react';
 
 /**
+ * Shared channel between overlay back-close entries and MobileExitGuard so
+ * the guard can tell WHICH popstate events belong to overlays (and must be
+ * left alone) versus real user gesture-backs it should handle.
+ *
+ * Ordering guarantee: MobileExitGuard registers its popstate listener at app
+ * mount, overlays register later — so on a gesture back the guard's handler
+ * runs first, sees `depth > 0`, and yields; the overlay's handler then closes
+ * the overlay.
+ */
+let overlayDepth = 0;
+
+export const overlayBackChannel = {
+  /** An overlay pushed its synthetic history entry. */
+  armed() {
+    overlayDepth += 1;
+  },
+  /** The synthetic entry left the stack (gesture pop or programmatic pop).
+   *  Programmatic pops (✕ / backdrop → history.back()) are additionally
+   *  flagged by MobileExitGuard's history wrapper, so depth is enough here. */
+  popped() {
+    overlayDepth = Math.max(0, overlayDepth - 1);
+  },
+  /** MobileExitGuard: is a live overlay entry consuming this popstate? */
+  consumesPop() {
+    return overlayDepth > 0;
+  },
+};
+
+/**
  * useOverlayBackClose — make the browser/OS Back gesture close an open overlay
  * (modal, sheet, lightbox) instead of navigating away from the page that
  * opened it.
@@ -40,11 +69,13 @@ export function useOverlayBackClose(
       window.location.href,
     );
     entryLiveRef.current = true;
+    overlayBackChannel.armed();
 
     const handlePop = () => {
       // Our entry was just popped by a Back gesture/press. Close the overlay
       // in place instead of letting the navigation fall through.
       entryLiveRef.current = false;
+      overlayBackChannel.popped();
       onCloseRef.current();
     };
     window.addEventListener('popstate', handlePop);
@@ -54,6 +85,7 @@ export function useOverlayBackClose(
       // Closed programmatically (not via Back): remove the entry we added.
       if (entryLiveRef.current) {
         entryLiveRef.current = false;
+        overlayBackChannel.popped();
         window.history.back();
       }
     };

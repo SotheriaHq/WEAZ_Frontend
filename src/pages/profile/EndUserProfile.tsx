@@ -1220,9 +1220,11 @@ export const EndUserProfile: React.FC = () => {
           ) : null}
         </div>
 
-        {/* Mobile: orders summary panel shown below content when on non-orders tab */}
+        {/* Tablet-only: orders summary below content on non-orders tabs.
+            Phones (<md) intentionally do NOT get this duplicate — the Orders
+            tab itself is the single home for all orders on mobile browsers. */}
         {isOwner && activeTab !== 'Orders' ? (
-          <div className="mt-5 lg:hidden">
+          <div className="mt-5 hidden md:block lg:hidden">
             <OrdersPanel
               onViewAll={(selection) => {
                 if (selection) {

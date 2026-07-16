@@ -3,6 +3,7 @@ import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { useOverlayBackClose } from '@/hooks/useOverlayBackClose';
 
 interface MediaItem {
   id: string;
@@ -93,6 +94,10 @@ export default function ImageLightbox({
   onNext,
   onSelectIndex,
 }: ImageLightboxProps) {
+  // Rule 29: a Back gesture closes the lightbox in place (stacked overlays
+  // each consume one Back before the route is ever popped).
+  useOverlayBackClose(true, onClose);
+
   // Keyboard navigation
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     switch (e.key) {

@@ -33,6 +33,9 @@ import useMarketSections from '@/hooks/useMarketSections';
 import { queryKeys } from '@/query/queryKeys';
 import { useScrollRestore } from '@/components/ScrollRestoreProvider';
 import { useMarketSurfacePrefetch } from '@/hooks/useMarketSurfacePrefetch';
+import { useOverlayBackClose } from '@/hooks/useOverlayBackClose';
+import { selectIsMobile } from '@/features/uiSlice';
+import { createMixSeed, mixFeedItems } from '@/utils/feedMixer';
 
 const BASE_FILTERS = ['FOR_YOU', 'MENSWEAR', 'WOMENSWEAR', 'EVERYBODY', 'ON_SALE'] as const;
 
@@ -411,6 +414,14 @@ const MarketPlace: React.FC = () => {
 
   const [selectedProduct, setSelectedProduct] = useState<MarketplaceProduct | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const isMobileViewportUi = useSelector(selectIsMobile);
+  // Rule 29: an OS/browser Back gesture closes the open product view in place
+  // instead of popping the underlying route.
+  useOverlayBackClose(
+    Boolean(selectedProduct),
+    () => setSelectedProduct(null),
+    isMobileViewportUi,
+  );
   const [selectedFilter, setSelectedFilter] = useState<string>('FOR_YOU');
   const [visibleCount, setVisibleCount] = useState(18);
   const [heroIndex, setHeroIndex] = useState(0);
@@ -500,7 +511,15 @@ const MarketPlace: React.FC = () => {
     [fallbackProductsQuery.data, hiddenTargetIds],
   );
 
-  const products = sectionProducts.length > 0 ? sectionProducts : fallbackProducts;
+  // Scored rotation: a fresh seed per screen mount means every visit
+  // (login / refresh / re-route) renders a differently mixed grid, while the
+  // order stays stable during the visit. Rules documented in utils/feedMixer.
+  const marketMixSeedRef = useRef(createMixSeed());
+  const rawProducts = sectionProducts.length > 0 ? sectionProducts : fallbackProducts;
+  const products = useMemo(
+    () => mixFeedItems(rawProducts, marketMixSeedRef.current),
+    [rawProducts],
+  );
   const loading =
     products.length === 0 &&
     (marketSectionsQuery.isLoading ||

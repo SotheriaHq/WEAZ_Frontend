@@ -14,7 +14,6 @@ import useImagePreload from '@/hooks/useImagePreload';
 import PinchZoomImage from '@/components/media/PinchZoomImage';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
-import CollapsibleMetaSheet from '@/components/ui/CollapsibleMetaSheet';
 import { selectIsMobile } from '@/features/uiSlice';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useOverlayBackClose } from '@/hooks/useOverlayBackClose';
@@ -94,6 +93,8 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
   // always visible and the heavier metadata (description, tags, comments)
   // collapses. Starts collapsed so the design dominates.
   const [mobileDetailsOpen, setMobileDetailsOpen] = React.useState(false);
+  // Swipe up/down on the meta header expands/collapses the details section.
+  const metaSwipeStartYRef = React.useRef<number | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const bagFlow = useBagFlow();
@@ -565,16 +566,17 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
     ) : null;
 
   // ------------------------------------------------------------------
-  // MOBILE: keep a true MODAL (open/close, backdrop), image fills the
-  // modal edge-to-edge at native aspect (no square crop, no letterbox
-  // blur/bg), metadata is a collapsible overlay sheet (drag + tap).
+  // MOBILE: keep a true MODAL (open/close, backdrop). ASPECT-AWARE layout:
+  // the media region is sized by the image's natural aspect ratio and
+  // SHRINKS (object-contain — never cropped, never pushed down) so the
+  // metadata always sits BELOW the image, never covering it while
+  // collapsed. Vertical and horizontal images are both fully visible.
   // Tap the image (outside controls) closes the modal. Back gesture
   // closes the overlay in place via useOverlayBackClose.
   // ------------------------------------------------------------------
   if (isMobile) {
     const mobileActionBtn =
       'inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10';
-    const metaSnap = mobileDetailsOpen ? 'expanded' : 'collapsed';
 
     return (
       <OverlayPortal>
@@ -589,12 +591,10 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         >
           <div
             ref={dialogRef}
-            className="relative w-full max-w-[560px] overflow-hidden rounded-t-3xl bg-black shadow-2xl sm:rounded-3xl"
+            className="relative flex w-full max-w-[560px] flex-col overflow-hidden rounded-t-3xl bg-black shadow-2xl sm:rounded-3xl"
             style={{ maxHeight: '94vh' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Spacer so short landscape images still leave room for the
-                metadata sheet without clipping or forced letterboxing. */}
             {/* Close chip */}
             <button
               type="button"
@@ -605,18 +605,17 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               <span aria-hidden="true" className="text-lg">×</span>
             </button>
 
-            {/* Image fills the modal width; height follows native aspect up to
-                94vh. No side/top/bottom letterbox padding or blur fill. */}
+            {/* MEDIA REGION — flexes to the image's natural height and shrinks
+                when the sheet needs room. object-contain keeps the FULL image
+                visible for every aspect ratio (portrait and landscape). */}
             <div
-              className="relative w-full"
+              className="relative min-h-0 flex-auto"
               onClick={(e) => {
                 // Tap image background closes; ignore interactive controls.
                 const t = e.target as HTMLElement | null;
-                if (t?.closest('button, a, input, textarea, video, [data-meta-sheet-handle], [data-meta-sheet-scroll]')) {
+                if (t?.closest('button, a, input, textarea, video')) {
                   return;
                 }
-                // Don't close when the meta sheet itself was the target.
-                if (t?.closest('[data-meta-sheet-root]')) return;
                 onClose();
               }}
             >
@@ -625,16 +624,16 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                   kind="video"
                   src={activeMedia?.url || ''}
                   fit="contain"
-                  className="w-full"
-                  mediaClassName="block h-auto w-full max-h-[94vh]"
-                  maxHeightClassName="max-h-[94vh]"
+                  className="h-full w-full"
+                  mediaClassName="block h-auto max-h-full w-full object-contain"
+                  maxHeightClassName="max-h-full"
                   controls={true}
                 />
               ) : (
                 <PinchZoomImage
                   src={activeMedia?.url || ''}
                   alt={item.collectionTitle || 'Design image'}
-                  className="max-h-[94vh]"
+                  className="h-full max-h-full"
                 />
               )}
 
@@ -671,19 +670,46 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                   >
                     <span aria-hidden="true" className="text-lg">›</span>
                   </button>
-                  <div className="absolute bottom-24 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
+                  <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
                     {activeMediaIndex + 1} / {mediaItems.length}
                   </div>
                 </>
               ) : null}
+            </div>
 
-              {/* Metadata overlays the image — drag/tap to expand or collapse */}
-              <div data-meta-sheet-root>
-                <CollapsibleMetaSheet
-                  snap={metaSnap}
-                  onSnapChange={(next) => setMobileDetailsOpen(next === 'expanded')}
-                  peek={
-                    <>
+            {/* META REGION — in normal flow BELOW the media (never covers it
+                while collapsed). Details expand with a smooth pure-CSS
+                grid-rows transition; swipe up/down on the handle also
+                expands/collapses. */}
+            <div
+              className="shrink-0 border-t border-white/10 bg-white/95 backdrop-blur-md dark:bg-[#0f0b11]/95"
+              onTouchStart={(e) => {
+                const t = e.target as HTMLElement | null;
+                if (t?.closest('[data-meta-sheet-scroll]')) return;
+                metaSwipeStartYRef.current = e.touches[0]?.clientY ?? null;
+              }}
+              onTouchEnd={(e) => {
+                const startY = metaSwipeStartYRef.current;
+                metaSwipeStartYRef.current = null;
+                if (startY === null) return;
+                const endY = e.changedTouches[0]?.clientY ?? startY;
+                const dy = endY - startY;
+                if (Math.abs(dy) < 30) return;
+                setMobileDetailsOpen(dy < 0);
+              }}
+            >
+              {/* Drag handle */}
+              <button
+                type="button"
+                aria-label={mobileDetailsOpen ? 'Collapse details' : 'Expand details'}
+                onClick={() => setMobileDetailsOpen((v) => !v)}
+                className="flex w-full items-center justify-center pb-1 pt-2"
+              >
+                <span className="h-1 w-10 rounded-full bg-slate-300 dark:bg-white/25" />
+              </button>
+
+              <div className="px-4 pb-3">
+                <>
                       <div className="flex items-center justify-between gap-2 pr-1">
                         <button
                           type="button"
@@ -779,9 +805,22 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                           Store
                         </button>
                       </div>
-                    </>
-                  }
-                  body={
+                </>
+              </div>
+
+              {/* Collapsible details/comments — smooth pure-CSS grid-rows
+                  transition (expanding compresses the media region above,
+                  it never slides OVER the image). */}
+              <div
+                className="grid transition-[grid-template-rows] duration-300 ease-out"
+                style={{ gridTemplateRows: mobileDetailsOpen ? '1fr' : '0fr' }}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  <div
+                    data-meta-sheet-scroll
+                    className="max-h-[42vh] overflow-y-auto overscroll-contain px-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+                    style={{ touchAction: 'pan-y' }}
+                  >
                     <div className="space-y-3 pt-1">
                       {item.collectionDescription ? (
                         <p className="text-xs leading-relaxed text-slate-500 dark:text-white/60">
@@ -846,8 +885,8 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                         </div>
                       </div>
                     </div>
-                  }
-                />
+                  </div>
+                </div>
               </div>
             </div>
           </div>

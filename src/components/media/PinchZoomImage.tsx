@@ -191,7 +191,12 @@ const PinchZoomImage: React.FC<PinchZoomImageProps> = ({
   return (
     <div
       ref={containerRef}
-      className={['relative w-full overflow-hidden', className || ''].join(' ')}
+      className={[
+        // Center the contained image inside a possibly height-constrained
+        // region (aspect-aware modal): the full image is always visible.
+        'relative flex w-full items-center justify-center overflow-hidden',
+        className || '',
+      ].join(' ')}
       style={{ touchAction: 'pan-y' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -204,8 +209,8 @@ const PinchZoomImage: React.FC<PinchZoomImageProps> = ({
         src={src}
         alt={alt}
         draggable={false}
-        className="block h-auto w-full max-h-[inherit] select-none object-contain will-change-transform"
-        style={{ transformOrigin: 'center center', maxHeight: 'inherit' }}
+        className="block h-auto max-h-full w-full select-none object-contain will-change-transform"
+        style={{ transformOrigin: 'center center' }}
       />
     </div>
   );
