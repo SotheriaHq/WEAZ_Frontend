@@ -1,7 +1,6 @@
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { useSelector, useDispatch } from 'react-redux';
-import { clearUser } from '../features/userSlice';
-import { resetUnreadCount } from '../features/notificationsSlice';
 import { closeSidebar, toggleSidebar } from '../features/uiSlice';
 import {
   openCartDrawer,
@@ -10,7 +9,6 @@ import {
   selectCartIsDrawerOpen,
   fetchCart,
   fetchCustomBagCount,
-  resetCartState,
 } from '../features/cartSlice';
 import {
   openWishlistDrawer,
@@ -18,13 +16,10 @@ import {
   fetchWishlist,
   selectWishlistTotal,
   selectWishlistIsDrawerOpen,
-  resetWishlistState,
 } from '../features/wishlistSlice';
 import type { RootState, AppDispatch } from '../store';
 import '../styles/scrollbar-hide.css';
 import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
-import { apiClient, dropStoredAccessToken } from '../api/httpClient';
-import { env } from '../config/env';
 import getProfileOrHomeUrl from '../lib/navigation';
 import { useEffect, useState } from 'react';
 import { useSyncedThemePreference } from '@/hooks/useSyncedThemePreference';
@@ -61,6 +56,7 @@ const THEME_MENU_OPTIONS = [
 ];
 
 export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuContext = 'default' }) => {
+  const { logout } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
@@ -362,18 +358,8 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
           <DropdownItem
             leftIcon="↩️"
             tone="danger"
-            onClick={async () => {
-              try {
-                await apiClient.post('/auth/logout');
-              } catch (error) {
-                void error;
-              }
-              dropStoredAccessToken();
-              localStorage.removeItem(env.userStorageKey);
-              dispatch(clearUser());
-              dispatch(resetCartState());
-              dispatch(resetWishlistState());
-              dispatch(resetUnreadCount());
+            onClick={() => {
+              logout();
               setShowProfileMenu(false);
               navigate('/', { replace: true });
             }}

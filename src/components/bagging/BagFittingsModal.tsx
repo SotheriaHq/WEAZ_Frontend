@@ -173,7 +173,7 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 18, scale: 0.97 }}
               transition={{ type: 'spring', damping: 26, stiffness: 280 }}
-              className="fixed inset-0 z-layer-modal flex items-end justify-center p-0 sm:items-center sm:p-4"
+              className="fixed inset-0 z-layer-modal flex items-end justify-center px-0 pb-[env(safe-area-inset-bottom)] sm:items-center sm:p-4"
               onClick={(event) => event.stopPropagation()}
               role="dialog"
               aria-modal="true"
@@ -182,7 +182,7 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
               <div
                 ref={dialogRef}
                 tabIndex={-1}
-                className="relative flex max-h-[min(92dvh,100%)] w-full max-w-xl flex-col overflow-hidden rounded-t-[22px] border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950 sm:max-h-[min(88vh,720px)] sm:rounded-[28px]"
+                className="relative flex max-h-[min(85dvh,100%)] w-full max-w-xl flex-col overflow-hidden rounded-t-[22px] border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950 sm:max-h-[min(88vh,720px)] sm:rounded-[28px]"
               >
                 <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-cyan-500 to-sky-500" />
                 <button
@@ -194,7 +194,7 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
                   <span aria-hidden="true" className="text-lg leading-none text-slate-500">x</span>
                 </button>
 
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 md:p-8">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-6 md:p-8">
                   <div className="space-y-1.5 pr-10 sm:space-y-3">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-600 sm:text-xs sm:tracking-[0.24em]">
                       Fittings required
@@ -209,7 +209,7 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
                     </p>
                   </div>
 
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5 sm:mt-6 sm:rounded-3xl sm:p-4">
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5 sm:mt-6 sm:rounded-3xl sm:p-4">
                     <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 sm:text-sm">
                       {isRefreshingStaleMeasurements ? 'Measurements to refresh' : 'Missing measurements'}
                     </p>
@@ -249,12 +249,12 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
                   ) : null}
                 </div>
 
-                <div className="shrink-0 border-t border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-slate-950 sm:p-4">
+                <div className="shrink-0 border-t border-slate-200 bg-white p-2.5 dark:border-white/10 dark:bg-slate-950 sm:p-3">
                   <div className="flex flex-row gap-2 sm:gap-3">
                     <button
                       type="button"
                       onClick={onClose}
-                      className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                      className="inline-flex min-h-9 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5 sm:min-h-11 sm:rounded-2xl sm:px-4 sm:py-2.5 sm:text-sm"
                     >
                       Close
                     </button>
@@ -262,7 +262,7 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
                       type="button"
                       onClick={() => void handleSave()}
                       disabled={loading || saving || unresolvedMeasurements.length > 0}
-                      className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                      className="inline-flex min-h-9 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 sm:min-h-11 sm:rounded-2xl sm:px-4 sm:py-2.5 sm:text-sm"
                     >
                       {saving ? 'Saving...' : 'Save fittings'}
                       <span aria-hidden="true">→</span>

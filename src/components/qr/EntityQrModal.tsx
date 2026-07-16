@@ -87,33 +87,23 @@ export const EntityQrModal: React.FC<EntityQrModalProps> = ({
           aria-label="Close QR code modal"
         />
 
-        <section className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[2rem] border border-gray-200/70 bg-white/95 p-5 shadow-2xl dark:border-white/10 dark:bg-zinc-950/95 sm:p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-                Share
-              </p>
-              <h3 className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                {title}
-              </h3>
-              {subtitle ? (
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {subtitle}
-                </p>
-              ) : null}
-            </div>
+        <section className="relative z-10 w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-[2rem] border border-gray-200/70 bg-white/95 p-4 shadow-2xl dark:border-white/10 dark:bg-zinc-950/95 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white sm:text-lg">
+              {title}
+            </h3>
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-gray-200/80 bg-white text-sm transition hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+              className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-gray-200/80 bg-white text-sm transition hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 sm:h-10 sm:w-10 sm:rounded-2xl"
               aria-label="Close"
             >
               ✕
             </button>
           </div>
 
-          <div className="mt-5">
-            <QRExportFrame title={title} subtitle={subtitle} note={logoMessage}>
+          <div className="mt-3 sm:mt-5">
+            <QRExportFrame note={logoMessage}>
               <BrandedQRCode
                 ref={qrRootRef}
                 value={url}
@@ -126,28 +116,25 @@ export const EntityQrModal: React.FC<EntityQrModalProps> = ({
             </QRExportFrame>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-gray-200/80 bg-gray-50/80 px-3 py-3 dark:border-white/10 dark:bg-white/5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
-              Public link
-            </p>
-            <p className="mt-1 break-all text-xs font-medium text-gray-800 dark:text-gray-200">
+          <div className="mt-3 rounded-xl border border-gray-200/80 bg-gray-50/80 px-3 py-2 dark:border-white/10 dark:bg-white/5 sm:mt-4 sm:rounded-2xl sm:py-3">
+            <p className="break-all text-[11px] font-medium text-gray-800 dark:text-gray-200 sm:text-xs">
               {url}
             </p>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2.5">
+          <div className="mt-3 grid grid-cols-3 gap-2 sm:mt-4 sm:gap-2.5">
             <button
               type="button"
               onClick={handleCopy}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200/80 bg-white px-3 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-100 dark:hover:bg-white/10"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-200/80 bg-white px-2 py-2 text-xs font-semibold text-gray-800 transition hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-100 dark:hover:bg-white/10 sm:gap-2 sm:rounded-2xl sm:px-3 sm:py-3 sm:text-sm"
             >
               <span aria-hidden="true">🔗</span>
-              Copy Link
+              Copy
             </button>
             <button
               type="button"
               onClick={handleShare}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200/80 bg-white px-3 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-100 dark:hover:bg-white/10"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-200/80 bg-white px-2 py-2 text-xs font-semibold text-gray-800 transition hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-100 dark:hover:bg-white/10 sm:gap-2 sm:rounded-2xl sm:px-3 sm:py-3 sm:text-sm"
             >
               <span aria-hidden="true">↗️</span>
               Share
@@ -155,10 +142,10 @@ export const EntityQrModal: React.FC<EntityQrModalProps> = ({
             <button
               type="button"
               onClick={handleDownload}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-3 py-3 text-sm font-semibold text-black transition hover:bg-emerald-400"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-2 py-2 text-xs font-semibold text-black transition hover:bg-emerald-400 sm:gap-2 sm:rounded-2xl sm:px-3 sm:py-3 sm:text-sm"
             >
               <span aria-hidden="true">⬇️</span>
-              Download
+              Save
             </button>
           </div>
         </section>

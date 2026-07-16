@@ -16,7 +16,6 @@ import { EndUserSizeFitModal } from './EndUserSizeFitModal';
 import { EndUserSizeFitQuickShareModal } from './EndUserSizeFitQuickShareModal';
 import { EndUserProfileQrModal } from './EndUserProfileQrModal';
 import { SizeFitApi } from '@/api/SizeFitApi';
-import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import type {
   ComputedSizeFitProfile,
   SizeFitProfile,
@@ -182,7 +181,6 @@ export const EndUserProfile: React.FC = () => {
   const [isSizeFitOpen, setIsSizeFitOpen] = useState(false);
   const [isQuickShareOpen, setIsQuickShareOpen] = useState(false);
   const [isQrOpen, setIsQrOpen] = useState(false);
-  const [isReminderDialogOpen, setIsReminderDialogOpen] = useState(false);
   const [sizeFitLoading, setSizeFitLoading] = useState(false);
   const [sizeFitSaving, setSizeFitSaving] = useState(false);
   const [sizeFitProfile, setSizeFitProfile] = useState<SizeFitProfile | null>(null);
@@ -917,9 +915,10 @@ export const EndUserProfile: React.FC = () => {
     },
     {
       key: 'fits',
-      icon: '📐',
-      label: 'My Fits',
+      icon: sizeFitProfile?.isUpdateDue ? '⚠️' : '📐',
+      label: sizeFitProfile?.isUpdateDue ? 'Update Fittings' : 'My Fits',
       onClick: () => setIsSizeFitOpen(true),
+      pulse: sizeFitProfile?.isUpdateDue,
     },
     {
       key: 'quick-share',
@@ -932,14 +931,6 @@ export const EndUserProfile: React.FC = () => {
       icon: '🗳️',
       label: 'QR Code',
       onClick: () => setIsQrOpen(true),
-    },
-    {
-      key: 'update-fits',
-      icon: '⚠️',
-      label: 'Update Fits',
-      onClick: () => setIsReminderDialogOpen(true),
-      pulse: true,
-      hidden: !sizeFitProfile?.isUpdateDue,
     },
   ];
 
@@ -1306,50 +1297,6 @@ export const EndUserProfile: React.FC = () => {
         onClose={() => setIsAvatarModalOpen(false)}
       />
 
-      {isReminderDialogOpen ? (
-        <OverlayPortal>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-layer-modal flex items-center justify-center p-4"
-          >
-            <button
-              type="button"
-              className="absolute inset-0 bg-black/55 backdrop-blur-sm"
-              onClick={() => setIsReminderDialogOpen(false)}
-              aria-label="Close"
-            />
-            <motion.section
-              initial={{ scale: 0.95, y: 12 }}
-              animate={{ scale: 1, y: 0 }}
-              className="relative z-10 w-full max-w-sm rounded-3xl border border-white/30 bg-white/95 p-5 shadow-2xl dark:border-white/10 dark:bg-zinc-900/95"
-            >
-              <h3 className="text-base font-semibold text-theme">⚠️ Size/Fit Update Reminder</h3>
-              <p className="mt-2 text-sm text-theme-secondary">
-                Keep your size/fits current every {sizeFitProfile?.requireUpdateEveryDays ?? 14} days.
-                Your latest fitting values are attached to new orders so fulfillment stays accurate.
-              </p>
-              <div className="mt-4 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsReminderDialogOpen(false)}
-                  className="rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/15 dark:text-gray-200 dark:hover:bg-white/5"
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setIsReminderDialogOpen(false); setIsSizeFitOpen(true); }}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 active:scale-95"
-                >
-                  Open Fits
-                </button>
-              </div>
-            </motion.section>
-          </motion.div>
-        </OverlayPortal>
-      ) : null}
 
       {isOwner ? (
         <input
