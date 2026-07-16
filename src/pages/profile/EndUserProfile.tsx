@@ -95,12 +95,7 @@ const normalizeProfile = (raw: any): UserProfile | null => {
   };
 };
 
-const formatJoinLabel = (value?: string): string | null => {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return `Joined ${new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(parsed)}`;
-};
+
 
 const describeAlphaFit = (value?: string | null): string | null => {
   if (!value) return null;
@@ -880,7 +875,6 @@ export const EndUserProfile: React.FC = () => {
 
   const profileUrl = buildProfileUrl({ id: profile.id, username: profile.username });
   const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim() || profile.username;
-  const joinLabel = formatJoinLabel(profile.createdAt ?? (isOwner ? currentUser?.createdAt : undefined));
   const avatar = resolveProfileImageSource({
     profileImage: avatarPreviewUrl ?? profile.profileImage ?? (isOwner ? currentUser?.profileImage : null),
     profileImageId: avatarPreviewUrl
@@ -1043,15 +1037,11 @@ export const EndUserProfile: React.FC = () => {
               <p className="mt-0.5 truncate text-sm text-theme-secondary">
                 @{profile.username}
               </p>
-              {(profile.location || joinLabel) ? (
+              {profile.location ? (
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-theme-secondary sm:text-xs">
-                  {profile.location ? (
-                    <span className="flex items-center gap-0.5">
-                      <span aria-hidden="true">📍</span> {profile.location}
-                    </span>
-                  ) : null}
-                  {profile.location && joinLabel ? <span className="h-1 w-1 rounded-full bg-gray-400" /> : null}
-                  {joinLabel ? <span>{joinLabel}</span> : null}
+                  <span className="flex items-center gap-0.5">
+                    <span aria-hidden="true">📍</span> {profile.location}
+                  </span>
                 </div>
               ) : null}
 

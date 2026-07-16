@@ -1870,40 +1870,38 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
           )}
         </div>
 
-        <div className="mb-4 inline-flex rounded-2xl border border-gray-200/80 bg-white/80 p-1 dark:border-white/10 dark:bg-white/5">
-          {(['standard', 'custom'] as const).map((view) => {
-            const active = activeView === view;
-            return (
-              <button
-                key={view}
-                type="button"
-                onClick={() => handleViewChange(view)}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                  active
-                    ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                    : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-                }`}
-              >
-                {view === 'standard' ? 'Standard Orders' : 'Custom Orders'}
-              </button>
-            );
-          })}
+        <div className="mb-4 flex flex-row items-center gap-2.5">
+          <div className="inline-flex shrink-0 rounded-2xl border border-gray-200/80 bg-white/80 p-0.5 dark:border-white/10 dark:bg-white/5">
+            {(['standard', 'custom'] as const).map((view) => {
+              const active = activeView === view;
+              return (
+                <button
+                  key={view}
+                  type="button"
+                  onClick={() => handleViewChange(view)}
+                  className={`rounded-xl px-2.5 py-1.5 text-[10px] sm:text-xs font-semibold transition ${
+                    active
+                      ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                      : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                  }`}
+                >
+                  {view === 'standard' ? 'Standard' : 'Custom'}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="relative flex-1 min-w-0">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search orders..."
+              className="w-full rounded-2xl border border-gray-200/80 bg-white/70 py-1.5 pl-3 pr-3 text-[10px] sm:text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-400/40 dark:border-white/10 dark:bg-white/5 dark:text-white"
+            />
+          </div>
         </div>
 
-        <div className="relative mb-3">
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={
-              activeView === 'standard'
-                ? 'Search standard orders...'
-                : 'Search custom orders...'
-            }
-            className="w-full rounded-2xl border border-gray-200/80 bg-white/70 py-2.5 pl-4 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-400/40 dark:border-white/10 dark:bg-white/5 dark:text-white"
-          />
-        </div>
-
-        <div className="mb-4 flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+        <div className="mb-4 flex items-center border-b border-gray-100 dark:border-white/10 overflow-x-auto scrollbar-hide">
           {(activeView === 'standard' ? STANDARD_STATUS_OPTIONS : CUSTOM_STATUS_OPTIONS).map((opt) => {
             const active = activeView === 'standard' ? standardStatus === opt : customStatus === opt;
             return (
@@ -1917,16 +1915,16 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                   }
                   setCustomStatus(opt as CustomStatusFilter);
                 }}
-                className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+                className={`shrink-0 border-b-2 px-3 pb-2 text-[10px] sm:text-xs font-bold transition-all ${
                   active
-                    ? 'bg-fuchsia-500 text-white'
-                    : 'border border-gray-200/80 bg-white/60 text-gray-600 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
+                    ? 'border-fuchsia-500 text-fuchsia-600 dark:text-fuchsia-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
                 }`}
               >
                 {opt === 'ALL'
                   ? 'All'
                   : opt === 'PROCESSING'
-                    ? 'Proc.'
+                    ? 'Processing'
                     : opt.charAt(0) + opt.slice(1).toLowerCase()}
               </button>
             );
