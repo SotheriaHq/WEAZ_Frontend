@@ -85,6 +85,45 @@ const namesSoftMatch = (left: string, right: string): boolean => {
 
 const digitsOnly = (value: string): string => value.replace(/\D/g, '');
 
+/**
+ * Client-side card brand detection from leading digits (free "custom guard":
+ * Luhn + length + brand pattern — no external API involved).
+ */
+export function detectCardBrand(cardNumber: string): string | null {
+  const digits = digitsOnly(cardNumber);
+  if (!digits) {
+    return null;
+  }
+  if (/^(506[01]|507[89]|6500)/.test(digits)) {
+    return 'Verve';
+  }
+  if (/^4/.test(digits)) {
+    return 'Visa';
+  }
+  if (/^(5[1-5]|2[2-7])/.test(digits)) {
+    return 'Mastercard';
+  }
+  if (/^3[47]/.test(digits)) {
+    return 'American Express';
+  }
+  return null;
+}
+
+/** Groups digits 4-4-4-… for display while typing. */
+export function formatCardNumberInput(value: string): string {
+  const digits = digitsOnly(value).slice(0, 19);
+  return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+}
+
+/** Normalizes expiry typing to MM/YY (auto-inserts the slash). */
+export function formatExpiryInput(value: string): string {
+  const digits = digitsOnly(value).slice(0, 4);
+  if (digits.length <= 2) {
+    return digits;
+  }
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
+
 const isLuhnValid = (value: string): boolean => {
   const digits = digitsOnly(value);
   if (digits.length < 12) {
@@ -318,6 +357,7 @@ export function validatePaymentData(
   paymentMethod: string,
   paymentData: PaymentData,
   shippingAddress: ShippingAddress,
+  options?: { requireNewCardDraft?: boolean },
 ): PaymentFormErrors {
   const errors: PaymentFormErrors = {};
 
@@ -363,7 +403,7 @@ export function validatePaymentData(
       errors.savedCardId = 'Select a saved card or switch to a new card';
     }
   } else if (paymentData.channel === 'CARD') {
-    if (hasRawCardDraft(paymentData)) {
+    if (hasRawCardDraft(paymentData) || options?.requireNewCardDraft) {
       validateCardDraft(paymentData, shippingAddress, errors);
     }
   }
@@ -507,6 +547,9 @@ export function getReviewCtaLabel(
     }
     if (paymentData.channel === 'CARD' && paymentData.useSavedCard && paymentData.savedCardId) {
       return 'Continue with saved card';
+    }
+    if (paymentData.channel === 'CARD' && hasRawCardDraft(paymentData)) {
+      return 'Pay with new card';
     }
     return 'Open secure card checkout';
   }

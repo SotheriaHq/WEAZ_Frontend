@@ -355,6 +355,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const [cardValidationSession, setCardValidationSession] =
     useState<CardValidationSessionSummary | null>(null);
   const [cardValidationLoading, setCardValidationLoading] = useState(false);
+  const [customCardEntryEnabled, setCustomCardEntryEnabled] = useState(false);
 
   /* ── Submission state ── */
   const [submitting, setSubmitting] = useState(false);
@@ -374,10 +375,12 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         }
 
         setRuntimeCardholderNameMatchMode(policy.paystack.cardholderNameMatchMode);
+        setCustomCardEntryEnabled(Boolean(policy.paystack.customCardEntryEnabled));
       })
       .catch(() => {
         if (active) {
           setRuntimeCardholderNameMatchMode(null);
+          setCustomCardEntryEnabled(false);
         }
       });
 
@@ -661,10 +664,13 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const grandTotal = standardGrandTotal + customSubtotal;
   const brandGroups = useMemo(() => groupByBrand(cart.items), [cart.items]);
   const activePaymentData = paymentMethod === 'PENDING_SELECTION' ? null : paymentState[paymentMethod];
+  // With custom card entry enabled (SIT/test keys), new cards are collected on
+  // this page and follow the standard Review flow instead of the hosted CTA.
   const isHostedNewCardSelection =
     paymentMethod === 'PAYSTACK' &&
     activePaymentData?.channel === 'CARD' &&
     !activePaymentData.useSavedCard &&
+    !customCardEntryEnabled &&
     !hasCollectedPaystackCardDraft(activePaymentData);
   const paymentSummaryLines = useMemo(
     () => (activePaymentData && paymentMethod !== 'PENDING_SELECTION' ? getPaymentSummaryLines(paymentMethod, activePaymentData) : []),
@@ -817,7 +823,17 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         toast.error('Please select a payment method');
         return;
       }
-      const validationErrors = validatePaymentData(paymentMethod, paymentState[paymentMethod], address);
+      const validationErrors = validatePaymentData(
+        paymentMethod,
+        paymentState[paymentMethod],
+        address,
+        {
+          requireNewCardDraft:
+            customCardEntryEnabled &&
+            paymentState[paymentMethod].channel === 'CARD' &&
+            !paymentState[paymentMethod].useSavedCard,
+        },
+      );
       setPaymentErrors(validationErrors);
       if (Object.keys(validationErrors).length > 0) {
         setCheckoutProgressStage('FAILED');
@@ -857,6 +873,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     paymentMethod,
     paymentState,
     address,
+    customCardEntryEnabled,
     getFirstPaymentErrorMessage,
     ensureCardValidationSession,
   ]);
@@ -1578,6 +1595,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                             shippingAddress={address}
                             errors={paymentErrors}
                             onChange={updateSelectedPaymentData}
+                            customCardEntryEnabled={customCardEntryEnabled}
                             savedCards={savedCards}
                             savedCardsLoading={savedCardsLoading}
                             savedCardsError={savedCardsError}

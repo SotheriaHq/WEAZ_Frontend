@@ -180,6 +180,10 @@ const LoginPage = () => {
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showReactivationLink, setShowReactivationLink] = useState(false);
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+  const [lockoutSecondsLeft, setLockoutSecondsLeft] = useState(0);
+  const [attemptsWarning, setAttemptsWarning] = useState('');
+  const [showLockoutResetHint, setShowLockoutResetHint] = useState(false);
   const [rememberMe, setRememberMe] = useState<boolean>(rememberedState.remember);
   const [emailSuggestions, setEmailSuggestions] = useState<string[]>(rememberedState.emails);
   const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
@@ -232,6 +236,23 @@ const LoginPage = () => {
     const timer = window.setInterval(tick, 1000);
     return () => window.clearInterval(timer);
   }, [resendCooldownUntil]);
+
+  // Failed-attempt lockout countdown (progressive backoff from the backend).
+  useEffect(() => {
+    if (lockoutUntil === null) return;
+    const tick = () => {
+      const remaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setLockoutUntil(null);
+        setLockoutSecondsLeft(0);
+        return;
+      }
+      setLockoutSecondsLeft(remaining);
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [lockoutUntil]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -300,6 +321,8 @@ const LoginPage = () => {
     setSetupPassword('');
     setSetupConfirmPassword('');
     setShowReactivationLink(false);
+    setAttemptsWarning('');
+    setShowLockoutResetHint(false);
   };
 
   const filteredSuggestions = useMemo(() => {
@@ -369,6 +392,10 @@ const LoginPage = () => {
     dispatch(addLocalNotification({ message: 'Signed in successfully.' }));
     toast.success('Login successful!');
     setShowReactivationLink(false);
+    setLockoutUntil(null);
+    setLockoutSecondsLeft(0);
+    setAttemptsWarning('');
+    setShowLockoutResetHint(false);
 
     const redirectPath =
       user.role === 'SuperAdmin' || user.role === 'Admin'
@@ -685,6 +712,63 @@ const LoginPage = () => {
       completeLogin(payload, normalizedEmail);
     } catch (error: unknown) {
       if (isAxiosError(error)) {
+        const structuredData = error.response?.data as Record<string, unknown> | undefined;
+        const structuredErrors =
+          structuredData &&
+          typeof structuredData.errors === 'object' &&
+          structuredData.errors !== null &&
+          !Array.isArray(structuredData.errors)
+            ? (structuredData.errors as Record<string, unknown>)
+            : undefined;
+        const structuredCode =
+          typeof structuredErrors?.code === 'string' ? structuredErrors.code : undefined;
+        const structuredAttemptsRemaining =
+          typeof structuredErrors?.attemptsRemaining === 'number'
+            ? structuredErrors.attemptsRemaining
+            : null;
+
+        if (structuredAttemptsRemaining !== null && structuredAttemptsRemaining <= 5) {
+          setAttemptsWarning(
+            structuredAttemptsRemaining <= 1
+              ? 'Final warning: one more failed attempt will suspend this account.'
+              : `${structuredAttemptsRemaining} attempts remaining before this account is suspended.`,
+          );
+        }
+
+        if (structuredCode === 'LOGIN_TEMPORARILY_LOCKED') {
+          const rawRetryAfter = Number(structuredErrors?.retryAfterSeconds ?? 60);
+          const seconds =
+            Number.isFinite(rawRetryAfter) && rawRetryAfter > 0
+              ? Math.ceil(rawRetryAfter)
+              : 60;
+          setLockoutUntil(Date.now() + seconds * 1000);
+          setLockoutSecondsLeft(seconds);
+          const msg =
+            (typeof structuredData?.message === 'string' && structuredData.message) ||
+            `Too many failed attempts. Try again in ${seconds}s.`;
+          setError('password', { type: 'server', message: msg });
+          toast.error(msg);
+          setValue('password', '', { shouldDirty: false });
+          setShowPassword(false);
+          setIsLoading(false);
+          return;
+        }
+
+        if (structuredCode === 'ACCOUNT_SUSPENDED_LOGIN_LOCKOUT') {
+          const msg =
+            (typeof structuredData?.message === 'string' && structuredData.message) ||
+            'This account has been suspended after too many failed sign-in attempts.';
+          setError('password', { type: 'server', message: msg });
+          toast.error(msg);
+          setShowReactivationLink(true);
+          setShowLockoutResetHint(true);
+          setAttemptsWarning('');
+          setValue('password', '', { shouldDirty: false });
+          setShowPassword(false);
+          setIsLoading(false);
+          return;
+        }
+
         if (error.response?.status === 429) {
           const rawRetryAfter = error.response.headers?.['retry-after'];
           const seconds = parseInt(String(rawRetryAfter ?? '60'), 10);
@@ -1173,20 +1257,53 @@ const LoginPage = () => {
                     )}
                   </button>
                 ) : loginStep === 'password' ? (
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="auth-btn-primary w-full py-3.5 rounded-xl text-sm font-medium tracking-wide"
-                  >
-                    {isLoading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <VLoader size={16} phase="loading" showLabel={false} />
-                        Signing In...
-                      </span>
-                    ) : (
-                      'Sign In'
+                  <>
+                    {attemptsWarning && lockoutSecondsLeft <= 0 && (
+                      <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-300">
+                        ⚠️ {attemptsWarning}{' '}
+                        <Link
+                          to="/forgot-password"
+                          className="font-medium text-amber-200 underline hover:text-white"
+                        >
+                          Forgot your password?
+                        </Link>
+                      </div>
                     )}
-                  </button>
+                    {lockoutSecondsLeft > 0 && (
+                      <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-300">
+                        🔒 Sign-in is paused after repeated failed attempts. You can
+                        try again in{' '}
+                        <span className="font-semibold text-amber-100">
+                          {Math.floor(lockoutSecondsLeft / 60)}:
+                          {String(lockoutSecondsLeft % 60).padStart(2, '0')}
+                        </span>
+                        , or{' '}
+                        <Link
+                          to="/forgot-password"
+                          className="font-medium text-amber-200 underline hover:text-white"
+                        >
+                          reset your password
+                        </Link>{' '}
+                        now.
+                      </div>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={isLoading || lockoutSecondsLeft > 0}
+                      className="auth-btn-primary w-full py-3.5 rounded-xl text-sm font-medium tracking-wide disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isLoading ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <VLoader size={16} phase="loading" showLabel={false} />
+                          Signing In...
+                        </span>
+                      ) : lockoutSecondsLeft > 0 ? (
+                        `Try again in ${Math.floor(lockoutSecondsLeft / 60)}:${String(lockoutSecondsLeft % 60).padStart(2, '0')}`
+                      ) : (
+                        'Sign In'
+                      )}
+                    </button>
+                  </>
                 ) : loginStep === 'code-login' ? (
                   <button
                     type="button"
@@ -1221,6 +1338,19 @@ const LoginPage = () => {
                   <p className="text-xs text-amber-300">
                     Account access is currently restricted. You can submit a leniency/reactivation request.
                   </p>
+                  {showLockoutResetHint && (
+                    <p className="mt-2 text-xs text-amber-300">
+                      Fastest fix:{' '}
+                      <Link
+                        to="/forgot-password"
+                        className="font-medium text-amber-200 underline hover:text-white"
+                      >
+                        reset your password
+                      </Link>{' '}
+                      — completing a reset from your email restores access
+                      immediately.
+                    </p>
+                  )}
                   <Link
                     to={`/account-reactivation?email=${encodeURIComponent(
                       (watchEmail ?? '').trim(),
