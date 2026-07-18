@@ -86,6 +86,8 @@ interface StoreProductCardProps {
   onPreviewNavigationActiveChange?: (active: boolean) => void;
   isOwnerView?: boolean;
   onEdit?: (product: StoreProduct) => void;
+  /** First-row / LCP cards: eager + high fetch priority. Default lazy. */
+  priority?: boolean;
 }
 
 type GallerySource = {
@@ -120,6 +122,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   onPreviewNavigationActiveChange,
   isOwnerView = false,
   onEdit,
+  priority = false,
 }) => {
   const dispatch = useDispatch<AppDispatch>();
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
@@ -503,7 +506,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       }}
     >
       <div
-        className="relative overflow-hidden bg-transparent"
+        className="relative aspect-[4/5] w-full overflow-hidden bg-transparent"
         style={activeImage?.url ? undefined : { minHeight: 240 }}
       >
         {hasDisplayImage && !activeImage?.url && !imgError ? (
@@ -517,10 +520,11 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             kind="image"
             src={activeImage.url}
             alt={product.name}
-            className="block w-full max-w-full"
-            mediaClassName={`block h-auto w-full transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
-            maxHeightClassName="max-h-[440px]"
-            loading="eager"
+            className="absolute inset-0 block h-full w-full max-w-full"
+            mediaClassName={`block h-full w-full object-contain transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
+            maxHeightClassName="max-h-none"
+            loading={priority ? 'eager' : 'lazy'}
+            fetchPriority={priority ? 'high' : 'low'}
             onError={() => {
               setFailedGalleryKeys((prev) => (
                 activeImage?.key && !prev.includes(activeImage.key)

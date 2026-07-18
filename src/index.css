@@ -9,6 +9,32 @@ html {
   text-rendering: geometricPrecision;
 }
 
+/*
+ * Browser-aware defaults (Addy Osmani / modern pipeline):
+ * - Prefer compositor-only motion (transform/opacity).
+ * - Honour reduced-motion so we never thrash layout for a11y users.
+ * - content-visibility for long feed regions (opt-in class).
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.feed-content-visibility {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 720px;
+}
+
 /* ─── Global thin blending scrollbars ─────────────────────────────────────── */
 /* Light mode: barely-there warm-gray thumb, transparent track */
 * {

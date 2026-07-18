@@ -28,15 +28,23 @@
          Never add inline script blocks here; they are silently blocked on
          weaz.me (this froze the boot splash on mobile once already).
          Pre-paint logic lives in external files under /boot/. -->
+    <!-- theme-init must stay sync (prevents theme FOUC). Everything else is
+         deferred so it does not block HTML parse / first paint. -->
     <script src="/boot/theme-init.js"></script>
     <!-- Kick off primary data fetches in parallel with the JS bundle
          (anonymous visitors) — adopted by the app via window.__WIEZ_EARLY__. -->
-    <script src="/boot/early-data.js"></script>
+    <script src="/boot/early-data.js" defer></script>
     <script src="/boot/analytics.js" defer></script>
-    <!-- Google Fonts: Playfair Display for elegant product titles -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Fonts: fewer families/weights = less LCP contention. display=swap so
+         text paints with system fallback immediately. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600&family=Inter:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Stable brand mark; cheap SVG, helps first paint when used in chrome. -->
+    <link rel="preload" as="image" href="/brand/wiez-logo-mark.svg" />
   </head>
   <body>
     <!-- Brand boot gauge: a seal-shaped (curly-edged) filler ring that fills

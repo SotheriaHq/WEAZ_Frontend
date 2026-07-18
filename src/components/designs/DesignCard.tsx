@@ -39,6 +39,8 @@ interface DesignCardProps {
   isPatched?: boolean;
   onTogglePatch?: (brandId: string) => void;
   patchBusy?: boolean;
+  /** First-row / LCP cards: eager + high fetch priority. Default lazy. */
+  priority?: boolean;
 }
 
 export const DesignCard: React.FC<DesignCardProps> = ({
@@ -53,6 +55,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   isPatched: isPatchedProp,
   onTogglePatch,
   patchBusy: patchBusyProp,
+  priority = false,
 }) => {
   const navigate = useNavigate();
   const isVideo = Boolean(item.media.type?.toUpperCase().includes('VIDEO'));
@@ -244,8 +247,8 @@ export const DesignCard: React.FC<DesignCardProps> = ({
         setShowCustomLabel(false);
       }}
     >
-      {/* Full Image Background */}
-      <div className="relative w-full h-full">
+      {/* Full Image Background — aspect box reserves layout (CLS) before paint */}
+      <div className="relative aspect-[3/4] w-full min-h-[200px] bg-transparent">
         {isVideo ? (
           <MediaRenderer
             kind="video"
@@ -255,8 +258,9 @@ export const DesignCard: React.FC<DesignCardProps> = ({
             fit="contain"
             maxHeightClassName="max-h-none"
             maxWidthClassName="max-w-full"
-            className="w-full h-full"
-            mediaClassName="w-full h-full object-contain"
+            className="absolute inset-0 h-full w-full"
+            mediaClassName="h-full w-full object-contain"
+            preload={priority ? 'metadata' : 'none'}
           />
         ) : (
           <ImageWithFallback
@@ -269,15 +273,14 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               alt={item.collectionTitle}
               fit="contain"
               rounded="none"
-              containerClassName="h-full w-full"
+              containerClassName="absolute inset-0 h-full w-full"
               maxHeightClassName="max-h-none"
               className="h-full w-full object-contain"
               fallbackName={item.collectionTitle}
-              /* Document-scrolled feed: defer off-screen card images so the
-                 first screenful loads immediately instead of all cards
-                 contending and painting one at a time. In-viewport cards still
-                 load right away (native lazy loads what's already visible). */
-              loading="lazy"
+              /* Document-scrolled feed: first-row LCP cards use eager+high;
+                 the rest lazy so they don't contend for the connection pool. */
+              loading={priority ? 'eager' : 'lazy'}
+              fetchPriority={priority ? 'high' : 'low'}
             />
         )}
         
