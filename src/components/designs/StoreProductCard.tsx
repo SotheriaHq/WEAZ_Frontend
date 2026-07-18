@@ -36,7 +36,16 @@ export interface StoreProduct {
   discountPercent?: number | null;
   thumbnail?: string;
   images: string[];
-  media?: Array<{ id: string; url: string; type: string; isPrimary?: boolean }>;
+  media?: Array<{
+    id: string;
+    fileUploadId?: string | null;
+    url: string;
+    type: string;
+    isPrimary?: boolean;
+    width?: number | null;
+    height?: number | null;
+    aspectRatio?: number | null;
+  }>;
   mediaIds?: string[];
   sizes: string[];
   sizingMode?: SizingMode;
@@ -94,14 +103,39 @@ type GallerySource = {
   key: string;
   fileId?: string;
   url?: string | null;
+  aspectRatio?: number | null;
 };
 
 type ResolvedGalleryImage = {
   key: string;
   url: string;
+  aspectRatio?: number | null;
 };
 
 const MAX_GALLERY_ITEMS = 6;
+const MIN_CARD_ASPECT_RATIO = 0.45;
+const MAX_CARD_ASPECT_RATIO = 2.2;
+
+const resolveCardAspectRatio = (value?: number | null): number | null => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return Math.min(MAX_CARD_ASPECT_RATIO, Math.max(MIN_CARD_ASPECT_RATIO, value));
+};
+
+const aspectRatioFromDimensions = (
+  width?: number | null,
+  height?: number | null,
+): number | null =>
+  typeof width === 'number' &&
+  Number.isFinite(width) &&
+  width > 0 &&
+  typeof height === 'number' &&
+  Number.isFinite(height) &&
+  height > 0
+    ? width / height
+    : null;
+
 const normalizeGalleryUrl = (value?: string | null) => {
   const raw = String(value ?? '').trim();
   if (!raw) return null;
@@ -270,14 +304,18 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       url?: string | null;
     } | null) => {
       // Prefer FileUpload id — ProductMedia.id is a different table UUID and
-      // causes /uploads/signed-url/:id → 400 "File not found".
+      // causes the signed media endpoint to fail.
       const fromUpload =
         typeof item?.fileUploadId === 'string' ? item.fileUploadId.trim() : '';
       if (fromUpload) return fromUpload;
       return undefined;
     };
 
-    const appendSource = (source: { fileId?: string; url?: string | null }) => {
+    const appendSource = (source: {
+      fileId?: string;
+      url?: string | null;
+      aspectRatio?: number | null;
+    }) => {
       const fileId = typeof source.fileId === 'string' && source.fileId.trim().length > 0
         ? source.fileId.trim()
         : undefined;
@@ -292,6 +330,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         key,
         fileId,
         url: source.url ?? normalizedUrl,
+        aspectRatio: resolveCardAspectRatio(source.aspectRatio),
       });
     };
 
@@ -303,22 +342,31 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     appendSource({
       fileId: resolveMediaFileId(primaryMedia),
       url: primaryMedia?.url || product.thumbnail || product.images[0] || null,
+      aspectRatio:
+        resolveCardAspectRatio(primaryMedia?.aspectRatio) ??
+        aspectRatioFromDimensions(primaryMedia?.width, primaryMedia?.height),
     });
 
     appendSource({
       fileId: resolveMediaFileId(secondaryMedia),
       url: secondaryMedia?.url || (product.images.length > 1 ? product.images[1] : null),
+      aspectRatio:
+        resolveCardAspectRatio(secondaryMedia?.aspectRatio) ??
+        aspectRatioFromDimensions(secondaryMedia?.width, secondaryMedia?.height),
     });
 
     product.media?.forEach((item) => {
       appendSource({
         fileId: resolveMediaFileId(item),
         url: item.url,
+        aspectRatio:
+          resolveCardAspectRatio(item.aspectRatio) ??
+          aspectRatioFromDimensions(item.width, item.height),
       });
     });
 
     // mediaIds are ProductMedia row ids, NOT FileUpload ids — do not pass them
-    // to /uploads/signed-url. Prefer URLs / fileUploadId from media slots above.
+    // to the signed media endpoint. Prefer URLs / fileUploadId from media slots above.
 
     product.images.forEach((imageUrl) => {
       appendSource({ url: imageUrl });
@@ -384,7 +432,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           if (!source || acc.some((entry) => entry.key === source.key)) {
             return acc;
           }
-          acc.push({ key: source.key, url: candidate });
+          acc.push({ key: source.key, url: candidate, aspectRatio: source.aspectRatio });
           return acc;
         }, []),
       );
@@ -413,6 +461,14 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       ? galleryImages[1]
       : galleryImages[0] ?? null;
   const hasDisplayImage = Boolean(activeImage?.url || desiredImage?.url);
+  const cardAspectRatio =
+    activeImage?.aspectRatio ??
+    desiredImage?.aspectRatio ??
+    galleryImages[0]?.aspectRatio ??
+    null;
+  const cardAspectStyle = cardAspectRatio ? { aspectRatio: cardAspectRatio } : undefined;
+  const mediaFrameStyle =
+    cardAspectStyle ?? (activeImage?.url ? undefined : { minHeight: 240 });
 
   useEffect(() => {
     if (!isHovered || !hoverGalleryEnabled) {
@@ -506,8 +562,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       }}
     >
       <div
-        className="relative aspect-[4/5] w-full overflow-hidden bg-transparent"
-        style={activeImage?.url ? undefined : { minHeight: 240 }}
+        className={`relative w-full overflow-hidden bg-transparent ${cardAspectRatio ? '' : 'aspect-[4/5]'}`}
+        style={mediaFrameStyle}
       >
         {hasDisplayImage && !activeImage?.url && !imgError ? (
           <div className="absolute inset-0 animate-pulse">
@@ -520,8 +576,9 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             kind="image"
             src={activeImage.url}
             alt={product.name}
+            fit="cover"
             className="absolute inset-0 block h-full w-full max-w-full"
-            mediaClassName={`block h-full w-full object-contain transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
+            mediaClassName={`block h-full w-full object-cover transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
             maxHeightClassName="max-h-none"
             loading={priority ? 'eager' : 'lazy'}
             fetchPriority={priority ? 'high' : 'low'}
@@ -824,3 +881,4 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 };
 
 export default StoreProductCard;
+

@@ -27,9 +27,13 @@ export const mapSectionProductToMarketplaceProduct = (
     media: [
       {
         id: mediaFileId || id,
+        fileUploadId: mediaFileId,
         url: mediaUrl || '',
         type: 'image',
         isPrimary: true,
+        width: item.media?.width ?? null,
+        height: item.media?.height ?? null,
+        aspectRatio: item.media?.aspectRatio ?? null,
       },
     ],
     mediaIds: mediaFileId ? [mediaFileId] : undefined,

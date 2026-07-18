@@ -53,8 +53,39 @@ const canvasToBlob = (
   });
 
 const buildPreprocessedName = (name: string, outputType: string) => {
-  const ext = outputType === 'image/png' ? 'png' : 'jpg';
+  const ext =
+    outputType === 'image/png'
+      ? 'png'
+      : outputType === 'image/webp'
+        ? 'webp'
+        : 'jpg';
   return name.replace(/\.[^.]+$/, '') + `.pre.${ext}`;
+};
+
+const isLossyOutputType = (outputType: string) =>
+  outputType === 'image/jpeg' || outputType === 'image/webp';
+
+const encodeCanvas = async (
+  canvas: HTMLCanvasElement,
+  outputType: string,
+  quality: number,
+) => {
+  const blob = await canvasToBlob(
+    canvas,
+    outputType,
+    isLossyOutputType(outputType) ? quality : undefined,
+  );
+  if (
+    outputType !== 'image/webp' ||
+    (blob && String(blob.type || '').toLowerCase() === 'image/webp')
+  ) {
+    return { blob, outputType };
+  }
+
+  return {
+    blob: await canvasToBlob(canvas, 'image/jpeg', quality),
+    outputType: 'image/jpeg',
+  };
 };
 
 export async function preprocessImageFile(
@@ -106,8 +137,10 @@ export async function preprocessImageFile(
       return { file, originalFile: file, skipped: true, reason: 'context-unavailable' };
     }
 
-    const outputType =
-      needsSizeReduction || workingFile.type !== 'image/png' ? 'image/jpeg' : 'image/png';
+    let outputType =
+      workingFile.type === 'image/png' && !needsSizeReduction
+        ? 'image/png'
+        : 'image/webp';
     const minQuality = Math.max(
       0.35,
       Math.min(options.minQuality ?? DEFAULT_MIN_JPEG_QUALITY, DEFAULT_JPEG_QUALITY),
@@ -133,16 +166,14 @@ export async function preprocessImageFile(
       }
       ctx.drawImage(bitmap, 0, 0, currentWidth, currentHeight);
 
-      blob = await canvasToBlob(
-        canvas,
-        outputType,
-        outputType === 'image/jpeg' ? quality : undefined,
-      );
+      const encoded = await encodeCanvas(canvas, outputType, quality);
+      blob = encoded.blob;
+      outputType = encoded.outputType;
 
       if (!blob) break;
       if (!options.maxSizeBytes || blob.size <= options.maxSizeBytes) break;
 
-      if (outputType === 'image/jpeg' && quality > minQuality) {
+      if (isLossyOutputType(outputType) && quality > minQuality) {
         quality = Math.max(minQuality, quality - 0.1);
         continue;
       }

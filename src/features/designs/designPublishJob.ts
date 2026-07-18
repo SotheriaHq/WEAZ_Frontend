@@ -79,11 +79,11 @@ const isAlreadyUploadReady = (file: File, maxSizeBytes: number) => {
   const type = file.type.trim().toLowerCase();
   // Media-store already server-normalizes HEIC/unknown into JPEG at selection.
   // Re-running canvas preprocess on go-live is the multi-second mobile stall.
-  if (file.size <= maxSizeBytes && /image\/(jpeg|png|webp|gif)/i.test(type)) {
+  if (file.size <= maxSizeBytes && /image\/(jpeg|png|webp|avif|gif)/i.test(type)) {
     return true;
   }
-  // .pre.jpg naming from preprocessImageFile / selection pipeline
-  if (file.size <= maxSizeBytes && /\.pre\.(jpe?g|png)$/i.test(file.name)) {
+  // .pre.* naming from preprocessImageFile / selection pipeline
+  if (file.size <= maxSizeBytes && /\.pre\.(jpe?g|png|webp|avif)$/i.test(file.name)) {
     return true;
   }
   return false;

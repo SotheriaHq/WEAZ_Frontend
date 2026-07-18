@@ -160,12 +160,12 @@ const isAlreadyUploadReady = (file: File, maxSizeBytes: number) => {
   if (!isImageUploadFile(file)) return file.size <= maxSizeBytes;
   const type = file.type.trim().toLowerCase();
   // Selection-time media-store normalization already produces browser-safe
-  // JPEG/PNG/WebP under the limit. Re-running createImageBitmap here was the
+  // JPEG/PNG/WebP/AVIF under the limit. Re-running createImageBitmap here was the
   // multi-second mobile go-live stall.
-  if (file.size <= maxSizeBytes && /image\/(jpeg|png|webp|gif)/i.test(type)) {
+  if (file.size <= maxSizeBytes && /image\/(jpeg|png|webp|avif|gif)/i.test(type)) {
     return true;
   }
-  if (file.size <= maxSizeBytes && /\.pre\.(jpe?g|png)$/i.test(file.name)) {
+  if (file.size <= maxSizeBytes && /\.pre\.(jpe?g|png|webp|avif)$/i.test(file.name)) {
     return true;
   }
   return false;

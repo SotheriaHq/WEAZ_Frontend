@@ -194,8 +194,8 @@ const shouldPreferFileIdResolution = (value?: string | null, fileId?: string | n
   return isS3LikeUrl(value);
 };
 
-const canUseSourceDirectly = (value?: string | null, fileId?: string | null) =>
-  isUsableInitialUrl(value) && !shouldPreferFileIdResolution(value, fileId);
+const canUseSourceDirectly = (src?: string | null, fileId?: string | null) =>
+  isUsableInitialUrl(src) && !shouldPreferFileIdResolution(src, fileId);
 
 const resolveSourceCacheKey = (fileId?: string | null, src?: string | null) => {
   if (fileId) return fileId;

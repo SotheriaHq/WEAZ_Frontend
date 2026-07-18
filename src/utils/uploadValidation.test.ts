@@ -46,6 +46,12 @@ describe('uploadValidation', () => {
     expect(() => assertValidUploadFiles([file], WEB_UPLOAD_POLICIES.productMedia)).not.toThrow();
   });
 
+  it('allows AVIF images to proceed', () => {
+    const file = makeFile('look.avif', 'image/avif', 1024);
+
+    expect(validateUploadFile(file, WEB_UPLOAD_POLICIES.designMedia)).toEqual([]);
+  });
+
   it('uses extension fallback when picker MIME metadata is missing', () => {
     const file = makeFile('look.jpg', '', 1024);
 

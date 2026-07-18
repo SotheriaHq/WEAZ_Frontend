@@ -69,6 +69,9 @@ export interface MarketSectionItem {
     fileId?: string | null;
     type?: 'IMAGE' | 'VIDEO' | 'UNKNOWN';
     alt?: string | null;
+    width?: number | null;
+    height?: number | null;
+    aspectRatio?: number | null;
   } | null;
   price?: {
     amount?: number | null;
@@ -304,6 +307,34 @@ const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
 
 const normalizeFiniteNumber = (value: unknown, fallback: number) =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const optionalString = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const optionalNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const aspectRatioFromDimensions = (
+  width?: number | null,
+  height?: number | null,
+): number | null =>
+  typeof width === 'number' &&
+  Number.isFinite(width) &&
+  width > 0 &&
+  typeof height === 'number' &&
+  Number.isFinite(height) &&
+  height > 0
+    ? width / height
+    : null;
 
 const normalizeMarketSectionMetadata = (metadata: unknown): MarketSectionMetadata | undefined => {
   if (!isObjectRecord(metadata)) return undefined;
@@ -551,10 +582,16 @@ export interface ResetFeedPreferencesRequest {
   reason?: string | null;
 }
 
-const toMarketItem = (raw: RawMarketItem): MarketItem => {
+export const toMarketItem = (raw: RawMarketItem): MarketItem => {
   const collection = (raw.collection as Record<string, unknown>) ?? {};
   const owner = (collection.owner as Record<string, unknown>) ?? {};
-  const media = (raw.media ?? raw.file ?? raw) as Record<string, unknown>;
+  const primaryMedia = isObjectRecord(raw.primaryMedia) ? raw.primaryMedia : null;
+  const fallbackMedia = isObjectRecord(raw.media)
+    ? raw.media
+    : isObjectRecord(raw.file)
+      ? raw.file
+      : raw;
+  const media = (primaryMedia ?? fallbackMedia) as Record<string, unknown>;
   const rawTags = Array.isArray(raw.tags)
     ? (raw.tags as unknown[]).map((tag) => (typeof tag === 'string' ? tag : '')).filter(Boolean)
     : [];
@@ -564,28 +601,26 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
     : rawTags;
 
   const mediaFileId =
-    typeof media.fileId === 'string'
-      ? (media.fileId as string)
-      : typeof raw.mediaFileId === 'string'
-        ? (raw.mediaFileId as string)
-        : (raw.fileUploadId as string);
+    optionalString(media.fileId) ??
+    optionalString(raw.mediaFileId) ??
+    optionalString(raw.fileUploadId) ??
+    optionalString(media.fileUploadId) ??
+    '';
 
   const mediaUrl =
-    typeof media.url === 'string'
-      ? (media.url as string)
-      : typeof media.s3Url === 'string'
-        ? (media.s3Url as string)
-        : typeof raw.mediaUrl === 'string'
-          ? (raw.mediaUrl as string)
-          : undefined;
+    optionalString(media.displayUrl) ??
+    optionalString(media.url) ??
+    optionalString(media.s3Url) ??
+    optionalString(raw.mediaUrl);
 
   const mediaType = (raw.mediaType as MarketMediaType) ?? ((media.mediaType || media.type) as MarketMediaType) ?? 'POST_IMAGE';
 
-  const num = (v: unknown): number | null => {
-    if (typeof v === 'number' && Number.isFinite(v)) return v;
-    if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v);
-    return null;
-  };
+  const width = optionalNumber(media.width) ?? optionalNumber(raw.width);
+  const height = optionalNumber(media.height) ?? optionalNumber(raw.height);
+  const aspectRatio =
+    optionalNumber(media.aspectRatio) ??
+    optionalNumber(raw.aspectRatio) ??
+    aspectRatioFromDimensions(width, height);
 
   const mapped: MarketItem = {
     id: String(raw.id ?? mediaFileId ?? ''),
@@ -619,12 +654,12 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
       (raw.brandLogoFileId as string | undefined) ??
       null,
     minPrice:
-      num(collection.minPrice) ?? num(raw.minPrice),
+      optionalNumber(collection.minPrice) ?? optionalNumber(raw.minPrice),
     maxPrice:
-      num(collection.maxPrice) ?? num(raw.maxPrice),
+      optionalNumber(collection.maxPrice) ?? optionalNumber(raw.maxPrice),
     // Include sale fields if provided by backend; accept number or numeric string
-    saleMinPrice: num((collection as any).saleMinPrice ?? (raw as any).saleMinPrice),
-    saleMaxPrice: num((collection as any).saleMaxPrice ?? (raw as any).saleMaxPrice),
+    saleMinPrice: optionalNumber((collection as any).saleMinPrice ?? (raw as any).saleMinPrice),
+    saleMaxPrice: optionalNumber((collection as any).saleMaxPrice ?? (raw as any).saleMaxPrice),
     saleStartAt:
       (collection as any).saleStartAt && typeof (collection as any).saleStartAt === 'string'
         ? ((collection as any).saleStartAt as string)
@@ -679,18 +714,14 @@ const toMarketItem = (raw: RawMarketItem): MarketItem => {
       fileId: mediaFileId || '',
       url: mediaUrl,
       previewUrl:
-        typeof media.previewUrl === 'string'
-          ? (media.previewUrl as string)
-          : typeof raw.previewUrl === 'string'
-            ? (raw.previewUrl as string)
-            : mediaUrl,
+        optionalString(media.previewUrl) ??
+        optionalString(media.thumbnailUrl) ??
+        optionalString(raw.previewUrl) ??
+        mediaUrl,
       type: mediaType,
-      aspectRatio:
-        typeof media.aspectRatio === 'number'
-          ? (media.aspectRatio as number)
-          : typeof raw.aspectRatio === 'number'
-            ? (raw.aspectRatio as number)
-            : null,
+      width,
+      height,
+      aspectRatio,
       createdAt:
         typeof media.createdAt === 'string'
           ? (media.createdAt as string)
@@ -964,4 +995,3 @@ export const marketApi = {
 };
 
 export default marketApi;
-

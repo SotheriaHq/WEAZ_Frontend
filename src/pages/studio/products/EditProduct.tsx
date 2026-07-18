@@ -2601,8 +2601,8 @@ const EditProduct: React.FC = () => {
     const isAlreadyUploadReady = (file: File) => {
       const type = file.type.trim().toLowerCase();
       if (file.size > maxSizeBytes) return false;
-      if (/image\/(jpeg|png|webp|gif)/i.test(type)) return true;
-      if (/\.pre\.(jpe?g|png)$/i.test(file.name)) return true;
+      if (/image\/(jpeg|png|webp|avif|gif)/i.test(type)) return true;
+      if (/\.pre\.(jpe?g|png|webp|avif)$/i.test(file.name)) return true;
       return false;
     };
 

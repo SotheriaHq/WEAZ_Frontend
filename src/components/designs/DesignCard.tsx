@@ -43,6 +43,16 @@ interface DesignCardProps {
   priority?: boolean;
 }
 
+const MIN_CARD_ASPECT_RATIO = 0.45;
+const MAX_CARD_ASPECT_RATIO = 2.2;
+
+const resolveCardAspectRatio = (value?: number | null): number | null => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return Math.min(MAX_CARD_ASPECT_RATIO, Math.max(MIN_CARD_ASPECT_RATIO, value));
+};
+
 export const DesignCard: React.FC<DesignCardProps> = ({
   item,
   onOpenView,
@@ -230,6 +240,8 @@ export const DesignCard: React.FC<DesignCardProps> = ({
     brandLogoFileId: item.brandLogoFileId,
   });
   const brandAvatarFallback = getAvatarFallback(item.brandName ?? null, item.username ?? null);
+  const cardAspectRatio = resolveCardAspectRatio(item.media.aspectRatio);
+  const cardAspectStyle = cardAspectRatio ? { aspectRatio: cardAspectRatio } : undefined;
 
   return (
     <article
@@ -248,18 +260,21 @@ export const DesignCard: React.FC<DesignCardProps> = ({
       }}
     >
       {/* Full Image Background — aspect box reserves layout (CLS) before paint */}
-      <div className="relative aspect-[3/4] w-full min-h-[200px] bg-transparent">
+      <div
+        className={`relative w-full bg-transparent ${cardAspectRatio ? '' : 'aspect-[3/4] min-h-[200px]'}`}
+        style={cardAspectStyle}
+      >
         {isVideo ? (
           <MediaRenderer
             kind="video"
             src={item.media.url ?? ''}
             poster={item.media.previewUrl ?? undefined}
             controls={false}
-            fit="contain"
+            fit="cover"
             maxHeightClassName="max-h-none"
             maxWidthClassName="max-w-full"
             className="absolute inset-0 h-full w-full"
-            mediaClassName="h-full w-full object-contain"
+            mediaClassName="h-full w-full object-cover"
             preload={priority ? 'metadata' : 'none'}
           />
         ) : (
@@ -271,11 +286,11 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               src={item.media.previewUrl ?? item.media.url ?? ''}
               fileId={item.media.fileId || null}
               alt={item.collectionTitle}
-              fit="contain"
+              fit="cover"
               rounded="none"
               containerClassName="absolute inset-0 h-full w-full"
               maxHeightClassName="max-h-none"
-              className="h-full w-full object-contain"
+              className="h-full w-full object-cover"
               fallbackName={item.collectionTitle}
               /* Document-scrolled feed: first-row LCP cards use eager+high;
                  the rest lazy so they don't contend for the connection pool. */
