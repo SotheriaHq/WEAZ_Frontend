@@ -433,11 +433,21 @@ export function buildContactInfo(
         savedCardDisplay: null,
       } satisfies PaystackPaymentData);
 
+  const billingAddress = resolveBillingAddress(paystackData, shippingAddress);
+  // The backend validates billingAddress as a full ShippingAddressDto whose
+  // phone is required — but the web billing form has no phone field and
+  // shippingToBillingAddress drops it. Carry the best phone we have so
+  // /payment/initialize-unified doesn't 400 on new-card payments.
+  const billingPhone =
+    String((billingAddress as { phone?: string }).phone ?? '').trim() ||
+    String(paystackData.phone ?? '').trim() ||
+    String(shippingAddress.phone ?? '').trim();
+
   return {
     phone: paystackData.phone,
     email: paystackData.email,
     billingSameAsShipping: paystackData.billingSameAsShipping,
-    billingAddress: resolveBillingAddress(paystackData, shippingAddress),
+    billingAddress: { ...billingAddress, phone: billingPhone },
     channel: paystackData.channel,
   };
 }
