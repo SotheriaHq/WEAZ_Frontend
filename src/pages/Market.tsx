@@ -32,6 +32,7 @@ import { useScrollRestore } from '@/components/ScrollRestoreProvider';
 import { useMarketSurfacePrefetch } from '@/hooks/useMarketSurfacePrefetch';
 import useMarketFeed from '@/hooks/useMarketFeed';
 import useRunwayPinnedFeed from '@/hooks/useRunwayPinnedFeed';
+import { createMixSeed, mixFeedItems } from '@/utils/feedMixer';
 import { queryKeys } from '@/query/queryKeys';
 
 // Error type detection
@@ -516,7 +517,15 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     };
   }, [feedData, isLoading, openDesignId, openMediaId, routeOpenKey]);
 
-  const items = useMemo(() => feedData?.items ?? [], [feedData?.items]);
+  // Scored rotation (product rule: remix on every login / refresh / re-route).
+  // The backend rotates per fresh load, but the persisted query cache replays
+  // the previous response within staleTime — so remix presentation-side with a
+  // per-mount seed, exactly like the MarketPlace grid does.
+  const runwayMixSeedRef = useRef(createMixSeed());
+  const items = useMemo(
+    () => mixFeedItems(feedData?.items ?? [], runwayMixSeedRef.current),
+    [feedData?.items],
+  );
 
   const mediaTargetIds = useMemo(
     () => items.map((item) => item.id).filter(Boolean),
