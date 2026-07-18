@@ -134,37 +134,26 @@ export default defineConfig(({ mode }) => {
               if (id.includes('/@reduxjs/') || id.includes('/react-redux/')) {
                 return 'redux-vendor';
               }
-              if (id.includes('/framer-motion/')) {
-                return 'motion-vendor';
-              }
-              if (id.includes('/lucide-react/')) {
-                return 'icons-vendor';
-              }
-              if (id.includes('/primereact/') || id.includes('/primeicons/')) {
-                return 'prime-vendor';
-              }
-              if (id.includes('/recharts/')) {
-                return 'charts-vendor';
-              }
-              if (
-                id.includes('/qrcode.react/') ||
-                id.includes('/react-qrcode-logo/') ||
-                id.includes('/emoji-picker-react/') ||
-                id.includes('/react-easy-crop/')
-              ) {
-                return 'feature-vendor';
-              }
+              // Only ALWAYS-LOADED vendors may be forced into named chunks.
+              // A forced chunk claims its unassigned dependency subtree, so a
+              // lazy-only vendor (recharts, emoji-picker, ...) that shares a
+              // transitive dep with entry code (react-is, lodash, tslib)
+              // drags its whole chunk into the entry's static import graph —
+              // charts-vendor (88 kB gz of recharts+d3) was downloading on
+              // every anonymous landing this way. Unforced vendors colocate
+              // with the lazy route that actually uses them.
             }
-            // LOAD-BEARING for mobile startup: without this, admin page
-            // modules collapse into the ENTRY bundle (measured: 748 kB →
-            // 1,101 kB when removed on 2026-07-05). Forcing each admin page
-            // into its own chunk keeps the console out of every visitor's
-            // first download. Do not remove without re-measuring the entry.
-            if (id.includes('/pages/admin/')) {
-              const normalized = id.split(path.sep).join('/');
-              const fileName = normalized.slice(normalized.lastIndexOf('/') + 1);
-              return `admin-${fileName.replace(/\.[cm]?[jt]sx?$/, '')}`;
-            }
+            // Do NOT force pages/admin/* into named chunks here. manualChunks
+            // claims the assigned module PLUS its unassigned dependency
+            // subtree, so shared primitives (UniversalSelect, Dropdown, Modal,
+            // toast, react-query, ...) were captured INTO admin-* chunks and
+            // the entry had to statically import ten admin chunks plus
+            // charts-vendor on every anonymous landing (GTmetrix 2026-07-18:
+            // ~427 kB unused JS, 66-request critical chain). App.tsx's
+            // React.lazy() imports already give each admin page its own chunk;
+            // shared code belongs in the entry graph. If admin code ever shows
+            // up in the entry again, the cause is a STATIC import of an admin
+            // page somewhere — fix that import, not the chunking.
             return undefined;
           },
         },

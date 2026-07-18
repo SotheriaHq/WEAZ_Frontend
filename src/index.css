@@ -2128,3 +2128,14 @@ html:not(.dark) .input-glass:focus {
   width: 100%;
   break-inside: avoid;
 }
+
+/* PrimeReact's lara theme points :root and --font-family at its bundled
+   "Inter var" (339 kB InterVariable woff2 + italic — the largest non-image
+   asset on the landing page). WIEZ text is Plus Jakarta Sans; repointing the
+   theme variables means that font face is never used, so the browser never
+   downloads it. This file loads after theme.css (main.tsx import order), so
+   these same-specificity declarations win the cascade. */
+:root {
+  font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+  --font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+}
