@@ -854,6 +854,10 @@ export const customOrderConfigurationsApi = {
     page?: number;
     limit?: number;
     isActive?: boolean;
+    /** Required for non-owner callers; brand owners may omit to list own brand. */
+    brandId?: string;
+    sourceType?: 'PRODUCT' | 'DESIGN';
+    sourceId?: string;
   }) {
     const response = await apiClient.get('/custom-order-configurations', withParams(params));
     return hydrateConfigurationPage(

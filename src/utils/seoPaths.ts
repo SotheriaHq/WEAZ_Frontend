@@ -1,3 +1,7 @@
+/**
+ * Client-side paths that must never be indexable in the SPA shell.
+ * Keep aligned with `bthreadly/src/seo/seo.config.ts` SEO_DISALLOWED_PATH_PREFIXES.
+ */
 const PRIVATE_PATH_PREFIXES = [
   '/studio',
   '/admin',
@@ -13,6 +17,9 @@ const PRIVATE_PATH_PREFIXES = [
   '/verify-email',
   '/change-email',
   '/account',
+  '/settings',
+  '/notifications',
+  '/diagnostics',
   '/search',
   '/store/create',
   '/store/essentials',
@@ -23,6 +30,8 @@ const PRIVATE_PATH_PREFIXES = [
   '/products/create',
   '/designs/create',
   '/collections/create',
+  '/accept-invite',
+  '/trouble',
 ];
 
 export function isSeoNoindexClientPath(pathname: string): boolean {

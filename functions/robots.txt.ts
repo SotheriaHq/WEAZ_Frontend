@@ -8,6 +8,10 @@ import { fetchWithTimeout, resolveApiBaseUrl } from './seo-shared';
  */
 export const onRequest: PagesFunction = async (context) => {
   const requestOrigin = new URL(context.request.url).origin;
+  // Fail-open for production indexing: allow public surfaces, block private
+  // app shells. When the API is healthy it may instead return full Disallow
+  // for SIT/UAT (SEO_INDEXING_ENABLED=false). Keep this list in sync with
+  // bthreadly/src/seo/seo.config.ts SEO_DISALLOWED_PATH_PREFIXES.
   const fallbackBody = [
     'User-agent: *',
     'Allow: /',
@@ -17,8 +21,17 @@ export const onRequest: PagesFunction = async (context) => {
     'Disallow: /bag/',
     'Disallow: /orders/',
     'Disallow: /messages/',
+    'Disallow: /dashboard/',
+    'Disallow: /settings/',
+    'Disallow: /notifications/',
+    'Disallow: /diagnostics/',
+    'Disallow: /account/',
+    'Disallow: /custom-orders/',
     'Disallow: /login',
     'Disallow: /signup',
+    'Disallow: /forgot-password',
+    'Disallow: /reset-password',
+    'Disallow: /verify-email',
     '',
     `Sitemap: ${requestOrigin}/sitemap.xml`,
     '',
