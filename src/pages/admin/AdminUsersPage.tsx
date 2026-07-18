@@ -312,103 +312,6 @@ const AdminUsersPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Filter bar ── */}
-      <div className="rounded-2xl border border-gray-200/80 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {/* Search — spans 2 cols */}
-          <div className="col-span-2 sm:col-span-2 flex flex-col gap-1">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              Search
-            </label>
-            <input
-              type="text"
-              placeholder="Name, username, or email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-9 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-purple-400 dark:border-white/10 dark:bg-black/30 dark:text-white"
-            />
-          </div>
-
-          <InlineSelect
-            label="Role"
-            value={roleFilter}
-            onChange={setRoleFilter}
-            options={[
-              { value: 'ALL', label: 'All roles' },
-              { value: 'User', label: 'Users' },
-              { value: 'Admin', label: 'Admins' },
-            ]}
-          />
-
-          <InlineSelect
-            label="Status"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            options={[
-              { value: 'ALL', label: 'All statuses' },
-              { value: 'ACTIVE', label: 'Active' },
-              { value: 'SUSPENDED', label: 'Suspended' },
-              { value: 'DEACTIVATED', label: 'Inactive' },
-            ]}
-          />
-
-          <InlineSelect
-            label="Sort"
-            value={sortBy}
-            onChange={setSortBy}
-            options={[
-              { value: 'created_desc', label: 'Newest' },
-              { value: 'created_asc', label: 'Oldest' },
-              { value: 'name_asc', label: 'Name A–Z' },
-              { value: 'name_desc', label: 'Name Z–A' },
-              { value: 'status', label: 'Status' },
-            ]}
-          />
-
-          {/* View toggle */}
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              View
-            </span>
-            <div className="flex h-9 overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
-              {(['table', 'cards'] as ViewMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setViewMode(mode)}
-                  className={`flex-1 px-2 py-1 text-xs font-semibold transition ${
-                    viewMode === mode
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-black/20 dark:text-gray-300 dark:hover:bg-white/10'
-                  }`}
-                >
-                  {mode === 'table' ? '📋' : '⊞'}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Status chips + result count */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-            {statusCounts.ACTIVE} active
-          </span>
-          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-            {statusCounts.SUSPENDED} suspended
-          </span>
-          <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
-            {statusCounts.DEACTIVATED} inactive
-          </span>
-          <span className="ml-auto text-[11px] text-gray-400 dark:text-gray-500">
-            {uniqueUsers.length} loaded{isFiltered ? ' (filtered)' : ''}
-            {['name_asc', 'name_desc', 'status'].includes(sortBy) && (
-              <span className="ml-1 text-amber-500">· sorted locally</span>
-            )}
-          </span>
-        </div>
-      </div>
-
       {mergedError && (
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
           {mergedError}
@@ -416,12 +319,109 @@ const AdminUsersPage: React.FC = () => {
       )}
 
       {/* ── Directory ── */}
-      <section className="rounded-2xl border border-gray-200/80 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
-        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-white/5">
+      <section className="rounded-2xl border border-gray-200/80 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.03] overflow-hidden">
+        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.01]">
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">User Directory</h2>
           {loadingUsers && (
             <span className="text-xs text-gray-400 dark:text-gray-500">Loading...</span>
           )}
+        </div>
+
+        {/* Unified Filters Section inside Directory Card */}
+        <div className="border-b border-gray-100 dark:border-white/5 p-4 bg-white dark:bg-transparent">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {/* Search — spans 2 cols */}
+            <div className="col-span-2 sm:col-span-2 flex flex-col gap-1">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                Search
+              </label>
+              <input
+                type="text"
+                placeholder="Name, username, or email..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-purple-400 dark:border-white/10 dark:bg-black/30 dark:text-white"
+              />
+            </div>
+
+            <InlineSelect
+              label="Role"
+              value={roleFilter}
+              onChange={setRoleFilter}
+              options={[
+                { value: 'ALL', label: 'All roles' },
+                { value: 'User', label: 'Users' },
+                { value: 'Admin', label: 'Admins' },
+              ]}
+            />
+
+            <InlineSelect
+              label="Status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: 'ALL', label: 'All statuses' },
+                { value: 'ACTIVE', label: 'Active' },
+                { value: 'SUSPENDED', label: 'Suspended' },
+                { value: 'DEACTIVATED', label: 'Inactive' },
+              ]}
+            />
+
+            <InlineSelect
+              label="Sort"
+              value={sortBy}
+              onChange={setSortBy}
+              options={[
+                { value: 'created_desc', label: 'Newest' },
+                { value: 'created_asc', label: 'Oldest' },
+                { value: 'name_asc', label: 'Name A–Z' },
+                { value: 'name_desc', label: 'Name Z–A' },
+                { value: 'status', label: 'Status' },
+              ]}
+            />
+
+            {/* View toggle */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                View
+              </span>
+              <div className="flex h-9 overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+                {(['table', 'cards'] as ViewMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setViewMode(mode)}
+                    className={`flex-1 px-2 py-1 text-xs font-semibold transition ${
+                      viewMode === mode
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-black/20 dark:text-gray-300 dark:hover:bg-white/10'
+                    }`}
+                  >
+                    {mode === 'table' ? '📋' : '⊞'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Status chips + result count */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+              {statusCounts.ACTIVE} active
+            </span>
+            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+              {statusCounts.SUSPENDED} suspended
+            </span>
+            <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
+              {statusCounts.DEACTIVATED} inactive
+            </span>
+            <span className="ml-auto text-[11px] text-gray-400 dark:text-gray-500">
+              {uniqueUsers.length} loaded{isFiltered ? ' (filtered)' : ''}
+              {['name_asc', 'name_desc', 'status'].includes(sortBy) && (
+                <span className="ml-1 text-amber-500">· sorted locally</span>
+              )}
+            </span>
+          </div>
         </div>
 
         <div className="p-4">

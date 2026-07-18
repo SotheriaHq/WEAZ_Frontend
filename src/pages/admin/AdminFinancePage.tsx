@@ -786,6 +786,24 @@ const AdminFinancePage: React.FC = () => {
   return (
     <div className="space-y-6">
       <AdminBreadcrumb segments={[{ label: 'Finance' }]} />
+
+      <div className="flex border-b border-black/10 dark:border-white/10 gap-6">
+        <button
+          type="button"
+          onClick={() => navigate('/admin/finance')}
+          className="pb-3 text-sm font-semibold transition-all border-b-2 border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
+        >
+          Finance Control
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/admin/finance/settlement-policies')}
+          className="pb-3 text-sm font-semibold transition-all border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+        >
+          Settlement Policies
+        </button>
+      </div>
+
       <section className="rounded-3xl border border-black/10 bg-white/85 p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -795,13 +813,6 @@ const AdminFinancePage: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/admin/finance/settlement-policies')}
-              className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]"
-            >
-              Settlement policies
-            </button>
             <button
               type="button"
               onClick={refreshCurrentTab}

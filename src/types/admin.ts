@@ -137,6 +137,7 @@ export interface AdminBrand {
     email: string;
     firstName: string;
     lastName: string;
+    username?: string;
     status?: string;
     profileImage?: string | null;
   };
