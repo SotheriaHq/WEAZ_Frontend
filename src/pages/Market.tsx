@@ -740,10 +740,11 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
               className="flex -ml-6 w-auto"
               columnClassName="pl-6 space-y-6 bg-clip-padding"
             >
-              {pinnedItems.map((item) => (
+              {pinnedItems.map((item, index) => (
                 <div key={item.id} className="w-full">
                   <DesignCard
                     item={item}
+                    priority={index < 4}
                     onOpenView={(it) => setViewItem(it)}
                     onViewCollection={handleViewCollection}
                     onViewBrand={handleViewBrand}
@@ -881,10 +882,11 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
           className="flex -ml-6 w-auto"
           columnClassName="pl-6 space-y-6 bg-clip-padding"
         >
-          {filteredItems.map((item) => (
+          {filteredItems.map((item, index) => (
             <div key={item.id} className="w-full">
               <DesignCard
                 item={item}
+                priority={index < 4}
                 onOpenView={(it) => setViewItem(it)}
                 onViewCollection={handleViewCollection}
                 onViewBrand={handleViewBrand}

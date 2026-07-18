@@ -1023,7 +1023,7 @@ const MarketPlace: React.FC = () => {
               {visibleProducts.length > 0 ? (
                 <>
                   <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 md:gap-5">
-                    {visibleProducts.map((product) => (
+                    {visibleProducts.map((product, index) => (
                       <motion.div
                         key={product.id}
                         initial={{ opacity: 0, y: 10 }}
@@ -1033,6 +1033,7 @@ const MarketPlace: React.FC = () => {
                       >
                         <StoreProductCard
                           product={product}
+                          priority={index < 3}
                           onViewProduct={(selected) =>
                             handleOpenProduct(selected, { source: 'market_grid' })
                           }
