@@ -892,6 +892,19 @@ export const EndUserProfile: React.FC = () => {
         : 'profile-photo-ring-viewed'
       : 'profile-photo-frame-neutral';
   const alphaFitLabel = describeAlphaFit(computedAlphaSize);
+  // Quick-access fittings (parity with the native profile): every saved
+  // measurement as a compact chip. Keys carry MEN_/WOMEN_ namespacing that must
+  // never surface as a label — the brand already chose who the design is for.
+  const formatMeasurementLabel = (key: string): string =>
+    key
+      .replace(/^(MEN|WOMEN|MENS|WOMENS|UNISEX)_/i, '')
+      .toLowerCase()
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (ch) => ch.toUpperCase());
+  const savedMeasurementEntries = Object.entries(sizeFitProfile?.measurements ?? {}).filter(
+    ([, value]) => String(value ?? '').trim().length > 0,
+  );
+  const measurementUnitLabel = (sizeFitProfile?.preferredLengthUnit ?? 'CM').toLowerCase();
   const profileActions: ProfileAction[] = [
     {
       key: 'edit',
@@ -1139,6 +1152,29 @@ export const EndUserProfile: React.FC = () => {
                     {alphaFitLabel}
                   </div>
                 ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {/* ── MY FITTINGS quick view (owner): saved measurements at a glance ── */}
+          {isOwner && savedMeasurementEntries.length > 0 ? (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => setIsSizeFitOpen(true)}
+                className="mb-1.5 text-xs font-bold uppercase tracking-wide text-gray-500 transition hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-300"
+              >
+                📏 My fittings · {savedMeasurementEntries.length}
+              </button>
+              <div className="flex flex-wrap gap-1.5">
+                {savedMeasurementEntries.map(([key, value]) => (
+                  <span
+                    key={key}
+                    className="rounded-lg border border-gray-200/70 bg-gray-50/80 px-2 py-1 text-xs font-semibold text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
+                  >
+                    {formatMeasurementLabel(key)} · {String(value)} {measurementUnitLabel}
+                  </span>
+                ))}
               </div>
             </div>
           ) : null}
