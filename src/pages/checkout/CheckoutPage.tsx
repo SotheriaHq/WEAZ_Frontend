@@ -41,7 +41,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import PaymentDetailsSection from '@/pages/checkout/PaymentDetailsSection';
 import {
   loadDeliveryAddressBook,
+  pushDeliveryAddressBook,
   removeDeliveryAddress,
+  syncDeliveryAddressBook,
   toShippingAddress,
   upsertDeliveryAddress,
   type SavedDeliveryAddress,
@@ -571,7 +573,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     const loadSavedAddresses = async () => {
       setSavedAddressesLoading(true);
       try {
-        const stored = loadDeliveryAddressBook(user?.id);
+        const stored = await syncDeliveryAddressBook(user?.id);
         if (!active) return;
 
         if (stored.length > 0) {
@@ -614,6 +616,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         if (nextSavedAddresses[0]) {
           setEditingAddressId(nextSavedAddresses[0].id);
           setAddress(toShippingAddress(nextSavedAddresses[0]));
+        }
+        if (nextSavedAddresses.length > 0) {
+          pushDeliveryAddressBook(user?.id, nextSavedAddresses);
         }
       } catch {
         if (!active) return;
@@ -1175,6 +1180,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         contactEmail: currentAddressDraft.contactEmail || paymentSubmissionData.email || '',
       });
       setSavedAddresses(nextAddresses);
+      pushDeliveryAddressBook(user?.id, nextAddresses);
       if (nextAddresses[0]) {
         setEditingAddressId(nextAddresses[0].id);
       }

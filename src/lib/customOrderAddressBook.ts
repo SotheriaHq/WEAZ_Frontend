@@ -1,3 +1,4 @@
+import { apiClient } from '@/api/httpClient';
 import type { ShippingAddress } from '@/api/StoreApi';
 
 export interface SavedDeliveryAddress {
@@ -186,6 +187,67 @@ export const removeDeliveryAddress = (
   const next = loadDeliveryAddressBook(userId).filter((entry) => entry.id !== addressId);
   saveRecords(userId, next);
   return next;
+};
+
+const mergeAddressLists = (
+  left: SavedDeliveryAddress[],
+  right: SavedDeliveryAddress[],
+): SavedDeliveryAddress[] => {
+  const byId = new Map<string, SavedDeliveryAddress>();
+  for (const entry of [...left, ...right]) {
+    const existing = byId.get(entry.id);
+    if (!existing || entry.updatedAt.localeCompare(existing.updatedAt) > 0) {
+      byId.set(entry.id, entry);
+    }
+  }
+  return Array.from(byId.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+};
+
+/**
+ * Server-backed address book sync: the backend (`/users/me/delivery-addresses`)
+ * is the cross-device source so web and the native app see the same saved
+ * addresses. Local storage stays as the offline/latency cache; merges favor
+ * the newest updatedAt per address id.
+ */
+export const syncDeliveryAddressBook = async (
+  userId?: string | null,
+): Promise<SavedDeliveryAddress[]> => {
+  const local = loadDeliveryAddressBook(userId);
+  if (!userId) return local;
+
+  try {
+    const res = await apiClient.get('/users/me/delivery-addresses');
+    const rawItems = res.data?.data?.items;
+    const serverItems = (Array.isArray(rawItems) ? rawItems : [])
+      .map((entry) =>
+        normalizeDeliveryAddress(entry as Partial<SavedDeliveryAddress> & { contactPhone?: string | null }),
+      )
+      .filter((entry): entry is SavedDeliveryAddress => Boolean(entry));
+
+    const merged = mergeAddressLists(local, serverItems);
+    saveRecords(userId, merged);
+
+    const serverById = new Map(serverItems.map((entry) => [entry.id, entry]));
+    const serverMissesLocal = merged.some((entry) => {
+      const remote = serverById.get(entry.id);
+      return !remote || entry.updatedAt.localeCompare(remote.updatedAt) > 0;
+    });
+    if (serverMissesLocal) {
+      void apiClient.put('/users/me/delivery-addresses', { items: merged }).catch(() => undefined);
+    }
+    return merged;
+  } catch {
+    return local;
+  }
+};
+
+/** Fire-and-forget upload of the current book so other devices can pull it. */
+export const pushDeliveryAddressBook = (
+  userId: string | null | undefined,
+  addresses: SavedDeliveryAddress[],
+) => {
+  if (!userId) return;
+  void apiClient.put('/users/me/delivery-addresses', { items: addresses }).catch(() => undefined);
 };
 
 export const toShippingAddress = (address: SavedDeliveryAddress): ShippingAddress => ({
