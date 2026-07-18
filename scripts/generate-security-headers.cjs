@@ -93,7 +93,10 @@ const csp = [
   "frame-ancestors 'none'",
   `script-src ${scriptSrc}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "img-src 'self' data: blob: https://*.amazonaws.com https://*.s3.amazonaws.com https://*.cloudfront.net https://res.cloudinary.com https://images.unsplash.com https://lh3.googleusercontent.com https://unavatar.io https://flagcdn.com https://checkout.paystack.com https://standard.paystack.co",
+  // apiBaseUrl: display media is served through the API host's /media/*
+  // reverse proxy (stable cacheable URLs, HTTP/2) instead of per-request
+  // signed S3 URLs — see MEDIA_PUBLIC_BASE_URL in the backend.
+  `img-src 'self' data: blob: ${apiBaseUrl} https://*.amazonaws.com https://*.s3.amazonaws.com https://*.cloudfront.net https://res.cloudinary.com https://images.unsplash.com https://lh3.googleusercontent.com https://unavatar.io https://flagcdn.com https://checkout.paystack.com https://standard.paystack.co`,
   "font-src 'self' data: https://fonts.gstatic.com",
   `connect-src ${buildConnectSrc()}`,
   'frame-src https://accounts.google.com https://checkout.paystack.com https://standard.paystack.co https://js.paystack.co',
