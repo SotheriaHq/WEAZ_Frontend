@@ -22,7 +22,7 @@ export type RequestEmailChangePayload = {
 };
 
 export type DeleteAccountPayload = {
-  confirmationWord: string;
+  email: string;
   currentPassword: string;
 };
 

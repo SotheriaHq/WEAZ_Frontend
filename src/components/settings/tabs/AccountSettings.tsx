@@ -118,7 +118,11 @@ const AccountSettings: React.FC = () => {
               <p className="text-sm font-medium text-red-900 dark:text-red-200">Delete Account</p>
               <p className="text-sm text-red-600 dark:text-red-400">Permanently delete your account and all data</p>
             </div>
-            <button className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">
+            <button
+              type="button"
+              onClick={handleOpenSecurity}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+            >
               Delete Account
             </button>
           </div>
