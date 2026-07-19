@@ -1050,9 +1050,11 @@ export const EndUserProfile: React.FC = () => {
               <h1 className="truncate text-xl font-black tracking-tight text-theme sm:text-3xl">
                 {fullName}
               </h1>
-              <p className="mt-0.5 truncate text-sm text-theme-secondary">
-                @{profile.username}
-              </p>
+              {profile.username ? (
+                <p className="mt-0.5 truncate text-sm text-theme-secondary">
+                  @{profile.username}
+                </p>
+              ) : null}
               {profile.location ? (
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-theme-secondary sm:text-xs">
                   <span className="flex items-center gap-0.5">
