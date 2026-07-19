@@ -2129,6 +2129,38 @@ html:not(.dark) .input-glass:focus {
   break-inside: avoid;
 }
 
+/* Profile "My fittings" marquee: two stacked rows of measurement chips drift
+   horizontally under the fittings box. The track holds its content twice, so
+   translating -50% loops seamlessly. Compositor-only (transform), pauses on
+   hover, and stops entirely for reduced-motion users. */
+.fittings-marquee {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+  mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+}
+.fittings-marquee-track {
+  animation: fittings-marquee 32s linear infinite;
+  will-change: transform;
+}
+.fittings-marquee-track-alt {
+  animation-duration: 41s;
+}
+.fittings-marquee:hover .fittings-marquee-track {
+  animation-play-state: paused;
+}
+@keyframes fittings-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fittings-marquee-track {
+    animation: none;
+  }
+}
+
 /* PrimeReact's lara theme points :root and --font-family at its bundled
    "Inter var" (339 kB InterVariable woff2 + italic — the largest non-image
    asset on the landing page). WIEZ text is Plus Jakarta Sans; repointing the

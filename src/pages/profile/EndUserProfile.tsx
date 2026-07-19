@@ -183,6 +183,7 @@ export const EndUserProfile: React.FC = () => {
   const [displayChartFamily, setDisplayChartFamily] = useState<CustomOrderChartFamily>('UK');
   const [computedSize, setComputedSize] = useState<string | null>(null);
   const [computedAlphaSize, setComputedAlphaSize] = useState<string | null>(null);
+  const [computedMissingBaseline, setComputedMissingBaseline] = useState<string[]>([]);
   const [chartLoading, setChartLoading] = useState(false);
   const [chartSaving, setChartSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -359,9 +360,11 @@ export const EndUserProfile: React.FC = () => {
       const nextComputedSize = resolveComputedSizeLabel(computed);
       setComputedSize(nextComputedSize);
       setComputedAlphaSize(extractAlphaSizeFromLabel(nextComputedSize));
+      setComputedMissingBaseline(computed?.missingBaselineMeasurements ?? []);
     } catch (err) {
       setComputedSize(null);
       setComputedAlphaSize(null);
+      setComputedMissingBaseline([]);
       console.error('Failed to load computed size fit', err);
     } finally {
       setChartLoading(false);
@@ -1107,10 +1110,56 @@ export const EndUserProfile: React.FC = () => {
                       {alphaFitLabel}
                     </div>
                   ) : null}
+                  {!chartLoading && !computedSize && computedMissingBaseline.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsSizeFitOpen(true)}
+                      className="mt-1 max-w-[180px] text-right text-[11px] font-semibold leading-snug text-amber-600 transition hover:text-amber-700 dark:text-amber-300 dark:hover:text-amber-200"
+                    >
+                      Add {computedMissingBaseline.map((key) => formatMeasurementLabel(key)).join(' · ')} to see your size →
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ) : null}
           </div>
+
+          {/* ── MY FITTINGS carousel: every saved fitting from baggings, moving
+                two-by-two at the bottom of the fittings box ── */}
+          {isOwner && savedMeasurementEntries.length > 0 ? (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => setIsSizeFitOpen(true)}
+                className="mb-1.5 text-xs font-bold uppercase tracking-wide text-gray-500 transition hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-300"
+              >
+                📏 My fittings · {savedMeasurementEntries.length}
+              </button>
+              <div className="space-y-1.5">
+                {[savedMeasurementEntries.filter((_, index) => index % 2 === 0),
+                  savedMeasurementEntries.filter((_, index) => index % 2 === 1)]
+                  .filter((row) => row.length > 0)
+                  .map((row, rowIndex) => (
+                    <div key={rowIndex} className="fittings-marquee overflow-hidden">
+                      <div
+                        className={`fittings-marquee-track flex w-max gap-1.5 ${rowIndex === 1 ? 'fittings-marquee-track-alt' : ''}`}
+                      >
+                        {[...row, ...row].map(([key, value], chipIndex) => (
+                          <button
+                            key={`${key}-${chipIndex}`}
+                            type="button"
+                            onClick={() => setIsSizeFitOpen(true)}
+                            className="shrink-0 rounded-lg border border-gray-200/70 bg-gray-50/80 px-2 py-1 text-xs font-semibold text-gray-700 transition hover:border-indigo-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-indigo-400/50"
+                          >
+                            {formatMeasurementLabel(key)} · {String(value)} {measurementUnitLabel}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ) : null}
 
           {/* ── ACTION BAR ── */}
           {isOwner ? (
@@ -1151,33 +1200,19 @@ export const EndUserProfile: React.FC = () => {
                   <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">
                     {alphaFitLabel}
                   </div>
+                ) : !chartLoading && !computedSize && computedMissingBaseline.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsSizeFitOpen(true)}
+                    className="min-w-0 flex-1 text-left text-[10px] font-semibold leading-snug text-amber-600 dark:text-amber-300"
+                  >
+                    Add {computedMissingBaseline.map((key) => formatMeasurementLabel(key)).join(' · ')} →
+                  </button>
                 ) : null}
               </div>
             </div>
           ) : null}
 
-          {/* ── MY FITTINGS quick view (owner): saved measurements at a glance ── */}
-          {isOwner && savedMeasurementEntries.length > 0 ? (
-            <div className="mt-3">
-              <button
-                type="button"
-                onClick={() => setIsSizeFitOpen(true)}
-                className="mb-1.5 text-xs font-bold uppercase tracking-wide text-gray-500 transition hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-300"
-              >
-                📏 My fittings · {savedMeasurementEntries.length}
-              </button>
-              <div className="flex flex-wrap gap-1.5">
-                {savedMeasurementEntries.map(([key, value]) => (
-                  <span
-                    key={key}
-                    className="rounded-lg border border-gray-200/70 bg-gray-50/80 px-2 py-1 text-xs font-semibold text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
-                  >
-                    {formatMeasurementLabel(key)} · {String(value)} {measurementUnitLabel}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : null}
         </motion.section>
 
         {/* ── TAB BAR ── */}
