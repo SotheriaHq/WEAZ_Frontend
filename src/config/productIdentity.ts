@@ -13,8 +13,8 @@ export const LEGAL_EMAIL =
   import.meta.env.VITE_LEGAL_EMAIL || '[PRODUCT CONFIRMATION NEEDED]';
 export const COPYRIGHT_OWNER = '[PRODUCT CONFIRMATION NEEDED]';
 
-export const COMPANY_LOGO_PATH = '/brand/wiez-logo-mark.svg';
-export const COMPANY_LOGO_LOCKUP_PATH = '/brand/wiez-logo-lockup.svg';
+export const COMPANY_LOGO_PATH = '/brand/wiez-logo-mark.png';
+export const COMPANY_LOGO_LOCKUP_PATH = '/brand/wiez-logo-lockup.png';
 export const COMPANY_WORDMARK_PATH = '/brand/wiez-wordmark.svg';
 export const COMPANY_FAVICON_PATH = '/brand/wiez-favicon.svg';
 export const LOGO_ACCESSIBILITY_LABEL = `${APP_NAME} logo`;
