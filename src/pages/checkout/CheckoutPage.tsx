@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
+import BackLink from '@/components/ui/BackLink';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { formatPrice } from '@/utils/helpers';
@@ -253,19 +254,9 @@ function isActiveCardValidationSession(
   return Number.isFinite(expiry) && expiry > Date.now();
 }
 
-const CheckoutBackLink: React.FC<{
-  label: string;
-  onClick: () => void;
-}> = ({ label, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 underline decoration-slate-400/80 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 dark:text-slate-200 dark:decoration-slate-500 dark:hover:text-white"
-  >
-    <span aria-hidden>←</span>
-    <span>{label}</span>
-  </button>
-);
+// Shared, stable back affordance (see components/ui/BackLink). Kept as a local
+// alias so the existing call sites below read unchanged.
+const CheckoutBackLink = BackLink;
 
 const CheckoutPanel: React.FC<{
   kicker: string;

@@ -14,6 +14,7 @@ import { getCheckoutStatusCopy } from '@/pages/checkout/checkoutStatusCopy';
 import { setRuntimeCardholderNameMatchMode } from '@/pages/checkout/paymentFlow';
 import { canOfferCustomOrderCardRetry } from '@/pages/checkout/paymentRetryFlow';
 import { fetchCart, openCartDrawer } from '@/features/cartSlice';
+import { queryClient } from '@/query/queryClient';
 import type { AppDispatch } from '@/store';
 
 type ViewState = 'verifying' | 'resolved' | 'missing';
@@ -168,6 +169,14 @@ const PaymentReturnPage: React.FC = () => {
   ) => {
     if (status === 'PAID') {
       await dispatch(fetchCart({ force: true }));
+      // A new order now exists. The Orders tab uses a cache-first resource with
+      // refetchOnMount:false, so without this it paints the pre-order cache and
+      // the buyer had to hard-refresh to see the order they just placed. Force a
+      // fresh fetch (active + inactive) so the tab is populated on arrival.
+      void queryClient.invalidateQueries({
+        queryKey: ['profile', 'orders', 'me'],
+        refetchType: 'all',
+      });
       toast.success('Your order is placed successfully, Thank you for shopping.');
       navigate(`/bag/confirmation?reference=${encodeURIComponent(reference)}`, {
         replace: options?.replace,

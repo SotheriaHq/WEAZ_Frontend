@@ -545,12 +545,22 @@ const MessagingManagementPage: React.FC = () => {
     }
   }, [refetchInboxResource]);
 
-  /* ---- Auto-select from URL params ---- */
+  /* ---- Auto-select from URL params ----
+     When a specific order/custom order/thread is requested we must open THAT
+     conversation. Custom-order chats are buyer<->brand (DIRECT) threads linked
+     to the order, so they never match by contextType==='CUSTOM_ORDER'; we
+     resolve the reference to its real thread server-side (actor-scoped) instead
+     of silently selecting conversations[0] — which was opening the wrong
+     brand's chat. Only default to the first conversation when NO specific
+     context was requested. */
+  const contextResolveKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (conversations.length === 0) { setActiveId(''); return; }
 
     const queryOrderId = params.get('orderId');
     const queryCustomOrderId = params.get('customOrderId');
+    const queryThreadId = params.get('threadId') || params.get('thread');
+    const hasExplicitContext = Boolean(queryOrderId || queryCustomOrderId || queryThreadId);
 
     if (queryOrderId) {
       const t = conversations.find((i) => i.contextType === 'STANDARD_ORDER' && i.orderId === queryOrderId);
@@ -561,7 +571,6 @@ const MessagingManagementPage: React.FC = () => {
       if (t) { setActiveId(t.id); return; }
     }
 
-    const queryThreadId = params.get('threadId') || params.get('thread');
     if (queryThreadId) {
       if (conversations.some((i) => i.id === queryThreadId)) { setActiveId(queryThreadId); return; }
       void messagingApi.resolveThreadRoute(queryThreadId).then((resolved) => {
@@ -571,9 +580,36 @@ const MessagingManagementPage: React.FC = () => {
         if (resolved.customOrderId) next.set('customOrderId', resolved.customOrderId);
         setParams(next, { replace: true });
       }).catch(() => {});
+      return;
     }
 
-    if (!activeId || !conversations.some((i) => i.id === activeId)) {
+    // Explicit order/custom-order that didn't directly match an inbox item:
+    // resolve it to its actual (often DIRECT/BUYER_BRAND) thread. Never fall
+    // through to conversations[0] here — that opened an unrelated brand's chat.
+    if (queryOrderId || queryCustomOrderId) {
+      const resolveKey = `co:${queryCustomOrderId ?? ''}|o:${queryOrderId ?? ''}`;
+      if (contextResolveKeyRef.current !== resolveKey) {
+        contextResolveKeyRef.current = resolveKey;
+        void messagingApi.resolveConversation({
+          orderId: queryOrderId ?? undefined,
+          customOrderId: queryCustomOrderId ?? undefined,
+        }).then((resolved) => {
+          if (!resolved?.threadId) return;
+          if (conversations.some((i) => i.id === resolved.threadId)) {
+            setActiveId(resolved.threadId);
+          } else {
+            const next = new URLSearchParams(params);
+            next.set('threadId', resolved.threadId);
+            setParams(next, { replace: true });
+          }
+        }).catch(() => {
+          // Leave nothing selected rather than opening the wrong conversation.
+        });
+      }
+      return;
+    }
+
+    if (!hasExplicitContext && (!activeId || !conversations.some((i) => i.id === activeId))) {
       setActiveId(conversations[0].id);
     }
   }, [activeId, conversations, params, setParams]);

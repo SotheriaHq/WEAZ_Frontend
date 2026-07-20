@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminDashboardApi } from '../../api/AdminApi';
 import { unwrapApiResponse } from '@/types/auth';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import useCachedResource from '@/hooks/useCachedResource';
+import { THREADLY_COUNT_STALE_TIME_MS } from '@/query/queryClient';
 
 type RecentLog = {
   id: string;
@@ -102,23 +104,22 @@ const statusBadge = (status: string | null | undefined) => {
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Near-real-time platform stats: polls every 20s (pauses when the tab is
+  // hidden) so the admin overview reflects live counts without a manual refresh.
+  const { data: stats, loading } = useCachedResource<DashboardStats>({
+    queryKey: ['admin', 'dashboard', 'stats'],
+    queryFn: async () => {
+      const res = await adminDashboardApi.getStats();
+      return unwrapApiResponse<DashboardStats>(res.data as any);
+    },
+    staleTime: THREADLY_COUNT_STALE_TIME_MS,
+    refetchInterval: 20_000,
+  });
 
-  useEffect(() => {
-    adminDashboardApi
-      .getStats()
-      .then((res) => {
-        const payload = unwrapApiResponse<DashboardStats>(res.data as any);
-        setStats(payload);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
+  // Deltas are derived from real stats only — no fabricated growth numbers.
   const primaryCards = [
-    { label: 'Total Users', value: stats?.totalUsers, change: '+12.4% vs last month', changeType: 'up' as const, color: 'indigo', route: '/admin/users' },
-    { label: 'Active Brands', value: stats?.totalBrands, change: `+${stats?.totalBrands ? Math.round(stats.totalBrands * 0.013) : 0} new this week`, changeType: 'up' as const, color: 'fuchsia', route: '/admin/brands' },
+    { label: 'Total Users', value: stats?.totalUsers, change: stats?.activeUsers30d != null ? `${stats.activeUsers30d.toLocaleString()} active in 30d` : 'Registered users', changeType: 'up' as const, color: 'indigo', route: '/admin/users' },
+    { label: 'Active Brands', value: stats?.totalBrands, change: 'Active on platform', changeType: 'neutral' as const, color: 'fuchsia', route: '/admin/brands' },
     { label: 'Pending Reviews', value: stats?.pendingVerifications, change: 'Action Required', changeType: 'warning' as const, color: 'amber', route: '/admin/moderation' },
     { label: 'Open Disputes', value: stats?.openDisputes, change: 'Needs attention', changeType: 'warning' as const, color: 'red', route: '/admin/disputes' },
   ];

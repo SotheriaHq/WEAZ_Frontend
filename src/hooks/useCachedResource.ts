@@ -47,6 +47,12 @@ export interface CachedResourceOptions<T> {
   staleTime?: number;
   /** Override the global 30-minute in-memory retention for this resource. */
   gcTime?: number;
+  /**
+   * Poll interval in ms for near-real-time data (e.g. dashboards, live counts).
+   * Omit to disable polling (default). Polling pauses while the tab is in the
+   * background to avoid needless load.
+   */
+  refetchInterval?: number;
 }
 
 export interface CachedResource<T> {
@@ -66,7 +72,7 @@ export interface CachedResource<T> {
 export function useCachedResource<T>(
   options: CachedResourceOptions<T>,
 ): CachedResource<T> {
-  const { queryKey, queryFn, enabled = true, initialData, staleTime, gcTime } = options;
+  const { queryKey, queryFn, enabled = true, initialData, staleTime, gcTime, refetchInterval } = options;
 
   const query = useQuery<T>({
     queryKey,
@@ -75,6 +81,9 @@ export function useCachedResource<T>(
     ...(initialData !== undefined ? { initialData } : {}),
     ...(staleTime !== undefined ? { staleTime } : {}),
     ...(gcTime !== undefined ? { gcTime } : {}),
+    ...(refetchInterval !== undefined
+      ? { refetchInterval, refetchIntervalInBackground: false }
+      : {}),
   });
 
   return {

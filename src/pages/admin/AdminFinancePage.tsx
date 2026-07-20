@@ -446,6 +446,18 @@ const AdminFinancePage: React.FC = () => {
     void loadOverview();
   }, [loadOverview]);
 
+  // Near-real-time finance metrics: refresh the overview every 20s (paused when
+  // the tab is hidden). The payments table is intentionally NOT auto-refreshed
+  // so it doesn't reorder while an admin is reading/filtering it.
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadOverview();
+      }
+    }, 20_000);
+    return () => window.clearInterval(interval);
+  }, [loadOverview]);
+
   useEffect(() => {
     if (activeTab === 'payments') void loadPayments();
     if (activeTab === 'escrow') void loadEscrow();

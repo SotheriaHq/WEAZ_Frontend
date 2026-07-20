@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { CustomOrderProgressStage } from '@/api/CustomOrderApi';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { humanizeCustomOrderToken } from './customOrderFormatting';
@@ -357,31 +357,80 @@ export const CustomOrderWorkspaceTabs: React.FC<{
   </div>
 );
 
-export const CustomOrderMediaPreview: React.FC<{ src?: string | null; title: string; emoji?: string; className?: string }> = ({
-  src,
-  title,
-  emoji = '🧵',
-  className,
-}) => (
-  <div className={`group relative overflow-hidden rounded-[2rem] border border-white/40 bg-gradient-to-b from-black/[0.02] to-black/[0.05] shadow-sm dark:border-white/10 dark:from-white/[0.02] dark:to-white/[0.05] ${className ?? ''}`}>
-    {src ? (
-      <>
-        <ImageWithFallback
-          src={src}
-          alt={title}
-          fallbackName={title}
-          fit="contain"
-          rounded="none"
-          containerClassName="flex min-h-[240px] w-full items-center justify-center overflow-hidden lg:min-h-[320px]"
-          className="h-auto w-full max-h-[85vh] transition-transform duration-700 group-hover:scale-[1.02]"
-          maxHeightClassName="max-h-[85vh]"
-        />
-        <div className="pointer-events-none absolute inset-0 rounded-[2rem] ring-1 ring-inset ring-black/10 dark:ring-white/10" />
-      </>
-    ) : (
-      <div className="flex min-h-[260px] items-center justify-center bg-slate-900 text-7xl text-white transition-colors duration-500 group-hover:bg-slate-800 dark:bg-slate-950">
-        <span aria-hidden="true" className="transition-transform duration-500 group-hover:scale-110">{emoji}</span>
-      </div>
-    )}
-  </div>
-);
+export const CustomOrderMediaPreview: React.FC<{
+  src?: string | null;
+  /** All angles the designer posted. When >1, a thumbnail gallery is shown. */
+  sources?: Array<string | null | undefined> | null;
+  title: string;
+  emoji?: string;
+  className?: string;
+}> = ({ src, sources, title, emoji = '🧵', className }) => {
+  // Prefer the explicit multi-angle list; fall back to the single cover so all
+  // existing single-image callers keep working unchanged (Rule 31 additive).
+  const images = useMemo(() => {
+    const list = (sources && sources.length > 0 ? sources : [src])
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .filter((value): value is string => value.length > 0);
+    return Array.from(new Set(list));
+  }, [sources, src]);
+
+  const [activeIndex, setActiveIndex] = useState(0);
+  useEffect(() => {
+    // Reset when the underlying set of images changes (e.g. switching orders).
+    setActiveIndex(0);
+  }, [images.join('|')]);
+
+  const activeSrc = images[Math.min(activeIndex, images.length - 1)] ?? null;
+
+  return (
+    <div className={`group relative overflow-hidden rounded-[2rem] border border-white/40 bg-gradient-to-b from-black/[0.02] to-black/[0.05] shadow-sm dark:border-white/10 dark:from-white/[0.02] dark:to-white/[0.05] ${className ?? ''}`}>
+      {activeSrc ? (
+        <>
+          <ImageWithFallback
+            src={activeSrc}
+            alt={images.length > 1 ? `${title} — angle ${activeIndex + 1}` : title}
+            fallbackName={title}
+            fit="contain"
+            rounded="none"
+            containerClassName="flex min-h-[240px] w-full items-center justify-center overflow-hidden lg:min-h-[320px]"
+            className="h-auto w-full max-h-[85vh] transition-transform duration-700 group-hover:scale-[1.02]"
+            maxHeightClassName="max-h-[85vh]"
+          />
+          <div className="pointer-events-none absolute inset-0 rounded-[2rem] ring-1 ring-inset ring-black/10 dark:ring-white/10" />
+          {images.length > 1 ? (
+            <div className="absolute inset-x-0 bottom-0 flex gap-2 overflow-x-auto no-scrollbar bg-gradient-to-t from-black/40 to-transparent p-3">
+              {images.map((image, index) => (
+                <button
+                  key={image}
+                  type="button"
+                  onClick={() => setActiveIndex(index)}
+                  aria-label={`View ${title} angle ${index + 1}`}
+                  aria-current={index === activeIndex}
+                  className={`h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border transition ${
+                    index === activeIndex
+                      ? 'border-white ring-2 ring-white'
+                      : 'border-white/40 opacity-80 hover:opacity-100'
+                  }`}
+                >
+                  <ImageWithFallback
+                    src={image}
+                    alt={`${title} angle ${index + 1}`}
+                    fallbackName={title}
+                    fit="contain"
+                    rounded="none"
+                    containerClassName="flex h-full w-full items-center justify-center bg-black/[0.04] dark:bg-white/[0.06]"
+                    className="h-full w-full"
+                  />
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <div className="flex min-h-[260px] items-center justify-center bg-slate-900 text-7xl text-white transition-colors duration-500 group-hover:bg-slate-800 dark:bg-slate-950">
+          <span aria-hidden="true" className="transition-transform duration-500 group-hover:scale-110">{emoji}</span>
+        </div>
+      )}
+    </div>
+  );
+};

@@ -191,6 +191,8 @@ const DashboardHome: React.FC = () => {
       }
     },
     enabled: Boolean(user?.id),
+    // Near-real-time studio metrics: poll every 20s, paused when tab is hidden.
+    refetchInterval: 20_000,
   });
 
   const overview = dashboardData?.overview ?? null;

@@ -536,6 +536,21 @@ export const messagingApi = {
     return unwrapApiResponse<ResolvedThreadRoute>(response.data);
   },
 
+  // Resolve a conversation from a context reference (order/custom order/brand)
+  // to its actual thread. Actor-scoped server-side (JWT), so it only ever
+  // returns a thread the caller participates in — no cross-account resolution.
+  async resolveConversation(params: {
+    orderId?: string;
+    customOrderId?: string;
+    brandId?: string;
+    threadId?: string;
+  }) {
+    const response = await apiClient.get('/messaging/conversations/resolve', {
+      params,
+    });
+    return unwrapApiResponse<ResolvedThreadRoute>(response.data);
+  },
+
   async listThreadMessages(threadId: string, params?: { cursorCreatedAt?: string; cursorId?: string; limit?: number }) {
     const response = await apiClient.get(`/messaging/threads/${threadId}/messages`, { params });
     return parseMessageList(response.data);

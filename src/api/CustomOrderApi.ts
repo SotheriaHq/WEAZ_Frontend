@@ -376,6 +376,8 @@ export interface CustomOrderDetail {
     title: string;
     slug?: string | null;
     primaryMediaUrl?: string | null;
+    /** All renderable angles the designer posted (falls back to the cover). */
+    mediaUrls?: string[] | null;
     brandName?: string | null;
   };
   configurationVersionId: string;

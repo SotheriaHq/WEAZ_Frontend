@@ -50,6 +50,7 @@ import {
   type PaymentFormState,
 } from '@/pages/checkout/paymentFlow';
 import { useConfirm } from '@/components/ui/useConfirm';
+import BackLink from '@/components/ui/BackLink';
 import { useCachedResource } from '@/hooks/useCachedResource';
 import { queryClient } from '@/query/queryClient';
 
@@ -476,6 +477,11 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
   }
 
   const firstItem = order.items?.[0] ?? null;
+  const standardMediaUrls = (firstItem?.images && firstItem.images.length > 0)
+    ? firstItem.images
+    : firstItem?.thumbnail
+      ? [firstItem.thumbnail]
+      : [];
   const canConfirmDelivery =
     (order.status === 'SHIPPED' || order.status === 'DELIVERED') &&
     order.paymentStatus === 'PAID' &&
@@ -497,37 +503,21 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-full border border-gray-200/80 bg-white/80 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-fuchsia-300 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:text-white"
-        >
-          Back to orders
-        </button>
+        <BackLink label="Back to orders" onClick={onBack} variant="pill" />
         <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
           Standard order
         </div>
       </div>
 
       <section className="overflow-hidden rounded-[28px] border border-gray-200/80 bg-white/70 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
-        <div className="grid gap-6 p-6 lg:grid-cols-[180px_minmax(0,1fr)]">
-          <div className="aspect-square overflow-hidden rounded-3xl border border-gray-200 dark:border-white/10">
-            {firstItem?.thumbnail ? (
-              <ImageWithFallback
-                src={firstItem.thumbnail}
-                alt={firstItem.name}
-                fit="contain"
-                rounded="none"
-                className="h-full w-full"
-                containerClassName="h-full w-full overflow-hidden"
-                maxHeightClassName="max-h-[85vh]"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-gray-400 dark:text-gray-500">
-                No image
-              </div>
-            )}
-          </div>
+        <div className="grid gap-6 p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <CustomOrderMediaPreview
+            src={firstItem?.thumbnail ?? null}
+            sources={standardMediaUrls}
+            title={firstItem?.name || 'Order item'}
+            emoji="🛍️"
+            className="min-h-[240px] lg:min-h-[320px]"
+          />
 
           <div className="space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1069,6 +1059,11 @@ export const BuyerCustomOrderDetailView: React.FC<{
   }, [order]);
   const hasTimelineEntries = timelineReceiptEntries.length > 0;
   const mediaUrl = order?.source.primaryMediaUrl ?? previewOrder?.sourcePrimaryMediaUrl ?? null;
+  const sourceMediaUrls = (order?.source.mediaUrls && order.source.mediaUrls.length > 0)
+    ? order.source.mediaUrls
+    : mediaUrl
+      ? [mediaUrl]
+      : [];
   const title = order?.source.title ?? previewOrder?.sourceTitle ?? 'Custom order';
   const brandName = order?.source.brandName ?? previewOrder?.brand?.name ?? 'Brand';
   const paymentStatusValue = order?.paymentStatus ?? previewOrder?.paymentStatus ?? null;
@@ -1172,13 +1167,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
     <div className="space-y-6">
       {ConfirmDialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-full border border-gray-200/80 bg-white/80 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-fuchsia-300 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:text-white"
-        >
-          Back to orders
-        </button>
+        <BackLink label="Back to orders" onClick={onBack} variant="pill" />
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -1195,6 +1184,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
         <div className="grid gap-6 p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           <CustomOrderMediaPreview
             src={mediaUrl}
+            sources={sourceMediaUrls}
             title={title}
             className="min-h-[240px] lg:min-h-[320px]"
           />

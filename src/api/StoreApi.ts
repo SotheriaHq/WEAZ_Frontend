@@ -225,6 +225,8 @@ export interface OrderItem {
   productName?: string | null;
   thumbnail?: string | null;
   image?: string | null;
+  /** All renderable angles for this product (falls back to the cover). */
+  images?: string[] | null;
   price: number;
   unitPrice?: number;
   quantity: number;
