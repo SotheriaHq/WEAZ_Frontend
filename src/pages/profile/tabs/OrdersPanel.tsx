@@ -53,6 +53,7 @@ import { useConfirm } from '@/components/ui/useConfirm';
 import BackLink from '@/components/ui/BackLink';
 import { useCachedResource } from '@/hooks/useCachedResource';
 import { queryClient } from '@/query/queryClient';
+import { useRealtime } from '@/realtime/RealtimeProvider';
 
 const STANDARD_STATUS_OPTIONS = ['ALL', 'PENDING', 'PROCESSING', 'SHIPPED'] as const;
 const CUSTOM_STATUS_OPTIONS = ['ALL', 'PENDING', 'ACTIVE', 'COMPLETED', 'ISSUES'] as const;
@@ -1640,6 +1641,22 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
 }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { onNotification } = useRealtime();
+
+  useEffect(() => {
+    return onNotification((payload) => {
+      if (
+        payload.type === 'order.updated' ||
+        payload.type === 'notification.created' ||
+        payload.type === 'custom-order.updated'
+      ) {
+        void queryClient.invalidateQueries({ queryKey: ['profile', 'orders', 'me'] });
+        void queryClient.invalidateQueries({ queryKey: ['orders', 'detail'] });
+        void queryClient.invalidateQueries({ queryKey: ['orders', 'customDetail'] });
+      }
+    });
+  }, [onNotification]);
+
   // Cached through the shared query client so returning to the Orders tab paints
   // instantly from cache instead of flashing the skeleton + refetching every time.
   const {
@@ -2019,6 +2036,13 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                           }`}
                         />
                       ))}
+                    </div>
+
+                    <div className="mt-1.5 flex justify-between text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      <span className={completedSegments >= 1 ? "text-fuchsia-600 dark:text-fuchsia-400 font-extrabold" : ""}>Pending</span>
+                      <span className={completedSegments >= 2 ? "text-fuchsia-600 dark:text-fuchsia-400 font-extrabold" : ""}>Processing</span>
+                      <span className={completedSegments >= 3 ? "text-fuchsia-600 dark:text-fuchsia-400 font-extrabold" : ""}>Shipped</span>
+                      <span className={completedSegments >= 4 ? "text-fuchsia-600 dark:text-fuchsia-400 font-extrabold" : ""}>Delivered</span>
                     </div>
                   </button>
                 );

@@ -3,6 +3,8 @@ import React from 'react';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { COMPANY_LOGO_PATH, COMPANY_NAME } from '@/lib/brand';
 
+import { useTheme } from '@/context/ThemeContext';
+
 // New WIEZ monogram mark (tight-cropped): width/height of the deep-dark art.
 // `size` is the rendered height; width follows this ratio.
 const WIEZ_MARK_ASPECT_RATIO = 783 / 504;
@@ -18,6 +20,7 @@ const WiezLogo: React.FC<WiezLogoProps> = ({
   className = '',
   decorative = true,
 }) => {
+  const { resolvedTheme } = useTheme();
   const width = Math.round(size * WIEZ_MARK_ASPECT_RATIO);
 
   return (
@@ -26,6 +29,7 @@ const WiezLogo: React.FC<WiezLogoProps> = ({
       style={{
         width: `${width}px`,
         height: `${size}px`,
+        filter: resolvedTheme === 'dark' ? 'invert(1)' : undefined,
       }}
     >
       <MediaRenderer

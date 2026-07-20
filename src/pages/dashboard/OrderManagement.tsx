@@ -516,14 +516,6 @@ const OrderManagement: React.FC = () => {
           >
             ⭳ Export CSV
           </button>
-          <button
-            type="button"
-            disabled
-            className="rounded-2xl bg-[linear-gradient(135deg,#f97316,#c2410c)] px-5 py-2 text-sm font-semibold text-white opacity-75 shadow-[0_18px_40px_rgba(249,115,22,0.22)]"
-            title="Manual order creation is not implemented yet"
-          >
-            ＋ Create Manual Order
-          </button>
         </div>
       </section>
 
@@ -611,22 +603,22 @@ const OrderManagement: React.FC = () => {
         <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full min-w-[900px] border-collapse text-left sm:min-w-[980px] lg:min-w-[1080px]">
             <thead>
-              <tr className="border-b border-slate-200/80 bg-slate-100/80 dark:border-white/10 dark:bg-white/[0.03]">
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Order ID</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Customer</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Items</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Details</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Status</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Message</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Payment</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Amount</th>
-                <th className="sticky right-0 bg-slate-100/95 px-6 py-4 dark:bg-zinc-900" />
+              <tr className="bg-slate-50 dark:bg-white/[0.02]">
+                <th className="w-[10%] min-w-[95px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Order ID</th>
+                <th className="w-[20%] min-w-[160px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Customer</th>
+                <th className="w-[8%] min-w-[65px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Items</th>
+                <th className="w-[22%] min-w-[180px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Details</th>
+                <th className="w-[11%] min-w-[95px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Status</th>
+                <th className="w-[7%] min-w-[60px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Message</th>
+                <th className="w-[11%] min-w-[95px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Payment</th>
+                <th className="w-[8%] min-w-[70px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Amount</th>
+                <th className="w-[3%] min-w-[30px] px-3 py-3" />
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-16 text-center">
+                  <td colSpan={9} className="px-3 py-16 text-center">
                     <div className="space-y-3">
                       {Array.from({ length: 5 }).map((_, index) => (
                         <div
@@ -639,7 +631,7 @@ const OrderManagement: React.FC = () => {
                 </tr>
               ) : sortedOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-16 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <td colSpan={9} className="px-3 py-16 text-center text-sm text-slate-500 dark:text-slate-400">
                     No orders found matching your criteria.
                   </td>
                 </tr>
@@ -655,16 +647,16 @@ const OrderManagement: React.FC = () => {
                     <tr
                       key={order.id}
                       onClick={() => setSelectedOrder({ id: order.id })}
-                      className="cursor-pointer border-b border-slate-200/70 transition hover:bg-slate-100/70 dark:border-white/6 dark:hover:bg-white/[0.025]"
+                      className="cursor-pointer transition hover:bg-slate-50 dark:hover:bg-white/[0.015]"
                     >
-                      <td className="px-6 py-4 align-top">
+                      <td className="px-3 py-4 align-middle">
                         <p className="font-mono text-sm font-semibold tracking-tight text-orange-600 dark:text-orange-400">
                           #{order.id.slice(0, 8).toUpperCase()}
                         </p>
                         <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-500">{getRelativeTime(order.createdAt)}</p>
                       </td>
 
-                      <td className="px-6 py-4 align-top">
+                      <td className="px-3 py-4 align-middle">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500/15 text-xs font-black text-orange-600 dark:text-orange-300">
                             {getInitials(order.customerName)}
@@ -676,7 +668,7 @@ const OrderManagement: React.FC = () => {
                         </div>
                       </td>
 
-                      <td className="px-6 py-4 align-top">
+                      <td className="px-3 py-4 align-middle">
                         <div className="flex items-center gap-2">
                           {previews.length > 0 ? (
                             previews.map((item, index) => (
@@ -688,7 +680,7 @@ const OrderManagement: React.FC = () => {
                                 return (
                                   <div
                                     key={item.orderItemId || item.id || `${order.id}-${index}`}
-                                    className={`h-10 w-10 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/5 ${index > 0 ? '-ml-4' : ''}`}
+                                    className={`h-10 w-10 overflow-hidden rounded-xl bg-white shadow-sm dark:bg-white/5 ${index > 0 ? '-ml-4' : ''}`}
                                   >
                                     <ImageWithFallback
                                       src={src}
@@ -704,7 +696,7 @@ const OrderManagement: React.FC = () => {
                               })()
                             ))
                           ) : (
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm dark:border-white/10 dark:bg-white/5">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-sm dark:bg-white/5">
                               🧵
                             </div>
                           )}
@@ -717,37 +709,37 @@ const OrderManagement: React.FC = () => {
                         </div>
                       </td>
 
-                      <td className="px-6 py-4 align-top">
+                      <td className="px-3 py-4 align-middle">
                         <p className="max-w-[240px] truncate text-sm text-slate-700 dark:text-slate-200">{fit.primaryName}</p>
                         {fit.detailLine ? (
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">{fit.detailLine}</p>
                         ) : null}
                         <div className="mt-2 flex flex-wrap gap-2">
-                          <span className={`inline-flex rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${fit.usesCustomSizing ? 'border-indigo-500/20 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300' : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'}`}>
+                          <span className={`inline-flex rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${fit.usesCustomSizing ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300' : 'bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-300'}`}>
                             {fit.sizingLabel}
                           </span>
                           {fit.measurementCount > 0 ? (
-                            <span className="inline-flex rounded-md border border-orange-500/20 bg-orange-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-orange-700 dark:text-orange-300">
+                            <span className="inline-flex rounded-md bg-orange-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-orange-700 dark:text-orange-300">
                               {fit.measurementCount} points
                             </span>
                           ) : null}
                         </div>
                       </td>
 
-                      <td className="px-6 py-4 align-top">
-                        <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getStatusClasses(order.status)}`}>
+                      <td className="px-3 py-4 align-middle">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${getStatusClasses(order.status)}`}>
                           {order.status}
                         </span>
                       </td>
 
-                      <td className="px-6 py-4 align-top">
+                      <td className="px-3 py-4 align-middle">
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             setChatOrder({ id: order.id, customerName: order.customerName });
                           }}
-                          className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-lg transition hover:border-orange-300 hover:bg-orange-50 dark:border-white/10 dark:bg-white/5"
+                          className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-lg transition hover:bg-orange-500/10 dark:bg-white/[0.04]"
                           aria-label={`Open message thread for order ${order.id}`}
                           title="Open order chat"
                         >
@@ -760,24 +752,24 @@ const OrderManagement: React.FC = () => {
                         </button>
                       </td>
 
-                      <td className="px-6 py-4 align-top">
-                        <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getPaymentClasses(order.paymentStatus)}`}>
+                      <td className="px-3 py-4 align-middle">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${getPaymentClasses(order.paymentStatus)}`}>
                           {order.paymentStatus || 'PENDING'}
                         </span>
                       </td>
 
-                      <td className="px-6 py-4 align-top">
+                      <td className="px-3 py-4 align-middle">
                         <p className="text-sm font-black">{formatCurrency(normalizeAmount(order.totalAmount), order.currency)}</p>
                       </td>
 
-                      <td className="sticky right-0 bg-white/95 px-6 py-4 text-right align-top dark:bg-zinc-900">
+                      <td className="px-3 py-4 text-right align-middle">
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             setSelectedOrder({ id: order.id });
                           }}
-                          className="rounded-xl border border-transparent px-3 py-2 text-lg leading-none text-slate-500 transition hover:border-slate-200 hover:bg-slate-100 hover:text-slate-900 dark:hover:border-white/10 dark:hover:bg-white/5 dark:hover:text-white"
+                          className="rounded-xl px-3 py-2 text-lg leading-none text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/5 dark:hover:text-white"
                           aria-label={`View order ${order.id}`}
                         >
                           ...
@@ -802,7 +794,7 @@ const OrderManagement: React.FC = () => {
               type="button"
               onClick={() => setPage((current) => Math.max(1, current - 1))}
               disabled={page === 1}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-sm font-bold text-slate-500 transition hover:border-orange-300 hover:text-orange-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-sm font-bold text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/[0.08]"
             >
               {'<'}
             </button>
@@ -818,7 +810,7 @@ const OrderManagement: React.FC = () => {
                     className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold transition ${
                       active
                         ? 'bg-orange-500 text-white'
-                        : 'border border-slate-200 bg-white/80 text-slate-500 hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'
+                        : 'bg-slate-50 text-slate-500 hover:bg-slate-100 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/[0.08]'
                     }`}
                   >
                     {targetPage}
@@ -830,7 +822,7 @@ const OrderManagement: React.FC = () => {
               type="button"
               onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
               disabled={page === totalPages}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-sm font-bold text-slate-500 transition hover:border-orange-300 hover:text-orange-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-sm font-bold text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/[0.08]"
             >
               {'>'}
             </button>
