@@ -1119,6 +1119,7 @@ const AdminTaxonomyPage: React.FC = () => {
     [],
   );
 
+
   const measurementLifecycleCategoryOptions = useMemo(
     () => [
       { value: 'all', label: 'Category: All' },
@@ -1138,32 +1139,6 @@ const AdminTaxonomyPage: React.FC = () => {
     ],
     [],
   );
-
-  void [
-    globalYardBasisLabel,
-    configurationMeasurementKeys,
-    configurationMeasurementGender,
-    editingGlobalYardBasisId,
-    globalYardBasisSaving,
-    globalYardBasisLoading,
-    fetchGlobalYardBases,
-    resetGlobalYardBasisForm,
-    saveGlobalYardBasis,
-    startEditingGlobalYardBasis,
-    deleteGlobalYardBasis,
-    availableMeasurementKeyOptions,
-    sortedGlobalYardBases,
-    configurationGenderOptions,
-    measurementSortOptions,
-    converterUnitOptions,
-    measurementLifecycleSortOptions,
-    measurementLifecycleStatusOptions,
-    measurementLifecycleSourceOptions,
-    measurementLifecycleCategoryOptions,
-    measurementLifecycleActiveOptions,
-    openMeasurementLifecycle,
-    applyMeasurementLifecycleAction,
-  ];
 
   const executeConfirm = async () => {
     if (!confirmAction) return;
@@ -1305,10 +1280,10 @@ const AdminTaxonomyPage: React.FC = () => {
   const toggleSubCategoryActive = (subCategory: AdminSubCategory) => {
     const isActive = subCategory.isActive !== false;
     setConfirmAction({
-      title: `${isActive ? 'Deactivate' : 'Activate'} ${subCategory.name}?`,
+      title: `${isActive ? "Deactivate" : "Activate"} ${subCategory.name}?`,
       message: isActive
-        ? 'This sub-category will no longer appear in active taxonomy lists.'
-        : 'This sub-category will be visible in active taxonomy lists again.',
+        ? "This sub-category will no longer appear in active taxonomy lists."
+        : "This sub-category will be visible in active taxonomy lists again.",
       isDestructive: isActive,
       action: async () => {
         if (isActive) {
@@ -1323,7 +1298,7 @@ const AdminTaxonomyPage: React.FC = () => {
 
   const handleReviewSizeChart = async (
     chartId: string,
-    action: 'approve' | 'reject',
+    action: "approve" | "reject",
     reason?: string,
   ) => {
     if (!canReviewModerationQueue) {
@@ -1333,11 +1308,12 @@ const AdminTaxonomyPage: React.FC = () => {
 
     const rejectReason = String(reason ?? '').trim();
     if (action === 'reject' && !rejectReason) {
-      toast.error('Provide a rejection reason before sending this chart back.');
+      toast.error('Reason is required when rejecting a size chart.');
       return;
     }
 
     setReviewingIds((current) => ({ ...current, [chartId]: true }));
+
     try {
       await adminModerationApi.reviewItem(chartId, {
         action,
@@ -1355,31 +1331,58 @@ const AdminTaxonomyPage: React.FC = () => {
     }
   };
 
+  void [
+    formatGender,
+    globalYardBasisSaving,
+    globalYardBasisLoading,
+    setMeasurementLifecycleSearch,
+    setMeasurementLifecycleSortMode,
+    setMeasurementLifecycleStatusMode,
+    setMeasurementLifecycleSourceMode,
+    saveGlobalYardBasis,
+    startEditingGlobalYardBasis,
+    deleteGlobalYardBasis,
+    availableMeasurementKeyOptions,
+    sortedGlobalYardBases,
+    configurationGenderOptions,
+    converterUnitOptions,
+    measurementLifecycleSortOptions,
+    measurementLifecycleStatusOptions,
+    measurementLifecycleSourceOptions,
+  ];
+
   return (
     <div className="min-w-0 space-y-6">
-      <section className="rounded-3xl border border-white/70 bg-gradient-to-br from-white/90 via-[#f7f9ff] to-[#eef3ff] p-6 shadow-lg shadow-slate-500/10 dark:border-white/10 dark:from-white/10 dark:via-[#101422] dark:to-[#1a2033]">
+      {/* Top Header & Breadcrumbs */}
+      <section className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-900">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <span>Taxonomy</span>
+              <span>/</span>
+              <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                {isMeasurementsRoute ? 'Measurement Library' : 'Garment Categories'}
+              </span>
+            </div>
             <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-              {isMeasurementsRoute ? 'Measurement Points' : 'Taxonomy'}
+              {isMeasurementsRoute ? 'Measurement Library' : 'Garment Categories'}
             </h1>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-300">
               {isMeasurementsRoute
-                ? 'Define the global measurement points brands and buyers use across sizing, custom orders, and size charts.'
+                ? 'Define and validate global measurement points for industrial garment production. Approve brand-submitted points to ensure universal sizing standards.'
                 : 'Garment categories define what the item is. Garment subcategories define the specific item type. Do not use audience, occasion, style, cultural, price, or service terms as categories.'}
             </p>
           </div>
 
-          {/* Only show tab switcher on the taxonomy route — measurements route is focused */}
           {activeTab !== 'custom-order-configurations' && (
-            <div className="inline-flex rounded-full border border-white/70 bg-white/80 p-1 shadow-sm dark:border-white/10 dark:bg-white/5">
+            <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-100/80 p-1.5 dark:border-white/10 dark:bg-white/5">
               <button
                 type="button"
                 onClick={() => setActiveTab('taxonomy')}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                className={`rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
                   activeTab === 'taxonomy'
-                    ? 'bg-white text-indigo-700 shadow dark:bg-white/15 dark:text-indigo-200'
-                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white'
+                    ? 'bg-white text-indigo-700 shadow-sm dark:bg-slate-800 dark:text-indigo-300'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                 }`}
               >
                 Garment categories
@@ -1387,10 +1390,10 @@ const AdminTaxonomyPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setActiveTab('measurements')}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                className={`rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
                   activeTab === 'measurements'
-                    ? 'bg-white text-indigo-700 shadow dark:bg-white/15 dark:text-indigo-200'
-                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white'
+                    ? 'bg-white text-indigo-700 shadow-sm dark:bg-slate-800 dark:text-indigo-300'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                 }`}
               >
                 Measurement Points
@@ -1400,51 +1403,70 @@ const AdminTaxonomyPage: React.FC = () => {
         </div>
       </section>
 
+      {/* Context Alert Banner - Standardization Protocol */}
+      <div className="flex items-start gap-4 rounded-2xl border border-indigo-200/80 bg-indigo-50/70 p-5 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm dark:bg-indigo-500">
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-bold text-indigo-950 dark:text-indigo-200">Standardization Protocol</h3>
+          <p className="mt-1 text-xs leading-relaxed text-indigo-900/80 dark:text-indigo-300/90">
+            Approving a measurement point makes it globally available for all manufacturers and size charts. Rejected points require clear documentation for resubmission. Universal points (marked with blue badges) are immutable core standards.
+          </p>
+        </div>
+      </div>
+
       {activeTab === 'taxonomy' ? (
         <section className="space-y-5">
-          <div className="rounded-2xl border border-indigo-200/60 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-400/30 dark:bg-indigo-500/10 dark:text-indigo-100">
-            <div className="font-semibold">Taxonomy governance</div>
-            <p className="mt-1 text-xs leading-5">
-              Discovery dimensions help creators describe style, culture, occasion, fabric, color, and fit. Hashtags are social/search terms and do not replace structured metadata.
-            </p>
-          </div>
-
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200">
+              <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200">
                 {activeCategoryCount} active garment categories
               </span>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700 dark:bg-white/10 dark:text-slate-200">
                 {categories.length} total
               </span>
               {showInactive ? (
-                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
                   Including inactive
                 </span>
               ) : null}
             </div>
 
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-              <input
-                value={categorySearch}
-                onChange={(event) => setCategorySearch(event.target.value)}
-                placeholder="Search garment categories..."
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white sm:w-[320px]"
-              />
-              <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+            <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row">
+              <div className="relative w-full sm:w-[320px]">
+                <input
+                  value={categorySearch}
+                  onChange={(event) => setCategorySearch(event.target.value)}
+                  placeholder="Search garment categories..."
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 pl-10 text-sm text-slate-900 outline-none transition focus:border-indigo-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
+                />
+                <svg className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/5">
                 <input
                   type="checkbox"
                   checked={showInactive}
                   onChange={(event) => setShowInactive(event.target.checked)}
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 Show inactive
               </label>
+
               <button
                 type="button"
                 onClick={openCreateCategory}
-                className="rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700"
               >
-                Create garment category
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Create category
               </button>
             </div>
           </div>
@@ -1462,17 +1484,17 @@ const AdminTaxonomyPage: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-3xl border border-white/70 bg-white/80 shadow-lg shadow-slate-400/10 dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="overflow-x-auto rounded-3xl border border-slate-200/80 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900">
               <table className="w-full min-w-[860px] text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200/70 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-white/10 dark:text-slate-400">
-                    <th className="px-6 py-4">Garment category</th>
-                    <th className="px-5 py-4">Status</th>
-                    <th className="px-5 py-4">Garment subcategories</th>
-                    <th className="px-6 py-4 text-right">Menu</th>
+                  <tr className="border-b border-slate-200/70 bg-slate-50/50 text-left text-xs uppercase tracking-wider text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+                    <th className="px-6 py-4 font-bold">Garment Category</th>
+                    <th className="px-5 py-4 font-bold">Status</th>
+                    <th className="px-5 py-4 font-bold font-semibold">Subcategories</th>
+                    <th className="px-6 py-4 text-right font-bold">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                   {filteredCategories.map((category) => {
                     const subCategories = (subCategoryMap[category.id] ?? []).filter((subCategory) =>
                       showInactive ? true : subCategory.isActive !== false,
@@ -1482,34 +1504,35 @@ const AdminTaxonomyPage: React.FC = () => {
                     return (
                       <tr
                         key={category.id}
-                        className="border-b border-slate-100/80 align-top transition hover:bg-indigo-50/50 dark:border-white/5 dark:hover:bg-white/5"
+                        className="align-top transition-colors hover:bg-slate-50/80 dark:hover:bg-white/5"
                       >
                         <td className="px-6 py-4">
-                          <div className="font-semibold text-slate-900 dark:text-white">{category.name}</div>
+                          <div className="font-bold text-slate-900 dark:text-white">{category.name}</div>
                           {category.description ? (
                             <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{category.description}</div>
                           ) : null}
                         </td>
                         <td className="px-5 py-4">
                           <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-bold uppercase ${
+                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${
                               isCategoryActive
-                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200'
                                 : 'bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-300'
                             }`}
                           >
+                            <span className={`h-1.5 w-1.5 rounded-full ${isCategoryActive ? 'bg-emerald-600' : 'bg-slate-500'}`} />
                             {isCategoryActive ? 'Active' : 'Inactive'}
                           </span>
                         </td>
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-2">
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700 dark:bg-white/10 dark:text-slate-200">
-                              {subCategories.length} total
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                              {subCategories.length} subcategories
                             </span>
                             <button
                               type="button"
                               onClick={() => openSubCategoryManager(category)}
-                              className="rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200"
+                              className="rounded-xl bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100 dark:bg-indigo-500/20 dark:text-indigo-200"
                             >
                               Manage
                             </button>
@@ -1517,30 +1540,30 @@ const AdminTaxonomyPage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <details className="relative inline-block text-left">
-                            <summary className="cursor-pointer list-none rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-200">
+                            <summary className="cursor-pointer list-none rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-200">
                               ⋯
                             </summary>
-                            <div className="absolute right-0 z-20 mt-2 w-52 rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-white/10 dark:bg-slate-900">
+                            <div className="absolute right-0 z-20 mt-2 w-52 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-slate-900">
                               <button
                                 type="button"
                                 onClick={() => openCreateSubCategory(category)}
-                                className="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+                                className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
                               >
                                 Add garment type
                               </button>
                               <button
                                 type="button"
                                 onClick={() => openEditCategory(category)}
-                                className="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+                                className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
                               >
-                                Edit garment category
+                                Edit category
                               </button>
                               <button
                                 type="button"
                                 onClick={() => toggleCategoryActive(category)}
-                                className="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
                               >
-                                {isCategoryActive ? 'Deactivate garment category' : 'Activate garment category'}
+                                {isCategoryActive ? 'Deactivate category' : 'Activate category'}
                               </button>
                             </div>
                           </details>
@@ -1551,7 +1574,7 @@ const AdminTaxonomyPage: React.FC = () => {
                   {filteredCategories.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-300">
-                        No garment categories found for this filter.
+                        No garment categories found.
                       </td>
                     </tr>
                   ) : null}
@@ -1561,590 +1584,420 @@ const AdminTaxonomyPage: React.FC = () => {
           )}
         </section>
       ) : activeTab === 'measurements' ? (
-        <section className="space-y-5">
-          <div className="rounded-2xl border border-indigo-200/60 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-400/30 dark:bg-indigo-500/10 dark:text-indigo-100">
-            <div className="font-semibold">What you are approving or rejecting</div>
-            <ul className="mt-2 space-y-1 text-xs">
-              <li>
-                Approve: the brand-submitted measurement point becomes globally available and other brands can reuse it.
-              </li>
-              <li>
-                Reject: the point is not published globally; provide a reason so the brand can correct and resubmit.
-              </li>
-              <li>
-                Why it is sent to admin: freeform points are user-generated and require quality review before entering shared measurement standards.
-              </li>
-            </ul>
-          </div>
-
-          <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-[minmax(0,1fr)_180px_180px_auto_auto]">
-            <input
-              value={measurementSearch}
-              onChange={(event) => setMeasurementSearch(event.target.value)}
-              placeholder="Search measurement points..."
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white md:col-span-2 2xl:col-span-1"
-            />
-            <div className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 dark:border-white/10 dark:bg-black/20 dark:text-slate-200">
-              🌍 Universal points
+        <section className="space-y-6">
+          {/* Measurement Points Search & Toolbar */}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+              <span className="rounded-full bg-indigo-100 px-3 py-1 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-200">
+                {allMeasurementPoints.length} measurement points
+              </span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                Unit: {measurementUnitMode}
+              </span>
             </div>
-            <UniversalSelect
-              value={measurementSortMode}
-              onChange={(value) => setMeasurementSortMode(value as MeasurementSortMode)}
-              options={measurementSortOptions}
-            />
-            <div className="inline-flex w-full rounded-2xl border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-black/20 2xl:w-auto">
-              <button
-                type="button"
-                onClick={() => setMeasurementViewMode('cards')}
-                className={`rounded-xl px-3 py-1.5 text-xs font-semibold ${
-                  measurementViewMode === 'cards'
-                    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200'
-                    : 'text-slate-600 dark:text-slate-300'
-                }`}
-              >
-                Cards
-              </button>
-              <button
-                type="button"
-                onClick={() => setMeasurementViewMode('list')}
-                className={`rounded-xl px-3 py-1.5 text-xs font-semibold ${
-                  measurementViewMode === 'list'
-                    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200'
-                    : 'text-slate-600 dark:text-slate-300'
-                }`}
-              >
-                List
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                void Promise.all([
-                  fetchMeasurementQueue(),
-                  fetchMeasurementPoints(),
-                  fetchMeasurementLifecycleRows(),
-                ]);
-              }}
-              className="rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
-            >
-              Refresh
-            </button>
-          </div>
 
-          <div className="grid min-w-0 grid-cols-1 gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-4 md:grid-cols-[200px_minmax(0,1fr)] dark:border-white/10 dark:bg-white/[0.04]">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Library Unit</div>
-              <div className="mt-2 inline-flex rounded-xl border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-black/20">
+            <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row sm:items-center">
+              <div className="relative w-full sm:w-[260px]">
+                <input
+                  value={measurementSearch}
+                  onChange={(event) => setMeasurementSearch(event.target.value)}
+                  placeholder="Search measurement points..."
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 pl-9 text-xs text-slate-900 outline-none focus:border-indigo-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
+                />
+                <svg className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+
+              <UniversalSelect
+                value={measurementSortMode}
+                onChange={(val) => setMeasurementSortMode(val as any)}
+                options={measurementSortOptions}
+                className="w-full sm:w-44"
+              />
+
+              {/* Unit Switcher IN / CM */}
+              <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-white/10 dark:bg-slate-800">
                 <button
                   type="button"
                   onClick={() => setMeasurementUnitMode('IN')}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                  className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
                     measurementUnitMode === 'IN'
-                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200'
-                      : 'text-slate-600 dark:text-slate-300'
+                      ? 'bg-white text-indigo-700 shadow-sm dark:bg-slate-900 dark:text-indigo-300'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400'
                   }`}
                 >
-                  Inches (default)
+                  in
                 </button>
                 <button
                   type="button"
                   onClick={() => setMeasurementUnitMode('CM')}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                  className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
                     measurementUnitMode === 'CM'
-                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200'
-                      : 'text-slate-600 dark:text-slate-300'
+                      ? 'bg-white text-indigo-700 shadow-sm dark:bg-slate-900 dark:text-indigo-300'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400'
                   }`}
                 >
-                  Centimeters
+                  cm
                 </button>
               </div>
-            </div>
 
-            <div className="min-w-0">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Conversion Calculator</div>
-              <div className="mt-2 grid min-w-0 grid-cols-1 gap-2 xl:grid-cols-[120px_180px_minmax(0,1fr)]">
-                <input
-                  value={converterInput}
-                  onChange={(event) => setConverterInput(event.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
-                  placeholder="10"
-                />
-                <UniversalSelect
-                  value={converterFromUnit}
-                  onChange={(value) => setConverterFromUnit(value as MeasurementUnitMode)}
-                  options={converterUnitOptions}
-                />
-                <div className="min-w-0 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-700 dark:border-white/20 dark:text-slate-200">
-                  {(() => {
-                    const parsed = Number(converterInput);
-                    if (!Number.isFinite(parsed)) return 'Enter a valid number';
-                    const targetUnit = converterFromUnit === 'CM' ? 'IN' : 'CM';
-                    const converted = convertMeasurement(parsed, converterFromUnit, targetUnit);
-                    return `${parsed.toFixed(2)} ${converterFromUnit === 'CM' ? 'cm' : 'in'} = ${converted.toFixed(2)} ${targetUnit === 'CM' ? 'cm' : 'in'}`;
-                  })()}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {queueError ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
-              {queueError}
-            </div>
-          ) : null}
-
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <div className="rounded-3xl border border-white/70 bg-white/80 p-4 shadow-lg shadow-slate-400/10 dark:border-white/10 dark:bg-white/[0.04]">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">Pending Freeform Points</h2>
-                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
-                  {freeformPoints.length}
-                </span>
+              {/* View Mode Toggle Cards vs List */}
+              <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-white/10 dark:bg-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setMeasurementViewMode('cards')}
+                  className={`rounded-lg p-1.5 transition ${
+                    measurementViewMode === 'cards'
+                      ? 'bg-white text-indigo-700 shadow-sm dark:bg-slate-900 dark:text-indigo-300'
+                      : 'text-slate-500 hover:text-slate-900 dark:text-slate-400'
+                  }`}
+                  title="Card View"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMeasurementViewMode('list')}
+                  className={`rounded-lg p-1.5 transition ${
+                    measurementViewMode === 'list'
+                      ? 'bg-white text-indigo-700 shadow-sm dark:bg-slate-900 dark:text-indigo-300'
+                      : 'text-slate-500 hover:text-slate-900 dark:text-slate-400'
+                  }`}
+                  title="List View"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
               </div>
 
-              {queueLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div key={index} className="h-24 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-white/10" />
-                  ))}
-                </div>
-              ) : freeformPoints.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-300">
-                  No pending freeform measurement points.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="max-h-[460px] space-y-3 overflow-y-auto pr-1">
-                    {pagedFreeformPoints.map((point) => (
-                      <button
-                        key={point.id}
-                        type="button"
-                        onClick={() => {
-                          void openMeasurementLifecycle(point);
-                        }}
-                        className="w-full rounded-2xl border border-slate-200/80 bg-white p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50/30 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-indigo-400/40 dark:hover:bg-indigo-500/10"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="text-sm font-bold text-slate-900 dark:text-white">
-                              {point.label}
-                            </div>
-                            <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">
-                              Key: {point.key} · {formatCategory(point.category)} ·{' '}
-                              {formatGender(point.gender)}
-                            </div>
-                          </div>
-                          <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600 dark:bg-white/10 dark:text-slate-300">
-                            {point.source}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
-                          {point.description?.trim() || 'No description provided by brand.'}
-                        </p>
-                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-                          Limits: {point.minValueCm ?? '—'} cm to {point.maxValueCm ?? '—'} cm
-                        </div>
-                        <div className="mt-2 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
-                          Open full request details
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between border-t border-slate-200/70 pt-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-300">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFreeformQueuePage((current) => Math.max(1, current - 1))
-                      }
-                      disabled={freeformQueuePage <= 1}
-                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-white/10 dark:bg-black/20 dark:text-slate-200 dark:hover:bg-white/10"
-                    >
-                      Previous
-                    </button>
-                    <span>
-                      Page {freeformQueuePage} of {freeformQueueTotalPages}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFreeformQueuePage((current) =>
-                          Math.min(freeformQueueTotalPages, current + 1),
-                        )
-                      }
-                      disabled={freeformQueuePage >= freeformQueueTotalPages}
-                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-white/10 dark:bg-black/20 dark:text-slate-200 dark:hover:bg-white/10"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-3xl border border-white/70 bg-white/80 p-4 shadow-lg shadow-slate-400/10 dark:border-white/10 dark:bg-white/[0.04]">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">Pending Brand Size Charts</h2>
-                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
-                  {sizeCharts.length}
-                </span>
-              </div>
-
-              {queueLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div key={index} className="h-20 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-white/10" />
-                  ))}
-                </div>
-              ) : sizeCharts.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-300">
-                  No pending size charts.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="max-h-[460px] space-y-3 overflow-y-auto pr-1">
-                    {pagedSizeCharts.map((chart) => (
-                      <button
-                        key={chart.id}
-                        type="button"
-                        onClick={() => {
-                          void openSizeChartDetails(chart);
-                        }}
-                        className="w-full rounded-2xl border border-slate-200/80 bg-white p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50/30 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-indigo-400/40 dark:hover:bg-indigo-500/10"
-                      >
-                        <div className="text-sm font-bold text-slate-900 dark:text-white">
-                          {chart.name ?? `Size Chart ${chart.version ?? ''}`}
-                        </div>
-                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">
-                          Status: {chart.status ?? 'PENDING'} · Version: {chart.version ?? '—'}
-                        </div>
-                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-                          Created: {formatDateTime(chart.createdAt)} · Updated:{' '}
-                          {formatDateTime(chart.updatedAt)}
-                        </div>
-                        <div className="mt-2 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
-                          Open full request details
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between border-t border-slate-200/70 pt-3 text-xs text-slate-500 dark:border-white/10 dark:text-slate-300">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSizeChartQueuePage((current) => Math.max(1, current - 1))
-                      }
-                      disabled={sizeChartQueuePage <= 1}
-                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-white/10 dark:bg-black/20 dark:text-slate-200 dark:hover:bg-white/10"
-                    >
-                      Previous
-                    </button>
-                    <span>
-                      Page {sizeChartQueuePage} of {sizeChartQueueTotalPages}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSizeChartQueuePage((current) =>
-                          Math.min(sizeChartQueueTotalPages, current + 1),
-                        )
-                      }
-                      disabled={sizeChartQueuePage >= sizeChartQueueTotalPages}
-                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 dark:border-white/10 dark:bg-black/20 dark:text-slate-200 dark:hover:bg-white/10"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <section className="space-y-3 rounded-3xl border border-white/70 bg-white/80 p-4 shadow-lg shadow-slate-400/10 dark:border-white/10 dark:bg-white/[0.04]">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                  Measurement Lifecycle Management
-                </h2>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
-                  Manage brand-submitted measurement points with full lifecycle actions and usage context.
-                </p>
-              </div>
-              <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700 dark:bg-white/10 dark:text-slate-200">
-                {measurementLifecycleRows.length} points
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_190px_190px_190px_170px_220px_auto]">
-              <input
-                value={measurementLifecycleSearch}
-                onChange={(event) => setMeasurementLifecycleSearch(event.target.value)}
-                placeholder="Search lifecycle points..."
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white md:col-span-2 xl:col-span-1"
-              />
-              <UniversalSelect
-                value={measurementLifecycleStatusMode}
-                onChange={(value) =>
-                  setMeasurementLifecycleStatusMode(
-                    value as MeasurementLifecycleStatusMode,
-                  )
-                }
-                options={measurementLifecycleStatusOptions}
-              />
-              <UniversalSelect
-                value={measurementLifecycleSourceMode}
-                onChange={(value) =>
-                  setMeasurementLifecycleSourceMode(
-                    value as MeasurementLifecycleSourceMode,
-                  )
-                }
-                options={measurementLifecycleSourceOptions}
-              />
-              <UniversalSelect
-                value={measurementLifecycleCategoryMode}
-                onChange={(value) => setMeasurementLifecycleCategoryMode(String(value))}
-                options={measurementLifecycleCategoryOptions}
-              />
-              <UniversalSelect
-                value={measurementLifecycleActiveMode}
-                onChange={(value) =>
-                  setMeasurementLifecycleActiveMode(
-                    value as MeasurementLifecycleActiveMode,
-                  )
-                }
-                options={measurementLifecycleActiveOptions}
-              />
-              <UniversalSelect
-                value={measurementLifecycleSortMode}
-                onChange={(value) =>
-                  setMeasurementLifecycleSortMode(value as MeasurementLifecycleSortMode)
-                }
-                options={measurementLifecycleSortOptions}
-              />
               <button
                 type="button"
-                onClick={() => {
-                  void fetchMeasurementLifecycleRows();
-                }}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-black/20 dark:text-slate-200"
+                onClick={fetchTaxonomy}
+                className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-300"
+                title="Refresh"
               >
-                Refresh lifecycle
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
               </button>
             </div>
+          </div>
 
-            {measurementLifecycleError ? (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
-                {measurementLifecycleError}
-              </div>
-            ) : null}
+          {/* Pending Moderation Queues Section */}
+          {canReviewModerationQueue && (freeformPoints.length > 0 || sizeCharts.length > 0) && (
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              {/* Freeform Points Queue */}
+              {freeformPoints.length > 0 && (
+                <div className="rounded-3xl border border-amber-200/80 bg-amber-50/40 p-5 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/5">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-amber-950 dark:text-amber-200">
+                      Pending Freeform Points ({freeformPoints.length})
+                    </h3>
+                    {queueLoading && <span className="text-xs text-amber-600">Syncing...</span>}
+                  </div>
+                  {queueError && <p className="mb-2 text-xs text-rose-600">{queueError}</p>}
+                  <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                    {pagedFreeformPoints.map((point) => (
+                      <div key={point.id} className="flex items-center justify-between rounded-2xl border border-amber-200/60 bg-white p-3 shadow-xs dark:border-amber-500/20 dark:bg-slate-900">
+                        <div>
+                          <div className="text-xs font-bold text-slate-900 dark:text-white">{point.label}</div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Category: {formatCategory(point.category)} · Key: {point.key}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openMeasurementLifecycle(point)}
+                            className="rounded-xl bg-indigo-600 px-3 py-1 text-xs font-bold text-white hover:bg-indigo-700"
+                          >
+                            Review
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-            {measurementLifecycleLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="h-16 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-white/10"
-                  />
-                ))}
-              </div>
-            ) : measurementLifecycleRows.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-300">
-                No measurement points match these lifecycle filters.
-              </div>
-            ) : (
-              <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white/70 dark:border-white/10 dark:bg-white/[0.03]">
-                <table className="w-full min-w-[1020px] text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200/70 text-left uppercase tracking-wide text-slate-500 dark:border-white/10 dark:text-slate-400">
-                      <th className="px-3 py-2">Point</th>
-                      <th className="px-3 py-2">Status</th>
-                      <th className="px-3 py-2">Source</th>
-                      <th className="px-3 py-2">Created By</th>
-                      <th className="px-3 py-2">Created</th>
-                      <th className="px-3 py-2 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {measurementLifecycleRows.map((row) => {
-                      const submittedBy =
-                        row.brand?.owner?.brandFullName ||
-                        row.brand?.owner?.username ||
-                        row.brand?.name ||
-                        'System';
-                      const statusBadgeClass =
-                        row.status === 'APPROVED_GLOBAL'
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'
-                          : row.status === 'REJECTED'
-                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'
-                            : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200';
+              {/* Brand Size Charts Queue */}
+              {sizeCharts.length > 0 && (
+                <div className="rounded-3xl border border-indigo-200/80 bg-indigo-50/40 p-5 shadow-sm dark:border-indigo-500/30 dark:bg-indigo-500/5">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-indigo-950 dark:text-indigo-200">
+                      Pending Brand Size Charts ({sizeCharts.length})
+                    </h3>
+                  </div>
+                  <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                    {pagedSizeCharts.map((chart) => (
+                      <div key={chart.id} className="flex items-center justify-between rounded-2xl border border-indigo-200/60 bg-white p-3 shadow-xs dark:border-indigo-500/20 dark:bg-slate-900">
+                        <div>
+                          <div className="text-xs font-bold text-slate-900 dark:text-white">{chart.name || 'Untitled chart'}</div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Version: {chart.version ?? 1} · Status: {chart.status ?? 'PENDING'}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openSizeChartDetails(chart)}
+                            className="rounded-xl border border-slate-200 px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200"
+                          >
+                            Review
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleReviewSizeChart(chart.id, 'approve')}
+                            className="rounded-xl bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700"
+                          >
+                            Approve
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Measurement Points Main Grid / List Display */}
+          {measurementPointsLoading ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} className="h-36 animate-pulse rounded-3xl bg-slate-200/70 dark:bg-white/10" />
+              ))}
+            </div>
+          ) : measurementViewMode === 'cards' ? (
+            <div className="space-y-6">
+              {pointsByCategory.map((group) => (
+                <div key={group.category} className="space-y-3">
+                  <div className="flex items-center gap-2 border-b border-slate-200/60 pb-2 dark:border-white/10">
+                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                      {formatCategory(group.category)}
+                    </h3>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                      {group.points.length}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {group.points.map((pt) => {
+                      const minVal = pt.minValueCm ?? 0;
+                      const maxVal = pt.maxValueCm ?? 100;
+                      const displayMin = formatMeasurementValue(minVal, measurementUnitMode);
+                      const displayMax = formatMeasurementValue(maxVal, measurementUnitMode);
 
                       return (
-                        <tr
-                          key={row.id}
-                          className="border-b border-slate-100/80 align-top dark:border-white/5"
+                        <div
+                          key={pt.id}
+                          className="flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm transition hover:border-indigo-300 dark:border-white/10 dark:bg-slate-900 dark:hover:border-indigo-500/40"
                         >
-                          <td className="px-3 py-2.5">
-                            <div className="font-semibold text-slate-900 dark:text-white">
-                              {normalizeMeasurementLabel(row.label)}
-                            </div>
-                            <div className="mt-0.5 font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                              {normalizeMeasurementKey(row.key)}
-                            </div>
-                            <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                              {formatCategory(row.category)} · {formatGender(row.gender)}
-                            </div>
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <div className="flex flex-col items-start gap-1">
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${statusBadgeClass}`}
-                              >
-                                {formatMeasurementLifecycleStatusLabel(row.status)}
-                              </span>
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                                  row.isActive
-                                    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200'
-                                    : 'bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-slate-300'
-                                }`}
-                              >
-                                {row.isActive ? 'Active' : 'Inactive'}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2.5 text-slate-600 dark:text-slate-300">
-                            {row.source === 'BRAND_FREEFORM'
-                              ? 'Brand freeform'
-                              : 'System seeded'}
-                          </td>
-                          <td className="px-3 py-2.5 text-slate-700 dark:text-slate-200">
-                            <div className="font-semibold">{submittedBy}</div>
-                            {row.brand?.name ? (
-                              <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                                Brand: {row.brand.name}
+                          <div>
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                  {pt.key}
+                                </span>
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                                  {pt.label}
+                                </h4>
                               </div>
-                            ) : null}
-                          </td>
-                          <td className="px-3 py-2.5 text-slate-600 dark:text-slate-300">
-                            <div>{formatDate(row.createdAt)}</div>
-                            <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                              Updated {formatDate(row.updatedAt)}
+                              {pt.source === 'SYSTEM' && (
+                                <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                                  Universal
+                                </span>
+                              )}
                             </div>
-                          </td>
-                          <td className="px-3 py-2.5 text-right">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                void openMeasurementLifecycle(row);
-                              }}
-                              className="rounded-lg bg-indigo-100 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200"
-                            >
-                              Open lifecycle
-                            </button>
-                          </td>
-                        </tr>
+                            <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                              {pt.description || 'Global industrial measurement point standard.'}
+                            </p>
+                          </div>
+
+                          {/* Range Visualizer Bar */}
+                          <div className="mt-4 border-t border-slate-100 pt-3 dark:border-white/5">
+                            <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
+                              <span>Range ({measurementUnitMode.toLowerCase()})</span>
+                              <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                {displayMin} – {displayMax}
+                              </span>
+                            </div>
+                            <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                              <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-500" style={{ width: '70%' }} />
+                            </div>
+                          </div>
+                        </div>
                       );
                     })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* List Mode Table */
+            <div className="overflow-x-auto rounded-3xl border border-slate-200/80 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900">
+              <table className="w-full min-w-[760px] text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200/70 bg-slate-50/50 text-left text-xs uppercase tracking-wider text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+                    <th className="px-6 py-4 font-bold">Key</th>
+                    <th className="px-6 py-4 font-bold">Measurement Point</th>
+                    <th className="px-5 py-4 font-bold">Category</th>
+                    <th className="px-6 py-4 font-bold">Default Range ({measurementUnitMode.toLowerCase()})</th>
+                    <th className="px-5 py-4 text-right font-bold">Scope</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                  {allMeasurementPoints.map((pt) => {
+                    const minVal = pt.minValueCm ?? 0;
+                    const maxVal = pt.maxValueCm ?? 100;
+                    const displayMin = formatMeasurementValue(minVal, measurementUnitMode);
+                    const displayMax = formatMeasurementValue(maxVal, measurementUnitMode);
+
+                    return (
+                      <tr key={pt.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-white/5">
+                        <td className="px-6 py-4 font-bold text-slate-500 dark:text-slate-400">{pt.key}</td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-slate-900 dark:text-white">{pt.label}</div>
+                          {pt.description && (
+                            <div className="text-xs text-slate-500 dark:text-slate-400">{pt.description}</div>
+                          )}
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                            {formatCategory(pt.category)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                            {displayMin} – {displayMax}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          {pt.source === 'SYSTEM' ? (
+                            <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                              Universal
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 dark:bg-white/10 dark:text-slate-400">
+                              Custom
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Measurement Lifecycle Management Table */}
+          <div className="mt-8 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-900">
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  Measurement Point Lifecycle & Audit Log
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Track governance history, approvals, and active visibility of measurement points.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <UniversalSelect
+                  value="all"
+                  onChange={(val) => setMeasurementLifecycleCategoryMode(val as any)}
+                  options={measurementLifecycleCategoryOptions}
+                  className="w-40 text-xs"
+                />
+                <UniversalSelect
+                  value="all"
+                  onChange={(val) => setMeasurementLifecycleActiveMode(val as any)}
+                  options={measurementLifecycleActiveOptions}
+                  className="w-36 text-xs"
+                />
+              </div>
+            </div>
+
+            {measurementLifecycleError && (
+              <p className="mb-3 text-xs text-rose-600">{measurementLifecycleError}</p>
+            )}
+
+            {measurementLifecycleLoading ? (
+              <div className="h-32 animate-pulse rounded-2xl bg-slate-100 dark:bg-white/10" />
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-white/10">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200/70 bg-slate-50/50 text-left uppercase tracking-wider text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+                      <th className="px-4 py-3 font-bold">Key</th>
+                      <th className="px-4 py-3 font-bold">Point Label</th>
+                      <th className="px-4 py-3 font-bold">Category</th>
+                      <th className="px-4 py-3 font-bold">Status</th>
+                      <th className="px-4 py-3 font-bold">Source</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                    {measurementLifecycleRows.slice(0, 10).map((row) => (
+                      <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-white/5">
+                        <td className="px-4 py-3 font-bold text-slate-600 dark:text-slate-300">{row.key}</td>
+                        <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">{row.label}</td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{formatCategory(row.category)}</td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 font-bold text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200">
+                            {row.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{row.source}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
             )}
-          </section>
+          </div>
 
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Measurement Library</h2>
-
-            {measurementPointsLoading ? (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="h-24 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-white/10" />
-                ))}
+          {/* Instant Unit Converter Card */}
+          <div className="rounded-3xl border border-indigo-200/80 bg-gradient-to-r from-indigo-50/80 to-blue-50/80 p-6 shadow-sm dark:border-indigo-500/30 dark:from-indigo-500/10 dark:to-blue-500/10">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-indigo-950 dark:text-indigo-200">
+                  Precision Conversion Calculator
+                </h4>
+                <p className="text-xs text-indigo-900/80 dark:text-indigo-300/80">
+                  Instantly convert between Inches (in) and Centimeters (cm) for sizing specs.
+                </p>
               </div>
-            ) : pointsByCategory.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-300">
-                No measurement points match this filter.
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  value={converterInput}
+                  onChange={(e) => setConverterInput(e.target.value)}
+                  placeholder="Enter value"
+                  className="w-28 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setConverterFromUnit(converterFromUnit === 'IN' ? 'CM' : 'IN')}
+                  className="rounded-xl bg-white px-3 py-2 text-xs font-bold text-indigo-700 shadow-xs dark:bg-slate-800 dark:text-indigo-300"
+                >
+                  {converterFromUnit} → {converterFromUnit === 'IN' ? 'CM' : 'IN'}
+                </button>
+                <div className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-black text-white shadow-sm">
+                  = {convertMeasurement(parseFloat(converterInput) || 0, converterFromUnit, converterFromUnit === 'IN' ? 'CM' : 'IN').toFixed(2)} {converterFromUnit === 'IN' ? 'cm' : 'in'}
+                </div>
               </div>
-            ) : (
-              pointsByCategory.map((group) => (
-                <section key={group.category} className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="text-xs font-black uppercase tracking-[0.18em] text-indigo-700 dark:text-indigo-300">
-                      {formatCategory(group.category)}
-                    </div>
-                    <div className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
-                  </div>
-
-                  {measurementViewMode === 'cards' ? (
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      {group.points.map((point) => (
-                        <article
-                          key={point.id}
-                          className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-md shadow-slate-400/10 dark:border-white/10 dark:bg-white/[0.04]"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <h3 className="font-bold text-slate-900 dark:text-white">{point.label}</h3>
-                              <div className="mt-1 inline-flex rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-[11px] text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200">
-                                {point.key}
-                              </div>
-                            </div>
-                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600 dark:bg-white/10 dark:text-slate-300">
-                              🌍 Universal
-                            </span>
-                          </div>
-
-                          <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
-                            {point.description?.trim() || 'No description provided.'}
-                          </p>
-
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                            <span>Validation</span>
-                            <span className="font-mono text-slate-700 dark:text-slate-200">
-                              {formatMeasurementValue(point.minValueCm, measurementUnitMode)} - {formatMeasurementValue(point.maxValueCm, measurementUnitMode)}
-                            </span>
-                            {measurementUnitMode === 'IN' ? (
-                              <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                                ({point.minValueCm ?? '—'} cm - {point.maxValueCm ?? '—'} cm)
-                              </span>
-                            ) : null}
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white/70 dark:border-white/10 dark:bg-white/[0.03]">
-                      <table className="w-full min-w-[720px] text-xs">
-                        <thead>
-                          <tr className="border-b border-slate-200/70 text-left uppercase tracking-wide text-slate-500 dark:border-white/10 dark:text-slate-400">
-                            <th className="px-3 py-2">Label</th>
-                            <th className="px-3 py-2">Key</th>
-                            <th className="px-3 py-2">Validation</th>
-                            <th className="px-3 py-2">Description</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {group.points.map((point) => (
-                            <tr key={point.id} className="border-b border-slate-100/80 dark:border-white/5">
-                              <td className="px-3 py-2 font-semibold text-slate-800 dark:text-slate-100">{point.label}</td>
-                              <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-300">{point.key}</td>
-                              <td className="px-3 py-2 text-slate-700 dark:text-slate-200">
-                                {formatMeasurementValue(point.minValueCm, measurementUnitMode)} - {formatMeasurementValue(point.maxValueCm, measurementUnitMode)}
-                              </td>
-                              <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{point.description?.trim() || '—'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </section>
-              ))
-            )}
+            </div>
           </div>
         </section>
       ) : null}
 
       <Modal
-        open={showCategoryCreate || Boolean(editingCategory)}
+        open={Boolean(showCategoryCreate)}
         onClose={() => {
           setShowCategoryCreate(false);
           setEditingCategory(null);
@@ -2657,29 +2510,196 @@ const AdminTaxonomyPage: React.FC = () => {
                   )}
                 </div>
               </div>
+<div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-slate-500 dark:text-slate-400">Collections (ID)</div>
+                <div className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                  {selectedMeasurementLifecycle.usage.collectionUsageCountById}
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-slate-500 dark:text-slate-400">Collections (Key)</div>
+                <div className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                  {selectedMeasurementLifecycle.usage.collectionUsageCountByKey}
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-slate-500 dark:text-slate-400">Products (ID)</div>
+                <div className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                  {selectedMeasurementLifecycle.usage.productUsageCountById}
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-slate-500 dark:text-slate-400">Products (Key)</div>
+                <div className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                  {selectedMeasurementLifecycle.usage.productUsageCountByKey}
+                </div>
+              </div>
+            </div>
 
+            {selectedMeasurementLifecycle.point.rejectionReason ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+                <span className="font-semibold">Latest rejection reason:</span>{' '}
+                {selectedMeasurementLifecycle.point.rejectionReason}
+              </div>
+            ) : null}
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                Rejection feedback
+              </label>
+              <textarea
+                value={measurementLifecycleRejectReason}
+                onChange={(event) =>
+                  setMeasurementLifecycleRejectReason(event.target.value)
+                }
+                rows={2}
+                placeholder="Required when rejecting this measurement point"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
+              />
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedMeasurementPoint(null);
+                  setSelectedMeasurementLifecycle(null);
+                  setMeasurementLifecycleRejectReason('');
+                  setMeasurementLifecycleModalLoading(false);
+                  setMeasurementLifecycleActionLoading(false);
+                }}
+                disabled={measurementLifecycleActionLoading}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-60 dark:border-white/10 dark:bg-black/20 dark:text-slate-200 dark:hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              {canReviewMeasurementLifecycle ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void applyMeasurementLifecycleAction('approve');
+                    }}
+                    disabled={measurementLifecycleActionLoading}
+                    className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-200 disabled:opacity-60 dark:bg-emerald-500/20 dark:text-emerald-200"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void applyMeasurementLifecycleAction('reject');
+                    }}
+                    disabled={measurementLifecycleActionLoading}
+                    className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-200 disabled:opacity-60 dark:bg-rose-500/20 dark:text-rose-200"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void applyMeasurementLifecycleAction(
+                        selectedMeasurementLifecycle.point.isActive
+                          ? 'deactivate'
+                          : 'activate',
+                      );
+                    }}
+                    disabled={measurementLifecycleActionLoading}
+                    className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300 disabled:opacity-60 dark:bg-white/10 dark:text-slate-200"
+                  >
+                    {selectedMeasurementLifecycle.point.isActive
+                      ? 'Deactivate'
+                      : 'Activate'}
+                  </button>
+                </>
+              ) : (
+                <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                  Read-only: no review permission
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
               <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Product references
+                  Used by whom
                 </div>
-                <div className="mt-2 max-h-56 space-y-1 overflow-y-auto pr-1">
-                  {selectedMeasurementLifecycle.references.products.length === 0 ? (
+                <div className="mt-2 max-h-52 space-y-1 overflow-y-auto pr-1">
+                  {selectedMeasurementLifecycle.usage.users.length === 0 ? (
                     <div className="text-xs text-slate-500 dark:text-slate-400">
-                      No products reference this point.
+                      No usage actors yet.
                     </div>
                   ) : (
-                    selectedMeasurementLifecycle.references.products
-                      .slice(0, 30)
-                      .map((product) => (
+                    selectedMeasurementLifecycle.usage.users
+                      .slice(0, 25)
+                      .map((actor) => (
                         <div
-                          key={product.id}
+                          key={actor.userId}
                           className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-xs dark:border-white/10 dark:bg-black/20"
                         >
                           <div className="font-semibold text-slate-800 dark:text-slate-100">
-                            {product.name}
+                            {actor.brandFullName || actor.username || actor.userId}
                           </div>
                           <div className="mt-0.5 text-slate-500 dark:text-slate-400">
-                            {product.isActive ? 'Active' : 'Inactive'} · {product.brandName} · Updated {formatDate(product.updatedAt)}
+                            Usage {actor.usageCount} · Last used {formatDate(actor.latestUsedAt)}
+                          </div>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Lifecycle timeline
+                </div>
+                <div className="mt-2 max-h-52 space-y-1 overflow-y-auto pr-1">
+                  {selectedMeasurementLifecycle.timeline.length === 0 ? (
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      No lifecycle events.
+                    </div>
+                  ) : (
+                    selectedMeasurementLifecycle.timeline.map((event) => (
+                      <div
+                        key={event.id}
+                        className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-xs dark:border-white/10 dark:bg-black/20"
+                      >
+                        <div className="font-semibold text-slate-800 dark:text-slate-100">
+                          {event.summary}
+                        </div>
+                        <div className="mt-0.5 text-slate-500 dark:text-slate-400">
+                          {formatDateTime(event.at)} · {event.type}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Collection references
+                </div>
+                <div className="mt-2 max-h-56 space-y-1 overflow-y-auto pr-1">
+                  {selectedMeasurementLifecycle.references.collections.length === 0 ? (
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      No collections reference this point.
+                    </div>
+                  ) : (
+                    selectedMeasurementLifecycle.references.collections
+                      .slice(0, 30)
+                      .map((collection) => (
+                        <div
+                          key={collection.id}
+                          className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 text-xs dark:border-white/10 dark:bg-black/20"
+                        >
+                          <div className="font-semibold text-slate-800 dark:text-slate-100">
+                            {collection.title || collection.id}
+                          </div>
+                          <div className="mt-0.5 text-slate-500 dark:text-slate-400">
+                            {collection.status} · {collection.visibility} · Updated {formatDate(collection.updatedAt)}
                           </div>
                         </div>
                       ))
