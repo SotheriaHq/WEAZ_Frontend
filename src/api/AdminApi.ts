@@ -186,6 +186,11 @@ export const adminDashboardApi = {
       pendingVerifications: number;
       pendingPayouts: number;
       openDisputes: number;
+      ordersNeedingAttention?: number;
+      customOrdersNeedingAttention?: number;
+      totalDesigns?: number;
+      totalProducts?: number;
+      totalCollections?: number;
       recentLogs: {
         id: string;
         action: string;
@@ -201,6 +206,16 @@ export const adminDashboardApi = {
         targetRoute?: string | null;
       }[];
     }>('/admin/dashboard/stats'),
+
+  /** Cheap live badges for 20s polling (not the full stats fan-out). */
+  getLiveBadges: () =>
+    apiClient.get<{
+      customOrdersNeedingAttention: number;
+      openDisputes: number;
+      pendingPayouts: number;
+      pendingVerifications: number;
+      ordersNeedingAttention: number;
+    }>('/admin/dashboard/badges'),
 };
 
 // ── Users ──

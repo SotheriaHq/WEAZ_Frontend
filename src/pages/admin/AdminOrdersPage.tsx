@@ -1,4 +1,4 @@
-import React, { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
@@ -128,6 +128,10 @@ const AdminOrdersPage: React.FC = () => {
   const [attentionOnly, setAttentionOnly] = useState(searchParams.get('attention') === '1');
   const [customPage, setCustomPage] = useState(1);
   const [customTotal, setCustomTotal] = useState(0);
+  const [customAttentionTotal, setCustomAttentionTotal] = useState(0);
+  const [customNextCursor, setCustomNextCursor] = useState<string | null>(null);
+  const [customCursor, setCustomCursor] = useState<string | undefined>(undefined);
+  const [customCursorStack, setCustomCursorStack] = useState<Array<string | undefined>>([]);
 
   const [standardOrders, setStandardOrders] = useState<AdminStandardOrderListItem[]>([]);
   const [standardSummary, setStandardSummary] = useState<AdminStandardOrderListResponse['summary'] | null>(null);
@@ -136,6 +140,8 @@ const AdminOrdersPage: React.FC = () => {
 
   const [loadingStandard, setLoadingStandard] = useState(false);
   const [loadingCustom, setLoadingCustom] = useState(false);
+  const customRequestSeqRef = useRef(0);
+  const standardRequestSeqRef = useRef(0);
 
   const [selectedStandard, setSelectedStandard] = useState<AdminStandardOrderDetail | null>(null);
   const [standardModalOpen, setStandardModalOpen] = useState(false);
@@ -149,7 +155,18 @@ const AdminOrdersPage: React.FC = () => {
   const [commissionUpdatedAt, setCommissionUpdatedAt] = useState<string | null>(null);
   const [commissionRules, setCommissionRules] = useState<AdminCommissionRule[]>([]);
 
+  const sortParam =
+    customSort === 'NEWEST'
+      ? 'newest'
+      : customSort === 'OLDEST'
+        ? 'oldest'
+        : customSort === 'AMOUNT_DESC'
+          ? 'amount'
+          : 'attention';
+
   const loadStandardOrders = useCallback(async () => {
+    const seq = standardRequestSeqRef.current + 1;
+    standardRequestSeqRef.current = seq;
     setLoadingStandard(true);
     try {
       const response = await adminOrdersApi.list({
@@ -157,42 +174,76 @@ const AdminOrdersPage: React.FC = () => {
         q: deferredSearchQuery.trim() || '',
         status: standardStatusFilter,
       });
+      if (standardRequestSeqRef.current !== seq) return;
       const payload = unwrapApiResponse<AdminStandardOrderListResponse>(response.data as any);
       setStandardOrders(Array.isArray(payload?.items) ? payload.items : []);
       setStandardSummary(payload?.summary ?? null);
     } catch (error: any) {
+      if (standardRequestSeqRef.current !== seq) return;
       toast.error(error?.response?.data?.message || 'Unable to load standard-order queue');
       setStandardOrders([]);
       setStandardSummary(null);
     } finally {
-      setLoadingStandard(false);
+      if (standardRequestSeqRef.current === seq) {
+        setLoadingStandard(false);
+      }
     }
   }, [deferredSearchQuery, standardStatusFilter]);
 
   const loadCustomOrders = useCallback(async () => {
+    const seq = customRequestSeqRef.current + 1;
+    customRequestSeqRef.current = seq;
     setLoadingCustom(true);
     try {
       const payload = await customOrdersAdminApi.list({
-        page: customPage,
+        // Prefer keyset cursor; fall back to page for the first page only.
+        ...(customCursor
+          ? { cursor: customCursor }
+          : { page: customPage }),
         limit: CUSTOM_PAGE_SIZE,
         q: deferredSearchQuery.trim() || undefined,
         status: customStatusFilter ? (customStatusFilter as CustomOrderStatus) : undefined,
+        attention: attentionOnly ? 1 : undefined,
+        sort: sortParam,
       });
+      if (customRequestSeqRef.current !== seq) return;
       // Replace only on success so the table never flashes empty while refetching.
       setCustomOrders(Array.isArray(payload?.items) ? payload.items : []);
       setCustomTotal(Number(payload?.total ?? 0));
+      setCustomAttentionTotal(Number(payload?.attentionTotal ?? 0));
+      setCustomNextCursor(payload?.nextCursor ?? null);
       setCustomLoaded(true);
     } catch (error: any) {
+      if (customRequestSeqRef.current !== seq) return;
       toast.error(error?.response?.data?.message || 'Unable to load custom-order queue');
     } finally {
-      setLoadingCustom(false);
+      if (customRequestSeqRef.current === seq) {
+        setLoadingCustom(false);
+      }
     }
-  }, [customPage, customStatusFilter, deferredSearchQuery]);
+  }, [customPage, customCursor, customStatusFilter, deferredSearchQuery, attentionOnly, sortParam]);
 
-  // Reset to the first page whenever the filter/search/attention inputs change.
+  // Reset pagination whenever filters/sort change (single reset — avoids double fetch races).
   useEffect(() => {
     setCustomPage(1);
-  }, [customStatusFilter, deferredSearchQuery, attentionOnly]);
+    setCustomCursor(undefined);
+    setCustomCursorStack([]);
+    setCustomNextCursor(null);
+  }, [customStatusFilter, deferredSearchQuery, attentionOnly, customSort]);
+
+  // Re-apply tab/attention from the URL when the dashboard banner is clicked
+  // while this page is already mounted (searchParams change without remount).
+  useEffect(() => {
+    const tab = (searchParams.get('tab') || '').toUpperCase();
+    if (tab === 'CUSTOM') {
+      setActiveTab('CUSTOM');
+    } else if (tab === 'COMMISSION') {
+      setActiveTab('COMMISSION');
+    } else if (tab === 'STANDARD') {
+      setActiveTab('STANDARD');
+    }
+    setAttentionOnly(searchParams.get('attention') === '1');
+  }, [searchParams]);
 
   const loadStandardDetail = useCallback(async (orderId: string) => {
     setStandardModalOpen(true);
@@ -260,13 +311,18 @@ const AdminOrdersPage: React.FC = () => {
     }
   }, [canManageCommission]);
 
+  // Tab-gated loads: only fetch the queue the admin is looking at.
   useEffect(() => {
-    void loadStandardOrders();
-  }, [loadStandardOrders]);
+    if (activeTab === 'STANDARD') {
+      void loadStandardOrders();
+    }
+  }, [activeTab, loadStandardOrders]);
 
   useEffect(() => {
-    void loadCustomOrders();
-  }, [loadCustomOrders]);
+    if (activeTab === 'CUSTOM') {
+      void loadCustomOrders();
+    }
+  }, [activeTab, loadCustomOrders]);
 
   useEffect(() => {
     if (activeTab === 'COMMISSION') {
@@ -298,34 +354,15 @@ const AdminOrdersPage: React.FC = () => {
     ];
   }, [standardSummary]);
 
-  const customNeedsAttentionCount = useMemo(
-    () => customOrders.filter((entry) => entry.adminAttentionRequiredAt).length,
-    [customOrders],
-  );
-
-  // Client-side sort + attention filter of the loaded page. Attention-first is
-  // the default so orders needing action float to the top of every page.
+  // Server already filters by attention and sorts; only amount needs a page-local
+  // re-sort (grand total lives in JSON — no scalar DB column).
   const visibleCustomOrders = useMemo(() => {
-    const rows = attentionOnly
-      ? customOrders.filter((entry) => entry.adminAttentionRequiredAt)
-      : [...customOrders];
+    if (customSort !== 'AMOUNT_DESC') {
+      return customOrders;
+    }
     const amount = (entry: CustomOrderListItem) => Number(entry.buyerPriceSummary?.grandTotal ?? 0);
-    const created = (entry: CustomOrderListItem) => new Date(entry.createdAt).getTime();
-    const attn = (entry: CustomOrderListItem) => (entry.adminAttentionRequiredAt ? 1 : 0);
-    return rows.sort((a, b) => {
-      switch (customSort) {
-        case 'NEWEST':
-          return created(b) - created(a);
-        case 'OLDEST':
-          return created(a) - created(b);
-        case 'AMOUNT_DESC':
-          return amount(b) - amount(a);
-        case 'ATTENTION':
-        default:
-          return attn(b) - attn(a) || created(b) - created(a);
-      }
-    });
-  }, [customOrders, customSort, attentionOnly]);
+    return [...customOrders].sort((a, b) => amount(b) - amount(a));
+  }, [customOrders, customSort]);
 
   const customMetrics = useMemo(() => {
     const paid = customOrders.filter(
@@ -337,13 +374,38 @@ const AdminOrdersPage: React.FC = () => {
     );
     return [
       { label: 'Total orders', value: String(customTotal || customOrders.length) },
-      { label: 'Needs review', value: String(customNeedsAttentionCount) },
+      { label: 'Needs review', value: String(customAttentionTotal) },
       { label: 'Paid (page)', value: String(paid.length) },
       { label: 'Revenue (page)', value: formatCurrency(revenue, 'NGN') },
     ];
-  }, [customOrders, customTotal, customNeedsAttentionCount]);
+  }, [customOrders, customTotal, customAttentionTotal]);
 
   const customTotalPages = Math.max(1, Math.ceil((customTotal || 0) / CUSTOM_PAGE_SIZE));
+  const canGoPrevCustom = Boolean(customCursor) || customPage > 1;
+  const canGoNextCustom = Boolean(customNextCursor) || customPage < customTotalPages;
+
+  const goCustomPrev = () => {
+    if (customCursorStack.length > 0) {
+      const stack = [...customCursorStack];
+      const prev = stack.pop();
+      setCustomCursorStack(stack);
+      setCustomCursor(prev);
+      setCustomPage((p) => Math.max(1, p - 1));
+      return;
+    }
+    setCustomCursor(undefined);
+    setCustomPage((prev) => Math.max(1, prev - 1));
+  };
+
+  const goCustomNext = () => {
+    if (customNextCursor) {
+      setCustomCursorStack((stack) => [...stack, customCursor]);
+      setCustomCursor(customNextCursor);
+      setCustomPage((p) => p + 1);
+      return;
+    }
+    setCustomPage((prev) => Math.min(customTotalPages, prev + 1));
+  };
 
   const customAmount = (entry: CustomOrderListItem) =>
     formatCurrency(
@@ -711,7 +773,7 @@ const AdminOrdersPage: React.FC = () => {
               <td className="px-4 py-3">
                 <div className="flex items-center gap-2">
                   {flagged ? (
-                    <span className="animate-pulse text-base leading-none" title="Needs admin review" aria-label="Needs admin review">🚩</span>
+                    <span className="motion-safe:animate-pulse text-base leading-none" title="Needs admin review" aria-label="Needs admin review">🚩</span>
                   ) : null}
                   <div className="font-semibold text-slate-900 dark:text-white">{entry.sourceTitle || `Custom #${entry.id.slice(0, 8)}`}</div>
                 </div>
@@ -758,7 +820,7 @@ const AdminOrdersPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                {flagged ? <span className="animate-pulse text-base leading-none" aria-label="Needs admin review">🚩</span> : null}
+                {flagged ? <span className="motion-safe:animate-pulse text-base leading-none" aria-label="Needs admin review">🚩</span> : null}
                 <div className="truncate font-semibold text-slate-900 dark:text-white">{entry.sourceTitle || 'Custom order'}</div>
               </div>
               <div className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
@@ -798,7 +860,7 @@ const AdminOrdersPage: React.FC = () => {
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
               #{entry.id.slice(0, 8).toUpperCase()}
             </div>
-            {flagged ? <span className="animate-pulse text-base leading-none" aria-label="Needs admin review">🚩</span> : null}
+            {flagged ? <span className="motion-safe:animate-pulse text-base leading-none" aria-label="Needs admin review">🚩</span> : null}
           </div>
           <div className="mt-2 text-base font-semibold text-slate-900 dark:text-white">{entry.sourceTitle || 'Custom order'}</div>
           <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">{entry.brand.name || 'Brand'}</div>
@@ -937,7 +999,7 @@ const AdminOrdersPage: React.FC = () => {
                         : 'border-black/10 text-slate-700 hover:border-rose-300 dark:border-white/10 dark:text-slate-200'
                     }`}
                   >
-                    🚩 Needs review{customNeedsAttentionCount > 0 ? ` (${customNeedsAttentionCount})` : ''}
+                    🚩 Needs review{customAttentionTotal > 0 ? ` (${customAttentionTotal})` : ''}
                   </button>
                 </>
               )}
@@ -995,21 +1057,25 @@ const AdminOrdersPage: React.FC = () => {
 
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                     <div className="text-xs text-slate-500 dark:text-slate-400">
-                      Page {customPage} of {customTotalPages} • {customTotal} total{attentionOnly ? ' • filtered to needs-review' : ''}
+                      Page {customPage} of {customTotalPages} • {customTotal}{' '}
+                      {attentionOnly ? 'needing review' : 'total'}
+                      {!attentionOnly && customAttentionTotal > 0
+                        ? ` • ${customAttentionTotal} need review`
+                        : ''}
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        disabled={customPage <= 1 || loadingCustom}
-                        onClick={() => setCustomPage((prev) => Math.max(1, prev - 1))}
+                        disabled={!canGoPrevCustom || loadingCustom}
+                        onClick={goCustomPrev}
                         className="rounded-full border border-black/10 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-200"
                       >
                         ← Previous
                       </button>
                       <button
                         type="button"
-                        disabled={customPage >= customTotalPages || loadingCustom}
-                        onClick={() => setCustomPage((prev) => Math.min(customTotalPages, prev + 1))}
+                        disabled={!canGoNextCustom || loadingCustom}
+                        onClick={goCustomNext}
                         className="rounded-full border border-black/10 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-200"
                       >
                         Next →

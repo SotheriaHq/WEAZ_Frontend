@@ -56,6 +56,12 @@ const attentionReasonLabel = (reason?: string | null) => {
       return 'It has been stuck at the same stage for a while.';
     case 'PAYOUT_RELEASE_ELIGIBLE':
       return 'It is ready for a manual payout release.';
+    case 'DISPUTE_OPENED':
+      return 'A dispute was opened on this order.';
+    case 'ISSUE_REPORTED':
+      return 'The buyer reported an issue.';
+    case 'FLAG_RISK':
+      return 'A risk flag was raised and still needs follow-up.';
     default:
       return 'This order was escalated for admin review.';
   }
@@ -86,24 +92,28 @@ const AdminCustomOrderDetailPage: React.FC = () => {
   const refreshSequenceRef = useRef(0);
   const selectedSource = selected?.source ?? null;
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options?: { background?: boolean }) => {
     if (!orderId) return;
     const sequence = refreshSequenceRef.current + 1;
     refreshSequenceRef.current = sequence;
-    setLoading(true);
+    if (!options?.background) {
+      setLoading(true);
+    }
+
+    // Single detail fetch includes capped ledgerAllocations — no second RTT.
     try {
-      const [detail, allocationData] = await Promise.all([
-        customOrdersAdminApi.getById(orderId),
-        customOrdersAdminApi.getLedgerAllocations({ customOrderId: orderId, limit: 50 }),
-      ]);
+      const detail = await customOrdersAdminApi.getById(orderId);
       if (refreshSequenceRef.current !== sequence) return;
       setSelected(detail);
-      setLedgerAllocations(allocationData.items);
+      setLedgerAllocations(
+        Array.isArray(detail?.ledgerAllocations) ? detail.ledgerAllocations : [],
+      );
       setNotFound(false);
     } catch (error: any) {
       if (refreshSequenceRef.current !== sequence) return;
       if (error?.response?.status === 404) {
         setNotFound(true);
+        setSelected(null);
       } else {
         toast.error(error?.response?.data?.message || 'Unable to load custom-order detail');
       }
@@ -133,12 +143,25 @@ const AdminCustomOrderDetailPage: React.FC = () => {
     );
   }, [selected]);
 
-  const runAction = async (work: () => Promise<unknown>, successMessage: string) => {
+  const runAction = async (
+    work: () => Promise<unknown>,
+    successMessage: string,
+    options?: { clearsAttention?: boolean },
+  ) => {
     setBusy(true);
     try {
       await work();
       toast.success(successMessage);
-      await refresh();
+      // Optimistic banner clear for resolving actions (feels instant).
+      if (options?.clearsAttention !== false) {
+        setSelected((prev) =>
+          prev
+            ? { ...prev, adminAttentionRequiredAt: null, adminAttentionReason: null }
+            : prev,
+        );
+      }
+      // Background revalidate — don't block the UI on the full detail reload.
+      void refresh({ background: true });
       return true;
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to complete admin action');
@@ -198,13 +221,16 @@ const AdminCustomOrderDetailPage: React.FC = () => {
           {/* Attention banner — stays until an admin takes a concrete action. */}
           {needsAttention ? (
             <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-rose-300/70 bg-rose-50 px-5 py-4 dark:border-rose-500/30 dark:bg-rose-500/10">
-              <span className="animate-pulse text-2xl" aria-hidden>🚨</span>
+              <span className="motion-safe:animate-pulse text-2xl" aria-hidden>🚨</span>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-bold text-rose-700 dark:text-rose-200">
                   This order needs your attention
                 </div>
                 <div className="mt-0.5 text-xs text-rose-600/90 dark:text-rose-200/80">
-                  {attentionReasonLabel(selected.adminAttentionReason)} The flag clears once you take an action below (remind, flag, hold, escalate, or cancel).
+                  {attentionReasonLabel(selected.adminAttentionReason)}{' '}
+                  {String(selected.adminAttentionReason || '').toUpperCase() === 'FLAG_RISK'
+                    ? 'Risk flags stay raised until you resolve the underlying issue (hold, escalate, cancel, or close a dispute).'
+                    : 'The flag clears once you take a resolving action below (remind, hold, escalate, cancel, or close a dispute).'}
                 </div>
               </div>
             </div>
@@ -399,7 +425,16 @@ const AdminCustomOrderDetailPage: React.FC = () => {
                     description: 'This records an explicit risk signal against the order for admin follow-up and operational review.',
                     confirmLabel: 'Flag risk',
                     tone: 'danger',
-                    execute: () => runAction(() => customOrdersAdminApi.flagRisk(selected.id, { reason: riskReason.trim(), note: riskNote.trim() || undefined }), 'Risk flag recorded'),
+                    execute: () =>
+                      runAction(
+                        () =>
+                          customOrdersAdminApi.flagRisk(selected.id, {
+                            reason: riskReason.trim(),
+                            note: riskNote.trim() || undefined,
+                          }),
+                        'Risk flag recorded',
+                        { clearsAttention: false },
+                      ),
                   })
                 }
                 className="mt-3 rounded-full bg-rose-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"

@@ -38,6 +38,14 @@ type DashboardStats = {
   recentLogs: RecentLog[];
 };
 
+type LiveBadges = {
+  customOrdersNeedingAttention: number;
+  openDisputes: number;
+  pendingPayouts: number;
+  pendingVerifications: number;
+  ordersNeedingAttention: number;
+};
+
 const humanAction = (action: string): { label: string; verb: string } => {
   const map: Record<string, { label: string; verb: string }> = {
     USER_SIGNUP: { label: 'User Signup', verb: 'signed up' },
@@ -109,32 +117,52 @@ const statusBadge = (status: string | null | undefined) => {
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  // Near-real-time platform stats: polls every 20s (pauses when the tab is
-  // hidden) so the admin overview reflects live counts without a manual refresh.
+
+  // Heavy platform totals — slower poll. Not re-run every 20s.
   const { data: stats, loading } = useCachedResource<DashboardStats>({
     queryKey: ['admin', 'dashboard', 'stats'],
     queryFn: async () => {
       const res = await adminDashboardApi.getStats();
       return unwrapApiResponse<DashboardStats>(res.data as any);
     },
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
+
+  // Live action badges — cheap counts only, 20s poll.
+  const { data: badges } = useCachedResource<LiveBadges>({
+    queryKey: ['admin', 'dashboard', 'badges'],
+    queryFn: async () => {
+      const res = await adminDashboardApi.getLiveBadges();
+      return unwrapApiResponse<LiveBadges>(res.data as any);
+    },
     staleTime: THREADLY_COUNT_STALE_TIME_MS,
     refetchInterval: 20_000,
   });
+
+  const pendingVerifications =
+    badges?.pendingVerifications ?? stats?.pendingVerifications;
+  const openDisputes = badges?.openDisputes ?? stats?.openDisputes;
+  const pendingPayouts = badges?.pendingPayouts ?? stats?.pendingPayouts;
+  const ordersNeedingAttention =
+    badges?.ordersNeedingAttention ?? stats?.ordersNeedingAttention;
+  const customAttentionCount =
+    badges?.customOrdersNeedingAttention ?? stats?.customOrdersNeedingAttention ?? 0;
 
   // Deltas are derived from real stats only — no fabricated growth numbers.
   const primaryCards = [
     { label: 'Total Users', value: stats?.totalUsers, change: stats?.activeUsers30d != null ? `${stats.activeUsers30d.toLocaleString()} active in 30d` : 'Registered users', changeType: 'up' as const, color: 'indigo', route: '/admin/users' },
     { label: 'Active Brands', value: stats?.totalBrands, change: 'Active on platform', changeType: 'neutral' as const, color: 'fuchsia', route: '/admin/brands' },
-    { label: 'Pending Reviews', value: stats?.pendingVerifications, change: 'Action Required', changeType: 'warning' as const, color: 'amber', route: '/admin/moderation' },
-    { label: 'Open Disputes', value: stats?.openDisputes, change: 'Needs attention', changeType: 'warning' as const, color: 'red', route: '/admin/disputes' },
+    { label: 'Pending Reviews', value: pendingVerifications, change: 'Action Required', changeType: 'warning' as const, color: 'amber', route: '/admin/moderation' },
+    { label: 'Open Disputes', value: openDisputes, change: 'Needs attention', changeType: 'warning' as const, color: 'red', route: '/admin/disputes' },
   ];
 
   const secondaryMetrics = useMemo(() => {
     const base = [
       { label: 'Active (30d)', value: stats?.activeUsers30d?.toLocaleString() ?? '—', route: '/admin/users' },
-      { label: 'Pending Payouts', value: stats?.pendingPayouts?.toLocaleString() ?? '—', route: '/admin/payouts' },
-      { label: 'Orders to Ship', value: stats?.ordersNeedingAttention?.toLocaleString() ?? '—', route: '/admin/orders' },
-      { label: 'Verifications', value: stats?.pendingVerifications?.toLocaleString() ?? '—', route: '/admin/brands' },
+      { label: 'Pending Payouts', value: pendingPayouts?.toLocaleString() ?? '—', route: '/admin/payouts' },
+      { label: 'Orders to Ship', value: ordersNeedingAttention?.toLocaleString() ?? '—', route: '/admin/orders' },
+      { label: 'Verifications', value: pendingVerifications?.toLocaleString() ?? '—', route: '/admin/brands' },
       { label: 'Audit Events', value: stats?.recentLogs?.length?.toString() ?? '—', route: '/admin/audit' },
       { label: 'Products', value: stats?.totalProducts?.toLocaleString() ?? '—', route: '/admin/content?tab=products' },
       { label: 'Designs', value: stats?.totalDesigns?.toLocaleString() ?? '—', route: '/admin/content?tab=designs' },
@@ -146,7 +174,7 @@ const AdminDashboard: React.FC = () => {
       { label: 'Signups Today', value: stats?.dailySignupCount?.toLocaleString() ?? '—', route: '/admin/users' },
       ...base.slice(1),
     ];
-  }, [stats]);
+  }, [stats, pendingPayouts, ordersNeedingAttention, pendingVerifications]);
 
   const colorMap: Record<string, { glow: string; text: string }> = {
     indigo: { glow: 'bg-indigo-500/10', text: 'text-indigo-400' },
@@ -173,8 +201,6 @@ const AdminDashboard: React.FC = () => {
     return `${days}d ago`;
   };
 
-  const customAttentionCount = stats?.customOrdersNeedingAttention ?? 0;
-
   return (
     <div className="space-y-8">
       <div>
@@ -195,7 +221,7 @@ const AdminDashboard: React.FC = () => {
           aria-label={`${customAttentionCount} custom orders need admin review`}
         >
           <span className="relative flex h-11 w-11 shrink-0 items-center justify-center">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400/40" />
+            <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-rose-400/40" />
             <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-full bg-rose-500 text-xl text-white">🚨</span>
           </span>
           <div className="min-w-0 flex-1">

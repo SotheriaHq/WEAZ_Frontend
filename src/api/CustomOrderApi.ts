@@ -601,9 +601,13 @@ export interface CustomOrderPaymentAttempt {
 
 export interface PaginatedCustomOrders<T> {
   items: T[];
-  page: number;
+  page?: number;
   limit: number;
   total: number;
+  /** Server count of orders needing admin attention under the same filters. */
+  attentionTotal?: number;
+  /** Keyset cursor for the next page (prefer over deep OFFSET). */
+  nextCursor?: string | null;
 }
 
 export interface CustomOrderRiskDashboard {
@@ -1124,7 +1128,20 @@ export const customOrdersAdminApi = {
     return unwrapApiResponse<CustomOrderRiskDashboard>(response.data);
   },
 
-  async list(params?: { page?: number; limit?: number; status?: CustomOrderStatus; stage?: CustomOrderProgressStage; brandId?: string; q?: string }) {
+  async list(params?: {
+    page?: number;
+    limit?: number;
+    status?: CustomOrderStatus;
+    stage?: CustomOrderProgressStage;
+    brandId?: string;
+    q?: string;
+    /** Server-side needs-review filter (dashboard deep-link). */
+    attention?: boolean | 1 | 0;
+    /** Server-side sort: attention | newest | oldest | amount. */
+    sort?: 'attention' | 'newest' | 'oldest' | 'amount';
+    /** Keyset cursor from a prior response's nextCursor. */
+    cursor?: string;
+  }) {
     const response = await apiClient.get('/admin/custom-orders', withParams(params));
     return unwrapApiResponse<PaginatedCustomOrders<CustomOrderListItem>>(response.data);
   },

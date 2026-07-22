@@ -104,17 +104,36 @@ function determineContentReviewRoute(notification: NormalizedNotification): stri
  * Uses the registry pattern with fallback to legacy targetUrl
  */
 /**
- * A `target.preview` that is an app-relative path (e.g. system notifications
- * carry `/admin/custom-orders/:id` or `/custom-orders/:id`) is a real route.
- * Use it for navigation so notifications land the user on the exact screen
- * instead of falling through to the notifications settings page.
+ * Allowlisted app-relative `target.preview` paths. Only known order/admin
+ * surfaces become routes — an unrelated system notification with a
+ * non-route relative preview must not navigate somewhere odd.
  */
-function relativePreviewRoute(preview?: string): string | null {
+const PREVIEW_ROUTE_PREFIXES = [
+    '/admin/custom-orders/',
+    '/admin/orders',
+    '/custom-orders/',
+    '/orders/',
+    '/studio/custom-orders/',
+    '/studio/orders/',
+] as const;
+
+/**
+ * A `target.preview` that is an allowlisted app-relative path (e.g. system
+ * notifications carry `/admin/custom-orders/:id` or `/custom-orders/:id`) is a
+ * real route. Use it for navigation so order notifications land on the exact
+ * screen instead of falling through to notification settings.
+ */
+export function relativePreviewRoute(preview?: string): string | null {
     if (!preview) return null;
     if (/^https?:\/\//i.test(preview)) return null;
     // Single leading slash only (guards against protocol-relative "//host").
-    if (preview.startsWith('/') && !preview.startsWith('//')) return preview;
-    return null;
+    if (!preview.startsWith('/') || preview.startsWith('//')) return null;
+    // Strip query/hash for prefix matching; preserve the full path as the route.
+    const pathOnly = preview.split(/[?#]/)[0] || preview;
+    const allowed = PREVIEW_ROUTE_PREFIXES.some(
+        (prefix) => pathOnly === prefix.replace(/\/$/, '') || pathOnly.startsWith(prefix),
+    );
+    return allowed ? preview : null;
 }
 
 export function determineNotificationRoute(notification: NormalizedNotification): string {
