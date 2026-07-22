@@ -115,6 +115,7 @@ const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'));
 const AdminForceResetPasswordPage = lazy(() => import('./pages/admin/AdminForceResetPasswordPage'));
 const AdminResetPasswordPage = lazy(() => import('./pages/admin/AdminResetPasswordPage'));
 const AdminCustomOrdersPage = lazy(() => import('./pages/admin/AdminCustomOrdersPage'));
+const AdminCustomOrderDetailPage = lazy(() => import('./pages/admin/AdminCustomOrderDetailPage'));
 const AdminMessagingPage = lazy(() => import('./pages/admin/AdminMessagingPage'));
 
 // Password reset pages — lazy loaded
@@ -916,7 +917,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <AdminDashboard /> },
           { path: 'custom-orders', element: <RequireAdminPermission permission="MODERATION_READ"><AdminCustomOrdersPage /></RequireAdminPermission> },
-          { path: 'custom-orders/:orderId', element: <RequireAdminPermission permission="MODERATION_READ"><AdminCustomOrdersPage /></RequireAdminPermission> },
+          { path: 'custom-orders/:orderId', element: <RequireAdminPermission permission="MODERATION_READ"><AdminCustomOrderDetailPage /></RequireAdminPermission> },
           { path: 'users', element: <RequireAdminPermission permission="USERS_READ"><AdminUsersPage /></RequireAdminPermission> },
           { path: 'brands', element: <RequireAdminPermission permission="BRANDS_READ"><AdminBrandsPage /></RequireAdminPermission> },
           { path: 'verification', element: <RequireAdminPermission permission="BRANDS_VERIFY"><AdminVerificationQueuePage /></RequireAdminPermission> },

@@ -19,6 +19,14 @@ import type { NormalizedNotification } from '@/utils/notificationAdapter';
 import { trackOnce, createTelemetryEvent } from '@/utils/notificationTelemetry';
 import './NotificationItem.css';
 
+// A `target.preview` is meant to be a short human snippet (e.g. a comment
+// excerpt). Some system notifications reuse it to carry a route path — never
+// show that raw path/URL to the user; it's used only for routing.
+function isRouteyPreview(preview?: string | null): boolean {
+  if (!preview) return false;
+  return preview.startsWith('/') || /^https?:\/\//i.test(preview);
+}
+
 // Utility function for relative time
 function timeAgo(dateString: string): string {
   const date = new Date(dateString);
@@ -153,7 +161,7 @@ export const NotificationItem = React.memo<NotificationItemProps>(
             {actionText && (
               <span className="action-text"> {actionText}</span>
             )}
-            {target?.preview && (
+            {target?.preview && !isRouteyPreview(target.preview) && (
               <span className="target-preview"> {target.preview}</span>
             )}
           </div>

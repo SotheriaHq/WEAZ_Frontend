@@ -103,11 +103,28 @@ function determineContentReviewRoute(notification: NormalizedNotification): stri
  * Determine the route for navigating to notification target content
  * Uses the registry pattern with fallback to legacy targetUrl
  */
+/**
+ * A `target.preview` that is an app-relative path (e.g. system notifications
+ * carry `/admin/custom-orders/:id` or `/custom-orders/:id`) is a real route.
+ * Use it for navigation so notifications land the user on the exact screen
+ * instead of falling through to the notifications settings page.
+ */
+function relativePreviewRoute(preview?: string): string | null {
+    if (!preview) return null;
+    if (/^https?:\/\//i.test(preview)) return null;
+    // Single leading slash only (guards against protocol-relative "//host").
+    if (preview.startsWith('/') && !preview.startsWith('//')) return preview;
+    return null;
+}
+
 export function determineNotificationRoute(notification: NormalizedNotification): string {
     const { type, target, subTargetId, targetUrl, actor, payload } = notification;
 
-    // Fallback URL if nothing else works
-    const fallbackUrl = targetUrl || '/settings?tab=notifications';
+    // Fallback chain: explicit legacy targetUrl → app-relative target preview →
+    // notifications settings. The preview step is what routes system order
+    // notifications (admin-review, buyer flags) to their exact screen.
+    const fallbackUrl =
+        targetUrl || relativePreviewRoute(target?.preview) || '/settings?tab=notifications';
 
     // Content-review lifecycle routes take priority — these previously fell
     // through to the notifications screen (client-reported).

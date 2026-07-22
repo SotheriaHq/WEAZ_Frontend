@@ -280,7 +280,11 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
   const contentTitleFor = (n: NormalizedNotification): string => {
     const payload = (n.payload as Record<string, unknown> | undefined) ?? {};
     const fromTarget = typeof n.target?.preview === 'string' ? n.target.preview.trim() : '';
-    if (fromTarget) return fromTarget;
+    // `target.preview` is a human content title for content notifications, but
+    // system notifications reuse it to carry a route path (e.g.
+    // "/admin/custom-orders/:id"). Never surface that raw path as a title.
+    const isRouteyPreview = fromTarget.startsWith('/') || /^https?:\/\//i.test(fromTarget);
+    if (fromTarget && !isRouteyPreview) return fromTarget;
 
     const fromPayload =
       (typeof payload.contentTitle === 'string' && payload.contentTitle) ||

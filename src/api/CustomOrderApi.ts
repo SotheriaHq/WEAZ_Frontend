@@ -188,15 +188,22 @@ export interface CustomOrderListItem {
   sourceType: CustomOrderSourceType;
   sourceId: string;
   sourceTitle: string;
+  sourceBrandName?: string | null;
   sourcePrimaryMediaUrl?: string | null;
+  currency?: string;
   brand: {
     name: string;
+    id?: string;
+    ownerId?: string;
   };
   buyer?: {
     name?: string | null;
     email?: string | null;
     phone?: string | null;
   };
+  /** Sticky "needs admin attention" signal (set by ops cron, cleared by any admin action). */
+  adminAttentionRequiredAt?: string | null;
+  adminAttentionReason?: string | null;
   delivery?: {
     city?: string | null;
     state?: string | null;
@@ -421,6 +428,11 @@ export interface CustomOrderDetail {
   retentionHoldUntil?: string | null;
   retentionHoldSetById?: string | null;
   retentionHoldSetAt?: string | null;
+  /** Sticky "needs admin attention" signal — drives the detail-page danger banner. */
+  adminAttentionRequiredAt?: string | null;
+  adminAttentionReason?: string | null;
+  brandId?: string;
+  buyerId?: string;
   progressEvents: CustomOrderProgressEvent[];
   extensionRequests: CustomOrderExtensionRequest[];
   issues: CustomOrderIssue[];

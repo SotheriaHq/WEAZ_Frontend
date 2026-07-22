@@ -1,5 +1,5 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import Modal from '@/components/ui/Modal';
@@ -29,6 +29,9 @@ import {
 
 type OrdersTab = 'STANDARD' | 'CUSTOM' | 'COMMISSION';
 type OrdersView = 'TABLE' | 'LIST' | 'CARDS';
+type CustomSort = 'ATTENTION' | 'NEWEST' | 'OLDEST' | 'AMOUNT_DESC';
+
+const CUSTOM_PAGE_SIZE = 30;
 
 const COMMISSION_CONFIG_KEYS = {
   fallback: 'finance.commission.defaultPercent',
@@ -109,18 +112,27 @@ const formatPercent = (value: unknown) => {
 
 const AdminOrdersPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { isSuperAdmin } = useAdminPermissions();
   const canManageCommission = isSuperAdmin;
-  const [activeTab, setActiveTab] = useState<OrdersTab>('STANDARD');
+  const initialTab = (searchParams.get('tab') || '').toUpperCase();
+  const [activeTab, setActiveTab] = useState<OrdersTab>(
+    initialTab === 'CUSTOM' ? 'CUSTOM' : initialTab === 'COMMISSION' ? 'COMMISSION' : 'STANDARD',
+  );
   const [viewMode, setViewMode] = useState<OrdersView>('TABLE');
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const [standardStatusFilter, setStandardStatusFilter] = useState('');
   const [customStatusFilter, setCustomStatusFilter] = useState('');
+  const [customSort, setCustomSort] = useState<CustomSort>('ATTENTION');
+  const [attentionOnly, setAttentionOnly] = useState(searchParams.get('attention') === '1');
+  const [customPage, setCustomPage] = useState(1);
+  const [customTotal, setCustomTotal] = useState(0);
 
   const [standardOrders, setStandardOrders] = useState<AdminStandardOrderListItem[]>([]);
   const [standardSummary, setStandardSummary] = useState<AdminStandardOrderListResponse['summary'] | null>(null);
   const [customOrders, setCustomOrders] = useState<CustomOrderListItem[]>([]);
+  const [customLoaded, setCustomLoaded] = useState(false);
 
   const [loadingStandard, setLoadingStandard] = useState(false);
   const [loadingCustom, setLoadingCustom] = useState(false);
@@ -161,18 +173,26 @@ const AdminOrdersPage: React.FC = () => {
     setLoadingCustom(true);
     try {
       const payload = await customOrdersAdminApi.list({
-        limit: 30,
+        page: customPage,
+        limit: CUSTOM_PAGE_SIZE,
         q: deferredSearchQuery.trim() || undefined,
         status: customStatusFilter ? (customStatusFilter as CustomOrderStatus) : undefined,
       });
+      // Replace only on success so the table never flashes empty while refetching.
       setCustomOrders(Array.isArray(payload?.items) ? payload.items : []);
+      setCustomTotal(Number(payload?.total ?? 0));
+      setCustomLoaded(true);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to load custom-order queue');
-      setCustomOrders([]);
     } finally {
       setLoadingCustom(false);
     }
-  }, [customStatusFilter, deferredSearchQuery]);
+  }, [customPage, customStatusFilter, deferredSearchQuery]);
+
+  // Reset to the first page whenever the filter/search/attention inputs change.
+  useEffect(() => {
+    setCustomPage(1);
+  }, [customStatusFilter, deferredSearchQuery, attentionOnly]);
 
   const loadStandardDetail = useCallback(async (orderId: string) => {
     setStandardModalOpen(true);
@@ -277,6 +297,59 @@ const AdminOrdersPage: React.FC = () => {
       },
     ];
   }, [standardSummary]);
+
+  const customNeedsAttentionCount = useMemo(
+    () => customOrders.filter((entry) => entry.adminAttentionRequiredAt).length,
+    [customOrders],
+  );
+
+  // Client-side sort + attention filter of the loaded page. Attention-first is
+  // the default so orders needing action float to the top of every page.
+  const visibleCustomOrders = useMemo(() => {
+    const rows = attentionOnly
+      ? customOrders.filter((entry) => entry.adminAttentionRequiredAt)
+      : [...customOrders];
+    const amount = (entry: CustomOrderListItem) => Number(entry.buyerPriceSummary?.grandTotal ?? 0);
+    const created = (entry: CustomOrderListItem) => new Date(entry.createdAt).getTime();
+    const attn = (entry: CustomOrderListItem) => (entry.adminAttentionRequiredAt ? 1 : 0);
+    return rows.sort((a, b) => {
+      switch (customSort) {
+        case 'NEWEST':
+          return created(b) - created(a);
+        case 'OLDEST':
+          return created(a) - created(b);
+        case 'AMOUNT_DESC':
+          return amount(b) - amount(a);
+        case 'ATTENTION':
+        default:
+          return attn(b) - attn(a) || created(b) - created(a);
+      }
+    });
+  }, [customOrders, customSort, attentionOnly]);
+
+  const customMetrics = useMemo(() => {
+    const paid = customOrders.filter(
+      (entry) => String(entry.paymentStatus).toUpperCase() === 'PAID',
+    );
+    const revenue = paid.reduce(
+      (sum, entry) => sum + Number(entry.buyerPriceSummary?.grandTotal ?? 0),
+      0,
+    );
+    return [
+      { label: 'Total orders', value: String(customTotal || customOrders.length) },
+      { label: 'Needs review', value: String(customNeedsAttentionCount) },
+      { label: 'Paid (page)', value: String(paid.length) },
+      { label: 'Revenue (page)', value: formatCurrency(revenue, 'NGN') },
+    ];
+  }, [customOrders, customTotal, customNeedsAttentionCount]);
+
+  const customTotalPages = Math.max(1, Math.ceil((customTotal || 0) / CUSTOM_PAGE_SIZE));
+
+  const customAmount = (entry: CustomOrderListItem) =>
+    formatCurrency(
+      entry.buyerPriceSummary?.grandTotal,
+      entry.buyerPriceSummary?.currency || entry.currency || 'NGN',
+    );
 
   const commissionPreview = useMemo(() => {
     const gross = 100000;
@@ -623,14 +696,25 @@ const AdminOrdersPage: React.FC = () => {
           </tr>
         </thead>
         <tbody className="divide-y divide-black/10 dark:divide-white/10">
-          {customOrders.map((entry) => (
+          {visibleCustomOrders.map((entry) => {
+            const flagged = Boolean(entry.adminAttentionRequiredAt);
+            return (
             <tr
               key={entry.id}
               onClick={() => navigate(`/admin/custom-orders/${entry.id}`)}
-              className="cursor-pointer bg-white/70 transition hover:bg-emerald-500/10 dark:bg-white/[0.02]"
+              className={`cursor-pointer transition hover:bg-emerald-500/10 ${
+                flagged
+                  ? 'bg-rose-500/[0.06] dark:bg-rose-500/[0.08]'
+                  : 'bg-white/70 dark:bg-white/[0.02]'
+              }`}
             >
               <td className="px-4 py-3">
-                <div className="font-semibold text-slate-900 dark:text-white">{entry.sourceTitle || `Custom #${entry.id.slice(0, 8)}`}</div>
+                <div className="flex items-center gap-2">
+                  {flagged ? (
+                    <span className="animate-pulse text-base leading-none" title="Needs admin review" aria-label="Needs admin review">🚩</span>
+                  ) : null}
+                  <div className="font-semibold text-slate-900 dark:text-white">{entry.sourceTitle || `Custom #${entry.id.slice(0, 8)}`}</div>
+                </div>
                 <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">#{entry.id.slice(0, 8).toUpperCase()}</div>
               </td>
               <td className="px-4 py-3">
@@ -645,11 +729,12 @@ const AdminOrdersPage: React.FC = () => {
                 </div>
               </td>
               <td className="px-4 py-3">
-                <div className="font-semibold text-slate-900 dark:text-white">{entry.buyerPriceSummary?.currency || 'NGN'} {String(entry.buyerPriceSummary?.grandTotal ?? 0)}</div>
+                <div className="font-semibold text-slate-900 dark:text-white">{customAmount(entry)}</div>
                 <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{entry.paymentStatus}</div>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -657,22 +742,31 @@ const AdminOrdersPage: React.FC = () => {
 
   const renderCustomList = () => (
     <div className="space-y-3">
-      {customOrders.map((entry) => (
+      {visibleCustomOrders.map((entry) => {
+        const flagged = Boolean(entry.adminAttentionRequiredAt);
+        return (
         <button
           key={entry.id}
           type="button"
           onClick={() => navigate(`/admin/custom-orders/${entry.id}`)}
-          className="w-full rounded-2xl border border-black/10 bg-white/75 px-4 py-4 text-left transition hover:border-emerald-300 hover:bg-emerald-500/10 dark:border-white/10 dark:bg-white/[0.03]"
+          className={`w-full rounded-2xl border px-4 py-4 text-left transition hover:border-emerald-300 hover:bg-emerald-500/10 ${
+            flagged
+              ? 'border-rose-300/70 bg-rose-500/[0.06] dark:border-rose-500/40 dark:bg-rose-500/[0.08]'
+              : 'border-black/10 bg-white/75 dark:border-white/10 dark:bg-white/[0.03]'
+          }`}
         >
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="min-w-0">
-              <div className="truncate font-semibold text-slate-900 dark:text-white">{entry.sourceTitle || 'Custom order'}</div>
+              <div className="flex items-center gap-2">
+                {flagged ? <span className="animate-pulse text-base leading-none" aria-label="Needs admin review">🚩</span> : null}
+                <div className="truncate font-semibold text-slate-900 dark:text-white">{entry.sourceTitle || 'Custom order'}</div>
+              </div>
               <div className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
                   Buyer {entry.buyer?.name || 'Buyer'} • Brand {entry.brand.name || 'Brand'}
               </div>
             </div>
             <div className="text-right">
-                <div className="font-semibold text-slate-900 dark:text-white">{entry.buyerPriceSummary?.currency || 'NGN'} {String(entry.buyerPriceSummary?.grandTotal ?? 0)}</div>
+                <div className="font-semibold text-slate-900 dark:text-white">{customAmount(entry)}</div>
               <div className="mt-1 flex flex-wrap justify-end gap-2">
                 <CustomOrderBadge value={entry.status} />
                 <CustomOrderBadge value={entry.paymentStatus} type="payment" />
@@ -680,21 +774,31 @@ const AdminOrdersPage: React.FC = () => {
             </div>
           </div>
         </button>
-      ))}
+        );
+      })}
     </div>
   );
 
   const renderCustomCards = () => (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {customOrders.map((entry) => (
+      {visibleCustomOrders.map((entry) => {
+        const flagged = Boolean(entry.adminAttentionRequiredAt);
+        return (
         <button
           key={entry.id}
           type="button"
           onClick={() => navigate(`/admin/custom-orders/${entry.id}`)}
-          className="rounded-2xl border border-black/10 bg-white/80 p-4 text-left transition hover:border-emerald-300 hover:bg-emerald-500/10 dark:border-white/10 dark:bg-white/[0.03]"
+          className={`rounded-2xl border p-4 text-left transition hover:border-emerald-300 hover:bg-emerald-500/10 ${
+            flagged
+              ? 'border-rose-300/70 bg-rose-500/[0.06] dark:border-rose-500/40 dark:bg-rose-500/[0.08]'
+              : 'border-black/10 bg-white/80 dark:border-white/10 dark:bg-white/[0.03]'
+          }`}
         >
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
-            #{entry.id.slice(0, 8).toUpperCase()}
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
+              #{entry.id.slice(0, 8).toUpperCase()}
+            </div>
+            {flagged ? <span className="animate-pulse text-base leading-none" aria-label="Needs admin review">🚩</span> : null}
           </div>
           <div className="mt-2 text-base font-semibold text-slate-900 dark:text-white">{entry.sourceTitle || 'Custom order'}</div>
           <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">{entry.brand.name || 'Brand'}</div>
@@ -702,9 +806,10 @@ const AdminOrdersPage: React.FC = () => {
             <CustomOrderBadge value={entry.status} />
             <CustomOrderBadge value={entry.currentProgressStage || 'ORDER_PLACED'} type="stage" />
           </div>
-          <div className="mt-3 text-sm font-semibold text-slate-900 dark:text-white">{entry.buyerPriceSummary?.currency || 'NGN'} {String(entry.buyerPriceSummary?.grandTotal ?? 0)}</div>
+          <div className="mt-3 text-sm font-semibold text-slate-900 dark:text-white">{customAmount(entry)}</div>
         </button>
-      ))}
+        );
+      })}
     </div>
   );
 
@@ -753,7 +858,7 @@ const AdminOrdersPage: React.FC = () => {
 
         {activeTab !== 'COMMISSION' ? (
           <div className="mt-5 grid gap-3 md:grid-cols-4">
-            {standardMetrics.map((metric) => (
+            {(activeTab === 'CUSTOM' ? customMetrics : standardMetrics).map((metric) => (
               <div
                 key={metric.label}
                 className="rounded-2xl border border-black/10 bg-slate-50/80 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]"
@@ -794,22 +899,47 @@ const AdminOrdersPage: React.FC = () => {
                   className="min-w-[220px]"
                 />
               ) : (
-                <UniversalSelect
-                  value={customStatusFilter}
-                  onChange={setCustomStatusFilter}
-                  options={[
-                    { value: '', label: 'All statuses' },
-                    { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pending acceptance' },
-                    { value: 'ACCEPTED', label: 'Accepted' },
-                    { value: 'IN_PRODUCTION', label: 'In production' },
-                    { value: 'IN_TRANSIT', label: 'In transit' },
-                    { value: 'DELIVERED_PENDING_BUYER_CONFIRMATION', label: 'Pending buyer confirmation' },
-                    { value: 'COMPLETED', label: 'Completed' },
-                    { value: 'DISPUTED', label: 'Disputed' },
-                    { value: 'REFUND_IN_PROGRESS', label: 'Refund in progress' },
-                  ]}
-                  className="min-w-[220px]"
-                />
+                <>
+                  <UniversalSelect
+                    value={customStatusFilter}
+                    onChange={setCustomStatusFilter}
+                    options={[
+                      { value: '', label: 'All statuses' },
+                      { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pending acceptance' },
+                      { value: 'ACCEPTED', label: 'Accepted' },
+                      { value: 'IN_PRODUCTION', label: 'In production' },
+                      { value: 'IN_TRANSIT', label: 'In transit' },
+                      { value: 'DELIVERED_PENDING_BUYER_CONFIRMATION', label: 'Pending buyer confirmation' },
+                      { value: 'COMPLETED', label: 'Completed' },
+                      { value: 'DISPUTED', label: 'Disputed' },
+                      { value: 'REFUND_IN_PROGRESS', label: 'Refund in progress' },
+                    ]}
+                    className="min-w-[200px]"
+                  />
+                  <UniversalSelect
+                    value={customSort}
+                    onChange={(value) => setCustomSort(value as CustomSort)}
+                    options={[
+                      { value: 'ATTENTION', label: 'Needs review first' },
+                      { value: 'NEWEST', label: 'Newest first' },
+                      { value: 'OLDEST', label: 'Oldest first' },
+                      { value: 'AMOUNT_DESC', label: 'Amount: high to low' },
+                    ]}
+                    className="min-w-[180px]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setAttentionOnly((prev) => !prev)}
+                    aria-pressed={attentionOnly}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                      attentionOnly
+                        ? 'border-rose-300 bg-rose-500/10 text-rose-700 dark:border-rose-500/40 dark:text-rose-300'
+                        : 'border-black/10 text-slate-700 hover:border-rose-300 dark:border-white/10 dark:text-slate-200'
+                    }`}
+                  >
+                    🚩 Needs review{customNeedsAttentionCount > 0 ? ` (${customNeedsAttentionCount})` : ''}
+                  </button>
+                </>
               )}
 
               <div className="ml-auto inline-flex rounded-full border border-black/10 bg-white p-1 dark:border-white/10 dark:bg-slate-950">
@@ -843,20 +973,50 @@ const AdminOrdersPage: React.FC = () => {
                 ) : (
                   renderStandardCards()
                 )
-              ) : loadingCustom ? (
+              ) : loadingCustom && !customLoaded ? (
                 <div className="rounded-2xl border border-black/10 px-4 py-8 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
                   Loading custom-order queue...
                 </div>
-              ) : customOrders.length === 0 ? (
+              ) : visibleCustomOrders.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-black/10 px-4 py-8 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
-                  No custom orders match your filter.
+                  {attentionOnly ? 'No custom orders currently need review.' : 'No custom orders match your filter.'}
                 </div>
-              ) : viewMode === 'TABLE' ? (
-                renderCustomTable()
-              ) : viewMode === 'LIST' ? (
-                renderCustomList()
               ) : (
-                renderCustomCards()
+                <>
+                  {/* Keep the table mounted while refetching (only dim it) so
+                      pagination/filter changes never flash an empty state. */}
+                  <div className={loadingCustom ? 'pointer-events-none opacity-60 transition-opacity' : 'transition-opacity'}>
+                    {viewMode === 'TABLE'
+                      ? renderCustomTable()
+                      : viewMode === 'LIST'
+                        ? renderCustomList()
+                        : renderCustomCards()}
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      Page {customPage} of {customTotalPages} • {customTotal} total{attentionOnly ? ' • filtered to needs-review' : ''}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={customPage <= 1 || loadingCustom}
+                        onClick={() => setCustomPage((prev) => Math.max(1, prev - 1))}
+                        className="rounded-full border border-black/10 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-200"
+                      >
+                        ← Previous
+                      </button>
+                      <button
+                        type="button"
+                        disabled={customPage >= customTotalPages || loadingCustom}
+                        onClick={() => setCustomPage((prev) => Math.min(customTotalPages, prev + 1))}
+                        className="rounded-full border border-black/10 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-200"
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </>
