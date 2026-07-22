@@ -56,6 +56,7 @@ const sidebarGroups: SidebarGroup[] = [
     brandOnly: true,
     items: [
       { key: 'store-general', label: 'General', path: '/settings?tab=store-general', icon: '⚙️', description: 'Store name, bio, logo' },
+      { key: 'store-hours', label: 'Working Hours', path: '/settings?tab=store-hours', icon: '🕒', description: 'Days & hours you operate' },
       { key: 'store-social', label: 'Social & Links', path: '/settings?tab=store-social', icon: '🔗', description: 'Social links, verification' },
       { key: 'store-policies', label: 'Policies', path: '/settings?tab=store-policies', icon: '📄', description: 'Return, shipping, terms' },
       { key: 'store-team', label: 'Team Members', path: '/settings?tab=store-team', icon: '👥', description: 'Manage access' },

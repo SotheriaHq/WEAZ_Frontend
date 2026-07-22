@@ -87,14 +87,17 @@
 
 .notification-header {
   font-size: 0.875rem;
+  font-weight: 600;
   line-height: 1.4;
   word-wrap: break-word;
+  color: #111827;
 }
 
 /* Username */
 .username {
-  font-weight: 600;
-  color: #8b5cf6;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--brand-primary, #8b5cf6);
   cursor: pointer;
   transition: text-decoration 0.15s ease;
   min-height: 44px;
@@ -113,7 +116,9 @@
 }
 
 .username.system {
-  color: #6b7280;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--brand-primary, #8b5cf6);
   cursor: default;
 }
 
@@ -123,23 +128,22 @@
 
 /* Action Text */
 .action-text {
-  font-weight: 400;
-  color: #374151;
-  /* Darker gray for better contrast in light mode */
+  font-weight: 600;
+  color: #111827;
 }
 
 /* Target Preview */
 .target-preview {
-  font-weight: 600;
-  color: #111827;
-  /* Darkest gray for target emphasis in light mode */
+  font-weight: 700;
+  font-style: italic;
+  color: var(--brand-primary, #8b5cf6);
 }
 
 /* Preview Text */
 .preview-text {
   font-size: 0.8125rem;
-  color: #374151;
-  /* Better contrast in light mode */
+  font-weight: 600;
+  color: #111827;
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -151,9 +155,8 @@
 /* Timestamp */
 .timestamp {
   font-size: 0.6875rem;
-  font-weight: 500;
+  font-weight: 600;
   color: #6b7280;
-  /* Slightly darker timestamp for visibility */
   margin-top: 0.125rem;
 }
 
@@ -167,6 +170,10 @@
 }
 
 /* Dark Mode */
+.dark .notification-header {
+  color: #f9fafb;
+}
+
 .dark .notification-item.unread {
   background: linear-gradient(135deg,
       rgba(139, 92, 246, 0.15) 0%,
@@ -182,22 +189,21 @@
 }
 
 .dark .username.system {
-  color: #9ca3af;
+  color: #a78bfa;
 }
 
 .dark .action-text {
-  color: #e5e7eb;
-  /* Much lighter for dark mode - was #9ca3af */
+  color: #f9fafb;
 }
 
 .dark .target-preview {
-  color: #f9fafb;
-  /* Near white for target emphasis in dark mode */
+  font-weight: 700;
+  font-style: italic;
+  color: #a78bfa;
 }
 
 .dark .preview-text {
-  color: #d1d5db;
-  /* Lighter for better dark mode contrast - was #9ca3af */
+  color: #f3f4f6;
 }
 
 .dark .timestamp {

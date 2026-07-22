@@ -36,6 +36,18 @@ let storeStatusCacheUserId: string | null = null;
 let inFlightStoreStatusCheck: Promise<StoreStatusCache> | null = null;
 let inFlightStoreStatusCheckUserId: string | null = null;
 
+/**
+ * Reset this guard's module-level status cache so the next render refetches.
+ * Call after mutating anything the gate depends on (e.g. saving working hours),
+ * otherwise a published brand — whose fresh cache short-circuits the refetch —
+ * could keep being redirected by a stale `businessHoursConfigured` for up to the
+ * cache TTL.
+ */
+export function invalidateRequireStoreSetupCache(): void {
+  storeStatusCache = { status: null, hadError: false, checkedAt: 0 };
+  storeStatusCacheUserId = null;
+}
+
 const normalizeCacheUserId = (userId?: string | null): string | null => {
   const candidate = String(userId ?? '').trim();
   return candidate.length > 0 ? candidate : null;
@@ -232,6 +244,21 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
 
   if (loading) {
     return <>{children}</>;
+  }
+
+  // Business Hours hard gate (option B): once working hours are REQUIRED
+  // (server flag), a brand without configured hours — including previously
+  // published ones — must set them before using Studio. Redirect to the hours
+  // settings, which lives outside this guard so there's no redirect loop. Only
+  // when we have a clean loaded status, to avoid false gating on errors. This is
+  // inert until STORE_WORKING_HOURS_REQUIRED is enabled server-side.
+  if (
+    !hadError &&
+    status &&
+    status.workingHoursRequired === true &&
+    status.businessHoursConfigured === false
+  ) {
+    return <Navigate to="/settings?tab=store-hours" replace />;
   }
 
   // Setup complete → allow Studio regardless of open/paused, so a paused store is

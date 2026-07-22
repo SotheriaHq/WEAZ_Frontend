@@ -7,6 +7,7 @@ import {
   confirmMyOrderDelivery,
   getMyOrder,
   getMyOrders,
+  getMyOrdersVersion,
   type Order,
   type PaystackPaymentData,
   type ShippingAddress,
@@ -1641,21 +1642,64 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
 }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { onNotification } = useRealtime();
+  const { onNotification, onMessageEvent, socketConnected } = useRealtime();
 
+  const invalidateOrders = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['profile', 'orders', 'me'] });
+    void queryClient.invalidateQueries({ queryKey: ['orders', 'detail'] });
+    void queryClient.invalidateQueries({ queryKey: ['orders', 'customDetail'] });
+  }, []);
+
+  // Realtime sync (primary, ~free): the backend now emits dedicated
+  // `order.updated` / `custom-order.updated` events on every status/progress
+  // change; also refetch on any order-related notification as a backstop. We
+  // re-subscribe when the socket (re)connects so a new socket instance keeps
+  // the handlers. See ORDER_LIFECYCLE_SLA_AND_SYNC plan §Phase 0.
   useEffect(() => {
-    return onNotification((payload) => {
-      if (
-        payload.type === 'order.updated' ||
-        payload.type === 'notification.created' ||
-        payload.type === 'custom-order.updated'
-      ) {
-        void queryClient.invalidateQueries({ queryKey: ['profile', 'orders', 'me'] });
-        void queryClient.invalidateQueries({ queryKey: ['orders', 'detail'] });
-        void queryClient.invalidateQueries({ queryKey: ['orders', 'customDetail'] });
+    const offOrder = onMessageEvent('order.updated', invalidateOrders);
+    const offCustom = onMessageEvent('custom-order.updated', invalidateOrders);
+    const offNotif = onNotification((payload) => {
+      if (String(payload?.type ?? '').toUpperCase().includes('ORDER')) {
+        invalidateOrders();
       }
     });
-  }, [onNotification]);
+    return () => {
+      offOrder();
+      offCustom();
+      offNotif();
+    };
+  }, [onMessageEvent, onNotification, invalidateOrders, socketConnected]);
+
+  // Cheap self-heal fallback: ONLY while the realtime socket is down, poll the
+  // lightweight orders-version signature (~1 aggregate) every 60s and refetch
+  // the heavy list only when it changes. No polling when the socket is healthy.
+  const lastOrdersVersionRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (socketConnected) return;
+    let active = true;
+    const check = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const { version } = await getMyOrdersVersion();
+        if (!active) return;
+        if (
+          lastOrdersVersionRef.current !== null &&
+          lastOrdersVersionRef.current !== version
+        ) {
+          invalidateOrders();
+        }
+        lastOrdersVersionRef.current = version;
+      } catch {
+        /* transient; try again next tick */
+      }
+    };
+    void check();
+    const interval = window.setInterval(() => void check(), 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [socketConnected, invalidateOrders]);
 
   // Cached through the shared query client so returning to the Orders tab paints
   // instantly from cache instead of flashing the skeleton + refetching every time.

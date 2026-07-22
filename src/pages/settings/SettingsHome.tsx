@@ -14,6 +14,7 @@ import EmailPreferencesSettings from '@/components/settings/tabs/EmailPreference
 import StoreGeneralSettings from '@/components/settings/tabs/StoreGeneralSettings';
 import StorePoliciesSettings from '@/components/settings/tabs/StorePoliciesSettings';
 import StorePaymentsSettings from '@/components/settings/tabs/StorePaymentsSettings';
+import StoreHoursSettings from '@/components/settings/tabs/StoreHoursSettings';
 import ProfileVisibilitySettings from '@/components/settings/tabs/ProfileVisibilitySettings';
 import SizeFitSettings from '@/components/settings/tabs/SizeFitSettings';
 import HiddenContentSettings from './HiddenContentSettings';
@@ -194,6 +195,7 @@ const sections: Record<string, React.ReactNode> = {
 
   // Studio
   'store-general': <StoreGeneralSettings />,
+  'store-hours': <StoreHoursSettings />,
   'store-social': (
     <ComingSoon
       title="Social & Links"

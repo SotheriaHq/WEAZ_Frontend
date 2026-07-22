@@ -583,6 +583,18 @@ export const getMyOrder = async (orderId: string): Promise<Order> => {
   return extractData<Order>(res);
 };
 
+// Lightweight change-detection signature for the buyer's orders (standard +
+// custom). Used as a cheap disconnected-socket fallback so the Orders tab only
+// refetches the heavy list when this signature actually changes.
+export const getMyOrdersVersion = async (): Promise<{
+  version: string;
+  count: number;
+  lastUpdated: string | null;
+}> => {
+  const res = await apiClient.get('/store/orders/version');
+  return extractData(res);
+};
+
 export const confirmMyOrderDelivery = async (
   orderId: string,
   note?: string,
@@ -670,6 +682,24 @@ export interface BrandStoreInfo {
 
 // ============= Store Status & Setup =============
 
+export type WeekdayKey =
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday';
+
+export interface DaySchedule {
+  /** "HH:mm" 24h. */
+  open: string;
+  close: string;
+  closed: boolean;
+}
+
+export type WorkingHoursSchedule = Record<WeekdayKey, DaySchedule>;
+
 export interface StoreStatusResponse {
   brandId: string;
   isStoreOpen: boolean;
@@ -682,6 +712,10 @@ export interface StoreStatusResponse {
   isReadyToPublish?: boolean;
   /** Owner has pressed Publish at least once (survives pausing). */
   isPublished?: boolean;
+  /** Whether the brand has configured its working hours (Business Hours). */
+  businessHoursConfigured?: boolean;
+  /** Whether working hours are currently a hard requirement (server flag). */
+  workingHoursRequired?: boolean;
   missingFields: string[];
   profile: {
     name: string;
@@ -696,6 +730,8 @@ export interface StoreStatusResponse {
     socialTiktok?: string | null;
     socialWebsite?: string | null;
     responseTimeSla?: string | null;
+    workingHours?: WorkingHoursSchedule | null;
+    timezone?: string | null;
   };
   paymentAccount?: StorePaymentAccountSummary | null;
 }
@@ -1020,6 +1056,20 @@ export const updateStoreProfile = async (data: StoreProfileUpdateData): Promise<
   return status;
 };
 
+export const updateWorkingHours = async (data: {
+  workingHours: WorkingHoursSchedule;
+  timezone: string;
+}): Promise<{
+  workingHours: WorkingHoursSchedule;
+  timezone: string;
+  businessHoursConfiguredAt: string | null;
+}> => {
+  const res = await apiClient.patch('/store/working-hours', data);
+  // Setup status now depends on this; drop the cache so the gate re-evaluates.
+  clearStoreStatusCache();
+  return extractData(res);
+};
+
 export const getStorePolicies = async (): Promise<StorePoliciesResponse> => {
   const res = await apiClient.get('/store/policies');
   return extractData<StorePoliciesResponse>(res);
@@ -1213,6 +1263,7 @@ export default {
   openStore,
   closeStore,
   updateStoreProfile,
+  updateWorkingHours,
   getStorePolicies,
   updateStorePaymentAccount,
   updateStorePolicies,

@@ -253,6 +253,29 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
+  const renderStyledActionText = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/("(?:[^"\\]|\\.)*"|\/[^\s]+|#[A-Za-z0-9_-]+)/g);
+    return parts.map((part, idx) => {
+      if (!part) return null;
+      const isTargetOrLink =
+        (part.startsWith('"') && part.endsWith('"')) ||
+        part.startsWith('/') ||
+        part.startsWith('#');
+      if (isTargetOrLink) {
+        return (
+          <span
+            key={idx}
+            className="font-bold italic text-[color:var(--brand-primary)] dark:text-purple-400 mx-0.5"
+          >
+            {part}
+          </span>
+        );
+      }
+      return <span key={idx}>{part}</span>;
+    });
+  };
+
 
   const contentTitleFor = (n: NormalizedNotification): string => {
     const payload = (n.payload as Record<string, unknown> | undefined) ?? {};
@@ -538,12 +561,12 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="text-xs text-theme-secondary line-clamp-2 leading-5">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-2 leading-5">
                               {hasActorLabel ? (
                                 hasActorLink ? (
                                   <button
                                     type="button"
-                                    className="font-semibold text-purple-600 dark:text-purple-400 hover:underline underline-offset-2 transition-colors"
+                                    className="font-bold italic text-[color:var(--brand-primary)] dark:text-purple-400 hover:underline underline-offset-2 transition-colors"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       void handleActorClick(n);
@@ -553,14 +576,16 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                                     @{actorDisplayName}
                                   </button>
                                 ) : (
-                                  <span className="font-semibold text-[color:var(--text-primary)]">@{actorDisplayName}</span>
+                                  <span className="font-bold italic text-[color:var(--brand-primary)] dark:text-purple-400">@{actorDisplayName}</span>
                                 )
                               ) : (
-                                showCompanyPrefix ? <span className="font-semibold text-[color:var(--text-primary)]">{COMPANY_NAME}</span> : null
+                                showCompanyPrefix ? <span className="font-bold italic text-[color:var(--brand-primary)] dark:text-purple-400">{COMPANY_NAME}</span> : null
                               )}
-                              <span className={hasActorLabel || showCompanyPrefix ? 'ml-1' : undefined}>{actionTextWithoutTitle}</span>
+                              <span className={hasActorLabel || showCompanyPrefix ? 'ml-1' : undefined}>
+                                {renderStyledActionText(actionTextWithoutTitle)}
+                              </span>
                               {contentTitle ? (
-                                <span className="ml-1 inline-flex max-w-[180px] items-center truncate rounded-md border border-purple-300/50 bg-purple-100/70 px-1.5 py-0.5 font-semibold text-purple-700 dark:border-purple-400/30 dark:bg-purple-500/15 dark:text-purple-300">
+                                <span className="ml-1 inline-flex max-w-[200px] items-center truncate rounded-md border border-purple-300/50 bg-purple-100/70 px-1.5 py-0.5 font-bold italic text-[color:var(--brand-primary)] dark:border-purple-400/30 dark:bg-purple-500/15 dark:text-purple-300">
                                   "{contentTitle}"
                                 </span>
                               ) : null}

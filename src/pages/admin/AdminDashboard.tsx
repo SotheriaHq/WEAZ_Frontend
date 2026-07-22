@@ -30,6 +30,10 @@ type DashboardStats = {
   pendingVerifications: number;
   pendingPayouts: number;
   openDisputes: number;
+  ordersNeedingAttention?: number;
+  totalDesigns?: number;
+  totalProducts?: number;
+  totalCollections?: number;
   recentLogs: RecentLog[];
 };
 
@@ -128,10 +132,12 @@ const AdminDashboard: React.FC = () => {
     const base = [
       { label: 'Active (30d)', value: stats?.activeUsers30d?.toLocaleString() ?? '—', route: '/admin/users' },
       { label: 'Pending Payouts', value: stats?.pendingPayouts?.toLocaleString() ?? '—', route: '/admin/payouts' },
+      { label: 'Orders to Ship', value: stats?.ordersNeedingAttention?.toLocaleString() ?? '—', route: '/admin/orders' },
       { label: 'Verifications', value: stats?.pendingVerifications?.toLocaleString() ?? '—', route: '/admin/brands' },
       { label: 'Audit Events', value: stats?.recentLogs?.length?.toString() ?? '—', route: '/admin/audit' },
-      { label: 'Content', value: '—', route: '/admin/content' },
-      { label: 'Designs', value: '—', route: '/admin/content?tab=designs' },
+      { label: 'Products', value: stats?.totalProducts?.toLocaleString() ?? '—', route: '/admin/content?tab=products' },
+      { label: 'Designs', value: stats?.totalDesigns?.toLocaleString() ?? '—', route: '/admin/content?tab=designs' },
+      { label: 'Collections', value: stats?.totalCollections?.toLocaleString() ?? '—', route: '/admin/content?tab=collections' },
     ];
     if (!stats?.showDailySignupCount) return base;
     return [
