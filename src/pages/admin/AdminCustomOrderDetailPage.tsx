@@ -152,6 +152,16 @@ const AdminCustomOrderDetailPage: React.FC = () => {
     try {
       await work();
       toast.success(successMessage);
+      // Clear the transient inputs after a successful submit so a note isn't
+      // accidentally reused on the next action. Retention-hold fields re-seed
+      // from the refreshed order, so they're left to the load effect.
+      setReminderNote('');
+      setRiskReason('');
+      setRiskNote('');
+      setRefundReason('');
+      setRefundNote('');
+      setCancelReason('');
+      setCancelNote('');
       // Optimistic banner clear for resolving actions (feels instant).
       if (options?.clearsAttention !== false) {
         setSelected((prev) =>

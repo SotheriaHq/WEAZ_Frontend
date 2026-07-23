@@ -204,6 +204,8 @@ export interface CustomOrderListItem {
   /** Sticky "needs admin attention" signal (set by ops cron, cleared by any admin action). */
   adminAttentionRequiredAt?: string | null;
   adminAttentionReason?: string | null;
+  /** Read-only brand signal: an admin reminder/dispute notice is unacknowledged (📣 badge). */
+  hasUnreadAdminNotice?: boolean;
   delivery?: {
     city?: string | null;
     state?: string | null;
@@ -261,6 +263,13 @@ export interface CustomOrderIssue {
 export interface CustomOrderDispute {
   id: string;
   status: CustomOrderDisputeStatus | string;
+  reasonType?: CustomOrderIssueType | string;
+  /** Buyer's opening statement (read-only to the brand). */
+  buyerStatement?: string | null;
+  /** The brand's single response, once submitted (read-only afterward). */
+  brandResponse?: string | null;
+  /** Deadline by which the brand may still submit its response, if set. */
+  brandRespondByAt?: string | null;
   resolution?: CustomOrderDisputeResolution | string | null;
   adminNotes?: string | null;
   assignedAdminId?: string | null;
@@ -431,6 +440,10 @@ export interface CustomOrderDetail {
   /** Sticky "needs admin attention" signal — drives the detail-page danger banner. */
   adminAttentionRequiredAt?: string | null;
   adminAttentionReason?: string | null;
+  /** Read-only admin-notice state for the brand's studio detail (reminder/dispute). */
+  brandAdminNoticeAt?: string | null;
+  brandAdminNoticeAckAt?: string | null;
+  hasUnreadAdminNotice?: boolean;
   brandId?: string;
   buyerId?: string;
   progressEvents: CustomOrderProgressEvent[];
@@ -1114,6 +1127,34 @@ export const customOrdersBrandApi = {
       payload,
     );
     return unwrapApiResponse<CustomOrderDetail>(response.data);
+  },
+
+  /** Mark all admin notices (reminders/dispute alerts) on this order as seen. Read-only ack. */
+  async ackAdminNotices(brandId: string, orderId: string) {
+    const response = await apiClient.post(
+      `/brands/${brandId}/custom-orders/${orderId}/admin-notices/ack`,
+    );
+    return unwrapApiResponse<{ customOrderId: string; acknowledged: boolean }>(
+      response.data,
+    );
+  },
+
+  /** Submit the brand's single, one-time response to an admin-adjudicated dispute. */
+  async respondToDispute(
+    brandId: string,
+    orderId: string,
+    disputeId: string,
+    payload: { response: string },
+  ) {
+    const response = await apiClient.post(
+      `/brands/${brandId}/custom-orders/${orderId}/disputes/${disputeId}/respond`,
+      payload,
+    );
+    return unwrapApiResponse<{
+      disputeId: string;
+      status: CustomOrderDisputeStatus | string;
+      brandResponse: string | null;
+    }>(response.data);
   },
 };
 

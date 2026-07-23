@@ -100,8 +100,15 @@ const StudioCustomOrderCard: React.FC<{
 }> = ({ order, summary, onOpenOrder, onOpenMessages }) => {
   const unreadCount = Number(summary?.unreadCount ?? 0);
 
+  // Read-only admin notice (reminder/dispute) the brand hasn't opened yet.
+  const hasAdminNotice = Boolean(order.hasUnreadAdminNotice);
+
   return (
-    <article className={`overflow-hidden rounded-2xl border transition hover:shadow-[0_8px_30px_rgba(15,23,42,0.08)] ${cardTone(order.status)}`}>
+    <article
+      className={`overflow-hidden rounded-2xl border transition hover:shadow-[0_8px_30px_rgba(15,23,42,0.08)] ${cardTone(order.status)} ${
+        hasAdminNotice ? 'ring-2 ring-rose-400/70 ring-offset-1 ring-offset-transparent' : ''
+      }`}
+    >
       <div className="grid items-center gap-0 lg:grid-cols-[64px_minmax(0,1fr)_170px_140px_130px]">
         {/* Thumbnail */}
         <div className="hidden overflow-hidden lg:block">
@@ -132,6 +139,14 @@ const StudioCustomOrderCard: React.FC<{
             {summary?.hasUnread ? (
               <span className="inline-flex rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
                 💬 {unreadCount > 0 ? `${unreadCount}` : '●'}
+              </span>
+            ) : null}
+            {hasAdminNotice ? (
+              <span
+                className="inline-flex animate-pulse items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-300"
+                title="An admin left a reminder or dispute notice — open the order to read it"
+              >
+                📣 Admin notice
               </span>
             ) : null}
           </div>
@@ -241,7 +256,11 @@ const CustomOrdersPage: React.FC = () => {
       active: orders.filter((entry) =>
         ['PENDING_BRAND_ACCEPTANCE', 'ACCEPTED', 'IN_PRODUCTION', 'READY_FOR_DISPATCH', 'IN_TRANSIT'].includes(entry.status),
       ).length,
-      issues: orders.filter((entry) => ['DISPUTED', 'DELIVERY_ISSUE_REPORTED'].includes(entry.status)).length,
+      issues: orders.filter(
+        (entry) =>
+          ['DISPUTED', 'DELIVERY_ISSUE_REPORTED'].includes(entry.status) ||
+          entry.hasUnreadAdminNotice,
+      ).length,
     }),
     [orders],
   );

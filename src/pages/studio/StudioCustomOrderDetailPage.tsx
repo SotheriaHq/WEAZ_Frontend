@@ -114,6 +114,22 @@ const textValue = (value: unknown, fallback = '—') =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
+// Human title for a read-only admin notice (reminder / risk flag / escalation)
+// derived from the ADMIN-authored timeline event's payload.
+const describeAdminNoticeTitle = (
+  payload: Record<string, unknown> | null | undefined,
+): string => {
+  const reason = typeof payload?.reason === 'string' ? payload.reason : '';
+  const action = typeof payload?.action === 'string' ? payload.action : '';
+  if (reason === 'MANUAL_BRAND_REMINDER') return '📣 Reminder from admin';
+  if (action === 'FLAG_RISK') return '🚩 Risk flag from admin';
+  if (reason) return `📣 ${humanizeCustomOrderToken(reason)}`;
+  return '📣 Admin notice';
+};
+
+const disputeIsClosed = (status: string) =>
+  ['RESOLVED', 'CLOSED'].includes(status.toUpperCase());
+
 const hashToTab = (hash: string): StudioDetailTab | null => {
   const key = hash.replace('#', '').trim().toLowerCase();
   if (key === 'measurements') return 'measurements';
@@ -223,6 +239,8 @@ const StudioCustomOrderDetailPage: React.FC = () => {
   const [extensionReason, setExtensionReason] = useState('');
   const [exceptionReason, setExceptionReason] = useState('');
   const [exceptionQuote, setExceptionQuote] = useState('');
+  const [ackingNotices, setAckingNotices] = useState(false);
+  const [disputeResponses, setDisputeResponses] = useState<Record<string, string>>({});
   const highlightMessageId = searchParams.get('messageId');
 
   const loadOrder = useCallback(async (resolvedBrandId?: string | null) => {
@@ -349,6 +367,22 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     () => Object.entries(order?.measurementSnapshot ?? {}),
     [order?.measurementSnapshot],
   );
+
+  // Read-only admin notices: reminders / risk flags / escalations authored by
+  // the admin team (actorType ADMIN), newest first. Brands never reply here.
+  const adminNotices = useMemo(
+    () =>
+      (order?.timelineEvents ?? [])
+        .filter((event) => String(event.actorType).toUpperCase() === 'ADMIN')
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        ),
+    [order?.timelineEvents],
+  );
+  const disputes = useMemo(() => order?.disputes ?? [], [order?.disputes]);
+  const hasAdminNoticeContent = adminNotices.length > 0 || disputes.length > 0;
 
   const currentStage = order?.currentProgressStage ?? 'ORDER_RECEIVED';
   const currentStageLabel = humanizeCustomOrderToken(currentStage);
@@ -501,6 +535,75 @@ const StudioCustomOrderDetailPage: React.FC = () => {
       toast.success('Exception review request submitted.');
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to request exception review.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Read-only acknowledgement — clears the 📣 badge; brands never reply here.
+  const handleAckAdminNotices = async () => {
+    if (!brandId || !order) return;
+    setAckingNotices(true);
+    try {
+      await customOrdersBrandApi.ackAdminNotices(brandId, order.id);
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              hasUnreadAdminNotice: false,
+              brandAdminNoticeAckAt: new Date().toISOString(),
+            }
+          : prev,
+      );
+      toast.success('Admin notices marked as seen.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to update admin notices.');
+    } finally {
+      setAckingNotices(false);
+    }
+  };
+
+  // One-time brand response to an admin-adjudicated dispute (locked afterward).
+  const handleRespondToDispute = async (disputeId: string) => {
+    if (!brandId || !order) return;
+    const text = (disputeResponses[disputeId] ?? '').trim();
+    if (text.length < 5) {
+      toast.error('Please write at least a sentence before submitting.');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const result = await customOrdersBrandApi.respondToDispute(
+        brandId,
+        order.id,
+        disputeId,
+        { response: text },
+      );
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              disputes: prev.disputes.map((dispute) =>
+                dispute.id === disputeId
+                  ? {
+                      ...dispute,
+                      brandResponse: result.brandResponse ?? text,
+                      status: result.status,
+                    }
+                  : dispute,
+              ),
+            }
+          : prev,
+      );
+      setDisputeResponses((prev) => {
+        const next = { ...prev };
+        delete next[disputeId];
+        return next;
+      });
+      toast.success('Your response was submitted to the admin team.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to submit your response.');
     } finally {
       setBusy(false);
     }
@@ -992,6 +1095,162 @@ const StudioCustomOrderDetailPage: React.FC = () => {
           <p className="mt-2">
             Do not treat this order as production-ready until payment moves to paid.
           </p>
+        </section>
+      ) : null}
+
+      {hasAdminNoticeContent ? (
+        <section
+          className={`rounded-[1.75rem] border p-5 ${
+            order.hasUnreadAdminNotice
+              ? 'border-rose-300/70 bg-rose-50/90 dark:border-rose-500/25 dark:bg-rose-500/10'
+              : 'border-black/10 bg-white/85 dark:border-white/10 dark:bg-white/[0.04]'
+          }`}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
+                <span aria-hidden="true">📣</span>
+                <span>Admin notices</span>
+                {order.hasUnreadAdminNotice ? (
+                  <span className="inline-flex animate-pulse rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-rose-700 dark:text-rose-300">
+                    New
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Reminders and dispute notices from the WIEZ admin team. These are read-only — you can submit a single response on a dispute, but there's no back-and-forth here.
+              </p>
+            </div>
+            {order.hasUnreadAdminNotice ? (
+              <button
+                type="button"
+                onClick={() => void handleAckAdminNotices()}
+                disabled={ackingNotices}
+                className="shrink-0 rounded-full bg-slate-950 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-slate-950"
+              >
+                {ackingNotices ? 'Marking…' : 'Mark as seen'}
+              </button>
+            ) : null}
+          </div>
+
+          {adminNotices.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              {adminNotices.map((event) => {
+                const payload = isRecord(event.payloadJson) ? event.payloadJson : null;
+                const note = typeof payload?.note === 'string' ? payload.note : '';
+                return (
+                  <div
+                    key={event.id}
+                    className="rounded-2xl border border-black/10 bg-white/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {describeAdminNoticeTitle(payload)}
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {formatDateTime(event.createdAt)}
+                      </div>
+                    </div>
+                    {note ? (
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
+                        {note}
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-sm italic text-slate-400 dark:text-slate-500">
+                        No additional note was left.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {disputes.length > 0 ? (
+            <div className="mt-4 space-y-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                Disputes
+              </div>
+              {disputes.map((dispute) => {
+                const status = String(dispute.status);
+                const alreadyResponded = Boolean(dispute.brandResponse);
+                const canRespond = !alreadyResponded && !disputeIsClosed(status);
+                const draft = disputeResponses[dispute.id] ?? '';
+                return (
+                  <div
+                    key={dispute.id}
+                    className="rounded-2xl border border-rose-200/70 bg-white/70 px-4 py-4 dark:border-rose-500/20 dark:bg-white/[0.03]"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {dispute.reasonType
+                          ? humanizeCustomOrderToken(String(dispute.reasonType))
+                          : 'Dispute'}
+                      </div>
+                      <CustomOrderBadge value={status} />
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      Opened {formatDateTime(dispute.openedAt)}
+                    </div>
+
+                    {dispute.buyerStatement ? (
+                      <div className="mt-3 rounded-xl border border-black/10 bg-black/[0.02] px-3 py-2 text-sm text-slate-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">
+                          Buyer statement
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap">{dispute.buyerStatement}</p>
+                      </div>
+                    ) : null}
+
+                    {alreadyResponded ? (
+                      <div className="mt-3 rounded-xl border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-300">
+                          Your response (submitted)
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap">{dispute.brandResponse}</p>
+                      </div>
+                    ) : canRespond ? (
+                      <div className="mt-3">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                          Submit your response — you can only do this once
+                        </div>
+                        <textarea
+                          value={draft}
+                          onChange={(event) =>
+                            setDisputeResponses((prev) => ({
+                              ...prev,
+                              [dispute.id]: event.target.value,
+                            }))
+                          }
+                          rows={3}
+                          maxLength={2000}
+                          placeholder="Explain your side of this dispute for the admin team…"
+                          className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                        />
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <span className="text-xs text-slate-400 dark:text-slate-500">
+                            {draft.trim().length}/2000
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => void handleRespondToDispute(dispute.id)}
+                            disabled={busy || draft.trim().length < 5}
+                            className="rounded-full bg-rose-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                          >
+                            Submit response
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-3 text-sm italic text-slate-400 dark:text-slate-500">
+                        This dispute is closed — no response can be submitted.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </section>
       ) : null}
 
