@@ -32,6 +32,9 @@ interface UniversalSelectProps {
   optionAllowWrap?: boolean;
   selectedAllowWrap?: boolean;
   menuLayer?: 'dropdown' | 'modal';
+  size?: 'sm' | 'md' | 'lg';
+  compact?: boolean;
+  fitContent?: boolean;
 }
 
 const normalizeSearchText = (value: string): string =>
@@ -62,7 +65,11 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
   optionAllowWrap = false,
   selectedAllowWrap = false,
   menuLayer = 'dropdown',
+  size = 'md',
+  compact = false,
+  fitContent = false,
 }) => {
+  const isSmall = compact || size === 'sm';
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties | null>(null);
@@ -344,14 +351,14 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
       : null;
 
   return (
-    <div className={`relative space-y-2 ${className}`} ref={containerRef}>
+    <div className={`relative ${fitContent ? 'inline-block' : 'w-full space-y-1.5'} ${className}`} ref={containerRef}>
       {label && (
-        <label className="block text-sm font-medium text-[color:var(--text-secondary)]">
+        <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">
           {label}
         </label>
       )}
 
-      <div className="relative">
+      <div className={fitContent ? 'inline-block' : 'relative w-full'}>
         <button
           type="button"
           onClick={() => !disabled && setIsOpen(!isOpen)}
@@ -360,21 +367,24 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
           aria-haspopup="listbox"
           aria-expanded={isOpen}
           className={`
-            relative w-full cursor-pointer rounded-2xl border text-left shadow-sm transition-colors duration-200
-            flex px-4 ${selectedAllowWrap ? 'items-start py-2.5' : 'items-center justify-between py-3.5'}
+            relative cursor-pointer text-left transition-all duration-200
+            flex items-center ${fitContent ? 'w-auto gap-2' : 'w-full justify-between gap-3'}
+            ${isSmall ? 'rounded-xl px-3 py-2 text-xs font-semibold' : 'rounded-2xl px-4 py-3.5 text-sm'}
             ${disabled ? 'cursor-not-allowed opacity-60 bg-[color:var(--surface-muted)]' : 'surface-menu backdrop-blur-xl surface-interactive-hover'}
             ${
               error
                 ? 'border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.10)]'
-                : 'border-[color:var(--border-default)] hover:border-[color:var(--border-strong)]'
+                : isSmall
+                  ? 'border border-slate-200/70 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
+                  : 'border border-[color:var(--border-default)] hover:border-[color:var(--border-strong)]'
             }
           `}
         >
           <span
-            className={`flex min-w-0 flex-1 ${selectedAllowWrap ? 'items-start pr-8' : 'items-center'} ${!selectedOption ? 'text-[color:var(--text-secondary)]' : 'text-[color:var(--text-primary)]'}`}
+            className={`flex min-w-0 ${fitContent ? '' : 'flex-1'} ${selectedAllowWrap ? 'items-start pr-4' : 'items-center'} ${!selectedOption ? 'text-[color:var(--text-secondary)]' : 'text-[color:var(--text-primary)]'}`}
           >
             {selectedOption ? (
-              <span className={`flex min-w-0 flex-1 gap-2 ${selectedAllowWrap ? 'items-start' : 'items-center'}`}>
+              <span className={`flex min-w-0 ${fitContent ? '' : 'flex-1'} gap-1.5 ${selectedAllowWrap ? 'items-start' : 'items-center'}`}>
                 {selectedOption.icon && (
                   <span className="flex-shrink-0 text-[color:var(--text-secondary)]">
                     {selectedOption.icon}
@@ -383,7 +393,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                 <span
                   className={
                     selectedAllowWrap
-                      ? 'block w-full whitespace-normal break-words text-sm leading-5'
+                      ? 'block w-full whitespace-normal break-words text-xs leading-4'
                       : 'truncate'
                   }
                 >
@@ -394,7 +404,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
               <span
                 className={
                   selectedAllowWrap
-                    ? 'block w-full whitespace-normal break-words text-sm leading-5'
+                    ? 'block w-full whitespace-normal break-words text-xs leading-4'
                     : 'truncate'
                 }
               >
@@ -403,13 +413,13 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
             )}
           </span>
           <span
-            className={`pointer-events-none ${
-              selectedAllowWrap ? 'absolute right-3 top-3' : 'flex items-center pr-2'
+            className={`pointer-events-none flex items-center shrink-0 ${
+              selectedAllowWrap ? 'absolute right-2.5 top-2.5' : 'pl-0.5'
             }`}
           >
             <span
               aria-hidden="true"
-              className={`text-base leading-none text-[color:var(--text-secondary)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+              className={`leading-none text-[color:var(--text-secondary)] opacity-70 transition-transform duration-200 ${isSmall ? 'text-xs' : 'text-base'} ${isOpen ? 'rotate-180' : ''}`}
             >
               ⌄
             </span>

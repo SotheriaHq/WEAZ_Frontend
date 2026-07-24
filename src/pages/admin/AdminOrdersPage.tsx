@@ -598,57 +598,57 @@ const AdminOrdersPage: React.FC = () => {
     <div className="overflow-x-auto w-full">
       <table className="w-full text-left border-collapse">
         <thead>
-          <tr className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-white/10 font-geist text-xs text-slate-500 dark:text-slate-400 tracking-wider uppercase">
-            <th className="py-4 px-6 font-medium">ORDER</th>
-            <th className="py-4 px-6 font-medium">BUYER</th>
-            <th className="py-4 px-6 font-medium">BRAND</th>
-            <th className="py-4 px-6 font-medium">LIFECYCLE</th>
-            <th className="py-4 px-6 font-medium">FINANCIAL</th>
+          <tr className="bg-slate-50/50 dark:bg-slate-900/60 border-b border-slate-100 dark:border-white/5 font-geist text-[11px] font-semibold text-slate-500 dark:text-slate-400 tracking-wider uppercase">
+            <th className="py-3 px-5">ORDER</th>
+            <th className="py-3 px-5">BUYER</th>
+            <th className="py-3 px-5">BRAND</th>
+            <th className="py-3 px-5">LIFECYCLE</th>
+            <th className="py-3 px-5">FINANCIAL</th>
           </tr>
         </thead>
-        <tbody className="font-hanken-grotesk text-sm text-slate-900 dark:text-white divide-y divide-slate-100 dark:divide-white/10 bg-white dark:bg-slate-900">
+        <tbody className="font-hanken-grotesk text-sm text-slate-900 dark:text-white divide-y divide-slate-100/80 dark:divide-white/5 bg-white dark:bg-slate-900">
           {standardOrders.map((entry) => (
             <tr
               key={entry.id}
               onClick={() => void loadStandardDetail(entry.id)}
-              className="hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors cursor-pointer"
+              className="hover:bg-slate-50/80 dark:hover:bg-white/[0.03] transition-colors cursor-pointer"
             >
-              <td className="py-4 px-6 align-top">
+              <td className="py-3.5 px-5 align-middle">
                 <div className="font-semibold text-slate-900 dark:text-white">
                   {entry.primaryItemName || 'Standard order'}
                 </div>
-                <div className="text-slate-500 dark:text-slate-400 opacity-80 mt-1 font-geist text-xs">
+                <div className="text-slate-400 dark:text-slate-400 mt-0.5 font-geist text-xs">
                   #{entry.id.slice(0, 8).toUpperCase()}
                 </div>
               </td>
-              <td className="py-4 px-6 align-top">
+              <td className="py-3.5 px-5 align-middle">
                 <div className="font-medium text-slate-900 dark:text-white">
                   {entry.customerName || 'Customer'}
                 </div>
-                <div className="text-slate-500 dark:text-slate-400 opacity-80 mt-1 text-xs">
+                <div className="text-slate-400 dark:text-slate-400 mt-0.5 text-xs">
                   {entry.customerEmail || 'No email'}
                 </div>
               </td>
-              <td className="py-4 px-6 align-top">
+              <td className="py-3.5 px-5 align-middle">
                 <div className="font-medium text-slate-900 dark:text-white">
                   {entry.brand?.name || 'Brand'}
                 </div>
               </td>
-              <td className="py-4 px-6 align-top">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${normalizeBadgeTone(entry.status)}`}>
+              <td className="py-3.5 px-5 align-middle">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${normalizeBadgeTone(entry.status)}`}>
                     {entry.status}
                   </span>
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${normalizeBadgeTone(entry.paymentStatus)}`}>
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${normalizeBadgeTone(entry.paymentStatus)}`}>
                     {entry.paymentStatus}
                   </span>
                 </div>
               </td>
-              <td className="py-4 px-6 align-top">
+              <td className="py-3.5 px-5 align-middle">
                 <div className="font-semibold text-slate-900 dark:text-white">
                   {formatCurrency(entry.totalAmount, entry.currency || 'NGN')}
                 </div>
-                <div className="text-slate-500 dark:text-slate-400 opacity-80 mt-1 font-geist text-xs">
+                <div className="text-slate-400 dark:text-slate-400 mt-0.5 font-geist text-xs">
                   {formatDateTime(entry.createdAt)}
                 </div>
               </td>
@@ -660,7 +660,7 @@ const AdminOrdersPage: React.FC = () => {
   );
 
   const renderStandardList = () => (
-    <div className="space-y-3 p-4">
+    <div className="space-y-2.5 p-3.5">
       {standardOrders.map((entry) => {
         const thumbnail = safeMediaRef(entry.primaryItemImage);
         const fileId = isLikelyFileId(thumbnail) ? thumbnail : undefined;
@@ -671,11 +671,11 @@ const AdminOrdersPage: React.FC = () => {
             key={entry.id}
             type="button"
             onClick={() => void loadStandardDetail(entry.id)}
-            className="w-full rounded-xl border border-slate-200/80 bg-white p-4 text-left shadow-xs transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:hover:bg-white/[0.04]"
+            className="w-full rounded-xl border border-slate-100 dark:border-white/5 bg-white p-3.5 text-left shadow-2xs transition hover:bg-slate-50/80 dark:bg-slate-900 dark:hover:bg-white/[0.04]"
           >
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="h-14 w-14 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-slate-950 flex-shrink-0">
+                <div className="h-12 w-12 overflow-hidden rounded-xl border border-slate-100 bg-slate-50 dark:border-white/5 dark:bg-slate-950 flex-shrink-0">
                   {thumbnail ? (
                     <ImageWithFallback
                       src={src}
@@ -687,27 +687,27 @@ const AdminOrdersPage: React.FC = () => {
                       fit="cover"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-xl text-slate-400">🧵</div>
+                    <div className="flex h-full w-full items-center justify-center text-lg text-slate-400">🧵</div>
                   )}
                 </div>
                 <div>
-                  <div className="font-hanken-grotesk font-semibold text-slate-900 dark:text-white text-base">
+                  <div className="font-hanken-grotesk font-semibold text-slate-900 dark:text-white text-sm">
                     {entry.primaryItemName || `Order #${entry.id.slice(0, 8).toUpperCase()}`}
                   </div>
-                  <div className="mt-1 font-hanken-grotesk text-xs text-slate-500 dark:text-slate-400">
+                  <div className="mt-0.5 font-hanken-grotesk text-xs text-slate-500 dark:text-slate-400">
                     {entry.customerName} • {entry.brand?.name || 'Brand'}
                   </div>
                 </div>
               </div>
               <div className="text-right">
-                <div className="font-hanken-grotesk font-bold text-slate-900 dark:text-white text-base">
+                <div className="font-hanken-grotesk font-bold text-slate-900 dark:text-white text-sm">
                   {formatCurrency(entry.totalAmount, entry.currency || 'NGN')}
                 </div>
-                <div className="mt-1 flex flex-wrap justify-end gap-2">
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${normalizeBadgeTone(entry.status)}`}>
+                <div className="mt-1 flex flex-wrap justify-end gap-1.5">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${normalizeBadgeTone(entry.status)}`}>
                     {entry.status}
                   </span>
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${normalizeBadgeTone(entry.paymentStatus)}`}>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${normalizeBadgeTone(entry.paymentStatus)}`}>
                     {entry.paymentStatus}
                   </span>
                 </div>
@@ -720,32 +720,32 @@ const AdminOrdersPage: React.FC = () => {
   );
 
   const renderStandardCards = () => (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 p-4">
+    <div className="grid gap-3.5 md:grid-cols-2 xl:grid-cols-3 p-3.5">
       {standardOrders.map((entry) => (
         <button
           key={entry.id}
           type="button"
           onClick={() => void loadStandardDetail(entry.id)}
-          className="rounded-xl border border-slate-200/80 bg-white p-5 text-left shadow-xs transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:hover:bg-white/[0.04]"
+          className="rounded-xl border border-slate-100 dark:border-white/5 bg-white p-4 text-left shadow-2xs transition hover:bg-slate-50/80 dark:bg-slate-900 dark:hover:bg-white/[0.04]"
         >
           <div className="font-geist text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
             #{entry.id.slice(0, 8).toUpperCase()}
           </div>
-          <div className="mt-2 font-hanken-grotesk font-bold text-slate-900 dark:text-white text-base">
+          <div className="mt-1.5 font-hanken-grotesk font-bold text-slate-900 dark:text-white text-sm">
             {entry.primaryItemName || 'Standard order'}
           </div>
-          <div className="mt-1 font-hanken-grotesk text-xs text-slate-500 dark:text-slate-400">
+          <div className="mt-0.5 font-hanken-grotesk text-xs text-slate-500 dark:text-slate-400">
             {entry.customerName} • {entry.brand?.name || 'Brand'}
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${normalizeBadgeTone(entry.status)}`}>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${normalizeBadgeTone(entry.status)}`}>
               {entry.status}
             </span>
-            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${normalizeBadgeTone(entry.paymentStatus)}`}>
+            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${normalizeBadgeTone(entry.paymentStatus)}`}>
               {entry.paymentStatus}
             </span>
           </div>
-          <div className="mt-4 font-hanken-grotesk font-extrabold text-slate-900 dark:text-white text-lg">
+          <div className="mt-3 font-hanken-grotesk font-extrabold text-slate-900 dark:text-white text-base">
             {formatCurrency(entry.totalAmount, entry.currency || 'NGN')}
           </div>
         </button>
@@ -757,28 +757,28 @@ const AdminOrdersPage: React.FC = () => {
     <div className="overflow-x-auto w-full">
       <table className="w-full text-left border-collapse">
         <thead>
-          <tr className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-white/10 font-geist text-xs text-slate-500 dark:text-slate-400 tracking-wider uppercase">
-            <th className="py-4 px-6 font-medium">ORDER</th>
-            <th className="py-4 px-6 font-medium">BUYER</th>
-            <th className="py-4 px-6 font-medium">BRAND</th>
-            <th className="py-4 px-6 font-medium">LIFECYCLE</th>
-            <th className="py-4 px-6 font-medium">FINANCIAL</th>
+          <tr className="bg-slate-50/50 dark:bg-slate-900/60 border-b border-slate-100 dark:border-white/5 font-geist text-[11px] font-semibold text-slate-500 dark:text-slate-400 tracking-wider uppercase">
+            <th className="py-3 px-5">ORDER</th>
+            <th className="py-3 px-5">BUYER</th>
+            <th className="py-3 px-5">BRAND</th>
+            <th className="py-3 px-5">LIFECYCLE</th>
+            <th className="py-3 px-5">FINANCIAL</th>
           </tr>
         </thead>
-        <tbody className="font-hanken-grotesk text-sm text-slate-900 dark:text-white divide-y divide-slate-100 dark:divide-white/10 bg-white dark:bg-slate-900">
+        <tbody className="font-hanken-grotesk text-sm text-slate-900 dark:text-white divide-y divide-slate-100/80 dark:divide-white/5 bg-white dark:bg-slate-900">
           {visibleCustomOrders.map((entry) => {
             const flagged = Boolean(entry.adminAttentionRequiredAt);
             return (
               <tr
                 key={entry.id}
                 onClick={() => navigate(`/admin/custom-orders/${entry.id}`)}
-                className={`hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors cursor-pointer ${
+                className={`hover:bg-slate-50/80 dark:hover:bg-white/[0.03] transition-colors cursor-pointer ${
                   flagged
-                    ? 'bg-rose-500/[0.06] dark:bg-rose-500/[0.08]'
+                    ? 'bg-rose-500/[0.04] dark:bg-rose-500/[0.06]'
                     : ''
                 }`}
               >
-                <td className="py-4 px-6 align-top">
+                <td className="py-3.5 px-5 align-middle">
                   <div className="flex items-center gap-2">
                     {flagged ? (
                       <span className="motion-safe:animate-pulse text-base leading-none" title="Needs admin review" aria-label="Needs admin review">🚩</span>
@@ -787,34 +787,34 @@ const AdminOrdersPage: React.FC = () => {
                       {entry.sourceTitle || 'Custom order configuration'}
                     </div>
                   </div>
-                  <div className="text-slate-500 dark:text-slate-400 opacity-80 mt-1 font-geist text-xs">
+                  <div className="text-slate-400 dark:text-slate-400 mt-0.5 font-geist text-xs">
                     #{entry.id.slice(0, 8).toUpperCase()}
                   </div>
                 </td>
-                <td className="py-4 px-6 align-top">
+                <td className="py-3.5 px-5 align-middle">
                   <div className="font-medium text-slate-900 dark:text-white">
                     {entry.buyer?.name || 'Buyer'}
                   </div>
-                  <div className="text-slate-500 dark:text-slate-400 opacity-80 mt-1 text-xs">
+                  <div className="text-slate-400 dark:text-slate-400 mt-0.5 text-xs">
                     {entry.buyer?.email || 'No email'}
                   </div>
                 </td>
-                <td className="py-4 px-6 align-top">
+                <td className="py-3.5 px-5 align-middle">
                   <div className="font-medium text-slate-900 dark:text-white">
                     {entry.brand.name || 'Brand'}
                   </div>
                 </td>
-                <td className="py-4 px-6 align-top">
-                  <div className="flex items-center gap-2 flex-wrap">
+                <td className="py-3.5 px-5 align-middle">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <CustomOrderBadge value={entry.status} />
                     <CustomOrderBadge value={entry.currentProgressStage || 'ORDER_PLACED'} type="stage" />
                   </div>
                 </td>
-                <td className="py-4 px-6 align-top">
+                <td className="py-3.5 px-5 align-middle">
                   <div className="font-semibold text-slate-900 dark:text-white">
                     {customAmount(entry)}
                   </div>
-                  <div className="text-slate-500 dark:text-slate-400 opacity-80 mt-1 font-geist text-xs font-semibold uppercase">
+                  <div className="text-slate-400 dark:text-slate-400 mt-0.5 font-geist text-xs font-semibold uppercase">
                     {entry.paymentStatus}
                   </div>
                 </td>
@@ -827,7 +827,7 @@ const AdminOrdersPage: React.FC = () => {
   );
 
   const renderCustomList = () => (
-    <div className="space-y-3 p-4">
+    <div className="space-y-2.5 p-3.5">
       {visibleCustomOrders.map((entry) => {
         const flagged = Boolean(entry.adminAttentionRequiredAt);
         return (
@@ -835,29 +835,29 @@ const AdminOrdersPage: React.FC = () => {
             key={entry.id}
             type="button"
             onClick={() => navigate(`/admin/custom-orders/${entry.id}`)}
-            className={`w-full rounded-xl border p-4 text-left transition hover:bg-slate-50 dark:hover:bg-white/[0.04] ${
+            className={`w-full rounded-xl border p-3.5 text-left transition hover:bg-slate-50/80 dark:hover:bg-white/[0.04] ${
               flagged
-                ? 'border-rose-300/70 bg-rose-500/[0.06] dark:border-rose-500/40 dark:bg-rose-500/[0.08]'
-                : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-slate-900'
+                ? 'border-rose-300/60 bg-rose-500/[0.04] dark:border-rose-500/30 dark:bg-rose-500/[0.06]'
+                : 'border-slate-100 bg-white dark:border-white/5 dark:bg-slate-900'
             }`}
           >
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
                   {flagged ? <span className="motion-safe:animate-pulse text-base leading-none" aria-label="Needs admin review">🚩</span> : null}
-                  <div className="font-hanken-grotesk font-semibold text-slate-900 dark:text-white text-base">
+                  <div className="font-hanken-grotesk font-semibold text-slate-900 dark:text-white text-sm">
                     {entry.sourceTitle || 'Custom order configuration'}
                   </div>
                 </div>
-                <div className="mt-1 font-hanken-grotesk text-xs text-slate-500 dark:text-slate-400">
+                <div className="mt-0.5 font-hanken-grotesk text-xs text-slate-500 dark:text-slate-400">
                   Buyer: {entry.buyer?.name || 'Buyer'} • Brand: {entry.brand.name || 'Brand'}
                 </div>
               </div>
               <div className="text-right">
-                <div className="font-hanken-grotesk font-bold text-slate-900 dark:text-white text-base">
+                <div className="font-hanken-grotesk font-bold text-slate-900 dark:text-white text-sm">
                   {customAmount(entry)}
                 </div>
-                <div className="mt-1 flex flex-wrap justify-end gap-2">
+                <div className="mt-1 flex flex-wrap justify-end gap-1.5">
                   <CustomOrderBadge value={entry.status} />
                   <CustomOrderBadge value={entry.paymentStatus} type="payment" />
                 </div>
@@ -870,7 +870,7 @@ const AdminOrdersPage: React.FC = () => {
   );
 
   const renderCustomCards = () => (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 p-4">
+    <div className="grid gap-3.5 md:grid-cols-2 xl:grid-cols-3 p-3.5">
       {visibleCustomOrders.map((entry) => {
         const flagged = Boolean(entry.adminAttentionRequiredAt);
         return (
@@ -878,10 +878,10 @@ const AdminOrdersPage: React.FC = () => {
             key={entry.id}
             type="button"
             onClick={() => navigate(`/admin/custom-orders/${entry.id}`)}
-            className={`rounded-xl border p-5 text-left transition hover:bg-slate-50 dark:hover:bg-white/[0.04] ${
+            className={`rounded-xl border p-4 text-left transition hover:bg-slate-50/80 dark:hover:bg-white/[0.04] ${
               flagged
-                ? 'border-rose-300/70 bg-rose-500/[0.06] dark:border-rose-500/40 dark:bg-rose-500/[0.08]'
-                : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-slate-900'
+                ? 'border-rose-300/60 bg-rose-500/[0.04] dark:border-rose-500/30 dark:bg-rose-500/[0.06]'
+                : 'border-slate-100 bg-white dark:border-white/5 dark:bg-slate-900'
             }`}
           >
             <div className="flex items-center justify-between gap-2">
@@ -890,17 +890,17 @@ const AdminOrdersPage: React.FC = () => {
               </div>
               {flagged ? <span className="motion-safe:animate-pulse text-base leading-none" aria-label="Needs admin review">🚩</span> : null}
             </div>
-            <div className="mt-2 font-hanken-grotesk font-bold text-slate-900 dark:text-white text-base">
+            <div className="mt-1.5 font-hanken-grotesk font-bold text-slate-900 dark:text-white text-sm">
               {entry.sourceTitle || 'Custom order configuration'}
             </div>
-            <div className="mt-1 font-hanken-grotesk text-xs text-slate-500 dark:text-slate-400">
+            <div className="mt-0.5 font-hanken-grotesk text-xs text-slate-500 dark:text-slate-400">
               {entry.brand.name || 'Brand'}
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
               <CustomOrderBadge value={entry.status} />
               <CustomOrderBadge value={entry.currentProgressStage || 'ORDER_PLACED'} type="stage" />
             </div>
-            <div className="mt-4 font-hanken-grotesk font-extrabold text-slate-900 dark:text-white text-lg">
+            <div className="mt-3 font-hanken-grotesk font-extrabold text-slate-900 dark:text-white text-base">
               {customAmount(entry)}
             </div>
           </button>
@@ -932,13 +932,13 @@ const AdminOrdersPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="inline-flex items-center bg-slate-100 dark:bg-slate-900 rounded-full p-1 border border-slate-200/80 dark:border-white/10">
+        <div className="inline-flex items-center bg-slate-100/70 dark:bg-slate-900 rounded-full p-1 border border-slate-100 dark:border-white/5">
           <button
             type="button"
             onClick={() => setActiveTab('STANDARD')}
-            className={`px-5 py-2 rounded-full font-geist text-xs font-semibold transition-colors ${
+            className={`px-5 py-1.5 rounded-full font-geist text-xs font-semibold transition-colors ${
               activeTab === 'STANDARD'
-                ? 'bg-[#0A0A0A] text-white dark:bg-white dark:text-slate-950 shadow-xs'
+                ? 'bg-[#0A0A0A] text-white dark:bg-white dark:text-slate-950 shadow-2xs'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -947,9 +947,9 @@ const AdminOrdersPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('CUSTOM')}
-            className={`px-6 py-2 rounded-full font-geist text-xs font-semibold transition-colors ${
+            className={`px-6 py-1.5 rounded-full font-geist text-xs font-semibold transition-colors ${
               activeTab === 'CUSTOM'
-                ? 'bg-[#0A0A0A] text-white dark:bg-white dark:text-slate-950 shadow-xs'
+                ? 'bg-[#0A0A0A] text-white dark:bg-white dark:text-slate-950 shadow-2xs'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -959,9 +959,9 @@ const AdminOrdersPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveTab('COMMISSION')}
-              className={`px-5 py-2 rounded-full font-geist text-xs font-semibold transition-colors ${
+              className={`px-5 py-1.5 rounded-full font-geist text-xs font-semibold transition-colors ${
                 activeTab === 'COMMISSION'
-                  ? 'bg-[#0A0A0A] text-white dark:bg-white dark:text-slate-950 shadow-xs'
+                  ? 'bg-[#0A0A0A] text-white dark:bg-white dark:text-slate-950 shadow-2xs'
                   : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -977,12 +977,12 @@ const AdminOrdersPage: React.FC = () => {
           {(activeTab === 'CUSTOM' ? customMetrics : standardMetrics).map((metric) => (
             <div
               key={metric.label}
-              className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200/80 dark:border-white/10 shadow-xs flex flex-col justify-between min-h-[110px]"
+              className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-white/5 shadow-2xs flex flex-col justify-between min-h-[100px]"
             >
               <span className="font-geist text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 {metric.label}
               </span>
-              <span className="font-hanken-grotesk font-bold text-2xl text-slate-900 dark:text-white mt-2">
+              <span className="font-hanken-grotesk font-bold text-2xl text-slate-900 dark:text-white mt-1">
                 {metric.value}
               </span>
             </div>
@@ -991,23 +991,23 @@ const AdminOrdersPage: React.FC = () => {
       ) : null}
 
       {/* Main Data Section */}
-      <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-white/10 shadow-xs overflow-hidden flex flex-col">
+      <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/5 shadow-2xs overflow-hidden flex flex-col">
         {activeTab === 'COMMISSION' ? (
           <div className="p-6">{renderCommissionWorkspace()}</div>
         ) : (
           <>
             {/* Toolbar */}
-            <div className="p-4 border-b border-slate-200/80 dark:border-white/10 flex flex-col lg:flex-row gap-4 justify-between items-center bg-white dark:bg-slate-900">
-              <div className="relative w-full lg:w-96">
+            <div className="p-3.5 border-b border-slate-100 dark:border-white/5 flex flex-wrap md:flex-nowrap gap-2.5 justify-between items-center bg-white dark:bg-slate-900">
+              <div className="relative w-full sm:w-60 md:w-64 shrink-0">
                 <input
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder={activeTab === 'STANDARD' ? 'Search standard orders' : 'Search custom orders'}
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 font-hanken-grotesk text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 transition-all"
+                  className="w-full bg-slate-50/50 dark:bg-slate-950 border border-slate-200/60 dark:border-white/10 rounded-xl px-3.5 py-1.5 font-hanken-grotesk text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-indigo-500/60 transition-all shadow-2xs"
                 />
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+              <div className="flex flex-wrap md:flex-nowrap items-center gap-2 w-full md:w-auto overflow-x-auto scrollbar-none">
                 {activeTab === 'STANDARD' ? (
                   <UniversalSelect
                     value={standardStatusFilter}
@@ -1021,7 +1021,8 @@ const AdminOrdersPage: React.FC = () => {
                       { value: 'RETURNED', label: 'Returned' },
                       { value: 'CANCELLED', label: 'Cancelled' },
                     ]}
-                    className="min-w-[180px]"
+                    size="sm"
+                    fitContent
                   />
                 ) : (
                   <>
@@ -1039,7 +1040,8 @@ const AdminOrdersPage: React.FC = () => {
                         { value: 'DISPUTED', label: 'Disputed' },
                         { value: 'REFUND_IN_PROGRESS', label: 'Refund in progress' },
                       ]}
-                      className="min-w-[180px]"
+                      size="sm"
+                      fitContent
                     />
                     <UniversalSelect
                       value={customSort}
@@ -1050,16 +1052,17 @@ const AdminOrdersPage: React.FC = () => {
                         { value: 'OLDEST', label: 'Oldest first' },
                         { value: 'AMOUNT_DESC', label: 'Amount: high to low' },
                       ]}
-                      className="min-w-[170px]"
+                      size="sm"
+                      fitContent
                     />
                     <button
                       type="button"
                       onClick={() => setAttentionOnly((prev) => !prev)}
                       aria-pressed={attentionOnly}
-                      className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 font-geist text-xs font-bold transition ${
+                      className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 font-geist text-xs font-semibold shrink-0 transition ${
                         attentionOnly
-                          ? 'border-rose-300 bg-rose-500/10 text-rose-700 dark:border-rose-500/40 dark:text-rose-300'
-                          : 'border-slate-200 text-slate-700 hover:border-rose-300 dark:border-white/10 dark:text-slate-200'
+                          ? 'border-rose-300/80 bg-rose-500/10 text-rose-700 dark:border-rose-500/40 dark:text-rose-300'
+                          : 'border-slate-200/60 text-slate-700 hover:border-slate-300 dark:border-white/10 dark:text-slate-200'
                       }`}
                     >
                       🚩 Needs review{customAttentionTotal > 0 ? ` (${customAttentionTotal})` : ''}
@@ -1067,15 +1070,15 @@ const AdminOrdersPage: React.FC = () => {
                   </>
                 )}
 
-                <div className="inline-flex items-center bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/80 dark:border-white/10">
+                <div className="inline-flex items-center bg-slate-100/70 dark:bg-slate-950 p-0.5 rounded-xl border border-slate-200/60 dark:border-white/10 shrink-0 ml-auto md:ml-0">
                   {(['TABLE', 'LIST', 'CARDS'] as OrdersView[]).map((mode) => (
                     <button
                       key={mode}
                       type="button"
                       onClick={() => setViewMode(mode)}
-                      className={`px-3 py-1.5 rounded-lg font-geist text-xs font-bold tracking-wider transition-colors ${
+                      className={`px-2.5 py-1 rounded-lg font-geist text-[11px] font-bold tracking-wider transition-colors ${
                         viewMode === mode
-                          ? 'bg-[#10B981] text-white shadow-xs'
+                          ? 'bg-[#10B981] text-white shadow-2xs'
                           : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
