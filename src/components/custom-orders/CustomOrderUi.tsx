@@ -197,9 +197,14 @@ export const CustomOrderBadge: React.FC<{ value?: string | null; type?: 'status'
 };
 
 /**
- * Additive buyer payment lines only (no double-counting "outfit subtotal").
- * Production base = labor/production. Fabric, delivery, and rush are separate lines.
- * Buyer paid total is always the locked grandTotal the customer paid.
+ * Additive buyer payment lines that MUST sum to grandTotal.
+ *
+ * Pricing engine contract (custom-order-pricing.service):
+ *   outfitTotal (stored as subtotal) = productionBase + fabric + rush
+ *   grandTotal = outfitTotal + delivery
+ *
+ * So production base must exclude fabric AND rush:
+ *   productionBase = subtotal - fabric - rush
  */
 export const CustomOrderBuyerPaymentBreakdown: React.FC<{
   summary?: {
@@ -209,6 +214,8 @@ export const CustomOrderBuyerPaymentBreakdown: React.FC<{
     rushFee?: number | null;
     grandTotal?: number | null;
     currency?: string | null;
+    /** Optional explicit labor charge when present on locked summary. */
+    productionCharge?: number | null;
   } | null;
   formatCurrency: (value: number, currency?: string) => string;
   title?: string;
@@ -219,17 +226,29 @@ export const CustomOrderBuyerPaymentBreakdown: React.FC<{
   const shipping = Math.max(0, Number(summary?.shippingFee ?? 0));
   const rush = Math.max(0, Number(summary?.rushFee ?? 0));
   const grandTotal = Math.max(0, Number(summary?.grandTotal ?? 0));
-  // When fabric is present, subtotal is treated as outfit (production + fabric).
-  // Show production base alone so lines are additive and not confusing.
+  const explicitProduction = Number(summary?.productionCharge);
+  // outfitTotal (subtotal) already includes rush + fabric; strip both for labor only.
+  // Never do (subtotal - fabric) alone — that double-counts rush when rush is listed separately.
   const productionBase =
-    fabric > 0 ? Math.max(0, subtotal - fabric) : subtotal;
+    Number.isFinite(explicitProduction) && explicitProduction > 0
+      ? Math.round((explicitProduction + Number.EPSILON) * 100) / 100
+      : subtotal > 0
+        ? Math.max(0, Math.round((subtotal - fabric - rush + Number.EPSILON) * 100) / 100)
+        : Math.max(
+            0,
+            Math.round((grandTotal - fabric - shipping - rush + Number.EPSILON) * 100) / 100,
+          );
+
+  const lineSum = Math.round((productionBase + fabric + shipping + rush + Number.EPSILON) * 100) / 100;
+  const linesMatchTotal =
+    grandTotal <= 0 || Math.abs(lineSum - grandTotal) < 0.02;
 
   const rows: Array<{ label: string; value: string; emphasized?: boolean; hint?: string }> = [];
   if (productionBase > 0) {
     rows.push({
       label: 'Production base',
       value: formatCurrency(productionBase, currency),
-      hint: 'Labor and production charge only (excludes fabric).',
+      hint: 'Labor and production charge only. Excludes fabric, rush, and delivery.',
     });
   }
   if (fabric > 0) {
@@ -239,6 +258,13 @@ export const CustomOrderBuyerPaymentBreakdown: React.FC<{
       hint: 'Fabric yardage cost charged to the buyer.',
     });
   }
+  if (rush > 0) {
+    rows.push({
+      label: 'Rush fee',
+      value: formatCurrency(rush, currency),
+      hint: 'Expedited production surcharge selected by the buyer.',
+    });
+  }
   if (shipping > 0 || grandTotal > 0) {
     rows.push({
       label: 'Delivery fee',
@@ -246,18 +272,11 @@ export const CustomOrderBuyerPaymentBreakdown: React.FC<{
       hint: 'Shipping / delivery fee paid by the buyer.',
     });
   }
-  if (rush > 0) {
-    rows.push({
-      label: 'Rush fee',
-      value: formatCurrency(rush, currency),
-      hint: 'Expedited production surcharge, if selected.',
-    });
-  }
   rows.push({
     label: 'Buyer paid total',
     value: formatCurrency(grandTotal, currency),
     emphasized: true,
-    hint: 'Exact amount the buyer paid for this order.',
+    hint: 'Exact amount the buyer paid (production + fabric + rush + delivery).',
   });
 
   return (
@@ -296,6 +315,11 @@ export const CustomOrderBuyerPaymentBreakdown: React.FC<{
           </div>
         ))}
       </dl>
+      {!linesMatchTotal ? (
+        <p className="mt-2 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+          Line items ({formatCurrency(lineSum, currency)}) do not match buyer paid total. Showing locked paid total as source of truth.
+        </p>
+      ) : null}
     </div>
   );
 };

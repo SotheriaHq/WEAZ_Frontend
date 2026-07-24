@@ -404,6 +404,8 @@ export interface CustomOrderDetail {
     shippingFee?: number;
     rushFee?: number;
     fabricCharge?: number;
+    /** Labor/production only (excludes fabric + rush). */
+    productionCharge?: number;
   };
   internalPriceBreakdown?: Record<string, unknown>;
   quoteStatus?: CustomOrderQuoteStatus;
