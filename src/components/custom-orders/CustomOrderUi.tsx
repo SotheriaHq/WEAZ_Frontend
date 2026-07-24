@@ -196,7 +196,11 @@ export const CustomOrderBadge: React.FC<{ value?: string | null; type?: 'status'
   );
 };
 
-/** Explicit buyer payment lines for brand/admin order views (anti-truncation, full amounts). */
+/**
+ * Additive buyer payment lines only (no double-counting "outfit subtotal").
+ * Production base = labor/production. Fabric, delivery, and rush are separate lines.
+ * Buyer paid total is always the locked grandTotal the customer paid.
+ */
 export const CustomOrderBuyerPaymentBreakdown: React.FC<{
   summary?: {
     fabricCharge?: number | null;
@@ -210,44 +214,80 @@ export const CustomOrderBuyerPaymentBreakdown: React.FC<{
   title?: string;
 }> = ({ summary, formatCurrency, title = 'Buyer payment breakdown' }) => {
   const currency = summary?.currency || 'NGN';
-  const fabric = Number(summary?.fabricCharge ?? 0);
-  const subtotal = Number(summary?.subtotal ?? 0);
-  const shipping = Number(summary?.shippingFee ?? 0);
-  const rush = Number(summary?.rushFee ?? 0);
-  const grandTotal = Number(summary?.grandTotal ?? 0);
-  const productionOnly = Math.max(subtotal - fabric, 0);
+  const fabric = Math.max(0, Number(summary?.fabricCharge ?? 0));
+  const subtotal = Math.max(0, Number(summary?.subtotal ?? 0));
+  const shipping = Math.max(0, Number(summary?.shippingFee ?? 0));
+  const rush = Math.max(0, Number(summary?.rushFee ?? 0));
+  const grandTotal = Math.max(0, Number(summary?.grandTotal ?? 0));
+  // When fabric is present, subtotal is treated as outfit (production + fabric).
+  // Show production base alone so lines are additive and not confusing.
+  const productionBase =
+    fabric > 0 ? Math.max(0, subtotal - fabric) : subtotal;
 
-  const rows = [
-    { label: 'Production / outfit subtotal', value: formatCurrency(subtotal, currency) },
-    ...(fabric > 0
-      ? [{ label: 'Fabric charge (included above when priced)', value: formatCurrency(fabric, currency) }]
-      : []),
-    ...(productionOnly > 0 && fabric > 0
-      ? [{ label: 'Production base (derived)', value: formatCurrency(productionOnly, currency) }]
-      : []),
-    { label: 'Delivery fee', value: formatCurrency(shipping, currency) },
-    ...(rush > 0 ? [{ label: 'Rush fee', value: formatCurrency(rush, currency) }] : []),
-    {
-      label: 'Buyer paid total',
-      value: formatCurrency(grandTotal, currency),
-      emphasized: true,
-    },
-  ];
+  const rows: Array<{ label: string; value: string; emphasized?: boolean; hint?: string }> = [];
+  if (productionBase > 0) {
+    rows.push({
+      label: 'Production base',
+      value: formatCurrency(productionBase, currency),
+      hint: 'Labor and production charge only (excludes fabric).',
+    });
+  }
+  if (fabric > 0) {
+    rows.push({
+      label: 'Fabric',
+      value: formatCurrency(fabric, currency),
+      hint: 'Fabric yardage cost charged to the buyer.',
+    });
+  }
+  if (shipping > 0 || grandTotal > 0) {
+    rows.push({
+      label: 'Delivery fee',
+      value: formatCurrency(shipping, currency),
+      hint: 'Shipping / delivery fee paid by the buyer.',
+    });
+  }
+  if (rush > 0) {
+    rows.push({
+      label: 'Rush fee',
+      value: formatCurrency(rush, currency),
+      hint: 'Expedited production surcharge, if selected.',
+    });
+  }
+  rows.push({
+    label: 'Buyer paid total',
+    value: formatCurrency(grandTotal, currency),
+    emphasized: true,
+    hint: 'Exact amount the buyer paid for this order.',
+  });
 
   return (
     <div className="min-w-0">
       <div className="text-sm font-semibold text-slate-900 dark:text-white">{title}</div>
-      <dl className="mt-3 space-y-2 text-[13px] text-slate-600 dark:text-slate-300">
+      <dl className="mt-2 divide-y divide-black/5 dark:divide-white/10">
         {rows.map((row) => (
           <div
             key={row.label}
-            className={`flex items-start justify-between gap-3 rounded-xl px-2 py-1.5 ${
-              row.emphasized ? 'bg-emerald-50/80 dark:bg-emerald-500/10' : ''
+            className={`grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-0.5 py-2 ${
+              row.emphasized ? 'bg-emerald-50/70 px-2 dark:bg-emerald-500/10' : 'px-0.5'
             }`}
           >
-            <dt className="min-w-0 break-words font-medium opacity-80">{row.label}</dt>
+            <dt
+              className="min-w-0 text-[13px] font-medium text-slate-600 dark:text-slate-300"
+              title={row.hint}
+            >
+              <span className="break-words">{row.label}</span>
+              {row.hint ? (
+                <span
+                  className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 text-[10px] font-bold text-slate-500 dark:border-slate-600 dark:text-slate-400"
+                  aria-label={row.hint}
+                  title={row.hint}
+                >
+                  i
+                </span>
+              ) : null}
+            </dt>
             <dd
-              className={`min-w-0 break-words text-right font-semibold ${
+              className={`tabular-nums text-right text-[13px] font-semibold tracking-tight ${
                 row.emphasized ? 'text-emerald-800 dark:text-emerald-200' : 'text-slate-900 dark:text-white'
               }`}
             >
@@ -260,16 +300,39 @@ export const CustomOrderBuyerPaymentBreakdown: React.FC<{
   );
 };
 
+/** Section/field title with native hover description (title attribute + visible tip on hover). */
+export const CustomOrderFieldTitle: React.FC<{
+  title: string;
+  description: string;
+  className?: string;
+}> = ({ title, description, className }) => (
+  <div className={`group relative inline-flex max-w-full items-center gap-1.5 ${className ?? ''}`}>
+    <span className="text-sm font-semibold text-slate-900 dark:text-white">{title}</span>
+    <span
+      className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full border border-slate-300 text-[10px] font-bold leading-none text-slate-500 dark:border-slate-600 dark:text-slate-400"
+      title={description}
+      aria-label={description}
+    >
+      i
+    </span>
+    <span
+      role="tooltip"
+      className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-[min(18rem,70vw)] rounded-lg border border-black/10 bg-slate-900 px-2.5 py-2 text-[11px] font-medium leading-snug text-white shadow-lg group-hover:block dark:border-white/15 dark:bg-slate-800"
+    >
+      {description}
+    </span>
+  </div>
+);
+
 export const CustomOrderMetricCard: React.FC<{ label: string; value: React.ReactNode; helper?: React.ReactNode }> = ({
   label,
   value,
   helper,
 }) => (
-  <div className="group relative flex h-full min-h-[104px] min-w-0 flex-col justify-center overflow-hidden rounded-[1.4rem] border border-black/5 bg-gradient-to-br from-white to-slate-50/50 p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md dark:border-white/[0.05] dark:from-white/[0.03] dark:to-transparent">
-    <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:animate-shimmer group-hover:opacity-100 dark:via-white/5" />
-    <div className="relative text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-[11px] sm:tracking-[0.18em] dark:text-slate-400">{label}</div>
-    <div className="relative mt-1.5 min-w-0 break-words text-lg font-bold leading-tight text-slate-900 dark:text-white">{value}</div>
-    {helper ? <div className="relative mt-1 min-w-0 break-words text-[11px] font-medium text-slate-500 dark:text-slate-400">{helper}</div> : null}
+  <div className="group relative flex h-full min-h-0 min-w-0 flex-col justify-center overflow-hidden rounded-xl border border-black/5 bg-gradient-to-br from-white to-slate-50/50 px-3.5 py-3 shadow-sm dark:border-white/[0.05] dark:from-white/[0.03] dark:to-transparent">
+    <div className="relative text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{label}</div>
+    <div className="relative mt-1 min-w-0 break-words text-base font-bold leading-snug text-slate-900 dark:text-white">{value}</div>
+    {helper ? <div className="relative mt-0.5 min-w-0 break-words text-[11px] font-medium text-slate-500 dark:text-slate-400">{helper}</div> : null}
   </div>
 );
 
