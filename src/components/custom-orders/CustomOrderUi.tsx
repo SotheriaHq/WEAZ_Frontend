@@ -179,7 +179,7 @@ export const CustomOrderBadge: React.FC<{ value?: string | null; type?: 'status'
   type = 'status',
 }) => {
   if (!value) {
-    return <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">—</span>;
+    return <span className="inline-flex max-w-full whitespace-normal break-words rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">—</span>;
   }
 
   const text =
@@ -187,7 +187,77 @@ export const CustomOrderBadge: React.FC<{ value?: string | null; type?: 'status'
       ? stageLabelMap[value as CustomOrderProgressStage] ?? humanizeCustomOrderToken(value)
       : humanizeCustomOrderToken(value);
   const tone = statusToneMap[value] ?? 'bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-200';
-  return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>{text}</span>;
+  return (
+    <span
+      className={`inline-flex max-w-full whitespace-normal break-words rounded-full px-3 py-1 text-left text-xs font-semibold leading-snug ${tone}`}
+    >
+      {text}
+    </span>
+  );
+};
+
+/** Explicit buyer payment lines for brand/admin order views (anti-truncation, full amounts). */
+export const CustomOrderBuyerPaymentBreakdown: React.FC<{
+  summary?: {
+    fabricCharge?: number | null;
+    subtotal?: number | null;
+    shippingFee?: number | null;
+    rushFee?: number | null;
+    grandTotal?: number | null;
+    currency?: string | null;
+  } | null;
+  formatCurrency: (value: number, currency?: string) => string;
+  title?: string;
+}> = ({ summary, formatCurrency, title = 'Buyer payment breakdown' }) => {
+  const currency = summary?.currency || 'NGN';
+  const fabric = Number(summary?.fabricCharge ?? 0);
+  const subtotal = Number(summary?.subtotal ?? 0);
+  const shipping = Number(summary?.shippingFee ?? 0);
+  const rush = Number(summary?.rushFee ?? 0);
+  const grandTotal = Number(summary?.grandTotal ?? 0);
+  const productionOnly = Math.max(subtotal - fabric, 0);
+
+  const rows = [
+    { label: 'Production / outfit subtotal', value: formatCurrency(subtotal, currency) },
+    ...(fabric > 0
+      ? [{ label: 'Fabric charge (included above when priced)', value: formatCurrency(fabric, currency) }]
+      : []),
+    ...(productionOnly > 0 && fabric > 0
+      ? [{ label: 'Production base (derived)', value: formatCurrency(productionOnly, currency) }]
+      : []),
+    { label: 'Delivery fee', value: formatCurrency(shipping, currency) },
+    ...(rush > 0 ? [{ label: 'Rush fee', value: formatCurrency(rush, currency) }] : []),
+    {
+      label: 'Buyer paid total',
+      value: formatCurrency(grandTotal, currency),
+      emphasized: true,
+    },
+  ];
+
+  return (
+    <div className="min-w-0">
+      <div className="text-sm font-semibold text-slate-900 dark:text-white">{title}</div>
+      <dl className="mt-3 space-y-2 text-[13px] text-slate-600 dark:text-slate-300">
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            className={`flex items-start justify-between gap-3 rounded-xl px-2 py-1.5 ${
+              row.emphasized ? 'bg-emerald-50/80 dark:bg-emerald-500/10' : ''
+            }`}
+          >
+            <dt className="min-w-0 break-words font-medium opacity-80">{row.label}</dt>
+            <dd
+              className={`min-w-0 break-words text-right font-semibold ${
+                row.emphasized ? 'text-emerald-800 dark:text-emerald-200' : 'text-slate-900 dark:text-white'
+              }`}
+            >
+              {row.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
 };
 
 export const CustomOrderMetricCard: React.FC<{ label: string; value: React.ReactNode; helper?: React.ReactNode }> = ({

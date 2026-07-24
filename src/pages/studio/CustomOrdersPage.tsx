@@ -150,7 +150,7 @@ const StudioCustomOrderCard: React.FC<{
               </span>
             ) : null}
           </div>
-          <div className="mt-1 line-clamp-1 text-sm font-bold text-slate-900 dark:text-white">{order.sourceTitle}</div>
+          <div className="mt-1 break-words text-sm font-bold text-slate-900 dark:text-white">{order.sourceTitle}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <CustomOrderBadge value={order.status} />
             <CustomOrderBadge value={order.paymentStatus} type="payment" />

@@ -2154,51 +2154,31 @@ export const brandApi = {
   // ============================================
 
   async getPayouts(brandId: string) {
-    try {
-      const response = await apiClient.get(`/brands/${brandId}/payouts`);
-      return unwrapApiResponse<any>(response.data);
-    } catch (error) {
-      console.error('Error fetching payouts:', error);
-      return null;
-    }
+    const response = await apiClient.get(`/brands/${brandId}/payouts`);
+    return unwrapApiResponse<any>(response.data);
   },
 
   async getPayoutOverview(brandId: string) {
-    try {
-      const response = await apiClient.get(`/brands/${brandId}/payouts/overview`);
-      return unwrapApiResponse<any>(response.data);
-    } catch (error) {
-      console.error('Error fetching payout overview:', error);
-      return null;
-    }
+    const response = await apiClient.get(`/brands/${brandId}/payouts/overview`);
+    return unwrapApiResponse<any>(response.data);
   },
 
   async getIncomingTransactions(brandId: string, params?: { page?: number; limit?: number }) {
-    try {
-      const query = new URLSearchParams();
-      if (params?.page) query.append('page', String(params.page));
-      if (params?.limit) query.append('limit', String(params.limit));
-      const suffix = query.toString();
-      const response = await apiClient.get(`/brands/${brandId}/payouts/incoming${suffix ? `?${suffix}` : ''}`);
-      return unwrapApiResponse<any>(response.data);
-    } catch (error) {
-      console.error('Error fetching incoming transactions:', error);
-      return null;
-    }
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', String(params.page));
+    if (params?.limit) query.append('limit', String(params.limit));
+    const suffix = query.toString();
+    const response = await apiClient.get(`/brands/${brandId}/payouts/incoming${suffix ? `?${suffix}` : ''}`);
+    return unwrapApiResponse<any>(response.data);
   },
 
   async getHeldFunds(brandId: string, params?: { page?: number; limit?: number }) {
-    try {
-      const query = new URLSearchParams();
-      if (params?.page) query.append('page', String(params.page));
-      if (params?.limit) query.append('limit', String(params.limit));
-      const suffix = query.toString();
-      const response = await apiClient.get(`/brands/${brandId}/payouts/held-funds${suffix ? `?${suffix}` : ''}`);
-      return unwrapApiResponse<any>(response.data);
-    } catch (error) {
-      console.error('Error fetching held funds:', error);
-      return null;
-    }
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', String(params.page));
+    if (params?.limit) query.append('limit', String(params.limit));
+    const suffix = query.toString();
+    const response = await apiClient.get(`/brands/${brandId}/payouts/held-funds${suffix ? `?${suffix}` : ''}`);
+    return unwrapApiResponse<any>(response.data);
   },
 
   async requestPayout(brandId: string, amount: number) {

@@ -791,6 +791,13 @@ export const adminBreakGlassApi = {
 export const adminFinanceApi = {
   getOverview: () =>
     apiClient.get<AdminFinanceOverview>('/admin/finance/overview'),
+  repairCustomOrderSettlements: (data?: { limit?: number }) =>
+    apiClient.post<{
+      scanned: number;
+      repaired: number;
+      limit: number;
+      message: string;
+    }>('/admin/finance/settlement-repair/custom-orders', data ?? {}),
   listCommissionRules: () =>
     apiClient.get<AdminCommissionRule[]>('/admin/finance/commission-rules'),
   createCommissionRule: (data: {

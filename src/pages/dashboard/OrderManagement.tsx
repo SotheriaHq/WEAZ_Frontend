@@ -662,8 +662,8 @@ const OrderManagement: React.FC = () => {
                             {getInitials(order.customerName)}
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">{order.customerName}</p>
-                            <p className="truncate text-xs text-slate-500 dark:text-slate-500">{order.customerEmail || 'No email captured'}</p>
+                            <p className="break-words text-sm font-semibold">{order.customerName}</p>
+                            <p className="break-words text-xs text-slate-500 dark:text-slate-500">{order.customerEmail || 'No email captured'}</p>
                           </div>
                         </div>
                       </td>
@@ -710,7 +710,7 @@ const OrderManagement: React.FC = () => {
                       </td>
 
                       <td className="px-3 py-4 align-middle">
-                        <p className="max-w-[240px] truncate text-sm text-slate-700 dark:text-slate-200">{fit.primaryName}</p>
+                        <p className="max-w-[240px] break-words text-sm text-slate-700 dark:text-slate-200">{fit.primaryName}</p>
                         {fit.detailLine ? (
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">{fit.detailLine}</p>
                         ) : null}

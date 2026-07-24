@@ -8,6 +8,7 @@ import OrderMessagesPanel from '@/components/messaging/OrderMessagesPanel';
 import CustomOrderActionConfirmModal from '@/components/custom-orders/CustomOrderActionConfirmModal';
 import {
   CustomOrderBadge,
+  CustomOrderBuyerPaymentBreakdown,
   CustomOrderJsonBreakdown,
   CustomOrderKeyValueList,
   CustomOrderMediaPreview,
@@ -304,9 +305,18 @@ const AdminCustomOrderDetailPage: React.FC = () => {
               />
             </div>
             <div className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
-              <div className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Internal price breakdown</div>
-              <CustomOrderJsonBreakdown data={selected.internalPriceBreakdown as Record<string, unknown> | null | undefined} />
+              <CustomOrderBuyerPaymentBreakdown
+                summary={selected.buyerPriceSummary}
+                formatCurrency={(value, currency) =>
+                  formatCurrency(value, currency || selected.buyerPriceSummary?.currency || 'NGN')
+                }
+              />
             </div>
+          </div>
+
+          <div className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
+            <div className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Internal price breakdown</div>
+            <CustomOrderJsonBreakdown data={selected.internalPriceBreakdown as Record<string, unknown> | null | undefined} />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">

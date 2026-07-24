@@ -12,6 +12,7 @@ import OrderChatDrawer from '@/components/messaging/OrderChatDrawer';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
   CustomOrderBadge,
+  CustomOrderBuyerPaymentBreakdown,
   CustomOrderDataTable,
   CustomOrderJsonBreakdown,
   CustomOrderKeyValueList,
@@ -677,25 +678,34 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                 <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
                   Current display
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex min-w-0 flex-wrap gap-2">
                   <CustomOrderBadge value={currentStage} type="stage" />
                 </div>
-                <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                <p className="mt-3 break-words text-sm text-slate-600 dark:text-slate-300">
                   Order placed and order received are system-managed. Brand production updates begin from fabric and piece gathering after payment is confirmed.
                 </p>
               </div>
             </section>
           </div>
 
+          <section className={shell}>
+            <CustomOrderBuyerPaymentBreakdown
+              summary={order.buyerPriceSummary}
+              formatCurrency={(value, currency) =>
+                formatCurrency(value, currency ?? order.buyerPriceSummary.currency ?? 'NGN')
+              }
+            />
+          </section>
+
           {/* Technical breakdown merged into Overview */}
           <div className="grid items-start gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_360px]">
             <section className={shell}>
-              <div className="text-lg font-semibold text-slate-900 dark:text-white">Price breakdown</div>
+              <div className="text-lg font-semibold text-slate-900 dark:text-white">Internal price details</div>
               <div className="mt-4 space-y-4">
                 {technicalBreakdown && Object.keys(technicalBreakdown).length > 0 ? (
                   <CustomOrderJsonBreakdown data={technicalBreakdown} />
                 ) : (
-                  <div className="text-sm text-slate-500 dark:text-slate-400">No breakdown available.</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">No internal technical breakdown available.</div>
                 )}
                 {chartLock ? (
                   <CustomOrderDataTable

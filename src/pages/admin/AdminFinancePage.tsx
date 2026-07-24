@@ -684,6 +684,30 @@ const AdminFinancePage: React.FC = () => {
     }
   }, [loadOverview, loadPayments, staleLimit, staleOlderThanMinutes]);
 
+  const handleRepairCustomSettlements = useCallback(async () => {
+    setBusyKey('repair:custom-settlements');
+    try {
+      const response = await adminFinanceApi.repairCustomOrderSettlements({ limit: 50 });
+      const data = unwrapApiResponse<{
+        scanned: number;
+        repaired: number;
+        limit: number;
+        message: string;
+      }>(response.data as any);
+      toast.success(
+        data?.message ||
+          `Custom settlement repair: ${data?.repaired ?? 0} repaired of ${data?.scanned ?? 0} scanned.`,
+      );
+      void loadOverview();
+      void loadEscrow();
+      void loadTransactions();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to repair custom-order settlements');
+    } finally {
+      setBusyKey(null);
+    }
+  }, [loadEscrow, loadOverview, loadTransactions]);
+
   const handleReconciliationAction = useCallback(
     async (item: AdminReconciliationItem, action: 'claim' | 'release' | 'resolve') => {
       setBusyKey(`${action}:${item.id}`);
@@ -840,6 +864,18 @@ const AdminFinancePage: React.FC = () => {
                 className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950"
               >
                 {busyKey === 'run:LEDGER_INTEGRITY' ? 'Running...' : '🧾 Run ledger check'}
+              </button>
+            )}
+            {canProcess && (
+              <button
+                type="button"
+                onClick={() => void handleRepairCustomSettlements()}
+                disabled={busyKey === 'repair:custom-settlements'}
+                className="rounded-full border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100 dark:hover:bg-violet-500/20"
+              >
+                {busyKey === 'repair:custom-settlements'
+                  ? 'Repairing...'
+                  : '🛠️ Repair custom settlements'}
               </button>
             )}
           </div>
