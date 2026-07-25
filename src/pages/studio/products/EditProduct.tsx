@@ -112,6 +112,15 @@ import {
 import { queryKeys } from "@/query/queryKeys";
 import useCachedResource from "@/hooks/useCachedResource";
 
+// The media grid only renders the first 6 view-slots (one per allowed image).
+// Every media item must map to one of these, uniquely — otherwise an item lands
+// on a non-rendered slot (or collides with another) and silently disappears,
+// which reads to users as a lost/duplicated image on drag-and-drop.
+const RENDERABLE_MEDIA_SLOTS: MediaViewSlot[] = MEDIA_VIEW_SLOT_OPTIONS.slice(
+  0,
+  6,
+).map((option) => option.value);
+
 function toSkuToken(input: string): string {
   const cleaned = input
     .trim()
@@ -809,12 +818,23 @@ const EditProduct: React.FC = () => {
     [mediaUrls],
   );
 
+  // Assign every media item a UNIQUE, rendered slot. If an item's stored slot is
+  // not one of the 6 rendered slots, or is already taken by an earlier item, it
+  // spills to the next free rendered slot instead of overwriting (Map collision)
+  // and vanishing. This keeps what the user sees consistent with drag/drop, which
+  // identifies items by the slot they are actually DISPLAYED in.
   const mediaBySlot = useMemo(() => {
-    const next = new Map<MediaViewSlot, ProductMediaPreview>();
+    const bySlot = new Map<MediaViewSlot, ProductMediaPreview>();
+    const used = new Set<MediaViewSlot>();
     mediaUrls.forEach((item, index) => {
-      next.set(normalizeMediaViewSlot(item.viewSlot, index), item);
+      let slot = normalizeMediaViewSlot(item.viewSlot, index);
+      if (!RENDERABLE_MEDIA_SLOTS.includes(slot) || used.has(slot)) {
+        slot = RENDERABLE_MEDIA_SLOTS.find((candidate) => !used.has(candidate)) ?? slot;
+      }
+      used.add(slot);
+      bySlot.set(slot, item);
     });
-    return next;
+    return bySlot;
   }, [mediaUrls]);
 
   const buildStructuredMediaPayload = useCallback(
@@ -2789,89 +2809,45 @@ const EditProduct: React.FC = () => {
 
   const handleSwapMediaSlots = useCallback(
     (sourceSlot: string, targetSlot: string) => {
-      const sourceSlotNormalized = normalizeMediaViewSlot(sourceSlot);
-      const targetSlotNormalized = normalizeMediaViewSlot(targetSlot);
+      const sourceSlotNormalized = normalizeMediaViewSlot(sourceSlot) as MediaViewSlot;
+      const targetSlotNormalized = normalizeMediaViewSlot(targetSlot) as MediaViewSlot;
+      if (sourceSlotNormalized === targetSlotNormalized) return;
+
+      // Identify the items by the slot they are actually displayed in, then move
+      // each to the other's slot. A missing side means the target slot is empty,
+      // so we simply move the dragged item there. Reassigning viewSlot by item id
+      // (never touching array order) makes this a true swap — no duplication and
+      // no dependence on fragile index-based fallbacks.
+      const sourceItem = mediaBySlot.get(sourceSlotNormalized);
+      const targetItem = mediaBySlot.get(targetSlotNormalized);
+      if (!sourceItem && !targetItem) return;
+
+      const slotUpdates = new Map<string, MediaViewSlot>();
+      if (sourceItem) slotUpdates.set(sourceItem.id, targetSlotNormalized);
+      if (targetItem) slotUpdates.set(targetItem.id, sourceSlotNormalized);
 
       setMediaUrls((prev) => {
-        const sourceIdx = prev.findIndex(
-          (item, idx) =>
-            normalizeMediaViewSlot(item.viewSlot, idx) === sourceSlotNormalized,
+        const next = prev.map((item) =>
+          slotUpdates.has(item.id)
+            ? { ...item, viewSlot: slotUpdates.get(item.id) as MediaViewSlot }
+            : item,
         );
-        const targetIdx = prev.findIndex(
-          (item, idx) =>
-            normalizeMediaViewSlot(item.viewSlot, idx) === targetSlotNormalized,
-        );
-
-        if (sourceIdx === -1 && targetIdx === -1) return prev;
-
-        const next = [...prev];
-
-        if (sourceIdx !== -1 && targetIdx !== -1) {
-          const temp = next[sourceIdx];
-          next[sourceIdx] = next[targetIdx];
-          next[targetIdx] = temp;
-
-          const sourceSlotVal = next[sourceIdx].viewSlot;
-          next[sourceIdx] = {
-            ...next[sourceIdx],
-            viewSlot: next[targetIdx].viewSlot,
-          };
-          next[targetIdx] = { ...next[targetIdx], viewSlot: sourceSlotVal };
-        } else if (sourceIdx !== -1) {
-          next[sourceIdx] = {
-            ...next[sourceIdx],
-            viewSlot: targetSlotNormalized as MediaViewSlot,
-          };
-        } else if (targetIdx !== -1) {
-          next[targetIdx] = {
-            ...next[targetIdx],
-            viewSlot: sourceSlotNormalized as MediaViewSlot,
-          };
-        }
-
         const normalized = normalizePrimary(next);
         syncPersistedMediaIds(normalized);
         return normalized;
       });
 
+      // Pending items live in mediaUrls keyed by their tempId, so the same id map
+      // applies here to keep both arrays consistent.
       setPendingMediaFiles((prev) => {
-        const sourceIdx = prev.findIndex(
-          (item, idx) =>
-            normalizeMediaViewSlot(item.viewSlot, idx) === sourceSlotNormalized,
+        if (!prev.some((item) => slotUpdates.has(item.tempId))) return prev;
+        return normalizePending(
+          prev.map((item) =>
+            slotUpdates.has(item.tempId)
+              ? { ...item, viewSlot: slotUpdates.get(item.tempId) as MediaViewSlot }
+              : item,
+          ),
         );
-        const targetIdx = prev.findIndex(
-          (item, idx) =>
-            normalizeMediaViewSlot(item.viewSlot, idx) === targetSlotNormalized,
-        );
-
-        if (sourceIdx === -1 && targetIdx === -1) return prev;
-
-        const next = [...prev];
-
-        if (sourceIdx !== -1 && targetIdx !== -1) {
-          const temp = next[sourceIdx];
-          next[sourceIdx] = next[targetIdx];
-          next[targetIdx] = temp;
-
-          const sourceSlotVal = next[sourceIdx].viewSlot;
-          next[sourceIdx] = {
-            ...next[sourceIdx],
-            viewSlot: next[targetIdx].viewSlot,
-          };
-          next[targetIdx] = { ...next[targetIdx], viewSlot: sourceSlotVal };
-        } else if (sourceIdx !== -1) {
-          next[sourceIdx] = {
-            ...next[sourceIdx],
-            viewSlot: targetSlotNormalized as MediaViewSlot,
-          };
-        } else if (targetIdx !== -1) {
-          next[targetIdx] = {
-            ...next[targetIdx],
-            viewSlot: sourceSlotNormalized as MediaViewSlot,
-          };
-        }
-
-        return normalizePending(next);
       });
 
       setHasChanges(true);
@@ -2879,7 +2855,7 @@ const EditProduct: React.FC = () => {
         `Swapped positions: ${getMediaViewSlotLabel(sourceSlotNormalized)} and ${getMediaViewSlotLabel(targetSlotNormalized)}`,
       );
     },
-    [normalizePending, syncPersistedMediaIds],
+    [mediaBySlot, normalizePending, syncPersistedMediaIds],
   );
 
   const handleDragStart = (e: React.DragEvent, slot: string) => {
@@ -2907,8 +2883,9 @@ const EditProduct: React.FC = () => {
     const sourceSlot = e.dataTransfer.getData("text/plain") || draggingSlot;
     if (!sourceSlot || sourceSlot === targetSlot) return;
 
-    const hasSourceMedia = mediaUrls.some((m, idx) => normalizeMediaViewSlot(m.viewSlot, idx) === sourceSlot);
-    const hasTargetMedia = mediaUrls.some((m, idx) => normalizeMediaViewSlot(m.viewSlot, idx) === targetSlot);
+    // Use the displayed slot map so this stays consistent with what the user sees.
+    const hasSourceMedia = mediaBySlot.has(normalizeMediaViewSlot(sourceSlot) as MediaViewSlot);
+    const hasTargetMedia = mediaBySlot.has(normalizeMediaViewSlot(targetSlot) as MediaViewSlot);
 
     if (hasSourceMedia || hasTargetMedia) {
       handleSwapMediaSlots(sourceSlot, targetSlot);
@@ -3213,8 +3190,10 @@ const EditProduct: React.FC = () => {
         ) : null}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
-          {/* LEFT COLUMN: Media (50% approx -> 6 cols) */}
-          <div className="space-y-4 lg:col-span-6">
+          {/* LEFT COLUMN: Media — sticky rail so it stays in view while the long
+              details column scrolls, instead of leaving a tall empty gap and
+              pushing overall page height down. */}
+          <div className="space-y-4 lg:col-span-5 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto no-scrollbar">
             {/* Media Gallery */}
             <div
               id="product-media-section"
@@ -3523,8 +3502,9 @@ const EditProduct: React.FC = () => {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Details (50% approx -> 6 cols) */}
-          <div className="space-y-6 lg:col-span-6">
+          {/* RIGHT COLUMN: Details — widened to take the space freed by the
+              narrower sticky media rail. */}
+          <div className="space-y-6 lg:col-span-7">
             {/* Basic Info — same collapsible card language as Create Design */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-2">
@@ -4279,6 +4259,18 @@ const EditProduct: React.FC = () => {
                         sourceId={isEditMode ? productId : undefined}
                         sourceTitle={form.title}
                         measurementKeys={form.customMeasurementKeys}
+                        // Filter measurement points by the product's audience,
+                        // exactly like the design creation flow — otherwise the
+                        // product form showed the full (unfiltered) registry while
+                        // designs showed a gendered subset, so the two screens
+                        // rendered different measurement points for the same brand.
+                        measurementGender={
+                          form.gender === "MALE"
+                            ? "MEN"
+                            : form.gender === "FEMALE"
+                              ? "WOMEN"
+                              : "UNISEX"
+                        }
                         defaultBaseCharge={form.price > 0 ? form.price : null}
                         defaultProductionLeadDays={storeDefaultProductionLeadDays}
                         defaultProductionLeadLabel={storeCustomOrderLeadTimeLabel}

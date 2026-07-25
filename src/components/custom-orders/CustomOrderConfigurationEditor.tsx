@@ -4,6 +4,7 @@ import { getStoreStatus } from '@/api/StoreApi';
 import { MeasurementPointsApi } from '@/api/MeasurementPointsApi';
 import { useMeasurementPoints } from '@/hooks/useMeasurementPoints';
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import { sanitizeDecimalInput, sanitizeIntegerInput } from '@/utils/numericInput';
 import {
   customOrderConfigurationsApi,
   type CreateCustomFabricRuleBasisInput,
@@ -1512,7 +1513,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           </span>
           <input
             value={form.fabricCostPerYard}
-            onChange={(event) => updateForm('fabricCostPerYard', event.target.value)}
+            onChange={(event) => updateForm('fabricCostPerYard', sanitizeDecimalInput(event.target.value))}
             disabled={disabled}
             aria-invalid={Boolean(fieldErrors.fabricCostPerYard)}
             aria-describedby={fieldErrors.fabricCostPerYard ? getFieldErrorId('fabricCostPerYard') : undefined}
@@ -1536,7 +1537,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           </span>
           <input
             value={form.productionLeadDays}
-            onChange={(event) => updateForm('productionLeadDays', event.target.value)}
+            onChange={(event) => updateForm('productionLeadDays', sanitizeIntegerInput(event.target.value))}
             disabled={disabled}
             aria-invalid={Boolean(fieldErrors.productionLeadDays)}
             aria-describedby={fieldErrors.productionLeadDays ? getFieldErrorId('productionLeadDays') : undefined}
@@ -1561,7 +1562,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           </span>
           <input
             value={form.deliveryMinDays}
-            onChange={(event) => updateForm('deliveryMinDays', event.target.value)}
+            onChange={(event) => updateForm('deliveryMinDays', sanitizeIntegerInput(event.target.value))}
             disabled={disabled}
             aria-invalid={Boolean(fieldErrors.deliveryMinDays)}
             aria-describedby={fieldErrors.deliveryMinDays ? getFieldErrorId('deliveryMinDays') : undefined}
@@ -1581,7 +1582,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           </span>
           <input
             value={form.deliveryMaxDays}
-            onChange={(event) => updateForm('deliveryMaxDays', event.target.value)}
+            onChange={(event) => updateForm('deliveryMaxDays', sanitizeIntegerInput(event.target.value))}
             disabled={disabled}
             aria-invalid={Boolean(fieldErrors.deliveryMaxDays)}
             aria-describedby={fieldErrors.deliveryMaxDays ? getFieldErrorId('deliveryMaxDays') : undefined}
@@ -1816,7 +1817,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Average base yards</span>
             <input
               value={averageBaseYards}
-              onChange={(event) => setAverageBaseYards(event.target.value)}
+              onChange={(event) => setAverageBaseYards(sanitizeDecimalInput(event.target.value))}
               disabled={disabled}
               className={fieldClassName}
               placeholder="e.g. 2"
@@ -1859,7 +1860,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               <input
                 value={row.extraYards}
                 onChange={(event) => {
-                  const value = event.target.value;
+                  const value = sanitizeDecimalInput(event.target.value);
                   setSizeExtraRows((current) =>
                     current.map((entry, entryIndex) =>
                       entryIndex === index ? { ...entry, extraYards: value } : entry,
@@ -1951,7 +1952,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                 </span>
                 <input
                   value={form.rushFee}
-                  onChange={(event) => updateForm('rushFee', event.target.value)}
+                  onChange={(event) => updateForm('rushFee', sanitizeDecimalInput(event.target.value))}
                   disabled={disabled}
                   aria-invalid={Boolean(fieldErrors.rushFee)}
                   aria-describedby={fieldErrors.rushFee ? getFieldErrorId('rushFee') : undefined}
@@ -1972,7 +1973,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                 </span>
                 <input
                   value={form.rushProductionLeadDays}
-                  onChange={(event) => updateForm('rushProductionLeadDays', event.target.value)}
+                  onChange={(event) => updateForm('rushProductionLeadDays', sanitizeIntegerInput(event.target.value))}
                   disabled={disabled}
                   aria-invalid={Boolean(fieldErrors.rushProductionLeadDays)}
                   aria-describedby={fieldErrors.rushProductionLeadDays ? getFieldErrorId('rushProductionLeadDays') : undefined}

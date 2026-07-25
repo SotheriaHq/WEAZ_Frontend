@@ -1113,13 +1113,25 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     if (typeof window === 'undefined') return;
     if (loading || products.length === 0) return;
 
-    const draft = products.find((p) => resolveProductStatus(p) === 'DRAFT');
+    const now = Date.now();
+    // Don't nag about a draft the user is still creating / just submitted. A
+    // freshly-created product briefly exists as a DRAFT while the background
+    // publish job uploads media and flips it live; prompting "Continue your
+    // draft?" the instant they land on the store is the phantom prompt users hit
+    // right after "Create Product". Only remind about genuinely-abandoned drafts.
+    const FRESH_DRAFT_GRACE_MS = 10 * 60 * 1000;
+    const draftAge = (p: BackendProduct) => {
+      const ts = new Date(p.createdAt || 0).getTime();
+      return Number.isFinite(ts) && ts > 0 ? now - ts : Number.POSITIVE_INFINITY;
+    };
+    const draft = products.find(
+      (p) => resolveProductStatus(p) === 'DRAFT' && draftAge(p) >= FRESH_DRAFT_GRACE_MS,
+    );
     if (!draft) return;
 
     const key = `draft-reminder:${draft.id}`;
     const lastRaw = localStorage.getItem(key);
     const lastShown = lastRaw ? Number(lastRaw) : 0;
-    const now = Date.now();
     const intervalMs = 48 * 60 * 60 * 1000;
 
     if (!lastShown || now - lastShown >= intervalMs) {

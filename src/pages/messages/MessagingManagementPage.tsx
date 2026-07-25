@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
-import { messagingApi, type InboxItem, type ThreadMessage, type ThreadOrderItem } from '@/api/MessagingApi';
+import { messagingApi, type InboxItem, type ThreadMessage, type ThreadOrderItem, type ResolvedThreadRoute } from '@/api/MessagingApi';
 import { customOrdersBuyerApi, customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
 import { getStoreStatus } from '@/api/StoreApi';
 import { useRealtime } from '@/realtime/RealtimeProvider';
@@ -118,6 +118,40 @@ const mapInboxItem = (item: InboxItem): ConversationItem => ({
   hasUnread: Boolean(item.hasUnread),
   mutedUntil: item.mutedUntil ?? null,
   archivedAt: item.archivedAt ?? null,
+});
+
+/**
+ * Build a minimal ConversationItem from a resolved thread route so a thread that
+ * isn't in the inbox list can still be opened. Message + attached-order loading
+ * both key off `threadId` (thread transport), so the conversation renders fully;
+ * the inbox refetch later replaces this with the enriched item (participant, etc.).
+ */
+const synthesizeConversationFromRoute = (route: ResolvedThreadRoute): ConversationItem => ({
+  id: route.threadId,
+  threadId: route.threadId,
+  contextType: route.contextType,
+  contextId:
+    route.contextType === 'STANDARD_ORDER'
+      ? route.orderId || route.threadId
+      : route.contextType === 'CUSTOM_ORDER'
+        ? route.customOrderId || route.threadId
+        : route.threadId,
+  orderId: route.orderId ?? null,
+  customOrderId: route.customOrderId ?? null,
+  targetUrl: route.targetUrl ?? null,
+  orderDetailUrl: route.orderDetailUrl ?? null,
+  title: 'Conversation',
+  subtitle: '',
+  participantName: 'Conversation',
+  participantId: null,
+  participantImage: null,
+  participantUsername: null,
+  createdAt: new Date().toISOString(),
+  lastMessageAt: null,
+  unreadCount: 0,
+  hasUnread: false,
+  mutedUntil: null,
+  archivedAt: null,
 });
 
 const nextClientMessageId = () => {
@@ -373,6 +407,13 @@ const MessagingManagementPage: React.FC = () => {
   // (thread prefs, sent-message previews). Cache updates re-seed local state.
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [activeId, setActiveId] = useState<string>('');
+  // Safety net: a thread resolved from an order/custom-order/thread reference that
+  // is NOT present in the inbox list (e.g. archived, beyond the inbox window, or a
+  // freshly-linked buyer<->brand thread). Without this, "Open conversation" would
+  // land on the empty home screen because activeConversation is derived solely from
+  // the inbox. We synthesize a conversation item from the resolved route so the
+  // exact thread (and its attached order) opens regardless.
+  const [resolvedThreadFallback, setResolvedThreadFallback] = useState<ResolvedThreadRoute | null>(null);
   const highlightedMessageId = params.get('messageId');
 
   const inboxResource = useCachedResource<ConversationItem[]>({
@@ -443,7 +484,11 @@ const MessagingManagementPage: React.FC = () => {
   const messageNodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   /* ---- Derived ---- */
-  const activeConversation = conversations.find((item) => item.id === activeId) || null;
+  const activeConversation =
+    conversations.find((item) => item.id === activeId) ||
+    (resolvedThreadFallback && resolvedThreadFallback.threadId === activeId
+      ? synthesizeConversationFromRoute(resolvedThreadFallback)
+      : null);
   const activeAvatarSource = resolveAvatarMediaSource(activeConversation?.participantImage);
   const contactSidebarProps = activeConversation
     ? {
@@ -573,13 +618,17 @@ const MessagingManagementPage: React.FC = () => {
 
     if (queryThreadId) {
       if (conversations.some((i) => i.id === queryThreadId)) { setActiveId(queryThreadId); return; }
-      void messagingApi.resolveThreadRoute(queryThreadId).then((resolved) => {
-        const next = new URLSearchParams(params);
-        next.set('threadId', resolved.threadId);
-        if (resolved.orderId) next.set('orderId', resolved.orderId);
-        if (resolved.customOrderId) next.set('customOrderId', resolved.customOrderId);
-        setParams(next, { replace: true });
-      }).catch(() => {});
+      const resolveKey = `t:${queryThreadId}`;
+      if (contextResolveKeyRef.current !== resolveKey) {
+        contextResolveKeyRef.current = resolveKey;
+        void messagingApi.resolveThreadRoute(queryThreadId).then((resolved) => {
+          // Open the thread directly (synthesizing it if it's outside the inbox
+          // window) rather than only rewriting the URL, which could loop without
+          // ever selecting anything.
+          setResolvedThreadFallback(resolved);
+          setActiveId(resolved.threadId);
+        }).catch(() => {});
+      }
       return;
     }
 
@@ -595,13 +644,16 @@ const MessagingManagementPage: React.FC = () => {
           customOrderId: queryCustomOrderId ?? undefined,
         }).then((resolved) => {
           if (!resolved?.threadId) return;
-          if (conversations.some((i) => i.id === resolved.threadId)) {
-            setActiveId(resolved.threadId);
-          } else {
-            const next = new URLSearchParams(params);
-            next.set('threadId', resolved.threadId);
-            setParams(next, { replace: true });
-          }
+          // Carry the requested order reference into the resolved route so the
+          // conversation opens with that specific order attached (the thread's own
+          // customOrderId column is null for buyer<->brand DIRECT threads).
+          const enriched: ResolvedThreadRoute = {
+            ...resolved,
+            orderId: resolved.orderId ?? queryOrderId ?? null,
+            customOrderId: resolved.customOrderId ?? queryCustomOrderId ?? null,
+          };
+          setResolvedThreadFallback(enriched);
+          setActiveId(resolved.threadId);
         }).catch(() => {
           // Leave nothing selected rather than opening the wrong conversation.
         });
@@ -698,7 +750,20 @@ const MessagingManagementPage: React.FC = () => {
       const response = await messagingApi.listThreadOrders(activeConversation.threadId, { filter: orderFilter });
       const nextOrders = response.items || [];
       setThreadOrders(nextOrders);
+      // When the conversation was opened from a specific order/custom-order (the
+      // deep-link case), attach THAT order by default so messages carry its
+      // reference — even if the thread has several linked orders.
+      const requestedOrderId = params.get('orderId');
+      const requestedCustomOrderId = params.get('customOrderId');
+      const requestedKey = requestedCustomOrderId
+        ? `CUSTOM_ORDER:${requestedCustomOrderId}`
+        : requestedOrderId
+          ? `STANDARD_ORDER:${requestedOrderId}`
+          : '';
       setSelectedOrderKey((current) => {
+        if (requestedKey && nextOrders.some((order) => `${order.type}:${order.id}` === requestedKey)) {
+          return requestedKey;
+        }
         if (current && nextOrders.some((order) => `${order.type}:${order.id}` === current)) {
           return current;
         }
@@ -708,7 +773,7 @@ const MessagingManagementPage: React.FC = () => {
       setThreadOrders([]);
       setSelectedOrderKey('');
     }
-  }, [activeConversation?.threadId, orderFilter]);
+  }, [activeConversation?.threadId, orderFilter, params]);
 
   const refresh = useCallback(async () => {
     if (
