@@ -65,7 +65,7 @@ export const VERIFICATION_STEPS = [
   {
     id: 'identity',
     title: 'Identity',
-    summary: 'Legal name, age, and phone details',
+    summary: 'Owner / CEO / Founder identity details',
   },
   {
     id: 'business',

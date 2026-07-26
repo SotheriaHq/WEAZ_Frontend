@@ -6,11 +6,10 @@ import {
   useState,
 } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import VLoader from '@/components/loaders/VLoader';
 import MediaRenderer from '@/components/media/MediaRenderer';
-import VerificationHero from '@/components/studio/verification/VerificationHero';
 import {
   AUTHORITY_OPTIONS,
   buildSignatureText,
@@ -84,7 +83,7 @@ export default function VerificationWizardPage() {
   const [showSubmitPreview, setShowSubmitPreview] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     details: true,
-    guidelines: true,
+    guidelines: false,
   });
   const [uploadPreviewUrls, setUploadPreviewUrls] = useState<Partial<Record<UploadFieldKey, string>>>({});
   const [lastSignedAt, setLastSignedAt] = useState<string | null>(null);
@@ -100,12 +99,6 @@ export default function VerificationWizardPage() {
     typeof (location.state as { from?: unknown } | null)?.from === 'string'
       ? String((location.state as { from?: string }).from)
       : '/studio/verification';
-  const originLabel =
-    originPath.startsWith('/studio/store')
-      ? 'Store'
-      : originPath.startsWith('/studio/verification')
-        ? 'Verification'
-        : 'Back';
 
   const signatureText = useMemo(
     () => buildSignatureText(form, letter),
@@ -580,97 +573,63 @@ export default function VerificationWizardPage() {
   }
 
   return (
-    <div className="space-y-8 bg-surface min-h-screen">
-      {/* Navigation Breadcrumb */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/studio/verification', { state: { from: originPath } })}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant shadow-sm transition-all hover:bg-surface-container-low hover:text-on-surface"
-            aria-label="Back to verification"
-          >
-            ←
-          </button>
-          <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-widest text-on-surface-variant">
-            <Link to={originPath} className="transition hover:text-primary">
-              {originLabel}
-            </Link>
-            <span className="text-outline-variant">/</span>
-            <Link
-              to="/studio/verification"
-              className="transition hover:text-primary"
-            >
-              Verification
-            </Link>
-            <span className="text-outline-variant">/</span>
-            <span className="text-primary font-bold">Apply</span>
-          </nav>
-        </div>
-
-        <div className="hidden sm:flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => void saveDraft(stepIndex + 1)}
-            disabled={savingDraft}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-primary hover:bg-primary/5 transition-colors border border-primary/20"
-          >
-            {savingDraft ? 'Saving draft...' : 'Save draft'}
-          </button>
-        </div>
-      </div>
-
-      {/* Main Title Header & Step Progress Bar */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant/20 shadow-sm relative overflow-hidden">
+    <div className="space-y-4 bg-surface min-h-[calc(100vh-100px)] flex flex-col">
+      {/* Top Header: Single Minimal Row (Scaled down 80%) */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-surface-container-lowest p-3.5 sm:p-4 rounded-xl border border-outline-variant/20 shadow-sm relative overflow-hidden shrink-0">
         <div className="absolute top-0 left-0 right-0 h-1 bg-surface-container-highest">
           <div
             className="h-full bg-gradient-to-r from-primary via-tertiary to-primary transition-all duration-500 ease-out"
             style={{ width: `${completionStats.percent}%` }}
           ></div>
         </div>
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-highest text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
-            Step {stepIndex + 1} of {VERIFICATION_STEPS.length} — {step.title}
+
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/studio/verification', { state: { from: originPath } })}
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant text-xs shadow-sm hover:bg-surface-container-low transition-all"
+              aria-label="Back to verification"
+            >
+              ←
+            </button>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-highest text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+              Step {stepIndex + 1} of {VERIFICATION_STEPS.length} — {step.title}
+            </div>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-on-surface">Guided seller verification</h1>
-          <p className="mt-2 text-sm text-on-surface-variant max-w-2xl">
-            {step.summary}. Provide accurate legal information matching your official documents.
-          </p>
+          <div>
+            <h1 className="text-base sm:text-lg font-bold tracking-tight text-on-surface leading-tight">Guided Seller Verification</h1>
+            <p className="text-xs text-on-surface-variant truncate max-w-xl">
+              {step.summary}. Matches official legal documents.
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="text-right">
-            <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Completion</p>
-            <p className="text-lg font-bold text-primary tabular-nums">{completionStats.percent}%</p>
+
+        <div className="flex items-center gap-3 shrink-0 self-end lg:self-center">
+          <div className="flex items-center gap-2 bg-surface-container-low px-3 py-1 rounded-lg border border-outline-variant/20">
+            <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Completion</span>
+            <span className="text-xs font-bold text-primary tabular-nums">{completionStats.percent}% ({completionStats.completedCount}/{completionStats.totalCount})</span>
           </div>
-          <div className="w-10 h-10 rounded-full border-2 border-primary/20 flex items-center justify-center relative bg-primary/5">
-            <span className="text-xs font-bold text-primary">{completionStats.completedCount}/{completionStats.totalCount}</span>
+          <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wider ${verificationStatusTone(status?.verificationStatus)}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+            {status?.verificationStatus === 'NOT_SUBMITTED' && hasDraft
+              ? 'Drafted'
+              : verificationStatusLabel(status?.verificationStatus)}
           </div>
         </div>
       </div>
 
-      <VerificationHero
-        eyebrow="Verification application"
-        title="Official Brand Verification"
-        description="Structured verification sequence: identity, business, authority, evidence, and review. Draft state saves continuously as you progress."
-        statusLabel={
-          status?.verificationStatus === 'NOT_SUBMITTED' && hasDraft
-            ? 'Drafted'
-            : verificationStatusLabel(status?.verificationStatus)
-        }
-        statusTone={verificationStatusTone(status?.verificationStatus)}
-      />
-
       {wizardLockMessage ? (
-        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm shrink-0">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-800">
             Submission locked
           </p>
-          <p className="mt-3 text-sm leading-relaxed text-amber-900">
+          <p className="mt-1.5 text-xs leading-relaxed text-amber-900">
             {wizardLockMessage}
           </p>
-          <div className="mt-5">
-            <Button onClick={() => navigate('/studio/verification')}>
+          <div className="mt-3">
+            <Button size="sm" onClick={() => navigate('/studio/verification')}>
               Return to status workspace
             </Button>
           </div>
@@ -678,14 +637,14 @@ export default function VerificationWizardPage() {
       ) : null}
 
       {!wizardLockMessage ? (
-        <div className="flex flex-col lg:flex-row gap-8 w-full">
-          {/* Stepper Sidebar */}
-          <aside className="w-full lg:w-64 shrink-0">
-            <div className="sticky top-24 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 shadow-[0_8px_30px_rgba(0,0,0,0.03)] relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-full pointer-events-none"></div>
-              <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-6">Verification Path</h3>
+        <div className="flex flex-col lg:flex-row gap-6 w-full items-start flex-1 min-h-0">
+          {/* Left Sidebar: Stepper Path */}
+          <aside className="w-full lg:w-64 shrink-0 lg:sticky lg:top-24">
+            <div className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant/30 shadow-[0_4px_20px_rgba(0,0,0,0.02)] relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-full pointer-events-none"></div>
+              <h3 className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-5">Verification Path</h3>
               
-              <div className="relative space-y-7">
+              <div className="relative space-y-6">
                 {/* Vertical Connecting Line */}
                 <div className="absolute left-[11px] top-2 bottom-4 w-0.5 bg-outline-variant/30"></div>
 
@@ -704,7 +663,7 @@ export default function VerificationWizardPage() {
                         }
                         void goToStep(index);
                       }}
-                      className="relative flex items-start gap-4 text-left w-full group transition-all"
+                      className="relative flex items-start gap-3.5 text-left w-full group transition-all"
                     >
                       {isComplete ? (
                         <div className="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0 z-10 shadow-[0_0_10px_rgba(109,35,249,0.3)] transition-transform group-hover:scale-110">
@@ -722,19 +681,19 @@ export default function VerificationWizardPage() {
                       )}
 
                       <div className="pt-0.5">
-                        <p className={`text-sm font-semibold transition-colors ${
+                        <p className={`text-xs font-bold transition-colors ${
                           isActive
-                            ? 'text-primary font-bold'
+                            ? 'text-primary'
                             : isComplete
                               ? 'text-on-surface'
-                              : 'text-on-surface-variant opacity-70 group-hover:opacity-100'
+                              : 'text-on-surface-variant/70 group-hover:text-on-surface'
                         }`}>
                           {item.title}
                         </p>
-                        <p className={`text-xs mt-0.5 ${
+                        <p className={`text-[11px] mt-0.5 ${
                           isActive
                             ? 'text-primary/80 font-medium'
-                            : 'text-on-surface-variant/80'
+                            : 'text-on-surface-variant/70'
                         }`}>
                           {isComplete ? 'Verified' : isActive ? 'In Progress' : item.summary}
                         </p>
@@ -746,432 +705,444 @@ export default function VerificationWizardPage() {
             </div>
           </aside>
 
-          {/* Form Content Area */}
-          <div className="flex-1 max-w-4xl">
-            <div className="bg-surface-container-lowest rounded-2xl p-6 sm:p-10 border border-outline-variant/30 shadow-[0_8px_40px_rgba(0,0,0,0.04)] relative overflow-hidden">
+          {/* Right Main Form Container (Inline Scrollable, Screen height preserved) */}
+          <div className="flex-1 min-w-0 max-w-4xl lg:max-h-[calc(100vh-180px)] lg:overflow-y-auto lg:pr-2 space-y-6 rounded-2xl scrollbar-thin scrollbar-thumb-outline-variant/40">
+            <div className="bg-surface-container-lowest rounded-2xl p-5 sm:p-8 border border-outline-variant/30 shadow-[0_8px_32px_rgba(0,0,0,0.03)] relative overflow-hidden flex flex-col justify-between min-h-[500px]">
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-tertiary to-primary opacity-80"></div>
               
-              {/* Header inside Form Card with Accordion toggle for guidelines */}
-              <div className="mb-8 flex items-start justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-on-surface tracking-tight">{step.title} Details</h2>
-                  <p className="mt-2 text-sm text-on-surface-variant max-w-2xl leading-relaxed">
-                    {step.summary}. Ensure information provided matches registered legal documents to prevent verification delays.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => toggleSection('guidelines')}
-                  className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-primary hover:bg-primary/5 px-3 py-1.5 rounded-lg border border-primary/20 transition-colors"
-                >
-                  <span>{expandedSections.guidelines ? 'Hide instructions' : 'View instructions'}</span>
-                </button>
-              </div>
-
-              {expandedSections.guidelines && (
-                <div className="mb-8 p-4 rounded-xl bg-surface-container-low border border-outline-variant/20 text-xs leading-relaxed text-on-surface-variant space-y-1">
-                  <p className="font-semibold text-on-surface">💡 System Guidelines:</p>
-                  <p>• Provide exact legal spelling as shown on government IDs or CAC registration.</p>
-                  <p>• Uploaded documents must be clear, flat, legible captures in JPEG, PNG, or PDF formats.</p>
-                  <p>• Your progress is continuously autosaved. You can return at any time to finish your draft.</p>
-                </div>
-              )}
-
-              {/* Step 1: Identity */}
-              {step.id === 'identity' ? (
-                <div className="grid gap-6 sm:grid-cols-2">
-                  <Input
-                    label="Legal First Name *"
-                    placeholder="e.g. Jane"
-                    value={form.ownerLegalFirstName ?? ''}
-                    onChange={(event) => setField('ownerLegalFirstName', event.target.value)}
-                  />
-                  <Input
-                    label="Legal Last Name *"
-                    placeholder="e.g. Doe"
-                    value={form.ownerLegalLastName ?? ''}
-                    onChange={(event) => setField('ownerLegalLastName', event.target.value)}
-                  />
-                  <Input
-                    label="Date of Birth *"
-                    type="date"
-                    value={form.ownerDateOfBirth ?? ''}
-                    onChange={(event) => setField('ownerDateOfBirth', event.target.value)}
-                  />
-                  <Select
-                    label="Gender"
-                    value={form.ownerGender ?? 'PREFER_NOT_TO_SAY'}
-                    onChange={(event) =>
-                      setField('ownerGender', event.target.value as VerificationDraftData['ownerGender'])
-                    }
+              {/* Form Content */}
+              <div className="space-y-6">
+                <div className="flex items-start justify-between border-b border-outline-variant/20 pb-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-on-surface tracking-tight">{step.title} Details</h2>
+                    <p className="mt-1 text-xs text-on-surface-variant leading-relaxed">
+                      {step.summary}. Ensure information provided matches registered legal documents.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleSection('guidelines')}
+                    className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-primary hover:bg-primary/5 px-3 py-1.5 rounded-lg border border-primary/20 transition-colors shrink-0"
                   >
-                    {GENDER_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                  <Input
-                    label="Phone Number *"
-                    placeholder="(555) 000-0000"
-                    required
-                    value={form.ownerPhoneNumber ?? ''}
-                    onChange={(event) => setField('ownerPhoneNumber', event.target.value)}
-                    helperText="Syncs with your profile; used for verification notifications."
-                  />
-                  <Input
-                    label="National ID (NIN) *"
-                    placeholder="XXX-XX-XXXX"
-                    required
-                    value={form.ownerNin ?? ''}
-                    onChange={(event) => setField('ownerNin', event.target.value)}
-                    helperText="Must match owner's government-issued ID."
-                  />
+                    <span>{expandedSections.guidelines ? 'Hide instructions' : 'View instructions'}</span>
+                  </button>
                 </div>
-              ) : null}
 
-              {/* Step 2: Business */}
-              {step.id === 'business' ? (
-                <div className="grid gap-6 sm:grid-cols-2">
-                  <Input
-                    label="CAC Number *"
-                    placeholder="e.g. RC123456"
-                    value={form.cacNumber ?? ''}
-                    onChange={(event) => setField('cacNumber', event.target.value)}
-                  />
-                  <Select
-                    label="Legal Entity Type *"
-                    value={form.legalEntityType ?? 'BUSINESS_NAME'}
-                    onChange={(event) =>
-                      setField(
-                        'legalEntityType',
-                        event.target.value as VerificationDraftData['legalEntityType'],
-                      )
-                    }
-                  >
-                    {ENTITY_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                  <div className="sm:col-span-2">
+                {expandedSections.guidelines && (
+                  <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/20 text-xs leading-relaxed text-on-surface-variant space-y-1">
+                    <p className="font-semibold text-on-surface">💡 System Guidelines:</p>
+                    <p>• Provide exact legal spelling as shown on government IDs or CAC registration.</p>
+                    <p>• Uploaded documents must be clear, flat, legible captures in JPEG, PNG, or PDF formats.</p>
+                    <p>• Your progress is continuously autosaved. You can return at any time to finish your draft.</p>
+                  </div>
+                )}
+
+                {/* Step 1: Identity */}
+                {step.id === 'identity' ? (
+                  <div className="space-y-6">
+                    <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 text-xs text-on-surface flex items-center gap-3">
+                      <span className="text-lg shrink-0">👤</span>
+                      <p className="leading-normal">
+                        <strong className="text-primary font-bold">Owner / CEO / Founder Data Collection:</strong> Provide your exact personal legal details as shown on official government ID. Used solely for cryptographic identity resolution.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-6 sm:grid-cols-2">
                     <Input
-                      label="Street Address *"
-                      placeholder="e.g. 123 Fashion Avenue"
-                      value={form.businessAddress?.street ?? ''}
-                      onChange={(event) => setAddressField('street', event.target.value)}
+                      label="Legal First Name *"
+                      placeholder="e.g. Jane"
+                      value={form.ownerLegalFirstName ?? ''}
+                      onChange={(event) => setField('ownerLegalFirstName', event.target.value)}
                     />
+                    <Input
+                      label="Legal Last Name *"
+                      placeholder="e.g. Doe"
+                      value={form.ownerLegalLastName ?? ''}
+                      onChange={(event) => setField('ownerLegalLastName', event.target.value)}
+                    />
+                    <Input
+                      label="Date of Birth *"
+                      type="date"
+                      value={form.ownerDateOfBirth ?? ''}
+                      onChange={(event) => setField('ownerDateOfBirth', event.target.value)}
+                    />
+                    <Select
+                      label="Gender"
+                      value={form.ownerGender ?? 'PREFER_NOT_TO_SAY'}
+                      onChange={(event) =>
+                        setField('ownerGender', event.target.value as VerificationDraftData['ownerGender'])
+                      }
+                    >
+                      {GENDER_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </Select>
+                    <Input
+                      label="Phone Number *"
+                      placeholder="(555) 000-0000"
+                      required
+                      value={form.ownerPhoneNumber ?? ''}
+                      onChange={(event) => setField('ownerPhoneNumber', event.target.value)}
+                      helperText="Syncs with your profile; used for verification notifications."
+                    />
+                    <Input
+                      label="National ID (NIN) *"
+                      placeholder="XXX-XX-XXXX"
+                      required
+                      value={form.ownerNin ?? ''}
+                      onChange={(event) => setField('ownerNin', event.target.value)}
+                      helperText="Must match owner's government-issued ID."
+                    />
+                    </div>
                   </div>
-                  <Input
-                    label="City *"
-                    placeholder="e.g. Ikeja"
-                    value={form.businessAddress?.city ?? ''}
-                    onChange={(event) => setAddressField('city', event.target.value)}
-                  />
-                  <Input
-                    label="State"
-                    value={form.businessAddress?.state ?? ''}
-                    disabled
-                    helperText="Locked from verified store profile state."
-                  />
-                  <Input
-                    label="Country"
-                    value={form.businessAddress?.country ?? ''}
-                    disabled
-                    helperText="Locked from verified store profile country."
-                  />
-                  <div className="sm:col-span-2 rounded-xl border border-primary/20 bg-primary/5 p-4 text-xs font-medium text-on-surface">
-                    Registered location for verification: <span className="font-bold text-primary">{locationLockedLabel}</span>
-                  </div>
-                </div>
-              ) : null}
+                ) : null}
 
-              {/* Step 3: Authority */}
-              {step.id === 'authority' ? (
-                <div className="grid gap-6 sm:grid-cols-2">
-                  <Select
-                    label="Authority Type *"
-                    value={form.authorityType ?? 'LEGAL_OWNER'}
-                    onChange={(event) =>
-                      setField(
-                        'authorityType',
-                        event.target.value as VerificationDraftData['authorityType'],
-                      )
-                    }
-                  >
-                    {AUTHORITY_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                  <Select
-                    label="ID Document Type *"
-                    value={form.idDocumentType ?? 'NIN_SLIP'}
-                    onChange={(event) =>
-                      setField(
-                        'idDocumentType',
-                        event.target.value as VerificationDraftData['idDocumentType'],
-                      )
-                    }
-                  >
-                    {ID_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                  <Input
-                    label="ID Document Number *"
-                    placeholder="e.g. A12345678"
-                    value={form.idDocumentNumber ?? ''}
-                    onChange={(event) => setField('idDocumentNumber', event.target.value)}
-                  />
-                  <Input
-                    label="ID Expiry Date"
-                    type="date"
-                    value={form.idDocumentExpiryDate ?? ''}
-                    onChange={(event) =>
-                      setField('idDocumentExpiryDate', event.target.value)
-                    }
-                  />
-                  {form.authorityType === 'AUTHORIZED_REPRESENTATIVE' ? (
+                {/* Step 2: Business */}
+                {step.id === 'business' ? (
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    <Input
+                      label="CAC Number *"
+                      placeholder="e.g. RC123456"
+                      value={form.cacNumber ?? ''}
+                      onChange={(event) => setField('cacNumber', event.target.value)}
+                    />
+                    <Select
+                      label="Legal Entity Type *"
+                      value={form.legalEntityType ?? 'BUSINESS_NAME'}
+                      onChange={(event) =>
+                        setField(
+                          'legalEntityType',
+                          event.target.value as VerificationDraftData['legalEntityType'],
+                        )
+                      }
+                    >
+                      {ENTITY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </Select>
                     <div className="sm:col-span-2">
-                      <Textarea
-                        label="Authority Arrangement Description *"
-                        rows={4}
-                        placeholder="Explain authorization granted by company directors..."
-                        value={form.authorityProofDescription ?? ''}
-                        onChange={(event) =>
-                          setField('authorityProofDescription', event.target.value)
-                        }
-                        helperText="Provide details of representation authorization."
+                      <Input
+                        label="Street Address *"
+                        placeholder="e.g. 123 Fashion Avenue"
+                        value={form.businessAddress?.street ?? ''}
+                        onChange={(event) => setAddressField('street', event.target.value)}
                       />
                     </div>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {/* Step 4: Evidence Uploads with Drag & Drop */}
-              {step.id === 'uploads' ? (
-                <div className="grid gap-6 sm:grid-cols-2">
-                  {DOCUMENT_UPLOADS.map((item) => {
-                    const hidden =
-                      item.key === 'idDocumentBackKey' &&
-                      !needsBackImage(form.idDocumentType);
-                    const authorityHidden =
-                      item.key === 'authorityProofKey' &&
-                      form.authorityType !== 'AUTHORIZED_REPRESENTATIVE';
-
-                    if (hidden || authorityHidden) {
-                      return null;
-                    }
-
-                    const value = form[item.key as keyof VerificationDraftData] as string | undefined;
-                    const isDragActive = dragActiveField === item.key;
-                    const isUploading = uploadingField === item.key;
-                    const previewUrl = uploadPreviewUrls[item.key as UploadFieldKey];
-
-                    return (
-                      <div
-                        key={item.key}
-                        className={`relative rounded-2xl border-2 border-dashed p-6 transition-all duration-200 flex flex-col justify-between ${
-                          isDragActive
-                            ? 'border-primary bg-primary/10 scale-[0.99]'
-                            : value
-                              ? 'border-emerald-300 bg-emerald-50/40'
-                              : 'border-outline-variant/40 bg-surface-container-low hover:border-primary/50'
-                        }`}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setDragActiveField(item.key);
-                        }}
-                        onDragLeave={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setDragActiveField(null);
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setDragActiveField(null);
-                          const file = e.dataTransfer.files?.[0] ?? null;
-                          if (file) {
-                            void handleUpload(item.key as keyof VerificationDraftData, item.documentType, file);
-                          }
-                        }}
-                      >
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-bold uppercase tracking-widest text-on-surface">{item.label}</span>
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${value ? 'bg-emerald-100 text-emerald-800' : 'bg-surface-container-high text-on-surface-variant'}`}>
-                              {value ? 'Uploaded' : 'Required'}
-                            </span>
-                          </div>
-                          <p className="text-xs text-on-surface-variant mb-4">{item.hint}</p>
-
-                          {value ? (
-                            <div className="mb-4 rounded-xl border border-emerald-200 bg-white p-3 shadow-sm">
-                              <p className="truncate text-xs font-semibold text-emerald-900">
-                                📄 {String(value).split('/').pop() || 'Uploaded file'}
-                              </p>
-                              <div className="mt-2 flex items-center gap-3">
-                                {previewUrl ? (
-                                  /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?|$)/i.test(previewUrl) ? (
-                                    <MediaRenderer
-                                      kind="image"
-                                      src={previewUrl}
-                                      alt={`${item.label} preview`}
-                                      className="w-12 h-12 rounded-lg border border-emerald-200 bg-white"
-                                      mediaClassName="object-contain"
-                                      maxHeightClassName="max-h-12"
-                                      maxWidthClassName="max-w-12"
-                                    />
-                                  ) : (
-                                    <span className="text-2xl">📄</span>
-                                  )
-                                ) : (
-                                  <VLoader size={16} phase="loading" showLabel={false} />
-                                )}
-
-                                {previewUrl ? (
-                                  <a
-                                    href={previewUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-xs font-semibold text-primary underline hover:text-primary-container"
-                                  >
-                                    View full file
-                                  </a>
-                                ) : (
-                                  <span className="text-xs text-on-surface-variant">Generating preview…</span>
-                                )}
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-
-                        <div className="relative mt-2 flex items-center justify-between gap-3 pt-3 border-t border-outline-variant/20">
-                          <span className="text-[11px] text-on-surface-variant">
-                            Click or drag file here (PDF, JPG, PNG)
-                          </span>
-                          <label className="relative inline-flex cursor-pointer overflow-hidden rounded-xl">
-                            <input
-                              type="file"
-                              accept="image/*,application/pdf"
-                              className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                              onChange={(event) => {
-                                const file = event.target.files?.[0] ?? null;
-                                void handleUpload(
-                                  item.key as keyof VerificationDraftData,
-                                  item.documentType,
-                                  file,
-                                );
-                                event.currentTarget.value = '';
-                              }}
-                            />
-                            <span className="px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-tertiary text-on-primary text-xs font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-1.5">
-                              {isUploading ? (
-                                <>
-                                  <VLoader size={12} phase="loading" showLabel={false} />
-                                  Uploading...
-                                </>
-                              ) : value ? (
-                                'Replace File'
-                              ) : (
-                                'Upload File'
-                              )}
-                            </span>
-                          </label>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : null}
-
-              {/* Step 5: Review & Consent */}
-              {step.id === 'review' ? (
-                <div className="space-y-6">
-                  {/* Summary Bento Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-5 bg-surface-container-low rounded-2xl border border-outline-variant/20">
-                      <div className="flex items-center justify-between mb-3 pb-2 border-b border-outline-variant/20">
-                        <span className="text-xs font-bold text-primary uppercase tracking-widest">1. Personal Identity</span>
-                        <button type="button" onClick={() => setStepIndex(0)} className="text-xs text-primary hover:underline">Edit</button>
-                      </div>
-                      <dl className="space-y-2 text-xs">
-                        <div>
-                          <dt className="text-on-surface-variant uppercase text-[10px]">Legal Name</dt>
-                          <dd className="font-semibold text-on-surface">{[form.ownerLegalFirstName, form.ownerLegalLastName].filter(Boolean).join(' ') || 'Not set'}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-on-surface-variant uppercase text-[10px]">DOB & NIN</dt>
-                          <dd className="font-semibold text-on-surface">{form.ownerDateOfBirth || 'N/A'} • {form.ownerNin || 'N/A'}</dd>
-                        </div>
-                      </dl>
-                    </div>
-
-                    <div className="p-5 bg-surface-container-low rounded-2xl border border-outline-variant/20">
-                      <div className="flex items-center justify-between mb-3 pb-2 border-b border-outline-variant/20">
-                        <span className="text-xs font-bold text-tertiary uppercase tracking-widest">2. Business Profile</span>
-                        <button type="button" onClick={() => setStepIndex(1)} className="text-xs text-tertiary hover:underline">Edit</button>
-                      </div>
-                      <dl className="space-y-2 text-xs">
-                        <div>
-                          <dt className="text-on-surface-variant uppercase text-[10px]">CAC & Entity</dt>
-                          <dd className="font-semibold text-on-surface">{form.cacNumber || 'N/A'} ({form.legalEntityType})</dd>
-                        </div>
-                        <div>
-                          <dt className="text-on-surface-variant uppercase text-[10px]">Location</dt>
-                          <dd className="font-semibold text-on-surface">{form.businessAddress?.street}, {form.businessAddress?.city}</dd>
-                        </div>
-                      </dl>
+                    <Input
+                      label="City *"
+                      placeholder="e.g. Ikeja"
+                      value={form.businessAddress?.city ?? ''}
+                      onChange={(event) => setAddressField('city', event.target.value)}
+                    />
+                    <Input
+                      label="State"
+                      value={form.businessAddress?.state ?? ''}
+                      disabled
+                      helperText="Locked from verified store profile state."
+                    />
+                    <Input
+                      label="Country"
+                      value={form.businessAddress?.country ?? ''}
+                      disabled
+                      helperText="Locked from verified store profile country."
+                    />
+                    <div className="sm:col-span-2 rounded-xl border border-primary/20 bg-primary/5 p-3.5 text-xs font-medium text-on-surface">
+                      Registered location for verification: <span className="font-bold text-primary">{locationLockedLabel}</span>
                     </div>
                   </div>
+                ) : null}
 
-                  {/* Verification Letter Box */}
-                  {letter ? (
-                    <section className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm">
-                      <h3 className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3">Verification Consent Letter</h3>
-                      <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low p-5 text-xs leading-relaxed text-on-surface max-h-48 overflow-y-auto">
-                        <p className="font-bold text-sm mb-2">{letter.title}</p>
-                        <p className="whitespace-pre-line text-on-surface-variant">{letter.body}</p>
+                {/* Step 3: Authority */}
+                {step.id === 'authority' ? (
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    <Select
+                      label="Authority Type *"
+                      value={form.authorityType ?? 'LEGAL_OWNER'}
+                      onChange={(event) =>
+                        setField(
+                          'authorityType',
+                          event.target.value as VerificationDraftData['authorityType'],
+                        )
+                      }
+                    >
+                      {AUTHORITY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </Select>
+                    <Select
+                      label="ID Document Type *"
+                      value={form.idDocumentType ?? 'NIN_SLIP'}
+                      onChange={(event) =>
+                        setField(
+                          'idDocumentType',
+                          event.target.value as VerificationDraftData['idDocumentType'],
+                        )
+                      }
+                    >
+                      {ID_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </Select>
+                    <Input
+                      label="ID Document Number *"
+                      placeholder="e.g. A12345678"
+                      value={form.idDocumentNumber ?? ''}
+                      onChange={(event) => setField('idDocumentNumber', event.target.value)}
+                    />
+                    <Input
+                      label="ID Expiry Date"
+                      type="date"
+                      value={form.idDocumentExpiryDate ?? ''}
+                      onChange={(event) =>
+                        setField('idDocumentExpiryDate', event.target.value)
+                      }
+                    />
+                    {form.authorityType === 'AUTHORIZED_REPRESENTATIVE' ? (
+                      <div className="sm:col-span-2">
+                        <Textarea
+                          label="Authority Arrangement Description *"
+                          rows={4}
+                          placeholder="Explain authorization granted by company directors..."
+                          value={form.authorityProofDescription ?? ''}
+                          onChange={(event) =>
+                            setField('authorityProofDescription', event.target.value)
+                          }
+                          helperText="Provide details of representation authorization."
+                        />
                       </div>
+                    ) : null}
+                  </div>
+                ) : null}
 
-                      {form.letterKey ? (
-                        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900">
-                          <p className="font-bold">✅ Verification letter digitally signed</p>
-                          <p className="mt-1 text-[11px] text-emerald-800">
-                            {lastSignedAt
-                              ? `Signed on ${new Date(lastSignedAt).toLocaleString()}`
-                              : 'Signature captured for submission attempt.'}
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-                          Sign the letter below to confirm legal declaration before final submission.
-                        </div>
-                      )}
+                {/* Step 4: Evidence Uploads with Drag & Drop */}
+                {step.id === 'uploads' ? (
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    {DOCUMENT_UPLOADS.map((item) => {
+                      const hidden =
+                        item.key === 'idDocumentBackKey' &&
+                        !needsBackImage(form.idDocumentType);
+                      const authorityHidden =
+                        item.key === 'authorityProofKey' &&
+                        form.authorityType !== 'AUTHORIZED_REPRESENTATIVE';
 
-                      <div className="mt-4 flex flex-wrap gap-3">
-                        <Button
-                          onClick={() => void handleSignLetter()}
-                          loading={signing}
-                          className="shadow-sm"
+                      if (hidden || authorityHidden) {
+                        return null;
+                      }
+
+                      const value = form[item.key as keyof VerificationDraftData] as string | undefined;
+                      const isDragActive = dragActiveField === item.key;
+                      const isUploading = uploadingField === item.key;
+                      const previewUrl = uploadPreviewUrls[item.key as UploadFieldKey];
+
+                      return (
+                        <div
+                          key={item.key}
+                          className={`relative rounded-2xl border-2 border-dashed p-5 transition-all duration-200 flex flex-col justify-between ${
+                            isDragActive
+                              ? 'border-primary bg-primary/10 scale-[0.99]'
+                              : value
+                                ? 'border-emerald-300 bg-emerald-50/40'
+                                : 'border-outline-variant/40 bg-surface-container-low hover:border-primary/50'
+                          }`}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setDragActiveField(item.key);
+                          }}
+                          onDragLeave={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setDragActiveField(null);
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setDragActiveField(null);
+                            const file = e.dataTransfer.files?.[0] ?? null;
+                            if (file) {
+                              void handleUpload(item.key as keyof VerificationDraftData, item.documentType, file);
+                            }
+                          }}
                         >
-                          {form.letterKey ? 'Re-sign verification letter' : 'Sign verification letter'}
-                        </Button>
-                      </div>
-                    </section>
-                  ) : null}
-                </div>
-              ) : null}
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-bold uppercase tracking-widest text-on-surface">{item.label}</span>
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${value ? 'bg-emerald-100 text-emerald-800' : 'bg-surface-container-high text-on-surface-variant'}`}>
+                                {value ? 'Uploaded' : 'Required'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-on-surface-variant mb-4">{item.hint}</p>
 
-              {/* Action Bar Navigation */}
-              <div className="mt-10 pt-6 flex flex-wrap items-center justify-between gap-4 border-t border-outline-variant/20">
+                            {value ? (
+                              <div className="mb-4 rounded-xl border border-emerald-200 bg-white p-3 shadow-sm">
+                                <p className="truncate text-xs font-semibold text-emerald-900">
+                                  📄 {String(value).split('/').pop() || 'Uploaded file'}
+                                </p>
+                                <div className="mt-2 flex items-center gap-3">
+                                  {previewUrl ? (
+                                    /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?|$)/i.test(previewUrl) ? (
+                                      <MediaRenderer
+                                        kind="image"
+                                        src={previewUrl}
+                                        alt={`${item.label} preview`}
+                                        className="w-12 h-12 rounded-lg border border-emerald-200 bg-white"
+                                        mediaClassName="object-contain"
+                                        maxHeightClassName="max-h-12"
+                                        maxWidthClassName="max-w-12"
+                                      />
+                                    ) : (
+                                      <span className="text-2xl">📄</span>
+                                    )
+                                  ) : (
+                                    <VLoader size={16} phase="loading" showLabel={false} />
+                                  )}
+
+                                  {previewUrl ? (
+                                    <a
+                                      href={previewUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-xs font-semibold text-primary underline hover:text-primary-container"
+                                    >
+                                      View full file
+                                    </a>
+                                  ) : (
+                                    <span className="text-xs text-on-surface-variant">Generating preview…</span>
+                                  )}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div className="relative mt-2 flex items-center justify-between gap-3 pt-3 border-t border-outline-variant/20">
+                            <span className="text-[11px] text-on-surface-variant">
+                              Click or drag file here (PDF, JPG, PNG)
+                            </span>
+                            <label className="relative inline-flex cursor-pointer overflow-hidden rounded-xl">
+                              <input
+                                type="file"
+                                accept="image/*,application/pdf"
+                                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0] ?? null;
+                                  void handleUpload(
+                                    item.key as keyof VerificationDraftData,
+                                    item.documentType,
+                                    file,
+                                  );
+                                  event.currentTarget.value = '';
+                                }}
+                              />
+                              <span className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-primary to-tertiary text-on-primary text-xs font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-1.5">
+                                {isUploading ? (
+                                  <>
+                                    <VLoader size={12} phase="loading" showLabel={false} />
+                                    Uploading...
+                                  </>
+                                ) : value ? (
+                                  'Replace File'
+                                ) : (
+                                  'Upload File'
+                                )}
+                              </span>
+                            </label>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
+                {/* Step 5: Review & Consent */}
+                {step.id === 'review' ? (
+                  <div className="space-y-6">
+                    {/* Summary Bento Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 bg-surface-container-low rounded-2xl border border-outline-variant/20">
+                        <div className="flex items-center justify-between mb-3 pb-2 border-b border-outline-variant/20">
+                          <span className="text-xs font-bold text-primary uppercase tracking-widest">1. Personal Identity</span>
+                          <button type="button" onClick={() => setStepIndex(0)} className="text-xs text-primary hover:underline">Edit</button>
+                        </div>
+                        <dl className="space-y-2 text-xs">
+                          <div>
+                            <dt className="text-on-surface-variant uppercase text-[10px]">Legal Name</dt>
+                            <dd className="font-semibold text-on-surface">{[form.ownerLegalFirstName, form.ownerLegalLastName].filter(Boolean).join(' ') || 'Not set'}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-on-surface-variant uppercase text-[10px]">DOB & NIN</dt>
+                            <dd className="font-semibold text-on-surface">{form.ownerDateOfBirth || 'N/A'} • {form.ownerNin || 'N/A'}</dd>
+                          </div>
+                        </dl>
+                      </div>
+
+                      <div className="p-4 bg-surface-container-low rounded-2xl border border-outline-variant/20">
+                        <div className="flex items-center justify-between mb-3 pb-2 border-b border-outline-variant/20">
+                          <span className="text-xs font-bold text-tertiary uppercase tracking-widest">2. Business Profile</span>
+                          <button type="button" onClick={() => setStepIndex(1)} className="text-xs text-tertiary hover:underline">Edit</button>
+                        </div>
+                        <dl className="space-y-2 text-xs">
+                          <div>
+                            <dt className="text-on-surface-variant uppercase text-[10px]">CAC & Entity</dt>
+                            <dd className="font-semibold text-on-surface">{form.cacNumber || 'N/A'} ({form.legalEntityType})</dd>
+                          </div>
+                          <div>
+                            <dt className="text-on-surface-variant uppercase text-[10px]">Location</dt>
+                            <dd className="font-semibold text-on-surface">{form.businessAddress?.street}, {form.businessAddress?.city}</dd>
+                          </div>
+                        </dl>
+                      </div>
+                    </div>
+
+                    {/* Verification Letter Box */}
+                    {letter ? (
+                      <section className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm">
+                        <h3 className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3">Verification Consent Letter</h3>
+                        <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low p-4 text-xs leading-relaxed text-on-surface max-h-40 overflow-y-auto">
+                          <p className="font-bold text-xs mb-1.5">{letter.title}</p>
+                          <p className="whitespace-pre-line text-on-surface-variant">{letter.body}</p>
+                        </div>
+
+                        {form.letterKey ? (
+                          <div className="mt-3.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900">
+                            <p className="font-bold">✅ Verification letter digitally signed</p>
+                            <p className="mt-0.5 text-[11px] text-emerald-800">
+                              {lastSignedAt
+                                ? `Signed on ${new Date(lastSignedAt).toLocaleString()}`
+                                : 'Signature captured for submission attempt.'}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="mt-3.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                            Sign the letter below to confirm legal declaration before final submission.
+                          </div>
+                        )}
+
+                        <div className="mt-4 flex flex-wrap gap-3">
+                          <Button
+                            onClick={() => void handleSignLetter()}
+                            loading={signing}
+                            size="sm"
+                            className="shadow-sm"
+                          >
+                            {form.letterKey ? 'Re-sign verification letter' : 'Sign verification letter'}
+                          </Button>
+                        </div>
+                      </section>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Sticky Bottom Action Bar Inside Right Scroll Container */}
+              <div className="sticky bottom-0 bg-surface-container-lowest/95 backdrop-blur-md pt-4 pb-2 mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/20 z-20">
                 <button
                   type="button"
                   onClick={() => navigate('/studio/verification', { state: { from: originPath } })}
@@ -1181,31 +1152,41 @@ export default function VerificationWizardPage() {
                 </button>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <Button
-                    variant="secondary"
+                  <button
+                    type="button"
                     onClick={() => void saveDraft(stepIndex + 1, { redirectToCatalog: true })}
-                    loading={savingDraft}
+                    disabled={savingDraft}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-primary hover:bg-primary/5 transition-all border border-primary/30 flex items-center gap-1.5 disabled:opacity-50"
                   >
-                    Save draft
-                  </Button>
+                    {savingDraft ? (
+                      <>
+                        <VLoader size={12} phase="loading" showLabel={false} />
+                        Saving draft...
+                      </>
+                    ) : (
+                      'Save draft'
+                    )}
+                  </button>
 
                   {stepIndex > 0 ? (
                     <Button
                       variant="ghost"
                       onClick={() => setStepIndex((current) => current - 1)}
+                      size="sm"
                     >
                       Back
                     </Button>
                   ) : null}
 
                   {stepIndex < VERIFICATION_STEPS.length - 1 ? (
-                    <Button onClick={() => void goToStep(stepIndex + 1)}>
+                    <Button onClick={() => void goToStep(stepIndex + 1)} size="sm">
                       Continue
                     </Button>
                   ) : (
                     <Button
                       onClick={() => setShowSubmitPreview(true)}
                       className="shadow-md"
+                      size="sm"
                     >
                       {status?.verificationStatus === 'ADDITIONAL_INFO_REQUESTED'
                         ? 'Preview requested updates'
