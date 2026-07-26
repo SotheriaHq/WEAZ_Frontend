@@ -11,7 +11,9 @@ import DesignCard from '@/components/designs/DesignCard';
 import DesignSkeleton from '@/components/designs/DesignSkeleton';
 import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreProductCard';
 import DesignViewModal from '@/components/designs/DesignViewModal';
+import { RunwayReelsFeed } from '@/components/runway/RunwayReelsFeed';
 import { setEngagementState } from '@/features/engagementSlice';
+import { selectIsMobile } from '@/features/uiSlice';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
@@ -30,10 +32,26 @@ import { toDesignMarketItem } from '@/utils/designMarketItem';
 import { shouldLoadProductFallback, type MarketPageMode } from '@/utils/marketFallback';
 import { useScrollRestore } from '@/components/ScrollRestoreProvider';
 import { useMarketSurfacePrefetch } from '@/hooks/useMarketSurfacePrefetch';
-import useMarketFeed from '@/hooks/useMarketFeed';
+import useRunwayFeed from '@/hooks/useRunwayFeed';
 import useRunwayPinnedFeed from '@/hooks/useRunwayPinnedFeed';
 import { createMixSeed, mixFeedItems } from '@/utils/feedMixer';
 import { queryKeys } from '@/query/queryKeys';
+
+/**
+ * Runway page — Design feed UI.
+ * Domain: Design (backend). Label: Runway (frontend aesthetics).
+ * Not the commerce Market surface (`MarketPlace` / `/market`).
+ */
+
+/** Phones / narrow mobile browsers: reels. md+ (tablet/iPad/desktop): masonry. */
+const MASONRY_BREAKPOINT_COLS = {
+  default: 3,
+  1920: 4,
+  1536: 3,
+  1280: 3,
+  1024: 2,
+  768: 2,
+};
 
 // Error type detection
 type ErrorType = 'network' | 'timeout' | 'server' | 'empty' | 'category_empty' | 'unknown';
@@ -266,11 +284,11 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
   );
 };
 
-interface MarketProps {
+interface RunwayProps {
   mode?: MarketPageMode;
 }
 
-const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
+const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useDispatch();
@@ -279,6 +297,8 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   const [viewItem, setViewItem] = useState<MarketItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  /** Phone + responsive mobile: reels. Wider tablets/iPad keep masonry. */
+  const isMobileReels = useSelector(selectIsMobile);
   const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const {
@@ -296,16 +316,41 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   const savedBatchInFlightRef = useRef<string | null>(null);
   const savedBatchLastRunRef = useRef<Record<string, number>>({});
   const [isPending, startTransition] = useTransition();
+  // Extra pages for reels infinite scroll (first page still comes from useRunwayFeed).
+  const [reelsExtraItems, setReelsExtraItems] = useState<MarketItem[]>([]);
+  const [reelsNextCursor, setReelsNextCursor] = useState<string | null>(null);
+  const [reelsHasMore, setReelsHasMore] = useState(false);
+  const [reelsFetchingMore, setReelsFetchingMore] = useState(false);
+  const reelsFetchInFlightRef = useRef(false);
   
   // Scroll restoration hook
-  const { saveScrollPosition } = useScrollRestore('MARKET_FEED');
+  const { saveScrollPosition } = useScrollRestore('RUNWAY_FEED');
 
-  // Warm the Market surface cache while this screen idles so Runway → Market
+  // Warm the commerce Market surface cache while Runway idles so Runway → Market
   // switches paint instantly instead of cold-loading.
   useMarketSurfacePrefetch('runway');
 
+  // Phone reels use a fixed-position snap stage; lock document scroll so the
+  // page behind the stage never rubber-bands or steals vertical gestures.
+  useEffect(() => {
+    if (!isMobileReels) return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyOverscroll = body.style.overscrollBehaviorY;
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehaviorY = 'none';
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.overscrollBehaviorY = prevBodyOverscroll;
+    };
+  }, [isMobileReels]);
+
   const feedCategoriesQuery = useQuery({
-    queryKey: queryKeys.market.feedCategories(),
+    queryKey: queryKeys.runway.feedCategories(),
     queryFn: ({ signal }) => marketApi.getFeedCategories({ signal }),
   });
   const feedCategories = useMemo(() => {
@@ -336,8 +381,8 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     }
   }, [defaultFeedCategory, feedCategories, selectedCategory]);
 
-  // Fetch market feed using React Query with caching
-  const feedQuery = useMarketFeed({
+  // Design feed (Runway UI) via React Query
+  const feedQuery = useRunwayFeed({
       tag: activeFeedTag ?? undefined,
       counts: 'combined',
   });
@@ -527,20 +572,42 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     [feedData?.items],
   );
 
-  const mediaTargetIds = useMemo(
-    () => items.map((item) => item.id).filter(Boolean),
-    [items],
-  );
+  // Reset reels pagination when the primary feed page or category changes.
+  useEffect(() => {
+    setReelsExtraItems([]);
+    setReelsNextCursor(feedData?.nextCursor ?? null);
+    setReelsHasMore(Boolean(feedData?.hasNextPage));
+    reelsFetchInFlightRef.current = false;
+  }, [feedData?.items, feedData?.nextCursor, feedData?.hasNextPage, activeFeedTag]);
+
+  const mediaTargetIds = useMemo(() => {
+    const base = items.map((item) => item.id).filter(Boolean);
+    if (reelsExtraItems.length === 0) return base;
+    const seen = new Set(base);
+    const merged = [...base];
+    for (const entry of reelsExtraItems) {
+      if (!entry.id || seen.has(entry.id)) continue;
+      seen.add(entry.id);
+      merged.push(entry.id);
+    }
+    return merged;
+  }, [items, reelsExtraItems]);
 
   const mediaTargetIdsKey = useMemo(
     () => mediaTargetIds.join('|'),
     [mediaTargetIds],
   );
 
-  const patchBrandTargetIds = useMemo(
-    () => Array.from(new Set(items.map((item) => item.brandId).filter(Boolean))) as string[],
-    [items],
-  );
+  const patchBrandTargetIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const item of items) {
+      if (item.brandId) ids.add(item.brandId);
+    }
+    for (const item of reelsExtraItems) {
+      if (item.brandId) ids.add(item.brandId);
+    }
+    return Array.from(ids);
+  }, [items, reelsExtraItems]);
 
   // Load saved status for items
   useEffect(() => {
@@ -627,19 +694,75 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     return result;
   }, [items, selectedTag, activeFeedTag]);
 
+  /** First page + reels cursor pages (deduped). Masonry only uses filteredItems. */
+  const runwayReelsItems = useMemo(() => {
+    if (reelsExtraItems.length === 0) return filteredItems;
+    const seen = new Set(filteredItems.map((entry) => entry.id));
+    const merged = [...filteredItems];
+    for (const entry of reelsExtraItems) {
+      if (seen.has(entry.id)) continue;
+      seen.add(entry.id);
+      merged.push(entry);
+    }
+    return merged;
+  }, [filteredItems, reelsExtraItems]);
+
+  const handleReelsLoadMore = useCallback(async () => {
+    if (!isMobileReels || !reelsHasMore || !reelsNextCursor || reelsFetchInFlightRef.current) {
+      return;
+    }
+    reelsFetchInFlightRef.current = true;
+    setReelsFetchingMore(true);
+    try {
+      const page = await marketApi.getRunwayFeed({
+        tag: activeFeedTag ?? undefined,
+        counts: 'combined',
+        cursor: reelsNextCursor,
+        limit: 12,
+      });
+      const mixed = mixFeedItems(
+        page.items ?? [],
+        `${runwayMixSeedRef.current}:cursor:${reelsNextCursor}`,
+      );
+      setReelsExtraItems((prev) => {
+        const seen = new Set(prev.map((entry) => entry.id));
+        const next = [...prev];
+        for (const entry of mixed) {
+          if (seen.has(entry.id)) continue;
+          seen.add(entry.id);
+          next.push(entry);
+        }
+        return next;
+      });
+      setReelsNextCursor(page.nextCursor ?? null);
+      setReelsHasMore(Boolean(page.hasNextPage && page.nextCursor));
+    } catch {
+      // Silent — user can keep scrolling existing reels; next arm will retry.
+    } finally {
+      reelsFetchInFlightRef.current = false;
+      setReelsFetchingMore(false);
+    }
+  }, [
+    activeFeedTag,
+    isMobileReels,
+    reelsExtraItems.length,
+    reelsHasMore,
+    reelsNextCursor,
+  ]);
+
   const handleViewCollection = (designId: string) => {
-    saveScrollPosition('MARKET_FEED', window.scrollY);
+    saveScrollPosition('RUNWAY_FEED', window.scrollY);
     navigate(buildDesignRoute({ designId, legacyCollectionId: designId }));
   };
 
   const handleViewProduct = (product: StoreProduct) => {
-    saveScrollPosition('MARKET_FEED', window.scrollY);
+    saveScrollPosition('RUNWAY_FEED', window.scrollY);
     navigate(buildProductRoute({ productId: product.id }));
   };
 
   const handleViewBrand = (brandId: string, item: MarketItem) => {
     if (!brandId && !item.username) return;
-    saveScrollPosition('MARKET_FEED', window.scrollY);
+    saveScrollPosition('RUNWAY_FEED', window.scrollY);
     const path =
       buildBrandProfilePathFromMarketItem(item) ||
       (brandId ? `/profile/${encodeURIComponent(brandId)}` : null);
@@ -710,10 +833,125 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     }
   };
 
+  const categoryChips = (
+    <div className="flex items-center gap-2 border-b border-[color:var(--border-default)]/70 pb-1 text-sm min-w-max justify-start md:justify-center md:mx-auto">
+      {feedCategories.map((cat) => {
+        const active = selectedCategory === cat.key;
+        return (
+          <button
+            type="button"
+            key={cat.key}
+            onClick={() => startTransition(() => setSelectedCategory(cat.key))}
+            aria-pressed={active}
+            className={`relative shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              active
+                ? 'bg-[color:var(--brand-primary)]/10 text-[color:var(--brand-primary)]'
+                : 'text-theme-secondary hover:bg-[color:var(--surface-muted)] hover:text-theme'
+            }${isPending ? ' opacity-60' : ''}`}
+          >
+            {cat.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const reelsCategoryHeader = (
+    <div className="bg-gradient-to-b from-black/70 via-black/35 to-transparent px-2 pb-3 pt-2">
+      <div className="overflow-x-auto no-scrollbar">
+        <div className="flex min-w-max items-center gap-2">
+          {feedCategories.map((cat) => {
+            const active = selectedCategory === cat.key;
+            return (
+              <button
+                type="button"
+                key={cat.key}
+                onClick={() => startTransition(() => setSelectedCategory(cat.key))}
+                aria-pressed={active}
+                className={`relative shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold backdrop-blur-md transition-colors ${
+                  active
+                    ? 'bg-white/90 text-black'
+                    : 'bg-white/15 text-white hover:bg-white/25'
+                }${isPending ? ' opacity-60' : ''}`}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+
   if (isPinnedMode) {
     const pinnedLoading = pinnedFeed.isLoading && pinnedItems.length === 0;
     const hasMore = Boolean(pinnedFeed.data?.hasMore);
     const exhausted = !pinnedLoading && !hasMore;
+
+    if (isMobileReels) {
+      return (
+        <div className="relative">
+          {/* Fixed stage: phone viewport between top nav and island bottom nav. */}
+          <div
+            className="fixed inset-x-0 top-16 z-10 bg-black"
+            style={{
+              bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.75rem)',
+            }}
+          >
+            <RunwayReelsFeed
+              items={pinnedItems}
+              isLoading={pinnedLoading}
+              hasNextPage={hasMore}
+              isFetchingMore={pinnedFeed.isFetching && pinnedItems.length > 0}
+              onLoadMore={() => {
+                if (pinnedFeed.data?.nextCursor) {
+                  setPinnedCursor(pinnedFeed.data.nextCursor);
+                }
+              }}
+              onOpenView={(it) => setViewItem(it)}
+              onViewBrand={handleViewBrand}
+              isSaved={(id) => savedMap[id] ?? false}
+              saveBusy={(id) => savingIds.has(id)}
+              onToggleSave={handleToggleSave}
+              isPatched={(brandId) => getPatched(brandId)}
+              patchBusy={(brandId) => isPatchLoading(brandId)}
+              onTogglePatch={handleTogglePatch}
+              header={
+                <div className="flex items-center justify-between gap-2 bg-gradient-to-b from-black/75 to-transparent px-3 pb-2 pt-2">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70">
+                      Pinned search
+                    </p>
+                    <p className="text-sm font-bold text-white">“{pinnedQuery}”</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={exitPinnedToDefaultFeed}
+                    className="shrink-0 rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-semibold text-black"
+                  >
+                    Exit pin
+                  </button>
+                </div>
+              }
+            />
+          </div>
+          {exhausted && pinnedItems.length > 0 ? (
+            <div className="sr-only">End of pinned matches for {pinnedQuery}</div>
+          ) : null}
+          <DesignViewModal
+            open={Boolean(viewItem)}
+            item={viewItem}
+            onClose={closeViewModal}
+            onCommentCountChange={(newCount) => {
+              if (viewItem) {
+                handleCommentCountChange(viewItem.id, newCount);
+              }
+            }}
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 px-4">
         <div className="sticky top-16 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border-default)]/70 bg-[color:var(--surface-muted)]/60 px-4 py-3 backdrop-blur">
@@ -735,7 +973,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
         <div className="relative min-h-[240px]">
           {pinnedLoading ? (
             <Masonry
-              breakpointCols={{ default: 3, 1920: 4, 1536: 3, 1280: 3, 1024: 2, 768: 2, 640: 2 }}
+              breakpointCols={MASONRY_BREAKPOINT_COLS}
               className="flex -ml-6 w-auto"
               columnClassName="pl-6 space-y-6 bg-clip-padding"
             >
@@ -745,7 +983,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
             </Masonry>
           ) : pinnedItems.length > 0 ? (
             <Masonry
-              breakpointCols={{ default: 3, 1920: 4, 1536: 3, 1280: 3, 1024: 2, 768: 2, 640: 2 }}
+              breakpointCols={MASONRY_BREAKPOINT_COLS}
               className="flex -ml-6 w-auto"
               columnClassName="pl-6 space-y-6 bg-clip-padding"
             >
@@ -825,29 +1063,123 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Mobile reels (phone browsers + responsive mobile widths < 768)
+  // ---------------------------------------------------------------------------
+  if (isMobileReels) {
+    const showError = Boolean(error) && !feedData;
+    const showEmpty =
+      !isLoading &&
+      !error &&
+      runwayReelsItems.length === 0 &&
+      !(
+        shouldLoadProductFallback({
+          mode,
+          selectedCategory,
+          designItemCount: filteredItems.length,
+        }) && fallbackProducts.length > 0
+      );
+
+    return (
+      <div className="relative">
+        <div
+          className="fixed inset-x-0 top-16 z-10 bg-black"
+          style={{
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.75rem)',
+          }}
+        >
+          {showError ? (
+            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 py-4">
+              {reelsCategoryHeader}
+              <StateDisplay type={detectErrorType(error)} onRetry={() => void refetch()} />
+            </div>
+          ) : showEmpty ? (
+            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 py-4">
+              {reelsCategoryHeader}
+              {!activeFeedTag ? (
+                <StateDisplay type="empty" onRetry={() => void loadFeed()} />
+              ) : (
+                <StateDisplay
+                  type="category_empty"
+                  category={activeCategoryLabel}
+                  onRetry={() => void loadFeed()}
+                  onViewAll={() => {
+                    setSelectedCategory(defaultFeedCategory);
+                    setSelectedTag(null);
+                  }}
+                />
+              )}
+            </div>
+          ) : runwayReelsItems.length === 0 &&
+            shouldLoadProductFallback({
+              mode,
+              selectedCategory,
+              designItemCount: filteredItems.length,
+            }) &&
+            fallbackProducts.length > 0 ? (
+            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 py-4">
+              {reelsCategoryHeader}
+              <section className="mt-4 space-y-4" data-entity-type="PRODUCT" data-card-branch="product">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-theme-secondary">
+                    Ready-to-wear
+                  </p>
+                  <h2 className="text-xl font-bold text-theme">Fresh products in market</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {fallbackProducts.map((product) => (
+                    <StoreProductCard
+                      key={product.id}
+                      product={product}
+                      onViewProduct={handleViewProduct}
+                      enableHoverGallery
+                    />
+                  ))}
+                </div>
+              </section>
+            </div>
+          ) : (
+            <RunwayReelsFeed
+              items={runwayReelsItems}
+              isLoading={isLoading && !feedData}
+              hasNextPage={reelsHasMore}
+              isFetchingMore={reelsFetchingMore}
+              onLoadMore={() => {
+                void handleReelsLoadMore();
+              }}
+              onOpenView={(it) => setViewItem(it)}
+              onViewBrand={handleViewBrand}
+              isSaved={(id) => savedMap[id] ?? false}
+              saveBusy={(id) => savingIds.has(id)}
+              onToggleSave={handleToggleSave}
+              isPatched={(brandId) => getPatched(brandId)}
+              patchBusy={(brandId) => isPatchLoading(brandId)}
+              onTogglePatch={handleTogglePatch}
+              header={reelsCategoryHeader}
+            />
+          )}
+        </div>
+        <DesignViewModal
+          open={Boolean(viewItem)}
+          item={viewItem}
+          onClose={closeViewModal}
+          onCommentCountChange={(newCount) => {
+            if (viewItem) {
+              handleCommentCountChange(viewItem.id, newCount);
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tablet / desktop masonry
+  // ---------------------------------------------------------------------------
   return (
     <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 px-4">
       <div className="sticky top-16 z-20 mb-1 overflow-x-auto no-scrollbar px-2 py-1">
-        <div className="flex items-center gap-2 border-b border-[color:var(--border-default)]/70 pb-1 text-sm min-w-max justify-start md:justify-center md:mx-auto">
-        {feedCategories.map((cat) => {
-          const active = selectedCategory === cat.key;
-          return (
-            <button
-              type="button"
-              key={cat.key}
-              onClick={() => startTransition(() => setSelectedCategory(cat.key))}
-              aria-pressed={active}
-              className={`relative shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                active
-                  ? 'bg-[color:var(--brand-primary)]/10 text-[color:var(--brand-primary)]'
-                  : 'text-theme-secondary hover:bg-[color:var(--surface-muted)] hover:text-theme'
-              }${isPending ? ' opacity-60' : ''}`}
-            >
-              {cat.label}
-            </button>
-          );
-        })}
-        </div>
+        {categoryChips}
       </div>
 
       {/* Content — never dim or spinner-overlay already-painted cached data. */}
@@ -855,15 +1187,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
       <div>
       {isLoading && !feedData ? (
         <Masonry
-          breakpointCols={{
-            default: 3,
-            1920: 4,
-            1536: 3,
-            1280: 3,
-            1024: 2,
-            768: 2,
-            640: 2,
-          }}
+          breakpointCols={MASONRY_BREAKPOINT_COLS}
           className="flex -ml-6 w-auto"
           columnClassName="pl-6 space-y-6 bg-clip-padding"
         >
@@ -879,15 +1203,7 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
         />
       ) : filteredItems.length > 0 ? (
         <Masonry
-          breakpointCols={{
-            default: 3,
-            1920: 4,
-            1536: 3,
-            1280: 3,
-            1024: 2,
-            768: 2,
-            640: 2,
-          }}
+          breakpointCols={MASONRY_BREAKPOINT_COLS}
           className="flex -ml-6 w-auto"
           columnClassName="pl-6 space-y-6 bg-clip-padding"
         >
@@ -968,13 +1284,16 @@ const Market: React.FC<MarketProps> = ({ mode = 'designs' }) => {
   );
 };
 
-export default Market;
+export default Runway;
 
 // Modal outside of main layout tree for z-index safety
 // Render within page to keep simple routing for now
-export const MarketPageWithView: React.FC = () => {
-  return <Market mode="designs" />;
+export const RunwayPageWithView: React.FC = () => {
+  return <Runway mode="designs" />;
 };
+
+/** @deprecated Use RunwayPageWithView — Runway is the design feed, not commerce Market. */
+export const MarketPageWithView = RunwayPageWithView;
 
 
 

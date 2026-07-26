@@ -10,12 +10,12 @@ describe('normalizeMarketProduct', () => {
       name: 'Ready-to-Wear Ankara Gown',
       price: 65000,
       totalStock: 8,
-      brand: { id: 'brand-1', name: 'Threadly Atelier', currency: 'NGN' },
-      images: ['https://threadly.local/uploads/seed/design/domain-sample-1.jpg'],
+      brand: { id: 'brand-1', name: 'WIEZ Atelier', currency: 'NGN' },
+      images: ['https://wiez.local/uploads/seed/design/domain-sample-1.jpg'],
       media: [{
         id: 'media-1',
         fileUploadId: 'file-1',
-        url: 'https://threadly.local/uploads/seed/design/domain-sample-1.jpg',
+        url: 'https://wiez.local/uploads/seed/design/domain-sample-1.jpg',
         type: 'image',
         isPrimary: true,
         width: 900,
@@ -27,7 +27,7 @@ describe('normalizeMarketProduct', () => {
     expect(product?.entityType).toBe('PRODUCT');
     expect(product?.id).toBe('product-1');
     expect(product?.name).toBe('Ready-to-Wear Ankara Gown');
-    expect(product?.brand.name).toBe('Threadly Atelier');
+    expect(product?.brand.name).toBe('WIEZ Atelier');
     expect(product?.media?.[0]?.fileUploadId).toBe('file-1');
     expect(product?.media?.[0]?.aspectRatio).toBe(0.75);
     expect(product?.sizeAvailability).toEqual([

@@ -4,17 +4,14 @@ import { queryKeys } from '@/query/queryKeys';
 import type { MarketFeedResponse } from '@/types/market';
 
 /**
- * Hook to fetch and cache design feed (market feed).
- * Uses stale-while-revalidate pattern with TanStack Query.
- * 
- * Features:
- * - 3-minute cache before refetch (staleTime)
- * - 30-minute in-memory cache retention (gcTime)
- * - localStorage persistence
- * - No refetch on mount if cached
- * - Silent background refetch when stale
+ * Design feed for the Runway UI surface.
+ *
+ * Domain: Design (backend). Presentation label: Runway (frontend aesthetics).
+ * Not the commerce Market surface (`MarketPlace` / `/market`).
+ *
+ * Uses stale-while-revalidate (TanStack Query): 3m stale / 30m gc defaults.
  */
-export const useMarketFeed = (
+export const useRunwayFeed = (
   params?: GetMarketFeedParams,
   options?: {
     enabled?: boolean;
@@ -22,9 +19,11 @@ export const useMarketFeed = (
   },
 ) => {
   return useQuery({
-    queryKey: queryKeys.market.feed(params),
+    // Cache key stays under queryKeys.runway; transport may still hit
+    // GET /collections/market until the backend renames the design feed path.
+    queryKey: queryKeys.runway.feed(params),
     queryFn: async ({ signal }) => {
-      return await marketApi.getFeed(params, { signal });
+      return await marketApi.getRunwayFeed(params, { signal });
     },
     enabled: options?.enabled !== false,
     initialData: options?.initialData,
@@ -32,10 +31,7 @@ export const useMarketFeed = (
     // painted while the new tag loads so the skeleton never replaces
     // already-visible content mid-session.
     placeholderData: keepPreviousData,
-    // Use default staleTime/gcTime from queryClient
-    // staleTime: 3 minutes
-    // gcTime: 30 minutes
   });
 };
 
-export default useMarketFeed;
+export default useRunwayFeed;

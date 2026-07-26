@@ -272,7 +272,7 @@ const CheckoutPanel: React.FC<{
   description: string;
   children: React.ReactNode;
 }> = ({ kicker, title, description, children }) => (
-  <section className="threadly-chrome-surface relative overflow-hidden rounded-[32px] p-6 sm:p-8">
+  <section className="wiez-chrome-surface relative overflow-hidden rounded-[32px] p-6 sm:p-8">
     <div className="space-y-6">
       <div className="space-y-3">
         <div className="text-[11px] font-black uppercase tracking-[0.28em] text-fuchsia-500 dark:text-fuchsia-300">
@@ -1247,8 +1247,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   /* ─── Step Indicator ─── */
   const stepIdx = STEPS.indexOf(step);
   const shellClassName = embedded
-    ? 'threadly-shell-bg min-h-full'
-    : 'threadly-shell-bg min-h-screen';
+    ? 'wiez-shell-bg min-h-full'
+    : 'wiez-shell-bg min-h-screen';
   const contentClassName = embedded
     ? 'relative mx-auto max-w-7xl px-4 py-6 sm:px-5 lg:px-8 lg:py-8'
     : 'relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12';
@@ -1280,7 +1280,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       </div>
 
       {/* Step indicator */}
-      <nav className="threadly-chrome-surface mb-8 flex items-center justify-center gap-2 rounded-full px-3 py-3" aria-label="Checkout steps">
+      <nav className="wiez-chrome-surface mb-8 flex items-center justify-center gap-2 rounded-full px-3 py-3" aria-label="Checkout steps">
         {STEPS.map((s, i) => {
           const isActive = s === step;
           const isCompleted = i < stepIdx;
@@ -1836,7 +1836,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
         {/* ─── Order Summary Sidebar ─── */}
         <div className="lg:sticky lg:top-24 self-start">
-          <div className="threadly-summary-surface overflow-hidden rounded-[32px] p-6">
+          <div className="wiez-summary-surface overflow-hidden rounded-[32px] p-6">
             <div className="space-y-6">
               <div className="space-y-1">
                 <p className="text-[11px] font-black uppercase tracking-[0.28em] text-fuchsia-500 dark:text-fuchsia-300/80">Checkout</p>
@@ -1952,7 +1952,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 </div>
               </div>
 
-              <div className="threadly-chrome-surface rounded-[22px] px-4 py-4 text-sm text-slate-700 dark:text-slate-300">
+              <div className="wiez-chrome-surface rounded-[22px] px-4 py-4 text-sm text-slate-700 dark:text-slate-300">
                 <div className="flex gap-3">
                   <span className="mt-0.5 text-base text-fuchsia-500 dark:text-fuchsia-300">◉</span>
                   <p>

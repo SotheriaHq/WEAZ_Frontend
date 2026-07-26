@@ -10,8 +10,8 @@ import {
 const THEME_TRANSITION_DURATION_MS = 300;
 const LIGHT_THEME_COLOR = '#ffffff';
 const DARK_THEME_COLOR = '#0a0a0a';
-const EMBEDDED_SURFACE_SESSION_KEY = 'threadly.studio.embeddedSurface';
-const EMBEDDED_THEME_SESSION_KEY = 'threadly.studio.embeddedTheme';
+const EMBEDDED_SURFACE_SESSION_KEY = 'wiez.studio.embeddedSurface';
+const EMBEDDED_THEME_SESSION_KEY = 'wiez.studio.embeddedTheme';
 
 const getEmbeddedTheme = (): ResolvedTheme | null => {
   if (typeof window === 'undefined') return null;

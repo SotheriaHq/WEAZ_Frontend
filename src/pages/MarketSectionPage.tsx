@@ -304,7 +304,7 @@ const MarketSectionPage: React.FC = () => {
               type="button"
               onClick={() => {
                 saveScrollPosition(scrollRestoreKey, window.scrollY);
-                navigate('/market-place');
+                navigate('/market');
               }}
               className="mb-3 rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/10"
             >

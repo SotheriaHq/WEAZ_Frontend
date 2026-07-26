@@ -153,7 +153,7 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
           </p>
           <button
             type="button"
-            onClick={() => navigate('/market')}
+            onClick={() => navigate('/runway')}
             className="mt-6 inline-flex items-center gap-2 rounded-full border border-gray-200/80 bg-white/70 px-6 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
           >
             Explore Trends

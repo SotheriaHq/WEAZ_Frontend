@@ -1,6 +1,6 @@
 /**
  * Client-side paths that must never be indexable in the SPA shell.
- * Keep aligned with `bthreadly/src/seo/seo.config.ts` SEO_DISALLOWED_PATH_PREFIXES.
+ * Keep aligned with `bwiez/src/seo/seo.config.ts` SEO_DISALLOWED_PATH_PREFIXES.
  */
 const PRIVATE_PATH_PREFIXES = [
   '/studio',

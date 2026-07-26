@@ -387,7 +387,7 @@ const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search products..."
-                className="threadly-search-input pl-11"
+                className="wiez-search-input pl-11"
               />
             </div>
 

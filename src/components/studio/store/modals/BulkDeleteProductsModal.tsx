@@ -236,7 +236,7 @@ const BulkDeleteProductsModal: React.FC<BulkDeleteProductsModalProps> = ({
                   {!isPermanentDeleteMode && (
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { emoji: '🛒', label: 'In Carts', value: impactSummary.inCarts },
+                      { emoji: '🛒', label: 'In Bags', value: impactSummary.inCarts },
                       { emoji: '❤️', label: 'Wishlisted', value: impactSummary.inWishlists },
                       { emoji: '👁️', label: 'Total Views', value: impactSummary.totalViews },
                       { emoji: '🧵', label: 'Threads', value: impactSummary.totalThreads },

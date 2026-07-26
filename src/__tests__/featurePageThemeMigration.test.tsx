@@ -3,7 +3,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import Market from '@/pages/Market';
+import Runway from '@/pages/Runway';
 import CreateDesignPage from '@/pages/catalog/CreateDesign';
 import EditProduct from '@/pages/studio/products/EditProduct';
 import StoreCollectionCreate from '@/pages/studio/store/StoreCollectionCreate';
@@ -172,13 +172,13 @@ const createStore = () =>
     },
   });
 
-const renderMarket = (preference: 'light' | 'dark') => {
+const renderRunway = (preference: 'light' | 'dark') => {
   localStorage.setItem('vite-ui-theme', preference);
   render(
     <Provider store={createStore()}>
       <MemoryRouter>
         <ThemeProvider>
-          <Market />
+          <Runway />
         </ThemeProvider>
       </MemoryRouter>
     </Provider>,
@@ -207,7 +207,7 @@ describe('feature page theme token migration', () => {
   });
 
   it('renders the market feed under ThemeProvider in light mode', async () => {
-    renderMarket('light');
+    renderRunway('light');
 
     expect(await screen.findByTestId('featured-section')).toBeInTheDocument();
     await waitFor(() => expect(getFeedMock).toHaveBeenCalled());
@@ -215,7 +215,7 @@ describe('feature page theme token migration', () => {
   });
 
   it('renders the market feed under ThemeProvider in dark mode', async () => {
-    renderMarket('dark');
+    renderRunway('dark');
 
     expect(await screen.findByTestId('featured-section')).toBeInTheDocument();
     await waitFor(() => expect(getFeedMock).toHaveBeenCalled());

@@ -15,8 +15,8 @@ export interface BrandedQRCodeProps {
 }
 
 /** WIEZ brand gradient — purple to indigo */
-const THREADLY_FG_COLOR = '#6d28d9'; // purple-700
-const THREADLY_EYE_COLOR = '#4f46e5'; // indigo-600
+const WIEZ_FG_COLOR = '#6d28d9'; // purple-700
+const WIEZ_EYE_COLOR = '#4f46e5'; // indigo-600
 
 export const BrandedQRCode = forwardRef<HTMLDivElement, BrandedQRCodeProps>(
   (
@@ -51,7 +51,7 @@ export const BrandedQRCode = forwardRef<HTMLDivElement, BrandedQRCodeProps>(
     }, [logo, onLogoMessage]);
 
     const darkMode = theme === 'dark';
-    const fgColor = darkMode ? '#c4b5fd' : THREADLY_FG_COLOR; // purple-300 in dark, purple-700 in light
+    const fgColor = darkMode ? '#c4b5fd' : WIEZ_FG_COLOR; // purple-300 in dark, purple-700 in light
     const bgColor = darkMode ? '#18181b' : '#ffffff'; // zinc-900 in dark
 
     return (
@@ -69,7 +69,7 @@ export const BrandedQRCode = forwardRef<HTMLDivElement, BrandedQRCodeProps>(
           qrStyle="dots"
           bgColor={bgColor}
           fgColor={fgColor}
-          eyeColor={darkMode ? '#a78bfa' : THREADLY_EYE_COLOR}
+          eyeColor={darkMode ? '#a78bfa' : WIEZ_EYE_COLOR}
           logoImage={logoUrl || undefined}
           logoWidth={logoUrl ? exportSize * 0.18 : undefined}
           logoHeight={logoUrl ? exportSize * 0.18 : undefined}

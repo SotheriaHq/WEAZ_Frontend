@@ -226,7 +226,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({ isOpen, onClose
             </label>
             <input
               type="text"
-              className="threadly-search-input"
+              className="wiez-search-input"
               placeholder="Search by username or email"
               disabled={isSubmitting}
             />

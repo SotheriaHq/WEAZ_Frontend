@@ -32,7 +32,7 @@ import { COMPANY_NAME } from '@/lib/brand';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { PASSWORD_POLICY_MIN_LENGTH, getPasswordPolicyErrorMessage } from '@/lib/passwordPolicy';
 
-const CONFETTI_STORAGE_KEY = 'threadly-signup-confetti';
+const CONFETTI_STORAGE_KEY = 'wiez-signup-confetti';
 
 const hasCelebratedSignup = (userId: string | undefined | null): boolean => {
   if (!userId || typeof window === 'undefined') return true;
@@ -214,7 +214,7 @@ const SignUpPage = () => {
         : '/profile';
 
     if (hasBrandAccess) {
-      localStorage.removeItem('threadly.brandProfileSetup.dismissedUntil');
+      localStorage.removeItem('wiez.brandProfileSetup.dismissedUntil');
     }
 
     navigate(nextRoute, { replace: true });

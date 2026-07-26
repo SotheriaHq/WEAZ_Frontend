@@ -65,7 +65,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const mainMarginLeft = !isEmbeddedMobile && computedSidebarMode === 'RAIL' ? '72px' : '0px';
 
   return (
-    <div className="min-h-screen threadly-shell-bg text-gray-900 dark:text-white">
+    <div className="min-h-screen wiez-shell-bg text-gray-900 dark:text-white">
         
       {/* Navbar */}
       {!isEmbeddedMobile ? <Navbar /> : null}

@@ -143,7 +143,7 @@ export function useNotificationsBootstrap() {
       if (CONTENT_REVIEW_NOTIFICATION_TYPES.has(type)) {
         refreshOwnerCatalogQueries(queryClient, userId);
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('threadly:content-review-updated'));
+          window.dispatchEvent(new CustomEvent('wiez:content-review-updated'));
         }
       }
       const isMessageSignal = type.includes('MESSAGE');

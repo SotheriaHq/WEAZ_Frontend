@@ -17,15 +17,15 @@ import { getStoreStatus } from '@/api/StoreApi';
 import { DesignApi } from '@/api/DesignApi';
 import type { CommentTarget, CommentV2Dto, PageResult } from '@/types/comments';
 import type { BrandProfileDto, CollectionDto } from '@/types/profile';
-import { THREADLY_QUERY_STALE_TIME_MS } from './queryClient';
+import { WIEZ_QUERY_STALE_TIME_MS } from './queryClient';
 import { queryKeys } from './queryKeys';
 import { isUuidV4, normalizeUuidV4List } from '@/utils/uuid';
 import type { SizingRegion } from '@/types/sizeFit';
 
 type EnabledOption = { enabled?: boolean };
 type ThreadContentType = 'COLLECTION' | 'COLLECTION_MEDIA';
-const THREADLY_COMMENT_STALE_TIME_MS = 60 * 1000;
-const THREADLY_NOTIFICATION_SETTINGS_STALE_TIME_MS = 10 * 60 * 1000;
+const WIEZ_COMMENT_STALE_TIME_MS = 60 * 1000;
+const WIEZ_NOTIFICATION_SETTINGS_STALE_TIME_MS = 10 * 60 * 1000;
 const EMPTY_COMMENT_PAGE: PageResult<CommentV2Dto> = {
   items: [],
   hasNextPage: false,
@@ -112,7 +112,7 @@ export async function fetchMyUserProfileQuery(
       const response = await apiClient.get('/users/me/profile');
       return response.data?.data ?? response.data ?? null;
     },
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -157,7 +157,7 @@ export function useBrandCollectionsQuery(args: BrandCollectionsArgs, options?: E
     queryKey: queryKeys.brand.collections(ownerId, { scope, visibility, includeDeleted, onlyDeleted }),
     queryFn: () => brandApi.getCollections(String(ownerId), { scope, visibility, includeDeleted, onlyDeleted }),
     enabled: isEnabled(ownerId, options?.enabled ?? true),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
     refetchOnWindowFocus: true,
   });
 }
@@ -170,7 +170,7 @@ export function useMyDraftCollectionsQuery(
     queryKey: queryKeys.brand.myDrafts(ownerId),
     queryFn: () => brandApi.getMyDraftCollections(),
     enabled: isEnabled(ownerId, options?.enabled ?? true),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
     refetchOnWindowFocus: true,
     refetchOnMount: 'always',
   });
@@ -185,7 +185,7 @@ export function useBrandPrivateAccessStatesQuery(
     queryKey: queryKeys.brandPrivateAccess.myStates(brandId, viewerId),
     queryFn: (): Promise<BrandPrivateAccessState[]> => brandApi.getBrandPrivateStates(String(brandId)),
     enabled: Boolean(brandId && viewerId && (options?.enabled ?? true)),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -348,7 +348,7 @@ export function useNotificationSettingsQuery(userId?: string | null, options?: E
     queryKey: queryKeys.notifications.settings(userId),
     queryFn: () => NotificationsApi.getSettings(),
     enabled: isEnabled(userId, options?.enabled ?? true),
-    staleTime: THREADLY_NOTIFICATION_SETTINGS_STALE_TIME_MS,
+    staleTime: WIEZ_NOTIFICATION_SETTINGS_STALE_TIME_MS,
   });
 }
 
@@ -365,7 +365,7 @@ export function useMediaPublicUrlQuery(fileId?: string | null, options?: Enabled
     queryKey: queryKeys.media.publicUrl(fileId),
     queryFn: () => brandApi.getPublicFileUrl(String(fileId)),
     enabled: isEnabled(fileId, options?.enabled ?? true),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -374,8 +374,8 @@ export function useMediaSignedUrlQuery(fileId?: string | null, options?: Enabled
     queryKey: queryKeys.media.signedUrl(fileId),
     queryFn: () => brandApi.getPrivateSignedFileUrl(String(fileId)),
     enabled: isEnabled(fileId, options?.enabled ?? true),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
-    gcTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
+    gcTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -396,7 +396,7 @@ export function useSavedBatchStatusQuery(
       return toSavedStatusMap(items);
     },
     enabled: normalizedTargetIds.length > 0 && (options?.enabled ?? true),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -416,7 +416,7 @@ export function useSavedStatusQuery(
       return Boolean((payload as { isSaved?: unknown }).isSaved);
     },
     enabled: isUuidV4(normalizedTargetId) && (options?.enabled ?? true),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -435,7 +435,7 @@ export function useThreadedStatusQuery(
         ? ReactionsApi.getCollectionMediaIsThreaded(String(contentId))
         : ReactionsApi.getCollectionIsThreaded(String(contentId)),
     enabled: isEnabled(contentId, options?.enabled ?? true),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -464,7 +464,7 @@ export async function fetchCommentListQuery(
         throw error;
       }
     },
-    staleTime: THREADLY_COMMENT_STALE_TIME_MS,
+    staleTime: WIEZ_COMMENT_STALE_TIME_MS,
   });
 }
 
@@ -492,7 +492,7 @@ export async function fetchUnifiedCollectionCommentsQuery(
         throw error;
       }
     },
-    staleTime: THREADLY_COMMENT_STALE_TIME_MS,
+    staleTime: WIEZ_COMMENT_STALE_TIME_MS,
   });
 }
 
@@ -520,7 +520,7 @@ export async function fetchCommentRepliesQuery(
         throw error;
       }
     },
-    staleTime: THREADLY_COMMENT_STALE_TIME_MS,
+    staleTime: WIEZ_COMMENT_STALE_TIME_MS,
   });
 }
 
@@ -558,7 +558,7 @@ export async function fetchMySizeFitProfileQuery(
   return queryClient.fetchQuery({
     queryKey: key,
     queryFn: () => SizeFitApi.getMyProfile(),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -579,7 +579,7 @@ export async function fetchMyComputedSizeFitQuery(
       SizeFitApi.getComputedProfile(
         region ? { region: region as SizingRegion } : undefined,
       ),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -596,7 +596,7 @@ export async function fetchMySizeFitSharesQuery(
   return queryClient.fetchQuery({
     queryKey: key,
     queryFn: () => SizeFitApi.getShares(),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -613,7 +613,7 @@ export async function fetchDisplayChartPreferenceQuery(
   return queryClient.fetchQuery({
     queryKey: key,
     queryFn: () => customOrdersBuyerApi.getDisplayChartPreference(),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -634,7 +634,7 @@ export async function fetchActiveCustomOrderConfigurationQuery(
       sourceType === 'PRODUCT'
         ? customOrderConfigurationsApi.getActiveForProduct(sourceId)
         : customOrderConfigurationsApi.getActiveForDesign(sourceId),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -650,7 +650,7 @@ export function useActiveCustomOrderConfigurationQuery(
         ? customOrderConfigurationsApi.getActiveForProduct(sourceId as string)
         : customOrderConfigurationsApi.getActiveForDesign(sourceId as string),
     enabled: isEnabled(sourceType, options?.enabled ?? true) && isEnabled(sourceId, options?.enabled ?? true),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 

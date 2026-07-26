@@ -191,11 +191,24 @@ export const queryKeys = {
     brand: (brandId?: string | null) => ['reviews', 'brand', normalizeId(brandId)] as const,
     mine: () => ['reviews', 'mine'] as const,
   },
-  market: {
+  /**
+   * Runway = design feed UI (backend Design domain).
+   * Keys use `runway` so they are not confused with commerce `market.*`.
+   */
+  runway: {
     feedCategories: () =>
-      ['market', 'feedCategories'] as const,
+      ['runway', 'feedCategories'] as const,
     feed: (params?: object | null) =>
-      ['market', 'feed', normalizeRecord(params)] as const,
+      ['runway', 'feed', normalizeRecord(params)] as const,
+  },
+  /** Commerce Market (products, sections, suggestions) — not Runway/design feed. */
+  market: {
+    /** @deprecated Prefer queryKeys.runway.feedCategories */
+    feedCategories: () =>
+      ['runway', 'feedCategories'] as const,
+    /** @deprecated Prefer queryKeys.runway.feed */
+    feed: (params?: object | null) =>
+      ['runway', 'feed', normalizeRecord(params)] as const,
     sections: (params?: object | null) =>
       ['market', 'sections', normalizeRecord(params)] as const,
     sectionDetail: (sectionKey?: string | null, params?: object | null) =>
@@ -228,7 +241,7 @@ export const PRIVATE_QUERY_ROOTS = new Set<string>([
   'studio',
 ]);
 
-export const isPersistableThreadlyQueryKey = (queryKey: readonly unknown[]) => {
+export const isPersistableWiezQueryKey = (queryKey: readonly unknown[]) => {
   const [root, scope] = queryKey;
   if (root === 'brand') {
     return scope === 'profile' || scope === 'collections' || scope === 'collectionDetail';

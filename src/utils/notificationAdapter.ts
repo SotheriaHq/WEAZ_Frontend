@@ -185,7 +185,7 @@ function deriveTarget(
     const url = (raw.targetUrl as string) || (payload?.targetUrl as string);
     if (url) {
         try {
-            const parsed = new URL(url, 'https://threadly.local');
+            const parsed = new URL(url, 'https://wiez.local');
             const openMediaId = parsed.searchParams.get('openMedia');
             if (openMediaId) {
                 return { type: 'COLLECTION_MEDIA', id: openMediaId };

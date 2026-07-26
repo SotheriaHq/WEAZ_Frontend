@@ -338,7 +338,7 @@ export async function finalizeCollectionUploads(
 // ===================== Cart Preview API =====================
 /**
  * Get cart preview showing available and unavailable products in a collection
- * Used before "Add Entire Collection to Cart"
+ * Used before "Add Entire Collection to Bag"
  */
 export async function getCollectionCartPreview(collectionId: string): Promise<CollectionCartPreviewResponse> {
   const resp = await apiClient.get(`/collections/${collectionId}/cart-preview`);

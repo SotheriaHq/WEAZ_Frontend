@@ -20,13 +20,13 @@ type DiagnosticControls = {
 
 declare global {
   interface Window {
-    __THREADLY_DIAGNOSTICS__?: DiagnosticControls;
+    __WIEZ_DIAGNOSTICS__?: DiagnosticControls;
   }
 }
 
-const STORAGE_KEY = 'threadly:diagnostics:v1';
-const ENABLED_KEY = 'threadly:diagnostics:enabled';
-export const CLIENT_DIAGNOSTICS_EVENT = 'threadly:diagnostics-updated';
+const STORAGE_KEY = 'wiez:diagnostics:v1';
+const ENABLED_KEY = 'wiez:diagnostics:enabled';
+export const CLIENT_DIAGNOSTICS_EVENT = 'wiez:diagnostics-updated';
 const MAX_ENTRIES = 300;
 
 const nowIso = () => new Date().toISOString();
@@ -183,7 +183,7 @@ export const initClientDiagnostics = () => {
   const params = new URLSearchParams(window.location.search);
   if (
     params.get('debug') === '1' ||
-    params.get('threadlyDebug') === '1' ||
+    params.get('wiezDebug') === '1' ||
     params.get('wiezDebug') === '1'
   ) {
     enableClientDiagnostics();
@@ -204,7 +204,7 @@ export const initClientDiagnostics = () => {
     entries: getClientDiagnostics,
     copyText: formatClientDiagnostics,
   };
-  window.__THREADLY_DIAGNOSTICS__ = controls;
+  window.__WIEZ_DIAGNOSTICS__ = controls;
 
   window.addEventListener('error', (event) => {
     addClientDiagnostic('error', 'window.error', event.message || 'Window error', {

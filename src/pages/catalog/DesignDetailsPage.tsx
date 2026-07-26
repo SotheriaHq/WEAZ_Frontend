@@ -72,7 +72,7 @@ const DesignDetailsPage: React.FC = () => {
         <h1 className="text-2xl font-bold text-theme">Design unavailable</h1>
         <p className="text-sm text-theme-secondary">{error ?? 'This design could not be opened.'}</p>
         <Link
-          to="/market"
+          to="/runway"
           className="rounded-full bg-[color:var(--text-primary)] px-5 py-2.5 text-sm font-semibold text-[color:var(--surface-primary)]"
         >
           Back to market
@@ -86,7 +86,7 @@ const DesignDetailsPage: React.FC = () => {
       <DesignViewModal
         open
         item={item}
-        onClose={() => navigate('/market')}
+        onClose={() => navigate('/runway')}
       />
     </div>
   );

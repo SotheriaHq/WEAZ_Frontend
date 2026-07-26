@@ -86,7 +86,7 @@ const BrandStaffInvitePage: React.FC = () => {
 
   if (BRAND_STAFF_COMING_SOON) {
     return (
-      <main className="min-h-screen threadly-shell-bg px-4 py-16 text-theme">
+      <main className="min-h-screen wiez-shell-bg px-4 py-16 text-theme">
         <section className="mx-auto max-w-lg rounded-2xl border border-gray-200 bg-white/80 p-8 text-center shadow-sm dark:border-white/10 dark:bg-white/5">
           <div className="text-4xl" aria-hidden="true">👥</div>
           <h1 className="mt-3 text-lg font-bold">Brand staff is coming soon</h1>
@@ -106,7 +106,7 @@ const BrandStaffInvitePage: React.FC = () => {
   }
 
   return (
-    <main className="min-h-screen threadly-shell-bg px-4 py-16 text-theme">
+    <main className="min-h-screen wiez-shell-bg px-4 py-16 text-theme">
       <section className="mx-auto max-w-lg space-y-6">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-theme-secondary">

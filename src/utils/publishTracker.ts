@@ -33,9 +33,9 @@ type PublishTaskScope = {
   ownerId?: string | null;
 };
 
-const STORAGE_KEY = 'threadly.publish.designTasks.v2';
-const LEGACY_STORAGE_KEY = 'threadly.publish.designTasks.v1';
-const EVENT_NAME = 'threadly:publish-tasks-updated';
+const STORAGE_KEY = 'wiez.publish.designTasks.v2';
+const LEGACY_STORAGE_KEY = 'wiez.publish.designTasks.v1';
+const EVENT_NAME = 'wiez:publish-tasks-updated';
 const MAX_TASKS_PER_SCOPE = 12;
 const MAX_TOTAL_TASKS = 120;
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
@@ -431,7 +431,7 @@ export const reconcilePublishTasksWithDraftIds = (
  * reconcile so the draft card can render the "Open editor / Retry / Remove"
  * state instead of looking like a plain, intentional draft.
  */
-const FAILED_PUBLISH_STORAGE_KEY = 'threadly.publish.failedDesignIds.v1';
+const FAILED_PUBLISH_STORAGE_KEY = 'wiez.publish.failedDesignIds.v1';
 const FAILED_PUBLISH_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 const MAX_FAILED_PUBLISH_ENTRIES = 60;
 

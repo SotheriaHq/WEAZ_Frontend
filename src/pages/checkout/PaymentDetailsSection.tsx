@@ -144,7 +144,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
   return (
     <div
       className={`space-y-6 rounded-[28px] border ${
-        compact ? 'threadly-chrome-surface p-4' : 'threadly-chrome-surface p-5'
+        compact ? 'wiez-chrome-surface p-4' : 'wiez-chrome-surface p-5'
       }`}
     >
       <div className="space-y-1">

@@ -757,14 +757,14 @@ const EditProduct: React.FC = () => {
   // Persisted in localStorage so it never shows again after the first visit.
   useEffect(() => {
     if (isEditMode) return;
-    if (localStorage.getItem('threadly_tour_product_create')) return;
+    if (localStorage.getItem('wiez_tour_product_create')) return;
     const timer = window.setTimeout(() => setIsTourActive(true), 800);
     return () => clearTimeout(timer);
   }, [isEditMode]);
 
   const handleTourClose = useCallback(() => {
     setIsTourActive(false);
-    localStorage.setItem('threadly_tour_product_create', '1');
+    localStorage.setItem('wiez_tour_product_create', '1');
   }, []);
   const { confirm, ConfirmDialog: ConfirmModal } = useConfirm();
 
@@ -3285,7 +3285,7 @@ const EditProduct: React.FC = () => {
           {/* LEFT COLUMN: Media — sticky rail so it stays in view while the long
               details column scrolls, instead of leaving a tall empty gap and
               pushing overall page height down. */}
-          <div className="space-y-4 lg:col-span-5 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto no-scrollbar">
+          <div className="space-y-4 lg:col-span-5 lg:sticky lg:top-6 lg:self-start">
             {/* Media Gallery */}
             <div
               id="product-media-section"
@@ -3517,8 +3517,10 @@ const EditProduct: React.FC = () => {
                             mediaClassName="h-full w-full object-cover"
                           />
                           {/* Label with blur bg */}
-                          <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/60 backdrop-blur-sm text-[10px] font-bold text-white/90 tracking-wide uppercase select-none">
-                            {slotOption.label} {slotOption.required && <span className="text-amber-400">*</span>}
+                          <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-black/70 backdrop-blur-md text-[10px] font-bold text-white tracking-wide uppercase select-none flex items-center gap-1 shadow-sm">
+                            {assigned.isPrimary && <span className="text-amber-300 font-bold">★ Cover •</span>}
+                            <span>{slotOption.label}</span>
+                            {slotOption.required && <span className="text-amber-400">*</span>}
                           </div>
                           {/* Delete button with blur bg */}
                           {!saving && (
@@ -3528,7 +3530,7 @@ const EditProduct: React.FC = () => {
                                 e.stopPropagation();
                                 handleDeleteMedia(assigned.id);
                               }}
-                              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 backdrop-blur-sm hover:bg-red-500 flex items-center justify-center text-white transition-colors"
+                              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 backdrop-blur-md hover:bg-red-500 flex items-center justify-center text-white transition-colors shadow-sm"
                               aria-label="Remove"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -3540,9 +3542,15 @@ const EditProduct: React.FC = () => {
                           type="button"
                           onClick={() => openMediaPickerForSlot(slotOption.value)}
                           disabled={!canAddMoreMedia || saving}
-                          className="flex h-full w-full items-center justify-center p-3 transition-colors hover:bg-purple-50/5 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="flex h-full w-full flex-col items-center justify-center p-3 text-center transition-all hover:bg-purple-50/10 dark:hover:bg-purple-500/10 disabled:cursor-not-allowed disabled:opacity-50 group-hover:scale-105"
                         >
-                          <Plus className="h-5 w-5 text-theme-secondary hover:text-purple-500 transition-colors" />
+                          <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-600 dark:text-purple-400 mb-1.5 transition-transform group-hover:scale-110">
+                            <Plus className="h-4 w-4" />
+                          </div>
+                          <span className="text-[11px] font-bold text-theme uppercase tracking-wider">
+                            {slotOption.label} {slotOption.required && <span className="text-amber-500">*</span>}
+                          </span>
+                          <span className="text-[10px] text-theme-secondary mt-0.5">Click to upload</span>
                         </button>
                       )}
                     </div>
@@ -3927,9 +3935,9 @@ const EditProduct: React.FC = () => {
                   </div>
 
                   {!collapsedSections.pricing && (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 items-start">
                       <Input
-                        label="Price"
+                        label="Price *"
                         required
                         type="number"
                         value={form.price || ""}
@@ -3938,20 +3946,11 @@ const EditProduct: React.FC = () => {
                         }
                         placeholder="0"
                         startIcon={
-                          <span className="text-theme-secondary text-sm">
+                          <span className="text-theme-secondary text-xs">
                             ₦
                           </span>
                         }
                         data-testid="product-price-input"
-                        inputSize="sm"
-                        className="[&_label]:text-xs [&_label]:mb-1"
-                      />
-                      <Input
-                        label="Currency"
-                        type="text"
-                        value={form.currency}
-                        onChange={() => {}}
-                        disabled
                         inputSize="sm"
                         className="[&_label]:text-xs [&_label]:mb-1"
                       />
@@ -3965,7 +3964,7 @@ const EditProduct: React.FC = () => {
                         placeholder="0"
                         disabled={!form.onSale}
                         startIcon={
-                          <span className="text-theme-secondary text-sm">
+                          <span className="text-theme-secondary text-xs">
                             ₦
                           </span>
                         }
@@ -3982,7 +3981,7 @@ const EditProduct: React.FC = () => {
                           }
                           placeholder="0"
                           startIcon={
-                            <span className="text-theme-secondary text-sm">
+                            <span className="text-theme-secondary text-xs">
                               ₦
                             </span>
                           }
@@ -3990,12 +3989,21 @@ const EditProduct: React.FC = () => {
                           className="[&_label]:text-xs [&_label]:mb-1"
                         />
                         {profitMargin.margin > 0 && (
-                          <p className="text-[10px] text-gray-500 mt-1">
+                          <p className="text-[10px] text-gray-500 mt-1 truncate">
                             Margin: {profitMargin.margin}% • Profit:{" "}
                             {formatCurrency(profitMargin.profit, form.currency)}
                           </p>
                         )}
                       </div>
+                      <Input
+                        label="Currency"
+                        type="text"
+                        value={form.currency}
+                        onChange={() => {}}
+                        disabled
+                        inputSize="sm"
+                        className="[&_label]:text-xs [&_label]:mb-1"
+                      />
                     </div>
                   )}
                 </div>
@@ -4186,7 +4194,7 @@ const EditProduct: React.FC = () => {
                                     >
                                       <Input
                                         type="text"
-                                        list="threadly-size-options"
+                                        list="wiez-size-options"
                                         value={variant.size ?? ""}
                                         onChange={(e) =>
                                           updateVariant(originalIndex, {
@@ -4276,7 +4284,7 @@ const EditProduct: React.FC = () => {
                           );
                         })}
 
-                        <datalist id="threadly-size-options">
+                        <datalist id="wiez-size-options">
                           <option value="XXS" />
                           <option value="XS" />
                           <option value="S" />
@@ -4945,7 +4953,7 @@ const EditProduct: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="surface-menu sticky bottom-0 z-20 w-full border-t px-4 py-3 backdrop-blur-xl sm:px-6">
+      <footer className="sticky bottom-0 z-20 w-full px-4 py-2.5 backdrop-blur-md bg-white/80 dark:bg-zinc-900/80 border-t border-gray-200/40 dark:border-white/10 sm:px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs text-theme-secondary">
             {/* The "changes" concept only means something when editing an entity

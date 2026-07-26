@@ -23,7 +23,7 @@ export type PersistedDesignPublishJob = {
   updatedAt: number;
 };
 
-const DB_NAME = 'threadly-design-publish-recovery';
+const DB_NAME = 'wiez-design-publish-recovery';
 const STORE_NAME = 'jobs';
 const DB_VERSION = 1;
 const MAX_JOB_AGE_MS = 24 * 60 * 60 * 1000;

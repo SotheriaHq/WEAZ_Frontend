@@ -13,7 +13,7 @@ import { getActiveBrandId, hasActiveBrandMembership } from '@/lib/brandAccess';
 
 import EditProfileModal from '@/components/profile/EditProfileModal';
 
-const BRAND_SETUP_DISMISS_KEY = 'threadly.brandProfileSetup.dismissedUntil';
+const BRAND_SETUP_DISMISS_KEY = 'wiez.brandProfileSetup.dismissedUntil';
 
 function clearModalSearchParams(searchParams: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(searchParams);

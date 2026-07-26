@@ -2,7 +2,7 @@ import type { MeasurementPoint, MeasurementPointCategory } from '@/types/sizing'
 import { apiClient } from './httpClient';
 
 const unwrap = <T>(raw: any): T => (raw?.data ?? raw) as T;
-const MEASUREMENT_POINTS_UPDATED_EVENT = 'threadly:measurement-points-updated';
+const MEASUREMENT_POINTS_UPDATED_EVENT = 'wiez:measurement-points-updated';
 
 const normalizeMeasurementDisplayLabel = (rawLabel: string) =>
   String(rawLabel ?? '')

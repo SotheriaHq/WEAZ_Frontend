@@ -4,7 +4,7 @@ import type {
   BrandMemberRole,
 } from '@/types/auth';
 
-export const ACTIVE_BRAND_STORAGE_KEY = 'threadly.activeBrandId';
+export const ACTIVE_BRAND_STORAGE_KEY = 'wiez.activeBrandId';
 
 const ACTIVE_STATUS = 'ACTIVE';
 

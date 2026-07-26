@@ -20,7 +20,7 @@ const AdminScaffold: React.FC = () => {
   }, [dispatch, location.pathname]);
 
   return (
-    <div className={`min-h-screen overflow-x-hidden threadly-shell-bg ${ISLAND_BOTTOM_NAV_MOBILE_CLEARANCE_CLASS} lg:pb-0`}>
+    <div className={`min-h-screen overflow-x-hidden wiez-shell-bg ${ISLAND_BOTTOM_NAV_MOBILE_CLEARANCE_CLASS} lg:pb-0`}>
       <Navbar minimal={false} />
       <Sidebar overlayOnly />
       <AdminSidebar />

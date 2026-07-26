@@ -50,7 +50,7 @@ const roundClass = (rounded: ImageWithFallbackProps['rounded']) => {
 };
 
 // Session-storage backed cache for signed URLs to prevent flickering on navigation
-const CACHE_KEY = 'threadly_signed_url_cache';
+const CACHE_KEY = 'wiez_signed_url_cache';
 const CACHE_EXPIRY_MS = 14 * 60 * 1000; // 14 minutes (signed URLs typically expire at 15min)
 
 interface CacheEntry {

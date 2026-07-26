@@ -23,9 +23,9 @@ vi.mock('../ImageWithFallback', () => ({
 
 describe('AvatarCard', () => {
   it('uses the rounded-square fallback avatar when no image source exists', () => {
-    render(<AvatarCard name="Threadly Atelier" alt="Threadly Atelier" />);
+    render(<AvatarCard name="WIEZ Atelier" alt="WIEZ Atelier" />);
 
-    expect(screen.getByLabelText('Threadly Atelier avatar')).toBeInTheDocument();
+    expect(screen.getByLabelText('WIEZ Atelier avatar')).toBeInTheDocument();
     expect(screen.queryByTestId('avatar-image')).not.toBeInTheDocument();
   });
 
@@ -34,7 +34,7 @@ describe('AvatarCard', () => {
       <AvatarCard
         src={null}
         fileId="file_avatar_123"
-        name="Threadly Atelier"
+        name="WIEZ Atelier"
         size="lg"
       />,
     );

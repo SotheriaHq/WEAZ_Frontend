@@ -15,8 +15,8 @@ vi.mock('@/context/AuthContext', () => ({
 
 const baseUser: AuthUserDto = {
   id: 'user-1',
-  username: 'threadly',
-  email: 'threadly@example.com',
+  username: 'wiez',
+  email: 'wiez@example.com',
   firstName: 'Thread',
   lastName: 'Ly',
   role: 'User',

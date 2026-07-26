@@ -956,7 +956,7 @@ export default function CatalogShopTab({
                       value={minPrice ?? ''}
                       onChange={(e) => setMinPrice(e.target.value ? Number(e.target.value) : undefined)}
                       placeholder="Min"
-                      className="threadly-search-input px-3 py-2 text-sm"
+                      className="wiez-search-input px-3 py-2 text-sm"
                     />
                     <input
                       type="number"
@@ -964,7 +964,7 @@ export default function CatalogShopTab({
                       value={maxPrice ?? ''}
                       onChange={(e) => setMaxPrice(e.target.value ? Number(e.target.value) : undefined)}
                       placeholder="Max"
-                      className="threadly-search-input px-3 py-2 text-sm"
+                      className="wiez-search-input px-3 py-2 text-sm"
                     />
                   </div>
                 </div>

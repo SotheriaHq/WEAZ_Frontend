@@ -3,13 +3,22 @@ import React from 'react';
 
 interface TabsProps {
   tabs: string[];
+  /** Optional display labels; tab keys stay stable for routing/state. */
+  labels?: Record<string, string>;
   activeTab: string;
   onTabChange: (tab: string) => void;
   className?: string;
   compact?: boolean;
 }
 
-const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, className = '', compact = false }) => {
+const Tabs: React.FC<TabsProps> = ({
+  tabs,
+  labels,
+  activeTab,
+  onTabChange,
+  className = '',
+  compact = false,
+}) => {
   return (
     <div className={`border-b border-gray-200 dark:border-gray-700 ${className}`}>
       <nav className={`-mb-px flex ${compact ? 'space-x-4' : 'space-x-6'}`} aria-label="Tabs">
@@ -26,7 +35,7 @@ const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, className = '
             `}
             aria-current={activeTab === tab ? 'page' : undefined}
           >
-            {tab}
+            {labels?.[tab] ?? tab}
           </button>
         ))}
       </nav>

@@ -2,7 +2,7 @@
  * InlineStoreCollectionView
  *
  * End-user view of a store collection, rendered inline within CatalogShopTab.
- * Shows collection header, product grid, gallery, and "Add All to Cart".
+ * Shows collection header, product grid, gallery, and "Add All to Bag".
  *
  * Supports product drill-down via the `onViewProduct` callback which
  * lets CatalogShopTab render InlineProductDetail for a specific product.

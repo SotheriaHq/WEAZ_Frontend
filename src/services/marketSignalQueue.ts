@@ -1,11 +1,11 @@
 import { marketApi, type MarketSignalEvent } from '@/api/MarketApi';
 
 export const WEB_MARKET_SIGNAL_ANONYMOUS_SESSION_STORAGE_KEY =
-  'threadly.market.anonymousSessionId.v1';
+  'wiez.market.anonymousSessionId.v1';
 export const WEB_MARKET_SIGNAL_QUEUE_STORAGE_KEY =
-  'threadly.market.signalQueue.v1';
+  'wiez.market.signalQueue.v1';
 export const WEB_MARKET_SIGNAL_RECENT_STORAGE_KEY =
-  'threadly.market.signalRecent.v1';
+  'wiez.market.signalRecent.v1';
 export const WEB_MARKET_SIGNAL_QUEUE_LIMIT = 100;
 export const WEB_MARKET_SIGNAL_BATCH_LIMIT = 25;
 export const WEB_MARKET_SIGNAL_FLUSH_INTERVAL_MS = 5000;

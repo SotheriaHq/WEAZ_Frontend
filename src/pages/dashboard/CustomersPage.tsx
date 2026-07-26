@@ -29,7 +29,7 @@ const CustomersPage: React.FC = () => {
             <input
               type="text"
               placeholder="Search customers..."
-              className="threadly-search-input pl-10 w-64"
+              className="wiez-search-input pl-10 w-64"
             />
           </div>
         </div>

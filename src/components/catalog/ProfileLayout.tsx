@@ -193,7 +193,7 @@ export const ProfileLayout: React.FC = () => {
         title: 'Verify email to create catalog products',
         description: (
           <>
-            Catalog product creation is locked until verification is complete. Open the link sent to <span className="font-semibold">{maskedVerificationEmail}</span> and return.
+            Product creation is locked until verification is complete. Open the link sent to <span className="font-semibold">{maskedVerificationEmail}</span> and return.
           </>
         ),
         toastMessage:

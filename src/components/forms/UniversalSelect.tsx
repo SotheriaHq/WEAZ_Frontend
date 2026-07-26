@@ -259,7 +259,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
             <div
               role="listbox"
               aria-label={label ?? placeholder}
-              className="max-h-56 space-y-1 overflow-y-auto overscroll-contain p-1 pr-1.5 scrollbar-threadly"
+              className="max-h-56 space-y-1 overflow-y-auto overscroll-contain p-1 pr-1.5 scrollbar-wiez"
               onWheel={(event) => event.stopPropagation()}
               onTouchMove={(event) => event.stopPropagation()}
             >

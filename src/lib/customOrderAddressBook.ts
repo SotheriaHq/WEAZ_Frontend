@@ -30,8 +30,8 @@ export interface CustomOrderSavedAddress {
   updatedAt: string;
 }
 
-const DELIVERY_ADDRESS_BOOK_PREFIX = 'threadly.deliveryAddresses';
-const LEGACY_CUSTOM_ORDER_PREFIX = 'threadly.customOrderAddresses';
+const DELIVERY_ADDRESS_BOOK_PREFIX = 'wiez.deliveryAddresses';
+const LEGACY_CUSTOM_ORDER_PREFIX = 'wiez.customOrderAddresses';
 
 const getStorageKey = (prefix: string, userId?: string | null) =>
   `${prefix}:${userId && userId.trim() ? userId.trim() : 'guest'}`;

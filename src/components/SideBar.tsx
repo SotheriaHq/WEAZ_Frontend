@@ -117,14 +117,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
     {
       emoji: '👗',
       label: 'Runway',
-      path: '/',
-      active: location.pathname === '/market' || location.pathname === '/',
+      path: '/runway',
+      active: location.pathname === '/' || location.pathname === '/runway',
     },
     {
       emoji: '🛍️',
       label: 'Market',
-      path: '/market-place',
-      active: location.pathname === '/market-place',
+      path: '/market',
+      active:
+        location.pathname === '/market' ||
+        location.pathname === '/market' ||
+        location.pathname.startsWith('/market/sections'),
     },
     {
       emoji: '📺',
@@ -277,7 +280,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
 
       {/* OVERLAY SIDEBAR (Always rendered but translated when closed) */}
       <div
-        className={`fixed left-0 top-0 h-full z-layer-sidebar shadow-xl w-[240px] threadly-chrome-surface rounded-r-lg flex flex-col overflow-hidden transform transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${
+        className={`fixed left-0 top-0 h-full z-layer-sidebar shadow-xl w-[240px] wiez-chrome-surface rounded-r-lg flex flex-col overflow-hidden transform transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${
           isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'
         }`}
       >

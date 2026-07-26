@@ -35,6 +35,32 @@ html {
   contain-intrinsic-size: 1px 720px;
 }
 
+/*
+ * Runway mobile reels (web): platform CSS scroll-snap — mandatory + always —
+ * mirrors native FlatList snapToInterval + disableIntervalMomentum +
+ * decelerationRate="fast". No JS scroll hijacking (that causes lag).
+ * Honour reduced-motion by allowing free scroll without hard snap stops.
+ */
+.runway-reels-scroller {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  scrollbar-width: none;
+}
+.runway-reels-scroller::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .runway-reels-scroller {
+    scroll-snap-type: y proximity !important;
+  }
+  .runway-reels-scroller [data-runway-reel-id] {
+    scroll-snap-stop: normal !important;
+  }
+}
+
 /* ─── Global thin blending scrollbars ─────────────────────────────────────── */
 /* Light mode: barely-there warm-gray thumb, transparent track */
 * {
@@ -108,7 +134,7 @@ html {
     /* Layout tokens */
     --app-header-height: 64px;
 
-    /* Z-layer system (see fthreadly/docs/LAYOUT_ARCHITECTURE.md) */
+    /* Z-layer system (see fwiez/docs/LAYOUT_ARCHITECTURE.md) */
     --z-base: 0;
     --z-nav: 100;
     --z-sidebar: 200;
@@ -346,55 +372,55 @@ html {
   }
 
   /* WIEZ styled scrollbars (uses theme tokens) */
-  .scrollbar-threadly {
+  .scrollbar-wiez {
     scrollbar-width: thin;
     scrollbar-color: rgba(var(--brand-primary-rgb), 0.35) transparent;
   }
 
-  .scrollbar-threadly::-webkit-scrollbar {
+  .scrollbar-wiez::-webkit-scrollbar {
     height: 4px;
     width: 4px;
   }
 
-  .scrollbar-threadly::-webkit-scrollbar-track {
+  .scrollbar-wiez::-webkit-scrollbar-track {
     background: transparent;
   }
 
-  .scrollbar-threadly::-webkit-scrollbar-thumb {
+  .scrollbar-wiez::-webkit-scrollbar-thumb {
     background-color: rgba(var(--brand-primary-rgb), 0.3);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: content-box;
   }
 
-  .scrollbar-threadly::-webkit-scrollbar-thumb:hover {
+  .scrollbar-wiez::-webkit-scrollbar-thumb:hover {
     background-color: rgba(var(--brand-primary-rgb), 0.45);
   }
 
   /* Thicker, higher-contrast scrollbar for dense editor panels */
-  .scrollbar-threadly-strong {
+  .scrollbar-wiez-strong {
     scrollbar-width: thin;
     scrollbar-color: rgba(var(--brand-primary-rgb), 0.65) transparent;
   }
 
-  .scrollbar-threadly-strong::-webkit-scrollbar {
+  .scrollbar-wiez-strong::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
 
-  .scrollbar-threadly-strong::-webkit-scrollbar-track {
+  .scrollbar-wiez-strong::-webkit-scrollbar-track {
     background: transparent;
     border-radius: 999px;
   }
 
-  .scrollbar-threadly-strong::-webkit-scrollbar-thumb {
+  .scrollbar-wiez-strong::-webkit-scrollbar-thumb {
     background-color: rgba(var(--brand-primary-rgb), 0.5);
     border-radius: 999px;
     background-clip: content-box;
     min-height: 36px;
   }
 
-  .scrollbar-threadly-strong::-webkit-scrollbar-thumb:hover {
+  .scrollbar-wiez-strong::-webkit-scrollbar-thumb:hover {
     background-color: rgba(var(--brand-primary-rgb), 0.85);
   }
 }
@@ -472,31 +498,31 @@ html {
     @apply bg-white/70 dark:bg-white/10 backdrop-blur-md border border-white/30 dark:border-white/10 rounded-full;
   }
 
-  .threadly-shell-bg {
+  .wiez-shell-bg {
     /* Clean white — images own the colour story, background defers completely.
        background-attachment: fixed removed: it forced full GPU repaint on every
        scroll tick, causing jank on mid-range mobile devices. */
     background-color: var(--surface-primary);
   }
 
-  :is(.dark) .threadly-shell-bg {
+  :is(.dark) .wiez-shell-bg {
     background-color: var(--surface-primary); /* resolves to #0a0a0a in dark */
   }
 
-  .threadly-chrome-surface {
+  .wiez-chrome-surface {
     @apply border;
     background-color: var(--surface-secondary);
     border-color: var(--border-default);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   }
 
-  :is(.dark) .threadly-chrome-surface {
+  :is(.dark) .wiez-chrome-surface {
     background-color: var(--surface-secondary);
     border-color: var(--border-default);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   }
 
-  .threadly-summary-surface {
+  .wiez-summary-surface {
     @apply border;
     color: var(--text-primary);
     background-color: var(--surface-primary);
@@ -506,7 +532,7 @@ html {
       0 4px 16px rgba(0, 0, 0, 0.04);
   }
 
-  :is(.dark) .threadly-summary-surface {
+  :is(.dark) .wiez-summary-surface {
     color: var(--text-primary);
     background-color: var(--surface-secondary);
     border-color: var(--border-default);
@@ -515,38 +541,38 @@ html {
       0 4px 16px rgba(0, 0, 0, 0.2);
   }
 
-  .threadly-nav-surface {
+  .wiez-nav-surface {
     background: transparent;
     border-color: transparent;
     box-shadow: none;
   }
 
-  .threadly-nav-surface-muted {
+  .wiez-nav-surface-muted {
     background-color: var(--surface-secondary);
     border-bottom: 1px solid var(--border-default);
     box-shadow: none;
   }
 
-  :is(.dark) .threadly-nav-surface {
+  :is(.dark) .wiez-nav-surface {
     background: transparent;
     border-color: transparent;
     box-shadow: none;
   }
 
-  :is(.dark) .threadly-nav-surface-muted {
+  :is(.dark) .wiez-nav-surface-muted {
     background-color: var(--surface-secondary);
     border-bottom: 1px solid var(--border-default);
     box-shadow: none;
   }
 
   @media (max-width: 767px) {
-    .studio-shell .threadly-nav-surface-muted {
+    .studio-shell .wiez-nav-surface-muted {
       background-color: var(--surface-primary);
       border-bottom-color: transparent;
       box-shadow: none;
     }
 
-    :is(.dark) .studio-shell .threadly-nav-surface-muted {
+    :is(.dark) .studio-shell .wiez-nav-surface-muted {
       background-color: var(--surface-primary);
       border-bottom-color: transparent;
       box-shadow: none;
@@ -685,7 +711,7 @@ html {
   }
 
   /* WIEZ select styling (native select enhancements) */
-  .select-threadly {
+  .select-wiez {
     @apply appearance-none pr-10;
     background-position: right 0.75rem center;
     background-repeat: no-repeat;
@@ -693,17 +719,17 @@ html {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(107,114,128,0.9)' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m19 9-7 7-7-7'/%3E%3C/svg%3E");
   }
 
-  .dark .select-threadly {
+  .dark .select-wiez {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(229,231,235,0.85)' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m19 9-7 7-7-7'/%3E%3C/svg%3E");
   }
 
   /* Native option styling for dark/light dropdowns */
-  .select-threadly option {
+  .select-wiez option {
     background-color: #ffffff;
     color: #0f172a;
   }
 
-  .dark .select-threadly option {
+  .dark .select-wiez option {
     background-color: #0f1117;
     color: #f8fafc;
   }
@@ -747,7 +773,7 @@ html {
   }
 
   /* Unified search input styling — uses system surface so it never clashes with page bg */
-  .threadly-search-input {
+  .wiez-search-input {
     @apply w-full rounded-xl border border-transparent px-4 py-2.5 text-sm placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 focus:border-transparent;
     background-color: var(--surface-secondary);
     color: var(--text-primary);

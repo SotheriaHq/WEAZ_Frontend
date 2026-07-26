@@ -848,7 +848,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             </span>
           </div>
           
-          {/* Mobile Bag It/Add to Cart Feature inline in the bottom bar */}
+          {/* Mobile Bag It feature inline in the bottom bar */}
           {!isOwnerView && (
             <button
               type="button"

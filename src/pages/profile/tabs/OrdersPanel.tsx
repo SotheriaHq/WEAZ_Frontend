@@ -2006,7 +2006,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
               <EmptyOrdersState
                 query={query}
                 filtered={standardStatus !== 'ALL'}
-                onBrowse={() => navigate('/market')}
+                onBrowse={() => navigate('/runway')}
                 label="standard"
               />
             ) : (
@@ -2096,7 +2096,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
             <EmptyOrdersState
               query={query}
               filtered={customStatus !== 'ALL'}
-              onBrowse={() => navigate('/market')}
+              onBrowse={() => navigate('/runway')}
               label="custom"
             />
           ) : (

@@ -2,15 +2,15 @@ import { defaultShouldDehydrateQuery } from '@tanstack/react-query';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 import type { PersistedClient } from '@tanstack/react-query-persist-client';
 
-import { isPersistableThreadlyQueryKey } from './queryKeys';
+import { isPersistableWiezQueryKey } from './queryKeys';
 
-export const THREADLY_QUERY_CACHE_BUSTER = 'Threadly-web-phase2-v3';
+export const WIEZ_QUERY_CACHE_BUSTER = 'WIEZ-web-phase2-v3';
 // 24h (was 30min): mobile browsers discard tabs constantly, so every reopen
 // past maxAge was a full cold load with skeletons. Staleness is already
 // handled by staleTime + silent SWR revalidation — old-but-present data
 // paints instantly and refreshes in the background.
-export const THREADLY_QUERY_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-export const THREADLY_QUERY_CACHE_STORAGE_KEY = 'THREADLY_QUERY_CACHE_V1';
+export const WIEZ_QUERY_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+export const WIEZ_QUERY_CACHE_STORAGE_KEY = 'WIEZ_QUERY_CACHE_V1';
 
 const getStorage = () => (typeof window === 'undefined' ? undefined : window.localStorage);
 
@@ -78,25 +78,25 @@ const serializeWithinBudget = (client: PersistedClient): string => {
   return serialized;
 };
 
-export const threadlyQueryPersister = createSyncStoragePersister({
+export const wiezQueryPersister = createSyncStoragePersister({
   storage: createSafeStorage(),
-  key: THREADLY_QUERY_CACHE_STORAGE_KEY,
+  key: WIEZ_QUERY_CACHE_STORAGE_KEY,
   throttleTime: 1000,
   serialize: serializeWithinBudget,
 });
 
-export const shouldDehydrateThreadlyQuery: typeof defaultShouldDehydrateQuery = (query) =>
-  defaultShouldDehydrateQuery(query) && isPersistableThreadlyQueryKey(query.queryKey);
+export const shouldDehydrateWiezQuery: typeof defaultShouldDehydrateQuery = (query) =>
+  defaultShouldDehydrateQuery(query) && isPersistableWiezQueryKey(query.queryKey);
 
 export const purgeWebPersistedQueryCache = () => {
   try {
-    void threadlyQueryPersister.removeClient?.();
+    void wiezQueryPersister.removeClient?.();
   } catch {
     // Persisted cache cleanup must never block logout.
   }
 
   try {
-    getStorage()?.removeItem(THREADLY_QUERY_CACHE_STORAGE_KEY);
+    getStorage()?.removeItem(WIEZ_QUERY_CACHE_STORAGE_KEY);
   } catch {
     // Storage may be unavailable in restricted browser contexts.
   }

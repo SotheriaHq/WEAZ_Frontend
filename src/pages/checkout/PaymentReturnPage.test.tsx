@@ -126,7 +126,7 @@ const paidUnifiedAttempt: PaymentAttemptSummary = {
   canSimulate: false,
   orderIds: [],
   summary: {
-    items: [{ name: 'Threadly Tee', quantity: 1, price: 12000 }],
+    items: [{ name: 'WIEZ Tee', quantity: 1, price: 12000 }],
     subtotal: 12000,
     shippingCost: 2500,
     discount: 0,

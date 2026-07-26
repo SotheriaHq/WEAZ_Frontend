@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { brandApi } from '@/api/BrandApi';
-import { THREADLY_QUERY_STALE_TIME_MS } from '@/query/queryClient';
+import { WIEZ_QUERY_STALE_TIME_MS } from '@/query/queryClient';
 import { queryKeys } from '@/query/queryKeys';
 
 // Re-use the same session-storage cache from ImageWithFallback
-const CACHE_KEY = 'threadly_signed_url_cache';
+const CACHE_KEY = 'wiez_signed_url_cache';
 const CACHE_EXPIRY_MS = 14 * 60 * 1000;
 
 interface CacheEntry { url: string; expiresAt: number; }
@@ -269,15 +269,15 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
       queryClient.fetchQuery({
         queryKey: queryKeys.media.publicUrl(fileId),
         queryFn: () => brandApi.getPublicFileUrl(fileId),
-        staleTime: THREADLY_QUERY_STALE_TIME_MS,
+        staleTime: WIEZ_QUERY_STALE_TIME_MS,
         retry: false,
       }).then((publicUrl) => {
         if (publicUrl) return publicUrl;
         return queryClient.fetchQuery({
           queryKey: queryKeys.media.signedUrl(fileId),
           queryFn: () => brandApi.getPrivateSignedFileUrl(fileId),
-          staleTime: THREADLY_QUERY_STALE_TIME_MS,
-          gcTime: THREADLY_QUERY_STALE_TIME_MS,
+          staleTime: WIEZ_QUERY_STALE_TIME_MS,
+          gcTime: WIEZ_QUERY_STALE_TIME_MS,
           retry: false,
         });
       }),
@@ -299,15 +299,15 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
             queryClient.fetchQuery({
               queryKey: queryKeys.media.publicUrl(fileId),
               queryFn: () => brandApi.getPublicFileUrl(fileId, { forceRefresh: true }),
-              staleTime: THREADLY_QUERY_STALE_TIME_MS,
+              staleTime: WIEZ_QUERY_STALE_TIME_MS,
               retry: false,
             }).then((publicUrl) => {
               if (publicUrl) return publicUrl;
               return queryClient.fetchQuery({
                 queryKey: queryKeys.media.signedUrl(fileId),
                 queryFn: () => brandApi.getPrivateSignedFileUrl(fileId, { forceRefresh: true }),
-                staleTime: THREADLY_QUERY_STALE_TIME_MS,
-                gcTime: THREADLY_QUERY_STALE_TIME_MS,
+                staleTime: WIEZ_QUERY_STALE_TIME_MS,
+                gcTime: WIEZ_QUERY_STALE_TIME_MS,
                 retry: false,
               });
             }),

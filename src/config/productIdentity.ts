@@ -1,6 +1,7 @@
 export const APP_NAME = 'WIEZ';
 export const COMPANY_NAME = APP_NAME;
-export const FORMER_PRODUCT_NAME = 'Threadly';
+/** @deprecated Product is WIEZ only — do not surface former codenames in UI. */
+export const FORMER_PRODUCT_NAME = 'WIEZ';
 export const PRODUCT_TAGLINE = 'When you think WEARS, you think WIEZ.';
 export const PRODUCT_LOGO_TAGLINE = 'JUST WEAR';
 export const PRODUCT_DESCRIPTION =

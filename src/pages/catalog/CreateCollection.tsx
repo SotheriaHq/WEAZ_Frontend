@@ -541,7 +541,7 @@ const CreateCollectionInner: React.FC = () => {
             type="text"
             placeholder="Search by username or email"
             disabled={disabled}
-            className="threadly-search-input"
+            className="wiez-search-input"
           />
         </div>
       </Section>

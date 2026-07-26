@@ -3,7 +3,7 @@ import axios from 'axios';
 /**
  * Location cascade source for profile/settings forms.
  * Country (name) → State/Province → City/LGA.
- * Keep in parity with `threadly-mobile/src/services/locationService.ts`.
+ * Keep in parity with `wiez-mobile/src/services/locationService.ts`.
  */
 
 // Interfaces

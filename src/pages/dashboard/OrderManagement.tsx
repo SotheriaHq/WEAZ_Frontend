@@ -233,7 +233,7 @@ const downloadCsv = (orders: OrderRecord[]) => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = `threadly-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+  anchor.download = `wiez-orders-${new Date().toISOString().slice(0, 10)}.csv`;
   anchor.click();
   URL.revokeObjectURL(url);
 };

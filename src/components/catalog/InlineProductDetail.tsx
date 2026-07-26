@@ -972,7 +972,7 @@ export default function InlineProductDetail({
                   </button>
                 </div>
 
-                <div className="px-5 py-4 max-h-[50vh] overflow-y-auto scrollbar-threadly-strong space-y-3">
+                <div className="px-5 py-4 max-h-[50vh] overflow-y-auto scrollbar-wiez-strong space-y-3">
                   <p className="text-xs text-slate-600 dark:text-slate-400">
                     This product needs custom measurements. Add only the required points below to buy now.
                   </p>

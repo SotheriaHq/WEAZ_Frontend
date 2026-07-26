@@ -747,7 +747,12 @@ export const marketApi = {
     };
   },
 
-  async getFeed(
+  /**
+   * Design feed for the Runway UI.
+   * Backend path is still GET /collections/market (legacy name); domain is Design.
+   * Prefer `getRunwayFeed` at call sites.
+   */
+  async getRunwayFeed(
     params?: GetMarketFeedParams,
     options?: { signal?: AbortSignal },
   ): Promise<MarketFeedResponse> {
@@ -808,8 +813,16 @@ export const marketApi = {
     };
   },
 
+  /** @deprecated Prefer getRunwayFeed — this is the design/Runway feed, not commerce Market. */
+  async getFeed(
+    params?: GetMarketFeedParams,
+    options?: { signal?: AbortSignal },
+  ): Promise<MarketFeedResponse> {
+    return this.getRunwayFeed(params, options);
+  },
+
   /**
-   * SEARCH-CORE-4/5: Runway search-pinned feed. Reuses the same item DTO mapping
+   * SEARCH-CORE-4/5: Runway search-pinned design feed. Reuses the same item DTO mapping
    * as the default feed (the backend emits identical item shapes) and surfaces
    * the additive pinned-feed metadata (anchor, exhaustion, route hints).
    */

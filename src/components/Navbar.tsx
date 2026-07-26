@@ -377,8 +377,8 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
         minimal
           ? 'border-b border-transparent bg-transparent'
           : isScrolled
-            ? 'threadly-nav-surface-muted'
-            : 'threadly-nav-surface'
+            ? 'wiez-nav-surface-muted'
+            : 'wiez-nav-surface'
       }`}
       style={
         isScrolled && !minimal

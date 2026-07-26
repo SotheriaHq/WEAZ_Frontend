@@ -348,7 +348,7 @@ const DashboardHome: React.FC = () => {
                 </span>
               </h1>
               <p className="truncate text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
-                threadly.com/{store.slug || user?.username || 'your-store'}
+                weaz.com/{store.slug || user?.username || 'your-store'}
               </p>
             </div>
           </div>

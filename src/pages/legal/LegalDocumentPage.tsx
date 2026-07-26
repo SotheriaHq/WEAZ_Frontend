@@ -11,7 +11,7 @@ export default function LegalDocumentPage() {
   }
 
   return (
-    <main className="threadly-shell-bg min-h-screen px-4 py-12 text-slate-950 dark:text-white sm:px-6 lg:px-8">
+    <main className="wiez-shell-bg min-h-screen px-4 py-12 text-slate-950 dark:text-white sm:px-6 lg:px-8">
       <article className="mx-auto max-w-3xl">
         <Link
           to="/legal"

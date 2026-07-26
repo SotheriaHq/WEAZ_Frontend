@@ -53,7 +53,7 @@ type PendingBagAction = {
   returnPath: string;
 };
 
-const PENDING_BAG_ACTION_KEY = 'threadly.pendingBagAction.v1';
+const PENDING_BAG_ACTION_KEY = 'wiez.pendingBagAction.v1';
 
 const canUseSessionStorage = () =>
   typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined';

@@ -176,7 +176,7 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
                           value={localFilters.minPrice ?? ''}
                           onChange={(e) => setLocalFilters(prev => ({ ...prev, minPrice: e.target.value ? Number(e.target.value) : undefined }))}
                           placeholder="0"
-                          className="threadly-search-input px-3 py-2.5 text-sm"
+                          className="wiez-search-input px-3 py-2.5 text-sm"
                         />
                       </div>
                       <div className="text-gray-400 mt-5">-</div>
@@ -187,7 +187,7 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
                           value={localFilters.maxPrice ?? ''}
                           onChange={(e) => setLocalFilters(prev => ({ ...prev, maxPrice: e.target.value ? Number(e.target.value) : undefined }))}
                           placeholder="Any"
-                          className="threadly-search-input px-3 py-2.5 text-sm"
+                          className="wiez-search-input px-3 py-2.5 text-sm"
                         />
                       </div>
                     </div>

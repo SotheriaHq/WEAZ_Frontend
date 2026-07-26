@@ -8,9 +8,13 @@ import { overlayBackChannel } from '@/hooks/useOverlayBackClose';
 const MOBILE_MAX_WIDTH = 1024;
 const DOUBLE_BACK_WINDOW_MS = 2000;
 
-/** Runway + Market are the app "home" surfaces for the double-back exit prompt. */
+/** Runway (design feed) + Market (commerce discover) are home surfaces for double-back exit. */
 const isHomePath = (pathname: string) =>
-  pathname === '/' || pathname === '/market' || pathname === '/marketplace';
+  pathname === '/' ||
+  pathname === '/runway' ||
+  pathname === '/market' ||
+  pathname === '/market' ||
+  pathname === '/marketplace';
 
 const isMobileViewport = () =>
   typeof window !== 'undefined' && window.innerWidth < MOBILE_MAX_WIDTH;

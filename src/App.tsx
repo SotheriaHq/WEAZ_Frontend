@@ -50,7 +50,7 @@ import ScrollRestoreProvider from '@/components/ScrollRestoreProvider';
 import MobileExitGuard from '@/components/navigation/MobileExitGuard';
 import { isNewBuildAvailable } from '@/utils/buildVersionGuard';
 
-const Market = lazy(() => import('./pages/Market'));
+const Runway = lazy(() => import('./pages/Runway'));
 const CartDrawer = lazy(() => import('./components/designs/CartDrawer'));
 const WishlistDrawer = lazy(() => import('./components/designs/WishlistDrawer'));
 const GlobalModalRouter = lazy(() =>
@@ -499,9 +499,13 @@ const router = createBrowserRouter([
         path: '/',
         element: <Layout />,
         children: [
-          { index: true, element: withRouteFallback(<Market mode="designs" />) },
-          { path: 'market', element: withRouteFallback(<Market mode="designs" />) },
-          { path: 'market-place', element: withRouteFallback(<MarketPlace />) },
+          // Runway = design feed UI (backend Design). Market = commerce discover.
+          { index: true, element: withRouteFallback(<Runway mode="designs" />) },
+          { path: 'runway', element: withRouteFallback(<Runway mode="designs" />) },
+          // MARKET (commerce discover) is the primary Market surface.
+          { path: 'market', element: withRouteFallback(<MarketPlace />) },
+          // Legacy alias kept so old /market-place links still open Market.
+          { path: 'market-place', element: <Navigate to="/market" replace /> },
           { path: 'market/sections/:sectionKey', element: withRouteFallback(<MarketSectionPage />) },
           { path: 'search', element: withRouteFallback(<SearchResultsPage />) },
           { path: 'diagnostics', element: withRouteFallback(<DiagnosticsPage />) },

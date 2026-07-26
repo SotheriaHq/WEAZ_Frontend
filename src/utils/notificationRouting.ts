@@ -226,7 +226,7 @@ export function determineNotificationRoute(notification: NormalizedNotification)
                 return `/market?openDesign=${target.id}`;
             }
             if (target?.type === 'POST') {
-                return '/market';
+                return '/runway';
             }
             return fallbackUrl;
 
@@ -238,7 +238,7 @@ export function determineNotificationRoute(notification: NormalizedNotification)
                 return `/market?openDesign=${target.id}`;
             }
             if (target?.type === 'POST' && subTargetId) {
-                return '/market';
+                return '/runway';
             }
             return fallbackUrl;
 

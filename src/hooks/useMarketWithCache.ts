@@ -1,23 +1,20 @@
 import { useCallback } from 'react';
 import { useScrollRestore } from '@/components/ScrollRestoreProvider';
-import useMarketFeed from '@/hooks/useMarketFeed';
+import useRunwayFeed from '@/hooks/useRunwayFeed';
 import useMarketSections from '@/hooks/useMarketSections';
 import type { GetMarketFeedParams } from '@/api/MarketApi';
 import { useMarketSignals } from '@/hooks/useMarketSignals';
 
 /**
- * Hook to manage market data fetching with caching and scroll restoration.
- * Replaces direct API calls with React Query for better state management.
- *
- * Usage:
- * const { data, isLoading, error, refetch, saveScroll } = useMarketWithCache('MARKET_HOME');
+ * Combined cache helper: design feed (Runway) + commerce market sections.
+ * Prefer dedicated hooks when only one surface is needed.
  */
 export const useMarketWithCache = (surfaceType: string, params?: GetMarketFeedParams) => {
   const { saveScrollPosition, getScrollPosition } = useScrollRestore(surfaceType);
   const { anonymousSessionId } = useMarketSignals(surfaceType);
   
-  // Fetch market feed with React Query
-  const feedQuery = useMarketFeed(params, {
+  // Design feed (Runway UI)
+  const feedQuery = useRunwayFeed(params, {
     enabled: true,
   });
 

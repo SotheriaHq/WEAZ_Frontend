@@ -11,8 +11,8 @@ const StudioEmbeddedSearchBridge: React.FC = () => {
 
   React.useEffect(() => {
     const handleOpen = () => setOpen(true);
-    window.addEventListener('threadly:native-search-open', handleOpen);
-    return () => window.removeEventListener('threadly:native-search-open', handleOpen);
+    window.addEventListener('wiez:native-search-open', handleOpen);
+    return () => window.removeEventListener('wiez:native-search-open', handleOpen);
   }, []);
 
   if (!open) return null;

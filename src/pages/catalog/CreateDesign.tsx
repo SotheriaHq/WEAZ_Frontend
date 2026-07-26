@@ -315,7 +315,7 @@ const CreateDesignInner: React.FC = () => {
   // Persisted in localStorage so it never shows again after the first visit.
   useEffect(() => {
     if (isEditMode) return;
-    if (localStorage.getItem('threadly_tour_design_create')) return;
+    if (localStorage.getItem('wiez_tour_design_create')) return;
     const timer = window.setTimeout(() => setIsTourActive(true), 800);
     return () => clearTimeout(timer);
     // isEditMode is stable for the lifetime of this page instance
@@ -324,7 +324,7 @@ const CreateDesignInner: React.FC = () => {
 
   const handleTourClose = useCallback(() => {
     setIsTourActive(false);
-    localStorage.setItem('threadly_tour_design_create', '1');
+    localStorage.setItem('wiez_tour_design_create', '1');
   }, []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1994,7 +1994,7 @@ const CreateDesignInner: React.FC = () => {
                               onKeyDown={handleTagInputKeyDown}
                               placeholder="Search or create a hashtag..."
                               disabled={disabled || selectedTags.length >= 10}
-                              className="threadly-search-input pl-10 pr-[5.5rem]"
+                              className="wiez-search-input pl-10 pr-[5.5rem]"
                             />
                             <button
                               type="button"

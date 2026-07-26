@@ -344,7 +344,7 @@ const StoreGeneralSettings: React.FC = () => {
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Store URL Slug</label>
             <div className="flex items-center gap-2">
-              <span className="text-gray-500 dark:text-gray-400 text-sm">threadly.store/</span>
+              <span className="text-gray-500 dark:text-gray-400 text-sm">wiez.store/</span>
               <input
                 type="text"
                 value={slug}

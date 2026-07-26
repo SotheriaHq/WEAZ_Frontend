@@ -152,7 +152,7 @@ const wrapEndpointFailure = async <T,>(
   try {
     return await request();
   } catch (error: any) {
-    error.__threadlyMonitoringEndpoint = endpoint;
+    error.__wiezMonitoringEndpoint = endpoint;
     throw error;
   }
 };
@@ -215,7 +215,7 @@ const AdminMonitoringPage: React.FC = () => {
           'Failed to load operational alerts.',
         ),
         endpoint:
-          err?.__threadlyMonitoringEndpoint ??
+          err?.__wiezMonitoringEndpoint ??
           '/admin/alerts or /admin/alerts/summary',
         status: err?.response?.status ? String(err.response.status) : 'n/a',
       });

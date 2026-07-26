@@ -51,8 +51,8 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-const REMEMBERED_LOGIN_KEY = 'threadly-remembered-login';
-const REMEMBERED_EMAILS_KEY = 'threadly-remembered-emails';
+const REMEMBERED_LOGIN_KEY = 'wiez-remembered-login';
+const REMEMBERED_EMAILS_KEY = 'wiez-remembered-emails';
 const PASSWORD_SETUP_PURPOSE = 'PASSWORD_SETUP' as const;
 
 type LoginStep =

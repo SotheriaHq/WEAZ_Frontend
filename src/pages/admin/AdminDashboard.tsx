@@ -4,7 +4,7 @@ import { adminDashboardApi } from '../../api/AdminApi';
 import { unwrapApiResponse } from '@/types/auth';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import useCachedResource from '@/hooks/useCachedResource';
-import { THREADLY_COUNT_STALE_TIME_MS } from '@/query/queryClient';
+import { WIEZ_COUNT_STALE_TIME_MS } from '@/query/queryClient';
 
 type RecentLog = {
   id: string;
@@ -136,7 +136,7 @@ const AdminDashboard: React.FC = () => {
       const res = await adminDashboardApi.getLiveBadges();
       return unwrapApiResponse<LiveBadges>(res.data as any);
     },
-    staleTime: THREADLY_COUNT_STALE_TIME_MS,
+    staleTime: WIEZ_COUNT_STALE_TIME_MS,
     refetchInterval: 20_000,
   });
 

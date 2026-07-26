@@ -104,7 +104,7 @@ const ProductCarousel: React.FC<{
     <section className="space-y-3">
       {/* keyframes injected once per carousel render */}
       <style>{`
-        @keyframes threadly-marquee {
+        @keyframes wiez-marquee {
           from { transform: translateX(0); }
           to   { transform: translateX(-50%); }
         }
@@ -133,7 +133,7 @@ const ProductCarousel: React.FC<{
             className="flex gap-4"
             style={{
               width: 'max-content',
-              animation: `threadly-marquee ${durationS}s linear infinite`,
+              animation: `wiez-marquee ${durationS}s linear infinite`,
               animationPlayState: isPaused || previewNavigationActive ? 'paused' : 'running',
             }}
           >

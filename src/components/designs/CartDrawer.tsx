@@ -62,7 +62,7 @@ const CartItemThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt })
 /**
  * CartDrawer Component
  * 
- * A slide-in drawer displaying the shopping cart with:
+ * A slide-in drawer displaying the shopping bag with:
  * - Product list with quantity controls
  * - Promo code input with validation
  * - Order summary with discounts
@@ -310,7 +310,7 @@ const CartDrawer: React.FC = () => {
               }`}
               role="dialog"
               aria-modal="true"
-              aria-label="Shopping Bag"
+              aria-label="My Bag"
             >
               {/* Glass panel */}
               <div className="h-full bg-white/98 dark:bg-gray-950/98 backdrop-blur-2xl border-l border-white/30 dark:border-white/10 shadow-2xl flex flex-col">

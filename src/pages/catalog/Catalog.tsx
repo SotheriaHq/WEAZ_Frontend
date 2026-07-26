@@ -423,8 +423,8 @@ const ProfilePage: React.FC = () => {
     const onContentReviewUpdated = () => {
       void fetchCollections(user.id, { forceRefresh: true });
     };
-    window.addEventListener('threadly:content-review-updated', onContentReviewUpdated);
-    return () => window.removeEventListener('threadly:content-review-updated', onContentReviewUpdated);
+    window.addEventListener('wiez:content-review-updated', onContentReviewUpdated);
+    return () => window.removeEventListener('wiez:content-review-updated', onContentReviewUpdated);
   }, [fetchCollections, isOwner, user?.id]);
 
   const handleOpenAddModal = () => {
@@ -547,7 +547,7 @@ const ProfilePage: React.FC = () => {
     reviewsLoading;
 
   const getHasDismissedBrandSetup = useCallback(() => {
-    const DISMISS_KEY = 'threadly.brandProfileSetup.dismissedUntil';
+    const DISMISS_KEY = 'wiez.brandProfileSetup.dismissedUntil';
     if (typeof window === 'undefined') return false;
     const dismissedUntilRaw = window.localStorage.getItem(DISMISS_KEY);
     const dismissedUntil = dismissedUntilRaw ? Number(dismissedUntilRaw) : 0;
@@ -600,7 +600,7 @@ const ProfilePage: React.FC = () => {
   }, [isOwner, user, brandProfile]);
 
   useEffect(() => {
-    const DISMISS_KEY = 'threadly.storeSetup.dismissedUntil';
+    const DISMISS_KEY = 'wiez.storeSetup.dismissedUntil';
     if (!isOwner) {
       setStoreStatus(null);
       setStoreStatusLoading(false);
@@ -642,7 +642,7 @@ const ProfilePage: React.FC = () => {
   }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading]);
 
   const dismissStoreSetupNudge = useCallback(() => {
-    const DISMISS_KEY = 'threadly.storeSetup.dismissedUntil';
+    const DISMISS_KEY = 'wiez.storeSetup.dismissedUntil';
     const until = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
     localStorage.setItem(DISMISS_KEY, String(until));
     setHasDismissedStoreSetup(true);
@@ -666,7 +666,7 @@ const ProfilePage: React.FC = () => {
   // A mount-scoped ref re-fired on every catalog remount, so a hard refresh
   // re-popped the profile modal. sessionStorage survives refresh but resets for
   // a new session, so the nudge shows once and then leaves the user alone.
-  const AUTO_PROMPT_SESSION_KEY = 'threadly.brandProfileSetup.promptedSession';
+  const AUTO_PROMPT_SESSION_KEY = 'wiez.brandProfileSetup.promptedSession';
   const hasAutoPromptedSetupRef = useRef(false);
   useEffect(() => {
     if (hasAutoPromptedSetupRef.current) return;
@@ -2118,11 +2118,11 @@ const ProfilePage: React.FC = () => {
 
   const brandData = {
     brandName: viewDisplayData.brandName,
-    title: 'About Catalog',
+    title: isOwner ? 'About My Content' : 'About',
     description:
       viewDisplayData.description || (isOwner
         ? `${viewDisplayData.brandName} is a Lagos-based fashion brand where indigenous Nigerian textiles meet modern fashion innovation.`
-        : 'Welcome to our catalog!'),
+        : 'Welcome!'),
     socialLinks: {
       instagram: viewDisplayData.socialLinks?.instagram || undefined,
       facebook: viewDisplayData.socialLinks?.facebook || undefined,
@@ -2165,7 +2165,7 @@ const ProfilePage: React.FC = () => {
       <div className="mx-auto max-w-lg p-8 text-center">
         <p className="text-4xl" aria-hidden="true">🧭</p>
         <h2 className="mt-4 text-xl font-bold text-gray-900 dark:text-white">
-          {visitorError || 'Catalog not found'}
+          {visitorError || 'Page not found'}
         </h2>
         <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
           This brand catalog could not be loaded. Check your connection and try again.
@@ -2315,6 +2315,10 @@ const ProfilePage: React.FC = () => {
         <div className="mt-6">
           <Tabs
             tabs={['Content', 'Store', 'Reviews', 'Us']}
+            labels={{
+              // UI only: internal key stays Content (URL/backend). Owner sees My Content.
+              Content: isOwner ? 'My Content' : 'Content',
+            }}
             activeTab={activeTab}
             compact={isMobile}
             onTabChange={(tab) => {
@@ -2878,7 +2882,7 @@ const ProfilePage: React.FC = () => {
         title={recentlyDeletedDesign?.isDraft ? 'Draft Deleted' : 'Design Deleted'}
         message="Where do you want to go next?"
         confirmText="Create New Design"
-        cancelText="Go To Content"
+        cancelText="Go To My Content"
         onCancel={() => {
           const nextVisibility = recentlyDeletedDesign?.isDraft ? 'Drafts' : 'Public';
           setRecentlyDeletedDesign(null);

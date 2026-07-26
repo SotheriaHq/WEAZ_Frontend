@@ -17,8 +17,8 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 /**
  * Collection Cart Preview Modal (Item #3 Frontend)
  * 
- * Shows which items from a collection can/cannot be added to cart.
- * Allows users to review availability before bulk-adding to cart.
+ * Shows which items from a collection can/cannot be added to bag.
+ * Allows users to review availability before bulk-adding to bag.
  * 
  * USAGE:
  * const { data } = useQuery(['cart-preview', collectionId], () => 

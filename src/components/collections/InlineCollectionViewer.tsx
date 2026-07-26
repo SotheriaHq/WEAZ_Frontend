@@ -31,7 +31,7 @@ import {
   setCollectionDetailQueryData,
   useCollectionDetailQuery,
 } from '@/query/queries';
-import { THREADLY_QUERY_STALE_TIME_MS } from '@/query/queryClient';
+import { WIEZ_QUERY_STALE_TIME_MS } from '@/query/queryClient';
 import { queryKeys } from '@/query/queryKeys';
 
 interface InlineCollectionViewerProps {
@@ -230,15 +230,15 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               const publicUrl = await queryClient.fetchQuery({
                 queryKey: queryKeys.media.publicUrl(fileId),
                 queryFn: () => brandApi.getPublicFileUrl(fileId),
-                staleTime: THREADLY_QUERY_STALE_TIME_MS,
+                staleTime: WIEZ_QUERY_STALE_TIME_MS,
               });
               const url =
                 publicUrl ??
                 (await queryClient.fetchQuery({
                   queryKey: queryKeys.media.signedUrl(fileId),
                   queryFn: () => brandApi.getPrivateSignedFileUrl(fileId),
-                  staleTime: THREADLY_QUERY_STALE_TIME_MS,
-                  gcTime: THREADLY_QUERY_STALE_TIME_MS,
+                  staleTime: WIEZ_QUERY_STALE_TIME_MS,
+                  gcTime: WIEZ_QUERY_STALE_TIME_MS,
                 }));
               return { ...item, url: url || item.url };
             } catch {

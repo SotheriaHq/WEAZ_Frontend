@@ -11,12 +11,12 @@ import {
 describe('brandPublicIdentity', () => {
   it('extracts username from absolute and relative /u/ URLs', () => {
     expect(
-      extractUsernameFromProfileUrl('https://weaz.me/u/hovercovers'),
+      extractUsernameFromProfileUrl('https://§WIEZ_ME§/u/hovercovers'),
     ).toBe('hovercovers');
     expect(extractUsernameFromProfileUrl('/u/maison-vant?tab=Store')).toBe(
       'maison-vant',
     );
-    expect(extractUsernameFromProfileUrl('https://weaz.me/profile/abc')).toBe(
+    expect(extractUsernameFromProfileUrl('https://§WIEZ_ME§/profile/abc')).toBe(
       null,
     );
   });
@@ -24,7 +24,7 @@ describe('brandPublicIdentity', () => {
   it('resolves username from public link when field is missing', () => {
     expect(
       resolveBrandUsername({
-        publicProfileUrl: 'https://weaz.me/u/hovercovers',
+        publicProfileUrl: 'https://§WIEZ_ME§/u/hovercovers',
       }),
     ).toBe('hovercovers');
   });
@@ -62,7 +62,7 @@ describe('brandPublicIdentity', () => {
     expect(
       resolvePublicBrandIdentity({
         brandFullName: 'Hover Covers',
-        publicProfileUrl: 'https://weaz.me/u/hovercovers',
+        publicProfileUrl: 'https://§WIEZ_ME§/u/hovercovers',
         city: 'Lagos',
         country: 'Nigeria',
         tags: ['fashion'],

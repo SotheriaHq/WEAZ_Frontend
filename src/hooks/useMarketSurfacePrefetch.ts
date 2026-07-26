@@ -27,7 +27,7 @@ const onIdle = (callback: () => void): (() => void) => {
  * IMPORTANT: params here must stay IDENTICAL to what the target screens pass,
  * or the query keys won't match and the prefetch is wasted:
  * - MarketPlace sections: { limit: 8, anonymousSessionId } (MarketPlace.tsx)
- * - Runway feed: { counts: 'combined' } default-category feed (Market.tsx)
+ * - Runway design feed: { counts: 'combined' } (Runway.tsx)
  */
 export const useMarketSurfacePrefetch = (current: MarketSurface) => {
   const queryClient = useQueryClient();
@@ -48,11 +48,11 @@ export const useMarketSurfacePrefetch = (current: MarketSurface) => {
       if (current !== 'runway') {
         const feedParams = { counts: 'combined' as const };
         void queryClient.prefetchQuery({
-          queryKey: queryKeys.market.feed(feedParams),
-          queryFn: ({ signal }) => marketApi.getFeed(feedParams, { signal }),
+          queryKey: queryKeys.runway.feed(feedParams),
+          queryFn: ({ signal }) => marketApi.getRunwayFeed(feedParams, { signal }),
         });
         void queryClient.prefetchQuery({
-          queryKey: queryKeys.market.feedCategories(),
+          queryKey: queryKeys.runway.feedCategories(),
           queryFn: ({ signal }) => marketApi.getFeedCategories({ signal }),
         });
       }

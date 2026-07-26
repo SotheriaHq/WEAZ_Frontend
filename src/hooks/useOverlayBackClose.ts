@@ -64,7 +64,7 @@ export function useOverlayBackClose(
     // Push a same-URL entry: React Router sees no location change, so it does
     // not re-render a route — but a Back now has something to pop.
     window.history.pushState(
-      { ...(window.history.state ?? {}), __threadlyOverlay: true },
+      { ...(window.history.state ?? {}), __wiezOverlay: true },
       '',
       window.location.href,
     );

@@ -4,7 +4,7 @@ import { LEGAL_PAGES } from './legalDocuments';
 
 export default function LegalIndexPage() {
   return (
-    <main className="threadly-shell-bg min-h-screen px-4 py-12 text-slate-950 dark:text-white sm:px-6 lg:px-8">
+    <main className="wiez-shell-bg min-h-screen px-4 py-12 text-slate-950 dark:text-white sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-8">
           <p className="text-xs font-black uppercase tracking-[0.24em] text-fuchsia-500 dark:text-fuchsia-300">

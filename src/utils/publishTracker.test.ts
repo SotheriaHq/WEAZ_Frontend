@@ -126,7 +126,7 @@ describe('publishTracker identifiers', () => {
     // In-memory read rehydrates session preview so catalog cards can show cover.
     expect(readPublishTasks({ ownerId: 'owner-1' })[0]?.coverPreviewUrl).toBe(dataUrl);
     // Persistence layer must never store data: / blob: URLs (Safari quota).
-    const persisted = JSON.parse(window.localStorage.getItem('threadly.publish.designTasks.v2') || '[]') as Array<{
+    const persisted = JSON.parse(window.localStorage.getItem('wiez.publish.designTasks.v2') || '[]') as Array<{
       id: string;
       coverPreviewUrl?: string;
     }>;
@@ -135,10 +135,10 @@ describe('publishTracker identifiers', () => {
     const blobTask = createPublishTask({
       ownerId: 'owner-1',
       title: 'Blob task',
-      coverPreviewUrl: 'blob:https://weaz.me/local-preview',
+      coverPreviewUrl: 'blob:https://§WIEZ_ME§/local-preview',
     });
     expect(readPublishTasks({ ownerId: 'owner-1' }).some((task) => task.id === blobTask.id && task.coverPreviewUrl?.startsWith('blob:'))).toBe(true);
-    const persistedAfterBlob = JSON.parse(window.localStorage.getItem('threadly.publish.designTasks.v2') || '[]') as Array<{
+    const persistedAfterBlob = JSON.parse(window.localStorage.getItem('wiez.publish.designTasks.v2') || '[]') as Array<{
       coverPreviewUrl?: string;
     }>;
     expect(persistedAfterBlob.every((entry) => !entry.coverPreviewUrl?.startsWith('blob:') && !entry.coverPreviewUrl?.startsWith('data:'))).toBe(true);
@@ -163,13 +163,13 @@ describe('publishTracker identifiers', () => {
     expect(failedTask).toBeTruthy();
     if (!failedTask) return;
 
-    const stored = JSON.parse(window.localStorage.getItem('threadly.publish.designTasks.v2') || '[]') as PublishTask[];
+    const stored = JSON.parse(window.localStorage.getItem('wiez.publish.designTasks.v2') || '[]') as PublishTask[];
     const patched = stored.map((entry) =>
       entry.id === failedTask.id
         ? { ...entry, status: 'failed' as const, designId: 'server-draft-uuid', legacyCollectionId: 'server-draft-uuid' }
         : entry,
     );
-    window.localStorage.setItem('threadly.publish.designTasks.v2', JSON.stringify(patched));
+    window.localStorage.setItem('wiez.publish.designTasks.v2', JSON.stringify(patched));
 
     expect(readPublishTasks(scope).some((entry) => entry.status === 'failed')).toBe(true);
     expect(reconcilePublishTasksWithDraftIds(['server-draft-uuid'], scope)).toBe(1);
@@ -219,7 +219,7 @@ describe('publishTracker failed-publish markers', () => {
 
     expect(readPublishFailedDesignIds(scope).size).toBe(1);
     const stored = JSON.parse(
-      window.localStorage.getItem('threadly.publish.failedDesignIds.v1') || '[]',
+      window.localStorage.getItem('wiez.publish.failedDesignIds.v1') || '[]',
     ) as Array<{ designId: string }>;
     expect(stored.filter((entry) => entry.designId === 'design-1')).toHaveLength(1);
   });

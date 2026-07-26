@@ -340,7 +340,7 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-sm hover:from-purple-700 hover:to-indigo-700 transition shadow-lg shadow-purple-500/30"
             >
               <ShoppingCart className="w-4 h-4" />
-              Add to Cart
+              Bag It
             </button>
           )}
           {onAddToWishlist && (

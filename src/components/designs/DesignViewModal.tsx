@@ -51,7 +51,7 @@ import {
   fetchCollectionDetailQuery,
   useSavedStatusQuery,
 } from '@/query/queries';
-import { THREADLY_QUERY_STALE_TIME_MS } from '@/query/queryClient';
+import { WIEZ_QUERY_STALE_TIME_MS } from '@/query/queryClient';
 import { queryKeys } from '@/query/queryKeys';
 import ReportContentButton from '@/components/content-integrity/ReportContentButton';
 
@@ -216,7 +216,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               publicUrl = await queryClient.fetchQuery({
                 queryKey: queryKeys.media.publicUrl(m.fileId),
                 queryFn: () => brandApi.getPublicFileUrl(String(m.fileId)),
-                staleTime: THREADLY_QUERY_STALE_TIME_MS,
+                staleTime: WIEZ_QUERY_STALE_TIME_MS,
                 retry: false,
               });
             } catch {
@@ -227,8 +227,8 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               const signed = publicUrl ?? await queryClient.fetchQuery({
                 queryKey: queryKeys.media.signedUrl(m.fileId),
                 queryFn: () => brandApi.getPrivateSignedFileUrl(String(m.fileId)),
-                staleTime: THREADLY_QUERY_STALE_TIME_MS,
-                gcTime: THREADLY_QUERY_STALE_TIME_MS,
+                staleTime: WIEZ_QUERY_STALE_TIME_MS,
+                gcTime: WIEZ_QUERY_STALE_TIME_MS,
                 retry: false,
               });
               return { ...m, url: signed || m.url };
