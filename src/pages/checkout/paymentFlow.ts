@@ -4,6 +4,13 @@ import type {
   PaystackPaymentData,
   ShippingAddress,
 } from '@/api/StoreApi';
+import {
+  isEmptyPhone,
+  isValidPhone,
+  normalizePhoneToE164,
+  PHONE_INVALID_MESSAGE,
+  PHONE_REQUIRED_MESSAGE,
+} from '@/utils/phoneNumber';
 
 export interface PaymentOptionMeta {
   value: keyof PaymentFormState;
@@ -372,11 +379,15 @@ export function validatePaymentData(
     errors.email = 'Enter a valid email address';
   }
 
-  if (!paymentData.phone.trim()) {
-    errors.phone = 'Phone number is required';
+  if (isEmptyPhone(paymentData.phone)) {
+    errors.phone = PHONE_REQUIRED_MESSAGE;
+  } else if (!isValidPhone(paymentData.phone)) {
+    errors.phone = PHONE_INVALID_MESSAGE;
   }
 
-  if (!shippingAddress.phone.trim()) {
+  if (isEmptyPhone(shippingAddress.phone)) {
+    errors.phone = 'Add a valid shipping phone number first';
+  } else if (!isValidPhone(shippingAddress.phone)) {
     errors.phone = 'Add a valid shipping phone number first';
   }
 
@@ -438,13 +449,17 @@ export function buildContactInfo(
   // phone is required — but the web billing form has no phone field and
   // shippingToBillingAddress drops it. Carry the best phone we have so
   // /payment/initialize-unified doesn't 400 on new-card payments.
-  const billingPhone =
+  const billingPhoneRaw =
     String((billingAddress as { phone?: string }).phone ?? '').trim() ||
     String(paystackData.phone ?? '').trim() ||
     String(shippingAddress.phone ?? '').trim();
+  const billingPhone =
+    normalizePhoneToE164(billingPhoneRaw) ?? billingPhoneRaw;
+  const contactPhone =
+    normalizePhoneToE164(paystackData.phone) ?? String(paystackData.phone ?? '').trim();
 
   return {
-    phone: paystackData.phone,
+    phone: contactPhone,
     email: paystackData.email,
     billingSameAsShipping: paystackData.billingSameAsShipping,
     billingAddress: { ...billingAddress, phone: billingPhone },
@@ -476,13 +491,27 @@ export function buildPaymentSubmissionData(
 
   const draft = normalizeCardDraft(paystackData);
 
+  const submissionPhone =
+    normalizePhoneToE164(paystackData.phone) ?? String(paystackData.phone ?? '').trim();
+  const billingAddress = resolveBillingAddress(paystackData, shippingAddress);
+  const billingPhoneRaw =
+    String((billingAddress as { phone?: string }).phone ?? '').trim() ||
+    submissionPhone ||
+    String(shippingAddress.phone ?? '').trim();
+  const billingPhone =
+    normalizePhoneToE164(billingPhoneRaw) ?? billingPhoneRaw;
+
   return {
     method: 'PAYSTACK',
     channel: paystackData.channel,
     email: paystackData.email,
-    phone: paystackData.phone,
+    phone: submissionPhone,
     billingSameAsShipping: paystackData.billingSameAsShipping,
-    billingAddress: resolveBillingAddress(paystackData, shippingAddress),
+    // Backend ShippingAddressDto requires phone on billing; BillingAddress type is a subset.
+    billingAddress: {
+      ...billingAddress,
+      phone: billingPhone,
+    } as BillingAddress,
     consentAccepted: paystackData.consentAccepted,
     legalAcceptances: paystackData.legalAcceptances ?? [],
     useSavedCard:

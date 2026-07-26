@@ -1,11 +1,16 @@
-
 import axios from 'axios';
+
+/**
+ * Location cascade source for profile/settings forms.
+ * Country (name) → State/Province → City/LGA.
+ * Keep in parity with `threadly-mobile/src/services/locationService.ts`.
+ */
 
 // Interfaces
 export interface CountryOption {
     name: string;
     iso2: string; // Used for flags and API calls
-    flag: string; // Emoji
+    flag: string; // Emoji / alt
     flagImage: string; // SVG Url
 }
 
@@ -18,11 +23,20 @@ export interface CityOption {
     name: string;
 }
 
+/** Shared field labels for profile location cascade (anti-truncation-friendly). */
+export const LOCATION_FIELD_LABELS = {
+    country: 'Country',
+    state: 'State / Province',
+    city: 'City / LGA',
+} as const;
+
 // APIs
 const COUNTRIES_API = 'https://countriesnow.space/api/v0.1/countries';
 const REST_COUNTRIES_API = 'https://restcountries.com/v3.1/all?fields=name,cca2,flags';
 const LOCATION_REQUEST_TIMEOUT_MS = 8000;
-const FALLBACK_COUNTRIES: CountryOption[] = [
+
+/** Platform operating markets when the live country list is unavailable. */
+export const FALLBACK_COUNTRIES: CountryOption[] = [
     { name: 'Ghana', iso2: 'GH', flag: '', flagImage: 'https://flagcdn.com/gh.svg' },
     { name: 'Kenya', iso2: 'KE', flag: '', flagImage: 'https://flagcdn.com/ke.svg' },
     { name: 'Nigeria', iso2: 'NG', flag: '', flagImage: 'https://flagcdn.com/ng.svg' },

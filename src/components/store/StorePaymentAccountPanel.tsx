@@ -14,6 +14,13 @@ import {
   type StorePaymentBankOption,
 } from '@/api/StoreApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import {
+  isEmptyPhone,
+  isValidPhone,
+  normalizePhoneToE164,
+  PHONE_INVALID_MESSAGE,
+  sanitizePhoneInput,
+} from '@/utils/phoneNumber';
 
 interface StorePaymentAccountPanelProps {
   mode?: 'settings' | 'wizard';
@@ -475,6 +482,12 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
       return;
     }
 
+    const trimmedPhone = primaryContactPhone.trim();
+    if (!isEmptyPhone(trimmedPhone) && !isValidPhone(trimmedPhone)) {
+      toast.error(PHONE_INVALID_MESSAGE);
+      return;
+    }
+
     setSaving(true);
     setSyncAction(action);
     try {
@@ -483,7 +496,9 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
         accountNumber: resolvedAccountNumber,
         primaryContactName: primaryContactName.trim() || undefined,
         primaryContactEmail: primaryContactEmail.trim() || undefined,
-        primaryContactPhone: primaryContactPhone.trim() || undefined,
+        primaryContactPhone: isEmptyPhone(trimmedPhone)
+          ? undefined
+          : (normalizePhoneToE164(trimmedPhone) ?? undefined),
       });
       setAccountNumber('');
       await loadPanel(true);
@@ -895,9 +910,12 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
           <input
             type="tel"
             value={primaryContactPhone}
-            onChange={(event) => setPrimaryContactPhone(event.target.value)}
+            onChange={(event) =>
+              setPrimaryContactPhone(sanitizePhoneInput(event.target.value))
+            }
             disabled={loading || saving}
             className={inputClassName}
+            placeholder="080XXXXXXXX or +234..."
           />
         </div>
       </div>

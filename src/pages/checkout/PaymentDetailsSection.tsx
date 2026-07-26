@@ -15,6 +15,7 @@ import {
   getCardholderNameHelperText,
   type PaymentFormErrors,
 } from '@/pages/checkout/paymentFlow';
+import { sanitizePhoneInput } from '@/utils/phoneNumber';
 
 interface PaymentDetailsSectionProps {
   paymentData: PaystackPaymentData;
@@ -172,7 +173,9 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
           label="Payer phone"
           type="tel"
           value={paymentData.phone}
-          onChange={(event) => updateField('phone', event.target.value)}
+          onChange={(event) =>
+            updateField('phone', sanitizePhoneInput(event.target.value))
+          }
           error={errors.phone}
           required
           helperText={`Shipping phone on file: ${shippingAddress.phone || 'none yet'}`}

@@ -33,6 +33,14 @@ import BackLink from '@/components/ui/BackLink';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { formatPrice } from '@/utils/helpers';
+import {
+  isEmptyPhone,
+  isValidPhone,
+  normalizePhoneToE164,
+  PHONE_INVALID_MESSAGE,
+  PHONE_REQUIRED_MESSAGE,
+  sanitizePhoneInput,
+} from '@/utils/phoneNumber';
 import { openPaystackInline } from '@/lib/paystackInline';
 import {
   resolveInAppPaymentSession,
@@ -702,7 +710,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         user?.email?.trim() ||
         paymentState.PAYSTACK.email ||
         '',
-      phone: address.phone.trim(),
+      phone:
+        normalizePhoneToE164(address.phone) ?? address.phone.trim(),
       street: address.street.trim(),
       apartment: String(address.apartment ?? '').trim(),
       city: address.city.trim(),
@@ -722,7 +731,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
           currentAddressDraft.street &&
           currentAddressDraft.city &&
           currentAddressDraft.state &&
-          currentAddressDraft.phone,
+          currentAddressDraft.phone &&
+          isValidPhone(currentAddressDraft.phone),
       ),
     [currentAddressDraft],
   );
@@ -735,7 +745,11 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     if (!address.street.trim()) errors.street = 'Street address is required';
     if (!address.city.trim()) errors.city = 'City is required';
     if (!address.state) errors.state = 'State is required';
-    if (!address.phone.trim()) errors.phone = 'Phone number is required';
+    if (isEmptyPhone(address.phone)) {
+      errors.phone = PHONE_REQUIRED_MESSAGE;
+    } else if (!isValidPhone(address.phone)) {
+      errors.phone = PHONE_INVALID_MESSAGE;
+    }
     setShippingErrors(errors);
     return Object.keys(errors).length === 0;
   }, [address]);
@@ -1519,7 +1533,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                   label="Phone number"
                   type="tel"
                   value={address.phone}
-                  onChange={(e) => updateField('phone', e.target.value)}
+                  onChange={(e) =>
+                    updateField('phone', sanitizePhoneInput(e.target.value))
+                  }
                   placeholder="080XXXXXXXX"
                   error={shippingErrors.phone}
                   required

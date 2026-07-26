@@ -7,13 +7,25 @@ import type { AuthUserDto } from '../../types/auth';
 import type { BrandProfileDto } from '../../types/profile';
 import { brandApi, type UpdateBrandProfilePayload } from '../../api/BrandApi';
 import { toast } from 'sonner';
-import { locationService, type CountryOption, type StateOption } from '../../services/LocationService';
+import {
+  LOCATION_FIELD_LABELS,
+  locationService,
+  type CountryOption,
+  type StateOption,
+} from '../../services/LocationService';
 import UniversalSelect from '../forms/UniversalSelect';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { BRAND_TAG_OPTIONS, BRAND_TAG_SELECTION_LIMIT } from '../../data/brandTags';
 import VLoader from '@/components/loaders/VLoader';
+import {
+  isEmptyPhone,
+  isValidPhone,
+  normalizePhoneToE164,
+  PHONE_E164_MAX_LENGTH,
+  PHONE_INVALID_MESSAGE,
+} from '@/utils/phoneNumber';
 
 // ----------------------------------------------------------------------------
 // Zod Schemas & Helpers
@@ -59,7 +71,14 @@ const profileSchema = z
     socialFacebook: optionalSocialSchema,
     socialTwitter: optionalSocialSchema,
     socialWebsite: optionalSocialSchema,
-    phoneNumber: z.string().trim().max(30, { message: 'Phone number is too long' }).optional(),
+    phoneNumber: z
+      .string()
+      .trim()
+      .max(PHONE_E164_MAX_LENGTH, { message: 'Phone number is too long' })
+      .optional()
+      .refine((value) => isEmptyPhone(value) || isValidPhone(value), {
+        message: PHONE_INVALID_MESSAGE,
+      }),
     businessType: z.string().trim().max(120, { message: 'Business type is too long' }).optional(),
   })
   .refine(
@@ -336,7 +355,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         const brandCountry = values.brandCountry?.trim() || undefined;
         const brandState = values.brandState?.trim() || undefined;
         const brandCity = values.brandCity?.trim() || undefined;
-        const phoneNumber = values.phoneNumber?.trim() || undefined;
+        const rawPhone = values.phoneNumber?.trim() || '';
+        const phoneNumber = isEmptyPhone(rawPhone)
+          ? undefined
+          : (normalizePhoneToE164(rawPhone) ?? undefined);
         const businessType = values.businessType?.trim() || undefined;
 
         const payload: UpdateBrandProfilePayload = {
@@ -638,7 +660,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
               <div className="space-y-2">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <UniversalSelect
-                          label="Country"
+                          label={LOCATION_FIELD_LABELS.country}
                           value={selectedCountry || ''}
                           onChange={(val) => {
                               setValue('brandCountry', val, {
@@ -660,9 +682,11 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           disabled={loadingLocations}
                           className="w-full"
                           menuLayer="modal"
+                          optionAllowWrap
+                          selectedAllowWrap
                       />
                        <UniversalSelect
-                          label="State / Province"
+                          label={LOCATION_FIELD_LABELS.state}
                           value={selectedState || ''}
                           onChange={(val) => {
                               setValue('brandState', val, {
@@ -673,16 +697,24 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                               clearErrors('brandCountry');
                           }}
                           options={stateOptions}
-                          placeholder={loadingLocations ? "Loading..." : "State/Province"}
+                          placeholder={
+                            !selectedCountry
+                              ? 'Select country first'
+                              : loadingLocations
+                                ? 'Loading...'
+                                : 'Select state / province'
+                          }
                           searchable
                           searchPlaceholder="Search states or provinces..."
                           emptyMessage="No matching state or province found"
                           disabled={!selectedCountry || stateOptions.length === 0 || loadingLocations}
                           className="w-full"
                           menuLayer="modal"
+                          optionAllowWrap
+                          selectedAllowWrap
                       />
                        <UniversalSelect
-                          label="City"
+                          label={LOCATION_FIELD_LABELS.city}
                           value={watch('brandCity') || ''}
                           onChange={(val) =>
                             setValue('brandCity', val, {
@@ -691,13 +723,21 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                             })
                           }
                           options={cityOptions}
-                          placeholder={loadingLocations ? "Loading..." : "City"}
+                          placeholder={
+                            !selectedState
+                              ? 'Select state first'
+                              : loadingLocations
+                                ? 'Loading...'
+                                : 'Select city / LGA'
+                          }
                           searchable
-                          searchPlaceholder="Search cities..."
-                          emptyMessage="No matching city found"
+                          searchPlaceholder="Search cities or LGAs..."
+                          emptyMessage="No matching city or LGA found"
                           disabled={!selectedState || cityOptions.length === 0 || loadingLocations}
                           className="w-full"
                           menuLayer="modal"
+                          optionAllowWrap
+                          selectedAllowWrap
                       />
                   </div>
                   {errors.brandCountry && (

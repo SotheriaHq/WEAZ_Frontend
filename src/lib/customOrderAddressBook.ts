@@ -1,5 +1,6 @@
 import { apiClient } from '@/api/httpClient';
 import type { ShippingAddress } from '@/api/StoreApi';
+import { isValidPhone, normalizePhoneToE164 } from '@/utils/phoneNumber';
 
 export interface SavedDeliveryAddress {
   id: string;
@@ -72,7 +73,8 @@ const normalizeDeliveryAddress = (
   const lastName = String(raw.lastName ?? nameParts.lastName).trim();
   const customerName = explicitCustomerName || [firstName, lastName].filter(Boolean).join(' ').trim();
   const contactEmail = String(raw.contactEmail ?? '').trim();
-  const phone = String(raw.phone ?? raw.contactPhone ?? '').trim();
+  const rawPhone = String(raw.phone ?? raw.contactPhone ?? '').trim();
+  const phone = normalizePhoneToE164(rawPhone) ?? '';
   const street = String(raw.street ?? '').trim();
   const apartment = String(raw.apartment ?? '').trim();
   const city = String(raw.city ?? '').trim();
@@ -80,7 +82,7 @@ const normalizeDeliveryAddress = (
   const postalCode = String(raw.postalCode ?? '').trim();
   const country = String(raw.country ?? 'Nigeria').trim() || 'Nigeria';
 
-  if (!customerName || !street || !city || !state || !phone) {
+  if (!customerName || !street || !city || !state || !phone || !isValidPhone(phone)) {
     return null;
   }
 

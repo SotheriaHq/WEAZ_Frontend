@@ -23,6 +23,14 @@ import {
   type CustomOrderSavedAddress,
 } from '@/lib/customOrderAddressBook';
 import { openCartDrawer } from '@/features/cartSlice';
+import {
+  isEmptyPhone,
+  isValidPhone,
+  normalizePhoneToE164,
+  PHONE_INVALID_MESSAGE,
+  PHONE_REQUIRED_MESSAGE,
+  sanitizePhoneInput,
+} from '@/utils/phoneNumber';
 
 export interface CustomOrderComposerPageProps {
   configurationIdOverride?: string | null;
@@ -312,7 +320,10 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   );
 
   const contactInfo = useMemo(
-    () => ({ email: contactEmail, phone: contactPhone }),
+    () => ({
+      email: contactEmail,
+      phone: normalizePhoneToE164(contactPhone) ?? contactPhone.trim(),
+    }),
     [contactEmail, contactPhone],
   );
 
@@ -391,7 +402,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       id: editingAddressId ?? undefined,
       customerName: customerName.trim(),
       contactEmail: contactEmail.trim(),
-      contactPhone: contactPhone.trim(),
+      contactPhone: normalizePhoneToE164(contactPhone) ?? contactPhone.trim(),
       street: street.trim(),
       city: city.trim(),
       state: stateRegion.trim(),
@@ -529,8 +540,16 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       toast.error('Review and confirm that these measurements are current within the last 14 days.');
       return;
     }
-    if (!customerName.trim() || !contactEmail.trim() || !contactPhone.trim() || !street.trim() || !city.trim() || !stateRegion.trim() || !country.trim()) {
+    if (!customerName.trim() || !contactEmail.trim() || !street.trim() || !city.trim() || !stateRegion.trim() || !country.trim()) {
       toast.error('Complete the delivery and contact information first.');
+      return;
+    }
+    if (isEmptyPhone(contactPhone)) {
+      toast.error(PHONE_REQUIRED_MESSAGE);
+      return;
+    }
+    if (!isValidPhone(contactPhone)) {
+      toast.error(PHONE_INVALID_MESSAGE);
       return;
     }
 
@@ -880,7 +899,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
                   <label className="block md:col-span-2"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Customer name</span><input value={customerName} onChange={(event) => setCustomerName(event.target.value)} className={inputClassName} /></label>
                   <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Email</span><input value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} className={inputClassName} /></label>
-                  <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Phone</span><input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} className={inputClassName} /></label>
+                  <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Phone</span><input value={contactPhone} onChange={(event) => setContactPhone(sanitizePhoneInput(event.target.value))} className={inputClassName} inputMode="tel" /></label>
                   <label className="block md:col-span-2"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Street</span><input value={street} onChange={(event) => setStreet(event.target.value)} className={inputClassName} /></label>
                   <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">City</span><input value={city} onChange={(event) => setCity(event.target.value)} className={inputClassName} /></label>
                   <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">State</span><input value={stateRegion} onChange={(event) => setStateRegion(event.target.value)} className={inputClassName} /></label>

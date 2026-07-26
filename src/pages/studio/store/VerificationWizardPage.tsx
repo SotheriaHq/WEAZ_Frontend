@@ -38,6 +38,14 @@ import type {
 } from '@/types/verification';
 import { setUser } from '@/features/userSlice';
 import Modal from '@/components/ui/Modal';
+import {
+  isEmptyPhone,
+  isValidPhone,
+  normalizePhoneToE164,
+  PHONE_INVALID_MESSAGE,
+  PHONE_REQUIRED_MESSAGE,
+  sanitizePhoneInput,
+} from '@/utils/phoneNumber';
 
 const DOCUMENT_UPLOADS = [
   { key: 'ownerPhotoKey', label: 'Owner Selfie / Photo', documentType: 'OWNER_PHOTO', hint: 'Frontal clear portrait of store owner or director.' },
@@ -58,6 +66,18 @@ const DOCUMENT_UPLOADS = [
 ] as const;
 
 type UploadFieldKey = (typeof DOCUMENT_UPLOADS)[number]['key'];
+
+const isExpiryDateTooSoon = (expiryDateStr?: string): boolean => {
+  if (!expiryDateStr) return false;
+  const expiryDate = new Date(expiryDateStr);
+  if (Number.isNaN(expiryDate.getTime())) return false;
+  
+  const oneWeekFromToday = new Date();
+  oneWeekFromToday.setHours(0, 0, 0, 0);
+  oneWeekFromToday.setDate(oneWeekFromToday.getDate() + 7);
+  
+  return expiryDate.getTime() <= oneWeekFromToday.getTime();
+};
 
 export default function VerificationWizardPage() {
   const navigate = useNavigate();
@@ -86,6 +106,7 @@ export default function VerificationWizardPage() {
     guidelines: false,
   });
   const [uploadPreviewUrls, setUploadPreviewUrls] = useState<Partial<Record<UploadFieldKey, string>>>({});
+  const [localObjectUrls, setLocalObjectUrls] = useState<Partial<Record<UploadFieldKey, string>>>({});
   const [lastSignedAt, setLastSignedAt] = useState<string | null>(null);
   const saveDraftLockRef = useRef(false);
   const submitLockRef = useRef(false);
@@ -94,6 +115,16 @@ export default function VerificationWizardPage() {
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(localObjectUrls).forEach((url) => {
+        if (url && url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+  }, [localObjectUrls]);
 
   const originPath =
     typeof (location.state as { from?: unknown } | null)?.from === 'string'
@@ -104,6 +135,10 @@ export default function VerificationWizardPage() {
     () => buildSignatureText(form, letter),
     [form, letter],
   );
+
+  const getPreviewUrl = (fieldKey: UploadFieldKey): string | undefined => {
+    return localObjectUrls[fieldKey] || uploadPreviewUrls[fieldKey];
+  };
 
   const wizardLockMessage = useMemo(() => {
     if (!status) return null;
@@ -243,7 +278,7 @@ export default function VerificationWizardPage() {
       }).filter((item) => item.s3Key.length > 0);
 
       for (const item of uploads) {
-        if (uploadPreviewUrls[item.key]) {
+        if (uploadPreviewUrls[item.key] || localObjectUrls[item.key]) {
           continue;
         }
         try {
@@ -262,7 +297,7 @@ export default function VerificationWizardPage() {
     return () => {
       cancelled = true;
     };
-  }, [form, uploadPreviewUrls]);
+  }, [form, localObjectUrls, uploadPreviewUrls]);
 
   const setField = <K extends keyof VerificationDraftData>(
     key: K,
@@ -297,7 +332,9 @@ export default function VerificationWizardPage() {
       saveDraftLockRef.current = true;
       setSavingDraft(true);
       await brandApi.saveVerificationDraft(brandId, form, nextStep);
-      const resolvedPhoneNumber = String(form.ownerPhoneNumber ?? '').trim();
+      const resolvedPhoneNumber =
+        normalizePhoneToE164(form.ownerPhoneNumber) ??
+        String(form.ownerPhoneNumber ?? '').trim();
       if (user && resolvedPhoneNumber && (user.phoneNumber ?? '').trim() !== resolvedPhoneNumber) {
         dispatch(
           setUser({
@@ -328,6 +365,18 @@ export default function VerificationWizardPage() {
     file: File | null,
   ) => {
     if (!brandId || !file) return;
+
+    // Cache local blob URL for instant 0ms preview rendering without network overhead
+    if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+      const localUrl = URL.createObjectURL(file);
+      setLocalObjectUrls((prev) => {
+        if (prev[field as UploadFieldKey]?.startsWith('blob:')) {
+          URL.revokeObjectURL(prev[field as UploadFieldKey]!);
+        }
+        return { ...prev, [field as UploadFieldKey]: localUrl };
+      });
+    }
+
     try {
       setUploadingField(field);
       const presign = await brandApi.presignVerificationUpload(brandId, {
@@ -393,8 +442,14 @@ export default function VerificationWizardPage() {
       if (!form.ownerLegalFirstName?.trim() || !form.ownerLegalLastName?.trim()) {
         throw new Error('Enter the legal first and last name');
       }
-      if (!form.ownerDateOfBirth || !resolvedPhoneNumber) {
-        throw new Error('Date of birth and phone number are required');
+      if (!form.ownerDateOfBirth) {
+        throw new Error('Date of birth is required');
+      }
+      if (isEmptyPhone(resolvedPhoneNumber)) {
+        throw new Error(PHONE_REQUIRED_MESSAGE);
+      }
+      if (!isValidPhone(resolvedPhoneNumber)) {
+        throw new Error(PHONE_INVALID_MESSAGE);
       }
       if (!form.ownerNin?.trim()) {
         throw new Error('Owner NIN is required');
@@ -418,6 +473,9 @@ export default function VerificationWizardPage() {
     if (index === 2) {
       if (!form.idDocumentNumber?.trim()) {
         throw new Error('ID document number is required');
+      }
+      if (form.idDocumentExpiryDate && isExpiryDateTooSoon(form.idDocumentExpiryDate)) {
+        throw new Error('ID document expiry date must be valid for at least 1 week from today');
       }
       if (
         form.authorityType === 'AUTHORIZED_REPRESENTATIVE' &&
@@ -463,8 +521,9 @@ export default function VerificationWizardPage() {
     try {
       submitLockRef.current = true;
       validateStep(4);
-      const resolvedPhoneNumber =
+      const rawPhone =
         form.ownerPhoneNumber?.trim() || String(user?.phoneNumber ?? '').trim();
+      const resolvedPhoneNumber = normalizePhoneToE164(rawPhone) ?? rawPhone;
       setSubmitting(true);
       const payload: Record<string, unknown> = {
         ownerLegalFirstName: form.ownerLegalFirstName,
@@ -558,11 +617,6 @@ export default function VerificationWizardPage() {
   }, [form, user?.phoneNumber]);
 
   const step = VERIFICATION_STEPS[stepIndex];
-  const locationLockedLabel = useMemo(() => {
-    const country = String(form.businessAddress?.country ?? '').trim() || 'Nigeria';
-    const state = String(form.businessAddress?.state ?? '').trim() || 'Not set';
-    return `${state}, ${country}`;
-  }, [form.businessAddress?.country, form.businessAddress?.state]);
 
   const toggleSection = (id: string) => {
     setExpandedSections((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -748,53 +802,58 @@ export default function VerificationWizardPage() {
                     </div>
 
                     <div className="grid gap-6 sm:grid-cols-2">
-                    <Input
-                      label="Legal First Name *"
-                      placeholder="e.g. Jane"
-                      value={form.ownerLegalFirstName ?? ''}
-                      onChange={(event) => setField('ownerLegalFirstName', event.target.value)}
-                    />
-                    <Input
-                      label="Legal Last Name *"
-                      placeholder="e.g. Doe"
-                      value={form.ownerLegalLastName ?? ''}
-                      onChange={(event) => setField('ownerLegalLastName', event.target.value)}
-                    />
-                    <Input
-                      label="Date of Birth *"
-                      type="date"
-                      value={form.ownerDateOfBirth ?? ''}
-                      onChange={(event) => setField('ownerDateOfBirth', event.target.value)}
-                    />
-                    <Select
-                      label="Gender"
-                      value={form.ownerGender ?? 'PREFER_NOT_TO_SAY'}
-                      onChange={(event) =>
-                        setField('ownerGender', event.target.value as VerificationDraftData['ownerGender'])
-                      }
-                    >
-                      {GENDER_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                    <Input
-                      label="Phone Number *"
-                      placeholder="(555) 000-0000"
-                      required
-                      value={form.ownerPhoneNumber ?? ''}
-                      onChange={(event) => setField('ownerPhoneNumber', event.target.value)}
-                      helperText="Syncs with your profile; used for verification notifications."
-                    />
-                    <Input
-                      label="National ID (NIN) *"
-                      placeholder="XXX-XX-XXXX"
-                      required
-                      value={form.ownerNin ?? ''}
-                      onChange={(event) => setField('ownerNin', event.target.value)}
-                      helperText="Must match owner's government-issued ID."
-                    />
+                      <Input
+                        label="Legal First Name *"
+                        placeholder="e.g. Jane"
+                        value={form.ownerLegalFirstName ?? ''}
+                        onChange={(event) => setField('ownerLegalFirstName', event.target.value)}
+                      />
+                      <Input
+                        label="Legal Last Name *"
+                        placeholder="e.g. Doe"
+                        value={form.ownerLegalLastName ?? ''}
+                        onChange={(event) => setField('ownerLegalLastName', event.target.value)}
+                      />
+                      <Input
+                        label="Date of Birth *"
+                        type="date"
+                        value={form.ownerDateOfBirth ?? ''}
+                        onChange={(event) => setField('ownerDateOfBirth', event.target.value)}
+                      />
+                      <Select
+                        label="Gender"
+                        value={form.ownerGender ?? 'PREFER_NOT_TO_SAY'}
+                        onChange={(event) =>
+                          setField('ownerGender', event.target.value as VerificationDraftData['ownerGender'])
+                        }
+                      >
+                        {GENDER_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </Select>
+                      <Input
+                        label="Phone Number *"
+                        placeholder="080XXXXXXXX or +234..."
+                        required
+                        value={form.ownerPhoneNumber ?? ''}
+                        onChange={(event) =>
+                          setField(
+                            'ownerPhoneNumber',
+                            sanitizePhoneInput(event.target.value),
+                          )
+                        }
+                        helperText="Syncs with your profile; used for verification notifications."
+                      />
+                      <Input
+                        label="National ID (NIN) *"
+                        placeholder="XXX-XX-XXXX"
+                        required
+                        value={form.ownerNin ?? ''}
+                        onChange={(event) => setField('ownerNin', event.target.value)}
+                        helperText="Must match owner's government-issued ID."
+                      />
                     </div>
                   </div>
                 ) : null}
@@ -850,9 +909,6 @@ export default function VerificationWizardPage() {
                       disabled
                       helperText="Locked from verified store profile country."
                     />
-                    <div className="sm:col-span-2 rounded-xl border border-primary/20 bg-primary/5 p-3.5 text-xs font-medium text-on-surface">
-                      Registered location for verification: <span className="font-bold text-primary">{locationLockedLabel}</span>
-                    </div>
                   </div>
                 ) : null}
 
@@ -897,14 +953,23 @@ export default function VerificationWizardPage() {
                       value={form.idDocumentNumber ?? ''}
                       onChange={(event) => setField('idDocumentNumber', event.target.value)}
                     />
-                    <Input
-                      label="ID Expiry Date"
-                      type="date"
-                      value={form.idDocumentExpiryDate ?? ''}
-                      onChange={(event) =>
-                        setField('idDocumentExpiryDate', event.target.value)
-                      }
-                    />
+                    <div className="flex flex-col gap-1.5">
+                      <Input
+                        label="ID Expiry Date"
+                        type="date"
+                        value={form.idDocumentExpiryDate ?? ''}
+                        onChange={(event) =>
+                          setField('idDocumentExpiryDate', event.target.value)
+                        }
+                        error={isExpiryDateTooSoon(form.idDocumentExpiryDate) ? 'ID expires within 1 week or is already expired' : undefined}
+                      />
+                      {isExpiryDateTooSoon(form.idDocumentExpiryDate) ? (
+                        <div className="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 font-medium flex items-center gap-1.5">
+                          <span>⚠️</span>
+                          <span>Document Expiry Warning: Your ID expires within 7 days or is already expired. Please provide a document valid for more than 1 week.</span>
+                        </div>
+                      ) : null}
+                    </div>
                     {form.authorityType === 'AUTHORIZED_REPRESENTATIVE' ? (
                       <div className="sm:col-span-2">
                         <Textarea
@@ -940,7 +1005,7 @@ export default function VerificationWizardPage() {
                       const value = form[item.key as keyof VerificationDraftData] as string | undefined;
                       const isDragActive = dragActiveField === item.key;
                       const isUploading = uploadingField === item.key;
-                      const previewUrl = uploadPreviewUrls[item.key as UploadFieldKey];
+                      const previewUrl = getPreviewUrl(item.key as UploadFieldKey);
 
                       return (
                         <div
@@ -988,7 +1053,7 @@ export default function VerificationWizardPage() {
                                 </p>
                                 <div className="mt-2 flex items-center gap-3">
                                   {previewUrl ? (
-                                    /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?|$)/i.test(previewUrl) ? (
+                                    /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?|$)|blob:/i.test(previewUrl) ? (
                                       <MediaRenderer
                                         kind="image"
                                         src={previewUrl}
@@ -1098,6 +1163,42 @@ export default function VerificationWizardPage() {
                             <dd className="font-semibold text-on-surface">{form.businessAddress?.street}, {form.businessAddress?.city}</dd>
                           </div>
                         </dl>
+                      </div>
+
+                      {/* Evidence Files Preview Section in Review */}
+                      <div className="p-4 bg-surface-container-low rounded-2xl border border-outline-variant/20 md:col-span-2">
+                        <div className="flex items-center justify-between mb-3 pb-2 border-b border-outline-variant/20">
+                          <span className="text-xs font-bold text-primary uppercase tracking-widest">3. Uploaded Evidence Documents</span>
+                          <button type="button" onClick={() => setStepIndex(3)} className="text-xs text-primary hover:underline">Edit</button>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {DOCUMENT_UPLOADS.map((item) => {
+                            const value = String(form[item.key as keyof VerificationDraftData] ?? '').trim();
+                            if (!value) return null;
+                            const previewUrl = getPreviewUrl(item.key as UploadFieldKey);
+                            return (
+                              <div key={item.key} className="rounded-xl border border-emerald-200 bg-white p-3 shadow-sm flex items-center gap-3">
+                                {previewUrl && /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?|$)|blob:/i.test(previewUrl) ? (
+                                  <MediaRenderer
+                                    kind="image"
+                                    src={previewUrl}
+                                    alt={`${item.label} preview`}
+                                    className="w-12 h-12 rounded-lg border border-emerald-200 bg-white shrink-0"
+                                    mediaClassName="object-contain"
+                                    maxHeightClassName="max-h-12"
+                                    maxWidthClassName="max-w-12"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-xl shrink-0">📄</div>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">{item.label}</p>
+                                  <p className="truncate text-xs font-semibold text-emerald-950 mt-0.5">{value.split('/').pop() || 'Uploaded document'}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
 
@@ -1227,20 +1328,36 @@ export default function VerificationWizardPage() {
 
           <section className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-5">
             <p className="text-xs font-bold uppercase tracking-widest text-tertiary mb-3">Authority & Evidence Files</p>
-            <div className="grid gap-3 text-xs text-on-surface sm:grid-cols-2">
+            <div className="grid gap-3 text-xs text-on-surface sm:grid-cols-2 mb-4">
               <p><span className="font-semibold">Authority Type:</span> {form.authorityType || 'Not provided'}</p>
               <p><span className="font-semibold">ID Type:</span> {form.idDocumentType || 'Not provided'}</p>
               <p><span className="font-semibold">ID Number:</span> {form.idDocumentNumber || 'Not provided'}</p>
               <p><span className="font-semibold">ID Expiry:</span> {form.idDocumentExpiryDate || 'Not provided'}</p>
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               {DOCUMENT_UPLOADS.map((item) => {
                 const value = String(form[item.key as keyof VerificationDraftData] ?? '').trim();
                 if (!value) return null;
+                const previewUrl = getPreviewUrl(item.key as UploadFieldKey);
                 return (
-                  <div key={item.key} className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">{item.label}</p>
-                    <p className="mt-1 truncate text-xs text-emerald-900">📄 {value.split('/').pop() || value}</p>
+                  <div key={item.key} className="rounded-xl border border-emerald-200 bg-white p-3 shadow-sm flex items-center gap-3">
+                    {previewUrl && /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?|$)|blob:/i.test(previewUrl) ? (
+                      <MediaRenderer
+                        kind="image"
+                        src={previewUrl}
+                        alt={`${item.label} preview`}
+                        className="w-12 h-12 rounded-lg border border-emerald-200 bg-white shrink-0"
+                        mediaClassName="object-contain"
+                        maxHeightClassName="max-h-12"
+                        maxWidthClassName="max-w-12"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-xl shrink-0">📄</div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">{item.label}</p>
+                      <p className="truncate text-xs font-semibold text-emerald-950 mt-0.5">{value.split('/').pop() || value}</p>
+                    </div>
                   </div>
                 );
               })}
