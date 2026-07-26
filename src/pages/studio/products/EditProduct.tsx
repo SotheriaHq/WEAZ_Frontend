@@ -745,6 +745,12 @@ const EditProduct: React.FC = () => {
     fulfillment: true,
     additional: true,
   });
+  // 3-step wizard: 1 = Details (media + basics), 2 = Operations
+  // (pricing/variants/inventory/sizing/fulfillment/additional), 3 = Review.
+  // Steps are toggled by visibility only — every section stays mounted so no
+  // state, ref, preview, or drag-drop handler is ever lost between steps.
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
+  const wizardTopRef = useRef<HTMLDivElement | null>(null);
   const [isTourActive, setIsTourActive] = useState(false);
 
   // Auto-start the tour the first time a user opens the create-product page.
@@ -899,6 +905,21 @@ const EditProduct: React.FC = () => {
     }
     return false;
   }, [variantKeyCounts]);
+
+  // Live per-step completion — drives the stepper "fillers" and gates
+  // Continue/Publish. Mirrors the exact conditions the existing submit path
+  // already enforces so the wizard never disagrees with the save handler.
+  const step1Complete = useMemo(
+    () => form.title.trim().length > 0 && hasPrimaryMedia,
+    [form.title, hasPrimaryMedia],
+  );
+  const step2Complete = useMemo(
+    () =>
+      (form.price > 0 || minVariantPrice > 0) &&
+      form.variants.length > 0 &&
+      !hasDuplicateVariants,
+    [form.price, minVariantPrice, form.variants.length, hasDuplicateVariants],
+  );
 
   const normalizedShippingRegions = useMemo(
     () => normalizeShippingRegionCodes(shippingRegions),
@@ -1641,6 +1662,15 @@ const EditProduct: React.FC = () => {
     [],
   );
 
+  const goToStep = useCallback((next: 1 | 2 | 3) => {
+    setWizardStep(next);
+    // Scroll the wizard back to the top so each step opens from its start,
+    // without jumping the page around during the transition.
+    requestAnimationFrame(() => {
+      wizardTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
   const tourSteps = useMemo<TourStep[]>(
     () => [
       {
@@ -1663,11 +1693,16 @@ const EditProduct: React.FC = () => {
         description:
           'Set the selling price, an optional compare-at price, and decide whether to go live now or keep this as a draft.',
         emoji: '💳',
-        onEnter: () =>
+        onEnter: () => {
+          // Pricing now lives in Operations (step 2) — reveal it before the
+          // tour measures the target, otherwise the spotlight has nothing to
+          // anchor to (the section is display:none on step 1).
+          setWizardStep(2);
           setCollapsedSections((prev) =>
             prev.pricing ? { ...prev, pricing: false } : prev,
-          ),
-        enterDelay: 350,
+          );
+        },
+        enterDelay: 400,
       },
     ],
     [],
@@ -3189,6 +3224,63 @@ const EditProduct: React.FC = () => {
           <ReviewFeedbackBanner productId={productId} fallbackNote={reviewNoteParam} />
         ) : null}
 
+        {/* Wizard progress stepper — jumpable, fillers reflect live completion */}
+        <div ref={wizardTopRef} className="mb-6 sm:mb-8">
+          <div className="mx-auto flex w-full max-w-3xl items-center">
+            {([
+              { n: 1 as const, label: "Details", done: step1Complete },
+              { n: 2 as const, label: "Operations", done: step2Complete },
+              { n: 3 as const, label: "Review", done: false },
+            ]).map((s, i, arr) => {
+              const isActive = wizardStep === s.n;
+              return (
+                <React.Fragment key={s.n}>
+                  <button
+                    type="button"
+                    onClick={() => goToStep(s.n)}
+                    className="flex shrink-0 flex-col items-center gap-1.5"
+                    aria-current={isActive ? "step" : undefined}
+                  >
+                    <span
+                      className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
+                        isActive
+                          ? "bg-purple-600 text-white shadow-md shadow-purple-500/25"
+                          : s.done
+                            ? "bg-purple-600/15 text-purple-600 dark:text-purple-300"
+                            : "surface-control text-theme-secondary"
+                      }`}
+                    >
+                      {s.done && !isActive ? (
+                        <CheckCircle className="h-5 w-5" />
+                      ) : (
+                        s.n
+                      )}
+                    </span>
+                    <span
+                      className={`text-xs font-medium ${
+                        isActive ? "text-theme" : "text-theme-secondary"
+                      }`}
+                    >
+                      {s.label}
+                    </span>
+                  </button>
+                  {i < arr.length - 1 && (
+                    <div className="mx-2 mb-5 h-0.5 flex-1 overflow-hidden rounded-full surface-control">
+                      <div
+                        className={`h-full rounded-full bg-purple-600 transition-all duration-500 ${
+                          s.done ? "w-full" : "w-0"
+                        }`}
+                      />
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* STEP 1 — Details: Media + Basic Information */}
+        <div className={wizardStep === 1 ? "" : "hidden"}>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
           {/* LEFT COLUMN: Media — sticky rail so it stays in view while the long
               details column scrolls, instead of leaving a tall empty gap and
@@ -3781,6 +3873,13 @@ const EditProduct: React.FC = () => {
                     </div>
                   </div>
 
+        </div>
+        </div>
+        </div>
+
+        {/* STEP 2 — Operations: Pricing, Variants, Inventory & Shipping, Sizing, Fulfillment, Additional Details */}
+        <div className={wizardStep === 2 ? "" : "hidden"}>
+        <div className="mx-auto w-full max-w-4xl">
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-base">⚙️</span>
@@ -4576,6 +4675,271 @@ const EditProduct: React.FC = () => {
                 </div>
               </div>
             </div>
+        </div>
+        </div>
+
+        {/* STEP 3 — Review: read-only summary + publish (numbers reuse the same
+            live form state / profitMargin, so they always match Operations) */}
+        <div className={wizardStep === 3 ? "" : "hidden"}>
+          <div className="mx-auto w-full max-w-4xl space-y-4">
+            <div className="mb-1">
+              <h2 className="text-lg font-semibold text-theme">Review &amp; publish</h2>
+              <p className="text-sm text-theme-secondary">
+                Confirm everything looks right, then publish or save as a draft.
+              </p>
+            </div>
+
+            {/* Media */}
+            <section className="rounded-2xl border border-theme p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                  Media
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => goToStep(1)}
+                  className="text-xs font-medium text-purple-600 hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+              {mediaUrls.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {mediaUrls.map((m) => (
+                    <div
+                      key={m.id}
+                      className="relative h-16 w-16 overflow-hidden rounded-lg border border-theme"
+                    >
+                      <img
+                        src={m.url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                      {m.isPrimary && (
+                        <span className="absolute inset-x-0 bottom-0 bg-purple-600/80 text-center text-[10px] text-white">
+                          Cover
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-theme-secondary">No images added yet.</p>
+              )}
+            </section>
+
+            {/* Basic Information */}
+            <section className="rounded-2xl border border-theme p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                  Basic Information
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => goToStep(1)}
+                  className="text-xs font-medium text-purple-600 hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs text-theme-secondary">Title</dt>
+                  <dd className="text-sm text-theme">{form.title || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-theme-secondary">Audience</dt>
+                  <dd className="text-sm text-theme">
+                    {CREATOR_AUDIENCE_OPTIONS.find((o) => o.value === form.gender)
+                      ?.label ?? "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-theme-secondary">Category</dt>
+                  <dd className="text-sm text-theme">
+                    {productEditorSupportData?.taxonomyCategories?.find(
+                      (c) => c.id === form.taxonomyCategoryId,
+                    )?.name ?? "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-theme-secondary">Subcategory</dt>
+                  <dd className="text-sm text-theme">
+                    {productEditorSupportData?.taxonomyCategories
+                      ?.find((c) => c.id === form.taxonomyCategoryId)
+                      ?.types?.find((t) => t.id === form.categoryTypeId)?.name ??
+                      productEditorSupportData?.categoryTypes?.find(
+                        (t) => t.id === form.categoryTypeId,
+                      )?.name ??
+                      "—"}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-theme-secondary">Description</dt>
+                  <dd className="whitespace-pre-wrap text-sm text-theme">
+                    {form.description || "—"}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            {/* Pricing */}
+            <section className="rounded-2xl border border-theme p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                  Pricing
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => goToStep(2)}
+                  className="text-xs font-medium text-purple-600 hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
+                <div>
+                  <dt className="text-xs text-theme-secondary">Price</dt>
+                  <dd className="text-sm text-theme">
+                    {formatCurrency(form.price || minVariantPrice, form.currency)}
+                  </dd>
+                </div>
+                {form.onSale && form.compareAtPrice > 0 && (
+                  <div>
+                    <dt className="text-xs text-theme-secondary">Sale price</dt>
+                    <dd className="text-sm text-theme">
+                      {formatCurrency(form.compareAtPrice, form.currency)}
+                    </dd>
+                  </div>
+                )}
+                <div>
+                  <dt className="text-xs text-theme-secondary">Unit cost</dt>
+                  <dd className="text-sm text-theme">
+                    {form.costPerItem > 0
+                      ? formatCurrency(form.costPerItem, form.currency)
+                      : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-theme-secondary">Margin</dt>
+                  <dd className="text-sm text-theme">
+                    {profitMargin.margin > 0 ? `${profitMargin.margin}%` : "—"}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            {/* Variants */}
+            <section className="rounded-2xl border border-theme p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                  Variants
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => goToStep(2)}
+                  className="text-xs font-medium text-purple-600 hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+              {form.variants.length > 0 ? (
+                <div className="space-y-1">
+                  {form.variants.map((v, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="text-theme">
+                        {[v.color, v.size].filter(Boolean).join(" · ") ||
+                          `Variant ${i + 1}`}
+                      </span>
+                      <span className="text-theme-secondary">
+                        Stock: {Number.isFinite(v.stock) ? v.stock : 0}
+                        {typeof v.price === "number" && v.price > 0
+                          ? ` · ${formatCurrency(v.price, form.currency)}`
+                          : ""}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="pt-1 text-xs text-theme-secondary">
+                    Total stock: {variantTotalStock}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-theme-secondary">No variants added.</p>
+              )}
+            </section>
+
+            {/* Inventory & Fulfillment */}
+            <section className="rounded-2xl border border-theme p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                  Inventory &amp; Fulfillment
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => goToStep(2)}
+                  className="text-xs font-medium text-purple-600 hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+                <div>
+                  <dt className="text-xs text-theme-secondary">Track inventory</dt>
+                  <dd className="text-sm text-theme">
+                    {form.trackInventory ? "On" : "Off"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-theme-secondary">Sizing</dt>
+                  <dd className="text-sm text-theme">
+                    {form.sizingMode === "NONE" ? "None" : form.sizingMode}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-theme-secondary">Custom order</dt>
+                  <dd className="text-sm text-theme">
+                    {form.customOrderEnabled ? "Enabled" : "Off"}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            {/* Additional Details */}
+            <section className="rounded-2xl border border-theme p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                  Additional Details
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => goToStep(2)}
+                  className="text-xs font-medium text-purple-600 hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs text-theme-secondary">SKU</dt>
+                  <dd className="text-sm text-theme">
+                    {form.sku || "Auto-generated"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-theme-secondary">Materials</dt>
+                  <dd className="text-sm text-theme">{form.materials || "—"}</dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-theme-secondary">Tags</dt>
+                  <dd className="text-sm text-theme">
+                    {form.tags.length > 0 ? form.tags.join(", ") : "—"}
+                  </dd>
+                </div>
+              </dl>
+            </section>
           </div>
         </div>
       </main>
@@ -4599,6 +4963,16 @@ const EditProduct: React.FC = () => {
               ))}
           </div>
           <div className="flex w-full flex-wrap items-stretch gap-2 md:w-auto md:items-center md:gap-4">
+            {wizardStep > 1 && (
+              <button
+                type="button"
+                onClick={() => goToStep((wizardStep - 1) as 1 | 2 | 3)}
+                className="surface-control surface-interactive-hover inline-flex min-h-11 flex-1 items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold transition md:min-h-10 md:flex-initial md:px-4 md:text-sm"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back
+              </button>
+            )}
             {!isEditMode && !isCollectionContext && (
               <button
                 onClick={() =>
@@ -4651,39 +5025,50 @@ const EditProduct: React.FC = () => {
                   ? "Discard Changes"
                   : "Cancel"}
             </button>
-            <button
-              onClick={() =>
-                void triggerSave(false, {
-                  action: "publish",
-                  forceStatus: isCollectionFlow
-                    ? "DRAFT"
-                    : isCollectionContext
-                    ? "ACTIVE"
-                    : isDraftEditMode
+            {wizardStep < 3 ? (
+              <button
+                type="button"
+                onClick={() => goToStep((wizardStep + 1) as 1 | 2 | 3)}
+                className="relative inline-flex min-h-11 flex-1 items-center justify-center gap-1 rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 md:min-h-10 md:flex-initial md:px-6 md:text-sm"
+              >
+                Continue to {wizardStep === 1 ? "Operations" : "Review"}
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                onClick={() =>
+                  void triggerSave(false, {
+                    action: "publish",
+                    forceStatus: isCollectionFlow
+                      ? "DRAFT"
+                      : isCollectionContext
                       ? "ACTIVE"
-                      : undefined,
-                })
-              }
+                      : isDraftEditMode
+                        ? "ACTIVE"
+                        : undefined,
+                  })
+                }
                 disabled={saving || submitLocked}
-              className="relative inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 disabled:bg-purple-600/50 md:min-h-10 md:flex-initial md:px-6 md:text-sm"
-            >
+                className="relative inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 disabled:bg-purple-600/50 md:min-h-10 md:flex-initial md:px-6 md:text-sm"
+              >
                 {(saving || submitLocked) && saveAction === "publish" && (
-                <span className="absolute inset-0 flex items-center justify-center">
-                  <VLoader size={16} phase="loading" showLabel={false} />
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <VLoader size={16} phase="loading" showLabel={false} />
+                  </span>
+                )}
+                <span className={(saving || submitLocked) && saveAction === "publish" ? "opacity-0" : ""}>
+                  {isDraftEditMode
+                    ? "Go live"
+                    : isCollectionContext && isEditMode
+                      ? "Save to Collection"
+                      : isEditMode
+                        ? "Save Changes"
+                        : isCollectionFlow
+                          ? "Add to Collection"
+                          : "Create Product"}
                 </span>
-              )}
-              <span className={(saving || submitLocked) && saveAction === "publish" ? "opacity-0" : ""}>
-                {isDraftEditMode
-                  ? "Go live"
-                  : isCollectionContext && isEditMode
-                    ? "Save to Collection"
-                    : isEditMode
-                      ? "Save Changes"
-                      : isCollectionFlow
-                        ? "Add to Collection"
-                        : "Create Product"}
-              </span>
-            </button>
+              </button>
+            )}
           </div>
         </div>
       </footer>
