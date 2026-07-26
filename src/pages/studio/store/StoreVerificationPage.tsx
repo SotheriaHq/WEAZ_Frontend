@@ -227,7 +227,7 @@ export default function StoreVerificationPage() {
       status?.verificationStatus === 'IN_REVIEW'
     )
       return 3;
-    return 2; // Default starting application flow
+    return 2;
   }, [status]);
 
   if (loading) {
@@ -235,38 +235,39 @@ export default function StoreVerificationPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 bg-surface min-h-screen">
+      {/* Navigation Breadcrumb */}
       <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={() => navigate('/studio/store')}
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-white/10 dark:bg-zinc-800 dark:text-gray-300 dark:hover:border-white/20 dark:hover:bg-zinc-700"
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant shadow-sm transition hover:bg-surface-container-low hover:text-on-surface"
           aria-label="Back to store"
         >
           ←
         </button>
-        <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-          <Link to="/studio/store" className="transition hover:text-gray-700">
+        <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-widest text-on-surface-variant">
+          <Link to="/studio/store" className="transition hover:text-primary">
             Store
           </Link>
-          <span>/</span>
-          <span className="text-gray-800 dark:text-zinc-300">Verification</span>
+          <span className="text-outline-variant">/</span>
+          <span className="text-primary font-bold">Verification</span>
         </nav>
       </div>
 
-      {/* Progress Stepper */}
-      <div className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      {/* Progress Stepper Banner */}
+      <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_8px_32px_rgba(109,35,249,0.04)] relative overflow-hidden">
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gray-400 dark:text-gray-500">
-              Verification Stage
+            <p className="text-xs font-semibold uppercase tracking-widest text-on-surface-variant mb-1">
+              Verification Workspace
             </p>
-            <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-white">
+            <h2 className="text-xl font-bold text-on-surface">
               {currentStep === 4
                 ? 'Step 4 of 4 — Badge is Active 🎉'
                 : currentStep === 3
-                  ? 'Step 3 of 4 — WIEZ Review'
-                  : 'Step 2 of 4 — Identity & Documents'}
+                  ? 'Step 3 of 4 — Under WIEZ Review'
+                  : 'Step 2 of 4 — Identity & Evidence Submission'}
             </h2>
           </div>
           <div className="flex flex-1 max-w-md items-center gap-4">
@@ -282,21 +283,21 @@ export default function StoreVerificationPage() {
               const isDone = step < currentStep;
               const isCurrent = step === currentStep;
               return (
-                <div key={step} className="flex flex-1 flex-col items-center gap-1.5">
+                <div key={step} className="flex flex-1 flex-col items-center gap-2">
                   <div
-                    className={`h-2 w-full rounded-full transition-all duration-300 ${
+                    className={`h-2 w-full rounded-full transition-all duration-500 ${
                       isDone
-                        ? 'bg-purple-600 dark:bg-purple-500'
+                        ? 'bg-primary'
                         : isCurrent
-                          ? 'bg-amber-500 dark:bg-amber-400 animate-pulse'
-                          : 'bg-gray-200 dark:bg-zinc-800'
+                          ? 'bg-tertiary animate-pulse'
+                          : 'bg-surface-container-highest'
                     }`}
                   />
                   <span
                     className={`text-[10px] font-bold uppercase tracking-wider ${
                       isDone || isCurrent
-                        ? 'text-gray-800 dark:text-zinc-200'
-                        : 'text-gray-400 dark:text-zinc-600'
+                        ? 'text-primary'
+                        : 'text-on-surface-variant/60'
                     }`}
                   >
                     {label}
@@ -310,43 +311,43 @@ export default function StoreVerificationPage() {
 
       {status?.verificationStatus === 'REJECTED' &&
       status.rejectionReasons.length > 0 ? (
-        <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50 p-6 shadow-sm dark:border-rose-900/30 dark:bg-rose-950/20">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-rose-600 dark:text-rose-400">
-            Review outcome
+        <section className="rounded-2xl border border-rose-200 bg-rose-50 p-6 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-widest text-rose-700">
+            Review Outcome Feedback
           </p>
-          <ul className="mt-4 space-y-2 text-sm text-rose-800 dark:text-rose-300">
+          <ul className="mt-3 space-y-2 text-xs text-rose-900">
             {status.rejectionReasons.map((reason) => (
               <li key={`${reason.code}-${reason.label}`}>• {reason.label}</li>
             ))}
           </ul>
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            <div className="rounded-2xl border border-rose-200/80 bg-white/80 px-4 py-4 dark:border-rose-900/30 dark:bg-zinc-900/80">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-500 dark:text-rose-400">
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-rose-200/80 bg-white/80 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">
                 Applied on
               </p>
-              <p className="mt-2 text-sm font-semibold text-rose-900 dark:text-rose-250">
+              <p className="mt-1 text-xs font-semibold text-rose-950">
                 {status.verificationSubmittedAt
                   ? new Date(status.verificationSubmittedAt).toLocaleString()
                   : 'Not recorded'}
               </p>
             </div>
-            <div className="rounded-2xl border border-rose-200/80 bg-white/80 px-4 py-4 dark:border-rose-900/30 dark:bg-zinc-900/80">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-500 dark:text-rose-400">
-                Next reapply window
+            <div className="rounded-xl border border-rose-200/80 bg-white/80 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">
+                Reapply Window
               </p>
               {status.cooldownRemainingDays > 0 && cooldownTarget ? (
                 <>
-                  <p className="mt-2 text-sm font-semibold text-rose-900 dark:text-rose-250">
+                  <p className="mt-1 text-xs font-semibold text-rose-950">
                     {cooldownTarget.toLocaleString()}
                   </p>
-                  <p className="mt-1 text-xs text-rose-700 dark:text-rose-400">
+                  <p className="mt-0.5 text-[11px] text-rose-700">
                     {cooldownRemainingText}
                   </p>
                 </>
               ) : (
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                    You can reapply now
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold text-emerald-700">
+                    Eligible to reapply now
                   </p>
                   <Button
                     size="sm"
@@ -368,21 +369,21 @@ export default function StoreVerificationPage() {
       ) : null}
 
       {status?.verificationStatus === 'ADDITIONAL_INFO_REQUESTED' ? (
-        <section className="rounded-[1.75rem] border border-amber-200 bg-amber-50 p-6 shadow-sm dark:border-amber-900/30 dark:bg-amber-950/20">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-700 dark:text-amber-400">
-            More information requested
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-800">
+            More Information Requested
           </p>
           {status.infoRequestMessage ? (
-            <p className="mt-3 text-sm leading-6 text-amber-900 dark:text-amber-300">
+            <p className="mt-2 text-xs leading-relaxed text-amber-900">
               {status.infoRequestMessage}
             </p>
           ) : null}
           {infoItems.length > 0 ? (
-            <ul className="mt-4 space-y-3 text-sm text-amber-900 dark:text-amber-300">
+            <ul className="mt-4 space-y-2 text-xs text-amber-900">
               {infoItems.map((item: VerificationInfoItem) => (
                 <li
                   key={`${item.field}-${item.label}`}
-                  className="rounded-2xl border border-amber-200 bg-white/80 px-4 py-3 dark:border-amber-900/30 dark:bg-zinc-900/80"
+                  className="rounded-xl border border-amber-200 bg-white/80 p-3"
                 >
                   <span className="font-semibold">{item.label}</span>
                   {item.message ? `: ${item.message}` : ''}
@@ -407,63 +408,64 @@ export default function StoreVerificationPage() {
         </section>
       ) : null}
 
-      {/* Main content grid */}
+      {/* Main Content Bento Grid */}
       <section className="grid gap-6 lg:grid-cols-10">
         {/* Left Sidebar (40%) */}
         <div className="space-y-6 lg:col-span-4">
-          <div className="rounded-[1.75rem] border border-gray-200/80 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
-              Badge Status
+          <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm" id="verification-current-state">
+            <p className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4">
+              Store Badge Status
             </p>
             
             {/* Prominent badge display */}
-            <div className="mt-4 flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 py-8 text-center dark:border-white/10 dark:bg-zinc-950">
-              <span className="text-4xl mb-3">
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-outline-variant/40 bg-surface-container-low p-6 text-center">
+              <span className="text-4xl mb-2">
                 {status?.badgeState.isVerifiedBrand ? '🛡️' : '⚠️'}
               </span>
-              <h3 className={`text-xl font-black ${
+              <h3 className={`text-lg font-extrabold ${
                 status?.badgeState.isVerifiedBrand 
-                  ? 'text-emerald-600 dark:text-emerald-400' 
-                  : 'text-amber-600 dark:text-amber-400'
+                  ? 'text-emerald-700' 
+                  : 'text-amber-700'
               }`}>
-                {status?.badgeState.isVerifiedBrand ? 'Verified Brand' : 'Not Active'}
+                {status?.badgeState.isVerifiedBrand ? 'Verified Brand' : 'Verification Incomplete'}
               </h3>
-              <p className="mt-2 px-4 text-xs text-gray-500 dark:text-gray-400">
+              <p className="mt-2 text-xs text-on-surface-variant max-w-xs">
                 {status?.badgeState.isVerifiedBrand
-                  ? 'Your trust badge is displayed on your storefront and products.'
-                  : 'Submit verification evidence to unlock the verified badge.'}
+                  ? 'Your trust badge is displayed across storefronts, catalog items, and brand cards.'
+                  : 'Complete verification to earn your official WIEZ verification badge.'}
               </p>
             </div>
 
             {/* Status Pills */}
-            <div className="mt-6 space-y-3.5">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3.5 dark:border-white/5">
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Verification Status</span>
-                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
+                <span className="text-xs text-on-surface-variant">Verification Status</span>
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
                   status?.verificationStatus === 'APPROVED'
-                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                    ? 'bg-emerald-100 text-emerald-800'
                     : status?.verificationStatus === 'REJECTED'
-                      ? 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400'
+                      ? 'bg-rose-100 text-rose-800'
                       : status?.verificationStatus === 'PENDING' || status?.verificationStatus === 'IN_REVIEW'
-                        ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400'
-                        : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+                        ? 'bg-sky-100 text-sky-800'
+                        : 'bg-amber-100 text-amber-800'
                 }`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
                   {statusDisplayLabel}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3.5 dark:border-white/5">
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Attempts</span>
-                <span className="text-xs font-semibold text-gray-900 dark:text-white">
+              <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
+                <span className="text-xs text-on-surface-variant">Attempt Number</span>
+                <span className="text-xs font-bold text-on-surface">
                   {status?.verificationAttemptNumber ?? 0} attempt(s)
                 </span>
               </div>
 
-              {/* Reminders Toggle Switch layout */}
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3.5 dark:border-white/5">
+              {/* Reminders Toggle Switch */}
+              <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
                 <div>
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Email Reminders</span>
-                  <p className="text-[10px] text-gray-400 dark:text-gray-500">Nudge updates when action is required</p>
+                  <span className="text-xs text-on-surface-variant font-medium">Email Reminders</span>
+                  <p className="text-[10px] text-on-surface-variant/70">Nudge updates when action is required</p>
                 </div>
                 <button
                   type="button"
@@ -471,8 +473,8 @@ export default function StoreVerificationPage() {
                   disabled={saving}
                   className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                     status?.nudgeOptOut
-                      ? 'bg-gray-200 dark:bg-zinc-800'
-                      : 'bg-purple-600 dark:bg-purple-500'
+                      ? 'bg-surface-container-high'
+                      : 'bg-primary'
                   }`}
                 >
                   <span
@@ -483,25 +485,20 @@ export default function StoreVerificationPage() {
                 </button>
               </div>
 
-              <div className="flex flex-col gap-2 pt-2">
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Reapply Cooldown</span>
+              <div className="flex flex-col gap-2 pt-1">
+                <span className="text-xs font-medium text-on-surface-variant">Reapply Lockout</span>
                 <div className={`rounded-xl border p-3 ${
                   status?.cooldownRemainingDays
-                    ? 'border-amber-200 bg-amber-50/50 dark:border-amber-500/20 dark:bg-amber-500/5'
-                    : 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-500/20 dark:bg-emerald-500/5'
+                    ? 'border-amber-200 bg-amber-50'
+                    : 'border-emerald-200 bg-emerald-50'
                 }`}>
                   <p className={`text-xs font-semibold ${
-                    status?.cooldownRemainingDays ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'
+                    status?.cooldownRemainingDays ? 'text-amber-800' : 'text-emerald-800'
                   }`}>
                     {status?.cooldownRemainingDays
                       ? cooldownRemainingText ?? `${status.cooldownRemainingDays} day(s)`
                       : 'No active lockout'}
                   </p>
-                  {status?.cooldownRemainingDays && cooldownTarget ? (
-                    <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-500">
-                      Eligible on {cooldownTarget.toLocaleString()}
-                    </p>
-                  ) : null}
                 </div>
               </div>
             </div>
@@ -510,20 +507,21 @@ export default function StoreVerificationPage() {
 
         {/* Right Main Section (60%) */}
         <div className="space-y-6 lg:col-span-6">
-          {/* Next Action Hero Card */}
-          <div className="rounded-[1.75rem] border border-gray-200 bg-gradient-to-br from-white to-slate-50/80 p-6 shadow-sm dark:border-white/10 dark:bg-gradient-to-br dark:from-zinc-900 dark:to-zinc-950">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
-              Next Action
+          {/* Next Action Bento Card */}
+          <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full pointer-events-none"></div>
+            <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">
+              Next Recommended Action
             </p>
-            <h3 className="mt-3 text-lg font-black text-gray-900 dark:text-white">
+            <h3 className="text-lg font-bold text-on-surface">
               {callToAction.primaryLabel}
             </h3>
-            <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
-              Use the guided wizard to complete profile verification. The form preserves your draft data automatically as you proceed through the steps.
+            <p className="mt-2 text-xs text-on-surface-variant leading-relaxed">
+              Complete your verification sequence to earn verified brand status. Draft state saves automatically.
             </p>
 
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button onClick={handlePrimaryAction} className="rounded-xl px-5 shadow-[0_4px_20px_rgba(124,58,237,0.18)]">
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Button onClick={handlePrimaryAction} className="rounded-xl px-5 shadow-sm">
                 {heroPrimaryLabel}
               </Button>
               {status &&
@@ -542,114 +540,48 @@ export default function StoreVerificationPage() {
             </div>
           </div>
 
-          {/* Guided steps checklist */}
-          <div className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
-              Verification Checklist
+          {/* Verification Checklist */}
+          <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4">
+              Verification Flow Checklist
             </p>
-            <div className="mt-4 space-y-4">
+            <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">✓</span>
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-on-primary">✓</span>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">1. Setup Profile & Brand</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Setup your display name, username, and logo on WIEZ.</p>
+                  <p className="text-xs font-bold text-on-surface">1. Setup Store Profile</p>
+                  <p className="text-[11px] text-on-surface-variant">Storefront name, brand username, and logo configured.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
                   currentStep >= 2
-                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400'
-                    : 'bg-gray-100 text-gray-400 dark:bg-zinc-800'
+                    ? 'bg-primary text-on-primary'
+                    : 'bg-surface-container-high text-on-surface-variant'
                 }`}>2</span>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">2. Submit Identity & Documents</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Provide legal representative details, business address, and upload official ID document.</p>
+                  <p className="text-xs font-bold text-on-surface">2. Provide Legal & Evidence Details</p>
+                  <p className="text-[11px] text-on-surface-variant">Provide legal identity, CAC number, business address, and ID uploads.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
                   currentStep >= 3
-                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400'
-                    : 'bg-gray-100 text-gray-400 dark:bg-zinc-800'
+                    ? 'bg-primary text-on-primary'
+                    : 'bg-surface-container-high text-on-surface-variant'
                 }`}>3</span>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">3. Signature & Review</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Sign the legal confirmation letter. A WIEZ reviewer will pick up your application.</p>
+                  <p className="text-xs font-bold text-on-surface">3. Digital Signature & Review</p>
+                  <p className="text-[11px] text-on-surface-variant">Sign the legal letter to submit into the compliance review queue.</p>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Timeline details */}
-          <div className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
-              Timeline Summary
-            </p>
-            <div className="mt-4 space-y-3 text-xs text-gray-600 dark:text-gray-400">
-              <div className="flex items-center justify-between border-b border-gray-55 pb-2.5 dark:border-white/5">
-                <span>Last submitted:</span>
-                <span className="font-semibold text-gray-950 dark:text-white">
-                  {status?.verificationSubmittedAt
-                    ? new Date(status.verificationSubmittedAt).toLocaleString()
-                    : 'Not yet'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-b border-gray-55 pb-2.5 dark:border-white/5">
-                <span>Last reviewed:</span>
-                <span className="font-semibold text-gray-950 dark:text-white">
-                  {status?.verificationReviewedAt
-                    ? new Date(status.verificationReviewedAt).toLocaleString()
-                    : 'Not yet'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Record version:</span>
-                <span className="font-semibold text-gray-950 dark:text-white">
-                  {status?.updatedAt
-                    ? new Date(status.updatedAt).toLocaleString()
-                    : 'Unknown'}
-                </span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Public explanation section */}
-      {status?.badgeState.verifiedExplanationUrl ? (
-        <details className="group rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900 [&_summary::-webkit-details-marker]:hidden">
-          <summary className="flex cursor-pointer items-center justify-between focus:outline-none">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400 dark:text-gray-500">
-                Public Explanation
-              </p>
-              <h3 className="mt-1 text-sm font-bold text-gray-900 dark:text-white">
-                Learn what the verification badge represents
-              </h3>
-            </div>
-            <span className="ml-1.5 shrink-0 rounded-full bg-gray-50 p-1.5 text-gray-900 transition group-open:-rotate-180 dark:bg-zinc-800 dark:text-white">
-              ⌄
-            </span>
-          </summary>
-          
-          <div className="mt-4 border-t border-gray-100 pt-4 dark:border-white/5">
-            <p className="text-sm leading-7 text-gray-600 dark:text-gray-400">
-              The verification badge explanation copy is standard and reusable across WIEZ store, product, and profile pages, ensuring clear and consistent trust communication.
-            </p>
-            <div className="mt-4">
-              <Link
-                to={status.badgeState.verifiedExplanationUrl}
-                className="inline-flex text-sm font-semibold text-sky-700 transition hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300"
-              >
-                Open badge explanation route →
-              </Link>
-            </div>
-          </div>
-        </details>
-      ) : null}
-
-      {/* Attempt History Section at the bottom */}
-      <div className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+      {/* History Log Section */}
+      <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm">
         <VerificationHistoryPanel attempts={status?.attemptHistory ?? []} />
       </div>
     </div>
