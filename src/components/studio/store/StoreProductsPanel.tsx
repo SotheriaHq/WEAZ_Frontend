@@ -221,6 +221,31 @@ const resolveProductStatus = (product: BackendProduct): StudioStatus => {
   return product.isActive ? 'ACTIVE' : 'DRAFT';
 };
 
+// Maps a resolved product status to the studio filter tab that displays it. A
+// go-live product reroutes to ?status=in_review, but the backend decides its
+// real publicationStatus (IN_REVIEW or auto-PUBLISHED) — this lets the panel
+// auto-correct to the tab where the new product actually lands.
+const statusToFilterTab = (status: StudioStatus): ProductStatusFilter | null => {
+  switch (status) {
+    case 'ACTIVE':
+      return 'active';
+    case 'DRAFT':
+      return 'draft';
+    case 'IN_REVIEW':
+      return 'in_review';
+    case 'CHANGES_REQUESTED':
+      return 'changes_requested';
+    case 'REJECTED':
+      return 'rejected';
+    case 'ARCHIVED':
+      return 'archived';
+    case 'DELETED':
+      return 'deleted';
+    default:
+      return null; // FAILED / unknown — leave the current tab as-is
+  }
+};
+
 const hasRenderableProductMedia = (product: BackendProduct | null | undefined): boolean => {
   if (!product) return false;
   if (typeof product.thumbnail === 'string' && product.thumbnail.trim().length > 0) return true;
@@ -1155,10 +1180,12 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const visibleProductFillers = useMemo(() => {
     return productPublishTasks.filter((task) => {
       const productId = getPublishTaskDesignId(task);
+      // The real product row takes over ONLY once it is actually in the list —
+      // keep the (100% / "In review") filler until then so the reroute never
+      // shows a blank gap between "upload done" and "card fetched". The
+      // tab-correction effect switches to the product's real tab, where this
+      // reconcile then dissolves the filler.
       if (productId && productIdSet.has(productId)) return false; // reconciled
-      // Terminal-success: the real product row takes over (a refetch is already
-      // in flight from the job) — don't leave a stale filler on the wrong tab.
-      if (task.status === 'saved' || task.status === 'published') return false;
       const kind = task.kind ?? 'publish';
       if (filterStatus === 'draft') return kind === 'draft';
       if (filterStatus === 'in_review') return kind === 'publish';
@@ -1270,6 +1297,31 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
     return () => window.clearTimeout(timer);
   }, [location.search, navigate, outletView, products, recentCreatedProductId, refresh]);
+
+  // Land on the product's REAL tab. Go-live reroutes to ?status=in_review, but
+  // the backend resolves the new product to IN_REVIEW or auto-PUBLISHED. The
+  // in_review/draft owner query returns every status, so once the just-created
+  // product row is loaded, switch to the tab that actually shows it — once per
+  // product, and only away from the two reroute-target tabs (never fights a
+  // manual tab change the user makes later).
+  const tabCorrectedProductIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (outletView !== 'products') return;
+    if (filterStatus !== 'in_review' && filterStatus !== 'draft') return;
+    for (const task of productPublishTasks) {
+      if (task.status !== 'published' && task.status !== 'saved') continue;
+      const pid = getPublishTaskDesignId(task);
+      if (!pid || tabCorrectedProductIdsRef.current.has(pid)) continue;
+      const created = products.find((product) => product.id === pid);
+      if (!created) continue;
+      tabCorrectedProductIdsRef.current.add(pid);
+      const targetTab = statusToFilterTab(resolveProductStatus(created));
+      if (targetTab && targetTab !== filterStatus) {
+        setFilterStatus(targetTab);
+      }
+      break;
+    }
+  }, [outletView, filterStatus, productPublishTasks, products]);
 
   const handleDuplicate = async (productId: string) => {
     try {
