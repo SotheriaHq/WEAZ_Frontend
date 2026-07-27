@@ -44,7 +44,11 @@ html {
 .runway-reels-scroller {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
-  touch-action: pan-y;
+  /* Allow both pan axes (disable only zoom). The inner angle carousel consumes
+     horizontal drags; vertical drags fall through to this vertical feed. Using
+     pan-y alone here is fine, but pan-x pan-y keeps the two scrollers from ever
+     stripping an axis from each other across engines. */
+  touch-action: pan-x pan-y;
   scrollbar-width: none;
 }
 .runway-reels-scroller::-webkit-scrollbar {
@@ -64,15 +68,20 @@ html {
 /*
  * Inline angle carousel inside each reel (web): horizontal CSS scroll-snap —
  * mandatory + always — mirrors native FeedMediaCarousel (pagingEnabled +
- * disableIntervalMomentum + decelerationRate="fast"). touch-action: pan-x here
- * (vs pan-y on the vertical scroller) lets the browser route horizontal
- * gestures to the angle carousel and vertical gestures to the design snap.
+ * disableIntervalMomentum + decelerationRate="fast"). This element is
+ * absolute inset-0 (it fills the whole reel), so its touch-action governs
+ * every touch. It MUST permit pan-y as well as pan-x — otherwise a plain
+ * `pan-x` blocks vertical drags outright instead of letting them chain up to
+ * the vertical feed scroller. Horizontal drags still scroll this carousel (the
+ * only horizontally-scrollable element); vertical drags fall through because
+ * this carousel is overflow-y: hidden and cannot consume them.
  */
 .runway-reels-hcarousel {
   -webkit-overflow-scrolling: touch;
   overflow-x: auto;
+  overflow-y: hidden;
   overscroll-behavior-x: contain;
-  touch-action: pan-x;
+  touch-action: pan-x pan-y;
   scrollbar-width: none;
 }
 .runway-reels-hcarousel::-webkit-scrollbar {
