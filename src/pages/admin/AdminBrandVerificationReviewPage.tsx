@@ -137,8 +137,8 @@ export default function AdminBrandVerificationReviewPage() {
   const latestAttempt = details?.latestAttempt as Record<string, any> | null;
   const returnTo =
     typeof (location.state as { returnTo?: unknown } | null)?.returnTo === 'string'
-      ? ((location.state as { returnTo?: string }).returnTo || '/admin/verification')
-      : '/admin/verification';
+      ? ((location.state as { returnTo?: string }).returnTo || '/admin/users?tab=in-review')
+      : '/admin/users?tab=in-review';
   const selectedDocument = useMemo(
     () =>
       details?.documents?.find((document) => document.key === selectedDocumentKey) ??
@@ -316,15 +316,15 @@ export default function AdminBrandVerificationReviewPage() {
 
   return (
     <div className="min-w-0 space-y-6">
-      <AdminBreadcrumb segments={[{ label: 'Brands', path: '/admin/brands' }, { label: 'Verification Review' }]} />
+      <AdminBreadcrumb segments={[{ label: 'Users', path: '/admin/users?tab=in-review' }, { label: 'Verification Review' }]} />
       <section className="min-w-0 rounded-[2rem] border border-white/70 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_28%),linear-gradient(135deg,_#f9fcff,_#ffffff_48%,_#f7f7ff)] p-6 shadow-[0_30px_80px_-40px_rgba(14,165,233,0.35)]">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <Link
-              to="/admin/verification"
+              to="/admin/users?tab=in-review"
               className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700"
             >
-              Back to verification queue
+              Back to review queue
             </Link>
             <h1 className="mt-3 text-3xl font-black tracking-tight text-gray-900">
               {details.name || 'Unnamed brand'}

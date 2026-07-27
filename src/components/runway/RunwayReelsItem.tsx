@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { MessageCircle, Bookmark } from 'lucide-react';
 import type { RootState } from '@/store';
@@ -19,6 +19,7 @@ import {
 import { BAG_IT_LABEL } from '@/constants/bagging';
 import { formatPrice } from '@/utils/helpers';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
+import { useReelDesignMedia, type ReelMedia } from '@/hooks/useReelDesignMedia';
 import { toast } from 'sonner';
 
 export type RunwayReelsItemProps = {
@@ -35,10 +36,33 @@ export type RunwayReelsItemProps = {
   onTogglePatch?: (brandId: string) => void;
 };
 
+// Content overlays clear the floating island bottom-nav (pill h-14 at
+// bottom safe+10px). Anchored from the true viewport bottom because the reel
+// stage now fills the screen (Runway.tsx bottom:0).
+const DOTS_BOTTOM = 'calc(env(safe-area-inset-bottom, 0px) + 5rem)';
+const META_BOTTOM = 'calc(env(safe-area-inset-bottom, 0px) + 6.5rem)';
+const RAIL_BOTTOM = 'calc(env(safe-area-inset-bottom, 0px) + 6rem)';
+
+// How long the tap-revealed meta stays before fading (native showMetaOverlay).
+const META_REVEAL_MS = 4000;
+
+// Landscape media is letterboxed on the black matte; portrait/square fills.
+const fitForAspect = (aspect: number | null | undefined) => {
+  const useContain =
+    typeof aspect === 'number' && Number.isFinite(aspect) && aspect >= 1.05;
+  return {
+    fit: (useContain ? 'contain' : 'cover') as 'cover' | 'contain',
+    objectClass: useContain ? 'object-contain' : 'object-cover',
+  };
+};
+
 /**
- * Single full-viewport runway reel — Instagram/TikTok-style stage with
- * right action rail + bottom brand/meta. Deep-black matte in both themes
- * so light mode never flashes a pale frame between snaps.
+ * Single full-viewport runway reel — Instagram/TikTok-style stage with an
+ * inline horizontal angle carousel (swipe left/right through a design's media
+ * without opening anything), a permanent right action rail, and tap-to-reveal
+ * brand/meta that auto-hides. Deep-black matte in both themes so light mode
+ * never flashes a pale frame between snaps. Mirrors native RunwayFeedItem +
+ * FeedMediaCarousel + reveal-on-tap FeedMetaOverlay.
  */
 export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
   item,
@@ -58,7 +82,6 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
   const bagFlow = useBagFlow();
   const [bagBusy, setBagBusy] = useState(false);
 
-  const isVideo = Boolean(item.media.type?.toUpperCase().includes('VIDEO'));
   const isCustomAvailable = item.customAvailable === true;
   const brandId = typeof item.brandId === 'string' ? item.brandId.trim() : '';
   const ownsDesignBrand = checkOwnsDesignBrand(user, brandId);
@@ -72,20 +95,83 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
   });
   const brandAvatarFallback = getAvatarFallback(item.brandName ?? null, item.username ?? null);
 
-  const mediaSrc = useMemo(() => {
-    // Active + first reel: prefer full display URL; neighbors stay on CARD preview.
-    if (isActive || priority) {
-      return item.media.url ?? item.media.previewUrl ?? '';
-    }
-    return item.media.previewUrl ?? item.media.url ?? '';
-  }, [isActive, item.media.previewUrl, item.media.url, priority]);
+  // Inline angles — hydrated only once the reel is active/priority (native
+  // parity: scrolling the feed never fans out a detail fetch per off-screen reel).
+  const { media } = useReelDesignMedia(item, { enabled: isActive || priority });
+  const slides: ReelMedia[] = media.length > 0 ? media : [];
+  const hasMultiple = slides.length > 1;
 
-  // Portrait-first cover; landscape contain on black matte (native runway policy).
-  const aspect = item.media.aspectRatio;
-  const useContain =
-    typeof aspect === 'number' && Number.isFinite(aspect) && aspect >= 1.05;
-  const fit: 'cover' | 'contain' = useContain ? 'contain' : 'cover';
-  const objectClass = useContain ? 'object-contain' : 'object-cover';
+  // ── Horizontal angle carousel ──────────────────────────────────────────
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const activeSlideRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+
+  const handleCarouselScroll = useCallback(() => {
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      const el = scrollerRef.current;
+      if (!el) return;
+      const width = el.clientWidth || 1;
+      const idx = Math.max(0, Math.round(el.scrollLeft / width));
+      if (idx !== activeSlideRef.current) {
+        activeSlideRef.current = idx;
+        setActiveSlide(idx);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    // Clamp if the resolved list is shorter than the tracked index.
+    if (activeSlideRef.current > slides.length - 1) {
+      activeSlideRef.current = Math.max(0, slides.length - 1);
+      setActiveSlide(activeSlideRef.current);
+    }
+  }, [slides.length]);
+
+  useEffect(
+    () => () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    },
+    [],
+  );
+
+  // Only mount media within ±1 of the active slide (native shouldMountSlide).
+  const shouldMountSlide = useCallback(
+    (index: number) => Math.abs(index - activeSlide) <= 1,
+    [activeSlide],
+  );
+
+  // ── Reveal-on-tap meta (auto-hide) ─────────────────────────────────────
+  const [metaRevealed, setMetaRevealed] = useState(false);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const revealMeta = useCallback(() => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    setMetaRevealed(true);
+    hideTimerRef.current = setTimeout(() => {
+      setMetaRevealed(false);
+      hideTimerRef.current = null;
+    }, META_REVEAL_MS);
+  }, []);
+
+  // Meta never lingers onto another design; hide when this reel scrolls away.
+  useEffect(() => {
+    if (isActive) return;
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+    setMetaRevealed(false);
+  }, [isActive]);
+
+  useEffect(
+    () => () => {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    },
+    [],
+  );
 
   const priceLabel = useMemo(() => {
     const min = typeof item.minPrice === 'number' ? formatPrice(item.minPrice) : undefined;
@@ -122,55 +208,104 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
       data-runway-reel-id={item.id}
       aria-label={item.collectionTitle || 'Design'}
     >
-      {/* Media stage */}
-      <button
-        type="button"
-        className="absolute inset-0 z-0 block h-full w-full cursor-pointer border-0 bg-black p-0"
-        onClick={() => onOpenView?.(item)}
-        aria-label={`Open ${item.collectionTitle || 'design'}`}
-      >
-        {isVideo ? (
-          <MediaRenderer
-            kind="video"
-            src={mediaSrc}
-            poster={item.media.previewUrl ?? undefined}
-            controls={false}
-            autoPlay={isActive}
-            muted
-            loop
-            playsInline
-            fit={fit}
-            maxHeightClassName="max-h-none"
-            maxWidthClassName="max-w-none"
-            className="absolute inset-0 h-full w-full"
-            mediaClassName={`h-full w-full ${objectClass}`}
-            preload={isActive || priority ? 'metadata' : 'none'}
-          />
-        ) : (
-          <ImageWithFallback
-            src={mediaSrc}
-            fileId={item.media.fileId || null}
-            alt={item.collectionTitle}
-            fit={fit}
-            rounded="none"
-            containerClassName="absolute inset-0 h-full w-full"
-            maxHeightClassName="max-h-none"
-            className={`h-full w-full ${objectClass}`}
-            fallbackName={item.collectionTitle}
-            loading={priority || isActive ? 'eager' : 'lazy'}
-            fetchPriority={priority || isActive ? 'high' : 'low'}
-          />
-        )}
-      </button>
-
-      {/* Readability gradient */}
+      {/* Inline angle carousel — swipe left/right through the design's media.
+          Tapping a slide reveals the meta overlay (no open/route). */}
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-[42%] bg-gradient-to-t from-black/80 via-black/35 to-transparent"
+        ref={scrollerRef}
+        onScroll={hasMultiple ? handleCarouselScroll : undefined}
+        className="runway-reels-hcarousel absolute inset-0 z-0 flex h-full w-full overflow-y-hidden bg-black"
+        style={{ scrollSnapType: hasMultiple ? 'x mandatory' : undefined }}
+      >
+        {slides.map((slide, index) => {
+          const { fit, objectClass } = fitForAspect(slide.aspectRatio);
+          const isVideo = slide.type === 'video';
+          const mounted = shouldMountSlide(index);
+          const slideActive = isActive && index === activeSlide;
+          return (
+            <button
+              key={slide.id}
+              type="button"
+              onClick={revealMeta}
+              aria-label={`${item.collectionTitle || 'Design'} — view ${index + 1} of ${slides.length}`}
+              className="relative block h-full w-full shrink-0 cursor-pointer border-0 bg-black p-0"
+              style={{
+                minWidth: '100%',
+                scrollSnapAlign: 'start',
+                scrollSnapStop: 'always',
+              }}
+            >
+              {mounted ? (
+                isVideo ? (
+                  <MediaRenderer
+                    kind="video"
+                    src={slide.url}
+                    controls={false}
+                    autoPlay={slideActive}
+                    muted
+                    loop
+                    playsInline
+                    fit={fit}
+                    maxHeightClassName="max-h-none"
+                    maxWidthClassName="max-w-none"
+                    className="absolute inset-0 h-full w-full"
+                    mediaClassName={`h-full w-full ${objectClass}`}
+                    preload={slideActive || priority ? 'metadata' : 'none'}
+                  />
+                ) : (
+                  <ImageWithFallback
+                    src={slide.url}
+                    fileId={slide.fileId}
+                    alt={item.collectionTitle}
+                    fit={fit}
+                    rounded="none"
+                    containerClassName="absolute inset-0 h-full w-full"
+                    maxHeightClassName="max-h-none"
+                    className={`h-full w-full ${objectClass}`}
+                    fallbackName={item.collectionTitle}
+                    loading={index === 0 && (priority || isActive) ? 'eager' : 'lazy'}
+                    fetchPriority={index === 0 && (priority || isActive) ? 'high' : 'low'}
+                  />
+                )
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Angle dots — always visible for multi-media designs (native parity). */}
+      {hasMultiple ? (
+        <div
+          className="pointer-events-none absolute inset-x-0 z-[2] flex items-center justify-center gap-1.5"
+          style={{ bottom: DOTS_BOTTOM }}
+          aria-hidden
+        >
+          {slides.map((slide, index) => (
+            <span
+              key={slide.id}
+              className="h-1.5 rounded-full bg-white transition-all"
+              style={{
+                width: index === activeSlide ? 18 : 6,
+                opacity: index === activeSlide ? 1 : 0.4,
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {/* Readability gradient — fades in with the tap-revealed meta only, so
+          the default view stays clean like native. */}
+      <div
+        className={`pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-[42%] bg-gradient-to-t from-black/80 via-black/35 to-transparent transition-opacity duration-300 ${
+          metaRevealed ? 'opacity-100' : 'opacity-0'
+        }`}
         aria-hidden
       />
 
-      {/* Right action rail */}
-      <div className="absolute bottom-28 right-2 z-10 flex flex-col items-center gap-3.5 sm:right-3">
+      {/* Right action rail — ALWAYS visible (native parity). */}
+      <div
+        className="absolute right-2 z-10 flex flex-col items-center gap-3.5 sm:right-3"
+        style={{ bottom: RAIL_BOTTOM }}
+      >
         {isCustomAvailable ? (
           <button
             type="button"
@@ -268,8 +403,15 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
         ) : null}
       </div>
 
-      {/* Bottom meta */}
-      <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-4 pr-16 pt-8">
+      {/* Bottom meta — hidden by default, revealed on tap, auto-hides (native
+          FeedMetaOverlay). Brand avatar tap still routes to the brand. */}
+      <div
+        className={`absolute inset-x-0 z-10 px-3 pr-16 transition-opacity duration-300 ${
+          metaRevealed ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        style={{ bottom: META_BOTTOM }}
+        aria-hidden={!metaRevealed}
+      >
         <button
           type="button"
           onClick={(e) => {

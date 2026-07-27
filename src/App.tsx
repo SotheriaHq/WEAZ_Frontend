@@ -94,8 +94,6 @@ const DiagnosticsPage = lazy(() => import('./pages/DiagnosticsPage'));
 const AdminScaffold = lazy(() => import('./components/admin/AdminScaffold'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
-const AdminBrandsPage = lazy(() => import('./pages/admin/AdminBrandsPage'));
-const AdminVerificationQueuePage = lazy(() => import('./pages/admin/AdminVerificationQueuePage'));
 const AdminBrandVerificationReviewPage = lazy(() => import('./pages/admin/AdminBrandVerificationReviewPage'));
 const AdminContentManagementPage = lazy(() => import('./pages/admin/AdminContentManagementPage'));
 const AdminTaxonomyPage = lazy(() => import('./pages/admin/AdminTaxonomyPage'));
@@ -922,9 +920,10 @@ const router = createBrowserRouter([
           { index: true, element: <AdminDashboard /> },
           { path: 'custom-orders', element: <RequireAdminPermission permission="MODERATION_READ"><AdminCustomOrdersPage /></RequireAdminPermission> },
           { path: 'custom-orders/:orderId', element: <RequireAdminPermission permission="MODERATION_READ"><AdminCustomOrderDetailPage /></RequireAdminPermission> },
-          { path: 'users', element: <RequireAdminPermission permission="USERS_READ"><AdminUsersPage /></RequireAdminPermission> },
-          { path: 'brands', element: <RequireAdminPermission permission="BRANDS_READ"><AdminBrandsPage /></RequireAdminPermission> },
-          { path: 'verification', element: <RequireAdminPermission permission="BRANDS_VERIFY"><AdminVerificationQueuePage /></RequireAdminPermission> },
+          { path: 'users', element: <RequireAdminPermission permission={['USERS_READ', 'BRANDS_READ', 'BRANDS_VERIFY']}><AdminUsersPage /></RequireAdminPermission> },
+          // Brands + Verification are now tabs inside the unified Users console.
+          { path: 'brands', element: <Navigate to="/admin/users?tab=brands" replace /> },
+          { path: 'verification', element: <Navigate to="/admin/users?tab=in-review" replace /> },
           { path: 'brands/:id/verification-review', element: <RequireAdminPermission permission="BRANDS_VERIFY"><AdminBrandVerificationReviewPage /></RequireAdminPermission> },
           { path: 'content', element: <RequireAdminPermission permission={['PRODUCTS_READ', 'COLLECTIONS_READ', 'CONTENT_REVIEW_READ']}><AdminContentManagementPage /></RequireAdminPermission> },
           { path: 'content-review', element: <Navigate to="/admin/content?tab=review" replace /> },

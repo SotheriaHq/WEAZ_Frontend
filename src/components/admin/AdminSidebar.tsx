@@ -19,9 +19,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', path: '/admin', emoji: '📊' },
   { key: 'orders', label: 'Orders', path: '/admin/orders', emoji: '🧾', permission: 'PAYOUTS_READ' },
-  { key: 'users', label: 'Users', path: '/admin/users', emoji: '👤', permission: 'USERS_READ' },
-  { key: 'brands', label: 'Brands', path: '/admin/brands', emoji: '🏷️', permission: 'BRANDS_READ' },
-  { key: 'verification', label: 'Verification', path: '/admin/verification', emoji: '🪪', permission: 'BRANDS_VERIFY' },
+  { key: 'users', label: 'Users', path: '/admin/users', emoji: '👤', permissions: ['USERS_READ', 'BRANDS_READ', 'BRANDS_VERIFY'] },
   {
     key: 'content',
     label: 'Content Management',

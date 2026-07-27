@@ -895,7 +895,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
           <div
             className="fixed inset-x-0 top-16 z-10 bg-black"
             style={{
-              bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.75rem)',
+              bottom: 0,
             }}
           >
             <RunwayReelsFeed
@@ -1085,16 +1085,16 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
         <div
           className="fixed inset-x-0 top-16 z-10 bg-black"
           style={{
-            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.75rem)',
+            bottom: 0,
           }}
         >
           {showError ? (
-            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 py-4">
+            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]">
               {reelsCategoryHeader}
               <StateDisplay type={detectErrorType(error)} onRetry={() => void refetch()} />
             </div>
           ) : showEmpty ? (
-            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 py-4">
+            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]">
               {reelsCategoryHeader}
               {!activeFeedTag ? (
                 <StateDisplay type="empty" onRetry={() => void loadFeed()} />
@@ -1117,7 +1117,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
               designItemCount: filteredItems.length,
             }) &&
             fallbackProducts.length > 0 ? (
-            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 py-4">
+            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]">
               {reelsCategoryHeader}
               <section className="mt-4 space-y-4" data-entity-type="PRODUCT" data-card-branch="product">
                 <div>
