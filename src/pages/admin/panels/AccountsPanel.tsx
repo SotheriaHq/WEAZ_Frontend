@@ -156,11 +156,13 @@ const AccountsPanel: React.FC<AccountsPanelProps> = ({ mode }) => {
     const deduped: AdminUser[] = [];
     for (const user of users) {
       if (seen.has(user.id)) continue;
+      // Defensive filter: Shoppers tab strictly lists regular buyers (excludes brand accounts)
+      if (mode === 'shoppers' && user.type === 'BRAND') continue;
       seen.add(user.id);
       deduped.push(user);
     }
     return deduped;
-  }, [users]);
+  }, [users, mode]);
 
   const sortedUsers = useMemo(() => sortUsers(uniqueUsers, sortBy), [uniqueUsers, sortBy]);
 
