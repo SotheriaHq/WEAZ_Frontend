@@ -143,6 +143,94 @@ export interface AdminBrand {
   };
 }
 
+/** `GET /admin/brands/:id/overview` — everything the brand manage modal renders. */
+export interface AdminBrandOverview {
+  brand: {
+    id: string;
+    name: string | null;
+    ownerId: string;
+    currency: string;
+    isStoreOpen: boolean;
+    storePublishedAt: string | null;
+    createdAt: string;
+    /** Public storefront slug, or null when the store is not publicly reachable. */
+    storefrontSlug: string | null;
+  };
+  verification: {
+    status:
+      | 'NOT_SUBMITTED'
+      | 'PENDING'
+      | 'IN_REVIEW'
+      | 'ADDITIONAL_INFO_REQUESTED'
+      | 'APPROVED'
+      | 'REJECTED'
+      | 'CANCELLED';
+    /** A submission is awaiting an admin decision right now. */
+    isReviewOpen: boolean;
+    /** Any verification record exists (i.e. not NOT_SUBMITTED). */
+    hasSubmission: boolean;
+    submittedAt: string | null;
+    reviewedAt: string | null;
+    attemptNumber: number;
+  };
+  content: {
+    designs: number;
+    designsPublished: number;
+    storeCollections: number;
+    products: number;
+    productsLive: number;
+    productsInReview: number;
+    productsDraft: number;
+    posts: number;
+  };
+  transactions: {
+    currency: string;
+    grossInflow: number;
+    paidOut: number;
+    items: AdminBrandTransaction[];
+  };
+  reminders: AdminBrandReminder[];
+  disputes: AdminBrandDispute[];
+}
+
+export interface AdminBrandTransaction {
+  id: string;
+  kind: 'ORDER' | 'CUSTOM_ORDER' | 'PAYOUT';
+  direction: 'IN' | 'OUT';
+  title: string;
+  reference: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  occurredAt: string;
+  orderId: string | null;
+  customOrderId: string | null;
+  payoutId: string | null;
+}
+
+export interface AdminBrandReminder {
+  id: string;
+  type: string;
+  isRead: boolean;
+  createdAt: string;
+  orderId: string | null;
+  customOrderId: string | null;
+  detail: string | null;
+}
+
+export interface AdminBrandDispute {
+  id: string;
+  type: string;
+  status: string;
+  description: string;
+  targetType: string;
+  targetId: string;
+  resolution: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  isOpen: boolean;
+}
+
 export interface AdminPayout {
   id: string;
   brandId: string;

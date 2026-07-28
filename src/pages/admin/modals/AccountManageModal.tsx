@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Modal from '@/components/ui/Modal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import AdminInsightPanel from '@/components/admin/AdminInsightPanel';
 import { adminUsersApi, adminBrandsApi } from '@/api/AdminApi';
-import type { AdminUser, AdminBrand } from '@/types/admin';
+import type { AdminUser, AdminBrand, AdminBrandOverview } from '@/types/admin';
 import { unwrapApiResponse } from '@/types/auth';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { toast } from 'sonner';
@@ -132,7 +133,58 @@ const normalizePermissions = (
     : [];
 
 const actionButtonClass =
-  'inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-black';
+  'inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-inherit dark:focus-visible:ring-offset-black';
+
+/**
+ * Query param that reopens this modal for a brand. It is written into the
+ * history entry we leave behind before navigating to a store / order /
+ * verification review, so pressing Back returns to the screen the admin was
+ * actually on — the console with this brand open — instead of a bare list.
+ */
+export const BRAND_MANAGE_PARAM = 'manageBrand';
+
+const VERIFICATION_META: Record<string, { emoji: string; label: string; tone: string }> = {
+  NOT_SUBMITTED: { emoji: '⚪', label: 'Not submitted', tone: 'text-gray-500 dark:text-gray-400' },
+  PENDING: { emoji: '🟡', label: 'Pending review', tone: 'text-amber-700 dark:text-amber-300' },
+  IN_REVIEW: { emoji: '🔵', label: 'In review', tone: 'text-sky-700 dark:text-sky-300' },
+  ADDITIONAL_INFO_REQUESTED: { emoji: '🟠', label: 'Info requested', tone: 'text-orange-700 dark:text-orange-300' },
+  APPROVED: { emoji: '🟢', label: 'Approved', tone: 'text-emerald-700 dark:text-emerald-300' },
+  REJECTED: { emoji: '🔴', label: 'Rejected', tone: 'text-rose-700 dark:text-rose-300' },
+  CANCELLED: { emoji: '⚫', label: 'Cancelled', tone: 'text-gray-500 dark:text-gray-400' },
+};
+
+const REMINDER_LABELS: Record<string, string> = {
+  ORDER_FULFILLMENT_REMINDER: 'Fulfilment reminder',
+  ORDER_FULFILLMENT_OVERDUE: 'Fulfilment overdue',
+  CUSTOM_ORDER_REVIEW_REQUIRED: 'Custom order needs review',
+  CUSTOM_ORDER_STALE_STAGE_WARNING: 'Custom order stalled',
+  CUSTOM_ORDER_ACCEPTANCE_SLA_RISK: 'Acceptance SLA at risk',
+  CUSTOM_ORDER_ADMIN_REVIEW_TRIGGERED: 'Escalated to admin review',
+};
+
+const TRANSACTION_LABELS: Record<string, string> = {
+  ORDER: '🛍️ Store order',
+  CUSTOM_ORDER: '✂️ Custom order',
+  PAYOUT: '🏦 Payout',
+};
+
+const formatMoney = (amount: number, currency: string) => {
+  try {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: currency || 'NGN',
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${currency || 'NGN'} ${amount.toLocaleString()}`;
+  }
+};
+
+const formatDate = (value?: string | null) =>
+  value ? new Date(value).toLocaleDateString() : '—';
+
+const humanize = (value: string) =>
+  value.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
 
 const AccountManageModal: React.FC<Props> = ({
   open,
@@ -142,6 +194,7 @@ const AccountManageModal: React.FC<Props> = ({
   seedBrand,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isSuperAdmin, hasPermission } = useAdminPermissions();
 
   const targetUserId = seedUser?.id ?? seedBrand?.owner?.id ?? null;
@@ -149,6 +202,9 @@ const AccountManageModal: React.FC<Props> = ({
 
   const [detail, setDetail] = useState<AccountDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [overview, setOverview] = useState<AdminBrandOverview | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [overviewFailed, setOverviewFailed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [securityGate, setSecurityGate] = useState({
     actorEmail: '',
@@ -193,6 +249,41 @@ const AccountManageModal: React.FC<Props> = ({
     };
   }, [open, targetUserId]);
 
+  // Brand overview: storefront reachability, verification reviewability,
+  // content counts, transactions, reminders and disputes in one read. Only
+  // brand accounts have one, and `brandId` may only resolve after the detail
+  // fetch when the modal was opened from the Shoppers/Team tabs.
+  const overviewBrandId = seedBrandId ?? detail?.brand?.id ?? null;
+  useEffect(() => {
+    if (!open || !overviewBrandId) {
+      setOverview(null);
+      setOverviewFailed(false);
+      return;
+    }
+    let mounted = true;
+    setOverviewLoading(true);
+    setOverviewFailed(false);
+    (async () => {
+      try {
+        const res = await adminBrandsApi.getOverview(overviewBrandId);
+        const payload = unwrapApiResponse<AdminBrandOverview>(res.data as any);
+        if (mounted) setOverview(payload);
+      } catch {
+        // Fail open: the overview is enrichment, not a gate. Losing it must not
+        // strip an admin of controls this modal has always offered.
+        if (mounted) {
+          setOverview(null);
+          setOverviewFailed(true);
+        }
+      } finally {
+        if (mounted) setOverviewLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [open, overviewBrandId]);
+
   const currentPerms = useMemo(() => new Set(livePermissions), [livePermissions]);
 
   // Header falls back to the seed row while the detail is loading.
@@ -227,7 +318,8 @@ const AccountManageModal: React.FC<Props> = ({
   const isBrandAccount = detail?.type === 'BRAND' || Boolean(seedBrand);
   const brandId = seedBrandId ?? detail?.brand?.id ?? null;
   const brandName = seedBrand?.name ?? detail?.brand?.name ?? null;
-  const isStoreOpen = seedBrand?.isStoreOpen ?? detail?.brand?.isStoreOpen ?? false;
+  const isStoreOpen =
+    overview?.brand.isStoreOpen ?? seedBrand?.isStoreOpen ?? detail?.brand?.isStoreOpen ?? false;
 
   const isSeededUser = email ? SEEDED_USER_EMAILS.has(email.toLowerCase()) : false;
   const isDeleted = status === 'DEACTIVATED';
@@ -242,6 +334,10 @@ const AccountManageModal: React.FC<Props> = ({
   const canStoreOverride = hasPermission('BRANDS_STORE_OVERRIDE');
   const canSuspendBrand = hasPermission('BRANDS_SUSPEND');
   const canReviewVerification = hasPermission('BRANDS_VERIFY');
+  // Drill-through targets are permission-guarded routes; don't offer a link
+  // that would bounce the admin back to the dashboard.
+  const canViewOrders = hasPermission('PAYOUTS_READ');
+  const canViewCustomOrders = hasPermission('MODERATION_READ');
 
   const requireTarget = (): string | null => {
     if (!targetUserId) {
@@ -455,13 +551,75 @@ const AccountManageModal: React.FC<Props> = ({
     }
   };
 
+  // ── Drill-through navigation ─────────────────────────────────────────────
+  /**
+   * Push the destination carrying the console URL as its `returnTo`.
+   *
+   * The console URL already holds `?manageBrand=<id>` while this modal is open,
+   * so the entry we leave behind reopens the modal: browser Back, a swipe, or
+   * the destination's own back link all land on the screen the admin was on —
+   * this brand, still open — instead of some other list. Deliberately does NOT
+   * call `onClose()`, which would strip that param from the entry we're leaving.
+   */
+  const navigateAway = useCallback(
+    (to: string) => {
+      const params = new URLSearchParams(location.search);
+      if (brandId) params.set(BRAND_MANAGE_PARAM, brandId);
+      const search = params.toString();
+      const restoreTo = search ? `${location.pathname}?${search}` : location.pathname;
+      navigate(to, {
+        state: {
+          returnTo: restoreTo,
+          returnLabel: `Back to ${brandName ?? displayName}`,
+        },
+      });
+    },
+    [brandId, brandName, displayName, location.pathname, location.search, navigate],
+  );
+
+  const verificationStatus = overview?.verification.status ?? null;
+  const verificationMeta = verificationStatus
+    ? (VERIFICATION_META[verificationStatus] ?? {
+        emoji: '⚪',
+        label: humanize(verificationStatus),
+        tone: 'text-gray-500 dark:text-gray-400',
+      })
+    : null;
+  // Nothing was ever submitted → there is no review to open. A closed review
+  // (approved/rejected/cancelled) still has a record worth reading, so it stays
+  // reachable but is relabelled so the button never implies pending work.
+  // When the overview itself failed we keep the button live rather than
+  // stranding the admin behind a read that is only meant to inform.
+  const canOpenVerification = Boolean(
+    brandId &&
+      !overviewLoading &&
+      (overview ? overview.verification.hasSubmission : overviewFailed),
+  );
+  const verificationButtonLabel =
+    overview && !overview.verification.isReviewOpen
+      ? '🪪 View verification record'
+      : '🪪 Open verification review';
+  const verificationDisabledReason = overviewLoading
+    ? 'Loading verification state…'
+    : 'This brand has not submitted store verification yet.';
+
   const openVerificationReview = useCallback(() => {
-    if (!brandId) return;
-    onClose();
-    navigate(`/admin/brands/${brandId}/verification-review`, {
-      state: { returnTo: '/admin/users?tab=in-review' },
-    });
-  }, [brandId, navigate, onClose]);
+    if (!brandId || !canOpenVerification) return;
+    navigateAway(`/admin/brands/${brandId}/verification-review`);
+  }, [brandId, canOpenVerification, navigateAway]);
+
+  // The public storefront resolves by owner username and 404s while the store
+  // is closed; the server returns null for the slug in that case. The local
+  // fallback applies the same two conditions so the button is usable on the
+  // first paint (and if the overview read fails) instead of dead.
+  const ownerUsername =
+    detail?.username || seedBrand?.owner?.username || seedUser?.username || null;
+  const storefrontSlug =
+    overview?.brand.storefrontSlug ?? (isStoreOpen ? ownerUsername : null);
+  const openStorefront = useCallback(() => {
+    if (!storefrontSlug) return;
+    navigateAway(`/brand/${encodeURIComponent(storefrontSlug)}`);
+  }, [navigateAway, storefrontSlug]);
 
   const executeConfirm = async () => {
     if (!confirmAction) return;
@@ -601,16 +759,39 @@ const AccountManageModal: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Brand storefront controls */}
-          {isBrandAccount && brandId && (canStoreOverride || canSuspendBrand || canReviewVerification) && (
+          {/* Brand storefront controls. Rendered for every brand account —
+              "View store" opens a public page and needs no extra grant; the
+              override/suspend/verify buttons keep their own permission gates. */}
+          {isBrandAccount && brandId && (
             <div className="rounded-2xl border border-indigo-200/70 bg-indigo-50/50 px-4 py-4 dark:border-indigo-500/25 dark:bg-indigo-500/10">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">🏷️ Brand & storefront</h3>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isStoreOpen ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200' : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'}`}>
-                  {isStoreOpen ? '🟢 Store open' : '🔴 Store closed'}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {verificationMeta && (
+                    <span className={`text-[11px] font-semibold ${verificationMeta.tone}`}>
+                      {verificationMeta.emoji} {verificationMeta.label}
+                    </span>
+                  )}
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isStoreOpen ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200' : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'}`}>
+                    {isStoreOpen ? '🟢 Store open' : '🔴 Store closed'}
+                  </span>
+                </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={openStorefront}
+                  disabled={!storefrontSlug}
+                  title={
+                    storefrontSlug
+                      ? `Open ${brandName ?? displayName}'s public storefront`
+                      : overviewLoading
+                        ? 'Loading storefront state…'
+                        : 'This brand has no open storefront to view.'
+                  }
+                  className={`${actionButtonClass} bg-violet-100 text-violet-800 hover:bg-violet-200 dark:bg-violet-500/15 dark:text-violet-200 dark:hover:bg-violet-500/25`}
+                >
+                  🛍️ View store
+                </button>
                 {canStoreOverride && (
                   <button onClick={handleStoreToggle} className={`${actionButtonClass} bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/25`}>
                     {isStoreOpen ? '🔴 Force close store' : '🟢 Force open store'}
@@ -622,8 +803,13 @@ const AccountManageModal: React.FC<Props> = ({
                   </button>
                 )}
                 {canReviewVerification && (
-                  <button onClick={openVerificationReview} className={`${actionButtonClass} bg-sky-100 text-sky-800 hover:bg-sky-200 dark:bg-sky-500/15 dark:text-sky-200 dark:hover:bg-sky-500/25`}>
-                    🪪 Open verification review
+                  <button
+                    onClick={openVerificationReview}
+                    disabled={!canOpenVerification}
+                    title={canOpenVerification ? undefined : verificationDisabledReason}
+                    className={`${actionButtonClass} bg-sky-100 text-sky-800 hover:bg-sky-200 dark:bg-sky-500/15 dark:text-sky-200 dark:hover:bg-sky-500/25`}
+                  >
+                    {verificationButtonLabel}
                   </button>
                 )}
               </div>
@@ -648,6 +834,186 @@ const AccountManageModal: React.FC<Props> = ({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Brand insight panels — inline containers, each scrolling in place */}
+          {isBrandAccount && brandId && (
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <AdminInsightPanel
+                emoji="📦"
+                title="Content"
+                loading={overviewLoading && !overview}
+                isEmpty={!overview}
+                empty="Content counts unavailable."
+                maxHeightClass="max-h-40"
+              >
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                  {[
+                    { label: 'Designs', value: overview?.content.designs, note: `${overview?.content.designsPublished ?? 0} live` },
+                    { label: 'Products', value: overview?.content.products, note: `${overview?.content.productsLive ?? 0} live` },
+                    { label: 'In review', value: overview?.content.productsInReview, note: `${overview?.content.productsDraft ?? 0} drafts` },
+                    { label: 'Collections', value: overview?.content.storeCollections, note: `${overview?.content.posts ?? 0} posts` },
+                  ].map((cell) => (
+                    <div key={cell.label}>
+                      <dt className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">{cell.label}</dt>
+                      <dd className="text-lg font-bold leading-tight text-gray-900 dark:text-white">{cell.value ?? 0}</dd>
+                      <dd className="text-[11px] text-gray-500 dark:text-gray-400">{cell.note}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </AdminInsightPanel>
+
+              <AdminInsightPanel
+                emoji="💳"
+                title="Transactions"
+                badge={overview ? overview.transactions.items.length : undefined}
+                loading={overviewLoading && !overview}
+                isEmpty={!overview?.transactions.items.length}
+                empty="No paid orders or payouts yet."
+                maxHeightClass="max-h-40"
+              >
+                {overview && (
+                  <p className="mb-2 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+                    <span className="text-emerald-700 dark:text-emerald-300">
+                      {formatMoney(overview.transactions.grossInflow, overview.transactions.currency)} in
+                    </span>
+                    {' · '}
+                    <span className="text-amber-700 dark:text-amber-300">
+                      {formatMoney(overview.transactions.paidOut, overview.transactions.currency)} paid out
+                    </span>
+                  </p>
+                )}
+                <ul className="space-y-2">
+                  {overview?.transactions.items.map((item) => {
+                    const to = item.orderId
+                      ? canViewOrders
+                        ? `/admin/orders/${item.orderId}`
+                        : null
+                      : item.customOrderId
+                        ? canViewCustomOrders
+                          ? `/admin/custom-orders/${item.customOrderId}`
+                          : null
+                        : null;
+                    return (
+                      <li key={item.id} className="flex items-baseline justify-between gap-3 text-xs">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-gray-800 dark:text-gray-100">
+                            {TRANSACTION_LABELS[item.kind] ?? item.kind} · {item.title}
+                          </p>
+                          <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
+                            {formatDate(item.occurredAt)} · {humanize(item.status)}
+                            {item.reference ? ` · ${item.reference}` : ''}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className={`font-bold ${item.direction === 'IN' ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                            {item.direction === 'IN' ? '+' : '−'}
+                            {formatMoney(item.amount, item.currency)}
+                          </p>
+                          {to && (
+                            <button type="button" onClick={() => navigateAway(to)} className="text-[11px] font-semibold text-indigo-600 hover:underline dark:text-indigo-400">
+                              View →
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </AdminInsightPanel>
+
+              <AdminInsightPanel
+                emoji="⏰"
+                title="Order reminders sent"
+                badge={overview ? overview.reminders.length : undefined}
+                loading={overviewLoading && !overview}
+                isEmpty={!overview?.reminders.length}
+                empty="No fulfilment reminders have been sent to this brand."
+                maxHeightClass="max-h-40"
+              >
+                <ul className="space-y-2">
+                  {overview?.reminders.map((reminder) => {
+                    const to = reminder.orderId
+                      ? canViewOrders
+                        ? `/admin/orders/${reminder.orderId}`
+                        : null
+                      : reminder.customOrderId
+                        ? canViewCustomOrders
+                          ? `/admin/custom-orders/${reminder.customOrderId}`
+                          : null
+                        : null;
+                    return (
+                      <li key={reminder.id} className="flex items-baseline justify-between gap-3 text-xs">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-gray-800 dark:text-gray-100">
+                            {REMINDER_LABELS[reminder.type] ?? humanize(reminder.type)}
+                          </p>
+                          <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
+                            {formatDate(reminder.createdAt)}
+                            {reminder.detail ? ` · ${humanize(reminder.detail)}` : ''}
+                            {reminder.isRead ? '' : ' · unread'}
+                          </p>
+                        </div>
+                        {to ? (
+                          <button type="button" onClick={() => navigateAway(to)} className="shrink-0 text-[11px] font-semibold text-indigo-600 hover:underline dark:text-indigo-400">
+                            View order →
+                          </button>
+                        ) : (
+                          <span className="shrink-0 text-[11px] text-gray-400">No order link</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </AdminInsightPanel>
+
+              <AdminInsightPanel
+                emoji="⚖️"
+                title="Disputes"
+                badge={
+                  overview
+                    ? `${overview.disputes.filter((d) => d.isOpen).length} open / ${overview.disputes.length}`
+                    : undefined
+                }
+                loading={overviewLoading && !overview}
+                isEmpty={!overview?.disputes.length}
+                empty="No disputes raised against this brand's orders."
+                maxHeightClass="max-h-40"
+              >
+                <ul className="space-y-2">
+                  {overview?.disputes.map((dispute) => {
+                    const isCustom = dispute.targetType === 'CUSTOM_ORDER';
+                    const to = isCustom
+                      ? canViewCustomOrders
+                        ? `/admin/custom-orders/${dispute.targetId}`
+                        : null
+                      : canViewOrders
+                        ? `/admin/orders/${dispute.targetId}`
+                        : null;
+                    return (
+                      <li key={dispute.id} className="flex items-baseline justify-between gap-3 text-xs">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-gray-800 dark:text-gray-100">
+                            <span className={dispute.isOpen ? 'text-rose-600 dark:text-rose-300' : 'text-emerald-600 dark:text-emerald-300'}>
+                              {dispute.isOpen ? '🔴' : '🟢'} {humanize(dispute.status)}
+                            </span>{' '}
+                            · {isCustom ? 'Custom order' : 'Store order'}
+                          </p>
+                          <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
+                            {formatDate(dispute.createdAt)} · {dispute.description}
+                          </p>
+                        </div>
+                        {to && (
+                          <button type="button" onClick={() => navigateAway(to)} className="shrink-0 text-[11px] font-semibold text-indigo-600 hover:underline dark:text-indigo-400">
+                            View order →
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </AdminInsightPanel>
             </div>
           )}
 

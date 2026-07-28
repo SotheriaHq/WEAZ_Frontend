@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import BackLink from '@/components/ui/BackLink';
+import { useReturnTo } from '@/hooks/useReturnTo';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import OrderMessagesPanel from '@/components/messaging/OrderMessagesPanel';
 import CustomOrderActionConfirmModal from '@/components/custom-orders/CustomOrderActionConfirmModal';
@@ -90,6 +91,9 @@ const shortRef = (value?: string | null) => {
 const AdminCustomOrderDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { orderId } = useParams<{ orderId: string }>();
+  // Reachable from the custom-orders table and from the brand manage modal —
+  // honour the origin that sent us here instead of always popping to the table.
+  const backTarget = useReturnTo(BACK_TO_TABLE, 'Back to custom orders');
 
   const [selected, setSelected] = useState<CustomOrderDetail | null>(null);
   const [ledgerAllocations, setLedgerAllocations] = useState<CustomOrderLedgerAllocation[]>([]);
@@ -238,7 +242,7 @@ const AdminCustomOrderDetailPage: React.FC = () => {
         segments={[{ label: 'Orders', path: '/admin/orders' }, { label: 'Custom order' }]}
       />
 
-      <BackLink label="Back to custom orders" to={BACK_TO_TABLE} variant="pill" />
+      <BackLink label={backTarget.label} to={backTarget.to} variant="pill" />
 
       {loading && !selected ? (
         <div className="rounded-3xl border border-black/10 px-6 py-12 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
@@ -251,10 +255,10 @@ const AdminCustomOrderDetailPage: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={() => navigate(BACK_TO_TABLE)}
+            onClick={() => navigate(backTarget.to)}
             className="mt-4 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
           >
-            Back to custom orders
+            {backTarget.label}
           </button>
         </div>
       ) : (

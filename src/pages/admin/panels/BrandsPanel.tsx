@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { adminBrandsApi } from '@/api/AdminApi';
 import type { AdminBrand } from '@/types/admin';
@@ -10,7 +10,7 @@ import FilterDropdown from '@/components/ui/FilterDropdown';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { generateUserUid } from '@/utils/userUid';
-import AccountManageModal from '../modals/AccountManageModal';
+import AccountManageModal, { BRAND_MANAGE_PARAM } from '../modals/AccountManageModal';
 
 /**
  * Brand directory for the unified admin Users console (Brands tab).
@@ -57,6 +57,7 @@ const normalizeStatus = (status: string | undefined | null): StatusFilter | 'UNK
 const BrandsPanel: React.FC = () => {
   const { hasPermission } = useAdminPermissions();
   const canStoreOverride = hasPermission('BRANDS_STORE_OVERRIDE');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [search, setSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState<StoreFilter>('ALL');
@@ -131,6 +132,40 @@ const BrandsPanel: React.FC = () => {
     const suspended = uniqueBrands.filter((brand) => normalizeStatus(brand.owner?.status) === 'SUSPENDED').length;
     return { total, open, closed, suspended };
   }, [uniqueBrands]);
+
+  /**
+   * Reopen the manage modal when the URL carries `?manageBrand=<id>`.
+   *
+   * The modal writes that param into the history entry it leaves behind before
+   * drilling through to a storefront / order / verification review, so coming
+   * Back returns the admin to this brand rather than a bare list. It is a
+   * genuine user-driven deep link, never an auto-prompt.
+   */
+  const requestedBrandId = searchParams.get(BRAND_MANAGE_PARAM);
+  useEffect(() => {
+    if (!requestedBrandId || selectedBrand) return;
+    const match = brands.find((brand) => brand.id === requestedBrandId);
+    if (match) setSelectedBrand(match);
+  }, [brands, requestedBrandId, selectedBrand]);
+
+  const openManageModal = useCallback(
+    (brand: AdminBrand) => {
+      setSelectedBrand(brand);
+      if (searchParams.get(BRAND_MANAGE_PARAM) === brand.id) return;
+      const next = new URLSearchParams(searchParams);
+      next.set(BRAND_MANAGE_PARAM, brand.id);
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const closeManageModal = useCallback(() => {
+    setSelectedBrand(null);
+    if (!searchParams.get(BRAND_MANAGE_PARAM)) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete(BRAND_MANAGE_PARAM);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const getBrandVisual = (brand: AdminBrand) => {
     if (brand.logo && brand.logo.trim()) return brand.logo;
@@ -283,7 +318,7 @@ const BrandsPanel: React.FC = () => {
                       <td className="px-3 py-3 text-xs text-gray-500 dark:text-gray-400">{brand.createdAt ? new Date(brand.createdAt).toLocaleDateString() : '—'}</td>
                       <td className="px-3 py-3">
                         <div className="flex flex-wrap gap-2">
-                          <button type="button" onClick={() => setSelectedBrand(brand)} className="rounded-lg bg-indigo-100 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:hover:bg-indigo-500/30">⚙ Manage</button>
+                          <button type="button" onClick={() => openManageModal(brand)} className="rounded-lg bg-indigo-100 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:hover:bg-indigo-500/30">⚙ Manage</button>
                           {canStoreOverride && (
                             <button type="button" disabled={actionLoadingBrandId === brand.id} onClick={() => requestToggleStore(brand)} className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${brand.isStoreOpen ? 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-200 dark:hover:bg-rose-500/30' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30'} disabled:cursor-not-allowed disabled:opacity-60`}>
                               {actionLoadingBrandId === brand.id ? 'Saving...' : brand.isStoreOpen ? 'Close store' : 'Open store'}
@@ -325,7 +360,7 @@ const BrandsPanel: React.FC = () => {
                       <span>{ownerStatus === 'UNKNOWN' ? 'Unknown' : ownerStatus}</span>
                     </div>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setSelectedBrand(brand)} className="flex-1 rounded-lg bg-indigo-100 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:hover:bg-indigo-500/30">⚙ Manage</button>
+                      <button type="button" onClick={() => openManageModal(brand)} className="flex-1 rounded-lg bg-indigo-100 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:hover:bg-indigo-500/30">⚙ Manage</button>
                       {canStoreOverride && (
                         <button type="button" disabled={actionLoadingBrandId === brand.id} onClick={() => requestToggleStore(brand)} className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold ${brand.isStoreOpen ? 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-200 dark:hover:bg-rose-500/30' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30'} disabled:cursor-not-allowed disabled:opacity-60`}>
                           {actionLoadingBrandId === brand.id ? 'Saving...' : brand.isStoreOpen ? 'Close store' : 'Open store'}
@@ -357,7 +392,7 @@ const BrandsPanel: React.FC = () => {
       <AccountManageModal
         open={!!selectedBrand}
         seedBrand={selectedBrand}
-        onClose={() => setSelectedBrand(null)}
+        onClose={closeManageModal}
         onUpdated={() => { reset(); }}
       />
     </div>

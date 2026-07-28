@@ -3,6 +3,7 @@ import type {
   AdminUser,
   AdminReactivationRequest,
   AdminBrand,
+  AdminBrandOverview,
   AdminProduct,
   AdminCollection,
   AdminDesign,
@@ -264,6 +265,8 @@ export const adminBrandsApi = {
     apiClient.get<Paginated<AdminBrand>>('/admin/brands', { params }),
   getById: (id: string) =>
     apiClient.get<AdminBrand>(`/admin/brands/${id}`),
+  getOverview: (id: string) =>
+    apiClient.get<AdminBrandOverview>(`/admin/brands/${id}/overview`),
   overrideStoreOpen: (id: string, isOpen: boolean) =>
     apiClient.patch(`/admin/brands/${id}/open-close`, { isStoreOpen: isOpen }),
   suspend: (id: string, reason: string) =>
