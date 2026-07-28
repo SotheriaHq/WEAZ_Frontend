@@ -75,18 +75,43 @@ export const getCompactPublishTaskStatusLabel = ({
  */
 const runtimePreviewByTaskId = new Map<string, string>();
 
+/**
+ * Task ids whose blob preview was minted FOR the task (not borrowed from a
+ * still-mounted editor). A borrowed URL must never be revoked here — the editor
+ * owns its lifetime — but an owned one is revoked when the task is cleared so
+ * handing a cover to a filler card does not leak an object URL per creation.
+ */
+const ownedPreviewTaskIds = new Set<string>();
+
+const revokeOwnedPreview = (id: string) => {
+  if (!ownedPreviewTaskIds.delete(id)) return;
+  const url = runtimePreviewByTaskId.get(id);
+  if (!url || !url.startsWith('blob:')) return;
+  try {
+    URL.revokeObjectURL(url);
+  } catch {
+    // Revocation is best-effort; a stale handle must never break the tracker.
+  }
+};
+
 export const setPublishTaskRuntimePreview = (
   taskId: string,
   previewUrl?: string | null,
+  options?: { owned?: boolean },
 ) => {
   const id = String(taskId ?? '').trim();
   if (!id) return;
   const url = typeof previewUrl === 'string' ? previewUrl.trim() : '';
   if (!url) {
+    revokeOwnedPreview(id);
     runtimePreviewByTaskId.delete(id);
     return;
   }
+  revokeOwnedPreview(id);
   runtimePreviewByTaskId.set(id, url);
+  if (options?.owned && url.startsWith('blob:')) {
+    ownedPreviewTaskIds.add(id);
+  }
 };
 
 export const getPublishTaskRuntimePreview = (taskId?: string | null) => {
@@ -98,6 +123,7 @@ export const getPublishTaskRuntimePreview = (taskId?: string | null) => {
 export const clearPublishTaskRuntimePreview = (taskId?: string | null) => {
   const id = String(taskId ?? '').trim();
   if (!id) return;
+  revokeOwnedPreview(id);
   runtimePreviewByTaskId.delete(id);
 };
 
@@ -306,6 +332,12 @@ export const createPublishTask = (payload: {
   ownerId?: string | null;
   visibility?: 'PUBLIC' | 'PRIVATE';
   coverPreviewUrl?: string;
+  /**
+   * True when `coverPreviewUrl` was created for this task alone, so the tracker
+   * may revoke it on removal. Leave false/undefined when borrowing a URL an
+   * editor still renders and revokes itself.
+   */
+  ownsCoverPreview?: boolean;
   designId?: string;
   legacyCollectionId?: string;
   collectionId?: string;
@@ -318,7 +350,9 @@ export const createPublishTask = (payload: {
   // Keep ephemeral previews (blob:/data:) in session memory only — localStorage
   // strips them, and without this map catalog cards lose cover while uploading.
   if (payload.coverPreviewUrl) {
-    setPublishTaskRuntimePreview(id, payload.coverPreviewUrl);
+    setPublishTaskRuntimePreview(id, payload.coverPreviewUrl, {
+      owned: payload.ownsCoverPreview === true,
+    });
   }
   const task: PublishTask = {
     id,

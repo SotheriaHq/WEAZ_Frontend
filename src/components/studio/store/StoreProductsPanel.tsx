@@ -1185,7 +1185,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       // shows a blank gap between "upload done" and "card fetched". The
       // tab-correction effect switches to the product's real tab, where this
       // reconcile then dissolves the filler.
-      if (productId && productIdSet.has(productId)) return false; // reconciled
+      //
+      // A FAILED task is the exception: the create step succeeded, so the row
+      // IS in the list — as a stranded DRAFT. Reconciling it away used to hide
+      // the failure completely, leaving the owner with a silent draft and no
+      // hint that go-live never happened. Keep the retry/remove affordance.
+      if (productId && productIdSet.has(productId) && task.status !== 'failed') {
+        return false; // reconciled
+      }
       const kind = task.kind ?? 'publish';
       if (filterStatus === 'draft') return kind === 'draft';
       if (filterStatus === 'in_review') return kind === 'publish';
@@ -1297,6 +1304,38 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
     return () => window.clearTimeout(timer);
   }, [location.search, navigate, outletView, products, recentCreatedProductId, refresh]);
+
+  // Same media hydration, for the ASYNC create path. That reroute lands on
+  // /studio/store?status=in_review and never sets ?createdProductId=, so the
+  // retry above could not see it: the publish job fires exactly ONE refresh on
+  // completion, and whenever that response beat the new product's media rows
+  // the card painted broken and stayed broken until a manual reload.
+  const publishedMediaAttemptsRef = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (outletView !== 'products') return;
+
+    const pendingProductId = productPublishTasks
+      .filter((task) => task.status === 'published' || task.status === 'saved')
+      .map((task) => getPublishTaskDesignId(task))
+      .find((productId) => {
+        if (!productId) return false;
+        if ((publishedMediaAttemptsRef.current.get(productId) ?? 0) >= 12) return false;
+        const row = products.find((product) => product.id === productId) ?? null;
+        return !hasRenderableProductMedia(row);
+      });
+
+    if (!pendingProductId) return;
+
+    const timer = window.setTimeout(() => {
+      publishedMediaAttemptsRef.current.set(
+        pendingProductId,
+        (publishedMediaAttemptsRef.current.get(pendingProductId) ?? 0) + 1,
+      );
+      void refresh().catch(() => undefined);
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [outletView, productPublishTasks, products, refresh]);
 
   // Land on the product's REAL tab. Go-live reroutes to ?status=in_review, but
   // the backend resolves the new product to IN_REVIEW or auto-PUBLISHED. The

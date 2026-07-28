@@ -75,6 +75,7 @@ import { emitProductStudioSync } from "@/utils/productStudioEvents";
 import { createPublishTask } from "@/utils/publishTracker";
 import { runProductPublishJob } from "@/features/products/productPublishJob";
 import { TourOverlay, type TourStep } from "@/components/ui/TourOverlay";
+import { useOneTimeTour } from "@/hooks/useOneTimeTour";
 import StudioPageSkeleton from "@/components/studio/StudioPageSkeleton";
 import {
   isBrandProfileComplete,
@@ -751,21 +752,13 @@ const EditProduct: React.FC = () => {
   // state, ref, preview, or drag-drop handler is ever lost between steps.
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
   const wizardTopRef = useRef<HTMLDivElement | null>(null);
-  const [isTourActive, setIsTourActive] = useState(false);
-
   // Auto-start the tour the first time a user opens the create-product page.
-  // Persisted in localStorage so it never shows again after the first visit.
-  useEffect(() => {
-    if (isEditMode) return;
-    if (localStorage.getItem('wiez_tour_product_create')) return;
-    const timer = window.setTimeout(() => setIsTourActive(true), 800);
-    return () => clearTimeout(timer);
-  }, [isEditMode]);
-
-  const handleTourClose = useCallback(() => {
-    setIsTourActive(false);
-    localStorage.setItem('wiez_tour_product_create', '1');
-  }, []);
+  // The seen-flag is persisted the moment it is shown (not only on close), so
+  // ignoring it or navigating away is as permanent as pressing "Skip tour".
+  const { isActive: isTourActive, close: handleTourClose } = useOneTimeTour(
+    'wiez_tour_product_create',
+    { enabled: !isEditMode },
+  );
   const { confirm, ConfirmDialog: ConfirmModal } = useConfirm();
 
   const [taxonomyCategories, setTaxonomyCategories] = useState<
@@ -2098,14 +2091,22 @@ const EditProduct: React.FC = () => {
             const goingLive = !effectiveDraft;
             const productTitle =
               payload.title || form.title.trim() || "New product";
-            const coverPreviewUrl =
-              pendingUploads.find((u) => u.isPrimary)?.previewUrl ||
-              pendingUploads[0]?.previewUrl;
+            // Mint a preview URL that belongs to the publish task. Reusing the
+            // editor's `previewUrl` looked equivalent but was not: this page
+            // revokes every pending preview blob on unmount, and the reroute
+            // below unmounts it immediately — so the store's new card pointed
+            // at a dead blob and rendered broken until a manual refresh.
+            const coverUpload =
+              pendingUploads.find((u) => u.isPrimary) ?? pendingUploads[0];
+            const coverPreviewUrl = coverUpload?.file
+              ? URL.createObjectURL(coverUpload.file)
+              : undefined;
             const task = createPublishTask({
               ownerId: user?.id,
               title: productTitle,
               visibility: "PUBLIC",
               coverPreviewUrl,
+              ownsCoverPreview: Boolean(coverPreviewUrl),
               entity: "product",
               kind: goingLive ? "publish" : "draft",
               message: goingLive ? "Uploading…" : "Saving…",
@@ -5053,7 +5054,14 @@ const EditProduct: React.FC = () => {
                       ? "ACTIVE"
                       : isDraftEditMode
                         ? "ACTIVE"
-                        : undefined,
+                        : !isEditMode
+                          // A first-time "Create Product" submit is always a
+                          // submission — it must resolve to IN_REVIEW server-
+                          // side, never fall back to whatever `form.status`
+                          // happens to hold. Drafts are an explicit choice
+                          // ("Save as Draft"), not a submit outcome.
+                          ? "ACTIVE"
+                          : undefined,
                   })
                 }
                 disabled={saving || submitLocked}

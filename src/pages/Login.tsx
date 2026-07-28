@@ -35,6 +35,7 @@ import {
   PasswordPolicyFeedback,
 } from '@/components/auth/PasswordPolicyFeedback';
 import { AppleLogoIcon } from '@/components/auth/SocialAuthIcons';
+import { getFriendlyErrorMessage } from '@/utils/errorMessage';
 import '../styles/auth.css';
 
 const loginSchema = z.object({
@@ -66,28 +67,7 @@ type LoginStep =
   | 'setup-success';
 
 const getAuthFlowErrorMessage = (error: unknown, fallback: string): string => {
-  if (isAxiosError(error)) {
-    const data = error.response?.data as Record<string, unknown> | undefined;
-    const candidates = [
-      data?.message,
-      (data?.data as Record<string, unknown> | undefined)?.message,
-      data?.error,
-    ];
-    for (const candidate of candidates) {
-      if (typeof candidate === 'string' && candidate.trim()) {
-        const msg = candidate.trim();
-        if (msg.includes('ThrottlerException') || msg.includes('Too Many Requests')) return 'Too many requests. Please try again later.';
-        if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('incorrect')) return 'Invalid credentials';
-        return msg;
-      }
-    }
-  }
-
-  const message = (error as { message?: unknown })?.message;
-  const finalMsg = typeof message === 'string' && message.trim() ? message.trim() : fallback;
-  if (finalMsg.includes('ThrottlerException') || finalMsg.includes('Too Many Requests')) return 'Too many requests. Please try again later.';
-  if (finalMsg.toLowerCase().includes('invalid') || finalMsg.toLowerCase().includes('unauthorized') || finalMsg.toLowerCase().includes('not found') || finalMsg.toLowerCase().includes('incorrect')) return 'Invalid credentials';
-  return finalMsg;
+  return getFriendlyErrorMessage(error, fallback);
 };
 
 // Loading Component
@@ -783,15 +763,7 @@ const LoginPage = () => {
         }
 
         const responseData = error.response?.data as Record<string, unknown> | undefined;
-        let responseMessage =
-          (responseData && typeof responseData.message === 'string' && responseData.message) ||
-          'Login failed. Please try again.';
-        
-        if (responseMessage.includes('ThrottlerException') || responseMessage.includes('Too Many Requests')) {
-          responseMessage = 'Too many requests. Please try again later.';
-        } else if (responseMessage.toLowerCase().includes('invalid') || responseMessage.toLowerCase().includes('unauthorized') || responseMessage.toLowerCase().includes('not found') || responseMessage.toLowerCase().includes('incorrect')) {
-          responseMessage = 'Invalid credentials';
-        }
+        const responseMessage = getFriendlyErrorMessage(error, 'Login failed. Please try again.');
 
         const normalizedMessage = responseMessage.toLowerCase();
         const isForceResetRequired =

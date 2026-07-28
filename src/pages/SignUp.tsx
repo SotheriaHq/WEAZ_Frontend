@@ -13,10 +13,8 @@ import { addLocalNotification } from '../features/notificationsSlice';
 import { useNavigate, Link } from 'react-router-dom';
 import { apiClient, persistAccessToken, dropStoredAccessToken } from '../api/httpClient';
 import { AuthApi } from '@/api/AuthApi';
-import {
-  getRequiredLegalAcceptances,
-  LEGAL_SIGNUP_DOCUMENT_KEYS,
-} from '@/api/LegalApi';
+import { getRequiredLegalAcceptances, LEGAL_SIGNUP_DOCUMENT_KEYS } from '@/api/LegalApi';
+import { getFriendlyErrorMessage } from '@/utils/errorMessage';
 import { env } from '@/config/env';
 
 import '../styles/auth.css';
@@ -246,10 +244,9 @@ const SignUpPage = () => {
       );
       await completeSignup(unwrapApiResponse(signupRes.data));
     } catch (error: unknown) {
+      const responseMessage = getFriendlyErrorMessage(error, 'Sign up failed. Please try again.');
       if (isAxiosError(error)) {
         const data = error.response?.data as Record<string, unknown> | undefined;
-        const responseMessage =
-          (data && typeof data.message === 'string' && data.message) || 'Sign up failed. Please try again.';
 
         if (data && Array.isArray((data as { errors?: unknown }).errors)) {
           const serverErrors = (data as { errors: Array<Record<string, unknown>> }).errors;

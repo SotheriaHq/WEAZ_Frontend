@@ -13,6 +13,14 @@ import {
   LEGAL_CONTENT_PUBLISH_DOCUMENT_KEYS,
 } from '@/api/LegalApi';
 
+/**
+ * Product create/update are heavy transactional writes (media validation,
+ * taxonomy + filter checks, content submission). The global 15s axios default
+ * in `config/env.ts` aborts them on mobile connections, which silently strands
+ * a listing as a DRAFT — match the media-upload override instead.
+ */
+const PRODUCT_WRITE_TIMEOUT_MS = 90_000;
+
 // =====================
 // Types
 // =====================
@@ -431,6 +439,9 @@ export const productApi = {
         data: ProductDto;
       }>("/products", payload, {
         headers: { "Idempotency-Key": createIdempotencyKey() },
+        // The global 15s default is too tight for this write on mobile data —
+        // a timeout here strands a half-created listing. See updateProduct.
+        timeout: PRODUCT_WRITE_TIMEOUT_MS,
       });
       return response.data?.data ?? (response.data as unknown as ProductDto);
     } catch (error) {
@@ -451,7 +462,14 @@ export const productApi = {
       const response = await apiClient.patch<{
         status: string;
         data: ProductDto;
-      }>(`/products/${productId}`, payload);
+      }>(`/products/${productId}`, payload, {
+        // This is the go-live finalize call: the server validates structured
+        // media, taxonomy and filters, then opens a content submission — all
+        // in one transaction. On mobile data it regularly runs past the global
+        // 15s axios default, and an aborted request leaves the product sitting
+        // in DRAFT instead of IN_REVIEW.
+        timeout: PRODUCT_WRITE_TIMEOUT_MS,
+      });
       return response.data?.data ?? (response.data as unknown as ProductDto);
     } catch (error) {
       console.error("Failed to update product", error);

@@ -165,6 +165,7 @@ export interface VerificationQueueItem {
   id: string;
   name: string;
   verificationStatus: VerificationStatusValue;
+  createdAt?: string;
   updatedAt?: string;
   verificationSubmittedAt?: string | null;
   verificationAttemptNumber?: number;
@@ -172,6 +173,7 @@ export interface VerificationQueueItem {
   owner?: {
     id: string;
     email: string;
+    username?: string;
     firstName: string;
     lastName: string;
     status?: string;

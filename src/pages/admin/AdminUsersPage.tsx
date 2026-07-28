@@ -31,7 +31,7 @@ interface TabDef {
 const TAB_DEFS: TabDef[] = [
   { key: 'shoppers', label: 'Shoppers', emoji: '🛍️', permissions: ['USERS_READ'] },
   { key: 'brands', label: 'Brands', emoji: '🏷️', permissions: ['BRANDS_READ'] },
-  { key: 'in-review', label: 'In Review', emoji: '🪪', permissions: ['BRANDS_VERIFY'] },
+  { key: 'in-review', label: 'Store Verifications', emoji: '🪪', permissions: ['BRANDS_VERIFY'] },
   { key: 'team', label: 'Team', emoji: '🛡️', permissions: ['USERS_READ'] },
 ];
 

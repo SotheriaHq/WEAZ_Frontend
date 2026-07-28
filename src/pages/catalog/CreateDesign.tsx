@@ -102,6 +102,7 @@ import {
 } from '@/utils/contentIntegrity';
 import { addClientDiagnostic } from '@/utils/clientDiagnostics';
 import { TourOverlay, type TourStep } from '@/components/ui/TourOverlay';
+import { useOneTimeTour } from '@/hooks/useOneTimeTour';
 // ============================================================================
 
 type CategoryTypeOption = { id: string; slug?: string; name: string; categoryId?: string };
@@ -309,23 +310,13 @@ const CreateDesignInner: React.FC = () => {
   );
 
   // UI state
-  const [isTourActive, setIsTourActive] = useState(false);
-
   // Auto-start the tour the first time a user opens the create-design page.
-  // Persisted in localStorage so it never shows again after the first visit.
-  useEffect(() => {
-    if (isEditMode) return;
-    if (localStorage.getItem('wiez_tour_design_create')) return;
-    const timer = window.setTimeout(() => setIsTourActive(true), 800);
-    return () => clearTimeout(timer);
-    // isEditMode is stable for the lifetime of this page instance
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleTourClose = useCallback(() => {
-    setIsTourActive(false);
-    localStorage.setItem('wiez_tour_design_create', '1');
-  }, []);
+  // The seen-flag is persisted the moment it is shown (not only on close), so
+  // ignoring it or navigating away is as permanent as pressing "Skip tour".
+  const { isActive: isTourActive, close: handleTourClose } = useOneTimeTour(
+    'wiez_tour_design_create',
+    { enabled: !isEditMode },
+  );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
