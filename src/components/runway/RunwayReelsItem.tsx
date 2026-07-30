@@ -202,9 +202,19 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
 
   const commentCount = item.commentsCount ?? 0;
 
+  // `runway-reel-stage` carries the scroll-linked scale and declares the view
+  // timeline every overlay below reads (see index.css → Runway reel transit).
+  //
+  // The snap-start/snap-always classes that used to be on the article are gone
+  // on purpose. The wrapper in RunwayReelsFeed is already an identical
+  // full-height snap target, so this was a duplicate snap position — harmless
+  // until the article started carrying a transform, because the scroll snap area
+  // is the *transformed* border box. A scaled second target sits a few vh off
+  // the wrapper's, and two `snap-stop: always` positions that close together is
+  // a double-stop. Exactly one snap target per page.
   return (
     <article
-      className="relative h-full w-full shrink-0 snap-start snap-always overflow-hidden bg-black"
+      className="runway-reel-stage relative h-full w-full shrink-0 overflow-hidden bg-black"
       data-runway-reel-id={item.id}
       aria-label={item.collectionTitle || 'Design'}
     >
@@ -272,10 +282,14 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
         })}
       </div>
 
-      {/* Angle dots — always visible for multi-media designs (native parity). */}
+      {/* Angle dots — visible at rest for multi-media designs (native parity),
+          faded out during a vertical transit by runway-reel-chrome. Two rows of
+          bright white pills sliding past each other is close to worst-case for
+          pulling gaze: small, high-contrast and high spatial frequency. This was
+          the last thing still at full opacity mid-swipe on native. */}
       {hasMultiple ? (
         <div
-          className="pointer-events-none absolute inset-x-0 z-[2] flex items-center justify-center gap-1.5"
+          className="runway-reel-chrome pointer-events-none absolute inset-x-0 z-[2] flex items-center justify-center gap-1.5"
           style={{ bottom: DOTS_BOTTOM }}
           aria-hidden
         >
@@ -293,17 +307,31 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
       ) : null}
 
       {/* Readability gradient — fades in with the tap-revealed meta only, so
-          the default view stays clean like native. */}
-      <div
-        className={`pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-[42%] bg-gradient-to-t from-black/80 via-black/35 to-transparent transition-opacity duration-300 ${
-          metaRevealed ? 'opacity-100' : 'opacity-0'
-        }`}
-        aria-hidden
-      />
+          the default view stays clean like native.
 
-      {/* Right action rail — ALWAYS visible (native parity). */}
+          The transit fade sits on a WRAPPER rather than on this element, and
+          that placement is load-bearing: a scroll-driven animation and a
+          class-toggled opacity on the same element do not combine — the
+          animation wins outright and would pin the gradient permanently on.
+          Nested opacities multiply, which is what we actually want. The wrapper
+          is `inset-0` so the inner box resolves exactly as it did before. */}
+      <div className="runway-reel-chrome pointer-events-none absolute inset-0 z-[1]" aria-hidden>
+        <div
+          className={`absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-black/80 via-black/35 to-transparent transition-opacity duration-300 ${
+            metaRevealed ? 'opacity-100' : 'opacity-0'
+          }`}
+        />
+      </div>
+
+      {/* Right action rail — visible at rest (native parity), faded during a
+          vertical transit. Nothing here has a competing opacity of its own, so
+          it takes runway-reel-chrome directly. Retiring it by 45% of a page is
+          the single biggest win in the treatment: mid-swipe there are otherwise
+          TWO rails at the same screen edge sliding past each other at different
+          heights, and icons plus numeric counts hold foveal attention far
+          harder than the imagery behind them. */}
       <div
-        className="absolute right-2 z-10 flex flex-col items-center gap-3.5 sm:right-3"
+        className="runway-reel-chrome absolute right-2 z-10 flex flex-col items-center gap-3.5 sm:right-3"
         style={{ bottom: RAIL_BOTTOM }}
       >
         {isCustomAvailable ? (
@@ -404,61 +432,82 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
       </div>
 
       {/* Bottom meta — hidden by default, revealed on tap, auto-hides (native
-          FeedMetaOverlay). Brand avatar tap still routes to the brand. */}
-      <div
-        className={`absolute inset-x-0 z-10 px-3 pr-16 transition-opacity duration-300 ${
-          metaRevealed ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-        style={{ bottom: META_BOTTOM }}
-        aria-hidden={!metaRevealed}
-      >
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (brandId) onViewBrand?.(brandId, item);
-          }}
-          className="mb-1.5 flex max-w-[85%] items-center gap-2 rounded-lg text-left"
+          FeedMetaOverlay). Brand avatar tap still routes to the brand.
+
+          Same wrapper reasoning as the readability gradient, and here it is the
+          difference between working and badly broken: this element's opacity is
+          already driven by `metaRevealed`, so putting the transit fade on it
+          directly would let the animation override that and leave the meta card
+          permanently visible on every reel. The wrapper is `inset-0`, so
+          `inset-x-0` + META_BOTTOM resolve exactly as they did before, and it is
+          pointer-events-none, so the revealed state has to opt back in. */}
+      <div className="runway-reel-chrome pointer-events-none absolute inset-0 z-10">
+        <div
+          className={`absolute inset-x-0 px-3 pr-16 transition-opacity duration-300 ${
+            metaRevealed ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+          }`}
+          style={{ bottom: META_BOTTOM }}
+          aria-hidden={!metaRevealed}
         >
-          <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-white/35 shadow-md">
-            <ImageWithFallback
-              src={brandAvatar.src}
-              fileId={brandAvatar.fileId}
-              alt={item.brandName ?? item.username ?? 'Brand'}
-              fit="cover"
-              rounded="xl"
-              fallbackName={brandAvatarFallback}
-              containerClassName="h-9 w-9 rounded-xl"
-              className="h-9 w-9 object-cover"
-            />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-bold leading-tight text-white drop-shadow">
-              {item.brandName ?? item.username ?? 'Brand'}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (brandId) onViewBrand?.(brandId, item);
+            }}
+            className="mb-1.5 flex max-w-[85%] items-center gap-2 rounded-lg text-left"
+          >
+            <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-white/35 shadow-md">
+              <ImageWithFallback
+                src={brandAvatar.src}
+                fileId={brandAvatar.fileId}
+                alt={item.brandName ?? item.username ?? 'Brand'}
+                fit="cover"
+                rounded="xl"
+                fallbackName={brandAvatarFallback}
+                containerClassName="h-9 w-9 rounded-xl"
+                className="h-9 w-9 object-cover"
+              />
             </span>
-            {item.username && item.brandName !== item.username ? (
-              <span className="block text-[11px] leading-tight text-white/80">@{item.username}</span>
-            ) : null}
-          </span>
-        </button>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold leading-tight text-white drop-shadow">
+                {item.brandName ?? item.username ?? 'Brand'}
+              </span>
+              {item.username && item.brandName !== item.username ? (
+                <span className="block text-[11px] leading-tight text-white/80">@{item.username}</span>
+              ) : null}
+            </span>
+          </button>
 
-        <h3 className="max-w-[88%] text-[15px] font-bold leading-snug text-white drop-shadow">
-          {item.collectionTitle}
-        </h3>
+          <h3 className="max-w-[88%] text-[15px] font-bold leading-snug text-white drop-shadow">
+            {item.collectionTitle}
+          </h3>
 
-        {priceLabel ? (
-          <p className="mt-1 text-xs font-semibold text-emerald-300 drop-shadow">{priceLabel}</p>
-        ) : null}
+          {priceLabel ? (
+            <p className="mt-1 text-xs font-semibold text-emerald-300 drop-shadow">{priceLabel}</p>
+          ) : null}
 
-        {item.tags?.length ? (
-          <p className="mt-1.5 max-w-[90%] text-[11px] leading-snug text-white/75">
-            {item.tags
-              .slice(0, 4)
-              .map((tag) => (tag.startsWith('#') ? tag : `#${tag}`))
-              .join(' ')}
-          </p>
-        ) : null}
+          {item.tags?.length ? (
+            <p className="mt-1.5 max-w-[90%] text-[11px] leading-snug text-white/75">
+              {item.tags
+                .slice(0, 4)
+                .map((tag) => (tag.startsWith('#') ? tag : `#${tag}`))
+                .join(' ')}
+            </p>
+          ) : null}
+        </div>
       </div>
+
+      {/* Transit scrim — LAST child and the highest layer, so it dims the chrome
+          as well as the media (native RunwayFeedItem orders it the same way).
+          `opacity-0` is the untreated resting value: in a browser without
+          scroll-driven animation support the @supports block never applies, this
+          stays fully transparent, and the feed renders exactly as it does today.
+          Where support exists the keyframes override it per scroll position. */}
+      <div
+        className="runway-reel-scrim pointer-events-none absolute inset-0 z-20 bg-black opacity-0"
+        aria-hidden
+      />
     </article>
   );
 };

@@ -37,9 +37,14 @@ html {
 
 /*
  * Runway mobile reels (web): platform CSS scroll-snap — mandatory + always —
- * mirrors native FlatList snapToInterval + disableIntervalMomentum +
- * decelerationRate="fast". No JS scroll hijacking (that causes lag).
- * Honour reduced-motion by allowing free scroll without hard snap stops.
+ * the web equivalent of the native feed's `pagingEnabled`. No JS scroll
+ * hijacking (that causes lag). Honour reduced-motion by allowing free scroll
+ * without hard snap stops.
+ *
+ * Not `snapToInterval` + `disableIntervalMomentum`, which an earlier version of
+ * this comment claimed as the native reference: native abandoned that pair
+ * because it accelerated the settle into the target, and its guard test now
+ * fails the build if they reappear.
  */
 .runway-reels-scroller {
   -webkit-overflow-scrolling: touch;
@@ -95,6 +100,175 @@ html {
   }
   .runway-reels-hcarousel > * {
     scroll-snap-stop: normal !important;
+  }
+}
+
+/*
+ * ─── Runway reel transit treatment (web) ──────────────────────────────────
+ *
+ * Port of the native page transition in threadly-mobile
+ * `src/features/feed/utils/runwayTransitCurves.ts`. Before this, the web reels
+ * feed had none of it: mid-swipe the viewport held two full-bleed designs at
+ * full luminance, two permanently-visible action rails sliding past each other
+ * and two dot rows, with a hard seam between them. That is the exact condition
+ * reported as eye strain on native ("everything is just really vivid as they're
+ * transitioning, so it feels like your eyes are seeing so many things at the
+ * same time") — and it was worse here, because the web rail never faded at all.
+ *
+ * Why scroll-driven CSS and not a JS scroll handler: a per-frame React
+ * `onScroll` is precisely the main-thread work the native paging fix removed,
+ * and on a mobile browser it would also fight the browser's own snap physics.
+ * `animation-timeline` needs no listener and runs off the main thread.
+ *
+ * ## Timeline mapping — do not "simplify" this
+ *
+ * Each reel is exactly one scrollport tall, so its `view()` progress across the
+ * default `cover` range maps 1:1 onto the native curves' scroll offsets (`o` =
+ * the page's offset, `h` = page height):
+ *
+ *   view progress     0%       25%      50%       75%      100%
+ *   native scrollY    o - h    o - h/2  o         o + h/2  o + h
+ *                     ↑ below the fold  ↑ centred          ↑ left above
+ *
+ * The timeline is NAMED rather than an anonymous `view()` because the reel
+ * `<article>` is `overflow: hidden`, which makes it a scroll container: a
+ * descendant using a bare `view()` would resolve against the article — which
+ * cannot scroll — instead of the feed, and silently never animate. Declaring
+ * `view-timeline-name` on the article and referencing it by name from
+ * descendants resolves the timeline against the article's own ancestor
+ * scrollport, which is the feed scroller.
+ *
+ * ## Values
+ *
+ * Synced by hand with the native constants (separate git repo, so no import is
+ * possible). If you retune one side, retune the other:
+ *   RUNWAY_PAGE_SCRIM_MAX_OPACITY 0.55 → scrim peak once a page is a full
+ *                                        viewport away on the departure side
+ *   SCRIM_MIDPOINT_RATIO          0.72 → 0.55 × 0.72 = 0.396 at the midpoint.
+ *                                        Deliberately more than half, so the
+ *                                        outgoing page recedes *early* instead
+ *                                        of on a linear ramp that only dims it
+ *                                        once it is already mostly gone.
+ *   SCRIM_INCOMING_RATIO          0.5  → the approach side runs at half the
+ *                                        departure side (0.275 peak / 0.198
+ *                                        mid), so the arriving page wins the
+ *                                        mid-swipe contrast. Dimming both
+ *                                        equally leaves the eye two equally
+ *                                        murky candidates and no hint which to
+ *                                        settle on.
+ *   RUNWAY_PAGE_SCALE_MIN         0.94 → just enough to break the hard seam so
+ *                                        two abutting photographs stop reading
+ *                                        as one continuous surface. Deeper
+ *                                        (ViewPager2 uses 0.85) opens a matte
+ *                                        band that reads as a layout bug.
+ *   CHROME_FADE_END_RATIO         0.45 → chrome gone by 45% of a page out,
+ *                                        i.e. 50% ± 22.5% in view progress.
+ *                                        Faster than the scrim on purpose:
+ *                                        icons and counts hold foveal
+ *                                        attention far harder than imagery.
+ *
+ * The whole block sits behind @supports for a load-bearing reason. With no
+ * `animation-timeline` support, `animation-fill-mode: both` plus a timeline that
+ * never resolves falls back to the document timeline at 0s duration and pins
+ * every reel to its 100% keyframe — scrim 0.55, chrome 0, i.e. a permanently
+ * dimmed feed with no action rail. Unsupported browsers must get the plain
+ * untreated feed instead, which is exactly what omitting these rules gives.
+ */
+@supports (animation-timeline: view()) {
+  .runway-reels-scroller [data-runway-reel-id] {
+    view-timeline-name: --wiez-reel;
+    view-timeline-axis: block;
+  }
+
+  .runway-reel-stage,
+  .runway-reel-chrome,
+  .runway-reel-scrim {
+    animation-timeline: --wiez-reel;
+    animation-range: cover 0% cover 100%;
+    /* linear is required: the default `ease` would distort the offset mapping
+       above. `both` is what reproduces the native curves' extrapolate:'clamp' —
+       a reel outside the range holds its 0% / 100% value. */
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+  }
+
+  .runway-reel-stage {
+    animation-name: wiez-reel-scale;
+  }
+  .runway-reel-chrome {
+    animation-name: wiez-reel-chrome;
+  }
+  .runway-reel-scrim {
+    animation-name: wiez-reel-scrim;
+  }
+
+  @keyframes wiez-reel-scale {
+    0% {
+      transform: scale(0.94);
+    }
+    50% {
+      transform: scale(1);
+    }
+    100% {
+      transform: scale(0.94);
+    }
+  }
+
+  @keyframes wiez-reel-scrim {
+    0% {
+      opacity: 0.275;
+    }
+    25% {
+      opacity: 0.198;
+    }
+    50% {
+      opacity: 0;
+    }
+    75% {
+      opacity: 0.396;
+    }
+    100% {
+      opacity: 0.55;
+    }
+  }
+
+  @keyframes wiez-reel-chrome {
+    0%,
+    27.5% {
+      opacity: 0;
+    }
+    50% {
+      opacity: 1;
+    }
+    72.5%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  /*
+   * Reduce Motion: drop the scale only. It is the one curve here that is
+   * actually *movement*; the scrim and chrome fades are cross-fades, which is
+   * what Reduce Motion prefers as a substitute for movement rather than
+   * something it wants removed. Same rule as native, where `pageScaleEnabled`
+   * gates the scale alone.
+   *
+   * The duration re-declaration is not redundant. The global reduced-motion
+   * reset at the top of this file sets `animation-duration: 0.01ms !important`
+   * on every element. A progress timeline ignores `animation-duration` per
+   * spec, so in principle the fades survive it — but that is an easy detail for
+   * an engine to get wrong, and the failure mode is losing the treatment for
+   * exactly the users who most need the calmer transition. `auto` restores the
+   * timeline-driven behaviour explicitly.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .runway-reel-stage {
+      animation-name: none;
+    }
+    .runway-reel-chrome,
+    .runway-reel-scrim {
+      animation-duration: auto !important;
+    }
   }
 }
 

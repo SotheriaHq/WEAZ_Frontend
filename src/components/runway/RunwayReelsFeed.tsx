@@ -26,11 +26,21 @@ export type RunwayReelsFeedProps = {
 /**
  * Mobile-browser / responsive-phone Runway surface.
  *
- * Vertical CSS scroll-snap (mandatory + always) mirrors native FlatList
- * snapToInterval + disableIntervalMomentum + decelerationRate="fast":
- * each design fills the stage; the browser animates the settle so the
- * handoff is visible, not a hard jump. No JS scroll hijacking — that
- * causes lag compared with platform snap physics.
+ * Vertical CSS scroll-snap (mandatory + always) is the web equivalent of the
+ * native feed's `pagingEnabled`: each design fills the stage, exactly one page
+ * moves per gesture, and the browser owns the settle animation. No JS scroll
+ * hijacking — that lags badly next to platform snap physics.
+ *
+ * Do NOT "restore parity" with native `snapToInterval` +
+ * `disableIntervalMomentum` (which earlier revisions of this comment claimed to
+ * mirror). Native moved off that pair precisely because it made the settle
+ * accelerate into the target instead of easing into it, and the mobile guard
+ * test now fails the build if they come back. `y mandatory` +
+ * `scroll-snap-stop: always` is the correct analogue of what native does today.
+ *
+ * The per-page transit treatment (scrim, scale, chrome fade) is not here — it is
+ * scroll-driven CSS in index.css, keyed to each reel's own `view()` progress.
+ * See "Runway reel transit treatment" there.
  */
 export const RunwayReelsFeed: React.FC<RunwayReelsFeedProps> = ({
   items,
