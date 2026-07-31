@@ -361,7 +361,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   {/* Left - Image Gallery */}
                   <div className="relative bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 p-6">
                     {/* Main image */}
-                    <div className={`${CONTENT_DISPLAY_FRAME_CLASS} rounded-2xl shadow-lg`}>
+                    <div className={`${CONTENT_DISPLAY_FRAME_CLASS} h-[520px] sm:h-[580px] lg:h-[650px] max-h-[70vh] rounded-2xl shadow-lg`}>
                       <MediaRenderer
                         kind="image"
                         src={product.images[selectedImage] || product.thumbnail || ''}

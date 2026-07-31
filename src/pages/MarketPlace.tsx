@@ -1180,13 +1180,13 @@ const MarketPlace: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-layer-modal bg-black/60 p-3 backdrop-blur-sm sm:p-6"
+            className="fixed inset-0 z-layer-modal bg-black/60 p-3 backdrop-blur-sm sm:p-6 flex items-center justify-center"
           >
             <motion.div
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 18 }}
-              className="mx-auto h-full w-full max-w-6xl overflow-y-auto rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-[#120d18] sm:p-6"
+              className="mx-auto max-h-[92vh] w-full max-w-6xl overflow-y-auto lg:overflow-hidden rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-[#120d18] sm:p-6 glass-scrollbar flex flex-col"
             >
               <div className="mb-3 flex justify-end">
                 <button

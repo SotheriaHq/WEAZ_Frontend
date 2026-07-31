@@ -587,7 +587,7 @@ export default function InlineProductDetail({
         <div className="space-y-4">
           {/* Main Image */}
           <div
-            className="relative w-full overflow-hidden rounded-2xl cursor-zoom-in group"
+            className="relative w-full h-[520px] sm:h-[580px] lg:h-[650px] max-h-[70vh] rounded-2xl overflow-hidden cursor-zoom-in group"
             onClick={() => {
               if (suppressImageClickRef.current) {
                 suppressImageClickRef.current = false;
