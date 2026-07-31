@@ -7,6 +7,37 @@ import {
 } from './seo-shared';
 
 /**
+ * Hashed Vite build outputs under /assets/* must NEVER SPA-fallback to
+ * index.html. Cloudflare Pages' SPA mode returns 200 text/html for missing
+ * paths; our `/assets/*` header then stamps that HTML with
+ * `Cache-Control: public, max-age=31536000, immutable`, so the edge caches
+ * poison at the JS URL. Browsers then fail boot with:
+ *   Failed to load module script: … MIME type of "text/html"
+ * Incidents: 2026-07-10, 2026-07-31. Convert HTML-for-asset into a real 404
+ * with no-store so it cannot be cached as a successful module.
+ */
+const HASHED_ASSET_PATH =
+  /^\/assets\/.+\.(?:js|mjs|css|map|woff2?|ttf|otf|eot|png|jpe?g|gif|svg|webp|avif)$/i;
+
+const rejectSpaFallbackForAsset = async (
+  context: EventContext<unknown, string, unknown>,
+): Promise<Response> => {
+  const response = await context.next();
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.toLowerCase().includes('text/html')) {
+    return response;
+  }
+  return new Response('Not Found', {
+    status: 404,
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-store, must-revalidate',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+};
+
+/**
  * Bot rendering middleware.
  *
  * Crawler requests for public pages are answered with lightweight
@@ -21,6 +52,13 @@ export const onRequest: PagesFunction = async (context) => {
   const url = new URL(context.request.url);
   const userAgent = context.request.headers.get('user-agent') ?? '';
   const path = `${url.pathname}${url.search}`;
+
+  // Asset guard runs first — even crawlers must not receive bot HTML for
+  // hashed build files (shouldServeBotHtml already skips static extensions,
+  // but SPA fallback still applies at the platform layer).
+  if (HASHED_ASSET_PATH.test(url.pathname)) {
+    return rejectSpaFallbackForAsset(context);
+  }
 
   if (shouldCanonicalRedirect(url.pathname)) {
     try {

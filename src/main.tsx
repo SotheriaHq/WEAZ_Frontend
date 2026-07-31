@@ -40,7 +40,12 @@ const isStaleChunkLoadError = (value: unknown): boolean => {
     message.includes('Importing a module script failed') ||
     message.includes('error loading dynamically imported module') ||
     message.includes('Loading chunk') ||
-    message.includes('ChunkLoadError')
+    message.includes('ChunkLoadError') ||
+    // SPA fallback HTML served for a hashed .js URL (deploy race / poisoned cache).
+    message.includes('Failed to load module script') ||
+    message.includes('MIME type of "text/html"') ||
+    message.includes("MIME type of 'text/html'") ||
+    message.includes('Expected a JavaScript-or-Wasm module script')
   );
 };
 

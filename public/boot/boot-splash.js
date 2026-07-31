@@ -213,7 +213,12 @@
       message.indexOf('Importing a module script failed') !== -1 ||
       message.indexOf('error loading dynamically imported module') !== -1 ||
       message.indexOf('Loading chunk') !== -1 ||
-      message.indexOf('ChunkLoadError') !== -1
+      message.indexOf('ChunkLoadError') !== -1 ||
+      // SPA-fallback HTML served under a .js URL (Cloudflare Pages deploy race).
+      message.indexOf('Failed to load module script') !== -1 ||
+      message.indexOf('MIME type of "text/html"') !== -1 ||
+      message.indexOf("MIME type of 'text/html'") !== -1 ||
+      message.indexOf('Expected a JavaScript-or-Wasm module script') !== -1
     );
   }
 
