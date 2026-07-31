@@ -64,6 +64,29 @@ function createItemFromFile(f: File, index = 0): MediaItem {
   return { id, file: f, previewUrl, kind, viewSlot: normalizeMediaViewSlot(null, index) };
 }
 
+/**
+ * View slots are POSITIONAL: slot N belongs to whatever image sits at index N.
+ * That is already how the UI presents them ("1. Front, 2. Back, 3. Left...").
+ *
+ * They used to be stamped onto an item once, at add time, and never revisited —
+ * so any structural edit desynced slot from position. Deleting the first image
+ * left the survivors still tagged Back/Left/Right with NOTHING tagged Front, and
+ * a replacement file was slotted by its append position, so it could not become
+ * Front either: the required slot was simply unreachable and the design could
+ * never satisfy "fill Front, Back, Left, and Right".
+ *
+ * Re-deriving after every structural change keeps slot and position in agreement
+ * by construction, and makes drag-to-reorder double as slot assignment.
+ *
+ * Item identity is preserved when the slot is already correct, so this does not
+ * churn renders or invalidate preview URLs.
+ */
+const withPositionalViewSlots = (items: MediaItem[]): MediaItem[] =>
+  items.map((item, index) => {
+    const viewSlot = normalizeMediaViewSlot(null, index);
+    return item.viewSlot === viewSlot ? item : { ...item, viewSlot };
+  });
+
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'add': {
@@ -74,16 +97,20 @@ function reducer(state: State, action: Action): State {
       const newItems = action.files
         .slice(0, remaining)
         .map((file, index) => createItemFromFile(file, state.items.length + index));
-      return { items: [...state.items, ...newItems] };
+      return { items: withPositionalViewSlots([...state.items, ...newItems]) };
     }
     case 'remove':
-      return { items: state.items.filter((it) => it.id !== action.id) };
+      return {
+        items: withPositionalViewSlots(state.items.filter((it) => it.id !== action.id)),
+      };
     case 'clear':
       return { items: [] };
+    // `set` hydrates from the server in edit mode and must preserve the slots the
+    // server actually stored; only user-driven structural edits re-derive.
     case 'set':
       return { items: action.items };
     case 'reorder':
-      return { items: action.items };
+      return { items: withPositionalViewSlots(action.items) };
     case 'setPreview':
       return {
         items: state.items.map((it) =>
@@ -236,7 +263,7 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             }
           }
 
-          let previewUrl = await Promise.race([
+          const previewUrl = await Promise.race([
             buildDisplayableImagePreview(file),
             new Promise<string>((_, reject) => {
               setTimeout(

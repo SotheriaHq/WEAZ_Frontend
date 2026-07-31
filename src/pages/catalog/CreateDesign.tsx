@@ -39,6 +39,7 @@ import TextField from "../../components/forms/TextField";
 import UniversalSelect from "@/components/forms/UniversalSelect";
 import MediaUploadZone from "../../components/upload/MediaUploadZone";
 import ThumbnailStrip from "../../components/upload/ThumbnailStrip";
+import SizingConfigurator from "@/components/sizing/SizingConfigurator";
 import LocalMediaPreview from "../../components/media/LocalMediaPreview";
 import useFilePicker from "../../components/upload/useFilePicker";
 import { PrePublishConfirmModal } from "@/components/modals";
@@ -773,6 +774,39 @@ const CreateDesignInner: React.FC = () => {
     setCoverIndex(index);
     toast.success("Cover image updated");
   };
+
+  /**
+   * Reordering IS slot assignment — the media store derives view slots from
+   * position, so dropping an image at position 1 makes it the Front. This is
+   * how an owner reclaims a required slot after deleting the image that held
+   * it; before reorder existed there was no way to do that at all.
+   *
+   * Cover and selection follow the items they pointed at rather than staying
+   * pinned to a position, so a drag never silently re-points either of them.
+   */
+  const handleReorderMedia = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      const current = mediaStore.items;
+      if (fromIndex < 0 || fromIndex >= current.length) return;
+      const bounded = Math.min(Math.max(toIndex, 0), current.length - 1);
+      if (bounded === fromIndex) return;
+
+      const next = [...current];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(bounded, 0, moved);
+      mediaStore.reorder(next);
+
+      const followIndex = (index: number) => {
+        if (index === fromIndex) return bounded;
+        if (fromIndex < bounded && index > fromIndex && index <= bounded) return index - 1;
+        if (fromIndex > bounded && index >= bounded && index < fromIndex) return index + 1;
+        return index;
+      };
+      setSelectedIndex(followIndex);
+      setCoverIndex(followIndex);
+    },
+    [mediaStore],
+  );
 
   const goToMediaIndex = useCallback(
     (nextIndex: number) => {
@@ -1759,6 +1793,7 @@ const CreateDesignInner: React.FC = () => {
                   disabled={disabled}
                   progressById={perFileProgress}
                   showSlotLabels
+                  onReorder={handleReorderMedia}
                 />
 
                 {/* Hidden file input */}
@@ -2190,22 +2225,25 @@ const CreateDesignInner: React.FC = () => {
             className="self-start"
           >
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <UniversalSelect
-                  label="Sizing Mode"
-                  value={sizingMode}
-                  onChange={handleDesignSizingModeChange}
-                  options={DESIGN_SIZING_MODE_OPTIONS.map((option) => ({
-                    value: option.value,
-                    label: option.label,
-                  }))}
-                  disabled={disabled}
-                  searchable
-                  optionAllowWrap
-                  optionCompact
-                  selectedAllowWrap
-                />
+              {/*
+                Same sizing component the product form uses, so designs and
+                products expose an identical measurement-point picker (and the
+                same freeform submission path) instead of designs quietly
+                offering less. The RTW size-system select is hidden here only
+                because the design save payload has no field to persist it.
+              */}
+              <SizingConfigurator
+                sizingMode={sizingMode}
+                onSizingModeChange={handleDesignSizingModeChange}
+                onRtwSizeSystemChange={() => undefined}
+                showRtwSizeSystem={false}
+                customMeasurementKeys={customMeasurementKeys}
+                onCustomMeasurementKeysChange={setCustomMeasurementKeys}
+                measurementGender={measurementGender}
+                disabled={disabled}
+              />
 
+              <div className="grid grid-cols-2 gap-3">
                 <UniversalSelect
                   label="Fit Preference"
                   value={fitPreference}

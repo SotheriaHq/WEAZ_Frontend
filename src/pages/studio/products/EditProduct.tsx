@@ -4322,6 +4322,17 @@ const EditProduct: React.FC = () => {
                   onCustomMeasurementKeysChange={(keys) =>
                     updateForm("customMeasurementKeys", keys)
                   }
+                  // Must match what the design form passes, or the two screens
+                  // scope the measurement registry differently again: without
+                  // this the product picker showed the FULL registry while the
+                  // design picker showed an audience-scoped subset.
+                  measurementGender={
+                    form.gender === "MALE"
+                      ? "MEN"
+                      : form.gender === "FEMALE"
+                        ? "WOMEN"
+                        : "UNISEX"
+                  }
                 />
                 {form.variants.length > 0 &&
                 normalizeSizingMode(form.sizingMode) === "NONE" ? (
