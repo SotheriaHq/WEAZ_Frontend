@@ -61,6 +61,36 @@ const selectDailyBatch = <T,>(items: T[], batchSize: number, utcDayIndex: number
   return items.slice(start, start + batchSize);
 };
 
+/**
+ * Rotate the order of a section rail's items.
+ *
+ * WHY: the Explore grid has been score-mixed per mount since feedMixer landed,
+ * but the section rails were not — they render `section.items` exactly as the
+ * API returned them, and that order is stable across requests. So every visit
+ * to Market showed the same cards in the same row, in the same alignment.
+ *
+ * This mixes the rail with the SAME per-mount seed the grid uses: the set of
+ * cards is untouched (server curation still decides membership), only the order
+ * rotates, and it stays fixed for the whole visit so nothing reshuffles under a
+ * scroll. Scoring signals are projected out of the section item so freshness and
+ * engagement still bias the front of the rail — see utils/feedMixer.
+ */
+const mixSectionItems = (items: MarketSectionItem[], seed: string): MarketSectionItem[] => {
+  if (items.length <= 1) return items;
+  return mixFeedItems(
+    items.map((item) => ({
+      id: item.id,
+      brandId: item.brand?.id ?? null,
+      createdAt: item.createdAt ?? null,
+      updatedAt: item.updatedAt ?? null,
+      viewsCount: item.stats?.views ?? null,
+      threadsCount: item.stats?.threads ?? null,
+      item,
+    })),
+    seed,
+  ).map((entry) => entry.item);
+};
+
 const extractProductsFromSections = (sections: MarketSection[]) => {
   const byId = new Map<string, MarketplaceProduct>();
   for (const section of sections) {
@@ -726,13 +756,30 @@ const MarketPlace: React.FC = () => {
   );
 
   const freshDrops = useMemo(() => {
-    const combined = [...adminFeaturedFreshDrops, ...systemFreshDrops];
+    // selectDailyBatch decides WHICH drops are eligible today — that is the
+    // product rule and stays day-stable. Only the render ORDER rotates per
+    // visit. Admin-featured keeps its front-of-rail placement (it is curated
+    // positioning, not ranking); just its internal order is mixed.
+    const combined = [
+      ...mixFeedItems(adminFeaturedFreshDrops, marketMixSeedRef.current),
+      ...mixFeedItems(systemFreshDrops, marketMixSeedRef.current),
+    ];
     return combined.slice(0, SYSTEM_FRESH_DROPS_LIMIT + ADMIN_FRESH_DROPS_LIMIT);
   }, [adminFeaturedFreshDrops, systemFreshDrops]);
 
+  // Every rail below renders from this, so the rotation is applied exactly once.
+  const mixedMarketSections = useMemo(
+    () =>
+      marketSections.map((section) => ({
+        ...section,
+        items: mixSectionItems(section.items ?? [], marketMixSeedRef.current),
+      })),
+    [marketSections],
+  );
+
   const sectionProductsByKey = useMemo(() => {
     const byKey = new Map<string, MarketplaceProduct[]>();
-    for (const section of marketSections) {
+    for (const section of mixedMarketSections) {
       const mapped = (section.items ?? [])
         .map((item) => mapSectionProductToMarketplaceProduct(item))
         .filter((product): product is MarketplaceProduct => Boolean(product));
@@ -741,22 +788,22 @@ const MarketPlace: React.FC = () => {
       }
     }
     return byKey;
-  }, [marketSections]);
+  }, [mixedMarketSections]);
 
   // Client feedback: reach Explore Market faster; push personalization rails lower.
   const primaryPreviewSections = useMemo(
     () =>
-      marketSections.filter(
+      mixedMarketSections.filter(
         (section) =>
           section.key !== 'fresh-drops' &&
           section.key !== 'picked-for-you' &&
           section.items?.length > 0,
       ),
-    [marketSections],
+    [mixedMarketSections],
   );
   const pickedForYouSection = useMemo(
-    () => marketSections.find((section) => section.key === 'picked-for-you' && section.items?.length > 0) ?? null,
-    [marketSections],
+    () => mixedMarketSections.find((section) => section.key === 'picked-for-you' && section.items?.length > 0) ?? null,
+    [mixedMarketSections],
   );
 
   const freshDropsForDisplay = sectionProductsByKey.get('fresh-drops') ?? freshDrops;

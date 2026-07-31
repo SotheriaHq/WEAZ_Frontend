@@ -53,10 +53,22 @@ const assertCacheBypassIsForceGuarded = (label, content) => {
   });
 };
 
-assertIncludes('src/query/queryClient.ts', 'refetchOnMount: false', 'query defaults must not refetch on mount');
+// The policy this guards is "a STALE query must not refetch on mount" — not the
+// literal `false`. A bare `false` also suppressed refetching for explicitly
+// INVALIDATED queries, which silently broke every invalidateQueries call in the
+// app. The predicate keeps the perf policy and restores the invalidation
+// contract; both halves are asserted so neither can be dropped.
+assertIncludes(
+  'src/query/queryClient.ts',
+  "refetchOnMount: (query) => (query.state.isInvalidated ? 'always' : false)",
+  'stale queries must not refetch on mount, but invalidated ones must',
+);
 assertIncludes('src/query/queryClient.ts', 'refetchOnWindowFocus: false', 'query defaults must not refetch on focus');
-assertIncludes('src/query/queryClient.ts', 'staleTime: THREADLY_QUERY_STALE_TIME_MS', 'query defaults must keep shared staleTime');
-assertIncludes('src/query/queryClient.ts', 'gcTime: THREADLY_QUERY_GC_TIME_MS', 'query defaults must keep shared gcTime');
+// Constants carry the WIEZ_ prefix since the brand rename. These two still named
+// them THREADLY_*, so they had been failing on every run rather than protecting
+// anything (same defect already corrected in threadly-mobile's guard).
+assertIncludes('src/query/queryClient.ts', 'staleTime: WIEZ_QUERY_STALE_TIME_MS', 'query defaults must keep shared staleTime');
+assertIncludes('src/query/queryClient.ts', 'gcTime: WIEZ_QUERY_GC_TIME_MS', 'query defaults must keep shared gcTime');
 
 assertNotMatches('src/query/queryKeys.ts', /Date\.now\(|Math\.random\(/, 'query keys must stay deterministic');
 assertIncludes('src/query/queryKeys.ts', "scope === 'publicUrl'", 'public media URLs should remain persistable');
@@ -70,7 +82,8 @@ assertOrder(
   'media hook must try public URLs before private signed fallback',
 );
 assertIncludes('src/hooks/useSignedFileUrl.ts', 'retry: false', 'media public denial must not retry into request spam');
-assertIncludes('src/hooks/useSignedFileUrl.ts', 'gcTime: THREADLY_QUERY_STALE_TIME_MS', 'signed media query cache must stay short-lived');
+// Same WIEZ_ rename rot as the queryClient assertions above.
+assertIncludes('src/hooks/useSignedFileUrl.ts', 'gcTime: WIEZ_QUERY_STALE_TIME_MS', 'signed media query cache must stay short-lived');
 
 assertOrder(
   'src/components/designs/DesignViewModal.tsx',

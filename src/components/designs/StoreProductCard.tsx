@@ -123,6 +123,17 @@ const resolveCardAspectRatio = (value?: number | null): number | null => {
   return Math.min(MAX_CARD_ASPECT_RATIO, Math.max(MIN_CARD_ASPECT_RATIO, value));
 };
 
+/**
+ * The single frame ratio every market card renders into, portrait because that
+ * is what most fashion media is shot in and it gives the tallest usable image
+ * for a given row height.
+ *
+ * Fixed on purpose: cards previously inherited each image's own ratio, which is
+ * what made rails ragged and grids gappy. Media is letterboxed into this frame
+ * with `object-contain` so nothing is ever cropped or stretched.
+ */
+const CARD_FRAME_ASPECT_RATIO = 4 / 5;
+
 const aspectRatioFromDimensions = (
   width?: number | null,
   height?: number | null,
@@ -461,14 +472,30 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       ? galleryImages[1]
       : galleryImages[0] ?? null;
   const hasDisplayImage = Boolean(activeImage?.url || desiredImage?.url);
-  const cardAspectRatio =
+  // The media's own ratio is still read, but it NO LONGER drives the frame.
+  //
+  // It used to: `aspectRatio: cardAspectRatio` made every card as tall as its
+  // own image, so a rail of mixed portrait/square/landscape products rendered as
+  // a ragged row of different-height cards, and the Explore grid opened gaps
+  // wherever a short card sat next to a tall one. Worse, the frame then rendered
+  // `object-cover` on top, so the card was inconsistent AND cropping at the same
+  // time — the two failure modes we least wanted together.
+  //
+  // Now the frame is a fixed portrait ratio and the media is `object-contain`
+  // inside it. Content keeps its true shape (nothing is cropped or stretched),
+  // and the leftover space becomes a deliberate dark matte rather than a gap in
+  // the layout. That is the "dark shade support" the native app already uses.
+  const mediaAspectRatio =
     activeImage?.aspectRatio ??
     desiredImage?.aspectRatio ??
     galleryImages[0]?.aspectRatio ??
     null;
-  const cardAspectStyle = cardAspectRatio ? { aspectRatio: cardAspectRatio } : undefined;
-  const mediaFrameStyle =
-    cardAspectStyle ?? (activeImage?.url ? undefined : { minHeight: 240 });
+  // Only used to decide whether bars will actually appear, so the matte can stay
+  // fully transparent for media that fills the frame edge to edge.
+  const fillsFrameExactly =
+    mediaAspectRatio != null &&
+    Math.abs(mediaAspectRatio - CARD_FRAME_ASPECT_RATIO) < 0.02;
+  const mediaFrameStyle = activeImage?.url ? undefined : { minHeight: 240 };
 
   useEffect(() => {
     if (!isHovered || !hoverGalleryEnabled) {
@@ -561,8 +588,14 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         onPreviewNavigationActiveChange?.(false);
       }}
     >
+      {/* Fixed portrait frame + dark matte. The matte is what turns leftover
+          space from "a gap in the layout" into deliberate depth behind the
+          content, and it is skipped entirely when the media already fills the
+          frame so those cards stay pixel-identical to before. */}
       <div
-        className={`relative w-full overflow-hidden bg-transparent ${cardAspectRatio ? '' : 'aspect-[4/5]'}`}
+        className={`relative aspect-[4/5] w-full overflow-hidden ${
+          fillsFrameExactly ? 'bg-transparent' : 'bg-neutral-950'
+        }`}
         style={mediaFrameStyle}
       >
         {hasDisplayImage && !activeImage?.url && !imgError ? (
@@ -576,9 +609,9 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             kind="image"
             src={activeImage.url}
             alt={product.name}
-            fit="cover"
+            fit="contain"
             className="absolute inset-0 block h-full w-full max-w-full"
-            mediaClassName={`block h-full w-full object-cover transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
+            mediaClassName={`block h-full w-full object-contain transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
             maxHeightClassName="max-h-none"
             loading={priority ? 'eager' : 'lazy'}
             fetchPriority={priority ? 'high' : 'low'}
@@ -752,7 +785,17 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           </div>
         ) : null}
 
-        <div className="hidden md:block absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/82 via-black/42 to-transparent px-4 pb-4 pt-16">
+        {/*
+          Calm frosted bar, not a tall gradient. The old treatment was a
+          `pt-16` `from-black/82` scrim: it covered ~40% of the card (so media
+          never read "in full") and its perceived weight swung with the image —
+          invisible over dark media, a heavy black band over light media.
+          A constant blurred tint is legible against ANY content because it does
+          not depend on what is underneath. black/55 is the floor that keeps
+          white text above 4.5:1 even over pure-white media, and the blur only
+          softens what is already behind it.
+        */}
+        <div className="hidden md:block absolute inset-x-0 bottom-0 z-10 border-t border-white/10 bg-black/55 px-4 pb-3 pt-2.5 backdrop-blur-md">
           <h3 className="line-clamp-1 text-sm font-semibold leading-snug text-white drop-shadow-sm">
             {product.name}
           </h3>
@@ -835,7 +878,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         </div>
 
         {/* Mobile View Bottom Overlay */}
-        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-black/45 backdrop-blur-md z-10 flex items-center justify-between min-h-[32px] max-h-[38px] border-t border-white/10" onClick={(e) => e.stopPropagation()}>
+        {/* Same frosted treatment as desktop; /45 -> /55 for the contrast floor. */}
+        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-black/55 backdrop-blur-md z-10 flex items-center justify-between min-h-[32px] max-h-[38px] border-t border-white/10" onClick={(e) => e.stopPropagation()}>
           <div className="flex-1 min-w-0 flex flex-col justify-center pl-1">
             <h3 
               className="font-bold text-white truncate leading-none uppercase"

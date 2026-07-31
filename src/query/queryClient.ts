@@ -12,7 +12,13 @@ export const queryClient = new QueryClient({
       staleTime: WIEZ_QUERY_STALE_TIME_MS,
       gcTime: WIEZ_QUERY_GC_TIME_MS,
       retry: 1,
-      refetchOnMount: false,
+      // Perf policy: merely being STALE must not refetch on mount — staleTime
+      // governs. But an explicitly INVALIDATED query must refetch, or
+      // invalidateQueries means nothing. A plain `false` suppressed both, so a
+      // mutation's invalidation only ever reached screens that happened to be
+      // mounted at that instant; anything else served stale data until its TTL
+      // elapsed. Mirrors threadly-mobile/src/query/queryClient.ts.
+      refetchOnMount: (query) => (query.state.isInvalidated ? 'always' : false),
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
     },
