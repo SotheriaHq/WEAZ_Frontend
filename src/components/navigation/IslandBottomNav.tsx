@@ -10,6 +10,8 @@ export type IslandBottomNavItem = {
   icon?: React.ReactNode;
   active?: boolean;
   disabled?: boolean;
+  /** Unread count rendered as a dot-badge over the icon. 0 hides it. */
+  badge?: number;
 };
 
 type IslandBottomNavProps = {
@@ -86,6 +88,7 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
               !item.disabled &&
               (optimisticActiveKey ? optimisticActiveKey === item.key : item.active),
             );
+            const showBadge = Boolean(!item.disabled && item.badge && item.badge > 0);
 
             return (
               <button
@@ -106,7 +109,9 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
                       }
                 }
                 aria-current={isSelected ? 'page' : undefined}
-                aria-label={item.label}
+                aria-label={
+                  showBadge ? `${item.label}, ${item.badge} unread` : item.label
+                }
                 title={item.disabled ? `${item.label} is locked` : item.label}
                 className={clsx(
                   ITEM_BASE_CLASS,
@@ -118,8 +123,13 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
                 )}
               >
                 {visual ? (
-                  <span className="text-[17px] leading-none" aria-hidden="true">
+                  <span className="relative text-[17px] leading-none" aria-hidden="true">
                     {visual}
+                    {showBadge && (
+                      <span className="absolute -right-2.5 -top-1.5 min-w-[15px] rounded-full bg-fuchsia-600 px-1 text-[9px] font-bold leading-[15px] text-white shadow">
+                        {(item.badge ?? 0) > 99 ? '99+' : item.badge}
+                      </span>
+                    )}
                   </span>
                 ) : null}
                 <span className="max-w-full truncate leading-tight">{item.label}</span>

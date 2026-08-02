@@ -7,6 +7,7 @@ import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import IslandBottomNav from '@/components/navigation/IslandBottomNav';
+import { useMessagingUnreadCount } from '@/hooks/useMessagingUnreadCount';
 
 interface SidebarLinkProps {
   emoji: string;
@@ -15,7 +16,10 @@ interface SidebarLinkProps {
   onClick?: () => void;
   isRail?: boolean;
   disabled?: boolean;
+  badge?: number;
 }
+
+const formatBadge = (count: number) => (count > 99 ? '99+' : String(count));
 
 interface SidebarProps {
   overlayOnly?: boolean;
@@ -28,8 +32,10 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
   onClick,
   isRail = false,
   disabled = false,
+  badge = 0,
 }) => {
   const isSelected = active && !disabled;
+  const showBadge = badge > 0 && !disabled;
 
   if (isRail) {
     return (
@@ -44,9 +50,25 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
             ? 'bg-[linear-gradient(180deg,rgba(217,70,239,0.12),rgba(255,255,255,0.1))] dark:bg-[linear-gradient(180deg,rgba(168,85,247,0.18),rgba(255,255,255,0.05))]'
             : 'hover:bg-white/28 dark:hover:bg-white/6'
         }`}
-        title={disabled ? `${label} (locked until store setup is complete)` : label}
+        title={
+          disabled
+            ? `${label} (locked until store setup is complete)`
+            : showBadge
+              ? `${label} (${badge} unread)`
+              : label
+        }
       >
-        <span className="text-xl">{emoji}</span>
+        <span className="relative text-xl">
+          {emoji}
+          {showBadge && (
+            <span
+              aria-hidden="true"
+              className="absolute -right-2.5 -top-1 min-w-[16px] rounded-full bg-fuchsia-600 px-1 text-[9px] font-bold leading-4 text-white shadow"
+            >
+              {formatBadge(badge)}
+            </span>
+          )}
+        </span>
         <span
           className={`text-[10px] truncate w-full text-center ${
             disabled
@@ -78,6 +100,11 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
     >
       <span className="w-6 shrink-0 text-center text-xl">{emoji}</span>
       <span className="flex-1 truncate text-[17px] font-medium">{label}</span>
+      {showBadge && (
+        <span className="ml-auto min-w-[20px] rounded-full bg-fuchsia-600 px-1.5 text-center text-[11px] font-bold leading-5 text-white shadow">
+          {formatBadge(badge)}
+        </span>
+      )}
     </button>
   );
 };
@@ -98,6 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
   const isProfileRoute = location.pathname === '/profile' || location.pathname.startsWith('/profile/');
   const isAdminConsoleUser = user?.role === 'SuperAdmin' || user?.role === 'Admin';
   const storeSetupComplete = useStoreSetupStatus();
+  const { unreadCount: unreadMessages } = useMessagingUnreadCount();
 
   if (overlayOnly && !isSidebarOpen) {
     return null;
@@ -135,14 +163,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
       path: '/subscriptions',
       active: location.pathname === '/subscriptions',
     },
-    ...(hasBrandAccess
+    // Messages is NOT brand-only. `/messages` renders a BUYER surface for
+    // shoppers, but the nav entry used to be gated behind brand access — so a
+    // shopper who messaged a brand had no way to reach the reply except by
+    // catching a notification deep link. The setup lock still applies to brands
+    // only; a shopper has no store to finish setting up.
+    ...(user
       ? [
           {
             emoji: '💬',
             label: 'Messages',
             path: '/messages',
             active: location.pathname === '/messages' || location.pathname.startsWith('/studio/messages'),
-            disabled: studioFeaturesLocked,
+            disabled: hasBrandAccess ? studioFeaturesLocked : false,
+            badge: unreadMessages,
           },
         ]
       : []),
@@ -187,6 +221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
           emoji: link.emoji,
           active: link.active,
           disabled: link.disabled,
+          badge: (link as { badge?: number }).badge,
         }))}
         onSelect={(item) => navigate(item.path, { replace: true })}
       />
@@ -203,6 +238,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
             label={link.label}
             active={link.active}
             disabled={link.disabled}
+            badge={(link as { badge?: number }).badge}
             onClick={() => handleLinkClick(link.path)}
             isRail={isRailMode}
           />

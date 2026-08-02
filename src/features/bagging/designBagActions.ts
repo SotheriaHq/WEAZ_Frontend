@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import { showNotice } from '@/components/ui/NoticeModal';
 import { BagApi } from '@/api/BagApi';
 import type { BagStatus } from '@/api/StoreApi';
 import type { MarketItem } from '@/types/market';
@@ -127,7 +128,10 @@ export async function runDesignBagFlow(options: {
     // Always honor canBag / DISABLED — DesignViewModal previously bypassed this
     // and opened the composer while the card showed "source is unavailable".
     if (!status.canBag || status.ui.defaultAction === 'DISABLED') {
-      toast.error(status.ui.disabledReason || 'This design cannot be bagged right now.');
+      showNotice({
+      title: 'Cannot bag this yet',
+      message: status.ui.disabledReason || 'This design cannot be bagged right now.',
+    });
       return 'blocked';
     }
 
@@ -156,7 +160,10 @@ export async function runDesignBagFlow(options: {
       return 'handled';
     }
 
-    toast.error(status.ui.disabledReason || 'This design cannot be bagged right now.');
+    showNotice({
+      title: 'Cannot bag this yet',
+      message: status.ui.disabledReason || 'This design cannot be bagged right now.',
+    });
     return 'blocked';
   } catch (error: any) {
     toast.error(error?.response?.data?.message || 'Unable to bag this design.');

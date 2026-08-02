@@ -15,6 +15,7 @@ import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { useCachedResource } from '@/hooks/useCachedResource';
+import { notifyMessagingRead } from '@/hooks/useMessagingUnreadCount';
 import { queryKeys } from '@/query/queryKeys';
 
 /* ------------------------------------------------------------------ */
@@ -399,6 +400,28 @@ const MessagingManagementPage: React.FC = () => {
   const actorId = profile?.id;
   const { onNotification, onMessageEvent } = useRealtime();
 
+  /**
+   * Which side of the conversation a message belongs to.
+   *
+   * `senderUserId === actorId` alone is not enough on the BRAND surface: the
+   * backend nulls `senderUserId` on moderated messages, and a brand thread can
+   * legitimately be answered by a staff member whose user id is not the viewing
+   * owner's — both cases collapsed every bubble to "received", which is why the
+   * sender/receiver colours never appeared for brands. Falling back to
+   * `senderRole` keeps the two sides distinct in those cases: on the brand
+   * surface BRAND_OWNER is "us", on the buyer surface BUYER is "us".
+   */
+  const isOwnMessage = useCallback(
+    (msg: { senderUserId?: string | null; senderRole?: string }) => {
+      if (actorId && msg.senderUserId) return msg.senderUserId === actorId;
+      if (msg.senderRole === 'SYSTEM' || msg.senderRole === 'ADMIN') return false;
+      return surface === 'BRAND'
+        ? msg.senderRole === 'BRAND_OWNER'
+        : msg.senderRole === 'BUYER';
+    },
+    [actorId, surface],
+  );
+
   /* ---- Conversation state ---- */
   const [filter, setFilter] = useState<'all' | 'unread' | 'orders' | 'custom' | 'inquiry' | 'archived'>('all');
   const [query, setQuery] = useState('');
@@ -666,6 +689,26 @@ const MessagingManagementPage: React.FC = () => {
     }
   }, [activeId, conversations, params, setParams]);
 
+  /**
+   * Reflect a completed mark-read locally.
+   *
+   * The server-side read landed, but nothing told the list row or the nav badge,
+   * so the "new message" dot survived opening the thread until a full inbox
+   * refetch happened to run. Clearing the row optimistically and firing
+   * `messaging:read` keeps the dot, the row and the badge in agreement
+   * immediately; the socket `message.read` echo then confirms it.
+   */
+  const clearLocalUnread = useCallback((conversationId: string) => {
+    setConversations((prev) =>
+      prev.map((item) =>
+        item.id === conversationId && (item.hasUnread || item.unreadCount > 0)
+          ? { ...item, unreadCount: 0, hasUnread: false }
+          : item,
+      ),
+    );
+    notifyMessagingRead();
+  }, []);
+
   /* ---- Load messages when active conversation changes ---- */
   const fetchMessages = useCallback(async () => {
     if (!activeConversation) return;
@@ -686,7 +729,10 @@ const MessagingManagementPage: React.FC = () => {
       const sorted = [...response.items].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
       setMessages(sorted);
       const lastId = sorted.at(-1)?.id;
-      if (lastId) await messagingApi.markThreadReadById(threadId, lastId);
+      if (lastId) {
+        await messagingApi.markThreadReadById(threadId, lastId);
+        clearLocalUnread(activeConversation.id);
+      }
       return;
     }
 
@@ -716,8 +762,9 @@ const MessagingManagementPage: React.FC = () => {
         if (surface === 'BRAND' && brandId) await messagingApi.markOrderReadForBrand(brandId, contextId, lastId);
         else await messagingApi.markOrderRead(contextId, lastId);
       }
+      clearLocalUnread(activeConversation.id);
     }
-  }, [activeConversation, brandId, getContextId, surface, useThreadTransport]);
+  }, [activeConversation, brandId, clearLocalUnread, getContextId, surface, useThreadTransport]);
 
   const fetchCustomOrderDetail = useCallback(async () => {
     if (!activeConversation || activeConversation.contextType !== 'CUSTOM_ORDER') {
@@ -942,6 +989,8 @@ const MessagingManagementPage: React.FC = () => {
         hasUnread: payload.markRead ? false : entry.hasUnread,
       };
     }));
+
+    if (payload.markRead) notifyMessagingRead();
   };
 
   const handleSend = useCallback(async (bodyText: string, attachmentFileIds: string[], replyToMessageId?: string) => {
@@ -1376,11 +1425,11 @@ const MessagingManagementPage: React.FC = () => {
                       <div key={msg.id} ref={(node) => { messageNodeRefs.current[msg.id] = node; }}>
                         <MessageBubble
                           message={msg}
-                          isOwn={!!actorId && msg.senderUserId === actorId}
+                          isOwn={isOwnMessage(msg)}
                           onReply={(m) => setReplyToMessage({
                             id: m.id,
                             bodyText: m.bodyText,
-                            senderName: m.sender?.firstName || m.sender?.username || (m.senderUserId === actorId ? 'You' : m.senderRole),
+                            senderName: m.sender?.firstName || m.sender?.username || (isOwnMessage(m) ? 'You' : m.senderRole),
                           })}
                         />
                       </div>

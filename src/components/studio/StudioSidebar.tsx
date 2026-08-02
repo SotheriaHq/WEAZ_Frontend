@@ -1,9 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import IslandBottomNav from '@/components/navigation/IslandBottomNav';
-import { messagingApi } from '@/api/MessagingApi';
-import { useRealtime } from '@/realtime/RealtimeProvider';
+import { useMessagingUnreadCount } from '@/hooks/useMessagingUnreadCount';
 
 interface StudioSidebarProps {
   active: string;
@@ -27,40 +26,9 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
   const storeSetupComplete = useStoreSetupStatus();
   const isSetupLocked = storeSetupComplete === false;
   const groups = [{ title: 'Studio', items: ALL_ITEMS }];
-  const [unreadMessages, setUnreadMessages] = useState(0);
-  const { onNotification, onMessageEvent } = useRealtime();
-
-  const refreshUnreadCount = useCallback(() => {
-    messagingApi.getUnreadCount().then((res) => {
-      setUnreadMessages(Number(res?.unreadCount ?? 0));
-    }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    messagingApi.getUnreadCount().then((res) => {
-      if (!cancelled) setUnreadMessages(Number(res?.unreadCount ?? 0));
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
-
-  // Listen to direct socket events (immediate, no worker dependency)
-  useEffect(() => {
-    const unsub1 = onMessageEvent('message.created', refreshUnreadCount);
-    const unsub2 = onMessageEvent('thread.updated', refreshUnreadCount);
-    return () => { unsub1(); unsub2(); };
-  }, [onMessageEvent, refreshUnreadCount]);
-
-  // Also listen to notification.created as a fallback for missed events
-  useEffect(() => {
-    const unsub = onNotification((payload: any) => {
-      const type = String(payload?.type ?? '');
-      if (type === 'MESSAGE_RECEIVED' || type === 'MESSAGE_UNREAD_REMINDER') {
-        refreshUnreadCount();
-      }
-    });
-    return unsub;
-  }, [onNotification, refreshUnreadCount]);
+  // Shared with the main SideBar so both badges move together — and so the
+  // count also DROPS on `message.read`, which the local copy never listened for.
+  const { unreadCount: unreadMessages } = useMessagingUnreadCount();
 
   const handleSelect = (key: string, path: string, options?: { replace?: boolean }) => {
     onSelect(key);

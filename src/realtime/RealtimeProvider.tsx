@@ -274,7 +274,10 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
   const joinUser = useCallback((userId: string) => safeJoin(`USER:${userId}`), [safeJoin]);
   const joinComment = useCallback((commentId: string) => safeJoin(`COMMENT:${commentId}`), [safeJoin]);
 
-  // Generic event router
+  // Generic event router.
+  // Keyed to `socketConnected` for the same reason as the on* subscribers above:
+  // this effect used to run once, before the socket existed, bail on the null
+  // check, and never re-run — so comment/thread fan-out was dead on arrival.
   useEffect(() => {
     const s = socketRef.current;
     if (!s) return;
@@ -323,7 +326,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
         s.off(ev);
       }
     };
-  }, [dispatch]);
+  }, [dispatch, socketConnected]);
 
   const onThread = useCallback((contentType: string, contentId: string, handler: ThreadHandler) => {
     const room = `${contentType}:${contentId}`;
@@ -350,26 +353,41 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     };
   }, [safeJoin]);
 
+  // These three read socketRef at call time and no-op when it is still null.
+  // Child effects run BEFORE the provider's own socket effect on first mount, so
+  // with empty dep arrays their identity never changed and a consumer that
+  // subscribed on mount silently never attached a listener for the whole
+  // session. Keying them to `socketConnected` makes the identity change once the
+  // socket exists, which re-runs consumer effects and lands the subscription.
   const onNotification = useCallback((handler: (payload: any) => void) => {
     const s = socketRef.current;
     if (!s) return () => void 0;
     s.on('notification.created', handler);
     return () => { s.off('notification.created', handler); };
-  }, []);
+    // socketConnected is the intentional resubscribe trigger; the rule cannot
+    // see the socketRef read that makes it load-bearing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socketConnected]);
 
   const onNotificationDeleted = useCallback((handler: (payload: any) => void) => {
     const s = socketRef.current;
     if (!s) return () => void 0;
     s.on('notification.deleted', handler);
     return () => { s.off('notification.deleted', handler); };
-  }, []);
+    // socketConnected is the intentional resubscribe trigger; the rule cannot
+    // see the socketRef read that makes it load-bearing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socketConnected]);
 
   const onMessageEvent = useCallback((event: string, handler: (payload: any) => void) => {
     const s = socketRef.current;
     if (!s) return () => void 0;
     s.on(event, handler);
     return () => { s.off(event, handler); };
-  }, []);
+    // socketConnected is the intentional resubscribe trigger; the rule cannot
+    // see the socketRef read that makes it load-bearing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socketConnected]);
 
   const value = React.useMemo<RealtimeContextValue>(() => ({
     joinCollection,

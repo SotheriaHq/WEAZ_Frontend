@@ -1,4 +1,5 @@
 import React from 'react';
+import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useQueryClient } from '@tanstack/react-query';
@@ -69,9 +70,23 @@ type ModalMedia = {
   fileId?: string | null;
 };
 
+/**
+ * Metadata-panel action tiles.
+ *
+ * `h-14` is fixed on purpose: the tiles hold their box while their labels change
+ * ("Save"→"Saved", "Bag It"→"Loading"), so the grid never reflows and the panel
+ * never jumps under the cursor mid-interaction.
+ */
+const ACTION_TILE_CLASS =
+  'flex h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-center transition-colors';
+const ACTION_TILE_NEUTRAL_CLASS =
+  'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/8 dark:text-slate-200 dark:hover:bg-white/14';
+const ACTION_TILE_LABEL_CLASS = 'w-full truncate text-[9px] font-bold leading-none';
+
 const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountChange }) => {
   const [commentCount, setCommentCount] = React.useState<number>(0);
   const [commentText, setCommentText] = React.useState('');
+  const [showCommentEmojiPicker, setShowCommentEmojiPicker] = React.useState(false);
   const [postingComment, setPostingComment] = React.useState(false);
   const [externalComment, setExternalComment] = React.useState<CommentV2Dto | null>(null);
   const [isSaved, setIsSaved] = React.useState(false);
@@ -841,8 +856,8 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                         </div>
                       ) : null}
 
-                      <div className="border-t border-slate-200/80 pt-3 dark:border-white/10">
-                        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 dark:border-white/15 dark:bg-black/25">
+                      <div className="pt-3">
+                        <div className="relative flex items-center gap-1.5 rounded-xl bg-slate-900/5 px-2.5 py-2 dark:bg-white/10">
                           <input
                             type="text"
                             value={commentText}
@@ -856,19 +871,45 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                             disabled={postingComment}
                             placeholder="Add a comment..."
                             maxLength={500}
-                            className="flex-1 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-white/40"
+                            className="flex-1 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-500 dark:text-white dark:placeholder:text-white/50"
                           />
+                          <button
+                            type="button"
+                            onClick={() => setShowCommentEmojiPicker((prev) => !prev)}
+                            aria-label="Insert emoji"
+                            aria-expanded={showCommentEmojiPicker}
+                            className="shrink-0 rounded-lg px-1.5 py-1 text-base leading-none transition hover:bg-slate-900/10 dark:hover:bg-white/10"
+                          >
+                            <span aria-hidden="true">🙂</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => {
                               void handleCommentSubmit();
                             }}
                             disabled={postingComment || !commentText.trim()}
-                            className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-slate-900"
+                            className="shrink-0 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-slate-900"
                             aria-label="Post comment"
                           >
                             {postingComment ? '...' : 'Post'}
                           </button>
+                          {showCommentEmojiPicker && (
+                            <div className="absolute bottom-full right-0 z-50 mb-2">
+                              <EmojiPicker
+                                onEmojiClick={(emojiData) => {
+                                  setCommentText((prev) => `${prev}${emojiData.emoji}`);
+                                  setShowCommentEmojiPicker(false);
+                                }}
+                                emojiStyle={EmojiStyle.NATIVE}
+                                theme={Theme.AUTO}
+                                searchDisabled
+                                skinTonesDisabled
+                                lazyLoadEmojis
+                                width={280}
+                                height={320}
+                              />
+                            </div>
+                          )}
                         </div>
                         <div className="mt-3">
                           <DesignCommentsPanel
@@ -969,8 +1010,9 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               ) : null}
             </div>
 
-            <div className="h-full min-w-0 p-3.5 md:p-4 bg-white/65 dark:bg-[#0f0b11]/70 text-slate-900 dark:text-white flex flex-col overflow-hidden">
-              <div className="space-y-3">
+            <div className="flex h-full min-w-0 flex-col overflow-hidden bg-white/65 text-slate-900 dark:bg-[#0f0b11]/70 dark:text-white">
+              {/* Fixed metadata header — never scrolls; only the comments feed below does. */}
+              <div className="shrink-0 space-y-2.5 border-b border-slate-900/8 p-3.5 dark:border-white/10 md:p-4">
                 {/* Brand row */}
                 <div className="flex items-center justify-between gap-2 pr-8">
                   <div className="flex min-w-0 items-center gap-2.5">
@@ -993,10 +1035,8 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                         />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-[13px] font-semibold transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{brandLabel}</p>
-                        </div>
-                        {item.username ? <p className="truncate text-[11px] text-slate-400 dark:text-white/40">@{item.username}</p> : null}
+                        <p className="truncate text-[13px] font-semibold leading-tight transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{brandLabel}</p>
+                        {item.username ? <p className="truncate text-[10px] leading-tight text-slate-500 dark:text-white/45">@{item.username}</p> : null}
                       </div>
                     </button>
                     {canPatchBrand ? (
@@ -1020,39 +1060,53 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
                 {/* Title + description */}
                 <div>
-                  <h1 className="text-base font-bold leading-snug">{item.collectionTitle}</h1>
+                  <h1 className="text-[17px] font-bold leading-tight tracking-tight">{item.collectionTitle}</h1>
                   {item.collectionDescription ? (
-                    <p className="mt-0.5 text-[11px] text-slate-500 dark:text-white/55 leading-relaxed line-clamp-2">{item.collectionDescription}</p>
+                    <p className="mt-0.5 line-clamp-2 text-[11px] font-medium italic leading-snug text-indigo-600/90 dark:text-indigo-300/90">{item.collectionDescription}</p>
                   ) : null}
                 </div>
 
                 {/* Tags */}
                 {item.tags?.length ? (
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1">
                     {item.tags.map((tag) => (
-                      <span key={tag} className="px-2 py-0.5 rounded-full bg-slate-100 text-[9px] font-semibold uppercase tracking-wider text-slate-700 dark:border dark:border-white/10 dark:bg-slate-800 dark:text-slate-100">
+                      <span key={tag} className="rounded border border-indigo-200/70 bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-700 dark:border-indigo-800/50 dark:bg-indigo-950/40 dark:text-indigo-200">
                         {tag}
                       </span>
                     ))}
                   </div>
                 ) : null}
 
-                {/* Price + Custom Order badge */}
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{saleBand || baseBand || 'Price on request'}</span>
-                  {saleBand && baseBand ? (
-                    <span className="text-[10px] text-slate-400 line-through">{baseBand}</span>
-                  ) : null}
+                {/* Price + Custom Order badge — labelled column on the left so the
+                    number is never mistaken for a single price, badge pinned right
+                    on its own baseline. */}
+                <div className="flex items-end justify-between gap-2">
+                  <div className="flex min-w-0 flex-col">
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 dark:text-white/45">
+                      {saleBand && baseBand ? 'Sale price' : 'Price range'}
+                    </span>
+                    <span className="truncate text-[15px] font-bold leading-tight text-emerald-600 dark:text-emerald-400">
+                      {saleBand || baseBand || 'Price on request'}
+                    </span>
+                    {saleBand && baseBand ? (
+                      <span className="text-[10px] leading-tight text-slate-400 line-through">{baseBand}</span>
+                    ) : null}
+                  </div>
                   {item.customAvailable ? (
-                    <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-500/15 dark:text-purple-300">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-pink-400/25 bg-pink-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-pink-600 dark:text-pink-400">
                       <span aria-hidden="true">✂️</span>
                       Custom
                     </span>
                   ) : null}
                 </div>
 
-                {/* Action buttons — compact icon-led pills */}
-                <div className="flex flex-wrap items-center gap-1.5">
+                {/* Action tiles — fixed 5-up grid.
+                    Every tile is the same height and the labels sit under the
+                    glyph, so nothing reflows when a label changes length
+                    ("Save"→"Saved", "Bag It"→"Loading..."). The old wrap-flow of
+                    pills re-laid-out on every state change, which is what read
+                    as the panel shaking. */}
+                <div className="grid grid-cols-5 gap-1.5">
                   <button
                     type="button"
                     disabled={
@@ -1061,7 +1115,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                       isOwnBrandContent ||
                       brandBagBlocked
                     }
-                    className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none dark:disabled:bg-slate-700 dark:disabled:text-slate-300"
+                    className={`${ACTION_TILE_CLASS} bg-indigo-600 text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-400`}
                     onClick={() => {
                       void handleOpenDesignCustomOrder();
                     }}
@@ -1089,7 +1143,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                             : 'not_bagged'
                       }
                       context="detail"
-                      size={28}
+                      size={22}
                       disabled={
                         openingCustomComposer ||
                         resolvingCustomConfiguration ||
@@ -1097,46 +1151,51 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                         brandBagBlocked
                       }
                     />
-                    {openingCustomComposer ? 'Loading...' : BAG_IT_LABEL}
+                    <span className={ACTION_TILE_LABEL_CLASS}>
+                      {openingCustomComposer ? 'Loading' : BAG_IT_LABEL}
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={handleToggleSave}
                     disabled={saveBusy}
                     title={isOwnBrandContent ? 'Brands cannot save their own products' : isSaved ? 'Unsave' : 'Save'}
-                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 disabled:opacity-50"
+                    className={`${ACTION_TILE_CLASS} ${ACTION_TILE_NEUTRAL_CLASS} disabled:opacity-50`}
                   >
-                    <span aria-hidden="true">🔖</span>
-                    {isSaved ? 'Saved' : 'Save'}
+                    <span aria-hidden="true" className="text-base leading-none">{isSaved ? '🔖' : '🏷️'}</span>
+                    <span className={ACTION_TILE_LABEL_CLASS}>{isSaved ? 'Saved' : 'Save'}</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleShare}
-                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+                    className={`${ACTION_TILE_CLASS} ${ACTION_TILE_NEUTRAL_CLASS}`}
                   >
-                    <span aria-hidden="true">🔗</span>
-                    Share
+                    <span aria-hidden="true" className="text-base leading-none">🔗</span>
+                    <span className={ACTION_TILE_LABEL_CLASS}>Share</span>
                   </button>
                   {item ? (
                     <ReportContentButton
                       targetType={item.designId ? 'DESIGN' : 'COLLECTION'}
                       targetId={item.designId ?? item.collectionId ?? item.id}
                       label="Report"
-                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+                      className={`${ACTION_TILE_CLASS} ${ACTION_TILE_NEUTRAL_CLASS} [&>span]:text-[9px]`}
                     />
                   ) : null}
                   <button
                     type="button"
                     onClick={handleOpenBrandCatalog}
-                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+                    className={`${ACTION_TILE_CLASS} ${ACTION_TILE_NEUTRAL_CLASS}`}
                   >
-                    <span aria-hidden="true">🏬</span>
-                    Store
+                    <span aria-hidden="true" className="text-base leading-none">🏬</span>
+                    <span className={ACTION_TILE_LABEL_CLASS}>Store</span>
                   </button>
                 </div>
               </div>
 
-              <div className="mt-3 min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/55 dark:bg-black/20 p-2">
+              {/* Comments sit directly on the panel surface: no card, no border,
+                  no tinted inner box — the list scrolls inline against the modal
+                  background so the text reads as part of the content. */}
+              <div className="min-h-0 flex-1 overflow-hidden bg-slate-900/[0.03] px-3.5 py-3 dark:bg-black/25 md:px-4">
                 <DesignCommentsPanel
                   mediaId={activeMediaId ?? item.id}
                   collectionId={item.collectionId}
@@ -1150,8 +1209,9 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                 />
               </div>
 
-              <div className="relative mt-3 pt-2 border-t border-slate-200/80 dark:border-white/10" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center gap-2 rounded-xl px-3 py-2 bg-white/90 border border-slate-200 dark:bg-black/25 dark:border-white/15">
+              {/* Sticky composer — pinned below the scrolling feed. */}
+              <div className="relative shrink-0 border-t border-slate-900/8 p-3 dark:border-white/10" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-1.5 rounded-xl bg-slate-900/5 px-2.5 py-1.5 dark:bg-white/10">
                   <input
                     type="text"
                     value={commentText}
@@ -1167,21 +1227,53 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     disabled={postingComment}
                     placeholder="Add a comment..."
                     maxLength={500}
-                    className="flex-1 bg-transparent border-none outline-none text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/40"
+                    className="flex-1 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-500 dark:text-white dark:placeholder:text-white/50"
                   />
+                  {/* The emoji affordance lived only on DesignCommentsPanel's own
+                      composer, which this modal renders with showComposer={false}
+                      — so on the design modal there was no emoji button at all. */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowCommentEmojiPicker((prev) => !prev);
+                    }}
+                    aria-label="Insert emoji"
+                    aria-expanded={showCommentEmojiPicker}
+                    className="shrink-0 rounded-lg px-1.5 py-1 text-base leading-none transition hover:bg-slate-900/10 dark:hover:bg-white/10"
+                  >
+                    <span aria-hidden="true">🙂</span>
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       void handleCommentSubmit();
                     }}
                     disabled={postingComment || !commentText.trim()}
-                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                    className="shrink-0 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                     aria-label="Post comment"
                     type="button"
                   >
                     {postingComment ? 'Posting...' : 'Post'}
                   </button>
                 </div>
+                {showCommentEmojiPicker && (
+                  <div className="absolute bottom-full right-0 z-50 mb-2">
+                    <EmojiPicker
+                      onEmojiClick={(emojiData) => {
+                        setCommentText((prev) => `${prev}${emojiData.emoji}`);
+                        setShowCommentEmojiPicker(false);
+                      }}
+                      emojiStyle={EmojiStyle.NATIVE}
+                      theme={Theme.AUTO}
+                      searchDisabled
+                      skinTonesDisabled
+                      lazyLoadEmojis
+                      width={300}
+                      height={360}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>

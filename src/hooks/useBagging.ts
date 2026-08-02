@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'sonner';
+import { showNotice } from '@/components/ui/NoticeModal';
 import type { AppDispatch, RootState } from '@/store';
 import {
   addToCart,
@@ -220,7 +221,10 @@ export function useBagging() {
         return status;
       }
       if (!status.custom.available) {
-        toast.error(status.ui.disabledReason || 'This product is not configured for custom bagging yet.');
+        showNotice({
+          title: 'Custom orders unavailable',
+          message: status.ui.disabledReason || 'This product is not configured for custom bagging yet.',
+        });
         return status;
       }
       const classes = duplicateClasses(status);
@@ -277,7 +281,10 @@ export function useBagging() {
     async (productId: string) => {
       const status = statusByProductId[productId] ?? (await prepareBag(productId));
       if (!status.custom.available) {
-        toast.error(status.ui.disabledReason || 'This product is not configured for custom bagging yet.');
+        showNotice({
+          title: 'Custom orders unavailable',
+          message: status.ui.disabledReason || 'This product is not configured for custom bagging yet.',
+        });
       }
       return status;
     },
@@ -329,7 +336,10 @@ export function useBagging() {
       }
 
       if (!status.canBag || status.ui.defaultAction === 'DISABLED') {
-        toast.error(status.ui.disabledReason || 'This product cannot be bagged.');
+        showNotice({
+          title: 'Cannot bag this yet',
+          message: status.ui.disabledReason || 'This product cannot be bagged.',
+        });
         if (bagFlow) {
           bagFlow.openExistingBag(product, status);
         } else {
@@ -366,7 +376,10 @@ export function useBagging() {
 
       if (status.ui.defaultAction === 'OPEN_CUSTOM_FLOW') {
         if (!status.custom.available) {
-          toast.error(status.ui.disabledReason || 'This product is not configured for custom bagging yet.');
+          showNotice({
+          title: 'Custom orders unavailable',
+          message: status.ui.disabledReason || 'This product is not configured for custom bagging yet.',
+        });
           return { action: 'DISABLED', status };
         }
         if (isFittingsIncomplete(status)) {

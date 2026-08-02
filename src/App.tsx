@@ -17,6 +17,7 @@ import { BrandPatchProvider } from './context/BrandPatchContext';
 import { ProfileLayout } from './components/catalog/ProfileLayout';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
+import { NoticeModalHost } from '@/components/ui/NoticeModal';
 import ErrorPage from './pages/ErrorPage';
 import SeoHead from './components/seo/SeoHead';
 import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
@@ -1001,6 +1002,7 @@ const App: React.FC = () => (
       <DropdownManagerProvider>
         <BrandPatchProvider>
           <Toaster position="top-center" richColors closeButton />
+          <NoticeModalHost />
           <RouterProvider router={router} />
         </BrandPatchProvider>
       </DropdownManagerProvider>
