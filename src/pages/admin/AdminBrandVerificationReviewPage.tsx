@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FC, ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import { toast } from 'sonner';
 import { adminBrandsApi } from '@/api/AdminApi';
@@ -11,6 +13,7 @@ import Textarea from '@/components/ui/Textarea';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { unwrapApiResponse } from '@/types/auth';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import VerificationEvidenceViewer from '@/components/admin/VerificationEvidenceViewer';
 import type {
   AdminVerificationDetails,
   VerificationDocumentItem,
@@ -123,14 +126,16 @@ const DetailRow: FC<{
   children: ReactNode;
   /** Identity numbers and timestamps read better in a fixed-width face. */
   mono?: boolean;
-}> = ({ label, children, mono = false }) => (
-  <div>
-    <dt className="text-[10px] font-medium uppercase tracking-[0.14em] text-gray-400">
+  /** Emails and addresses need the full card width or they wrap to four lines. */
+  wide?: boolean;
+}> = ({ label, children, mono = false, wide = false }) => (
+  <div className={wide ? 'col-span-2' : undefined}>
+    <dt className="text-[9px] font-medium uppercase tracking-[0.14em] text-gray-400">
       {label}
     </dt>
     <dd
-      className={`mt-1 break-words text-[15px] font-semibold leading-snug text-gray-900 ${
-        mono ? 'font-mono text-[13px] tracking-tight' : ''
+      className={`mt-0.5 break-words text-[13px] font-semibold leading-snug text-gray-900 ${
+        mono ? 'font-mono text-[12px] tracking-tight' : ''
       }`}
     >
       {children}
@@ -138,12 +143,19 @@ const DetailRow: FC<{
   </div>
 );
 
+/**
+ * Summary panel.
+ *
+ * Kept deliberately dense: three of these sit above the evidence workspace, and
+ * generous per-row spacing pushed the documents — the thing the reviewer
+ * actually came for — a full screen down the page.
+ */
 const SummaryCard: FC<{ title: string; children: ReactNode }> = ({ title, children }) => (
-  <div className="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-gray-100">
-    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
       {title}
     </p>
-    <dl className="mt-4 space-y-4">{children}</dl>
+    <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2.5">{children}</dl>
   </div>
 );
 
@@ -190,6 +202,8 @@ export default function AdminBrandVerificationReviewPage() {
   const [saving, setSaving] = useState(false);
   const [isRevealNinDialogOpen, setIsRevealNinDialogOpen] = useState(false);
   const [isNinRevealed, setIsNinRevealed] = useState(false);
+  const [isEvidenceViewerOpen, setIsEvidenceViewerOpen] = useState(false);
+  const currentAdminId = useSelector((state: RootState) => state.user.profile?.id) ?? null;
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -261,6 +275,30 @@ export default function AdminBrandVerificationReviewPage() {
       null,
     [details?.documents, selectedDocumentKey],
   );
+
+  /**
+   * Who owns this review right now, and therefore which actions are legal.
+   *
+   * The backend enforces all of this (`mustBeAssignedToAdmin`), but the page
+   * used to render Claim / Release / Reassign / Approve / Reject as permanently
+   * enabled — so claiming a review changed nothing visible here, and pressing
+   * Approve on an unclaimed review just produced a 403 toast.
+   */
+  const assignment = useMemo(() => {
+    const assignedTo = details?.verificationReviewedById ?? null;
+    const isClaimed = Boolean(assignedTo);
+    const isMine = Boolean(assignedTo && currentAdminId && assignedTo === currentAdminId);
+    const status = details?.verificationStatus;
+    return {
+      isClaimed,
+      isMine,
+      canClaim: !isClaimed && status === 'PENDING',
+      canRelease: isMine && status === 'IN_REVIEW',
+      canReassign: isClaimed && !isMine,
+      /** Approve / Reject / Request info all require the review to be yours. */
+      canDecide: isMine && status === 'IN_REVIEW',
+    };
+  }, [currentAdminId, details?.verificationReviewedById, details?.verificationStatus]);
 
   const letterDocument = useMemo(
     () =>
@@ -508,30 +546,73 @@ export default function AdminBrandVerificationReviewPage() {
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap items-center gap-2">
           <HintedAction
             variant="secondary"
-            hint="Take ownership of this review so you can submit final decisions."
+            hint={
+              assignment.canClaim
+                ? 'Take ownership of this review so you can submit final decisions.'
+                : assignment.isMine
+                  ? 'You already own this review.'
+                  : 'Only a pending, unclaimed review can be claimed.'
+            }
             onClick={() => void handleClaim()}
-            disabled={saving}
+            disabled={saving || !assignment.canClaim}
           >
             Claim
           </HintedAction>
           <HintedAction
-            hint="Put it back in the queue so another admin can continue."
+            hint={
+              assignment.canRelease
+                ? 'Put it back in the queue so another admin can continue.'
+                : 'Only the admin who owns this review can release it.'
+            }
             onClick={() => void handleRelease()}
-            disabled={saving}
+            disabled={saving || !assignment.canRelease}
           >
             Release
           </HintedAction>
           <HintedAction
-            hint="Move an already-assigned review to your account."
+            hint={
+              assignment.canReassign
+                ? 'Move this review off another admin and onto your account.'
+                : assignment.isMine
+                  ? 'This review is already yours.'
+                  : 'Nothing to reassign — this review is unclaimed.'
+            }
             onClick={() => void handleReassign()}
-            disabled={saving}
+            disabled={saving || !assignment.canReassign}
           >
             Reassign to me
           </HintedAction>
+
+          {/* The queue said "Claimed" while this page still offered every action
+              as though nothing had happened, so there was no way to tell whether
+              the claim had actually taken. State it outright. */}
+          <span
+            className={`ml-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
+              assignment.isMine
+                ? 'bg-emerald-100 text-emerald-800'
+                : assignment.isClaimed
+                  ? 'bg-amber-100 text-amber-800'
+                  : 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            {assignment.isMine
+              ? '✅ Assigned to you'
+              : assignment.isClaimed
+                ? '🔒 Claimed by another admin'
+                : '○ Unclaimed'}
+          </span>
         </div>
+
+        {!assignment.isMine ? (
+          <p className="mt-3 text-xs font-medium text-gray-600">
+            {assignment.isClaimed
+              ? 'Reassign this review to yourself before you can approve, reject or request more information.'
+              : 'Claim this review before you can approve, reject or request more information.'}
+          </p>
+        ) : null}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
@@ -569,7 +650,7 @@ export default function AdminBrandVerificationReviewPage() {
               <DetailRow label="Phone" mono>
                 {(latestAttempt?.ownerPhoneNumber as string) || NOT_PROVIDED}
               </DetailRow>
-              <DetailRow label="Account email">
+              <DetailRow label="Account email" wide>
                 {details.owner?.email || NOT_PROVIDED}
               </DetailRow>
             </SummaryCard>
@@ -587,7 +668,9 @@ export default function AdminBrandVerificationReviewPage() {
               <DetailRow label="ID document">
                 {humanizeEnum(latestAttempt?.idDocumentType)}
               </DetailRow>
-              <DetailRow label="Business address">{businessAddressText}</DetailRow>
+              <DetailRow label="Business address" wide>
+                {businessAddressText}
+              </DetailRow>
             </SummaryCard>
 
             <SummaryCard title="Queue record">
@@ -621,16 +704,27 @@ export default function AdminBrandVerificationReviewPage() {
                 </p>
                 <h2 className="mt-1 text-lg font-black text-gray-900">Document workspace</h2>
               </div>
-              {selectedDocument?.signedUrl ? (
-                <a
-                  href={selectedDocument.signedUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center rounded-full bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-800 transition hover:bg-sky-100"
-                >
-                  Open in new tab
-                </a>
-              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                {(details.documents ?? []).some((document) => document.signedUrl) ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsEvidenceViewerOpen(true)}
+                    className="inline-flex items-center rounded-full bg-gray-900 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-gray-800"
+                  >
+                    🔍 View all evidence
+                  </button>
+                ) : null}
+                {selectedDocument?.signedUrl ? (
+                  <a
+                    href={selectedDocument.signedUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center rounded-full bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-800 transition hover:bg-sky-100"
+                  >
+                    Open in new tab
+                  </a>
+                ) : null}
+              </div>
             </div>
 
             <div className="mt-4 grid gap-5 xl:grid-cols-[220px_minmax(0,1fr)] 2xl:grid-cols-[240px_minmax(0,1fr)]">
@@ -740,7 +834,14 @@ export default function AdminBrandVerificationReviewPage() {
                       className="h-[50vh] min-h-[320px] w-full bg-white sm:h-[56vh] sm:min-h-[380px] xl:h-[62vh] xl:min-h-[420px]"
                     />
                   ) : (
-                    <div className="flex min-h-[420px] items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_36%),linear-gradient(180deg,_#ffffff,_#f8fafc)] p-4">
+                    // The preview is boxed by its column, so ID scans render too
+                    // small to actually read. Click opens it at full size.
+                    <button
+                      type="button"
+                      onClick={() => setIsEvidenceViewerOpen(true)}
+                      title="Click to view full size"
+                      className="flex min-h-[420px] w-full cursor-zoom-in items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_36%),linear-gradient(180deg,_#ffffff,_#f8fafc)] p-4"
+                    >
                       <MediaRenderer
                         kind="image"
                         src={selectedDocument.signedUrl}
@@ -748,7 +849,7 @@ export default function AdminBrandVerificationReviewPage() {
                         className="block rounded-[1.25rem] shadow-lg"
                         maxHeightClassName="max-h-[85vh]"
                       />
-                    </div>
+                    </button>
                   )
                 ) : (
                   <div className="flex min-h-[420px] flex-col items-center justify-center gap-1 px-6 text-center">
@@ -892,7 +993,7 @@ export default function AdminBrandVerificationReviewPage() {
               className="mt-4"
               fullWidth
               onClick={() => void handleRequestInfo()}
-              disabled={saving}
+              disabled={saving || !assignment.canDecide}
             >
               Send request
             </Button>
@@ -933,17 +1034,30 @@ export default function AdminBrandVerificationReviewPage() {
               <Button
                 variant="danger"
                 onClick={() => void handleReview('REJECTED')}
-                disabled={saving}
+                disabled={saving || !assignment.canDecide}
               >
                 Reject
               </Button>
               <Button
                 onClick={() => void handleReview('APPROVED')}
-                disabled={saving}
+                disabled={saving || !assignment.canDecide}
               >
                 Approve
               </Button>
             </div>
+
+            {/* Approving does NOT guarantee a public badge: the backend also
+                requires an open store and an active owner. Admins were approving
+                brands, seeing no badge on the storefront, and assuming approval
+                had failed. */}
+            {details.verificationStatus === 'APPROVED' &&
+            !details.badgeState?.verificationBadgeVisible ? (
+              <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                This brand is approved, but the verified badge stays hidden until the
+                brand opens their store and the owner account is active. Nothing further
+                is needed from you.
+              </p>
+            ) : null}
           </section>
 
           <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100">
@@ -983,6 +1097,13 @@ export default function AdminBrandVerificationReviewPage() {
           </section>
         </div>
       </section>
+
+      <VerificationEvidenceViewer
+        open={isEvidenceViewerOpen}
+        documents={details.documents ?? []}
+        initialKey={selectedDocument?.key}
+        onClose={() => setIsEvidenceViewerOpen(false)}
+      />
 
       <ConfirmDialog
         open={isRevealNinDialogOpen}

@@ -100,6 +100,25 @@ export interface VerificationDraftData {
   letterKey?: string;
 }
 
+/**
+ * Store-setup steps still outstanding before verification may be applied for.
+ *
+ * The verified badge requires an APPROVED verification AND an open store, so a
+ * brand that verified with an unpublished store got an approval that produced
+ * no badge and no explanation. Submission is now gated on this, and each entry
+ * carries the route that fixes it.
+ */
+export interface VerificationStorePendingStep {
+  code: string;
+  label: string;
+  href: string;
+}
+
+export interface VerificationStoreReadiness {
+  isReady: boolean;
+  pending: VerificationStorePendingStep[];
+}
+
 export interface VerificationStatusResponse {
   brandId: string;
   verificationStatus: VerificationStatusValue;
@@ -118,6 +137,7 @@ export interface VerificationStatusResponse {
   infoRequestMessage?: string | null;
   badgeState: VerificationBadgeState;
   canSubmit: boolean;
+  storeReadiness?: VerificationStoreReadiness;
   nudgeOptOut?: boolean;
   attemptHistory?: VerificationAttemptHistoryItem[];
   latestAttempt?: Record<string, unknown> | null;

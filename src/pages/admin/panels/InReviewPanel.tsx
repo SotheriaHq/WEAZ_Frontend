@@ -53,6 +53,42 @@ const formatStatusLabel = (status: string) => {
   return upper.replace(/_/g, ' ') || 'Pending';
 };
 
+/**
+ * The column used to render a bare "#1", which reads like an ID rather than a
+ * count of how many times this brand has submitted. Spell it out: a first
+ * submission and a fourth are very different signals for a reviewer.
+ */
+const formatAttemptLabel = (attempt: number) => {
+  if (attempt <= 1) return '1st submission';
+  if (attempt === 2) return '2nd submission';
+  if (attempt === 3) return '3rd submission';
+  return `${attempt}th submission`;
+};
+
+const attemptTone = (attempt: number) =>
+  attempt >= 3
+    ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200'
+    : 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300';
+
+/**
+ * Whether the brand currently carries a public verified badge.
+ *
+ * Deliberately NOT the same thing as "verification approved": the badge also
+ * requires the store to be open and the owner active
+ * (`getBrandVerificationTruth` on the backend). Admins kept approving a brand
+ * and then finding no badge on the storefront, with nothing on screen saying
+ * why — so the queue names the state instead of leaving it to be inferred.
+ */
+const verifiedStateLabel = (status: string) => {
+  const upper = String(status || '').toUpperCase();
+  if (upper === 'APPROVED') return { label: 'Verified', tone: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200' };
+  if (upper === 'REJECTED') return { label: 'Rejected', tone: 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200' };
+  if (upper === 'IN_REVIEW') return { label: 'Under review', tone: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200' };
+  if (upper === 'ADDITIONAL_INFO_REQUESTED') return { label: 'Awaiting brand', tone: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200' };
+  if (upper === 'CANCELLED') return { label: 'Cancelled', tone: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300' };
+  return { label: 'Not verified', tone: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300' };
+};
+
 const InReviewPanel: React.FC = () => {
   const [queue, setQueue] = useState<VerificationQueueItem[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
@@ -274,6 +310,7 @@ const InReviewPanel: React.FC = () => {
                   <th className="px-4 py-3">UID</th>
                   <th className="px-4 py-3">Owner</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Verification</th>
                   <th className="px-4 py-3">Attempt</th>
                   <th className="px-4 py-3">Submitted</th>
                   <th className="px-4 py-3">Assignment</th>
@@ -349,8 +386,22 @@ const InReviewPanel: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-700 dark:bg-white/10 dark:text-gray-300">
-                          #{item.verificationAttemptNumber ?? 1}
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            verifiedStateLabel(String(item.verificationStatus)).tone
+                          }`}
+                        >
+                          {verifiedStateLabel(String(item.verificationStatus)).label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${attemptTone(
+                            item.verificationAttemptNumber ?? 1,
+                          )}`}
+                          title="How many times this brand has submitted for verification"
+                        >
+                          {formatAttemptLabel(item.verificationAttemptNumber ?? 1)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
@@ -431,7 +482,7 @@ const InReviewPanel: React.FC = () => {
                   </div>
 
                   <div className="flex items-center justify-between border-t border-b border-gray-100 py-2 text-xs text-gray-500 dark:border-white/5 dark:text-gray-400">
-                    <span>Attempt #{item.verificationAttemptNumber ?? 1}</span>
+                    <span>{formatAttemptLabel(item.verificationAttemptNumber ?? 1)}</span>
                     <span className="font-mono text-purple-600 dark:text-purple-400">{brandUid}</span>
                     <span>{isClaimed ? 'Claimed' : 'Unclaimed'}</span>
                   </div>

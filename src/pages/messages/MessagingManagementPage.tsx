@@ -623,12 +623,22 @@ const MessagingManagementPage: React.FC = () => {
      context was requested. */
   const contextResolveKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (conversations.length === 0) { setActiveId(''); return; }
-
     const queryOrderId = params.get('orderId');
     const queryCustomOrderId = params.get('customOrderId');
     const queryThreadId = params.get('threadId') || params.get('thread');
     const hasExplicitContext = Boolean(queryOrderId || queryCustomOrderId || queryThreadId);
+
+    // An empty inbox must NOT short-circuit context resolution. This guard used
+    // to sit at the top of the effect, so a shopper arriving from an order
+    // notification's "Open conversation" — who had never messaged anyone, and
+    // therefore had an empty inbox — bailed out before any resolution ran and
+    // landed on the blank general messages screen. That is the worst case for
+    // this deep link: the person who most needs to be dropped into the right
+    // thread is the one least able to find the brand by hand.
+    if (conversations.length === 0 && !hasExplicitContext) {
+      setActiveId('');
+      return;
+    }
 
     if (queryOrderId) {
       const t = conversations.find((i) => i.contextType === 'STANDARD_ORDER' && i.orderId === queryOrderId);

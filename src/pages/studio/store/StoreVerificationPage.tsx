@@ -13,6 +13,7 @@ import {
 } from '@/components/studio/verification/verificationShared';
 import type { VerificationInfoItem, VerificationStatusResponse } from '@/types/verification';
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
+import { showNotice } from '@/components/ui/NoticeModal';
 
 export default function StoreVerificationPage() {
   const navigate = useNavigate();
@@ -167,6 +168,7 @@ export default function StoreVerificationPage() {
   };
 
   const infoItems = status?.infoRequestedItems ?? [];
+  const storePending = status?.storeReadiness?.pending ?? [];
   const cooldownTarget = useMemo(() => {
     if (!status) return null;
 
@@ -194,6 +196,31 @@ export default function StoreVerificationPage() {
   }, [cooldownTarget, countdownNow]);
 
   const handlePrimaryAction = () => {
+    // Never let the owner walk the whole evidence wizard only to be refused at
+    // submit. Point them at the outstanding store step instead.
+    if (
+      storePending.length > 0 &&
+      callToAction.primaryTo === '/studio/verification/apply'
+    ) {
+      const first = storePending[0];
+      showNotice({
+        title: 'Finish your store first',
+        message: `Verification opens once your store is complete and published. Still to do: ${storePending
+          .map((step) => step.label)
+          .join(', ')}.`,
+        action: {
+          label: `Go to: ${first.label}`,
+          onSelect: () =>
+            navigate(first.href, {
+              state: {
+                from: `${location.pathname}${location.search}${location.hash}`,
+              },
+            }),
+        },
+      });
+      return;
+    }
+
     if (
       callToAction.primaryTo === '/studio/verification' &&
       (status?.verificationStatus === 'PENDING' ||
@@ -308,6 +335,45 @@ export default function StoreVerificationPage() {
           </div>
         </div>
       </div>
+
+      {/* Store-readiness gate.
+          A verified badge needs an APPROVED verification AND an open store, so
+          verifying before the store is finished produces an approval that
+          changes nothing visible — the brand assumes it failed. Block entry here
+          and link to the exact step that is outstanding. */}
+      {storePending.length > 0 &&
+      status?.verificationStatus !== 'APPROVED' &&
+      status?.verificationStatus !== 'PENDING' &&
+      status?.verificationStatus !== 'IN_REVIEW' ? (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-800">
+            ⚠️ Finish your store first
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-amber-900">
+            You can apply for verification once your store is complete and published.
+            Being verified only shows a badge on an open store, so we hold the
+            application until these are done:
+          </p>
+          <ul className="mt-4 space-y-2">
+            {storePending.map((step) => (
+              <li key={step.code}>
+                <Link
+                  to={step.href}
+                  state={{
+                    from: `${location.pathname}${location.search}${location.hash}`,
+                  }}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-white/80 p-3 text-sm text-amber-900 transition hover:border-amber-300 hover:bg-white"
+                >
+                  <span className="font-semibold">{step.label}</span>
+                  <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-amber-700">
+                    Fix →
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {status?.verificationStatus === 'REJECTED' &&
       status.rejectionReasons.length > 0 ? (

@@ -46,6 +46,72 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
   { value: 'status', label: 'Account state' },
 ];
 
+/**
+ * Verification state for the directory row.
+ *
+ * "Approved" and "shows a verified badge" are NOT the same thing — the badge
+ * also needs an open store and an active owner. An approved brand with a closed
+ * store therefore reads "Verified · store closed" rather than a flat "Verified",
+ * because that combination is exactly the case that had admins believing an
+ * approval had silently failed.
+ */
+const verificationState = (brand: AdminBrand): { label: string; tone: string; hint: string } => {
+  const status = String(brand.verificationStatus ?? 'NOT_SUBMITTED').toUpperCase();
+  if (status === 'APPROVED') {
+    return brand.isStoreOpen
+      ? {
+          label: '✅ Verified',
+          tone: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200',
+          hint: 'Approved and showing the verified badge.',
+        }
+      : {
+          label: '✅ Verified · store closed',
+          tone: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200',
+          hint: 'Approved, but the badge is hidden because the store is closed.',
+        };
+  }
+  if (status === 'IN_REVIEW') {
+    return {
+      label: 'Under review',
+      tone: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200',
+      hint: 'An admin is reviewing this submission.',
+    };
+  }
+  if (status === 'PENDING') {
+    return {
+      label: 'Awaiting review',
+      tone: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-200',
+      hint: 'Submitted and waiting to be claimed.',
+    };
+  }
+  if (status === 'ADDITIONAL_INFO_REQUESTED') {
+    return {
+      label: 'Awaiting brand',
+      tone: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200',
+      hint: 'More information was requested from the brand.',
+    };
+  }
+  if (status === 'REJECTED') {
+    return {
+      label: 'Rejected',
+      tone: 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200',
+      hint: 'Verification was rejected.',
+    };
+  }
+  if (status === 'CANCELLED') {
+    return {
+      label: 'Cancelled',
+      tone: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300',
+      hint: 'The brand cancelled its own submission.',
+    };
+  }
+  return {
+    label: 'Not verified',
+    tone: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300',
+    hint: 'This brand has never applied for verification.',
+  };
+};
+
 const normalizeStatus = (status: string | undefined | null): StatusFilter | 'UNKNOWN' => {
   const value = String(status ?? '').toUpperCase();
   if (value === 'ACTIVE') return 'ACTIVE';
@@ -271,6 +337,7 @@ const BrandsPanel: React.FC = () => {
                   <th className="px-3 py-3">Owner</th>
                   <th className="px-3 py-3">Email</th>
                   <th className="px-3 py-3">Store</th>
+                  <th className="px-3 py-3">Verification</th>
                   <th className="px-3 py-3">Account</th>
                   <th className="px-3 py-3">Joined</th>
                   <th className="px-3 py-3">Actions</th>
@@ -308,6 +375,14 @@ const BrandsPanel: React.FC = () => {
                       <td className="px-3 py-3">
                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${brand.isStoreOpen ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200' : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'}`}>
                           <span>{brand.isStoreOpen ? '🟢' : '🔴'}</span>{brand.isStoreOpen ? 'Open' : 'Closed'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span
+                          className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${verificationState(brand).tone}`}
+                          title={verificationState(brand).hint}
+                        >
+                          {verificationState(brand).label}
                         </span>
                       </td>
                       <td className="px-3 py-3">
@@ -352,7 +427,15 @@ const BrandsPanel: React.FC = () => {
                         <p className="text-base font-bold text-gray-900 dark:text-white">{brand.name || 'Unnamed brand'}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">{getOwnerName(brand)}</p>
                       </div>
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${brand.isStoreOpen ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200' : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'}`}>{brand.isStoreOpen ? 'Open' : 'Closed'}</span>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${brand.isStoreOpen ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200' : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'}`}>{brand.isStoreOpen ? 'Open' : 'Closed'}</span>
+                        <span
+                          className={`whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold ${verificationState(brand).tone}`}
+                          title={verificationState(brand).hint}
+                        >
+                          {verificationState(brand).label}
+                        </span>
+                      </div>
                     </div>
                     <p className="line-clamp-2 min-h-[40px] text-sm text-gray-600 dark:text-gray-300">{brand.description?.trim() || 'No brand description provided.'}</p>
                     <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">

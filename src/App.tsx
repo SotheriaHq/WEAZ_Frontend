@@ -47,6 +47,7 @@ import RequireAdmin from './components/admin/RequireAdmin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { ThemeBackendSync } from '@/components/theme/ThemeBackendSync';
+import { useVerificationStateSync } from '@/hooks/useVerificationStateSync';
 import ScrollRestoreProvider from '@/components/ScrollRestoreProvider';
 import MobileExitGuard from '@/components/navigation/MobileExitGuard';
 import { isNewBuildAvailable } from '@/utils/buildVersionGuard';
@@ -994,9 +995,19 @@ const HotRouteChunkPrefetch: React.FC = () => {
   return null;
 };
 
+/**
+ * Pulls a fresh auth profile when an admin approves/rejects this brand's
+ * verification, so the verified badge and studio state flip without a reload.
+ */
+const VerificationStateSync: React.FC = () => {
+  useVerificationStateSync();
+  return null;
+};
+
 const App: React.FC = () => (
   <AuthProvider>
     <ThemeBackendSync />
+    <VerificationStateSync />
     <HotRouteChunkPrefetch />
     <ScrollRestoreProvider>
       <DropdownManagerProvider>

@@ -128,6 +128,18 @@ export interface AdminBrand {
   name: string | null;
   ownerId?: string;
   isStoreOpen?: boolean;
+  /**
+   * Raw verification outcome. Note this is NOT the same as "shows a verified
+   * badge" — the badge additionally requires an open store and an active owner.
+   */
+  verificationStatus?:
+    | 'NOT_SUBMITTED'
+    | 'PENDING'
+    | 'IN_REVIEW'
+    | 'ADDITIONAL_INFO_REQUESTED'
+    | 'APPROVED'
+    | 'REJECTED'
+    | 'CANCELLED';
   description?: string | null;
   logo?: string | null;
   createdAt?: string;

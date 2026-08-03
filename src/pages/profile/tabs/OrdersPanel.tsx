@@ -1992,10 +1992,14 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
           })}
         </div>
 
-        <div className="space-y-3">
+        {/* Inline scroller: the list used to grow the page without bound, so a
+            shopper with twenty orders had to scroll past all of them to reach
+            anything below. Rows scroll within a fixed viewport instead, keeping
+            the tab a stable height regardless of order count. */}
+        <div className="max-h-[min(62vh,560px)] space-y-2 overflow-y-auto overscroll-contain scrollbar-wiez pr-1">
           {loading ? (
             Array.from({ length: 3 }).map((_, idx) => (
-              <div key={idx} className="h-24 rounded-2xl bg-gray-100 dark:bg-white/5 animate-pulse" />
+              <div key={idx} className="h-20 rounded-2xl bg-gray-100 dark:bg-white/5 animate-pulse" />
             ))
           ) : error ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-xs text-amber-700 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-300">
@@ -2022,18 +2026,9 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                     key={order.id}
                     type="button"
                     onClick={() => handleSelect({ kind: 'standard', id: order.id })}
-                    className="w-full rounded-2xl bg-white/65 p-3 text-left shadow-[0_14px_40px_rgba(15,23,42,0.05)] transition hover:bg-white dark:bg-white/[0.03] dark:hover:bg-white/10"
+                    className="w-full rounded-2xl bg-white/65 p-2.5 text-left shadow-[0_14px_40px_rgba(15,23,42,0.05)] transition hover:bg-white dark:bg-white/[0.03] dark:hover:bg-white/10"
                   >
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
-                        #ORD-{order.id.slice(0, 4).toUpperCase()}
-                      </span>
-                      <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${statusBadgeClass(normalizedStatus)}`}>
-                        {normalizedStatus}
-                      </span>
-                    </div>
-
-                    <div className="mb-3 flex items-start gap-3">
+                    <div className="flex items-start gap-2.5">
                       <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-white/10">
                         {firstItem?.thumbnail ? (
                           <ImageWithFallback
@@ -2053,40 +2048,47 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <p className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
-                          {firstItem?.name || 'Order'}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(order.createdAt)}</p>
-                        {summary?.hasUnread ? (
-                          <p className="mt-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
-                            {unreadCount > 0 ? `${unreadCount} unread messages` : 'New messages'}
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
+                            {firstItem?.name || 'Order'}
                           </p>
-                        ) : null}
+                          <p className="shrink-0 text-sm font-bold text-gray-900 dark:text-white">
+                            {formatCurrency(order.totalAmount, order.currency)}
+                          </p>
+                        </div>
+
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-gray-500 dark:text-gray-400">
+                          <span className="font-mono">
+                            #ORD-{order.id.slice(0, 4).toUpperCase()}
+                          </span>
+                          <span>{formatDate(order.createdAt)}</span>
+                          <span className={`rounded-md px-1.5 py-0.5 font-bold ${statusBadgeClass(normalizedStatus)}`}>
+                            {normalizedStatus}
+                          </span>
+                          {summary?.hasUnread ? (
+                            <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                              {unreadCount > 0 ? `${unreadCount} unread` : 'New messages'}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {/* The four stage captions below the bar doubled the row
+                            height for information the status chip already gives.
+                            The bar keeps the at-a-glance progress; the detail
+                            view keeps the labels. */}
+                        <div className="mt-2 flex items-center gap-1">
+                          {Array.from({ length: 4 }).map((_, idx) => (
+                            <span
+                              key={idx}
+                              className={`h-1 w-full rounded-full ${
+                                idx < completedSegments
+                                  ? 'bg-fuchsia-500 dark:bg-fuchsia-400'
+                                  : 'bg-gray-200 dark:bg-white/10'
+                              }`}
+                            />
+                          ))}
+                        </div>
                       </div>
-
-                      <p className="shrink-0 text-sm font-bold text-gray-900 dark:text-white">
-                        {formatCurrency(order.totalAmount, order.currency)}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: 4 }).map((_, idx) => (
-                        <span
-                          key={idx}
-                          className={`h-1.5 w-full rounded-full ${
-                            idx < completedSegments
-                              ? 'bg-fuchsia-500 dark:bg-fuchsia-400'
-                              : 'bg-gray-200 dark:bg-white/10'
-                          }`}
-                        />
-                      ))}
-                    </div>
-
-                    <div className="mt-1.5 flex justify-between text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      <span className={completedSegments >= 1 ? "text-fuchsia-600 dark:text-fuchsia-400 font-extrabold" : ""}>Pending</span>
-                      <span className={completedSegments >= 2 ? "text-fuchsia-600 dark:text-fuchsia-400 font-extrabold" : ""}>Processing</span>
-                      <span className={completedSegments >= 3 ? "text-fuchsia-600 dark:text-fuchsia-400 font-extrabold" : ""}>Shipped</span>
-                      <span className={completedSegments >= 4 ? "text-fuchsia-600 dark:text-fuchsia-400 font-extrabold" : ""}>Delivered</span>
                     </div>
                   </button>
                 );
@@ -2109,21 +2111,10 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                   key={order.id}
                   type="button"
                   onClick={() => handleSelect({ kind: 'custom', id: order.id })}
-                    className="w-full rounded-[1.7rem] bg-white/65 p-3.5 text-left shadow-[0_14px_40px_rgba(15,23,42,0.05)] transition hover:bg-white dark:bg-white/[0.03] dark:hover:bg-white/10"
+                    className="w-full rounded-2xl bg-white/65 p-2.5 text-left shadow-[0_14px_40px_rgba(15,23,42,0.05)] transition hover:bg-white dark:bg-white/[0.03] dark:hover:bg-white/10"
                 >
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
-                      {formatCustomOrderCode(order.id)}
-                    </span>
-                    {shouldShowBuyerStatusBadge(order.status) ? <CustomOrderBadge value={order.status} /> : null}
-                    <CustomOrderBadge
-                      value={getBuyerFacingProgressStage(order.currentProgressStage)}
-                      type="stage"
-                    />
-                  </div>
-
-                  <div className="grid gap-3 lg:grid-cols-[92px_minmax(0,1fr)_auto] lg:items-start">
-                    <div className="h-[92px] overflow-hidden rounded-[1.25rem] bg-gray-100 dark:bg-white/10">
+                  <div className="flex items-start gap-2.5">
+                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-white/10">
                       {order.sourcePrimaryMediaUrl ? (
                         <ImageWithFallback
                           src={order.sourcePrimaryMediaUrl}
@@ -2141,31 +2132,36 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                       )}
                     </div>
 
-                    <div className="min-w-0">
-                      <div className="line-clamp-1 text-lg font-bold text-gray-900 dark:text-white">
-                        {order.sourceTitle}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
+                          {order.sourceTitle}
+                        </div>
+                        <div className="shrink-0 text-sm font-bold text-gray-900 dark:text-white">
+                          {formatCurrency(order.buyerPriceSummary.grandTotal, order.buyerPriceSummary.currency)}
+                        </div>
                       </div>
-                      <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+
+                      <div className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
                         {order.brand?.name || 'Brand'} · {formatDate(order.createdAt)}
                       </div>
-                      {summary?.hasUnread ? (
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span className="font-mono text-[10px] text-gray-500 dark:text-gray-400">
+                          {formatCustomOrderCode(order.id)}
+                        </span>
+                        {shouldShowBuyerStatusBadge(order.status) ? (
+                          <CustomOrderBadge value={order.status} />
+                        ) : null}
+                        <CustomOrderBadge
+                          value={getBuyerFacingProgressStage(order.currentProgressStage)}
+                          type="stage"
+                        />
+                        {summary?.hasUnread ? (
+                          <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
                             {unreadCount > 0 ? `${unreadCount} unread` : 'New messages'}
                           </span>
-                        </div>
-                      ) : null}
-                      <div className="mt-3 grid gap-1 text-sm text-gray-600 dark:text-gray-300 sm:grid-cols-2">
-                        <span>Delivery: {order.delivery?.city || order.delivery?.state || 'Not scheduled'}</span>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <div className="text-base font-bold text-gray-900 dark:text-white">
-                        {formatCurrency(order.buyerPriceSummary.grandTotal, order.buyerPriceSummary.currency)}
-                      </div>
-                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        {order.measurementCount ?? 0} measurements
+                        ) : null}
                       </div>
                     </div>
                   </div>

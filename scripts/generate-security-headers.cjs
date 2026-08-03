@@ -99,7 +99,13 @@ const csp = [
   `img-src 'self' data: blob: ${apiBaseUrl} https://*.amazonaws.com https://*.s3.amazonaws.com https://*.cloudfront.net https://res.cloudinary.com https://images.unsplash.com https://lh3.googleusercontent.com https://unavatar.io https://flagcdn.com https://checkout.paystack.com https://standard.paystack.co`,
   "font-src 'self' data: https://fonts.gstatic.com",
   `connect-src ${buildConnectSrc()}`,
-  'frame-src https://accounts.google.com https://checkout.paystack.com https://standard.paystack.co https://js.paystack.co',
+  // S3 hosts: the admin brand-verification review page previews evidence PDFs
+  // (the signed confirmation letter) in an <iframe> pointed at a short-lived
+  // signed S3 URL. Without these the browser blocked the frame outright and the
+  // reviewer saw "This content is blocked. Contact the site owner to fix the
+  // issue." with no way to read the letter they were being asked to approve.
+  // Scoped to S3 only — not a general framing allowance.
+  'frame-src https://accounts.google.com https://checkout.paystack.com https://standard.paystack.co https://js.paystack.co https://*.amazonaws.com https://*.s3.amazonaws.com',
   "form-action 'self' https://checkout.paystack.com https://standard.paystack.co",
   "worker-src 'self' blob:",
   'upgrade-insecure-requests',
