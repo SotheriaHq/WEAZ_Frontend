@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { FC, ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import { toast } from 'sonner';
@@ -56,6 +57,120 @@ const isPdfDocument = (document: VerificationDocumentItem | null) =>
   document?.mimeType?.toLowerCase().includes('pdf') ||
   document?.signedUrl?.toLowerCase().includes('.pdf') ||
   false;
+
+const LETTER_DOCUMENT_KEY = 'letterOfConfirmationKey';
+
+const NOT_PROVIDED = 'Not provided';
+
+const formatBytes = (size?: number | null) => {
+  if (!size || size <= 0) return NOT_PROVIDED;
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(0)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return NOT_PROVIDED;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? NOT_PROVIDED : parsed.toLocaleString();
+};
+
+const formatDate = (value?: string | null) => {
+  if (!value) return NOT_PROVIDED;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? NOT_PROVIDED : parsed.toLocaleDateString();
+};
+
+const humanizeEnum = (value?: unknown) => {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return NOT_PROVIDED;
+  return text
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/^./, (char) => char.toUpperCase());
+};
+
+/** Human label for a file type slug that reaches the manifest raw (e.g. BRAND_VERIFICATION). */
+const humanizeFileType = (value?: unknown) => humanizeEnum(value);
+
+const shortenHash = (value?: unknown) => {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return 'Not recorded';
+  return text.length <= 16 ? text : `${text.slice(0, 8)}…${text.slice(-6)}`;
+};
+
+type ManifestEntry = {
+  fileId?: string;
+  s3Key?: string;
+  mimeType?: string | null;
+  size?: number | null;
+  sha256?: string | null;
+  uploadedAt?: string | null;
+  fileType?: string | null;
+};
+
+/**
+ * Property/value pair.
+ *
+ * The label sits directly above its value in one left-aligned column, so a
+ * reviewer scanning down reads property → value → property → value. The old
+ * layout ran "Label: value" together on a single line at the same weight, which
+ * is what read as scattered. The value gets the heavier, darker type because it
+ * is the thing being verified; the label is chrome.
+ */
+const DetailRow: FC<{
+  label: string;
+  children: ReactNode;
+  /** Identity numbers and timestamps read better in a fixed-width face. */
+  mono?: boolean;
+}> = ({ label, children, mono = false }) => (
+  <div>
+    <dt className="text-[10px] font-medium uppercase tracking-[0.14em] text-gray-400">
+      {label}
+    </dt>
+    <dd
+      className={`mt-1 break-words text-[15px] font-semibold leading-snug text-gray-900 ${
+        mono ? 'font-mono text-[13px] tracking-tight' : ''
+      }`}
+    >
+      {children}
+    </dd>
+  </div>
+);
+
+const SummaryCard: FC<{ title: string; children: ReactNode }> = ({ title, children }) => (
+  <div className="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-gray-100">
+    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+      {title}
+    </p>
+    <dl className="mt-4 space-y-4">{children}</dl>
+  </div>
+);
+
+/**
+ * Queue action with its explanation on hover/focus instead of a permanent
+ * paragraph. The three descriptions used to occupy a full row of bordered cards
+ * above the fold, pushing the actual evidence off screen.
+ */
+const HintedAction: FC<{
+  hint: string;
+  onClick: () => void;
+  disabled?: boolean;
+  variant?: 'secondary' | 'ghost';
+  children: ReactNode;
+}> = ({ hint, onClick, disabled, variant = 'ghost', children }) => (
+  <span className="group relative inline-flex">
+    <Button size="sm" variant={variant} onClick={onClick} disabled={disabled} title={hint}>
+      {children}
+    </Button>
+    <span
+      role="tooltip"
+      className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-xl bg-gray-900 px-3 py-2 text-left text-xs font-normal leading-relaxed text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+    >
+      {hint}
+    </span>
+  </span>
+);
 
 export default function AdminBrandVerificationReviewPage() {
   const { id = '' } = useParams();
@@ -146,6 +261,50 @@ export default function AdminBrandVerificationReviewPage() {
       null,
     [details?.documents, selectedDocumentKey],
   );
+
+  const letterDocument = useMemo(
+    () =>
+      details?.documents?.find((document) => document.key === LETTER_DOCUMENT_KEY) ?? null,
+    [details?.documents],
+  );
+
+  const businessAddressText = useMemo(() => {
+    const address = latestAttempt?.businessAddress as
+      | { street?: string; city?: string; state?: string; country?: string }
+      | null
+      | undefined;
+    if (!address) return NOT_PROVIDED;
+    const parts = [address.street, address.city, address.state, address.country]
+      .map((part) => (typeof part === 'string' ? part.trim() : ''))
+      .filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : NOT_PROVIDED;
+  }, [latestAttempt?.businessAddress]);
+
+  /**
+   * The manifest is stored as raw file rows (`s3Key`, `sha256`, byte counts) so
+   * it survives as an audit record. Dumping that JSON at a reviewer is unusable
+   * — resolve each entry against the reviewer document list so the row says
+   * "CAC certificate • PNG • 177 KB" instead of a UUID and a bucket path.
+   */
+  const manifestRows = useMemo(() => {
+    const raw = latestAttempt?.evidenceManifest;
+    const entries: ManifestEntry[] = Array.isArray(raw) ? (raw as ManifestEntry[]) : [];
+    const labelByKey = new Map(
+      (details?.documents ?? []).map((document) => [document.s3Key, document.label]),
+    );
+    return entries.map((entry, index) => ({
+      id: entry.fileId || entry.s3Key || `manifest-${index}`,
+      label:
+        (entry.s3Key ? labelByKey.get(entry.s3Key) : undefined) ??
+        humanizeFileType(entry.fileType),
+      mimeType: entry.mimeType || 'Unknown type',
+      size: formatBytes(entry.size),
+      uploadedAt: formatDateTime(entry.uploadedAt),
+      checksum: shortenHash(entry.sha256),
+      fullChecksum: typeof entry.sha256 === 'string' ? entry.sha256 : '',
+      s3Key: entry.s3Key || '',
+    }));
+  }, [details?.documents, latestAttempt?.evidenceManifest]);
 
   const selectedReasons = useMemo(() => {
     return reasons
@@ -308,7 +467,7 @@ export default function AdminBrandVerificationReviewPage() {
 
   if (!details) {
     return (
-      <div className="rounded-[1.75rem] border border-gray-200 bg-white p-6 text-sm text-gray-500 shadow-sm">
+      <div className="rounded-[1.75rem] bg-white p-6 text-sm text-gray-500 shadow-sm ring-1 ring-gray-100">
         Loading verification review...
       </div>
     );
@@ -349,163 +508,230 @@ export default function AdminBrandVerificationReviewPage() {
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Button size="sm" variant="secondary" onClick={() => void handleClaim()} disabled={saving}>
+        <div className="mt-6 flex flex-wrap gap-2">
+          <HintedAction
+            variant="secondary"
+            hint="Take ownership of this review so you can submit final decisions."
+            onClick={() => void handleClaim()}
+            disabled={saving}
+          >
             Claim
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => void handleRelease()} disabled={saving}>
+          </HintedAction>
+          <HintedAction
+            hint="Put it back in the queue so another admin can continue."
+            onClick={() => void handleRelease()}
+            disabled={saving}
+          >
             Release
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => void handleReassign()} disabled={saving}>
+          </HintedAction>
+          <HintedAction
+            hint="Move an already-assigned review to your account."
+            onClick={() => void handleReassign()}
+            disabled={saving}
+          >
             Reassign to me
-          </Button>
-        </div>
-        <div className="mt-4 grid gap-2 text-xs text-gray-600 md:grid-cols-2 xl:grid-cols-3">
-          <p className="rounded-xl border border-gray-200 bg-white/70 px-3 py-2 break-words">
-            <span className="font-semibold text-gray-900">Claim:</span> take ownership of this review so you can submit final decisions.
-          </p>
-          <p className="rounded-xl border border-gray-200 bg-white/70 px-3 py-2 break-words">
-            <span className="font-semibold text-gray-900">Release:</span> put it back in queue so another admin can continue.
-          </p>
-          <p className="rounded-xl border border-gray-200 bg-white/70 px-3 py-2 break-words">
-            <span className="font-semibold text-gray-900">Reassign to me:</span> move an already-assigned review to your account.
-          </p>
+          </HintedAction>
         </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
         <div className="min-w-0 space-y-6">
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div className="rounded-[1.5rem] border border-gray-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-                Owner identity
-              </p>
-              <p className="mt-3 text-sm font-semibold text-gray-900">
-                {latestAttempt?.ownerLegalFirstName} {latestAttempt?.ownerLegalLastName}
-              </p>
-              <p className="mt-2 text-sm text-gray-600">
-                NIN:{' '}
-                {isNinRevealed
-                  ? latestAttempt?.ownerNin || details.maskedOwnerNin || 'Not available'
-                  : details.maskedOwnerNin || 'Not available'}
-              </p>
-              {!isNinRevealed && latestAttempt?.ownerNin ? (
-                <button
-                  type="button"
-                  onClick={() => setIsRevealNinDialogOpen(true)}
-                  className="mt-2 inline-flex items-center rounded-full border border-gray-300 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-700 transition hover:bg-gray-100"
-                >
-                  Reveal NIN
-                </button>
-              ) : null}
-              <p className="mt-1 text-sm text-gray-600">
-                DOB:{' '}
-                {latestAttempt?.ownerDateOfBirth
-                  ? new Date(latestAttempt.ownerDateOfBirth).toLocaleDateString()
-                  : 'Not available'}
-              </p>
-            </div>
+            <SummaryCard title="Owner identity">
+              <DetailRow label="Name">
+                {[latestAttempt?.ownerLegalFirstName, latestAttempt?.ownerLegalLastName]
+                  .filter(Boolean)
+                  .join(' ') || NOT_PROVIDED}
+              </DetailRow>
+              <DetailRow label="ID number (NIN)" mono>
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <span>
+                    {isNinRevealed
+                      ? (latestAttempt?.ownerNin as string) ||
+                        details.maskedOwnerNin ||
+                        NOT_PROVIDED
+                      : details.maskedOwnerNin || NOT_PROVIDED}
+                  </span>
+                  {!isNinRevealed && latestAttempt?.ownerNin ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsRevealNinDialogOpen(true)}
+                      className="rounded-full bg-gray-100 px-2 py-0.5 font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-600 transition hover:bg-gray-200"
+                    >
+                      Reveal
+                    </button>
+                  ) : null}
+                </span>
+              </DetailRow>
+              <DetailRow label="Date of birth" mono>
+                {formatDate(latestAttempt?.ownerDateOfBirth as string | undefined)}
+              </DetailRow>
+              <DetailRow label="Phone" mono>
+                {(latestAttempt?.ownerPhoneNumber as string) || NOT_PROVIDED}
+              </DetailRow>
+              <DetailRow label="Account email">
+                {details.owner?.email || NOT_PROVIDED}
+              </DetailRow>
+            </SummaryCard>
 
-            <div className="rounded-[1.5rem] border border-gray-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-                Business
-              </p>
-              <p className="mt-3 text-sm font-semibold text-gray-900">
-                CAC: {latestAttempt?.cacNumber || 'Not available'}
-              </p>
-              <p className="mt-2 text-sm text-gray-600">
-                Entity: {String(latestAttempt?.legalEntityType || 'UNKNOWN').replace(/_/g, ' ')}
-              </p>
-              <p className="mt-1 text-sm text-gray-600">
-                Authority: {String(latestAttempt?.authorityType || 'UNKNOWN').replace(/_/g, ' ')}
-              </p>
-            </div>
+            <SummaryCard title="Business">
+              <DetailRow label="Registration (CAC)" mono>
+                {(latestAttempt?.cacNumber as string) || NOT_PROVIDED}
+              </DetailRow>
+              <DetailRow label="Entity type">
+                {humanizeEnum(latestAttempt?.legalEntityType)}
+              </DetailRow>
+              <DetailRow label="Authority">
+                {humanizeEnum(latestAttempt?.authorityType)}
+              </DetailRow>
+              <DetailRow label="ID document">
+                {humanizeEnum(latestAttempt?.idDocumentType)}
+              </DetailRow>
+              <DetailRow label="Business address">{businessAddressText}</DetailRow>
+            </SummaryCard>
 
-            <div className="rounded-[1.5rem] border border-gray-200 bg-white p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-                Queue record
-              </p>
-              <p className="mt-3 text-sm font-semibold text-gray-900">
+            <SummaryCard title="Queue record">
+              <DetailRow label="Attempt">
                 Attempt {details.verificationAttemptNumber ?? 0}
-              </p>
-              <p className="mt-2 text-sm text-gray-600">
-                Submitted:{' '}
-                {details.verificationSubmittedAt
-                  ? new Date(details.verificationSubmittedAt).toLocaleString()
-                  : 'Not available'}
-              </p>
-              <p className="mt-1 text-sm text-gray-600">
-                Version:{' '}
-                {details.updatedAt
-                  ? new Date(details.updatedAt).toLocaleString()
-                  : 'Not available'}
-              </p>
-            </div>
+              </DetailRow>
+              <DetailRow label="Submitted" mono>
+                {formatDateTime(details.verificationSubmittedAt)}
+              </DetailRow>
+              <DetailRow label="Version date" mono>
+                {formatDateTime(details.updatedAt)}
+              </DetailRow>
+              <DetailRow label="Letter version" mono>
+                {latestAttempt?.letterVersion
+                  ? `v${latestAttempt.letterVersion}`
+                  : 'Not recorded'}
+              </DetailRow>
+              <DetailRow label="Letter signed" mono>
+                {latestAttempt?.letterSignedAt
+                  ? formatDateTime(latestAttempt.letterSignedAt as string)
+                  : 'Not recorded'}
+              </DetailRow>
+            </SummaryCard>
           </section>
 
-          <section className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
+          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
                   Evidence review
                 </p>
-                <h2 className="mt-2 text-xl font-black text-gray-900">
-                  Document workspace
-                </h2>
-                <p className="mt-2 text-sm leading-7 text-gray-600">
-                  Preview submitted evidence directly from this verification record. Links are secure, short-lived, and refresh when this page reloads.
-                </p>
+                <h2 className="mt-1 text-lg font-black text-gray-900">Document workspace</h2>
               </div>
               {selectedDocument?.signedUrl ? (
                 <a
                   href={selectedDocument.signedUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-sky-800 transition hover:border-sky-300 hover:bg-sky-100"
+                  className="inline-flex items-center rounded-full bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-800 transition hover:bg-sky-100"
                 >
-                  Open file
+                  Open in new tab
                 </a>
               ) : null}
             </div>
 
-            <div className="mt-5 grid gap-5 xl:grid-cols-[220px_minmax(0,1fr)] 2xl:grid-cols-[240px_minmax(0,1fr)]">
-              <div className="min-w-0 space-y-3 xl:max-w-[240px]">
+            <div className="mt-4 grid gap-5 xl:grid-cols-[220px_minmax(0,1fr)] 2xl:grid-cols-[240px_minmax(0,1fr)]">
+              <div className="min-w-0 space-y-2 xl:max-w-[240px]">
                 {(details.documents ?? []).map((document) => (
                   <button
                     key={document.key}
                     type="button"
                     onClick={() => setSelectedDocumentKey(document.key)}
-                    className={`w-full rounded-[1.25rem] border px-4 py-4 text-left transition ${
+                    className={`w-full rounded-[1.25rem] px-4 py-3 text-left transition ${
                       selectedDocument?.key === document.key
-                        ? 'border-sky-300 bg-sky-50'
-                        : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                        ? 'bg-sky-50 ring-1 ring-sky-200'
+                        : 'bg-gray-50 hover:bg-gray-100'
                     }`}
                   >
                     <p className="text-sm font-semibold text-gray-900">{document.label}</p>
-                    <p className="mt-1 break-all text-xs uppercase tracking-[0.18em] text-gray-400">
-                      {document.mimeType || 'Unknown type'}
+                    <p className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] text-gray-500">
+                      <span className="uppercase tracking-[0.12em]">
+                        {document.mimeType?.split('/')[1] || 'File'}
+                      </span>
+                      <span>{formatBytes(document.size)}</span>
+                      {!document.signedUrl ? (
+                        <span className="font-semibold text-rose-600">Unavailable</span>
+                      ) : null}
                     </p>
                   </button>
                 ))}
-                <div className="rounded-[1.25rem] border border-indigo-200 bg-indigo-50 px-4 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Signed verification letter</p>
-                  <p className="mt-2 text-sm font-semibold text-indigo-900">What this means</p>
-                  <p className="mt-2 text-sm leading-6 text-indigo-900/90">
-                    The owner confirms that submitted business and identity details are accurate, and accepts platform verification terms.
+
+                {/* The letter used to render only as an inert explainer card, which
+                    reviewers read as "this IS the letter" — so a document that was
+                    right there in the list looked unviewable. It is now a summary
+                    that opens the real file. */}
+                <div className="rounded-[1.25rem] bg-indigo-50 px-4 py-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-600">
+                    Signed verification letter
                   </p>
-                  <p className="mt-2 text-xs text-indigo-800/80">
-                    Signature method: {String(latestAttempt?.signatureMethod || 'Not recorded').replace(/_/g, ' ')}
+                  <p className="mt-2 text-[13px] leading-6 text-indigo-900/90">
+                    The owner confirms that submitted business and identity details are
+                    accurate, and accepts platform verification terms.
                   </p>
-                  <p className="text-xs text-indigo-800/80">
-                    Letter version: {latestAttempt?.letterVersion ?? 'Not recorded'}
-                  </p>
-                  <p className="text-xs text-indigo-800/80">
-                    Signed at: {latestAttempt?.letterSignedAt ? new Date(latestAttempt.letterSignedAt).toLocaleString() : 'Not recorded'}
-                  </p>
+                  <dl className="mt-3 divide-y divide-indigo-200/60 text-indigo-900">
+                    <div className="flex items-baseline justify-between gap-3 py-1.5">
+                      <dt className="text-[10px] font-medium uppercase tracking-[0.12em] text-indigo-500">
+                        Method
+                      </dt>
+                      <dd className="text-[13px] font-semibold">
+                        {latestAttempt?.signatureMethod
+                          ? humanizeEnum(latestAttempt.signatureMethod)
+                          : 'Not recorded'}
+                      </dd>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-3 py-1.5">
+                      <dt className="text-[10px] font-medium uppercase tracking-[0.12em] text-indigo-500">
+                        Version
+                      </dt>
+                      <dd className="text-[13px] font-semibold">
+                        {latestAttempt?.letterVersion
+                          ? `v${latestAttempt.letterVersion}`
+                          : 'Not recorded'}
+                      </dd>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-3 py-1.5">
+                      <dt className="text-[10px] font-medium uppercase tracking-[0.12em] text-indigo-500">
+                        Signed
+                      </dt>
+                      <dd className="text-right text-[13px] font-semibold">
+                        {latestAttempt?.letterSignedAt
+                          ? formatDateTime(latestAttempt.letterSignedAt as string)
+                          : 'Not recorded'}
+                      </dd>
+                    </div>
+                  </dl>
+                  {letterDocument ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDocumentKey(letterDocument.key)}
+                        className="rounded-full bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-indigo-700"
+                      >
+                        View letter
+                      </button>
+                      {letterDocument.signedUrl ? (
+                        <a
+                          href={letterDocument.signedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700 transition hover:bg-indigo-100"
+                        >
+                          Download
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-[12px] font-semibold text-rose-700">
+                      No letter file is attached to this attempt.
+                    </p>
+                  )}
                 </div>
               </div>
 
-              <div className="min-w-0 overflow-hidden rounded-[1.5rem] border border-gray-200 bg-gray-50">
+              <div className="min-w-0 overflow-hidden rounded-[1.5rem] bg-gray-50 ring-1 ring-gray-100">
                 {selectedDocument?.signedUrl ? (
                   isPdfDocument(selectedDocument) ? (
                     <iframe
@@ -525,26 +751,74 @@ export default function AdminBrandVerificationReviewPage() {
                     </div>
                   )
                 ) : (
-                  <div className="flex min-h-[420px] items-center justify-center px-6 text-sm text-gray-500">
-                    No reviewer preview is available for the selected document yet.
+                  <div className="flex min-h-[420px] flex-col items-center justify-center gap-1 px-6 text-center">
+                    <p className="text-sm font-semibold text-gray-700">
+                      {selectedDocument
+                        ? `${selectedDocument.label} could not be loaded`
+                        : 'No evidence was submitted with this attempt'}
+                    </p>
+                    <p className="max-w-sm text-xs leading-relaxed text-gray-500">
+                      {selectedDocument
+                        ? 'The secure link expired or the stored file is missing. Reload this page to re-sign the link before rejecting on evidence grounds.'
+                        : 'Ask the brand to resubmit before deciding.'}
+                    </p>
                   </div>
                 )}
               </div>
             </div>
           </section>
 
-          <section className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-              Evidence manifest
-            </p>
-            <pre className="mt-4 max-h-72 overflow-auto rounded-[1.25rem] bg-gray-950 p-4 text-xs leading-6 text-gray-100">
-              {JSON.stringify(latestAttempt?.evidenceManifest ?? {}, null, 2)}
-            </pre>
+          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+                Evidence manifest
+              </p>
+              <p className="text-[11px] text-gray-400">
+                Recorded at submission — {manifestRows.length}{' '}
+                {manifestRows.length === 1 ? 'file' : 'files'}
+              </p>
+            </div>
+
+            {manifestRows.length === 0 ? (
+              <p className="mt-4 text-sm text-gray-500">
+                No manifest was recorded for this attempt.
+              </p>
+            ) : (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[560px] text-left text-sm">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-[0.14em] text-gray-400">
+                      <th className="py-2 pr-4 font-medium">Document</th>
+                      <th className="py-2 pr-4 font-medium">Type</th>
+                      <th className="py-2 pr-4 font-medium">Size</th>
+                      <th className="py-2 pr-4 font-medium">Uploaded</th>
+                      <th className="py-2 font-medium">Checksum</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {manifestRows.map((row) => (
+                      <tr key={row.id} className="align-top">
+                        <td className="py-2.5 pr-4 font-semibold text-gray-900">{row.label}</td>
+                        <td className="py-2.5 pr-4 text-gray-600">{row.mimeType}</td>
+                        <td className="py-2.5 pr-4 tabular-nums text-gray-600">{row.size}</td>
+                        <td className="py-2.5 pr-4 text-gray-600">{row.uploadedAt}</td>
+                        <td
+                          className="py-2.5 font-mono text-xs text-gray-500"
+                          title={row.fullChecksum || undefined}
+                        >
+                          {row.checksum}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
         </div>
 
         <div className="min-w-0 space-y-6">
-          <section className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
+          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
               Request information
             </p>
@@ -584,7 +858,7 @@ export default function AdminBrandVerificationReviewPage() {
               {requestInfoItems.map((item) => (
                 <div
                   key={`${item.field}-${item.label}`}
-                  className="rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-3"
+                  className="rounded-[1.25rem] bg-amber-50 px-4 py-3"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -624,7 +898,7 @@ export default function AdminBrandVerificationReviewPage() {
             </Button>
           </section>
 
-          <section className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
+          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
               Review decision
             </p>
@@ -632,7 +906,7 @@ export default function AdminBrandVerificationReviewPage() {
               {reasons.map((reason) => (
                 <label
                   key={reason.code}
-                  className="flex items-start gap-3 rounded-[1.25rem] border border-gray-200 px-4 py-3 text-sm text-gray-700"
+                  className="flex items-start gap-3 rounded-[1.25rem] bg-gray-50 px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-100"
                 >
                   <input
                     type="checkbox"
@@ -672,7 +946,7 @@ export default function AdminBrandVerificationReviewPage() {
             </div>
           </section>
 
-          <section className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
+          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
               Reviewer notes
             </p>
@@ -697,7 +971,7 @@ export default function AdminBrandVerificationReviewPage() {
               {(details.verificationNotes ?? []).map((note) => (
                 <article
                   key={note.id}
-                  className="rounded-[1.25rem] border border-gray-200 bg-gray-50 px-4 py-4"
+                  className="rounded-[1.25rem] bg-gray-50 px-4 py-4"
                 >
                   <p className="text-sm text-gray-700">{note.text}</p>
                   <p className="mt-2 text-xs text-gray-500">
