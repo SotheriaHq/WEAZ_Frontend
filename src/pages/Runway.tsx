@@ -891,9 +891,12 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
     if (isMobileReels) {
       return (
         <div className="relative">
-          {/* Fixed stage: phone viewport between top nav and island bottom nav. */}
+          {/* Full-bleed stage: owns the whole viewport, with the navbar floating
+              transparently over it (Layout → `immersive`). It used to start at
+              `top-16`, handing the top 64px of a media surface to a solid bar —
+              which is what read as the nav pushing everything down. */}
           <div
-            className="fixed inset-x-0 top-16 z-10 bg-black"
+            className="fixed inset-x-0 top-0 z-10 bg-black"
             style={{
               bottom: 0,
             }}
@@ -1082,19 +1085,20 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
 
     return (
       <div className="relative">
+        {/* Full-bleed stage — see the pinned-mode stage above. */}
         <div
-          className="fixed inset-x-0 top-16 z-10 bg-black"
+          className="fixed inset-x-0 top-0 z-10 bg-black"
           style={{
             bottom: 0,
           }}
         >
           {showError ? (
-            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]">
+            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 pt-20 pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]">
               {reelsCategoryHeader}
               <StateDisplay type={detectErrorType(error)} onRetry={() => void refetch()} />
             </div>
           ) : showEmpty ? (
-            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]">
+            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 pt-20 pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]">
               {reelsCategoryHeader}
               {!activeFeedTag ? (
                 <StateDisplay type="empty" onRetry={() => void loadFeed()} />
@@ -1117,7 +1121,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
               designItemCount: filteredItems.length,
             }) &&
             fallbackProducts.length > 0 ? (
-            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]">
+            <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 pt-20 pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]">
               {reelsCategoryHeader}
               <section className="mt-4 space-y-4" data-entity-type="PRODUCT" data-card-branch="product">
                 <div>

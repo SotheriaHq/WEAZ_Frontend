@@ -49,6 +49,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   );
   const isRouteSidebarHidden = location.pathname.startsWith('/studio') || isEmbeddedMobile;
 
+  /**
+   * Mobile Runway renders full-bleed reels (`Runway.tsx` → `isMobileReels`), so
+   * the bar floats over the stage instead of taking the top 64px of it. Both
+   * `/` and `/runway` are the design feed; masonry (>= 768px) keeps the normal
+   * solid bar, which is why this is gated on `isMobile` and not the route alone.
+   */
+  const isImmersiveNav =
+    isMobile && (location.pathname === '/' || location.pathname === '/runway');
+
   // Update sidebar mode when route or viewport changes
   useEffect(() => {
     if (computedSidebarMode !== sidebarMode) {
@@ -68,7 +77,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="min-h-screen wiez-shell-bg text-gray-900 dark:text-white">
         
       {/* Navbar */}
-      {!isEmbeddedMobile ? <Navbar /> : null}
+      {!isEmbeddedMobile ? <Navbar immersive={isImmersiveNav} /> : null}
 
       {/* Sidebar */}
       {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}

@@ -160,7 +160,7 @@ export const RunwayReelsFeed: React.FC<RunwayReelsFeedProps> = ({
         aria-busy="true"
         aria-label="Loading runway"
       >
-        {header}
+        <div className="pt-16">{header}</div>
         <div className="flex h-full w-full items-center justify-center p-6">
           <div className="w-full max-w-sm opacity-80">
             <DesignSkeleton />
@@ -174,8 +174,11 @@ export const RunwayReelsFeed: React.FC<RunwayReelsFeedProps> = ({
     <div
       className={`relative flex h-full w-full flex-col overflow-hidden bg-black ${className ?? ''}`}
     >
+      {/* `pt-16` clears the floating navbar. The stage is full-bleed (media runs
+          edge to edge behind the transparent bar), so the chips must be pushed
+          below it rather than the stage being shortened to make room. */}
       {header ? (
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 pt-16">
           <div className="pointer-events-auto">{header}</div>
         </div>
       ) : null}

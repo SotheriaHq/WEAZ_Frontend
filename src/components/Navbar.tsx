@@ -46,6 +46,21 @@ import {
 
 interface NavbarProps {
   minimal?: boolean;
+  /**
+   * Float the bar over a full-bleed dark stage instead of sitting on its own
+   * surface — the mobile Runway reels.
+   *
+   * The reels stage used to start at `top-16` so the solid bar could own the
+   * first 64px of the screen. That is a band of chrome above the photo on a
+   * surface whose entire point is edge-to-edge media, and it read as the navbar
+   * "pushing the rest of the view down". Native has always overlaid instead.
+   *
+   * Keeps every control (unlike `minimal`, which strips them); only the surface
+   * changes. Foreground is forced light because the stage is dark in BOTH
+   * themes, so the theme-coloured wordmark would otherwise be dark-on-dark in
+   * light mode — the same defect the Runway filter chips had.
+   */
+  immersive?: boolean;
   profileMenuContext?: 'default' | 'studio';
 }
 
@@ -55,7 +70,7 @@ const THEME_MENU_OPTIONS = [
   { value: 'system' as const, label: 'System', icon: '💻' },
 ];
 
-export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuContext = 'default' }) => {
+export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = false, profileMenuContext = 'default' }) => {
   const { logout } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
@@ -374,14 +389,16 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
   return (
     <nav
       className={`fixed top-0 left-0 z-layer-nav h-16 w-full px-4 sm:px-5 ${
-        minimal
-          ? 'border-b border-transparent bg-transparent'
-          : isScrolled
-            ? 'wiez-nav-surface-muted'
-            : 'wiez-nav-surface'
+        immersive
+          ? 'border-b-0 bg-transparent'
+          : minimal
+            ? 'border-b border-transparent bg-transparent'
+            : isScrolled
+              ? 'wiez-nav-surface-muted'
+              : 'wiez-nav-surface'
       }`}
       style={
-        isScrolled && !minimal
+        isScrolled && !minimal && !immersive
           ? {
               backdropFilter: 'blur(18px) saturate(140%)',
               WebkitBackdropFilter: 'blur(18px) saturate(140%)',
@@ -389,7 +406,17 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
           : undefined
       }
     >
-      <div className="flex h-full items-center justify-between gap-4">
+      {/* Readability scrim: over edge-filled media the bar has no surface of
+          its own, so the controls need this to stay legible. Extends past the
+          bar's own height so it fades out rather than ending on a hard edge. */}
+      {immersive ? (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/70 via-black/35 to-transparent"
+          aria-hidden
+        />
+      ) : null}
+
+      <div className={`relative flex h-full items-center justify-between gap-4 ${immersive ? 'text-white [&_.text-theme]:text-white [&_.text-theme-secondary]:text-white/80' : ''}`}>
         <div className="flex shrink-0 items-center">
           {!minimal ? (
             <button

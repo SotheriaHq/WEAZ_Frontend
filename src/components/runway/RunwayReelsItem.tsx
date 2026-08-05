@@ -20,6 +20,7 @@ import { BAG_IT_LABEL } from '@/constants/bagging';
 import { formatPrice } from '@/utils/helpers';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import { useReelDesignMedia, type ReelMedia } from '@/hooks/useReelDesignMedia';
+import { resolveRunwayMediaFit } from '@/components/runway/runwayMediaFit';
 import { toast } from 'sonner';
 
 export type RunwayReelsItemProps = {
@@ -46,15 +47,11 @@ const RAIL_BOTTOM = 'calc(env(safe-area-inset-bottom, 0px) + 6rem)';
 // How long the tap-revealed meta stays before fading (native showMetaOverlay).
 const META_REVEAL_MS = 4000;
 
-// Landscape media is letterboxed on the black matte; portrait/square fills.
-const fitForAspect = (aspect: number | null | undefined) => {
-  const useContain =
-    typeof aspect === 'number' && Number.isFinite(aspect) && aspect >= 1.05;
-  return {
-    fit: (useContain ? 'contain' : 'cover') as 'cover' | 'contain',
-    objectClass: useContain ? 'object-contain' : 'object-cover',
-  };
-};
+// Fit is decided by `resolveRunwayMediaFit` — the shared web/native policy.
+// Tall shots fill the stage; square-favouring and landscape shots are padded on
+// the black matte so the whole design stays viewable. Do not reintroduce a
+// local rule here: the previous one-liner (`aspect >= 1.05 ? contain : cover`)
+// never consulted the viewport and is why web and the app disagreed.
 
 /**
  * Single full-viewport runway reel — Instagram/TikTok-style stage with an
@@ -87,7 +84,15 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
   const ownsDesignBrand = checkOwnsDesignBrand(user, brandId);
   const brandBagBlocked = isBrandAccountBlockedFromBagging(user);
   const bagDisabled = bagBusy || ownsDesignBrand || brandBagBlocked;
-  const isRegular = user?.type === 'REGULAR';
+  /**
+   * Matches native's `canPatchBrands = user?.type !== 'BRAND'`.
+   *
+   * This used to be `user?.type === 'REGULAR'`, which also hid the button from
+   * SIGNED-OUT visitors — so `handleTogglePatch`'s "Please sign in to patch
+   * brands." prompt was unreachable and a guest had no way to discover the
+   * action at all. Brand accounts still cannot patch (sellers, not shoppers).
+   */
+  const canPatch = user?.type !== 'BRAND';
 
   const brandAvatar = resolveProfileImageSource({
     brandLogo: item.brandLogo,
@@ -106,6 +111,31 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
   const [activeSlide, setActiveSlide] = useState(0);
   const activeSlideRef = useRef(0);
   const rafRef = useRef<number | null>(null);
+
+  // Stage aspect feeds the shared fit policy, exactly as the native viewport
+  // does. Null until measured; the policy falls back to the shape-only decision,
+  // which is the same answer at phone aspect ratios — so there is no re-fit
+  // flash when the measurement lands.
+  const [stageAspect, setStageAspect] = useState<number | null>(null);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => {
+      const { clientWidth, clientHeight } = el;
+      if (clientWidth > 0 && clientHeight > 0) {
+        setStageAspect((prev) => {
+          const next = clientWidth / clientHeight;
+          // Ignore sub-pixel jitter (mobile URL-bar collapse resizes constantly).
+          return prev !== null && Math.abs(prev - next) < 0.005 ? prev : next;
+        });
+      }
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const handleCarouselScroll = useCallback(() => {
     if (rafRef.current != null) return;
@@ -183,8 +213,17 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
   const handleBagDesign = async (event: React.MouseEvent) => {
     event.stopPropagation();
     if (!isCustomAvailable || bagBusy) return;
+    // These two refusals must be SPOKEN, not swallowed. The button used to carry
+    // `disabled={bagDisabled}`, so for a brand account the click never fired at
+    // all: no pulse, no toast, no explanation — a dead control, which is what
+    // "the bag heartbeat is not working" was describing. The button now stays
+    // clickable and says why; only a genuinely in-flight request disables it.
     if (brandBagBlocked) {
       toast.info(BRAND_BAG_BLOCKED_MESSAGE);
+      return;
+    }
+    if (ownsDesignBrand) {
+      toast.info('This is your own design — bagging is for shoppers.');
       return;
     }
     setBagBusy(true);
@@ -227,7 +266,7 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
         style={{ scrollSnapType: hasMultiple ? 'x mandatory' : undefined }}
       >
         {slides.map((slide, index) => {
-          const { fit, objectClass } = fitForAspect(slide.aspectRatio);
+          const { fit, objectClass } = resolveRunwayMediaFit(slide.aspectRatio, stageAspect);
           const isVideo = slide.type === 'video';
           const mounted = shouldMountSlide(index);
           const slideActive = isActive && index === activeSlide;
@@ -339,7 +378,7 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
             type="button"
             className="flex flex-col items-center text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={handleBagDesign}
-            disabled={bagDisabled}
+            disabled={bagBusy}
             aria-label={BAG_IT_LABEL}
             title={
               brandBagBlocked
@@ -409,7 +448,7 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
           <span className="mt-0.5 text-[10px] font-bold drop-shadow">{isSaved ? 'Saved' : 'Save'}</span>
         </button>
 
-        {isRegular && brandId ? (
+        {canPatch && brandId ? (
           <button
             type="button"
             className="flex flex-col items-center text-white transition-transform active:scale-95 disabled:opacity-50"
