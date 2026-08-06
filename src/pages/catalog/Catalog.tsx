@@ -9,7 +9,6 @@ import { toast } from 'sonner';
 import ProfileHeader from '../../components/catalog/ProfileHeader';
 import OwnerCatalogMediaHeader from '../../components/catalog/OwnerCatalogMediaHeader';
 import Tabs from '../../components/Tabs';
-import AddCollectionModal from '../../components/profile/AddCollectionModal';
 import CollectionsGrid from '../../components/profile/CollectionsGrid';
 import CollectionsSkeleton from '../../components/profile/CollectionsSkeleton';
 import EmptyState from '../../components/EmptyState';
@@ -309,7 +308,6 @@ const ProfilePage: React.FC = () => {
     }
   }, [resolveTabFromQuery, searchParams]);
 
-  const [isAddOpen, setIsAddOpen] = useState(false);
   const [pendingAccessConfirm, setPendingAccessConfirm] = useState<string | null>(null);
   const [collectionToDelete, setCollectionToDelete] = useState<string | null>(null);
   const [collectionToRestore, setCollectionToRestore] = useState<string | null>(null);
@@ -427,10 +425,6 @@ const ProfilePage: React.FC = () => {
     return () => window.removeEventListener('wiez:content-review-updated', onContentReviewUpdated);
   }, [fetchCollections, isOwner, user?.id]);
 
-  const handleOpenAddModal = () => {
-    // collection type passed from dropdown; modal uses internal defaults for now
-    setIsAddOpen(true);
-  };
 
   // Capture navigation state from publish flow to show inline publishing badge on card
   useEffect(() => {
@@ -2391,7 +2385,7 @@ const ProfilePage: React.FC = () => {
                       {/* Show create controls only for owner */}
                       {isOwner && (
                         <div className="flex flex-shrink-0 gap-2">
-                          <AddCollectionDropdown openModal={() => handleOpenAddModal()} />
+                          <AddCollectionDropdown />
                         </div>
                       )}
                     </div>
@@ -2691,17 +2685,6 @@ const ProfilePage: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {isOwner && (
-        <AddCollectionModal
-          isOpen={isAddOpen}
-          onClose={() => setIsAddOpen(false)}
-          onCreate={async () => {
-            setIsAddOpen(false);
-            if (user) await fetchCollections(user.id, { forceRefresh: true });
-          }}
-        />
-      )}
 
       {/* Confirm access request dialog for visitor */}
       <ConfirmDialog

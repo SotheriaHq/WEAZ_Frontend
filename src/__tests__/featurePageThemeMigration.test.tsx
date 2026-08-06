@@ -125,25 +125,11 @@ vi.mock('@/hooks/UseBrandHook', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useCollectionUpload', () => ({
-  default: () => ({
-    uploadCollection: vi.fn(),
-    isUploading: false,
-    progress: 0,
-    perFileProgress: {},
-    cancelUploads: vi.fn(),
-  }),
-}));
-
 vi.mock('@/api/CustomOrderApi', () => ({
   customOrderConfigurationsApi: {
     create: vi.fn(),
     createFabricRuleBasis: vi.fn(),
   },
-}));
-
-vi.mock('@/api/collectionUploads', () => ({
-  finalizeCollectionUploads: vi.fn(),
 }));
 
 const setSystemDark = (matches: boolean) => {
