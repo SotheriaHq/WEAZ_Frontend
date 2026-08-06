@@ -275,7 +275,14 @@ const SignUpPage = () => {
 
           toast.error(displayedMessage || responseMessage);
         } else {
-          setError('email', { type: 'server', message: responseMessage });
+          // Only blame the email field when the email is genuinely the problem
+          // (409 = already registered). Pinning every unattributed failure to
+          // `email` is actively misleading: an unrelated 401/500 then renders as
+          // "Authentication required" under the email input, which sends both
+          // users and debugging down the wrong path.
+          if (error.response?.status === 409) {
+            setError('email', { type: 'server', message: responseMessage });
+          }
           toast.error(responseMessage);
         }
       } else {
