@@ -14,7 +14,7 @@ import { OverlayPortal } from '@/components/ui/OverlayPortal';
  * is one identifier and no plumbing.
  */
 
-export type NoticeTone = 'blocked' | 'info';
+export type NoticeTone = 'blocked' | 'info' | 'success';
 
 export type NoticePayload = {
   title?: string;
@@ -56,6 +56,16 @@ const getSnapshot = () => current;
 const TONE_GLYPH: Record<NoticeTone, string> = {
   blocked: '🚫',
   info: 'ℹ️',
+  // Milestones the user should actually register — publishing a store is the
+  // motivating case. A toast for that scrolls away before it is read, and the
+  // 'blocked'/'info' glyphs both read as a warning on a success.
+  success: '🎉',
+};
+
+const TONE_TITLE: Record<NoticeTone, string> = {
+  blocked: 'Not available yet',
+  info: 'Heads up',
+  success: 'All done',
 };
 
 /** Mount once, near the app root. */
@@ -108,7 +118,7 @@ export const NoticeModalHost: React.FC = () => {
                 id="wiez-notice-title"
                 className="text-sm font-bold text-slate-900 dark:text-white"
               >
-                {notice.title ?? (tone === 'blocked' ? 'Not available yet' : 'Heads up')}
+                {notice.title ?? TONE_TITLE[tone]}
               </h2>
               <p
                 id="wiez-notice-body"

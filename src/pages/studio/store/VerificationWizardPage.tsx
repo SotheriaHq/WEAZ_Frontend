@@ -116,15 +116,27 @@ export default function VerificationWizardPage() {
     userRef.current = user;
   }, [user]);
 
+  // Blob previews must outlive every re-render, and die only with the page.
+  //
+  // This cleanup used to depend on `localObjectUrls`, and React runs an effect's
+  // cleanup on every dependency change — not just unmount. So uploading a second
+  // document ran the previous cleanup, which revoked the FIRST document's blob
+  // while its <img> was still pointing at it. That image broke instantly, and
+  // broke permanently: `syncPreviewUrls` skipped any field that already had a
+  // local URL, so no signed S3 replacement was ever fetched for it.
+  const localObjectUrlsRef = useRef(localObjectUrls);
+  useEffect(() => {
+    localObjectUrlsRef.current = localObjectUrls;
+  }, [localObjectUrls]);
   useEffect(() => {
     return () => {
-      Object.values(localObjectUrls).forEach((url) => {
+      Object.values(localObjectUrlsRef.current).forEach((url) => {
         if (url && url.startsWith('blob:')) {
           URL.revokeObjectURL(url);
         }
       });
     };
-  }, [localObjectUrls]);
+  }, []);
 
   const originPath =
     typeof (location.state as { from?: unknown } | null)?.from === 'string'
@@ -137,7 +149,11 @@ export default function VerificationWizardPage() {
   );
 
   const getPreviewUrl = (fieldKey: UploadFieldKey): string | undefined => {
-    return localObjectUrls[fieldKey] || uploadPreviewUrls[fieldKey];
+    // Prefer the signed S3 URL once it arrives. It survives remounts, step
+    // changes and revocation; the blob is only a 0ms stand-in until the first
+    // fetch returns. Preferring the blob meant a dead object URL kept winning
+    // over a perfectly good signed one.
+    return uploadPreviewUrls[fieldKey] || localObjectUrls[fieldKey];
   };
 
   const wizardLockMessage = useMemo(() => {
@@ -278,7 +294,10 @@ export default function VerificationWizardPage() {
       }).filter((item) => item.s3Key.length > 0);
 
       for (const item of uploads) {
-        if (uploadPreviewUrls[item.key] || localObjectUrls[item.key]) {
+        // Only skip when a DURABLE url already exists. Skipping because a blob
+        // was present left every uploaded document with no signed fallback, so
+        // the moment that blob died the preview had nothing to fall back to.
+        if (uploadPreviewUrls[item.key]) {
           continue;
         }
         try {
@@ -366,8 +385,12 @@ export default function VerificationWizardPage() {
   ) => {
     if (!brandId || !file) return;
 
-    // Cache local blob URL for instant 0ms preview rendering without network overhead
-    if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+    // Cache local blob URL for instant 0ms preview rendering without network
+    // overhead. Images only: the preview picks its renderer with a regex whose
+    // `blob:` branch matches any object URL, so a PDF blob was handed to an
+    // <img> and rendered as a broken image instead of falling back to the
+    // document glyph.
+    if (file.type.startsWith('image/')) {
       const localUrl = URL.createObjectURL(file);
       setLocalObjectUrls((prev) => {
         if (prev[field as UploadFieldKey]?.startsWith('blob:')) {
@@ -1061,7 +1084,7 @@ export default function VerificationWizardPage() {
                                         className="w-12 h-12 rounded-lg border border-emerald-200 bg-white"
                                         mediaClassName="object-contain"
                                         maxHeightClassName="max-h-12"
-                                        maxWidthClassName="max-w-12"
+                                        maxWidthClassName="max-w-[3rem]"
                                       />
                                     ) : (
                                       <span className="text-2xl">📄</span>
@@ -1186,7 +1209,7 @@ export default function VerificationWizardPage() {
                                     className="w-12 h-12 rounded-lg border border-emerald-200 bg-white shrink-0"
                                     mediaClassName="object-contain"
                                     maxHeightClassName="max-h-12"
-                                    maxWidthClassName="max-w-12"
+                                    maxWidthClassName="max-w-[3rem]"
                                   />
                                 ) : (
                                   <div className="w-12 h-12 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-xl shrink-0">📄</div>
@@ -1349,7 +1372,7 @@ export default function VerificationWizardPage() {
                         className="w-12 h-12 rounded-lg border border-emerald-200 bg-white shrink-0"
                         mediaClassName="object-contain"
                         maxHeightClassName="max-h-12"
-                        maxWidthClassName="max-w-12"
+                        maxWidthClassName="max-w-[3rem]"
                       />
                     ) : (
                       <div className="w-12 h-12 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-xl shrink-0">📄</div>

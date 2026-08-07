@@ -343,13 +343,13 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
                       key={product.id}
                       className="flex items-center gap-4 p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200/50 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/10 transition-all"
                     >
-                      <div className="max-h-12 max-w-12 rounded-lg overflow-y-auto flex-shrink-0">
+                      <div className="max-h-12 max-w-[3rem] rounded-lg overflow-y-auto flex-shrink-0">
                         <MediaRenderer
                           kind="image"
                           src={product.image}
                           alt={product.name}
                           maxHeightClassName="max-h-12"
-                          maxWidthClassName="max-w-12"
+                          maxWidthClassName="max-w-[3rem]"
                           className="rounded-lg"
                           mediaClassName="rounded-lg"
                         />

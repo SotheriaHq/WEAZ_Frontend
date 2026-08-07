@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { showNotice } from '@/components/ui/NoticeModal';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 
@@ -578,7 +579,20 @@ const StoreCreationWizard: React.FC = () => {
       // Clear the localStorage draft since setup is complete
       clearStoreProgressLocally(user?.id);
       
-      toast.success('🎉 Your store is now live!');
+      // A notice, not a toast: publishing is the single most consequential
+      // action in this flow and it is immediately followed by a navigation, so a
+      // few-second toast on the outgoing page is the easiest thing in the app to
+      // miss. The notice host is global, so it survives the redirect.
+      showNotice({
+        tone: 'success',
+        title: 'Your store is live',
+        message:
+          'Buyers can find and browse your store now. Finish brand verification to start taking orders — only verified brands can receive them.',
+        action: {
+          label: 'Open verification',
+          onSelect: () => navigate('/studio/verification'),
+        },
+      });
       navigate('/store/my');
     } catch (error) {
       console.error('Failed to publish store', error);
