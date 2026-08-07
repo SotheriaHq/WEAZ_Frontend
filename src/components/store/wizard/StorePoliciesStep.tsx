@@ -266,11 +266,11 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                     </span>
                   </div>
                   <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">
-                    Step 2 of 3
+                    Step 2 of 4
                   </span>
                 </div>
                 <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-                  <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 transition-all duration-500" />
+                  <div className="h-full w-1/2 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 transition-all duration-500" />
                 </div>
               </div>
             )}
@@ -1257,12 +1257,12 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 <div className="mb-4 sm:mb-6">
                   <div className="flex justify-between text-sm mb-2">
                     <span className="text-gray-500">Progress</span>
-                    <span className="text-purple-600 font-medium">Step 2 of 3</span>
+                    <span className="text-purple-600 font-medium">Step 2 of 4</span>
                   </div>
                   <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
                     <div
                       className="bg-gradient-to-r from-purple-600 to-purple-700 h-full rounded-full transition-all duration-300"
-                      style={{ width: '66%' }}
+                      style={{ width: '50%' }}
                     />
                   </div>
                 </div>

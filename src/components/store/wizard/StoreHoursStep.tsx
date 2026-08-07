@@ -106,6 +106,28 @@ const StoreHoursStep: React.FC<StoreHoursStepProps> = ({
       <div className="flex-1 flex items-start justify-center p-3 sm:p-6 lg:p-12 overflow-y-auto">
         <div className="w-full max-w-[720px]">
           <div className="rounded-2xl overflow-hidden bg-white/80 dark:bg-white/[0.03] backdrop-blur-xl border border-gray-200/50 dark:border-purple-500/10 shadow-xl">
+            {/* Step header, matching StorePoliciesStep. Without it this screen
+                reads as a detour rather than a step of the setup flow — which
+                is exactly how a required field goes unnoticed. */}
+            <div className="px-8 pt-8 pb-4 border-b border-gray-200/50 dark:border-white/5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-purple-600/20 flex items-center justify-center text-purple-600 dark:text-purple-400 text-sm font-bold border border-purple-500/30">
+                    4
+                  </div>
+                  <span className="text-gray-900 dark:text-white font-medium">
+                    Working Hours
+                  </span>
+                </div>
+                <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">
+                  Step 3 of 4
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                <div className="h-full w-3/4 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 transition-all duration-500" />
+              </div>
+            </div>
+
             <div className="origin-top scale-[0.92] space-y-5 p-4 sm:scale-100 sm:space-y-8 sm:p-8">
               <div className="text-center space-y-2">
                 <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
