@@ -42,7 +42,21 @@ export function useStoreSetupStatus(): boolean | null {
     return cachedSetupComplete;
   }
   if (statusQuery.error) {
-    return false;
+    // Never lock the studio because the status request failed.
+    //
+    // This returned `false`, and `StudioSidebar` disables every nav item whose
+    // `requiresSetup` is true whenever this hook is `false` — which is all of
+    // them except Store. So a single failed `/store/status` call (the axios
+    // default times out at 15s, and the SIT box runs close to its memory
+    // ceiling) presented a fully set-up, published brand with a dead sidebar:
+    // pages still reachable by URL, but nothing clickable.
+    //
+    // `RequireStoreSetup` already takes the opposite stance and renders
+    // children when its own status fetch errors. The sidebar disagreeing with
+    // the route guard is what produced "the store is live but I can't get into
+    // Studio". Nav is an affordance, not a security boundary — every studio
+    // route re-checks on entry and the server re-checks on every write.
+    return cachedSetupComplete ?? true;
   }
   return null;
 }
