@@ -7,6 +7,7 @@ import type { RootState } from '@/store';
 // Step Components
 import StoreSocialStep from '@/components/store/wizard/StoreSocialStep';
 import StorePoliciesStep from '@/components/store/wizard/StorePoliciesStep';
+import StoreHoursStep from '@/components/store/wizard/StoreHoursStep';
 import StoreReviewStep from '@/components/store/wizard/StoreReviewStep';
 
 // API
@@ -98,14 +99,19 @@ const initialData: StoreWizardData = {
 };
 
 // Essentials is now collected before this wizard. These are the remaining setup steps.
+// `hours` is REQUIRED — the server counts business hours in store completeness,
+// so publishing fails without it. It sits before `review` so the brand cannot
+// reach the Publish button with hours outstanding.
 type WizardStep =
   | 'social'
   | 'policies'
+  | 'hours'
   | 'review';
 
 const STEP_ORDER: WizardStep[] = [
   'social',
   'policies',
+  'hours',
   'review',
 ];
 
@@ -117,6 +123,13 @@ const MAX_STORE_CONTACT_EMAIL_LEN = 254;
 const MAX_STORE_SOCIAL_HANDLE_LEN = 60;
 const MAX_STORE_WEBSITE_LEN = 200;
 const MAX_STORE_CATEGORIES = 4;
+// Stays 2 even though `hours` was inserted before `review`. This number is a
+// contract shared with `StoreEssentials` (which writes it) and
+// `resolveStoreSetupDestination` (which requires === 2 to route into this
+// wizard) — bumping it here alone would send finished-essentials brands back to
+// the essentials page. No bump is needed anyway: the old step numbers now
+// resolve to 1→social, 2→policies, 3→hours, so a draft saved at the old
+// "review" resumes on the new required step instead of skipping past it.
 const STORE_SETUP_WIZARD_VERSION = 2;
 
 const sanitizeWizardData = (data: StoreWizardData): StoreWizardData => {
@@ -577,7 +590,14 @@ const StoreCreationWizard: React.FC = () => {
 
       if (Array.isArray(missingFields) && missingFields.length > 0) {
         toast.error(`Store setup incomplete: ${missingFields.join(', ')}`);
-        navigate('/studio/store/essentials', { replace: true });
+        // `businessHours` is fixable inside this wizard. Routing it to the
+        // essentials page — which knows nothing about hours — would drop the
+        // brand somewhere that cannot resolve the error it was just shown.
+        if (missingFields.every((field) => field === 'businessHours')) {
+          setCurrentStep('hours');
+        } else {
+          navigate('/studio/store/essentials', { replace: true });
+        }
       } else {
         toast.error('Failed to publish store. Please try again.');
       }
@@ -605,6 +625,15 @@ const StoreCreationWizard: React.FC = () => {
         <StorePoliciesStep
           data={wizardData}
           onChange={handleDataChange}
+          onBack={goToPrevStep}
+          onContinue={goToNextStep}
+          isSaving={saveState === 'saving'}
+        />
+      )}
+
+      {/* Working hours (required) */}
+      {currentStep === 'hours' && (
+        <StoreHoursStep
           onBack={goToPrevStep}
           onContinue={goToNextStep}
           isSaving={saveState === 'saving'}

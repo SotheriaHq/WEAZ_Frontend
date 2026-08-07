@@ -1,17 +1,17 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
 import type { StoreWizardData } from '@/types/storeWizard';
 import MediaRenderer from '@/components/media/MediaRenderer';
-import type { StorePaymentAccountSummary } from '@/api/StoreApi';
+import { getStoreStatus, type StorePaymentAccountSummary } from '@/api/StoreApi';
 import StorePaymentAccountPanel from '@/components/store/StorePaymentAccountPanel';
 import BrandSettlementNoteFlag from '@/components/store/BrandSettlementNoteFlag';
 import { buildStorefrontUrl } from '@/utils/publicUrlBuilder';
 
 // Step type for navigation
-type WizardStep = 'social' | 'policies' | 'review';
+type WizardStep = 'social' | 'policies' | 'hours' | 'review';
 
 interface StoreReviewStepProps {
   data: StoreWizardData;
@@ -72,6 +72,29 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
   const [expandedSection, setExpandedSection] = useState<string | null>('payments');
   const [paymentAccount, setPaymentAccount] = useState<StorePaymentAccountSummary | null>(null);
   const [isCopyingPreview, setIsCopyingPreview] = useState(false);
+  // Hours live on the server, not in the wizard draft (the hours step saves them
+  // directly), so this panel has to ask rather than read `data`.
+  const [hoursComplete, setHoursComplete] = useState(false);
+  const [hoursRequired, setHoursRequired] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    void (async () => {
+      try {
+        const status = await getStoreStatus();
+        if (!mounted) return;
+        setHoursComplete(status?.businessHoursConfigured === true);
+        setHoursRequired(status?.workingHoursRequired !== false);
+      } catch {
+        // Leave the requirement showing as unmet. Publish is server-validated
+        // anyway, so an optimistic default here would only produce a button
+        // that looks enabled and then fails.
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Check if all requirements are met (minimal requirements)
   const descriptionComplete = data.description.trim().length > 0;
@@ -85,7 +108,12 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
   // Policies are optional - just need to have passed through the step
   const policiesComplete = true; // Always true - policies page visited
   const paymentAccountComplete = paymentAccount?.isReady === true;
-  const allRequirementsMet = basicComplete && paymentAccountComplete;
+  // Mirrors the server's `computeStoreCompleteness`. Publishing without hours is
+  // rejected by `POST /store/open`, so leaving them out of this gate would just
+  // move the failure to after the button press.
+  const workingHoursComplete = !hoursRequired || hoursComplete;
+  const allRequirementsMet =
+    basicComplete && paymentAccountComplete && workingHoursComplete;
 
   const toggleSection = useCallback((section: string) => {
     setExpandedSection((prev) => (prev === section ? null : section));
@@ -391,7 +419,21 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                 <ReadinessItem label="Policies set" checked={policiesComplete} />
                 <ReadinessItem label="Social links (optional)" checked={socialComplete} />
                 <ReadinessItem label="Payout account ready" checked={paymentAccountComplete} />
+                {hoursRequired ? (
+                  <ReadinessItem label="Working hours set" checked={hoursComplete} />
+                ) : null}
               </div>
+
+              {hoursRequired && !hoursComplete ? (
+                <button
+                  type="button"
+                  onClick={() => onGoToStep?.('hours')}
+                  className="mb-6 w-full rounded-xl border border-amber-300/70 bg-amber-50/80 px-4 py-3 text-left text-sm font-medium text-amber-900 transition-colors hover:bg-amber-100/80 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/15"
+                >
+                  <span aria-hidden="true">⏰</span> Set your working hours to
+                  publish →
+                </button>
+              ) : null}
 
               <div className="border-t border-gray-200 dark:border-gray-800 pt-6 space-y-4">
                 <BrandSettlementNoteFlag userId={user?.id} />

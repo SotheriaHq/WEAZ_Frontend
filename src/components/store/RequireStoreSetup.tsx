@@ -246,15 +246,24 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     return <>{children}</>;
   }
 
-  // Business Hours hard gate (option B): once working hours are REQUIRED
-  // (server flag), a brand without configured hours — including previously
-  // published ones — must set them before using Studio. Redirect to the hours
-  // settings, which lives outside this guard so there's no redirect loop. Only
-  // when we have a clean loaded status, to avoid false gating on errors. This is
-  // inert until STORE_WORKING_HOURS_REQUIRED is enabled server-side.
+  // Business Hours hard gate, for ALREADY-PUBLISHED stores only.
+  //
+  // Hours are part of `isSetupComplete` now, so an unpublished brand missing
+  // them is handled below by the normal setup redirect — the wizard collects
+  // hours as a step. A brand that published BEFORE hours were required has no
+  // such path: sending it to the wizard would bounce off `ShopSetupWizardPage`,
+  // which redirects any open store back to `/studio/store`, and this guard would
+  // send it to the wizard again — an infinite loop. Route those brands straight
+  // at the hours settings instead, which lives outside this guard.
+  //
+  // Gated on `isPublished` for the other direction too: a brand that has not
+  // started setup must land in the wizard, not in a working-hours form for a
+  // store that does not exist yet. Only acts on a cleanly loaded status so a
+  // failed request never gates anyone.
   if (
     !hadError &&
     status &&
+    status.isPublished === true &&
     status.workingHoursRequired === true &&
     status.businessHoursConfigured === false
   ) {
