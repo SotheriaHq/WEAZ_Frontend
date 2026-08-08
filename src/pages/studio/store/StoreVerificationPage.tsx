@@ -15,6 +15,13 @@ import type { VerificationInfoItem, VerificationStatusResponse } from '@/types/v
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 import { showNotice } from '@/components/ui/NoticeModal';
 
+/**
+ * Profile → Apply → Review → Active. Named so the rail, the "Step n of N"
+ * heading and the completion check cannot drift apart.
+ */
+const VERIFICATION_JOURNEY_STEPS = [1, 2, 3, 4] as const;
+const TOTAL_VERIFICATION_STEPS = VERIFICATION_JOURNEY_STEPS.length;
+
 export default function StoreVerificationPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -298,7 +305,7 @@ export default function StoreVerificationPage() {
             </h2>
           </div>
           <div className="flex flex-1 max-w-md items-center gap-4">
-            {[1, 2, 3, 4].map((step) => {
+            {VERIFICATION_JOURNEY_STEPS.map((step) => {
               const label =
                 step === 1
                   ? 'Profile'
@@ -307,8 +314,18 @@ export default function StoreVerificationPage() {
                     : step === 3
                       ? 'Review'
                       : 'Active';
-              const isDone = step < currentStep;
-              const isCurrent = step === currentStep;
+              // Step 4 (`Active`) is a TERMINAL state, not work in progress.
+              //
+              // `isDone = step < currentStep` left the final segment rendering
+              // as "current" — pale `bg-tertiary` with a pulse — on a brand
+              // whose badge was already live. So an approved brand saw a header
+              // reading "Step 4 of 4 — Badge is Active 🎉" above a rail whose
+              // last bar was visibly unfilled, and the pulse implied something
+              // was still running. The journey is finished; fill it.
+              const isFlowComplete = currentStep === TOTAL_VERIFICATION_STEPS;
+              const isDone =
+                step < currentStep || (isFlowComplete && step === currentStep);
+              const isCurrent = step === currentStep && !isDone;
               return (
                 <div key={step} className="flex flex-1 flex-col items-center gap-2">
                   <div

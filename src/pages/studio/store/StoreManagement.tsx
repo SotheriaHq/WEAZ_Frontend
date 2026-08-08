@@ -25,6 +25,7 @@ import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 import { useCachedResource } from '@/hooks/useCachedResource';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
+import VerifiedBrandBadge from '@/components/brand/VerifiedBrandBadge';
 
 export default function StoreManagement() {
   const navigate = useNavigate();
@@ -407,16 +408,42 @@ export default function StoreManagement() {
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={() => navigate('/studio/verification')}
-                className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-300"
-                aria-label="Open verification workspace"
-                title={verificationLabel}
-              >
-                <span>{verificationMarker}</span>
-                <span className="max-w-[140px] truncate">{verificationLabel}</span>
-              </button>
+              {/*
+                Once the badge is live, show THE BADGE — the same scalloped seal
+                buyers see on the storefront and catalog cards. A sky-blue pill
+                reading "✅ Seller verified" is a label ABOUT the badge, so the
+                owner's own Studio was the one surface that never showed them
+                what they had actually earned.
+
+                Before that point the pill still earns its place: it is a status
+                + call to action ("Verification in progress", "needs attention")
+                that has to be tappable to reach the workspace.
+              */}
+              {verificationBadgeVisible ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/studio/verification')}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 transition hover:bg-gray-100 dark:hover:bg-white/10"
+                  aria-label="Verified brand — open verification workspace"
+                  title="Verified brand"
+                >
+                  <VerifiedBrandBadge size={20} linkTo={null} />
+                  <span className="text-[11px] font-semibold text-on-surface">
+                    Verified
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate('/studio/verification')}
+                  className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-300"
+                  aria-label="Open verification workspace"
+                  title={verificationLabel}
+                >
+                  <span>{verificationMarker}</span>
+                  <span className="max-w-[140px] truncate">{verificationLabel}</span>
+                </button>
+              )}
 
               <div className="group relative">
                 <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
