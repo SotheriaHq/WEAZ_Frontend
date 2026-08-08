@@ -4,7 +4,6 @@ import { Navbar } from './Navbar';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
-import { useNotificationsBootstrap } from '@/hooks/useNotifications';
 import { setSidebarMode, closeSidebar, selectIsMobile } from '@/features/uiSlice';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { ISLAND_BOTTOM_NAV_CLEARANCE_CLASS } from '@/components/navigation/IslandBottomNav';
@@ -40,8 +39,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { sidebarMode, isSidebarOpen } = useSelector((state: RootState) => state.ui);
   const isMobile = useSelector(selectIsMobile);
 
-  // Mount global notifications bootstrap once.
-  useNotificationsBootstrap();
+  // Notifications bootstrap moved UP to `RootLayout` in App.tsx. It was never
+  // actually global here: StudioScaffold composes Navbar/Sidebar directly and
+  // never renders Layout, so /studio/* ran with no socket and no polling.
 
   const computedSidebarMode = useMemo(
     () => computeSidebarMode(location.pathname, isMobile),

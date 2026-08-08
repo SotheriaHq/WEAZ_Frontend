@@ -336,3 +336,51 @@ export function parseCommentHash(hash: string): string | null {
     const match = hash.match(/^#comment-(.+)$/);
     return match ? match[1] : null;
 }
+
+/**
+ * Where a click on a notification body should land, including the brand-aware
+ * overrides (studio order/message deep links) and the admin-console rewrite.
+ *
+ * Extracted from `NotificationsDropdown` so the dropdown and the full-page
+ * /notifications list cannot drift apart. Tapping the same notification has to
+ * go to the same place whether the user is on a phone or a desktop — and the
+ * brand overrides below are exactly the ones that route a content-review
+ * change-request to the screen where the brand can act on it.
+ */
+export function resolveNotificationClickRoute(
+    notification: NormalizedNotification,
+    context: { isBrand: boolean; isAdminConsoleUser: boolean },
+): string {
+    const payload = (notification.payload as Record<string, unknown> | undefined) ?? {};
+    const payloadTargetUrl = typeof payload.targetUrl === 'string' ? payload.targetUrl : null;
+    const explicitTargetUrl =
+        typeof notification.targetUrl === 'string' ? notification.targetUrl : null;
+    const exactTargetUrl = payloadTargetUrl || explicitTargetUrl;
+    const payloadOrderId = typeof payload.orderId === 'string' ? payload.orderId : null;
+    const payloadCustomOrderId =
+        typeof payload.customOrderId === 'string' ? payload.customOrderId : null;
+
+    const isOrderNotification =
+        notification.type === NotificationTypes.ORDER_PLACED ||
+        notification.type === NotificationTypes.ORDER_STATUS_UPDATED;
+    const isMessageNotification =
+        notification.type === NotificationTypes.MESSAGE_RECEIVED ||
+        notification.type === NotificationTypes.MESSAGE_UNREAD_REMINDER ||
+        notification.type === NotificationTypes.MESSAGE_THREAD_REOPENED ||
+        notification.type === NotificationTypes.MESSAGE_MODERATED;
+
+    let route: string;
+    if (exactTargetUrl) {
+        route = exactTargetUrl;
+    } else if (context.isBrand && isOrderNotification && payloadOrderId) {
+        route = `/studio?tab=orders&orderId=${encodeURIComponent(payloadOrderId)}`;
+    } else if (context.isBrand && isMessageNotification && payloadCustomOrderId) {
+        route = `/studio/messages?customOrderId=${encodeURIComponent(payloadCustomOrderId)}`;
+    } else if (context.isBrand && isMessageNotification && payloadOrderId) {
+        route = `/studio/messages?orderId=${encodeURIComponent(payloadOrderId)}`;
+    } else {
+        route = determineNotificationRoute(notification);
+    }
+
+    return context.isAdminConsoleUser && route.startsWith('/profile') ? '/admin' : route;
+}

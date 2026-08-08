@@ -17,6 +17,8 @@ import VerificationEvidenceViewer from '@/components/admin/VerificationEvidenceV
 import type {
   AdminVerificationDetails,
   VerificationDocumentItem,
+  VerificationHistoryEvent,
+  VerificationHistoryResponse,
   VerificationInfoItem,
   VerificationNote,
   VerificationReason,
@@ -203,16 +205,31 @@ export default function AdminBrandVerificationReviewPage() {
   const [isRevealNinDialogOpen, setIsRevealNinDialogOpen] = useState(false);
   const [isNinRevealed, setIsNinRevealed] = useState(false);
   const [isEvidenceViewerOpen, setIsEvidenceViewerOpen] = useState(false);
+  const [history, setHistory] = useState<VerificationHistoryResponse | null>(null);
   const currentAdminId = useSelector((state: RootState) => state.user.profile?.id) ?? null;
 
   const load = useCallback(async () => {
     if (!id) return;
 
-    const [detailsResponse, reasonsResponse, notesResponse] = await Promise.all([
-      adminBrandsApi.getVerificationDetails(id),
-      adminBrandsApi.getVerificationRejectionReasons(),
-      adminBrandsApi.getVerificationNotes(id),
-    ]);
+    const [detailsResponse, reasonsResponse, notesResponse, historyResponse] =
+      await Promise.all([
+        adminBrandsApi.getVerificationDetails(id),
+        adminBrandsApi.getVerificationRejectionReasons(),
+        adminBrandsApi.getVerificationNotes(id),
+        // Never block the review on the audit trail: it is context, not a
+        // prerequisite for approving or rejecting.
+        adminBrandsApi
+          .getVerificationHistory(id)
+          .catch(() => null),
+      ]);
+
+    setHistory(
+      historyResponse
+        ? unwrapApiResponse<VerificationHistoryResponse>(
+            historyResponse.data as never,
+          )
+        : null,
+    );
 
     const nextDetails = unwrapApiResponse<AdminVerificationDetails>(
       detailsResponse.data as never,
@@ -1058,6 +1075,95 @@ export default function AdminBrandVerificationReviewPage() {
                 is needed from you.
               </p>
             ) : null}
+          </section>
+
+          {/*
+            Information-request history. The review screen previously showed
+            only the CURRENT open request, because `requestInfo` overwrites
+            those columns and a resubmission clears them — so once a brand
+            replied there was no record left of what had been asked, by whom,
+            or how many times. This reads the append-only trail instead.
+          */}
+          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
+                Request history
+              </p>
+              {history ? (
+                <span className="text-xs text-gray-500">
+                  {history.totalInfoRequests} request
+                  {history.totalInfoRequests === 1 ? '' : 's'} ·{' '}
+                  {history.totalSubmissions} submission
+                  {history.totalSubmissions === 1 ? '' : 's'}
+                </span>
+              ) : null}
+            </div>
+
+            {!history ? (
+              <p className="mt-4 text-sm text-gray-500">
+                History is unavailable right now.
+              </p>
+            ) : history.events.length === 0 ? (
+              <p className="mt-4 text-sm text-gray-500">
+                No information requests have been raised on this brand.
+              </p>
+            ) : (
+              <ol className="mt-4 space-y-3">
+                {history.events.map((event: VerificationHistoryEvent) => (
+                  <li
+                    key={`${event.kind}-${event.id}`}
+                    className={`rounded-xl px-3 py-2.5 text-sm ring-1 ${
+                      event.kind === 'INFO_REQUESTED'
+                        ? 'bg-amber-50 text-amber-900 ring-amber-100'
+                        : 'bg-gray-50 text-gray-700 ring-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="font-semibold">
+                        {event.kind === 'INFO_REQUESTED'
+                          ? `📌 Info requested${
+                              event.actor ? ` by ${event.actor.name}` : ''
+                            }`
+                          : `📤 Submission #${event.attemptNumber}`}
+                      </span>
+                      <span className="shrink-0 text-xs text-gray-500">
+                        {new Date(event.at).toLocaleString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+
+                    {event.kind === 'INFO_REQUESTED' ? (
+                      <>
+                        {event.items.length > 0 ? (
+                          <ul className="mt-1.5 list-disc pl-5 text-xs leading-relaxed">
+                            {event.items.map((item: string) => (
+                              <li key={item}>{String(item).replace(/_/g, ' ')}</li>
+                            ))}
+                          </ul>
+                        ) : null}
+                        {event.message ? (
+                          <p className="mt-1.5 text-xs italic leading-relaxed">
+                            “{event.message}”
+                          </p>
+                        ) : null}
+                      </>
+                    ) : event.respondedToItems.length > 0 ? (
+                      <p className="mt-1.5 text-xs leading-relaxed text-gray-600">
+                        Answering:{' '}
+                        {event.respondedToItems
+                          .map((item: string) => String(item).replace(/_/g, ' '))
+                          .join(', ')}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            )}
           </section>
 
           <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100">

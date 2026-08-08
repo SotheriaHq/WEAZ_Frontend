@@ -188,6 +188,40 @@ export interface VerificationNote {
   createdAt: string;
 }
 
+/**
+ * One entry in the verification audit trail: either an admin asking for more
+ * information, or the brand filing a submission.
+ *
+ * Reconstructed server-side from the admin audit log (requests) and the attempt
+ * rows (submissions), because the live `infoRequested*` columns are overwritten
+ * by each new request and cleared the moment the brand replies.
+ */
+export type VerificationHistoryEvent =
+  | {
+      id: string;
+      kind: 'INFO_REQUESTED';
+      at: string;
+      items: string[];
+      message: string | null;
+      actor: { id: string; name: string } | null;
+    }
+  | {
+      id: string;
+      kind: 'BRAND_SUBMITTED';
+      at: string;
+      attemptNumber: number;
+      status: VerificationStatusValue;
+      /** What this particular submission was answering, if anything. */
+      respondedToItems: string[];
+      respondedToMessage: string | null;
+    };
+
+export interface VerificationHistoryResponse {
+  events: VerificationHistoryEvent[];
+  totalInfoRequests: number;
+  totalSubmissions: number;
+}
+
 export interface VerificationQueueItem {
   id: string;
   name: string;
@@ -197,6 +231,17 @@ export interface VerificationQueueItem {
   verificationSubmittedAt?: string | null;
   verificationAttemptNumber?: number;
   verificationReviewedById?: string | null;
+  verificationInfoRequestedAt?: string | null;
+  verificationInfoRespondedAt?: string | null;
+  /**
+   * The brand has answered an information request and no reviewer has acted on
+   * the answer yet. Derived server-side so every client agrees.
+   *
+   * Without it a resubmission just puts the row back to IN_REVIEW, which looks
+   * identical to every other in-review brand — the reviewer who asked for the
+   * change had nothing on the table telling them it had arrived.
+   */
+  hasUnreviewedInfoResponse?: boolean;
   owner?: {
     id: string;
     email: string;

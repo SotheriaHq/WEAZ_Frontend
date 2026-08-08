@@ -66,6 +66,7 @@ import type {
 } from '../types/admin';
 import type {
   AdminVerificationDetails,
+  VerificationHistoryResponse,
   VerificationNote,
   VerificationQueueResponse,
   VerificationReason,
@@ -296,6 +297,17 @@ export const adminBrandsApi = {
     apiClient.get<{ notes: VerificationNote[] }>(`/admin/brands/${id}/verification/notes`),
   addVerificationNote: (id: string, text: string) =>
     apiClient.post<VerificationNote>(`/admin/brands/${id}/verification/notes`, { text }),
+  /**
+   * Audit trail of every information request sent on this verification and
+   * every submission the brand filed in response. The live `infoRequested*`
+   * columns only ever hold the most recent OPEN request — they are overwritten
+   * by the next request and cleared when the brand replies — so this is the
+   * only place the full back-and-forth can be read.
+   */
+  getVerificationHistory: (id: string) =>
+    apiClient.get<VerificationHistoryResponse>(
+      `/admin/brands/${id}/verification/history`,
+    ),
 };
 
 // ── Products ──

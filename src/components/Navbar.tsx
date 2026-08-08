@@ -278,6 +278,33 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
             </DropdownItem>
           ) : null}
 
+          {/*
+            Notifications belongs in this menu in BOTH contexts.
+
+            In Studio (`profileMenuContext="studio"`) and on the Catalogue this
+            menu is the only account surface a brand sees, and it had no
+            notifications entry — so a brand working through their catalogue or
+            studio had no indication that an admin had asked for changes. The
+            count is the live Redux value, the same one the bell badge reads, so
+            the two can never disagree.
+          */}
+          <DropdownItem
+            leftIcon="🔔"
+            meta={
+              unreadCount > 0 ? (
+                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              ) : null
+            }
+            onClick={() => {
+              navigate('/notifications');
+              setShowProfileMenu(false);
+            }}
+          >
+            Notifications
+          </DropdownItem>
+
           <DropdownItem
             leftIcon="👤"
             onClick={() => {
@@ -503,6 +530,17 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
 
           {user ? (
             <div className="relative">
+              {/*
+                The bell is visible at EVERY width, unlike the wishlist and bag
+                buttons above it. Those two have a mobile home elsewhere;
+                notifications had none. The bell was `hidden sm:flex`, the island
+                dock has no entry, the profile menu had no entry, and there is no
+                /notifications route — so below 640px a user could not reach
+                their notifications by ANY path. That is why an admin's
+                change-request on a submitted product never surfaced to the brand
+                on a phone: the notification was created and pushed correctly,
+                there was simply nothing on screen able to show it.
+              */}
               <button
                 ref={notificationsButtonRef}
                 type="button"
@@ -511,8 +549,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
                   setShowLanguageDropdown(false);
                   setShowNotificationsDropdown((value) => !value);
                 }}
-                className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)] sm:flex"
-                aria-label="Notifications"
+                className="relative flex h-10 w-10 items-center justify-center rounded-xl text-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)]"
+                aria-label={
+                  unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
+                }
                 aria-expanded={showNotificationsDropdown}
               >
                 <span aria-hidden="true" className="text-xl">🔔</span>

@@ -46,6 +46,7 @@ import { setViewportWidth } from '@/features/uiSlice';
 import RequireAdmin from './components/admin/RequireAdmin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { useNotificationsBootstrap } from '@/hooks/useNotifications';
 import { ThemeBackendSync } from '@/components/theme/ThemeBackendSync';
 import { useVerificationStateSync } from '@/hooks/useVerificationStateSync';
 import ScrollRestoreProvider from '@/components/ScrollRestoreProvider';
@@ -85,6 +86,7 @@ const BrandStaffPage = lazy(() => import('./pages/studio/BrandStaffPage'));
 const BrandStaffInvitePage = lazy(() => import('./pages/studio/BrandStaffInvitePage'));
 const MyOrders = lazy(() => import('./pages/orders/MyOrders'));
 const MyReviewsPage = lazy(() => import('./pages/account/MyReviewsPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const OrderDetail = lazy(() => import('./pages/orders/OrderDetail'));
 const CheckoutPage = lazy(() => import('./pages/checkout/CheckoutPage'));
 const CustomOrderComposerPage = lazy(() => import('./pages/custom-orders/CustomOrderComposerPage'));
@@ -296,6 +298,21 @@ const RootLayout: React.FC = () => {
   const location = useLocation();
   const embeddedSurface = useEmbeddedSurface();
   const isEmbeddedMobile = embeddedSurface === 'mobile-app';
+
+  // The ONE notification bootstrap for the whole app.
+  //
+  // This used to live in `Layout` (labelled "mount global notifications
+  // bootstrap once") and again in `AdminScaffold` — but `StudioScaffold` does
+  // not render `Layout`, it composes `Navbar`/`Sidebar` directly. So for the
+  // entire time a brand was inside /studio/* there was NO socket subscription,
+  // no unread fetch and no polling fallback: an admin could request changes on
+  // a product and the brand sat in Studio seeing nothing, with the bell badge
+  // frozen at whatever it was when they entered (0 on a direct load).
+  //
+  // Mounting it at the root instead of per-shell is what makes "every
+  // authenticated surface receives notifications" true by construction rather
+  // than by remembering to add a line to each new shell.
+  useNotificationsBootstrap();
   const [showRouteIntentProgress, setShowRouteIntentProgress] = useState(false);
   const routeIntentTimeoutRef = useRef<number | null>(null);
 
@@ -825,6 +842,10 @@ const router = createBrowserRouter([
           { path: '/bag/payment-return', element: <Layout><PaymentReturnPage /></Layout> },
           { path: '/bag/confirmation', element: <Layout><OrderConfirmation /></Layout> },
           { path: '/orders', element: <Layout><MyOrders /></Layout> },
+          // Declared in seoPaths.ts long before it existed. Until now the bell
+          // dropdown was the only way to read a notification, and it is hidden
+          // below 640px — so this is the reachable surface on a phone.
+          { path: '/notifications', element: <Layout>{withRouteFallback(<NotificationsPage />)}</Layout> },
           { path: '/account/reviews', element: <Layout><MyReviewsPage /></Layout> },
           { path: '/messages', element: <Layout><MessagingManagementPage /></Layout> },
           {

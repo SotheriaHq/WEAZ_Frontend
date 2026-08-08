@@ -403,6 +403,14 @@ const InReviewPanel: React.FC = () => {
                         >
                           {formatAttemptLabel(item.verificationAttemptNumber ?? 1)}
                         </span>
+                        {item.hasUnreviewedInfoResponse ? (
+                          <span
+                            className="ml-1.5 whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200"
+                            title="This brand has answered the information request and is waiting on a decision"
+                          >
+                            ↩︎ Responded
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
                         {item.verificationSubmittedAt
@@ -482,7 +490,14 @@ const InReviewPanel: React.FC = () => {
                   </div>
 
                   <div className="flex items-center justify-between border-t border-b border-gray-100 py-2 text-xs text-gray-500 dark:border-white/5 dark:text-gray-400">
-                    <span>{formatAttemptLabel(item.verificationAttemptNumber ?? 1)}</span>
+                    <span>
+                      {formatAttemptLabel(item.verificationAttemptNumber ?? 1)}
+                      {item.hasUnreviewedInfoResponse ? (
+                        <span className="ml-1 font-semibold text-emerald-700 dark:text-emerald-300">
+                          · responded
+                        </span>
+                      ) : null}
+                    </span>
                     <span className="font-mono text-purple-600 dark:text-purple-400">{brandUid}</span>
                     <span>{isClaimed ? 'Claimed' : 'Unclaimed'}</span>
                   </div>
