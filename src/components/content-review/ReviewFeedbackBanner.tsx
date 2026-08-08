@@ -49,11 +49,21 @@ interface ReviewFeedbackBannerProps {
 /**
  * Reviewer-feedback banner for content edit screens.
  *
- * Authoritative by design: renders ONLY when the content's LATEST review
- * cycle is CHANGES_REQUESTED (fetched server-side), never from a URL flag —
- * stale or shared links cannot show the banner on approved content.
+ * Authoritative by design: driven entirely by the server-side review history,
+ * never by a URL flag — stale or shared links cannot fabricate feedback.
  *
- * Multiple review cycles on the same content are preserved: the latest
+ * Renders once the content has EVER had a changes-requested cycle, in one of
+ * two tones:
+ *  - outstanding (amber) — the current state is CHANGES_REQUESTED, act on it;
+ *  - answered (muted)    — the owner has resubmitted, kept visible for
+ *                          reference.
+ *
+ * The second case exists because the gate used to be "current state is
+ * CHANGES_REQUESTED or render nothing", which erased the request the moment it
+ * was answered: the owner held a notification saying changes were needed and
+ * the page showed nothing about what they were.
+ *
+ * Multiple review cycles on the same content are preserved: the relevant
  * request is shown prominently and the full timeline (every submit /
  * changes-requested / approval with its notes) expands below it.
  */
@@ -100,34 +110,67 @@ export default function ReviewFeedbackBanner({
     [cycles],
   );
 
-  // Authoritative gate: only content whose CURRENT review state is
-  // changes-requested shows the banner.
-  if (!latest || latest.status !== 'CHANGES_REQUESTED') return null;
+  // The most recent request the review team actually made, whatever the
+  // CURRENT state is.
+  const lastChangeRequest = useMemo(
+    () => (cycles ?? []).find((cycle) => cycle.status === 'CHANGES_REQUESTED') ?? null,
+    [cycles],
+  );
+
+  // Two states, not one.
+  //
+  // The gate used to be `latest.status !== 'CHANGES_REQUESTED' -> render
+  // nothing`, so the instant an owner resubmitted, the request they were
+  // answering vanished from the screen. They were left editing content with a
+  // notification saying changes were needed and nothing on the page saying
+  // WHAT. Once there has been a request, it stays visible — active while it is
+  // outstanding, muted and past-tense once it has been answered.
+  if (!latest || !lastChangeRequest) return null;
+  const isOutstanding = latest.status === 'CHANGES_REQUESTED';
+  const shown = isOutstanding ? latest : lastChangeRequest;
 
   const latestFeedback =
-    [latest.reasonLabel, latest.reasonNote].filter(Boolean).join(' — ') ||
+    [shown.reasonLabel, shown.reasonNote].filter(Boolean).join(' — ') ||
     fallbackNote?.trim() ||
-    'Review the feedback in your notification, make the updates below, and save — it goes back into review automatically.';
+    (isOutstanding
+      ? 'Review the feedback in your notification, make the updates below, and save — it goes back into review automatically.'
+      : 'No note was attached to that request.');
+
+  const tone = isOutstanding
+    ? 'border-amber-300 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10'
+    : 'border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/5';
 
   return (
-    <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+    <div className={`mb-4 rounded-2xl border p-4 ${tone}`}>
       <div className="flex items-start gap-3">
-        <span className="text-xl" aria-hidden="true">🛠️</span>
+        <span className="text-xl" aria-hidden="true">
+          {isOutstanding ? '🛠️' : '🗒️'}
+        </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
-              Changes requested by the review team
+            <p
+              className={`text-sm font-bold ${
+                isOutstanding
+                  ? 'text-amber-800 dark:text-amber-200'
+                  : 'text-gray-700 dark:text-gray-200'
+              }`}
+            >
+              {isOutstanding
+                ? 'Changes requested by the review team'
+                : latest.status === 'IN_REVIEW'
+                  ? 'You answered this request — back with the review team'
+                  : 'Previously requested by the review team'}
             </p>
             {changeRequestCount > 1 ? (
               <span className="rounded-full border border-amber-400/60 bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-500/20 dark:text-amber-100">
                 request #{changeRequestCount}
               </span>
             ) : null}
-            <span className="text-[11px] font-medium text-amber-700/80 dark:text-amber-200/70">
-              {formatWhen(latest.reviewedAt ?? latest.submittedAt)}
+            <span className={`text-[11px] font-medium ${isOutstanding ? 'text-amber-700/80 dark:text-amber-200/70' : 'text-gray-500 dark:text-gray-400'}`}>
+              {formatWhen(shown.reviewedAt ?? shown.submittedAt)}
             </span>
           </div>
-          <p className="mt-1 text-sm leading-6 text-amber-800/90 dark:text-amber-100/90">
+          <p className={`mt-1 text-sm leading-6 ${isOutstanding ? 'text-amber-800/90 dark:text-amber-100/90' : 'text-gray-600 dark:text-gray-300'}`}>
             {latestFeedback}
           </p>
 
@@ -136,7 +179,7 @@ export default function ReviewFeedbackBanner({
               <button
                 type="button"
                 onClick={() => setShowHistory((value) => !value)}
-                className="text-xs font-semibold text-amber-800 underline underline-offset-2 hover:opacity-80 dark:text-amber-200"
+                className={`text-xs font-semibold underline underline-offset-2 hover:opacity-80 ${isOutstanding ? 'text-amber-800 dark:text-amber-200' : 'text-gray-600 dark:text-gray-300'}`}
               >
                 {showHistory ? 'Hide review history' : `Review history (${history.length})`}
               </button>

@@ -23,6 +23,10 @@ import type {
   VerificationNote,
   VerificationReason,
 } from '@/types/verification';
+import {
+  verificationInfoItemLabel,
+  verificationInfoItemMessage,
+} from '@/types/verification';
 
 const REQUEST_FIELD_OPTIONS = [
   { value: 'cacNumber', label: 'CAC number' },
@@ -1141,9 +1145,22 @@ export default function AdminBrandVerificationReviewPage() {
                       <>
                         {event.items.length > 0 ? (
                           <ul className="mt-1.5 list-disc pl-5 text-xs leading-relaxed">
-                            {event.items.map((item: string) => (
-                              <li key={item}>{String(item).replace(/_/g, ' ')}</li>
-                            ))}
+                            {event.items.map((item, itemIndex) => {
+                              // Items are `{ field, label, message? }` objects.
+                              // Rendering them straight printed "[object Object]".
+                              const label = verificationInfoItemLabel(item);
+                              const note = verificationInfoItemMessage(item);
+                              return (
+                                <li key={`${label}-${itemIndex}`}>
+                                  {label}
+                                  {note ? (
+                                    <span className="block italic text-amber-800/80">
+                                      {note}
+                                    </span>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
                           </ul>
                         ) : null}
                         {event.message ? (
@@ -1156,7 +1173,7 @@ export default function AdminBrandVerificationReviewPage() {
                       <p className="mt-1.5 text-xs leading-relaxed text-gray-600">
                         Answering:{' '}
                         {event.respondedToItems
-                          .map((item: string) => String(item).replace(/_/g, ' '))
+                          .map((item) => verificationInfoItemLabel(item))
                           .join(', ')}
                       </p>
                     ) : null}

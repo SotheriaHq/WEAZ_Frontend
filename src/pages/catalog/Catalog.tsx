@@ -1291,6 +1291,16 @@ const ProfilePage: React.FC = () => {
       handleEditCollection(id);
       return;
     }
+    // In Review / Changes Requested / Rejected behave like Drafts: they are
+    // unfinished work the owner came here to ACT on, not published content to
+    // browse. They used to open the read-only viewer, which is a dead end —
+    // the owner had to find the edit route themselves after being told changes
+    // were needed. The edit screen already renders `ReviewFeedbackBanner`, so
+    // routing here is also what surfaces the reviewer's actual request.
+    if (REVIEW_VISIBILITY_STATUS[visibilityFilter]) {
+      handleEditCollection(id);
+      return;
+    }
     if (visibilityFilter === 'Deleted') return;
     setSelectedCollectionId(id);
     setSearchParams((prev) => {

@@ -201,7 +201,13 @@ export type VerificationHistoryEvent =
       id: string;
       kind: 'INFO_REQUESTED';
       at: string;
-      items: string[];
+      /**
+       * `VerificationInfoItem` objects — `{ field, label, message? }` — NOT
+       * strings. Rendering them directly produced "[object Object]" in the
+       * request history. Older audit rows may hold bare strings, so read them
+       * through `verificationInfoItemLabel`.
+       */
+      items: Array<VerificationInfoItem | string>;
       message: string | null;
       actor: { id: string; name: string } | null;
     }
@@ -212,9 +218,26 @@ export type VerificationHistoryEvent =
       attemptNumber: number;
       status: VerificationStatusValue;
       /** What this particular submission was answering, if anything. */
-      respondedToItems: string[];
+      respondedToItems: Array<VerificationInfoItem | string>;
       respondedToMessage: string | null;
     };
+
+/**
+ * Display label for one requested item, tolerating both the object form the
+ * admin console sends and any bare-string rows already in the audit log.
+ */
+export const verificationInfoItemLabel = (
+  item: VerificationInfoItem | string,
+): string => {
+  if (typeof item === 'string') return item.replace(/_/g, ' ');
+  return (item.label || item.field || '').replace(/_/g, ' ');
+};
+
+/** The reviewer's per-item note, when they attached one. */
+export const verificationInfoItemMessage = (
+  item: VerificationInfoItem | string,
+): string | null =>
+  typeof item === 'string' ? null : item.message?.trim() || null;
 
 export interface VerificationHistoryResponse {
   events: VerificationHistoryEvent[];

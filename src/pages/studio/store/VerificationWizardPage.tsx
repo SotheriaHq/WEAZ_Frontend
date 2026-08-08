@@ -42,6 +42,7 @@ import type {
 } from '@/types/verification';
 import { setUser } from '@/features/userSlice';
 import Modal from '@/components/ui/Modal';
+import VerificationStepRail from '@/components/studio/verification/VerificationStepRail';
 import {
   isEmptyPhone,
   isValidPhone,
@@ -689,12 +690,22 @@ export default function VerificationWizardPage() {
             >
               ←
             </button>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-highest text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider shrink-0">
+            {/*
+              Hidden under `lg`: the sticky step rail below already says
+              "Identity · Step 1/5 · 13%", and repeating it here cost a whole
+              row on a 360px screen.
+            */}
+            <div className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-highest text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
               Step {stepIndex + 1} of {VERIFICATION_STEPS.length} — {step.title}
             </div>
+            <div className="min-w-0 sm:hidden">
+              <h1 className="truncate text-base font-bold tracking-tight text-on-surface leading-tight">
+                Guided Seller Verification
+              </h1>
+            </div>
           </div>
-          <div>
+          <div className="hidden sm:block">
             <h1 className="text-base sm:text-lg font-bold tracking-tight text-on-surface leading-tight">Guided Seller Verification</h1>
             <p className="text-xs text-on-surface-variant truncate max-w-xl">
               {step.summary}. Matches official legal documents.
@@ -702,7 +713,8 @@ export default function VerificationWizardPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0 self-end lg:self-center">
+        {/* Completion + status share one row on phones instead of stacking. */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 self-start lg:self-center">
           <div className="flex items-center gap-2 bg-surface-container-low px-3 py-1 rounded-lg border border-outline-variant/20">
             <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Completion</span>
             <span className="text-xs font-bold text-primary tabular-nums">{completionStats.percent}% ({completionStats.completedCount}/{completionStats.totalCount})</span>
@@ -781,8 +793,30 @@ export default function VerificationWizardPage() {
 
       {!wizardLockMessage ? (
         <div className="flex flex-col lg:flex-row gap-6 w-full items-start flex-1 min-h-0">
-          {/* Left Sidebar: Stepper Path */}
-          <aside className="w-full lg:w-64 shrink-0 lg:sticky lg:top-24">
+          {/*
+            Compact step rail, phones and tablets only. The sidebar below is the
+            right shape beside the form at `lg`, but under it the same markup
+            went full width and stacked all five steps WITH their descriptions —
+            a whole screen of chrome before the first input. The rail is sticky,
+            so it also keeps the position visible while the form scrolls, which
+            the stacked list never did.
+          */}
+          <VerificationStepRail
+            className="lg:hidden"
+            steps={VERIFICATION_STEPS}
+            currentIndex={stepIndex}
+            completionPercent={completionStats.percent}
+            onSelect={(index) => {
+              if (index <= stepIndex) {
+                setStepIndex(index);
+                return;
+              }
+              void goToStep(index);
+            }}
+          />
+
+          {/* Left Sidebar: Stepper Path (desktop) */}
+          <aside className="hidden lg:block w-full lg:w-64 shrink-0 lg:sticky lg:top-24">
             <div className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant/30 shadow-[0_4px_20px_rgba(0,0,0,0.02)] relative overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-full pointer-events-none"></div>
               <h3 className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-5">Verification Path</h3>
