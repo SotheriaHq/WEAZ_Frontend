@@ -6,6 +6,7 @@ import userReducer from '@/features/userSlice';
 import type { AuthUserDto } from '@/types/auth';
 import {
   invalidateStoreSetupStatusCache,
+  primeStoreSetupStatusCache,
   useStoreSetupStatus,
 } from '@/hooks/useStoreSetupStatus';
 
@@ -105,6 +106,35 @@ describe('useStoreSetupStatus', () => {
       data: undefined,
       error: new Error('Network Error'),
     });
+    expect(renderHookValue()).toBe('false');
+  });
+
+  it('lets a prime override query data that was fetched before it', () => {
+    // Publishing a store primes this to `true`. The status response already in
+    // React Query was fetched moments earlier, while setup really was
+    // incomplete — it is stale, not authoritative. Reading it first made
+    // `primeStoreSetupStatusCache` dead code and left a live store with every
+    // studio nav item except Store disabled.
+    useStoreStatusQuery.mockReturnValue({
+      data: { isSetupComplete: false },
+      error: null,
+      dataUpdatedAt: 1_000,
+    });
+    primeStoreSetupStatusCache(true);
+
+    expect(renderHookValue()).toBe('true');
+  });
+
+  it('still prefers query data that is newer than the prime', () => {
+    // The override must be strictly time-based, or a stale prime would outlive
+    // a genuine server verdict — e.g. an admin unpublishing the store.
+    primeStoreSetupStatusCache(true);
+    useStoreStatusQuery.mockReturnValue({
+      data: { isSetupComplete: false },
+      error: null,
+      dataUpdatedAt: Date.now() + 10_000,
+    });
+
     expect(renderHookValue()).toBe('false');
   });
 

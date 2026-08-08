@@ -36,6 +36,10 @@ import {
   saveStoreProgressLocally,
 } from '@/utils/storeSetup';
 import { primeStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
+import { invalidateRequireStoreSetupCache } from '@/components/store/RequireStoreSetup';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/query/queryKeys';
+import type { StoreStatusResponse } from '@/api/StoreApi';
 import {
   sanitizeCustomOrderLeadTime,
   sanitizeResponseTimeSla,
@@ -195,6 +199,7 @@ const StoreCreationWizard: React.FC = () => {
   const [wizardData, setWizardData] = useState<StoreWizardData>(initialData);
   const [hasLiveStore, setHasLiveStore] = useState<boolean>(false);
   const [saveState, setSaveState] = useState<WizardSaveState>('idle');
+  const queryClient = useQueryClient();
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   
   // Refs for autosave
@@ -573,7 +578,34 @@ const StoreCreationWizard: React.FC = () => {
         LEGAL_STORE_PUBLISH_DOCUMENT_KEYS,
       );
       await openStore({ legalAcceptances });
+
+      // Publishing changes the answer to "is this store set up?", and TWO
+      // separate caches hold that answer. Priming only the module cache was not
+      // enough: `useStoreSetupStatus` reads `statusQuery.data` FIRST, so the
+      // stale React Query entry — fetched moments earlier, while setup really
+      // was incomplete — outranked the prime and kept winning. That single
+      // stale `false` is what left a live store with every studio link but
+      // Store disabled, and what kept the "Finish setting up your store" nudge
+      // on the catalog after publishing.
+      //
+      // Write the known-good state through first so nothing observes a stale
+      // `false`, then invalidate to reconcile with the server.
       primeStoreSetupStatusCache(true);
+      invalidateRequireStoreSetupCache();
+      queryClient.setQueryData<StoreStatusResponse | undefined>(
+        queryKeys.store.status(),
+        (previous) =>
+          previous
+            ? {
+                ...previous,
+                isSetupComplete: true,
+                isPublished: true,
+                isStoreOpen: true,
+                missingFields: [],
+              }
+            : previous,
+      );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.store.status() });
       markStoreOpenPending(user?.id);
       
       // Clear the localStorage draft since setup is complete
@@ -617,7 +649,7 @@ const StoreCreationWizard: React.FC = () => {
       }
       setSaveState('error');
     }
-  }, [persistProgress, navigate, user?.id]);
+  }, [persistProgress, navigate, user?.id, queryClient]);
 
   // --- RENDER ---
   return (

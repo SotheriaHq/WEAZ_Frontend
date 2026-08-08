@@ -1,7 +1,11 @@
+// `/max` metadata: the default import validates LENGTH only, so obviously wrong
+// numbers (e.g. a 14-digit "Nigerian" number against the 10-digit NSN) passed
+// `.isValid()`. These values reach checkout contact details and payout records,
+// so strict digit validation is worth the extra metadata.
 import {
   parsePhoneNumberFromString,
   type CountryCode,
-} from 'libphonenumber-js';
+} from 'libphonenumber-js/max';
 
 /**
  * Canonical phone validation + E.164 normalization (libphonenumber-js).

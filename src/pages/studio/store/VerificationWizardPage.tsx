@@ -25,6 +25,9 @@ import {
   verificationStatusTone,
 } from '@/components/studio/verification/verificationShared';
 import Button from '@/components/ui/Button';
+import PhoneNumberField from '@/components/forms/PhoneNumberField';
+import { resolveCountryIso2 } from '@/data/countryRegions';
+import type { CountryCode } from 'libphonenumber-js';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
@@ -33,6 +36,7 @@ import { brandApi } from '@/api/BrandApi';
 import type { RootState } from '@/store';
 import type {
   VerificationDraftData,
+  VerificationDraftResponse,
   VerificationLetterResponse,
   VerificationStatusResponse,
 } from '@/types/verification';
@@ -44,7 +48,6 @@ import {
   normalizePhoneToE164,
   PHONE_INVALID_MESSAGE,
   PHONE_REQUIRED_MESSAGE,
-  sanitizePhoneInput,
 } from '@/utils/phoneNumber';
 
 const DOCUMENT_UPLOADS = [
@@ -95,6 +98,8 @@ export default function VerificationWizardPage() {
   const [stepIndex, setStepIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [hasDraft, setHasDraft] = useState(false);
+  const [draftSource, setDraftSource] =
+    useState<VerificationDraftResponse['source']>(undefined);
   const [savingDraft, setSavingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [signing, setSigning] = useState(false);
@@ -156,6 +161,19 @@ export default function VerificationWizardPage() {
     return uploadPreviewUrls[fieldKey] || localObjectUrls[fieldKey];
   };
 
+  const verificationPhoneCountry = useMemo<CountryCode>(() => {
+    const iso2 = resolveCountryIso2(form.businessAddress?.country);
+    return (iso2 as CountryCode) || 'NG';
+  }, [form.businessAddress?.country]);
+
+  const infoRequestedItems = useMemo(
+    () =>
+      status?.verificationStatus === 'ADDITIONAL_INFO_REQUESTED'
+        ? (status.infoRequestedItems ?? [])
+        : [],
+    [status],
+  );
+
   const wizardLockMessage = useMemo(() => {
     if (!status) return null;
     if (status.verificationStatus === 'ADDITIONAL_INFO_REQUESTED') return null;
@@ -194,6 +212,7 @@ export default function VerificationWizardPage() {
         if (!active) return;
         setStatus(statusData);
         setLetter(letterData);
+        setDraftSource(draftData.source);
         if (draftData.draftData) {
           setForm((current) => mergeDraftIntoForm(current, draftData.draftData!));
         }
@@ -713,6 +732,53 @@ export default function VerificationWizardPage() {
         </section>
       ) : null}
 
+      {/*
+        Everything the owner needs to act on, on the screen where they act.
+        "Continue with corrections" used to drop them into the wizard with no
+        record of what was asked — that lived only on the status page they just
+        left — so they were re-filing blind.
+      */}
+      {!wizardLockMessage && infoRequestedItems.length > 0 ? (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm shrink-0 dark:border-amber-500/30 dark:bg-amber-500/10">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-800 dark:text-amber-200">
+            📌 WIEZ asked for updates
+          </p>
+          {status?.infoRequestMessage ? (
+            <p className="mt-1.5 text-xs leading-relaxed text-amber-900 dark:text-amber-100">
+              {status.infoRequestMessage}
+            </p>
+          ) : null}
+          <ul className="mt-2.5 space-y-1.5">
+            {infoRequestedItems.map((item) => (
+              <li
+                key={item.field || item.label}
+                className="text-xs leading-relaxed text-amber-900 dark:text-amber-100"
+              >
+                <span className="font-semibold">{item.label}</span>
+                {item.message ? ` — ${item.message}` : null}
+              </li>
+            ))}
+          </ul>
+          {draftSource === 'LAST_ATTEMPT' ? (
+            <p className="mt-3 text-[11px] leading-relaxed text-amber-800 dark:text-amber-200">
+              Your previous answers and documents are already filled in below.
+              Change only what is listed here, then resubmit.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
+      {!wizardLockMessage &&
+      infoRequestedItems.length === 0 &&
+      draftSource === 'LAST_ATTEMPT' ? (
+        <section className="rounded-xl border border-outline-variant/30 bg-surface-container-low p-4 shadow-sm shrink-0">
+          <p className="text-xs leading-relaxed text-on-surface-variant">
+            ℹ️ Prefilled from your last submission. Review every step, update
+            what changed, and resubmit.
+          </p>
+        </section>
+      ) : null}
+
       {!wizardLockMessage ? (
         <div className="flex flex-col lg:flex-row gap-6 w-full items-start flex-1 min-h-0">
           {/* Left Sidebar: Stepper Path */}
@@ -856,17 +922,15 @@ export default function VerificationWizardPage() {
                           </option>
                         ))}
                       </Select>
-                      <Input
-                        label="Phone Number *"
-                        placeholder="080XXXXXXXX or +234..."
+                      <PhoneNumberField
+                        label="Phone Number"
                         required
                         value={form.ownerPhoneNumber ?? ''}
-                        onChange={(event) =>
-                          setField(
-                            'ownerPhoneNumber',
-                            sanitizePhoneInput(event.target.value),
-                          )
-                        }
+                        onChange={(next) => setField('ownerPhoneNumber', next)}
+                        // Dial code follows the business address country, which
+                        // is locked to the brand's registered country.
+                        defaultCountry={verificationPhoneCountry}
+                        menuLayer="dropdown"
                         helperText="Syncs with your profile; used for verification notifications."
                       />
                       <Input

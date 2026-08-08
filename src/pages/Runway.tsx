@@ -1083,11 +1083,31 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
         }) && fallbackProducts.length > 0
       );
 
+    const showFallback =
+      runwayReelsItems.length === 0 &&
+      shouldLoadProductFallback({
+        mode,
+        selectedCategory,
+        designItemCount: filteredItems.length,
+      }) &&
+      fallbackProducts.length > 0;
+
+    // Black belongs to the MEDIA, not to the route. The stage was
+    // unconditionally `bg-black`, but the empty/error/fallback branches paint a
+    // theme surface on top of it — so on a light theme the user got light
+    // panels, a light category header and a light island bar sitting on a black
+    // stage, with black showing through every gap. Reels stay black because
+    // photos and video need a neutral ground; everything else follows the theme
+    // like the rest of the app.
+    const showsReels = !showError && !showEmpty && !showFallback;
+
     return (
       <div className="relative">
         {/* Full-bleed stage — see the pinned-mode stage above. */}
         <div
-          className="fixed inset-x-0 top-0 z-10 bg-black"
+          className={`fixed inset-x-0 top-0 z-10 ${
+            showsReels ? 'bg-black' : 'bg-[color:var(--surface-base)]'
+          }`}
           style={{
             bottom: 0,
           }}
@@ -1114,13 +1134,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
                 />
               )}
             </div>
-          ) : runwayReelsItems.length === 0 &&
-            shouldLoadProductFallback({
-              mode,
-              selectedCategory,
-              designItemCount: filteredItems.length,
-            }) &&
-            fallbackProducts.length > 0 ? (
+          ) : showFallback ? (
             <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 pt-20 pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]">
               {reelsCategoryHeader}
               <section className="mt-4 space-y-4" data-entity-type="PRODUCT" data-card-branch="product">

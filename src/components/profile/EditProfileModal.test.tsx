@@ -44,6 +44,15 @@ vi.mock('../../services/LocationService', () => ({
     getStates: vi.fn(async () => []),
     getCities: vi.fn(async () => []),
   },
+  // The factory replaces the WHOLE module, so every named export the component
+  // imports has to be listed here. This one was missing, and the component has
+  // imported it all along — the suite failed on module init before reaching a
+  // single assertion.
+  LOCATION_FIELD_LABELS: {
+    country: 'Country',
+    state: 'State / Province',
+    city: 'City / LGA',
+  },
 }));
 
 vi.mock('@/components/media/MediaRenderer', () => ({

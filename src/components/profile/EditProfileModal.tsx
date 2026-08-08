@@ -14,9 +14,17 @@ import {
   type StateOption,
 } from '../../services/LocationService';
 import UniversalSelect from '../forms/UniversalSelect';
+import LocationCascadeSelect from '../forms/LocationCascadeSelect';
+import PhoneNumberField from '../forms/PhoneNumberField';
+import { resolveCountryIso2 } from '@/data/countryRegions';
+import type { CountryCode } from 'libphonenumber-js';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import {
+  useKeyboardInset,
+  useScrollFocusedFieldIntoView,
+} from '@/hooks/useKeyboardInset';
 import { BRAND_TAG_OPTIONS, BRAND_TAG_SELECTION_LIMIT } from '../../data/brandTags';
 import VLoader from '@/components/loaders/VLoader';
 import {
@@ -291,6 +299,19 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     }
   }, [isOpen, initialValues, reset]);
 
+  /**
+   * Dial code follows the business country when we can map it, so a Ghanaian
+   * brand is not silently defaulted to +234. Falls back to NG, the primary
+   * market, when the country is unset or unrecognised.
+   */
+  const phoneDefaultCountry = useMemo<CountryCode>(() => {
+    const iso2 = resolveCountryIso2(
+      selectedCountry,
+      countries.find((c) => c.name === selectedCountry)?.iso2,
+    );
+    return (iso2 as CountryCode) || 'NG';
+  }, [selectedCountry, countries]);
+
   // Cascade: Load States when Country changes
   useEffect(() => {
     const loadStates = async () => {
@@ -299,12 +320,15 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             return;
         }
         setLoadingLocations(true);
-        const data = await locationService.getStates(selectedCountry);
+        // Pass ISO2 so the offline fallback can resolve the country even when
+        // the remote display name does not match one of its known aliases.
+        const iso2 = countries.find((c) => c.name === selectedCountry)?.iso2;
+        const data = await locationService.getStates(selectedCountry, iso2);
         setStates(data);
         setLoadingLocations(false);
     };
     void loadStates();
-  }, [selectedCountry]);
+  }, [selectedCountry, countries]);
 
   // Cascade: Load Cities when State changes
   useEffect(() => {
@@ -456,12 +480,16 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   };
 
   const dialogRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useFocusTrap({
     active: isOpen,
     containerRef: dialogRef,
     onEscape: onClose,
   });
+
+  const keyboardInset = useKeyboardInset(isOpen);
+  useScrollFocusedFieldIntoView(isOpen, formRef);
 
   if (!isOpen) return null;
 
@@ -474,11 +502,27 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         </div>
 
         {/* Main Modal Container */}
-        <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" aria-label="Brand setup">
-          <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-4xl neu-modal-surface surface-card rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in border border-theme">
+        <div
+          className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Brand setup"
+          // Mobile browsers keep `fixed inset-0` at full height when the
+          // keyboard opens, so the lower half of this modal sits underneath it.
+          // Reserving the keyboard's height re-centres the panel in the space
+          // that is actually visible.
+          style={{ paddingBottom: keyboardInset ? keyboardInset + 16 : undefined }}
+        >
+          <div
+            ref={dialogRef}
+            tabIndex={-1}
+            className="relative w-full max-w-4xl neu-modal-surface surface-card rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-in border border-theme"
+            style={{ maxHeight: `calc(90vh - ${keyboardInset}px)` }}
+          >
 
           {/* Scrollable Content */}
-          <form 
+          <form
+            ref={formRef}
             onSubmit={handleSubmit(onSubmit, onInvalid)}
             className="overflow-y-auto custom-scrollbar p-8 space-y-10 overscroll-contain"
           >
@@ -685,7 +729,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           optionAllowWrap
                           selectedAllowWrap
                       />
-                       <UniversalSelect
+                       <LocationCascadeSelect
                           label={LOCATION_FIELD_LABELS.state}
                           value={selectedState || ''}
                           onChange={(val) => {
@@ -697,23 +741,15 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                               clearErrors('brandCountry');
                           }}
                           options={stateOptions}
-                          placeholder={
-                            !selectedCountry
-                              ? 'Select country first'
-                              : loadingLocations
-                                ? 'Loading...'
-                                : 'Select state / province'
-                          }
-                          searchable
+                          parentValue={selectedCountry || ''}
+                          parentPlaceholder="Select country first"
+                          loading={loadingLocations}
+                          placeholder="Select state / province"
                           searchPlaceholder="Search states or provinces..."
                           emptyMessage="No matching state or province found"
-                          disabled={!selectedCountry || stateOptions.length === 0 || loadingLocations}
-                          className="w-full"
-                          menuLayer="modal"
-                          optionAllowWrap
-                          selectedAllowWrap
+                          fallbackHint="We couldn't load the list for this country — type your state or province."
                       />
-                       <UniversalSelect
+                       <LocationCascadeSelect
                           label={LOCATION_FIELD_LABELS.city}
                           value={watch('brandCity') || ''}
                           onChange={(val) =>
@@ -723,21 +759,13 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                             })
                           }
                           options={cityOptions}
-                          placeholder={
-                            !selectedState
-                              ? 'Select state first'
-                              : loadingLocations
-                                ? 'Loading...'
-                                : 'Select city / LGA'
-                          }
-                          searchable
+                          parentValue={selectedState || ''}
+                          parentPlaceholder="Select state first"
+                          loading={loadingLocations}
+                          placeholder="Select city / LGA"
                           searchPlaceholder="Search cities or LGAs..."
                           emptyMessage="No matching city or LGA found"
-                          disabled={!selectedState || cityOptions.length === 0 || loadingLocations}
-                          className="w-full"
-                          menuLayer="modal"
-                          optionAllowWrap
-                          selectedAllowWrap
+                          fallbackHint="We couldn't load the list for this state — type your city or LGA."
                       />
                   </div>
                   {errors.brandCountry && (
@@ -772,16 +800,20 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   )}
                 </div>
                 
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-theme-secondary">Phone Number</label>
-                  <input 
-                    type="tel" 
-                    placeholder="+1 (555) 000-0000"
-                    className="form-field w-full h-12 px-4 rounded-lg"
-                    {...register('phoneNumber')}
-                  />
-                  {errors.phoneNumber && <p className="text-xs text-red-500 font-medium">{errors.phoneNumber.message}</p>}
-                </div>
+                <PhoneNumberField
+                  value={watch('phoneNumber') || ''}
+                  onChange={(next) =>
+                    setValue('phoneNumber', next, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+                  }
+                  // Seed the dial code from the business country the user just
+                  // picked, so most people never touch the country selector.
+                  defaultCountry={phoneDefaultCountry}
+                  error={errors.phoneNumber?.message}
+                  helperText="Include your country code. Local trunk zeros (0803…) are handled for you."
+                />
                 
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-sm font-semibold text-theme-secondary">Instagram Handle</label>

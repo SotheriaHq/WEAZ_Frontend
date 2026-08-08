@@ -171,8 +171,15 @@ export function useMyDraftCollectionsQuery(
     queryFn: () => brandApi.getMyDraftCollections(),
     enabled: isEnabled(ownerId, options?.enabled ?? true),
     staleTime: WIEZ_QUERY_STALE_TIME_MS,
-    refetchOnWindowFocus: true,
-    refetchOnMount: 'always',
+    // Deliberately no `refetchOnMount: 'always'` / `refetchOnWindowFocus`.
+    //
+    // Those overrode the global policy and made Drafts the one catalog tab that
+    // hit the network on every single visit. Cached rows still painted, but the
+    // response replaced the array with fresh object identities, so every card
+    // remounted and re-fetched its image — the "cards flicker/shake in a few
+    // seconds after the tab appears" report. Freshness is already covered:
+    // staleTime governs, and Catalog invalidates this key after a background
+    // draft save, which the global `refetchOnMount` predicate honours.
   });
 }
 

@@ -20,6 +20,7 @@ import {
   useBrandProfileQuery,
 } from '@/query/queries';
 import { queryKeys } from '@/query/queryKeys';
+import { WIEZ_QUERY_STALE_TIME_MS } from '@/query/queryClient';
 
 type BrandReviewsData = {
   reviews: ProductReviewResponse[];
@@ -463,6 +464,12 @@ export const useBrandProfile = () => {
       const data = await queryClient.fetchQuery({
         queryKey: cacheKey,
         queryFn: () => brandApi.getReviews(brandId),
+        // `fetchQuery` defaults staleTime to 0, so leaving this off meant every
+        // return to the Reviews tab went to the network even when the cache had
+        // been filled seconds earlier — the request the user was watching when
+        // the cards "flickered in a few seconds later". With the global window
+        // applied it resolves from cache instantly and silently.
+        staleTime: WIEZ_QUERY_STALE_TIME_MS,
       });
       applyReviews(data);
     } catch (error) {

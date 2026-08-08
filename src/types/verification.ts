@@ -146,6 +146,13 @@ export interface VerificationStatusResponse {
 export interface VerificationDraftResponse {
   draftData: VerificationDraftData | null;
   lastSavedAt?: string | null;
+  /**
+   * Where `draftData` came from. `LAST_ATTEMPT` means the saved draft was
+   * consumed by a previous submission and the server rebuilt the form from the
+   * attempt on file — the owner is correcting a filed package, not resuming an
+   * unsent one, and the UI says so.
+   */
+  source?: 'DRAFT' | 'LAST_ATTEMPT' | 'EMPTY';
 }
 
 export interface VerificationLetterResponse {

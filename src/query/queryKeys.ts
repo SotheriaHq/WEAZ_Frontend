@@ -239,18 +239,60 @@ export const PRIVATE_QUERY_ROOTS = new Set<string>([
   'orders',
   'profile',
   'studio',
+  // PatchesTab keys inline as ['patches', profileId, scope]. It was missing
+  // here, so the previous account's patched brands survived logout in memory —
+  // and would have survived to disk the moment `patches` became persistable.
+  'patches',
 ]);
 
+/**
+ * Which cached queries are written to storage and rehydrated on the next load.
+ *
+ * Reload/tab-discard behaviour, NOT freshness: rehydrated data still obeys
+ * staleTime and revalidates silently, so the only thing persistence changes is
+ * whether a returning user sees their content immediately or a cold skeleton.
+ * Mobile browsers discard backgrounded tabs aggressively, which makes every
+ * non-persisted screen a full cold load with a skeleton and a layout jump.
+ *
+ * Two things keep this safe rather than "persist everything":
+ *  - every root listed here is also in PRIVATE_QUERY_ROOTS above, so logout
+ *    purges it from disk;
+ *  - payloads with real PII stay OUT. Orders (addresses, payment references),
+ *    brand finance and the reviews dashboard are deliberately memory-only.
+ */
 export const isPersistableWiezQueryKey = (queryKey: readonly unknown[]) => {
   const [root, scope] = queryKey;
   if (root === 'brand') {
-    return scope === 'profile' || scope === 'collections' || scope === 'collectionDetail';
+    return (
+      scope === 'profile' ||
+      scope === 'collections' ||
+      scope === 'collectionDetail' ||
+      // The owner's Drafts tab. Left out originally, so it was the one catalog
+      // tab that always cold-loaded after a reload while Public/Private
+      // repainted instantly from `brand.collections`.
+      scope === 'drafts' ||
+      scope === 'draft-collections'
+    );
+    // `brand.finance` and `brand.reviewsDashboard` intentionally fall through.
   }
   if (root === 'design' || root === 'designs' || root === 'config') {
     return true;
   }
   if (root === 'media') {
     return scope === 'publicUrl';
+  }
+  // Profile tabs the user actually round-trips between. These are read-only
+  // display data with no PII, and they are exactly the tabs that came back
+  // empty-then-flickering after a reload.
+  if (root === 'reviews' || root === 'patches') {
+    return true;
+  }
+  if (root === 'saved') {
+    // The Saved TAB list only. `saved.status` / `saved.batch` are per-target
+    // booleans probed for every card the user scrolls past — hundreds of tiny
+    // entries that would crowd real content out of the 4MB storage budget for
+    // no visible benefit (they re-resolve in one batched request).
+    return scope === 'me';
   }
   if (root === 'market') {
     return (

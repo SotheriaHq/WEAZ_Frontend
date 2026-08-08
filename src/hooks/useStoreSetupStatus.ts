@@ -34,6 +34,21 @@ export function useStoreSetupStatus(): boolean | null {
 
   if (!isBrand) return true;
   if (statusQuery.data) {
+    // A prime that is NEWER than the fetched data wins.
+    //
+    // Callers prime this after performing the very mutation that changes the
+    // answer — publishing a store, saving the last required setting. Query data
+    // fetched before that mutation is simply out of date, but it used to be
+    // read first unconditionally, so `primeStoreSetupStatusCache(true)` was
+    // dead code whenever a status response already existed (i.e. essentially
+    // always). That is what left a freshly published, live store with every
+    // studio nav item except Store disabled.
+    if (
+      cachedSetupComplete !== null &&
+      cacheTime > (statusQuery.dataUpdatedAt ?? 0)
+    ) {
+      return cachedSetupComplete;
+    }
     cachedSetupComplete = statusQuery.data.isSetupComplete;
     cacheTime = Date.now();
     return statusQuery.data.isSetupComplete;
