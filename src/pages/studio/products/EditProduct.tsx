@@ -13,7 +13,6 @@ import {
   ChevronRight,
   Plus,
   CheckCircle,
-  Video,
   X,
 
 } from "lucide-react";
@@ -22,7 +21,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import VLoader from "@/components/loaders/VLoader";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
-import { useUploadLimits } from "@/context/UploadLimitsContext";
 
 import { toast } from "sonner";
 import MediaRenderer from "@/components/media/MediaRenderer";
@@ -533,7 +531,6 @@ const createCustomOrderConfigurationWithBasis = async (
 const EditProduct: React.FC = () => {
   const navigate = useNavigate();
   const { id: productId } = useParams<{ id: string }>();
-  const { getLimitMB } = useUploadLimits();
   const location = useLocation();
   const returnTo = useMemo(
     () => new URLSearchParams(location.search).get("returnTo"),
@@ -3238,7 +3235,7 @@ const EditProduct: React.FC = () => {
   return (
     <div className="flex flex-col min-h-full bg-transparent text-theme font-sans">
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-3 py-3 sm:px-5 sm:py-5">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 py-3 pb-28 sm:px-5 sm:py-5 md:pb-12">
         <div className="mb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:mb-6">
           <div className="flex flex-col gap-1">
             <div className="flex items-center text-xs text-theme-secondary gap-2">
@@ -3576,26 +3573,6 @@ const EditProduct: React.FC = () => {
                 </p>
               </div>
             </div>
-
-            {/* Video Section */}
-            <div className="py-2 space-y-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-theme">
-                  Product Video
-                </h3>
-              </div>
-              <div className="rounded-lg border border-dashed border-theme p-6 flex flex-col items-center justify-center text-center surface-interactive-hover transition-colors cursor-pointer">
-                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-white/10 flex items-center justify-center mb-3 text-purple-500">
-                  <Video className="w-4 h-4" />
-                </div>
-                <p className="text-sm text-theme font-medium">
-                  Add Video
-                </p>
-                <p className="text-xs text-theme-secondary mt-1">
-                  MP4, WebM up to {getLimitMB('upload.maxSize.postVideo')}MB
-                </p>
-              </div>
-            </div>
           </div>
 
           {/* RIGHT COLUMN: Details — widened to take the space freed by the
@@ -3626,7 +3603,7 @@ const EditProduct: React.FC = () => {
 
                 <div className="space-y-4" id="product-category-section">
                         {/* Group 1: Category & Subcategory */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
                           <div className="min-w-0">
                             <UniversalSelect
                               label="What is it?"
@@ -3693,7 +3670,7 @@ const EditProduct: React.FC = () => {
                         </div>
 
                         {/* Group 2: Audience & Collection */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
                           <div className="min-w-0">
                             <UniversalSelect
                               label="Who is it for?"
@@ -4123,9 +4100,9 @@ const EditProduct: React.FC = () => {
                               key={group.stableKey}
                               className="overflow-hidden bg-transparent py-2 border-b border-gray-100 dark:border-white/5 last:border-0"
                             >
-                              {/* Color group header — step 1: name the color */}
-                              <div className="py-1.5 flex items-center gap-2 justify-between bg-transparent">
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {/* Color group header & Add sizes — compact side-by-side row */}
+                              <div className="py-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-transparent border-b border-gray-100 dark:border-white/5">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
                                   <span className="text-[10px] font-semibold uppercase text-theme-secondary shrink-0">
                                     Color
                                   </span>
@@ -4138,70 +4115,66 @@ const EditProduct: React.FC = () => {
                                     placeholder="e.g. Green"
                                     inputSize="sm"
                                     fullWidth={false}
-                                    className="w-28"
+                                    className="w-24 sm:w-28 shrink-0"
                                   />
-                                  <span className="text-[10px] text-gray-400">
+                                  <span className="text-[10px] text-gray-400 shrink-0">
                                     {group.variants.length} size
                                     {group.variants.length !== 1 ? "s" : ""}
                                   </span>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => removeColorGroup(group)}
-                                  className="inline-flex items-center justify-center h-6 w-6 rounded-full text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition shrink-0"
-                                  title="Remove this color and all its sizes"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
 
-                              {/* Step 2: add the sizes available in this color */}
-                              <div className="py-1.5 bg-transparent border-b border-gray-100 dark:border-white/5">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                   <span className="text-[10px] font-semibold uppercase text-theme-secondary shrink-0">
                                     Add sizes
                                   </span>
-                                  <input
-                                    ref={(el) => {
-                                      quickAddSizeInputRefs.current[group.stableKey] = el;
-                                    }}
-                                    type="text"
-                                    enterKeyHint="done"
-                                    autoCapitalize="characters"
-                                    placeholder="e.g. S, M, L, XL"
-                                    className="min-h-9 flex-1 min-w-0 text-xs bg-transparent border-none outline-none text-theme-secondary placeholder:text-gray-400 sm:min-h-0"
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        const input = e.currentTarget;
+                                  <div className="flex items-center gap-1 flex-1 min-w-0 rounded-lg border border-gray-200 dark:border-white/10 px-2 py-0.5 bg-white/50 dark:bg-white/[0.03]">
+                                    <input
+                                      ref={(el) => {
+                                        quickAddSizeInputRefs.current[group.stableKey] = el;
+                                      }}
+                                      type="text"
+                                      enterKeyHint="done"
+                                      autoCapitalize="characters"
+                                      placeholder="e.g. S, M, L, XL"
+                                      className="h-7 flex-1 min-w-0 text-xs bg-transparent border-none outline-none text-theme-secondary placeholder:text-gray-400"
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.preventDefault();
+                                          const input = e.currentTarget;
+                                          addMultipleSizesForGroup(
+                                            group,
+                                            input.value,
+                                          );
+                                          input.value = "";
+                                        }
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const input =
+                                          quickAddSizeInputRefs.current[group.stableKey];
+                                        if (!input) return;
                                         addMultipleSizesForGroup(
                                           group,
                                           input.value,
                                         );
                                         input.value = "";
-                                      }
-                                    }}
-                                  />
+                                        input.focus();
+                                      }}
+                                      className="inline-flex h-6 shrink-0 items-center justify-center rounded bg-purple-600 px-2 text-[10px] font-semibold text-white transition hover:bg-purple-500"
+                                    >
+                                      Add
+                                    </button>
+                                  </div>
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      const input =
-                                        quickAddSizeInputRefs.current[group.stableKey];
-                                      if (!input) return;
-                                      addMultipleSizesForGroup(
-                                        group,
-                                        input.value,
-                                      );
-                                      input.value = "";
-                                      input.focus();
-                                    }}
-                                    className="inline-flex min-h-8 shrink-0 items-center justify-center rounded-md bg-purple-600 px-2.5 text-[11px] font-semibold text-white transition hover:bg-purple-500"
+                                    onClick={() => removeColorGroup(group)}
+                                    className="inline-flex items-center justify-center h-6 w-6 rounded-full text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition shrink-0 ml-1"
+                                    title="Remove this color and all its sizes"
                                   >
-                                    Add
+                                    <X className="w-3.5 h-3.5" />
                                   </button>
-                                  <span className="hidden text-[9px] text-gray-400 shrink-0 sm:inline">
-                                    Enter to add
-                                  </span>
                                 </div>
                               </div>
 

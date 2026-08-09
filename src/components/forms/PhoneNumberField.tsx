@@ -93,7 +93,8 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
     () =>
       PHONE_COUNTRIES.map((country) => ({
         value: country.iso2,
-        label: `${country.flag} ${country.name} +${country.callingCode}`,
+        label: `${country.flag} +${country.callingCode}`,
+        description: country.name,
       })),
     [],
   );
@@ -115,7 +116,7 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
         : undefined;
 
   return (
-    <div className={`space-y-2 ${className}`}>
+    <div className={`space-y-2 w-full max-w-full overflow-hidden ${className}`}>
       {label ? (
         <label
           htmlFor={inputId}
@@ -126,7 +127,7 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
         </label>
       ) : null}
 
-      <div className="flex items-stretch gap-2">
+      <div className="flex items-stretch gap-2 w-full min-w-0">
         <UniversalSelect
           value={iso2}
           onChange={(next) => {
@@ -141,11 +142,12 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
           emptyMessage="No matching country"
           disabled={disabled}
           menuLayer={menuLayer}
-          className="w-[8.5rem] shrink-0"
+          className="w-[5.25rem] sm:w-[6rem] shrink-0"
           fitContent={false}
+          compact
         />
 
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-500">
             {getDialCode(iso2)}
           </span>
@@ -167,7 +169,7 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
               emit(digits, iso2);
             }}
             onBlur={() => setTouched(true)}
-            className="form-field h-12 w-full rounded-lg pr-4"
+            className="form-field h-12 w-full rounded-lg pr-4 text-sm"
             style={{
               paddingLeft: `${Math.max(3.25, getDialCode(iso2).length * 0.65 + 1.9)}rem`,
             }}
