@@ -111,9 +111,30 @@ async function waitForPagesDeploy(sha) {
   );
 
   while (Date.now() < deadline) {
-    const body = await cfFetch(
-      `/accounts/${accountId}/pages/projects/${encodeURIComponent(projectName)}/deployments?per_page=10`,
-    );
+    let body;
+    try {
+      body = await cfFetch(
+        `/accounts/${accountId}/pages/projects/${encodeURIComponent(projectName)}/deployments?per_page=10`,
+      );
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      // The token already verified as active, so a 401/403 here is about this
+      // account or this project, not the token value.
+      if (/\b(401|403)\b/.test(detail)) {
+        fail(
+          [
+            'Token is valid but cannot read this Pages project. Check, in order:',
+            `  1. CF_ACCOUNT_ID (${accountId.slice(0, 6)}…) is the account that OWNS the Pages project,`,
+            '     and is the account selected under the token\'s "Account Resources".',
+            '  2. The token has Account → Cloudflare Pages → Read.',
+            `  3. CF_PAGES_PROJECT_NAME ("${projectName}") matches Workers & Pages exactly.`,
+            '',
+            detail,
+          ].join('\n'),
+        );
+      }
+      throw error;
+    }
     const deployments = Array.isArray(body.result) ? body.result : [];
     const match = deployments.find((d) => deploymentMatchesSha(d, sha));
 
@@ -160,9 +181,56 @@ async function purgeCache() {
   console.log('[purge-cloudflare] Purge accepted:', JSON.stringify(body.result || body));
 }
 
+/**
+ * Ask Cloudflare whether the token itself is usable BEFORE spending the run on
+ * an account-scoped call.
+ *
+ * Without this, a dead token surfaced as `401 … {"code":10000,"message":
+ * "Authentication error"}` on the Pages deployments endpoint — which reads like
+ * a permissions problem and sent us auditing token scopes for two days. The
+ * real cause on 2026-08-09 was that `gh secret set` had been given the token
+ * where the NAME goes, so the repo grew secrets literally called
+ * `CFUT_<token>` while `CF_API_TOKEN` still held the pre-rotation value.
+ *
+ * `/user/tokens/verify` needs no permissions at all, so it separates the two
+ * cases cleanly: fail here and the token is wrong or revoked; pass here and a
+ * later 401 really is a missing scope or the wrong account id.
+ */
+async function assertTokenUsable() {
+  let verified;
+  try {
+    verified = await cfFetch('/user/tokens/verify');
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    fail(
+      [
+        'CF_API_TOKEN was rejected by Cloudflare — the token value is wrong, expired, or revoked.',
+        'This is NOT a permissions problem; /user/tokens/verify requires no scopes.',
+        '',
+        'Set it with the NAME first and the value at the prompt, never inline:',
+        '  gh secret set CF_API_TOKEN --repo <owner>/<repo>',
+        '',
+        'If `gh secret list` shows a secret whose name looks like CFUT_… then the',
+        'token was passed as the secret name. Delete it and revoke that token —',
+        'secret NAMES are not encrypted.',
+        '',
+        detail,
+      ].join('\n'),
+    );
+  }
+
+  const status = verified?.result?.status;
+  if (status && status !== 'active') {
+    fail(`CF_API_TOKEN status is "${status}", not "active".`);
+  }
+  console.log('[purge-cloudflare] Token verified (status=active).');
+}
+
 async function main() {
   if (!token) fail('CF_API_TOKEN is required');
   if (!zoneId) fail('CF_ZONE_ID is required');
+
+  await assertTokenUsable();
 
   if (waitSha) {
     await waitForPagesDeploy(waitSha);
