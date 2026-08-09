@@ -13,7 +13,6 @@ import {
   FiArrowLeft,
   FiTrash2,
   FiStar,
-  FiMove,
   FiMaximize2,
   FiChevronDown,
   FiChevronUp,
@@ -37,8 +36,10 @@ import { getStorePolicies } from '@/api/StoreApi';
 // Context & Hooks
 import TextField from "../../components/forms/TextField";
 import UniversalSelect from "@/components/forms/UniversalSelect";
-import MediaUploadZone from "../../components/upload/MediaUploadZone";
-import ThumbnailStrip from "../../components/upload/ThumbnailStrip";
+import MediaSlotGrid, {
+  buildMediaSlotMap,
+  renderableMediaSlots,
+} from "@/components/media/MediaSlotGrid";
 import SizingConfigurator from "@/components/sizing/SizingConfigurator";
 import LocalMediaPreview from "../../components/media/LocalMediaPreview";
 import useFilePicker from "../../components/upload/useFilePicker";
@@ -70,8 +71,6 @@ import type { SizingMode } from '@/types/sizing';
 import {
   DESIGN_FIT_PREFERENCE_OPTIONS,
   DESIGN_MAX_MEDIA_COUNT,
-  DESIGN_MEDIA_SLOTS,
-  DESIGN_REQUIRED_MEDIA_COUNT,
   DESIGN_TARGET_AGE_OPTIONS,
   type DesignFitPreference,
   type DesignTargetAgeGroup,
@@ -644,6 +643,45 @@ const CreateDesignInner: React.FC = () => {
     categoryTypeId.trim().length > 0 &&
     type.trim().length > 0;
 
+  /**
+   * Design media in the shape `MediaSlotGrid` renders. The local `file` is
+   * carried through because these are pre-upload picks — HEIC-from-camera and
+   * oversized phone JPEGs need the local preview pipeline, not a plain <img>.
+   */
+  const designSlotMedia = useMemo(
+    () =>
+      buildMediaSlotMap(
+        files.map((item, index) => ({
+          id: item.id,
+          url: item.previewUrl || '',
+          kind: item.kind === 'video' ? ('video' as const) : ('image' as const),
+          file: item.file,
+          isCover: index === coverIndex,
+          viewSlot: item.viewSlot,
+          progress: perFileProgress[item.id],
+        })),
+        DESIGN_MAX_MEDIA_COUNT,
+      ),
+    [files, coverIndex, perFileProgress],
+  );
+
+  /**
+   * Design slots are strictly positional — `useMediaStore` re-derives slot from
+   * index on every structural edit, which is what lets an owner reclaim Front
+   * after deleting the image that held it. So only the slot immediately after
+   * the last filled one can be picked; offering "Right" while "Left" is empty
+   * would promise a placement the store would quietly override.
+   */
+  const nextFillableDesignSlots = useMemo(() => {
+    const slots = renderableMediaSlots(DESIGN_MAX_MEDIA_COUNT);
+    const next = slots[files.length];
+    return next ? [next] : [];
+  }, [files.length]);
+
+  const openPickerForSlot = useCallback(() => {
+    picker.open();
+  }, [picker]);
+
   const resolveMediaWithUrl = useCallback((item?: MediaItem | null) => {
     if (!item) return null;
     return { ...item, url: item.previewUrl || '' };
@@ -806,6 +844,22 @@ const CreateDesignInner: React.FC = () => {
       setCoverIndex(followIndex);
     },
     [mediaStore],
+  );
+
+  /**
+   * Dragging one tile onto another moves it there and lets everything below
+   * shift up — a move, not a swap, because slots follow position here. Slots
+   * map back to indices through the same ordered list the grid renders.
+   */
+  const handleSlotDrop = useCallback(
+    (fromSlot: string, toSlot: string) => {
+      const slots = renderableMediaSlots(DESIGN_MAX_MEDIA_COUNT);
+      const fromIndex = slots.indexOf(fromSlot as (typeof slots)[number]);
+      const toIndex = slots.indexOf(toSlot as (typeof slots)[number]);
+      if (fromIndex < 0 || toIndex < 0) return;
+      handleReorderMedia(fromIndex, toIndex);
+    },
+    [handleReorderMedia],
   );
 
   const goToMediaIndex = useCallback(
@@ -1666,32 +1720,41 @@ const CreateDesignInner: React.FC = () => {
         <div className="mb-8 grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(360px,0.82fr)]">
           {/* Media Section */}
           <section id="design-media-section" className="min-w-0">
+            {/*
+              One hidden input for BOTH states. It used to live inside the
+              "has media" branch, because the empty state was a drop zone that
+              carried its own; with the grid on both sides, keeping it there
+              would leave the first slot tap with nothing to click.
+            */}
+            <input
+              ref={picker.inputRef}
+              type="file"
+              multiple
+              onChange={picker.handlers.onInputChange}
+              className="hidden"
+              accept="image/*,video/*"
+              disabled={disabled}
+            />
             {files.length === 0 ? (
-              <div className="space-y-3">
-                <MediaUploadZone
-                  onFilesUpload={mediaStore.addFiles}
-                  picker={picker}
-                  disabled={disabled}
-                  maxFiles={DESIGN_MAX_MEDIA_COUNT}
-                />
-                <div className="flex flex-wrap justify-center gap-1.5 px-2">
-                  {DESIGN_MEDIA_SLOTS.map((label, index) => (
-                    <span
-                      key={label}
-                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
-                        index < DESIGN_REQUIRED_MEDIA_COUNT
-                          ? 'bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400'
-                          : 'surface-control-muted'
-                      }`}
-                    >
-                      <span className="font-bold">{index + 1}.</span> {label}{index < DESIGN_REQUIRED_MEDIA_COUNT && ' *'}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-center text-[10px] text-theme-secondary mt-1">
-                  * Required to go live - fill Front, Back, Left, and Right
-                </p>
-              </div>
+              /*
+               * The slot grid IS the empty state now. It used to be a drop zone
+               * with a paragraph of instructions, a legend of numbered slot
+               * names, and a footnote about what is required — three pieces of
+               * copy describing a shape the grid simply shows. Product creation
+               * has always done it this way; there was no reason for design
+               * creation to teach a second mental model.
+               */
+              <MediaSlotGrid
+                mediaBySlot={designSlotMedia}
+                maxSlots={DESIGN_MAX_MEDIA_COUNT}
+                missingRequiredSlots={missingRequiredMediaSlots}
+                disabled={disabled}
+                onPickForSlot={openPickerForSlot}
+                enabledEmptySlots={nextFillableDesignSlots}
+                onDropFiles={(_slot, dropped) =>
+                  mediaStore.addFiles(dropped, DESIGN_MAX_MEDIA_COUNT)
+                }
+              />
             ) : (
               <div className="space-y-4 h-full min-w-0">
                 {/* Main Preview - NO background; media defines layout */}
@@ -1764,12 +1827,9 @@ const CreateDesignInner: React.FC = () => {
                           disabled={disabled}
                           active={coverIndex === selectedIndex}
                         />
-                        <ActionButton
-                          icon={<FiMove className="w-4 h-4" />}
-                          label="Reorder"
-                          onClick={() => {}}
-                          disabled
-                        />
+                        {/* The "Reorder" button here was permanently disabled
+                            and did nothing; reordering is a long press on a
+                            tile in the grid below. */}
                         <ActionButton
                           icon={<FiMaximize2 className="w-4 h-4" />}
                           label="Fullscreen"
@@ -1780,31 +1840,33 @@ const CreateDesignInner: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Thumbnail Strip */}
-                <ThumbnailStrip
-                  items={files}
-                  selectedIndex={selectedIndex}
-                  coverIndex={coverIndex}
-                  onSelect={setSelectedIndex}
-                  onDelete={handleDelete}
-                  onSetCover={handleSetCover}
-                  onAddMore={picker.open}
+                {/*
+                  Same grid as the empty state and as product creation. It
+                  replaces the thumbnail strip, where the slot was implied by
+                  position and only discoverable by dragging a grip.
+                */}
+                <MediaSlotGrid
+                  mediaBySlot={designSlotMedia}
+                  maxSlots={DESIGN_MAX_MEDIA_COUNT}
+                  missingRequiredSlots={missingRequiredMediaSlots}
+                  selectedId={files[selectedIndex]?.id ?? null}
+                  disabled={disabled}
                   canAddMore={files.length < DESIGN_MAX_MEDIA_COUNT}
-                  disabled={disabled}
-                  progressById={perFileProgress}
-                  showSlotLabels
-                  onReorder={handleReorderMedia}
-                />
-
-                {/* Hidden file input */}
-                <input
-                  ref={picker.inputRef}
-                  type="file"
-                  multiple
-                  onChange={picker.handlers.onInputChange}
-                  className="hidden"
-                  accept="image/*,video/*"
-                  disabled={disabled}
+                  onPickForSlot={openPickerForSlot}
+                  enabledEmptySlots={nextFillableDesignSlots}
+                  onSelect={(item) => {
+                    const index = files.findIndex((file) => file.id === item.id);
+                    if (index !== -1) setSelectedIndex(index);
+                  }}
+                  onDelete={(item) => handleDelete(item.id)}
+                  onSetCover={(item) => {
+                    const index = files.findIndex((file) => file.id === item.id);
+                    if (index !== -1) handleSetCover(index);
+                  }}
+                  onSlotDrop={handleSlotDrop}
+                  onDropFiles={(_slot, dropped) =>
+                    mediaStore.addFiles(dropped, DESIGN_MAX_MEDIA_COUNT)
+                  }
                 />
 
                 {/* Image info */}

@@ -112,9 +112,9 @@ import {
 } from "@/utils/contentIntegrity";
 import { queryKeys } from "@/query/queryKeys";
 import useCachedResource from "@/hooks/useCachedResource";
-import useLongPressSlotDrag, {
-  longPressSlotDragTileClass,
-} from "@/hooks/useLongPressSlotDrag";
+import MediaSlotGrid, {
+  type MediaSlotGridItem,
+} from "@/components/media/MediaSlotGrid";
 import {
   PRODUCT_PUBLISH_FIELD_ANCHOR,
   PRODUCT_PUBLISH_FIELD_LABEL,
@@ -551,8 +551,6 @@ const EditProduct: React.FC = () => {
   const queryClient = useQueryClient();
 
   const isEditMode = Boolean(productId);
-  const [draggingSlot, setDraggingSlot] = useState<string | null>(null);
-  const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
   const isCollectionContext = returnContext === "collection";
   const isCollectionFlow = isCollectionContext && !isEditMode;
   const pageTitle = isCollectionFlow
@@ -2991,52 +2989,24 @@ const EditProduct: React.FC = () => {
     [mediaBySlot, normalizePending, syncPersistedMediaIds],
   );
 
-  const handleDragStart = (e: React.DragEvent, slot: string) => {
-    e.dataTransfer.setData("text/plain", slot);
-    setDraggingSlot(slot);
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetSlot: string) => {
-    e.preventDefault();
-    setDraggingSlot(null);
-    setDragOverSlot(null);
-
-    const files = Array.from(e.dataTransfer.files).filter((f) =>
-      f.type.startsWith("image/"),
-    );
-    if (files.length > 0) {
-      const existing = mediaBySlot.get(targetSlot as MediaViewSlot);
-      if (existing) {
-        await handleDeleteMedia(existing.id);
-      }
-      await processAndUploadFiles(files, targetSlot as MediaViewSlot);
-      return;
-    }
-
-    const sourceSlot = e.dataTransfer.getData("text/plain") || draggingSlot;
-    if (!sourceSlot || sourceSlot === targetSlot) return;
-
-    // Use the displayed slot map so this stays consistent with what the user sees.
-    const hasSourceMedia = mediaBySlot.has(normalizeMediaViewSlot(sourceSlot) as MediaViewSlot);
-    const hasTargetMedia = mediaBySlot.has(normalizeMediaViewSlot(targetSlot) as MediaViewSlot);
-
-    if (hasSourceMedia || hasTargetMedia) {
-      handleSwapMediaSlots(sourceSlot, targetSlot);
-    }
-  };
-
-  // Touch reordering is long-press armed — see `useLongPressSlotDrag` for why
-  // the old touch-to-drag made the media grid impossible to scroll past.
-  const {
-    containerRef: mediaSlotGridRef,
-    draggingSlot: touchDraggingSlot,
-    overSlot: touchOverSlot,
-  } = useLongPressSlotDrag({
-    enabled: !saving,
-    canDragSlot: (slot) => mediaBySlot.has(slot as MediaViewSlot),
-    onSwap: (from, to) =>
-      handleSwapMediaSlots(from as MediaViewSlot, to as MediaViewSlot),
-  });
+  /**
+   * Slot map in the shape `MediaSlotGrid` renders. Product media is already
+   * uploaded, so no local `file` is attached — the grid uses the plain remote
+   * renderer for those, and only design creation's pre-upload files take the
+   * local preview path.
+   */
+  const slotGridMedia = useMemo(() => {
+    const grid = new Map<MediaViewSlot, MediaSlotGridItem>();
+    mediaBySlot.forEach((item, slot) => {
+      grid.set(slot, {
+        id: item.id,
+        url: item.url,
+        kind: "image",
+        isCover: Boolean(item.isPrimary),
+      });
+    });
+    return grid;
+  }, [mediaBySlot]);
 
   const handleSetCover = useCallback(
     async (mediaId: string) => {
@@ -3105,6 +3075,22 @@ const EditProduct: React.FC = () => {
       revokeBlobUrl,
       updateForm,
     ],
+  );
+
+  /** Dropping a photo onto an occupied slot replaces what is there. */
+  const handleDropFilesOnSlot = useCallback(
+    async (targetSlot: MediaViewSlot, files: File[]) => {
+      const existing = mediaBySlot.get(targetSlot);
+      if (existing) {
+        await handleDeleteMedia(existing.id);
+      }
+      await processAndUploadFiles(files, targetSlot);
+    },
+    // `processAndUploadFiles` is a plain function redefined every render, so it
+    // is deliberately not a dependency — including it would rebuild this on
+    // every keystroke elsewhere in the form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [handleDeleteMedia, mediaBySlot],
   );
 
   const handleReorderMedia = useCallback(
@@ -3550,109 +3536,24 @@ const EditProduct: React.FC = () => {
                 </button>
               )}
 
-              <div ref={mediaSlotGridRef} className="mt-4 grid grid-cols-2 gap-3">
-                {MEDIA_VIEW_SLOT_OPTIONS.slice(0, maxMediaCount).map((slotOption) => {
-                  const assigned = mediaBySlot.get(slotOption.value);
-                  const isMissing =
-                    slotOption.required &&
-                    missingRequiredProductMediaSlots.includes(slotOption.value);
-                  const isDragging =
-                    draggingSlot === slotOption.value ||
-                    touchDraggingSlot === slotOption.value;
-                  const isDragOver =
-                    dragOverSlot === slotOption.value ||
-                    touchOverSlot === slotOption.value;
-                  const isSelected = assigned && mediaUrls[carouselIndex]?.id === assigned.id;
-
-                  return (
-                    <div
-                      key={slotOption.value}
-                      data-slot={slotOption.value}
-                      draggable={Boolean(assigned) && !saving}
-                      onDragStart={(e) => handleDragStart(e, slotOption.value)}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        if (draggingSlot !== slotOption.value) {
-                          setDragOverSlot(slotOption.value);
-                        }
-                      }}
-                      onDragLeave={() => setDragOverSlot(null)}
-                      onDragEnd={() => {
-                        setDraggingSlot(null);
-                        setDragOverSlot(null);
-                      }}
-                      onDrop={(e) => handleDrop(e, slotOption.value)}
-                      className={`relative rounded-xl overflow-hidden aspect-[4/3] w-full border transition-all duration-200 group ${
-                        assigned && !saving ? longPressSlotDragTileClass : ""
-                      } ${
-                        isDragging
-                          ? "border-dashed border-purple-400 opacity-50 scale-95"
-                          : isDragOver
-                            ? "border-purple-500 bg-purple-500/5 scale-[1.02] shadow-md shadow-purple-500/5"
-                            : isSelected
-                              ? "border-purple-600 ring-2 ring-purple-600/30"
-                              : isMissing
-                                ? "border-amber-400 bg-amber-500/5"
-                                : "border-gray-200 dark:border-white/10 surface-subtle hover:border-purple-500/40"
-                      } ${saving ? "opacity-60 cursor-not-allowed" : assigned ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
-                    >
-                      {assigned ? (
-                        <div
-                          className="relative h-full w-full"
-                          onClick={() => {
-                            const idx = mediaUrls.findIndex((item) => item.id === assigned.id);
-                            if (idx !== -1) setCarouselIndex(idx);
-                          }}
-                        >
-                          <MediaRenderer
-                            kind="image"
-                            src={assigned.url}
-                            alt={`${slotOption.label} media`}
-                            fit="cover"
-                            className="h-full w-full"
-                            mediaClassName="h-full w-full object-cover"
-                          />
-                          {/* Label with blur bg */}
-                          <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-black/70 backdrop-blur-md text-[10px] font-bold text-white tracking-wide uppercase select-none flex items-center gap-1 shadow-sm">
-                            {assigned.isPrimary && <span className="text-amber-300 font-bold">★ Cover •</span>}
-                            <span>{slotOption.label}</span>
-                            {slotOption.required && <span className="text-amber-400">*</span>}
-                          </div>
-                          {/* Delete button with blur bg */}
-                          {!saving && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteMedia(assigned.id);
-                              }}
-                              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 backdrop-blur-md hover:bg-red-500 flex items-center justify-center text-white transition-colors shadow-sm"
-                              aria-label="Remove"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => openMediaPickerForSlot(slotOption.value)}
-                          disabled={!canAddMoreMedia || saving}
-                          className="flex h-full w-full flex-col items-center justify-center p-3 text-center transition-all hover:bg-purple-50/10 dark:hover:bg-purple-500/10 disabled:cursor-not-allowed disabled:opacity-50 group-hover:scale-105"
-                        >
-                          <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-600 dark:text-purple-400 mb-1.5 transition-transform group-hover:scale-110">
-                            <Plus className="h-4 w-4" />
-                          </div>
-                          <span className="text-[11px] font-bold text-theme uppercase tracking-wider">
-                            {slotOption.label} {slotOption.required && <span className="text-amber-500">*</span>}
-                          </span>
-                          <span className="text-[10px] text-theme-secondary mt-0.5">Click to upload</span>
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <MediaSlotGrid
+                className="mt-4"
+                mediaBySlot={slotGridMedia}
+                maxSlots={maxMediaCount}
+                missingRequiredSlots={missingRequiredProductMediaSlots}
+                selectedId={mediaUrls[carouselIndex]?.id ?? null}
+                disabled={saving}
+                canAddMore={canAddMoreMedia}
+                onPickForSlot={(slot) => openMediaPickerForSlot(slot)}
+                onSelect={(item) => {
+                  const idx = mediaUrls.findIndex((media) => media.id === item.id);
+                  if (idx !== -1) setCarouselIndex(idx);
+                }}
+                onDelete={(item) => void handleDeleteMedia(item.id)}
+                onSetCover={(item) => void handleSetCover(item.id)}
+                onSlotDrop={(from, to) => handleSwapMediaSlots(from, to)}
+                onDropFiles={(slot, files) => void handleDropFilesOnSlot(slot, files)}
+              />
 
               {publishErrors.media && mediaUrls.length > 0 && (
                 <p className="mt-3 text-xs text-orange-500">
