@@ -558,6 +558,7 @@ export default function StoreManagement() {
         downloadFileName="storefront-qr.png"
         logoUrl={avatarUrl || resolvedAvatar.src}
         logoFileId={resolvedAvatar.fileId}
+        username={overview?.store?.slug || user?.username}
       />
 
       {showStudioFloatingControls && analyticsOpen && analyticsCollapsed ? (

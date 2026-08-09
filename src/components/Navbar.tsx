@@ -1,7 +1,7 @@
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useSelector, useDispatch } from 'react-redux';
-import { closeSidebar, toggleSidebar } from '../features/uiSlice';
+import { closeSidebar, selectIsMobile, toggleSidebar } from '../features/uiSlice';
 import {
   openCartDrawer,
   closeCartDrawer,
@@ -24,7 +24,7 @@ import getProfileOrHomeUrl from '../lib/navigation';
 import { useEffect, useState } from 'react';
 import { useSyncedThemePreference } from '@/hooks/useSyncedThemePreference';
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import ImageWithFallback from './ImageWithFallback';
 import FrostedButton from './ui/FrostedButton';
@@ -94,6 +94,30 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
   const storeSetupComplete = useStoreSetupStatus();
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Phones only (<768px). Tablets and up keep the dropdown — it fits there.
+  const isMobileViewport = useSelector(selectIsMobile);
+
+  /**
+   * Opening notifications is idempotent. Tapping the bell twice, or the bell
+   * and then the menu entry, used to push a second identical history entry, so
+   * Back returned to the same screen and the reader had to press it once per
+   * accidental tap to escape.
+   */
+  const goToNotifications = React.useCallback(() => {
+    if (location.pathname === '/notifications') return;
+    navigate('/notifications', {
+      // Where Back should land. `location.key === 'default'` means this is the
+      // first entry in the session's history, so there is nothing behind it and
+      // the page falls back to a sensible home.
+      state: {
+        notificationsReturnTo:
+          location.key === 'default'
+            ? null
+            : `${location.pathname}${location.search}${location.hash}`,
+      },
+    });
+  }, [location.hash, location.key, location.pathname, location.search, navigate]);
   const userUid = user ? generateUserUid(user.id, user.firstName) : null;
   // Brand accounts display the brand identity (name + initials), never the
   // creator's personal name — keeps the fallback initials aligned with the
@@ -298,7 +322,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
               ) : null
             }
             onClick={() => {
-              navigate('/notifications');
+              goToNotifications();
               setShowProfileMenu(false);
             }}
           >
@@ -547,13 +571,22 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
                 onClick={() => {
                   setShowProfileMenu(false);
                   setShowLanguageDropdown(false);
+                  // On a phone the dropdown was a panel the height of the
+                  // screen — a full page wearing a popover's clothes, and one
+                  // that could not be scrolled past or navigated within. Mobile
+                  // browsers get the real screen instead, matching native,
+                  // where notifications have always been a route.
+                  if (isMobileViewport) {
+                    goToNotifications();
+                    return;
+                  }
                   setShowNotificationsDropdown((value) => !value);
                 }}
                 className="relative flex h-10 w-10 items-center justify-center rounded-xl text-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)]"
                 aria-label={
                   unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
                 }
-                aria-expanded={showNotificationsDropdown}
+                aria-expanded={isMobileViewport ? undefined : showNotificationsDropdown}
               >
                 <span aria-hidden="true" className="text-xl">🔔</span>
                 {unreadCount > 0 ? (
@@ -562,11 +595,13 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
                   </span>
                 ) : null}
               </button>
-              <NotificationsDropdown
-                open={showNotificationsDropdown}
-                onClose={() => setShowNotificationsDropdown(false)}
-                anchorRef={notificationsButtonRef}
-              />
+              {isMobileViewport ? null : (
+                <NotificationsDropdown
+                  open={showNotificationsDropdown}
+                  onClose={() => setShowNotificationsDropdown(false)}
+                  anchorRef={notificationsButtonRef}
+                />
+              )}
             </div>
           ) : null}
 

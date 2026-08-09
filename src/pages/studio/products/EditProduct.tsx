@@ -112,6 +112,17 @@ import {
 } from "@/utils/contentIntegrity";
 import { queryKeys } from "@/query/queryKeys";
 import useCachedResource from "@/hooks/useCachedResource";
+import useLongPressSlotDrag, {
+  longPressSlotDragTileClass,
+} from "@/hooks/useLongPressSlotDrag";
+import {
+  PRODUCT_PUBLISH_FIELD_ANCHOR,
+  PRODUCT_PUBLISH_FIELD_LABEL,
+  PRODUCT_PUBLISH_FIELD_STEP,
+  fieldsForStep,
+  validateProductForPublish,
+  type ProductPublishField,
+} from "./productPublishValidation";
 
 // The media grid only renders the first 6 view-slots (one per allowed image).
 // Every media item must map to one of these, uniquely — otherwise an item lands
@@ -542,8 +553,6 @@ const EditProduct: React.FC = () => {
   const isEditMode = Boolean(productId);
   const [draggingSlot, setDraggingSlot] = useState<string | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
-  const [touchSourceSlot, setTouchSourceSlot] = useState<MediaViewSlot | null>(null);
-  const [touchActiveOverSlot, setTouchActiveOverSlot] = useState<MediaViewSlot | null>(null);
   const isCollectionContext = returnContext === "collection";
   const isCollectionFlow = isCollectionContext && !isEditMode;
   const pageTitle = isCollectionFlow
@@ -899,26 +908,6 @@ const EditProduct: React.FC = () => {
     return false;
   }, [variantKeyCounts]);
 
-  // Live per-step completion — drives the stepper "fillers" and gates
-  // Continue/Publish. Mirrors the exact conditions the existing submit path
-  // already enforces so the wizard never disagrees with the save handler.
-  const step1Complete = useMemo(
-    () => form.title.trim().length > 0 && hasPrimaryMedia,
-    [form.title, hasPrimaryMedia],
-  );
-  const step2Complete = useMemo(
-    () =>
-      (form.price > 0 || minVariantPrice > 0) &&
-      form.variants.length > 0 &&
-      !hasDuplicateVariants,
-    [form.price, minVariantPrice, form.variants.length, hasDuplicateVariants],
-  );
-
-  const normalizedShippingRegions = useMemo(
-    () => normalizeShippingRegionCodes(shippingRegions),
-    [shippingRegions],
-  );
-
   const selectedFilterValueIds = useMemo(
     () =>
       Array.from(
@@ -936,6 +925,114 @@ const EditProduct: React.FC = () => {
         ),
       ),
     [filterSelection],
+  );
+
+  // Live publish readiness — one evaluation of the backend contract, reused for
+  // the stepper fillers, the Continue/Submit gates, the inline field errors and
+  // the "still needed" summary. Before this, the wizard checked title + cover
+  // and let the server discover the other eleven rules mid-submit.
+  const publishErrors = useMemo(
+    () =>
+      validateProductForPublish({
+        title: form.title,
+        description: form.description,
+        taxonomyCategoryId: form.taxonomyCategoryId,
+        categoryTypeId: form.categoryTypeId,
+        gender: form.gender,
+        tags: form.tags,
+        price: form.price,
+        minVariantPrice,
+        variantCount: form.variants.length,
+        hasDuplicateVariants,
+        mediaCount: mediaUrls.length,
+        hasCover: hasPrimaryMedia,
+        missingMediaSlots:
+          missingRequiredProductMediaSlots.map(getMediaViewSlotLabel),
+        styleDetailCount: selectedFilterValueIds.length,
+        trackInventory: form.trackInventory,
+        stock: form.stock,
+        customOrderEnabled: form.customOrderEnabled,
+      }),
+    [
+      form.title,
+      form.description,
+      form.taxonomyCategoryId,
+      form.categoryTypeId,
+      form.gender,
+      form.tags,
+      form.price,
+      form.variants.length,
+      form.trackInventory,
+      form.stock,
+      form.customOrderEnabled,
+      minVariantPrice,
+      hasDuplicateVariants,
+      mediaUrls.length,
+      hasPrimaryMedia,
+      missingRequiredProductMediaSlots,
+      selectedFilterValueIds.length,
+    ],
+  );
+
+  const step1Missing = useMemo(
+    () => fieldsForStep(publishErrors, 1),
+    [publishErrors],
+  );
+  const step2Missing = useMemo(
+    () => fieldsForStep(publishErrors, 2),
+    [publishErrors],
+  );
+  const step1Complete = step1Missing.length === 0;
+  const step2Complete = step2Missing.length === 0;
+
+  // A blank new product should not open covered in red. Errors surface once a
+  // field has been touched, or immediately when editing an existing product —
+  // there, an empty required field is a real defect the brand has to fix, not
+  // a form they have not filled in yet.
+  const [touchedPublishFields, setTouchedPublishFields] = useState<
+    Set<ProductPublishField>
+  >(() => new Set());
+  const markPublishFieldTouched = useCallback((field: ProductPublishField) => {
+    setTouchedPublishFields((prev) => {
+      if (prev.has(field)) return prev;
+      const next = new Set(prev);
+      next.add(field);
+      return next;
+    });
+  }, []);
+  const fieldError = useCallback(
+    (field: ProductPublishField): string | undefined =>
+      isEditMode || touchedPublishFields.has(field)
+        ? publishErrors[field]
+        : undefined,
+    [isEditMode, publishErrors, touchedPublishFields],
+  );
+
+  /** Jump to the field behind a "still needed" chip and reveal its error. */
+  const focusPublishField = useCallback(
+    (field: ProductPublishField) => {
+      markPublishFieldTouched(field);
+      const targetStep = PRODUCT_PUBLISH_FIELD_STEP[field];
+      setWizardStep(targetStep);
+      const anchorId = PRODUCT_PUBLISH_FIELD_ANCHOR[field];
+      // One frame so the step's container is visible before we measure it —
+      // steps are toggled with `hidden`, and a hidden element has no position.
+      requestAnimationFrame(() => {
+        const node = document.getElementById(anchorId);
+        if (!node) return;
+        node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const focusable = node.matches('input, textarea, select')
+          ? node
+          : node.querySelector<HTMLElement>('input, textarea, button, [tabindex]');
+        focusable?.focus({ preventScroll: true });
+      });
+    },
+    [markPublishFieldTouched],
+  );
+
+  const normalizedShippingRegions = useMemo(
+    () => normalizeShippingRegionCodes(shippingRegions),
+    [shippingRegions],
   );
 
   const hasShippingRegionPolicyChanges = useMemo(
@@ -2928,42 +3025,18 @@ const EditProduct: React.FC = () => {
     }
   };
 
-  const handleTouchStart = (_e: React.TouchEvent, slot: MediaViewSlot) => {
-    if (saving || !mediaBySlot.has(slot)) return;
-    setTouchSourceSlot(slot);
-    setDraggingSlot(slot);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!touchSourceSlot) return;
-    const touch = e.touches[0];
-    if (!touch) return;
-
-    const element = document.elementFromPoint(touch.clientX, touch.clientY);
-    if (!element) return;
-
-    const slotEl = element.closest("[data-slot]");
-    if (slotEl) {
-      const targetSlot = slotEl.getAttribute("data-slot") as MediaViewSlot | null;
-      if (targetSlot && targetSlot !== touchSourceSlot) {
-        setTouchActiveOverSlot(targetSlot);
-        setDragOverSlot(targetSlot);
-        return;
-      }
-    }
-    setTouchActiveOverSlot(null);
-    setDragOverSlot(null);
-  };
-
-  const handleTouchEnd = (_e: React.TouchEvent) => {
-    if (touchSourceSlot && touchActiveOverSlot) {
-      handleSwapMediaSlots(touchSourceSlot, touchActiveOverSlot);
-    }
-    setTouchSourceSlot(null);
-    setTouchActiveOverSlot(null);
-    setDraggingSlot(null);
-    setDragOverSlot(null);
-  };
+  // Touch reordering is long-press armed — see `useLongPressSlotDrag` for why
+  // the old touch-to-drag made the media grid impossible to scroll past.
+  const {
+    containerRef: mediaSlotGridRef,
+    draggingSlot: touchDraggingSlot,
+    overSlot: touchOverSlot,
+  } = useLongPressSlotDrag({
+    enabled: !saving,
+    canDragSlot: (slot) => mediaBySlot.has(slot as MediaViewSlot),
+    onSwap: (from, to) =>
+      handleSwapMediaSlots(from as MediaViewSlot, to as MediaViewSlot),
+  });
 
   const handleSetCover = useCallback(
     async (mediaId: string) => {
@@ -3154,6 +3227,27 @@ const EditProduct: React.FC = () => {
   // Render
   // =====================
   const isDraftEditMode = isEditMode && form.status === "DRAFT";
+
+  // Drafts are allowed to be incomplete — that is what a draft is for. Only
+  // submissions that will actually reach the server's publish validation are
+  // gated: the collection flow saves as DRAFT, and editing an existing product
+  // without forcing a status leaves DRAFT/ARCHIVED products where they are.
+  const submitKeepsCurrentStatus =
+    isEditMode && !isDraftEditMode && !isCollectionContext && !isCollectionFlow;
+  const isDraftOnlySubmit =
+    isCollectionFlow ||
+    (submitKeepsCurrentStatus &&
+      (form.status === "DRAFT" || form.status === "ARCHIVED"));
+  const blockingPublishFields: ProductPublishField[] = isDraftOnlySubmit
+    ? []
+    : [...step1Missing, ...step2Missing];
+  const canAdvanceFromCurrentStep =
+    isDraftOnlySubmit ||
+    (wizardStep === 1
+      ? step1Complete
+      : wizardStep === 2
+        ? step2Complete
+        : true);
 
   return (
     <div className="flex flex-col min-h-full bg-transparent text-theme font-sans">
@@ -3456,14 +3550,18 @@ const EditProduct: React.FC = () => {
                 </button>
               )}
 
-              <div className="mt-4 grid grid-cols-2 gap-3">
+              <div ref={mediaSlotGridRef} className="mt-4 grid grid-cols-2 gap-3">
                 {MEDIA_VIEW_SLOT_OPTIONS.slice(0, maxMediaCount).map((slotOption) => {
                   const assigned = mediaBySlot.get(slotOption.value);
                   const isMissing =
                     slotOption.required &&
                     missingRequiredProductMediaSlots.includes(slotOption.value);
-                  const isDragging = draggingSlot === slotOption.value;
-                  const isDragOver = dragOverSlot === slotOption.value;
+                  const isDragging =
+                    draggingSlot === slotOption.value ||
+                    touchDraggingSlot === slotOption.value;
+                  const isDragOver =
+                    dragOverSlot === slotOption.value ||
+                    touchOverSlot === slotOption.value;
                   const isSelected = assigned && mediaUrls[carouselIndex]?.id === assigned.id;
 
                   return (
@@ -3484,11 +3582,8 @@ const EditProduct: React.FC = () => {
                         setDragOverSlot(null);
                       }}
                       onDrop={(e) => handleDrop(e, slotOption.value)}
-                      onTouchStart={(e) => handleTouchStart(e, slotOption.value)}
-                      onTouchMove={handleTouchMove}
-                      onTouchEnd={handleTouchEnd}
                       className={`relative rounded-xl overflow-hidden aspect-[4/3] w-full border transition-all duration-200 group ${
-                        assigned && !saving ? "touch-none" : ""
+                        assigned && !saving ? longPressSlotDragTileClass : ""
                       } ${
                         isDragging
                           ? "border-dashed border-purple-400 opacity-50 scale-95"
@@ -3559,16 +3654,15 @@ const EditProduct: React.FC = () => {
                 })}
               </div>
 
-              {mediaUrls.length > 0 &&
-                missingRequiredProductMediaSlots.length > 0 && (
+              {publishErrors.media && mediaUrls.length > 0 && (
                 <p className="mt-3 text-xs text-orange-500">
-                  Add {missingRequiredProductMediaSlots.map(getMediaViewSlotLabel).join(", ")} media before going live.
+                  {publishErrors.media}
                 </p>
               )}
 
-              {!hasPrimaryMedia && mediaUrls.length > 0 && (
+              {publishErrors.cover && (
                 <p className="mt-3 text-xs text-orange-500">
-                  Select a cover image before saving.
+                  {publishErrors.cover}
                 </p>
               )}
 
@@ -3617,11 +3711,14 @@ const EditProduct: React.FC = () => {
 
               <div className="space-y-4">
                 <Input
+                  id="product-title-field"
                   label="Product Title"
                   required
                   type="text"
                   value={form.title}
                   onChange={(e) => updateForm("title", e.target.value)}
+                  onBlur={() => markPublishFieldTouched("title")}
+                  error={fieldError("title")}
                   placeholder="Enter product title"
                   data-testid="product-title-input"
                 />
@@ -3632,10 +3729,13 @@ const EditProduct: React.FC = () => {
                           <div className="min-w-0">
                             <UniversalSelect
                               label="What is it?"
+                              required
+                              error={fieldError("taxonomyCategoryId")}
                               value={form.taxonomyCategoryId}
-                              onChange={(value) =>
-                                updateForm("taxonomyCategoryId", value)
-                              }
+                              onChange={(value) => {
+                                markPublishFieldTouched("taxonomyCategoryId");
+                                updateForm("taxonomyCategoryId", value);
+                              }}
                               options={taxonomyCategorySelectOptions}
                               placeholder={
                                 categoriesLoading
@@ -3657,10 +3757,13 @@ const EditProduct: React.FC = () => {
                           <div className="min-w-0">
                             <UniversalSelect
                               label="Garment type"
+                              required
+                              error={fieldError("categoryTypeId")}
                               value={form.categoryTypeId}
-                              onChange={(value) =>
-                                updateForm("categoryTypeId", value)
-                              }
+                              onChange={(value) => {
+                                markPublishFieldTouched("categoryTypeId");
+                                updateForm("categoryTypeId", value);
+                              }}
                               options={subCategorySelectOptions}
                               placeholder={
                                 form.taxonomyCategoryId ||
@@ -3693,10 +3796,13 @@ const EditProduct: React.FC = () => {
                           <div className="min-w-0">
                             <UniversalSelect
                               label="Who is it for?"
+                              required
+                              error={fieldError("gender")}
                               value={form.gender}
-                              onChange={(value) =>
-                                updateForm("gender", value as CreatorAudience)
-                              }
+                              onChange={(value) => {
+                                markPublishFieldTouched("gender");
+                                updateForm("gender", value as CreatorAudience);
+                              }}
                               options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
                                 value: option.value,
                                 label: option.label,
@@ -3761,13 +3867,21 @@ const EditProduct: React.FC = () => {
                         </div>
                       </div>
 
-                      <div>
+                      <div id="product-style-details-field">
                         <FilterSelector
                           value={filterSelection}
-                          onChange={setFilterSelection}
+                          onChange={(next) => {
+                            markPublishFieldTouched("styleDetails");
+                            setFilterSelection(next);
+                          }}
                           entityType="PRODUCT"
                           onTagSuggestions={setTagSuggestions}
                         />
+                        {fieldError("styleDetails") && (
+                          <p className="mt-1.5 text-xs text-red-500">
+                            {fieldError("styleDetails")}
+                          </p>
+                        )}
                         {selectedFilterValueIds.length > 8 && (
                           <p className="mt-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-300">
                             ⚠️ {selectedFilterValueIds.length} style details selected — fewer,
@@ -3776,9 +3890,10 @@ const EditProduct: React.FC = () => {
                         )}
                       </div>
 
-                      <div>
+                      <div id="product-hashtags-field">
                         <label className="text-[11px] font-semibold text-theme-secondary mb-1.5 flex items-center">
                           Hashtags (up to {MAX_PRODUCT_TAGS})
+                          <span className="text-purple-500 ml-1">*</span>
                           <InfoTooltip text={CREATOR_METADATA_HELP.hashtags} />
                         </label>
                         {tagSuggestions.length > 0 && (
@@ -3857,9 +3972,15 @@ const EditProduct: React.FC = () => {
                             ))}
                           </div>
                         )}
-                        <p className="text-[11px] text-theme-secondary mt-1">
-                          Add one tag at a time. Use Enter or the Add button.
-                        </p>
+                        {fieldError("tags") ? (
+                          <p className="mt-1 text-xs text-red-500">
+                            {fieldError("tags")}
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-theme-secondary mt-1">
+                            Add one tag at a time. Use Enter or the Add button.
+                          </p>
+                        )}
                         <HashtagPickerModal
                           open={showTagPicker}
                           onClose={() => setShowTagPicker(false)}
@@ -3871,13 +3992,17 @@ const EditProduct: React.FC = () => {
                       </div>
 
                       <Textarea
+                        id="product-description-field"
                         label="Description"
+                        required
+                        error={fieldError("description")}
                         rows={4}
                         placeholder="Describe your product..."
                         value={form.description}
                         onChange={(e) =>
                           updateForm("description", e.target.value)
                         }
+                        onBlur={() => markPublishFieldTouched("description")}
                       />
                     </div>
                   </div>
@@ -3938,13 +4063,15 @@ const EditProduct: React.FC = () => {
                   {!collapsedSections.pricing && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 items-start">
                       <Input
-                        label="Price *"
+                        label="Price"
                         required
+                        error={fieldError("price")}
                         type="number"
                         value={form.price || ""}
                         onChange={(e) =>
                           updateForm("price", Number(e.target.value))
                         }
+                        onBlur={() => markPublishFieldTouched("price")}
                         placeholder="0"
                         startIcon={
                           <span className="text-theme-secondary text-xs">
@@ -4010,7 +4137,7 @@ const EditProduct: React.FC = () => {
                 </div>
 
                 {/* Variants */}
-                <div className="space-y-4 py-2">
+                <div id="product-variants-section" className="scroll-mt-24 space-y-4 py-2">
                   <div
                     className={`pb-2 ${collapsedSections.variants ? "" : "border-b border-gray-100 dark:border-white/5"}`}
                   >
@@ -4418,7 +4545,7 @@ const EditProduct: React.FC = () => {
                   {!collapsedSections.fulfillment && (
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Inventory */}
-                      <div className="py-2 space-y-4">
+                      <div id="product-inventory-section" className="scroll-mt-24 py-2 space-y-4">
                         <div className="flex items-center justify-between">
                           <h2 className="text-base font-medium text-theme">
                             Inventory
@@ -4966,6 +5093,31 @@ const EditProduct: React.FC = () => {
 
       {/* Footer */}
       <footer className="sticky bottom-0 z-20 w-full px-4 py-2.5 backdrop-blur-md bg-white/80 dark:bg-zinc-900/80 border-t border-gray-200/40 dark:border-white/10 sm:px-6">
+        {/* Why the primary button is inactive. A disabled control with no
+            explanation is worse than the mid-submit toast it replaces, so the
+            blockers are named here and each one jumps to its field. */}
+        {blockingPublishFields.length > 0 && !isDraftOnlySubmit && (
+          <div className="mx-auto mb-2 flex max-w-7xl flex-wrap items-center gap-x-2 gap-y-1.5">
+            <span className="text-[11px] font-semibold text-theme-secondary">
+              Still needed:
+            </span>
+            {blockingPublishFields.map((field) => (
+              <button
+                key={field}
+                type="button"
+                onClick={() => focusPublishField(field)}
+                className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20"
+              >
+                {PRODUCT_PUBLISH_FIELD_LABEL[field]}
+                {PRODUCT_PUBLISH_FIELD_STEP[field] !== wizardStep ? (
+                  <span className="opacity-70">
+                    · step {PRODUCT_PUBLISH_FIELD_STEP[field]}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs text-theme-secondary">
             {/* The "changes" concept only means something when editing an entity
@@ -5049,7 +5201,13 @@ const EditProduct: React.FC = () => {
               <button
                 type="button"
                 onClick={() => goToStep((wizardStep + 1) as 1 | 2 | 3)}
-                className="relative inline-flex min-h-11 flex-1 items-center justify-center gap-1 rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 md:min-h-10 md:flex-initial md:px-6 md:text-sm"
+                disabled={!canAdvanceFromCurrentStep}
+                title={
+                  canAdvanceFromCurrentStep
+                    ? undefined
+                    : "Complete this step's required fields first"
+                }
+                className="relative inline-flex min-h-11 flex-1 items-center justify-center gap-1 rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-purple-600/40 disabled:shadow-none md:min-h-10 md:flex-initial md:px-6 md:text-sm"
               >
                 Continue to {wizardStep === 1 ? "Operations" : "Review"}
                 <ChevronRight className="h-4 w-4" />
@@ -5075,8 +5233,17 @@ const EditProduct: React.FC = () => {
                           : undefined,
                   })
                 }
-                disabled={saving || submitLocked}
-                className="relative inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 disabled:bg-purple-600/50 md:min-h-10 md:flex-initial md:px-6 md:text-sm"
+                disabled={
+                  saving || submitLocked || blockingPublishFields.length > 0
+                }
+                title={
+                  blockingPublishFields.length > 0
+                    ? `Still needed: ${blockingPublishFields
+                        .map((field) => PRODUCT_PUBLISH_FIELD_LABEL[field])
+                        .join(", ")}`
+                    : undefined
+                }
+                className="relative inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-purple-600/50 disabled:shadow-none md:min-h-10 md:flex-initial md:px-6 md:text-sm"
               >
                 {(saving || submitLocked) && saveAction === "publish" && (
                   <span className="absolute inset-0 flex items-center justify-center">

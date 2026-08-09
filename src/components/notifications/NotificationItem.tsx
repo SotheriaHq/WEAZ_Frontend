@@ -47,10 +47,16 @@ export interface NotificationItemProps {
   onUsernameClick: (actorId: string) => void;
   onBodyClick: (notification: NormalizedNotification) => void;
   onMarkRead: (id: string) => void;
+  /**
+   * Renders the dismiss control. It lives inside the row rather than in the
+   * caller's markup because the row IS the `<li>` — an outer wrapper would
+   * nest one list item inside another.
+   */
+  onDelete?: (id: string) => void;
 }
 
 export const NotificationItem = React.memo<NotificationItemProps>(
-  ({ notification, onAvatarClick, onUsernameClick, onBodyClick, onMarkRead }) => {
+  ({ notification, onAvatarClick, onUsernameClick, onBodyClick, onMarkRead, onDelete }) => {
     const { id, type, isRead, actor, target, message } = notification;
     const displayName = getActorDisplayName(notification);
     const actionText = getActionText(type);
@@ -97,6 +103,11 @@ export const NotificationItem = React.memo<NotificationItemProps>(
       
       onBodyClick(notification);
     }, [id, handleMarkRead, onBodyClick, notification]);
+
+    const handleDelete = useCallback((e: React.MouseEvent) => {
+      e.stopPropagation();
+      onDelete?.(id);
+    }, [id, onDelete]);
 
     // Keyboard handler for accessibility
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -186,6 +197,18 @@ export const NotificationItem = React.memo<NotificationItemProps>(
         <div className="icon-section">
           <NotificationIcon type={type} size="sm" />
         </div>
+
+        {onDelete ? (
+          <button
+            type="button"
+            className="notification-dismiss"
+            onClick={handleDelete}
+            aria-label="Delete notification"
+            data-testid="notification-delete"
+          >
+            <span aria-hidden="true">✕</span>
+          </button>
+        ) : null}
       </li>
     );
   },
@@ -193,7 +216,8 @@ export const NotificationItem = React.memo<NotificationItemProps>(
     // Custom comparison - only re-render if these change
     return (
       prevProps.notification.id === nextProps.notification.id &&
-      prevProps.notification.isRead === nextProps.notification.isRead
+      prevProps.notification.isRead === nextProps.notification.isRead &&
+      Boolean(prevProps.onDelete) === Boolean(nextProps.onDelete)
     );
   }
 );

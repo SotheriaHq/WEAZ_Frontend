@@ -1033,7 +1033,18 @@ const App: React.FC = () => (
     <ScrollRestoreProvider>
       <DropdownManagerProvider>
         <BrandPatchProvider>
-          <Toaster position="top-center" richColors closeButton />
+          {/* 5s, not sonner's default 4s. Failure toasts carry the whole
+              explanation ("Product description is required to publish") and
+              four seconds is not enough to read a sentence, notice which field
+              it names, and react — the reported symptom was a submit that
+              "failed with no message". `closeButton` still lets anyone dismiss
+              early. */}
+          <Toaster
+            position="top-center"
+            richColors
+            closeButton
+            duration={5000}
+          />
           <NoticeModalHost />
           <RouterProvider router={router} />
         </BrandPatchProvider>

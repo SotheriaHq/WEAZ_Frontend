@@ -719,6 +719,8 @@ export interface AdminContentSubmission {
     submittedAt: string;
     reviewedAt?: string | null;
     reviewedById?: string | null;
+    /** Resolved reviewer — the raw id alone is unusable in an audit trail. */
+    reviewedBy?: { id: string; username: string | null } | null;
   }>;
   reports: AdminContentReport[];
 }

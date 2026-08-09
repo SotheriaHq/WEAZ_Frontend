@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import BrandedQRCode from './BrandedQRCode';
@@ -32,7 +32,6 @@ export const EntityQrModal: React.FC<EntityQrModalProps> = ({
   username,
 }) => {
   const qrRootRef = useRef<HTMLDivElement | null>(null);
-  const [logoMessage, setLogoMessage] = useState<string | null>(null);
   const normalizedFileName = useMemo(
     () => sanitizeQrFilename(downloadFileName),
     [downloadFileName],
@@ -103,7 +102,7 @@ export const EntityQrModal: React.FC<EntityQrModalProps> = ({
           </div>
 
           <div className="mt-3 sm:mt-5">
-            <QRExportFrame note={logoMessage}>
+            <QRExportFrame>
               <BrandedQRCode
                 ref={qrRootRef}
                 value={url}
@@ -111,7 +110,6 @@ export const EntityQrModal: React.FC<EntityQrModalProps> = ({
                 username={username}
                 previewSize={236}
                 exportSize={960}
-                onLogoMessage={setLogoMessage}
               />
             </QRExportFrame>
           </div>

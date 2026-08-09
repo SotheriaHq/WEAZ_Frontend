@@ -25,6 +25,8 @@ interface UniversalSelectProps {
   disabled?: boolean;
   className?: string;
   error?: string;
+  /** Shows the required asterisk, matching `Input`/`Textarea`. */
+  required?: boolean;
   searchable?: boolean;
   searchPlaceholder?: string;
   emptyMessage?: string;
@@ -50,6 +52,7 @@ const MENU_MIN_HEIGHT = 120;
 const MENU_MAX_HEIGHT = 320;
 
 const UniversalSelect: React.FC<UniversalSelectProps> = ({
+  required,
   label,
   value,
   onChange,
@@ -355,6 +358,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
       {label && (
         <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">
           {label}
+          {required && <span className="text-purple-500 ml-1">*</span>}
         </label>
       )}
 

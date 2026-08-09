@@ -3,14 +3,12 @@ import React from 'react';
 interface QRExportFrameProps {
   title?: string;
   subtitle?: string;
-  note?: string | null;
   children: React.ReactNode;
 }
 
 export const QRExportFrame: React.FC<QRExportFrameProps> = ({
   title,
   subtitle,
-  note,
   children,
 }) => {
   return (
@@ -33,9 +31,6 @@ export const QRExportFrame: React.FC<QRExportFrameProps> = ({
       <div className="grid place-items-center rounded-[1.5rem] bg-white p-4 shadow-inner">
         {children}
       </div>
-      {note ? (
-        <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">{note}</p>
-      ) : null}
     </div>
   );
 };

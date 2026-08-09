@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiPlay, FiStar, FiPlus, FiMove } from 'react-icons/fi';
 import type { MediaItem, MediaItemKind } from '../../types/media';
@@ -28,6 +28,17 @@ interface ThumbnailStripProps {
 
 /** Movement (px) before a press is treated as a drag rather than a tap. */
 const DRAG_ACTIVATION_PX = 6;
+
+/**
+ * Touch drags must be held before they arm. With movement alone as the trigger,
+ * six pixels of finger travel over a 24px grip was enough to start reordering —
+ * so on a phone the images shuffled under the thumb during what the owner
+ * intended as a scroll ("the user just touches, and the image is moving").
+ * A mouse pointer is precise and is not also the scrolling instrument, so it
+ * keeps the immediate movement threshold.
+ */
+const TOUCH_DRAG_HOLD_MS = 600;
+const TOUCH_DRAG_HOLD_TOLERANCE_PX = 10;
 
 interface PreviewFile {
   file?: File;
@@ -80,8 +91,19 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
     startX: number;
     startY: number;
     active: boolean;
+    /** Touch only: true once the press has been held long enough to arm. */
+    held: boolean;
+    holdTimer: ReturnType<typeof setTimeout> | null;
   } | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [armedId, setArmedId] = useState<string | null>(null);
+
+  const clearDrag = useCallback(() => {
+    if (dragRef.current?.holdTimer) clearTimeout(dragRef.current.holdTimer);
+    dragRef.current = null;
+    setDraggingId(null);
+    setArmedId(null);
+  }, []);
 
   const indexOfId = useCallback(
     (id: string) => items.findIndex((item) => item.id === id),
@@ -93,12 +115,23 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
       if (!onReorder || disabled || !id) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       event.stopPropagation();
+
+      const isTouch = event.pointerType !== 'mouse';
       dragRef.current = {
         pointerId: event.pointerId,
         id,
         startX: event.clientX,
         startY: event.clientY,
         active: false,
+        held: !isTouch,
+        holdTimer: isTouch
+          ? setTimeout(() => {
+              if (dragRef.current?.id !== id) return;
+              dragRef.current.held = true;
+              setArmedId(id);
+              navigator.vibrate?.(15);
+            }, TOUCH_DRAG_HOLD_MS)
+          : null,
       };
     },
     [disabled, onReorder],
@@ -109,8 +142,16 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
       const drag = dragRef.current;
       if (!drag || drag.pointerId !== event.pointerId || !onReorder) return;
 
+      const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+
+      if (!drag.held) {
+        // Still waiting out the hold: any real movement means this was a
+        // scroll, so hand the gesture back rather than starting a reorder.
+        if (moved > TOUCH_DRAG_HOLD_TOLERANCE_PX) clearDrag();
+        return;
+      }
+
       if (!drag.active) {
-        const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
         if (moved < DRAG_ACTIVATION_PX) return;
         drag.active = true;
         setDraggingId(drag.id);
@@ -134,19 +175,23 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
     [indexOfId, onReorder],
   );
 
-  const handleGripPointerEnd = useCallback((event: React.PointerEvent<HTMLElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    if (drag.active) {
-      try {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      } catch {
-        /* already released */
+  const handleGripPointerEnd = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      if (drag.active) {
+        try {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        } catch {
+          /* already released */
+        }
       }
-    }
-    dragRef.current = null;
-    setDraggingId(null);
-  }, []);
+      clearDrag();
+    },
+    [clearDrag],
+  );
+
+  useEffect(() => clearDrag, [clearDrag]);
 
   const previewFiles: PreviewFile[] = useMemo(() => {
     return items.map((it) => ({
@@ -276,16 +321,21 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({
                     onPointerUp={handleGripPointerEnd}
                     onPointerCancel={handleGripPointerEnd}
                     onClick={(event) => event.stopPropagation()}
-                    className="
+                    className={`
                       absolute bottom-1 left-1 z-10 flex h-6 w-6 touch-none
-                      items-center justify-center rounded-full bg-black/70
-                      text-white transition-colors hover:bg-purple-600
+                      items-center justify-center rounded-full
+                      text-white transition-all hover:bg-purple-600
                       cursor-grab active:cursor-grabbing
-                    "
+                      ${
+                        armedId === pf.id
+                          ? 'scale-125 bg-purple-600 ring-2 ring-purple-300'
+                          : 'bg-black/70'
+                      }
+                    `}
                     aria-label={`Reorder ${getMediaViewSlotLabel(
                       normalizeMediaViewSlot(pf.viewSlot, idx),
                     )} image`}
-                    title="Drag to reorder — position sets the view slot"
+                    title="Press and hold, then drag to reorder — position sets the view slot"
                   >
                     <FiMove className="h-3.5 w-3.5" />
                   </button>

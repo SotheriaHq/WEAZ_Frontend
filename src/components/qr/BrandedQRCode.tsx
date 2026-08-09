@@ -1,7 +1,8 @@
-import { forwardRef, useEffect, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import { QRCode } from 'react-qrcode-logo';
 import { useCurrentTheme } from '@/hooks/useCurrentTheme';
 import { resolveQrLogo, type QrLogoSource } from '@/utils/qrLogoResolver';
+import { drawQrCenterLabel } from '@/utils/qrCenterLabel';
 
 export interface BrandedQRCodeProps {
   value: string;
@@ -9,9 +10,8 @@ export interface BrandedQRCodeProps {
   previewSize?: number;
   exportSize?: number;
   className?: string;
-  /** Username to embed visually below the QR code */
+  /** Handle to stamp in the middle of the code, rendered as `@name`. */
   username?: string | null;
-  onLogoMessage?: (message: string | null) => void;
 }
 
 /** WIEZ brand gradient — purple to indigo */
@@ -20,43 +20,68 @@ const WIEZ_EYE_COLOR = '#4f46e5'; // indigo-600
 
 export const BrandedQRCode = forwardRef<HTMLDivElement, BrandedQRCodeProps>(
   (
-    {
-      value,
-      logo,
-      previewSize = 236,
-      exportSize = 960,
-      className,
-      username,
-      onLogoMessage,
-    },
+    { value, logo, previewSize = 236, exportSize = 960, className, username },
     ref,
   ) => {
     const theme = useCurrentTheme();
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
+    const hostRef = useRef<HTMLDivElement | null>(null);
+
+    const handle = username?.trim() ? `@${username.trim()}` : null;
+
+    // The handle owns the middle of the code, so a brand logo would land on top
+    // of it. Only fetch/paint the logo when there is no handle to show.
+    const wantsLogo = !handle && Boolean(logo);
 
     useEffect(() => {
+      if (!wantsLogo) {
+        setLogoUrl(null);
+        return;
+      }
+
       let active = true;
-
-      const run = async () => {
+      void (async () => {
         const resolved = await resolveQrLogo(logo);
-        if (!active) return;
-        setLogoUrl(resolved.url);
-        onLogoMessage?.(resolved.message ?? null);
-      };
-
-      void run();
+        if (active) setLogoUrl(resolved.url);
+      })();
       return () => {
         active = false;
       };
-    }, [logo, onLogoMessage]);
+    }, [logo, wantsLogo]);
 
     const darkMode = theme === 'dark';
     const fgColor = darkMode ? '#c4b5fd' : WIEZ_FG_COLOR; // purple-300 in dark, purple-700 in light
     const bgColor = darkMode ? '#18181b' : '#ffffff'; // zinc-900 in dark
+    const eyeColor = darkMode ? '#a78bfa' : WIEZ_EYE_COLOR;
+
+    /**
+     * The handle is painted INTO the QR canvas, not layered over it as a
+     * positioned `<span>`. `downloadQrPng` exports `canvas.toDataURL()`, so an
+     * overlay div is visible in the modal and then silently absent from the
+     * saved PNG — which is why the handle "was not part of" the QR anyone
+     * actually shared. Drawing on the canvas makes the preview and the export
+     * the same artwork by construction.
+     *
+     * `react-qrcode-logo` repaints the canvas from scratch whenever its props
+     * change, wiping this; every input that can trigger that repaint is in the
+     * dep list so the label is restamped. Child effects run before parent
+     * effects, so the code itself is always on the canvas by the time this runs.
+     */
+    useEffect(() => {
+      const canvas = hostRef.current?.querySelector('canvas');
+      if (!canvas || !handle) return;
+      drawQrCenterLabel(canvas, handle, { fgColor, bgColor });
+    }, [handle, value, fgColor, bgColor, eyeColor, exportSize, logoUrl]);
+
+    const setRefs = (node: HTMLDivElement | null) => {
+      hostRef.current = node;
+      if (typeof ref === 'function') ref(node);
+      else if (ref) ref.current = node;
+    };
 
     return (
       <div
-        ref={ref}
+        ref={setRefs}
         className={className}
         data-theme={theme}
         style={{ position: 'relative', display: 'inline-block' }}
@@ -64,12 +89,14 @@ export const BrandedQRCode = forwardRef<HTMLDivElement, BrandedQRCodeProps>(
         <QRCode
           value={value}
           size={exportSize}
-          ecLevel={logoUrl || username ? 'Q' : 'M'}
+          // 'Q' recovers ~25% of the code, which comfortably covers the small
+          // centre plate the handle or logo sits on.
+          ecLevel={logoUrl || handle ? 'Q' : 'M'}
           quietZone={12}
           qrStyle="dots"
           bgColor={bgColor}
           fgColor={fgColor}
-          eyeColor={darkMode ? '#a78bfa' : WIEZ_EYE_COLOR}
+          eyeColor={eyeColor}
           logoImage={logoUrl || undefined}
           logoWidth={logoUrl ? exportSize * 0.18 : undefined}
           logoHeight={logoUrl ? exportSize * 0.18 : undefined}
@@ -82,35 +109,6 @@ export const BrandedQRCode = forwardRef<HTMLDivElement, BrandedQRCodeProps>(
             display: 'block',
           }}
         />
-        {/* Username embedded inside the QR code — bottom edge */}
-        {username ? (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: Math.round(previewSize * 0.06),
-              left: '50%',
-              transform: 'translateX(-50%)',
-              pointerEvents: 'none',
-            }}
-          >
-            <span
-              style={{
-                display: 'inline-block',
-                padding: '2px 8px',
-                fontSize: Math.max(9, Math.round(previewSize * 0.042)),
-                fontWeight: 700,
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                letterSpacing: '0.03em',
-                color: fgColor,
-                backgroundColor: bgColor,
-                borderRadius: 4,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              @{username}
-            </span>
-          </div>
-        ) : null}
       </div>
     );
   },

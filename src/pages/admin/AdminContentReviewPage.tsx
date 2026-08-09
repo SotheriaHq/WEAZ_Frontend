@@ -189,6 +189,7 @@ const buildReviewLifecycle = (submission: AdminContentSubmission) => {
       submittedAt: submission.submittedAt,
       reviewedAt: submission.reviewedAt ?? null,
       reviewedById: submission.reviewedBy?.id ?? null,
+      reviewedBy: submission.reviewedBy ?? null,
     },
   ];
 };
@@ -783,16 +784,28 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
               <div className="rounded-lg border border-gray-200 p-4 dark:border-white/10">
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">Review History</h3>
                 <div className="mt-3 space-y-3">
-                  {buildReviewLifecycle(selected).map((history) => (
+                  {buildReviewLifecycle(selected).map((history, index, all) => (
                     <div key={history.id} className="rounded-lg bg-gray-50 p-3 text-sm dark:bg-white/5">
-                      <div className="font-semibold text-gray-900 dark:text-white">{statusLabel[history.status]}</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {statusLabel[history.status]}
+                        </span>
+                        {/* History is newest-first, so cycle 1 is the last row.
+                            Numbering it makes "which round was this?" answerable
+                            without counting entries by hand. */}
+                        <span className="shrink-0 rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                          {index === 0 ? 'Latest' : `Cycle ${all.length - index}`}
+                        </span>
+                      </div>
                       <div className="mt-1 text-xs text-gray-500">Submitted: {formatDate(history.submittedAt)}</div>
                       {history.reviewedAt && (
                         <div className="mt-1 text-xs text-gray-500">Reviewed: {formatDate(history.reviewedAt)}</div>
                       )}
-                      {history.reviewedById && (
-                        <div className="mt-1 text-xs text-gray-500">Reviewer: {history.reviewedById}</div>
-                      )}
+                      {history.reviewedBy?.username || history.reviewedById ? (
+                        <div className="mt-1 text-xs text-gray-500">
+                          Reviewer: {history.reviewedBy?.username || history.reviewedById}
+                        </div>
+                      ) : null}
                       {history.reasonLabel && <div className="mt-1 text-gray-500 dark:text-gray-400">{history.reasonLabel}</div>}
                       {history.reasonNote && <div className="mt-1 text-gray-500 dark:text-gray-400">{history.reasonNote}</div>}
                     </div>
