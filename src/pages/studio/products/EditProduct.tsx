@@ -56,6 +56,12 @@ import {
   validateMedia,
 } from "./mediaUtils";
 import { getTagColor } from "@/utils/tagColors";
+import {
+  needsResubmission,
+  normalizeContentReviewStatus,
+  primaryActionLabel,
+  reviewStateHint,
+} from "@/utils/contentReviewActions";
 import FilterSelector, {
   type FilterSelection,
 } from "@/components/categories/FilterSelector";
@@ -3210,6 +3216,22 @@ const EditProduct: React.FC = () => {
   // Render
   // =====================
   const isDraftEditMode = isEditMode && form.status === "DRAFT";
+  /**
+   * Where this product sits in the review lifecycle, from the server's own
+   * status rather than the local form status. `CHANGES_REQUESTED` / `REJECTED`
+   * mean the owner is answering the review team, and the action bar has to say
+   * so — "Save Changes" reads as a metadata edit and left owners believing
+   * their resubmission never went anywhere.
+   */
+  const productReviewStatus = useMemo(
+    () => normalizeContentReviewStatus(contentStatus),
+    [contentStatus],
+  );
+  const isResubmission = needsResubmission(productReviewStatus);
+  const productReviewHint = useMemo(
+    () => reviewStateHint(productReviewStatus),
+    [productReviewStatus],
+  );
 
   // Drafts are allowed to be incomplete — that is what a draft is for. Only
   // submissions that will actually reach the server's publish validation are
@@ -4998,7 +5020,9 @@ const EditProduct: React.FC = () => {
                 that already exists (draft or active). For a first-time create
                 there is no saved version to have unsaved changes against — the
                 indicator would just be noise next to "Save as Draft". */}
-            {isEditMode &&
+            {productReviewHint ? (
+              <span>{productReviewHint}</span>
+            ) : isEditMode &&
               (hasChanges ? (
                 <span className="text-orange-400">Unsaved changes</span>
               ) : (
@@ -5019,7 +5043,15 @@ const EditProduct: React.FC = () => {
                 Back
               </button>
             )}
-            {!isEditMode && !isCollectionContext && (
+            {/*
+              Also shown while answering a change request. Previously this was
+              create-only, so an owner whose product came back with requested
+              changes had exactly one control — submit — and no way to park the
+              work in progress. Deliberately NOT extended to live products:
+              draft-saving an ACTIVE product would silently unpublish it.
+            */}
+            {((!isEditMode && !isCollectionContext) ||
+              (isResubmission && !isCollectionContext && !isCollectionFlow)) && (
               <button
                 onClick={() =>
                   void triggerSave(true, {
@@ -5097,7 +5129,14 @@ const EditProduct: React.FC = () => {
                       ? "ACTIVE"
                       : isDraftEditMode
                         ? "ACTIVE"
-                        : !isEditMode
+                        // Answering a change request is a SUBMISSION. Leaving
+                        // this undefined kept the product on its existing
+                        // CHANGES_REQUESTED/REJECTED status, so the owner's
+                        // edits never re-entered the review queue and the
+                        // content sat stuck with nobody waiting on it.
+                        : isResubmission
+                          ? "ACTIVE"
+                          : !isEditMode
                           // A first-time "Create Product" submit is always a
                           // submission — it must resolve to IN_REVIEW server-
                           // side, never fall back to whatever `form.status`
@@ -5125,15 +5164,21 @@ const EditProduct: React.FC = () => {
                   </span>
                 )}
                 <span className={(saving || submitLocked) && saveAction === "publish" ? "opacity-0" : ""}>
-                  {isDraftEditMode
-                    ? "Go live"
-                    : isCollectionContext && isEditMode
-                      ? "Save to Collection"
-                      : isEditMode
-                        ? "Save Changes"
-                        : isCollectionFlow
-                          ? "Add to Collection"
-                          : "Create Product"}
+                  {isResubmission
+                    ? primaryActionLabel({
+                        status: productReviewStatus,
+                        isEditMode,
+                        entity: "product",
+                      })
+                    : isDraftEditMode
+                      ? "Go live"
+                      : isCollectionContext && isEditMode
+                        ? "Save to Collection"
+                        : isEditMode
+                          ? "Save Changes"
+                          : isCollectionFlow
+                            ? "Add to Collection"
+                            : "Create Product"}
                 </span>
               </button>
             )}

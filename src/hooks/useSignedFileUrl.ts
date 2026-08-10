@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { brandApi } from '@/api/BrandApi';
-import { WIEZ_QUERY_STALE_TIME_MS } from '@/query/queryClient';
+import {
+  WIEZ_MEDIA_URL_GC_TIME_MS,
+  WIEZ_QUERY_STALE_TIME_MS,
+} from '@/query/queryClient';
 import { queryKeys } from '@/query/queryKeys';
 
 // Re-use the same session-storage cache from ImageWithFallback
@@ -277,7 +280,7 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
           queryKey: queryKeys.media.signedUrl(fileId),
           queryFn: () => brandApi.getPrivateSignedFileUrl(fileId),
           staleTime: WIEZ_QUERY_STALE_TIME_MS,
-          gcTime: WIEZ_QUERY_STALE_TIME_MS,
+          gcTime: WIEZ_MEDIA_URL_GC_TIME_MS,
           retry: false,
         });
       }),
@@ -307,7 +310,7 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
                 queryKey: queryKeys.media.signedUrl(fileId),
                 queryFn: () => brandApi.getPrivateSignedFileUrl(fileId, { forceRefresh: true }),
                 staleTime: WIEZ_QUERY_STALE_TIME_MS,
-                gcTime: WIEZ_QUERY_STALE_TIME_MS,
+                gcTime: WIEZ_MEDIA_URL_GC_TIME_MS,
                 retry: false,
               });
             }),

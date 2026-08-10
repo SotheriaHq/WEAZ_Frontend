@@ -35,7 +35,8 @@ export const LONG_PRESS_MOVE_TOLERANCE_PX = 10;
  * `pan-y` keeps vertical scrolling with the browser while the press is still
  * being judged; once armed, the hook calls `preventDefault()` itself.
  */
-export const longPressSlotDragTileClass = 'touch-pan-y select-none';
+export const longPressSlotDragTileClass =
+  'touch-pan-y select-none [-webkit-touch-callout:none] [-webkit-user-select:none]';
 
 export interface UseLongPressSlotDragOptions {
   /** False disables the whole gesture (e.g. while saving). */
@@ -170,16 +171,47 @@ export function useLongPressSlotDrag<T extends HTMLElement = HTMLDivElement>({
       reset();
     };
 
+    /**
+     * A long press is exactly the gesture every mobile browser uses to open its
+     * own menu ("Open image in new tab", "Copy image", the iOS share callout).
+     * That menu was stealing the gesture at ~500ms — just before this hook arms
+     * at 600ms — so the drag could never start on a phone.
+     *
+     * Suppressing `contextmenu` on the grid is safe because the tiles have their
+     * own delete / set-cover controls; there is nothing in the browser menu an
+     * owner needs here. It is suppressed for any press that began on a
+     * draggable tile, not only armed ones, because the menu fires BEFORE the
+     * hold completes — waiting for `armed` would be waiting for an event that
+     * has already been pre-empted.
+     */
+    const handleContextMenu = (event: Event) => {
+      if (!enabledRef.current) return;
+      const target = event.target as HTMLElement | null;
+      const slot = target?.closest('[data-slot]')?.getAttribute('data-slot');
+      if (!slot || !canDragSlotRef.current(slot)) return;
+      event.preventDefault();
+    };
+
+    // iOS Safari starts a text/image selection under a held finger, which drags
+    // a selection highlight around instead of the tile.
+    const handleSelectStart = (event: Event) => {
+      if (gesture.current.slot) event.preventDefault();
+    };
+
     node.addEventListener('touchstart', handleTouchStart, { passive: true });
     node.addEventListener('touchmove', handleTouchMove, { passive: false });
     node.addEventListener('touchend', handleTouchEnd);
     node.addEventListener('touchcancel', reset);
+    node.addEventListener('contextmenu', handleContextMenu);
+    node.addEventListener('selectstart', handleSelectStart);
 
     return () => {
       node.removeEventListener('touchstart', handleTouchStart);
       node.removeEventListener('touchmove', handleTouchMove);
       node.removeEventListener('touchend', handleTouchEnd);
       node.removeEventListener('touchcancel', reset);
+      node.removeEventListener('contextmenu', handleContextMenu);
+      node.removeEventListener('selectstart', handleSelectStart);
       if (gesture.current.timer) clearTimeout(gesture.current.timer);
     };
   }, [holdMs, moveTolerancePx, reset]);

@@ -216,7 +216,10 @@ const ProfilePage: React.FC = () => {
   const [draftsError, setDraftsError] = useState<string | null>(null);
   const [draftsInitialized, setDraftsInitialized] = useState(false);
   const [isBrandQrOpen, setIsBrandQrOpen] = useState(false);
-  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; designId?: string; title?: string; visibility?: 'PUBLIC' | 'PRIVATE'; kind?: PublishTaskKind; reviewStatus?: string | null }>>({});
+  // 'settling' = upload finished, server row not in the list yet. The card stays
+  // mounted and fully rendered through this phase so it resolves in place
+  // instead of vanishing and popping back.
+  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed' | 'settling'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; designId?: string; title?: string; visibility?: 'PUBLIC' | 'PRIVATE'; kind?: PublishTaskKind; reviewStatus?: string | null }>>({});
   const [publishTasks, setPublishTasks] = useState<PublishTask[]>([]);
   // Persisted markers for drafts that are actually failed go-lives — survives
   // the local-task reconcile so the surviving Drafts card renders the
@@ -887,6 +890,22 @@ const ProfilePage: React.FC = () => {
     [isVisitorView, visitorCollections, collections]
   );
 
+  /**
+   * Every id the server has actually handed us, across every tab's list.
+   *
+   * This is the handoff signal between the local progress card and the real
+   * row. Without it the local card was dropped the instant the upload reported
+   * `published`/`saved`, while the refetched list had not rendered yet — so the
+   * card vanished for a beat and then reappeared fully formed. That gap is the
+   * blink owners see on every upload, on every tab.
+   */
+  const serverKnownIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const entry of activeCollections) if (entry?.id) ids.add(entry.id);
+    for (const entry of drafts) if (entry?.id) ids.add(entry.id);
+    return ids;
+  }, [activeCollections, drafts]);
+
   // Single card key = local task.id for the whole in-flight lifetime. Never re-key
   // to designId mid-upload (that was the double-card + remount flash).
   useEffect(() => {
@@ -902,7 +921,9 @@ const ProfilePage: React.FC = () => {
         if (!entry) continue;
         const taskId = entry.taskId ?? key;
         if (
-          (entry.status === 'publishing' || entry.status === 'failed') &&
+          (entry.status === 'publishing' ||
+            entry.status === 'failed' ||
+            entry.status === 'settling') &&
           !liveTaskIds.has(taskId) &&
           isLocalPublishTaskId(taskId)
         ) {
@@ -921,9 +942,19 @@ const ProfilePage: React.FC = () => {
           changed = true;
         }
         if (task.status === 'published' || task.status === 'saved') {
-          // Terminal local statuses: drop the ghost card; server row owns display.
-          if (next[key]) {
+          // Terminal local status: the server row owns display FROM THE MOMENT
+          // IT EXISTS — not from the moment the upload finished. Handing over
+          // early leaves a frame with neither card, which is the disappear /
+          // reappear flash. Hold the finished card in place (it already shows
+          // the real cover and title) until its row is in the list, then swap.
+          const serverRowReady = !nextDesignId || serverKnownIds.has(nextDesignId);
+          if (next[key] && serverRowReady) {
             delete next[key];
+            changed = true;
+          } else if (next[key] && next[key].status !== 'settling') {
+            // Keep the card mounted, but stop it reading as in-progress: the
+            // work is done and only the list refresh is outstanding.
+            next[key] = { ...next[key], status: 'settling', progress: 100, message: '' };
             changed = true;
           }
           return;
@@ -981,7 +1012,10 @@ const ProfilePage: React.FC = () => {
       });
       return changed ? next : prev;
     });
-  }, [publishTasks]);
+    // serverKnownIds is a dependency on purpose: when the refetched list finally
+    // contains the new row, this effect re-runs and retires the local card. That
+    // is the swap, and it happens in the same commit as the row appearing.
+  }, [publishTasks, serverKnownIds]);
 
   // When a local task reaches published/saved, drop it after a single background
   // catalog refresh — do not loop on collections identity every render.
@@ -1404,7 +1438,15 @@ const ProfilePage: React.FC = () => {
         .filter(([key, state]) => {
           if (decoratedIds.has(key)) return false;
           if (state.kind === 'draft') return false;
-          if (state.status !== 'publishing' && state.status !== 'failed') return false;
+          // 'settling' included: finished upload, server row still in flight.
+          // Dropping it here is what blinked the Review-tab card.
+          if (
+            state.status !== 'publishing' &&
+            state.status !== 'failed' &&
+            state.status !== 'settling'
+          ) {
+            return false;
+          }
           // Default go-live tasks to IN_REVIEW so they land on the review tab
           // even before finalize returns a status.
           const reviewStatus = String(
@@ -1414,11 +1456,14 @@ const ProfilePage: React.FC = () => {
         })
         .map(([key, state]) => {
           const nowIso = new Date(state.startedAt || Date.now()).toISOString();
-          const compactMessage = getCompactPublishTaskStatusLabel({
-            status: state.status === 'failed' ? 'failed' : 'uploading',
-            kind: state.kind,
-            progress: state.progress,
-          });
+          const isSettling = state.status === 'settling';
+          const compactMessage = isSettling
+            ? ''
+            : getCompactPublishTaskStatusLabel({
+                status: state.status === 'failed' ? 'failed' : 'uploading',
+                kind: state.kind,
+                progress: state.progress,
+              });
           return {
             id: key,
             status: targetReviewStatus,
@@ -1433,8 +1478,14 @@ const ProfilePage: React.FC = () => {
             coverImage: state.previewUrl,
             createdAt: nowIso,
             updatedAt: nowIso,
-            clientStatus: state.status === 'failed' ? 'publish-failed' : 'publishing',
-            clientStatusMessage: compactMessage,
+            // Settled: render as the finished review card, no progress chrome,
+            // so the handoff to the server row is invisible.
+            clientStatus: isSettling
+              ? undefined
+              : state.status === 'failed'
+                ? 'publish-failed'
+                : 'publishing',
+            clientStatusMessage: isSettling ? undefined : compactMessage,
             clientStatusMeta: {
               startedAt: state.startedAt,
               attempts: state.attempts,
@@ -1459,8 +1510,17 @@ const ProfilePage: React.FC = () => {
         // — don't also show the transient local placeholder (keyed by task id)
         // for the same design, or a failed go-live briefly double-cards.
         if (state.designId && decoratedIds.has(state.designId)) return false;
-        // Show both in-progress uploads AND failed tasks (so failed tasks surface as ghost cards)
-        if (state.status !== 'publishing' && state.status !== 'failed') return false;
+        // In-progress uploads, failed tasks (surfaced as ghost cards), and
+        // 'settling' cards — the last of these are finished uploads whose server
+        // row has not landed yet. Excluding them is what emptied the slot for a
+        // beat and made the card blink.
+        if (
+          state.status !== 'publishing' &&
+          state.status !== 'failed' &&
+          state.status !== 'settling'
+        ) {
+          return false;
+        }
         if (isDraftView) {
           if (state.kind !== 'draft') return false;
         } else if (state.kind === 'draft') {
@@ -1484,35 +1544,50 @@ const ProfilePage: React.FC = () => {
       .map(([key, state]) => {
         const nowIso = new Date(state.startedAt || Date.now()).toISOString();
         const isFailed = state.status === 'failed';
-        const compactMessage = getCompactPublishTaskStatusLabel({
-          status: isFailed ? 'failed' : 'uploading',
-          kind: state.kind,
-          progress: state.progress,
-        });
+        const isSettling = state.status === 'settling';
+        const compactMessage = isSettling
+          ? ''
+          : getCompactPublishTaskStatusLabel({
+              status: isFailed ? 'failed' : 'uploading',
+              kind: state.kind,
+              progress: state.progress,
+            });
+        const fallbackTitle = isFailed
+          ? isDraftView
+            ? 'Draft save failed'
+            : 'Publish failed'
+          : isDraftView
+            ? 'Saving draft'
+            : 'Publishing design';
         return {
           id: key,
           status: 'DRAFT',
-          name: state.title || (isFailed ? (isDraftView ? 'Draft save failed' : 'Publish failed') : (isDraftView ? 'Saving draft' : 'Publishing design')),
+          name: state.title || fallbackTitle,
           description: compactMessage,
           ownerId: user?.id || '',
-          title: state.title || (isFailed ? (isDraftView ? 'Draft save failed' : 'Publish failed') : (isDraftView ? 'Saving draft' : 'Publishing design')),
+          title: state.title || fallbackTitle,
           isPublic: targetVisibility !== 'PRIVATE',
           visibility: targetVisibility,
           type: 'EVERYBODY',
           coverImage: state.previewUrl,
           createdAt: nowIso,
           updatedAt: nowIso,
-          clientStatus: isFailed ? 'publish-failed' : 'publishing',
-          clientStatusMessage: compactMessage,
-          clientStatusMeta: {
-            startedAt: state.startedAt,
-            attempts: state.attempts,
-            offline: !navigator.onLine,
-            progress: state.progress,
-            previewUrl: state.previewUrl,
-            taskId: state.taskId,
-            kind: state.kind,
-          },
+          // A settling card carries NO client status: it renders as the finished
+          // card it is about to become, so the swap to the server row changes
+          // nothing the eye can catch.
+          clientStatus: isSettling ? undefined : isFailed ? 'publish-failed' : 'publishing',
+          clientStatusMessage: isSettling ? undefined : compactMessage,
+          clientStatusMeta: isSettling
+            ? undefined
+            : {
+                startedAt: state.startedAt,
+                attempts: state.attempts,
+                offline: !navigator.onLine,
+                progress: state.progress,
+                previewUrl: state.previewUrl,
+                taskId: state.taskId,
+                kind: state.kind,
+              },
         } as CollectionDto;
       });
 

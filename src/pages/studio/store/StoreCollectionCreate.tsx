@@ -31,6 +31,13 @@ import Tag from "@/components/ui/Tag";
 import InfoTooltip from "@/components/ui/InfoTooltip";
 import { getTagColor } from "@/utils/tagColors";
 import {
+  needsResubmission,
+  normalizeContentReviewStatus,
+  primaryActionLabel,
+  primaryActionPendingLabel,
+  reviewStateHint,
+} from "@/utils/contentReviewActions";
+import {
   getCollectionProductQueueItems,
   removeCollectionProductQueueItem,
   subscribeToCollectionProductQueue,
@@ -449,8 +456,21 @@ const StoreCollectionCreate: React.FC = () => {
   const [sessionFlowProductIds, setSessionFlowProductIds] = useState<string[]>(
     [],
   );
+  /**
+   * Review statuses belong here too. They used to be coerced to `null`, which
+   * made `isExistingCollectionEditMode` false for a collection sitting in
+   * CHANGES_REQUESTED — so the editor stopped recognising it as an existing
+   * collection at all, and the owner answering a change request was put back
+   * into what looks like a fresh create.
+   */
   const [existingCollectionStatus, setExistingCollectionStatus] = useState<
-    "DRAFT" | "PUBLISHED" | "ARCHIVED" | null
+    | "DRAFT"
+    | "PUBLISHED"
+    | "ARCHIVED"
+    | "IN_REVIEW"
+    | "CHANGES_REQUESTED"
+    | "REJECTED"
+    | null
   >(null);
   const [existingLinkedProductIds, setExistingLinkedProductIds] = useState<
     string[]
@@ -800,7 +820,10 @@ const StoreCollectionCreate: React.FC = () => {
       setExistingCollectionStatus(
         detail.status === "DRAFT" ||
           detail.status === "PUBLISHED" ||
-          detail.status === "ARCHIVED"
+          detail.status === "ARCHIVED" ||
+          detail.status === "IN_REVIEW" ||
+          detail.status === "CHANGES_REQUESTED" ||
+          detail.status === "REJECTED"
           ? detail.status
           : null,
       );
@@ -1668,6 +1691,15 @@ const StoreCollectionCreate: React.FC = () => {
         existingCollectionStatus !== "DRAFT",
       ),
     [existingCollectionStatus, prefillCollectionId],
+  );
+  const collectionReviewStatus = useMemo(
+    () => normalizeContentReviewStatus(existingCollectionStatus),
+    [existingCollectionStatus],
+  );
+  const collectionNeedsResubmission = needsResubmission(collectionReviewStatus);
+  const collectionReviewHint = useMemo(
+    () => reviewStateHint(collectionReviewStatus),
+    [collectionReviewStatus],
   );
   const isDraftCollectionEditMode = useMemo(
     () => Boolean(prefillCollectionId && existingCollectionStatus === "DRAFT"),
@@ -2960,6 +2992,12 @@ const StoreCollectionCreate: React.FC = () => {
         </section>
       </div>
 
+      {/* What pressing the primary action will actually do. Without it, an owner
+          in a change-request cycle has no confirmation that resubmitting sends
+          the collection back to review rather than publishing it outright. */}
+      {collectionReviewHint && (
+        <p className="pt-2 text-xs text-theme-secondary">{collectionReviewHint}</p>
+      )}
       <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
         <button
           type="button"
@@ -2974,7 +3012,13 @@ const StoreCollectionCreate: React.FC = () => {
         >
           {isExistingCollectionEditMode ? "Discard changes" : "Back"}
         </button>
-        {isExistingCollectionEditMode ? (
+        {/*
+          Only a PUBLISHED collection collapses to a single "Save changes".
+          A collection answering a change request keeps the full set — park it
+          as a draft, or resubmit — because that is the point at which the owner
+          most needs both, and the single-button bar is what stranded them.
+        */}
+        {isExistingCollectionEditMode && !collectionNeedsResubmission ? (
           <button
             type="button"
             onClick={() => handleSubmit("publish")}
@@ -2984,7 +3028,7 @@ const StoreCollectionCreate: React.FC = () => {
             {submitting && (
               <VLoader size={14} phase="loading" showLabel={false} />
             )}
-            {submitting ? "Saving..." : "Save changes"}
+            {submitting ? "Saving…" : "Save changes"}
           </button>
         ) : (
           <>
@@ -3011,8 +3055,12 @@ const StoreCollectionCreate: React.FC = () => {
                 <VLoader size={14} phase="loading" showLabel={false} />
               )}
               {submitting && submitAction === "publish"
-                ? "Going live..."
-                : "Go live"}
+                ? primaryActionPendingLabel(collectionReviewStatus)
+                : primaryActionLabel({
+                    status: collectionReviewStatus,
+                    isEditMode: Boolean(prefillCollectionId),
+                    entity: "collection",
+                  })}
             </button>
           </>
         )}

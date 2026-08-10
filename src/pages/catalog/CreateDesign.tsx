@@ -99,7 +99,16 @@ import {
   getMediaViewSlotLabel,
   getMissingRequiredMediaSlots,
   normalizeMediaViewSlot,
+  type MediaViewSlot,
 } from '@/utils/contentIntegrity';
+import {
+  canSaveDraft,
+  canWithdrawFromReview,
+  normalizeContentReviewStatus,
+  primaryActionLabel,
+  primaryActionPendingLabel,
+  reviewStateHint,
+} from '@/utils/contentReviewActions';
 import { addClientDiagnostic } from '@/utils/clientDiagnostics';
 import { TourOverlay, type TourStep } from '@/components/ui/TourOverlay';
 import { useOneTimeTour } from '@/hooks/useOneTimeTour';
@@ -452,6 +461,11 @@ const CreateDesignInner: React.FC = () => {
 
   const disabled = false;
   const isInReview = publicationStatus === 'IN_REVIEW';
+  const reviewStatus = useMemo(
+    () => normalizeContentReviewStatus(publicationStatus),
+    [publicationStatus],
+  );
+  const reviewHint = useMemo(() => reviewStateHint(reviewStatus), [reviewStatus]);
   const titleDescriptionLocked = useMemo(() => {
     if (!isEditMode || editingDraft || publicationStatus !== 'PUBLISHED' || !metadataEditedAt) {
       return false;
@@ -549,11 +563,17 @@ const CreateDesignInner: React.FC = () => {
                 ? await brandApi.getSignedFileUrl(m.fileId).catch(() => null)
                 : null;
               const previewUrl = signedUrl || m.previewUrl;
-              if (!previewUrl) return null;
+              // Do NOT drop media whose signed URL failed to mint. Dropping it
+              // silently removed the item from `files`, which made the required
+              // view slots read as missing, which made the primary action fail
+              // validation and appear dead — and had the owner saved anyway,
+              // the media would have been deleted from the design. An item that
+              // exists on the server must survive a transient signing failure.
+              if (!previewUrl && !m.remoteId) return null;
               return {
                 id: m.id,
                 file: undefined,
-                previewUrl,
+                previewUrl: previewUrl || '',
                 kind: m.kind,
                 remoteId: m.remoteId,
                 viewSlot: normalizeMediaViewSlot(m.viewSlot, index),
@@ -848,18 +868,43 @@ const CreateDesignInner: React.FC = () => {
 
   /**
    * Dragging one tile onto another moves it there and lets everything below
-   * shift up — a move, not a swap, because slots follow position here. Slots
-   * map back to indices through the same ordered list the grid renders.
+   * shift up — a move, not a swap, because slots follow position here.
+   *
+   * Resolution goes through the SAME map the grid rendered, by item id.
+   * It used to translate a slot into an array index with
+   * `renderableMediaSlots().indexOf(slot)` — the slot's ordinal in the canonical
+   * slot list. That is only equal to the array index while slots are strictly
+   * positional, which is true for a fresh create but NOT in edit mode: the store
+   * hydrates server media with `set`, which deliberately preserves whatever
+   * slots the server stored. A design whose media sat in FRONT / LEFT /
+   * DETAIL_1 therefore had ordinals 0 / 2 / 4 against array indices 0 / 1 / 2,
+   * so dragging the second tile moved the third item — and `handleReorderMedia`
+   * clamped any ordinal past the end instead of rejecting it. The visible result
+   * was an image appearing to land in the new slot while still occupying the old
+   * one, and whatever had been in the target vanishing.
    */
   const handleSlotDrop = useCallback(
     (fromSlot: string, toSlot: string) => {
-      const slots = renderableMediaSlots(DESIGN_MAX_MEDIA_COUNT);
-      const fromIndex = slots.indexOf(fromSlot as (typeof slots)[number]);
-      const toIndex = slots.indexOf(toSlot as (typeof slots)[number]);
-      if (fromIndex < 0 || toIndex < 0) return;
+      if (fromSlot === toSlot) return;
+      const sourceItem = designSlotMedia.get(fromSlot as MediaViewSlot);
+      if (!sourceItem) return;
+
+      const current = mediaStore.items;
+      const fromIndex = current.findIndex((item) => item.id === sourceItem.id);
+      if (fromIndex < 0) return;
+
+      const targetItem = designSlotMedia.get(toSlot as MediaViewSlot);
+      // Dropping onto an occupied tile lands on that item's position. Dropping
+      // onto an empty tile means "send it to the end", because an empty slot has
+      // no position of its own in a positional list.
+      const toIndex = targetItem
+        ? current.findIndex((item) => item.id === targetItem.id)
+        : current.length - 1;
+      if (toIndex < 0) return;
+
       handleReorderMedia(fromIndex, toIndex);
     },
-    [handleReorderMedia],
+    [designSlotMedia, handleReorderMedia, mediaStore.items],
   );
 
   const goToMediaIndex = useCallback(
@@ -1041,10 +1086,6 @@ const CreateDesignInner: React.FC = () => {
   const executeSaveDraft = async () => {
     // Guard: prevent double submission
     if (isSubmitting) return;
-    if (isInReview) {
-      toast.error('This design is in review. Call it back before saving as a draft.');
-      return;
-    }
 
     setSubmitIntent("draft");
     setIsSubmitting(true);
@@ -1319,7 +1360,16 @@ const CreateDesignInner: React.FC = () => {
       if (getSelectedFilterValueIds().length === 0)
         reasons.push("Add at least one style detail.");
       if (selectedTags.length === 0) reasons.push("Add at least one hashtag.");
-      toast.error(reasons[0] ?? "Complete the required details before going live.");
+      toast.error(
+        reasons.length > 1
+          ? `${reasons[0]} (${reasons.length - 1} more to fix)`
+          : reasons[0] ?? "Complete the required details before going live.",
+      );
+      addClientDiagnostic('warn', 'create-design', 'Publish blocked by validation', {
+        isEditMode,
+        publicationStatus,
+        reasons,
+      });
       return;
     }
 
@@ -1327,6 +1377,17 @@ const CreateDesignInner: React.FC = () => {
       const pendingCustomOrderDraft =
         customOrderEditorRef.current?.buildConfigurationDraft() ?? null;
       if (!pendingCustomOrderDraft) {
+        // This used to `return` in silence, which is how the primary action
+        // came to look broken: an owner answering a change request pressed it
+        // and nothing happened at all — no toast, no modal, no error.
+        // A blocked submit must always say what is blocking it.
+        toast.error(
+          'Finish the custom-order setup (measurements and pricing) before submitting.',
+        );
+        addClientDiagnostic('warn', 'create-design', 'Publish blocked by incomplete custom order', {
+          isEditMode,
+          publicationStatus,
+        });
         return;
       }
     }
@@ -2384,11 +2445,15 @@ const CreateDesignInner: React.FC = () => {
       <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 pb-12">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-sm text-theme-secondary">
-            {lastSaved
-              ? `${isEditMode ? "Design" : "Draft"} saved locally - Last edit: ${formatTimeAgo(lastSaved)}`
-              : isEditMode
-                ? "Unsaved changes"
-                : "Create a draft or go live when ready."}
+            {reviewHint ? (
+              <span className="block">{reviewHint}</span>
+            ) : lastSaved ? (
+              `${isEditMode ? "Design" : "Draft"} saved locally - Last edit: ${formatTimeAgo(lastSaved)}`
+            ) : isEditMode ? (
+              "Unsaved changes"
+            ) : (
+              "Create a draft or go live when ready."
+            )}
           </div>
           <div className="flex gap-3 w-full sm:w-auto">
             <button
@@ -2399,20 +2464,26 @@ const CreateDesignInner: React.FC = () => {
             >
               Cancel
             </button>
-            {isInReview ? (
+            {/*
+              Withdrawing is an ADDITIONAL action while a submission is pending,
+              never a replacement for Save Draft. Swapping the two is what left
+              owners in a change-request cycle with no way to park their work.
+            */}
+            {canWithdrawFromReview(reviewStatus) && (
               <button
                 type="button"
                 onClick={handleWithdrawFromReview}
-                disabled={disabled || withdrawingFromReview}
-                className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-6 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={withdrawingFromReview}
+                className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-5 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {withdrawingFromReview ? 'Calling back...' : '↩️ Call back from review'}
+                {withdrawingFromReview ? 'Calling back…' : '↩️ Call back'}
               </button>
-            ) : (
+            )}
+            {canSaveDraft(reviewStatus) && (
               <button
                 type="button"
                 onClick={handleSaveDraft}
-                disabled={disabled || isSubmitting}
+                disabled={isSubmitting}
                 className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-6 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting && submitIntent === "draft" ? (
@@ -2420,21 +2491,13 @@ const CreateDesignInner: React.FC = () => {
                 ) : (
                   <FiFile className="w-4 h-4" />
                 )}
-                {isSubmitting && submitIntent === "draft" ? "Saving..." : "Save Draft"}
+                {isSubmitting && submitIntent === "draft" ? "Saving…" : "Save Draft"}
               </button>
             )}
             <button
               type="button"
-              onClick={handleSaveDraft}
-              disabled={disabled}
-              className="hidden"
-            >
-              Hidden duplicate
-            </button>
-            <button
-              type="button"
               onClick={handlePublishClick}
-              disabled={disabled || isSubmitting}
+              disabled={isSubmitting}
               className="flex-1 sm:flex-none py-3 px-6 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-purple-500/25 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isSubmitting && submitIntent === "publish" ? (
@@ -2443,10 +2506,12 @@ const CreateDesignInner: React.FC = () => {
                 <HiOutlineSparkles className="w-5 h-5" />
               )}
               {isSubmitting && submitIntent === "publish"
-                ? "Going live..."
-                : isEditMode
-                  ? "Update Design"
-                  : "Go live"}
+                ? primaryActionPendingLabel(reviewStatus)
+                : primaryActionLabel({
+                    status: reviewStatus,
+                    isEditMode,
+                    entity: 'design',
+                  })}
             </button>
           </div>
         </div>
