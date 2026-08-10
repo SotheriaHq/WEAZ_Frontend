@@ -2674,7 +2674,10 @@ const EditProduct: React.FC = () => {
   const pushMediaPreviews = useCallback(
     (
       files: File[],
-      { makePrimary }: { makePrimary: boolean },
+      {
+        makePrimary,
+        replacingSlot = false,
+      }: { makePrimary: boolean; replacingSlot?: boolean },
     ): Array<{
       id: string;
       tempId: string;
@@ -2685,7 +2688,15 @@ const EditProduct: React.FC = () => {
     }> => {
       if (!files.length) return [];
 
-      const remaining = Math.max(0, maxMediaCount - mediaUrls.length);
+      // A replacement refills the slot it just emptied, so it is net-zero
+      // against the cap. `mediaUrls` here is captured from the render BEFORE
+      // that delete, so without the bonus a replace-at-cap computed `remaining`
+      // as 0, bailed out with the cap toast, and left the slot permanently
+      // empty — the delete had already gone through.
+      const remaining = Math.max(
+        0,
+        maxMediaCount - mediaUrls.length + (replacingSlot ? 1 : 0),
+      );
       const toAdd = files.slice(0, remaining);
       if (toAdd.length === 0) {
         toast.error(`You can upload up to ${maxMediaCount} images`);
@@ -2828,8 +2839,17 @@ const EditProduct: React.FC = () => {
     return validFiles;
   }, []);
 
-  const processAndUploadFiles = async (selectedFiles: File[], targetSlot?: MediaViewSlot) => {
-    if (!canAddMoreMedia) {
+  const processAndUploadFiles = async (
+    selectedFiles: File[],
+    targetSlot?: MediaViewSlot,
+    options?: { replacingSlot?: boolean },
+  ) => {
+    // See `pushMediaPreviews`: every capacity read in this function is captured
+    // from the render before the slot was cleared, so a replacement has to be
+    // told it is one or it gets rejected for exceeding a cap it cannot exceed.
+    const replacingSlot = options?.replacingSlot === true;
+
+    if (!canAddMoreMedia && !replacingSlot) {
       toast.error(`You can upload up to ${maxMediaCount} images`);
       return;
     }
@@ -2842,9 +2862,13 @@ const EditProduct: React.FC = () => {
     }
 
     if (isEditMode && productId) {
-      const uploadQueue = files.slice(0, maxMediaCount - mediaUrls.length);
+      const uploadQueue = files.slice(
+        0,
+        Math.max(0, maxMediaCount - mediaUrls.length + (replacingSlot ? 1 : 0)),
+      );
       const queuedPreviews = pushMediaPreviews(uploadQueue, {
         makePrimary: !hasPrimaryMedia,
+        replacingSlot,
       });
       if (!queuedPreviews.length) return;
 
@@ -2925,7 +2949,7 @@ const EditProduct: React.FC = () => {
     }
 
     const makePrimary = !hasPrimaryMedia;
-    pushMediaPreviews(files, { makePrimary });
+    pushMediaPreviews(files, { makePrimary, replacingSlot });
   };
 
   const handleMediaFilesSelected: React.ChangeEventHandler<
@@ -3080,20 +3104,40 @@ const EditProduct: React.FC = () => {
     ],
   );
 
-  /** Dropping a photo onto an occupied slot replaces what is there. */
+  /**
+   * Dropping a photo onto an occupied slot replaces what is there.
+   *
+   * Order matters: this deletes the occupant to free the slot, and a delete in
+   * edit mode is a server delete that cannot be undone. So nothing is removed
+   * until we know there is a usable image to put in its place — this used to
+   * delete first and validate afterwards, which turned every rejected drop into
+   * silent data loss.
+   */
   const handleDropFilesOnSlot = useCallback(
     async (targetSlot: MediaViewSlot, files: File[]) => {
+      const images = files.filter((file) => file.type.startsWith("image/"));
+      if (!images.length) return;
+
       const existing = mediaBySlot.get(targetSlot);
+      // Only a drop onto an EMPTY slot can push us past the cap; a replacement
+      // is net-zero. Checking here means the occupant survives a rejection.
+      if (!existing && !canAddMoreMedia) {
+        toast.error(`You can upload up to ${maxMediaCount} images`);
+        return;
+      }
+
       if (existing) {
         await handleDeleteMedia(existing.id);
       }
-      await processAndUploadFiles(files, targetSlot);
+      await processAndUploadFiles(images, targetSlot, {
+        replacingSlot: Boolean(existing),
+      });
     },
     // `processAndUploadFiles` is a plain function redefined every render, so it
     // is deliberately not a dependency — including it would rebuild this on
     // every keystroke elsewhere in the form.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [handleDeleteMedia, mediaBySlot],
+    [handleDeleteMedia, mediaBySlot, canAddMoreMedia],
   );
 
   const handleReorderMedia = useCallback(

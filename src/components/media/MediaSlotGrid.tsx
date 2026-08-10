@@ -18,7 +18,7 @@
  * Reordering is long-press armed on touch (`useLongPressSlotDrag`) and HTML5
  * drag-and-drop on a mouse, since `dragstart` never fires for touch input.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Plus, Star, X } from 'lucide-react';
 import MediaRenderer from './MediaRenderer';
 import LocalMediaPreview from './LocalMediaPreview';
@@ -30,6 +30,22 @@ import {
   normalizeMediaViewSlot,
   type MediaViewSlot,
 } from '@/utils/contentIntegrity';
+
+/**
+ * Marks a drag as having started on one of our own tiles.
+ *
+ * Dragging a tile puts an `<img>` on the drag, and Chromium helpfully attaches
+ * a re-encoded copy of that image to `dataTransfer.files`. So a reorder and an
+ * external photo drop are indistinguishable if you decide by payload — and the
+ * drop handler used to check `files` first, which meant an internal reorder
+ * ALWAYS took the file branch and never swapped. Design creation added a
+ * duplicate of the dragged image; product creation deleted whatever was in the
+ * target slot to make room for it, then hit the media cap and uploaded nothing.
+ *
+ * Origin is the only reliable signal, and a custom MIME type is how we record
+ * it: the browser never sets this one, so its presence means "we started this".
+ */
+const SLOT_DRAG_MIME = 'application/x-wiez-media-slot';
 
 export interface MediaSlotGridItem {
   id: string;
@@ -143,6 +159,12 @@ export const MediaSlotGrid: React.FC<MediaSlotGridProps> = ({
 
   const [pointerDragSlot, setPointerDragSlot] = useState<MediaViewSlot | null>(null);
   const [pointerOverSlot, setPointerOverSlot] = useState<MediaViewSlot | null>(null);
+  /**
+   * Backstop for `SLOT_DRAG_MIME`. Only one drag can be in flight, so a single
+   * ref is enough — and a ref, not state, because `drop` must read the value
+   * the drag started with regardless of where React is in its render cycle.
+   */
+  const dragSourceSlotRef = useRef<MediaViewSlot | null>(null);
 
   const swap = useCallback(
     (from: string, to: string) => {
@@ -187,39 +209,60 @@ export const MediaSlotGrid: React.FC<MediaSlotGridProps> = ({
             draggable={Boolean(item) && reorderable}
             onDragStart={(event) => {
               if (!reorderable || !item) return;
+              dragSourceSlotRef.current = slotOption.value;
+              event.dataTransfer.setData(SLOT_DRAG_MIME, slotOption.value);
               event.dataTransfer.setData('text/plain', slotOption.value);
+              event.dataTransfer.effectAllowed = 'move';
               setPointerDragSlot(slotOption.value);
             }}
             onDragOver={(event) => {
               if (!acceptsDrops) return;
               event.preventDefault();
+              // Reordering moves a tile; it never copies one. Saying so stops
+              // the cursor promising a "+" copy that will not happen.
+              if (dragSourceSlotRef.current) {
+                event.dataTransfer.dropEffect = 'move';
+              }
               if (pointerDragSlot !== slotOption.value) {
                 setPointerOverSlot(slotOption.value);
               }
             }}
             onDragLeave={() => setPointerOverSlot(null)}
             onDragEnd={() => {
+              dragSourceSlotRef.current = null;
               setPointerDragSlot(null);
               setPointerOverSlot(null);
             }}
             onDrop={(event) => {
               if (!acceptsDrops) return;
               event.preventDefault();
+
+              // Read origin BEFORE clearing it. `dataTransfer` is authoritative
+              // and survives across elements; the ref covers browsers that drop
+              // custom types on same-document drags.
+              const from =
+                (event.dataTransfer.getData(SLOT_DRAG_MIME) as MediaViewSlot | '') ||
+                dragSourceSlotRef.current;
+
+              dragSourceSlotRef.current = null;
               setPointerDragSlot(null);
               setPointerOverSlot(null);
 
-              // Files dropped from the desktop take precedence — a drop that
-              // carries files was never a slot-to-slot reorder.
+              // A drag that started on one of our tiles is a reorder, full
+              // stop — even though the browser also attached a file copy of the
+              // tile's image. Checking `files` first is what made reorders
+              // duplicate and delete media instead of swapping it.
+              if (from) {
+                if (reorderable) swap(from, slotOption.value);
+                return;
+              }
+
               const droppedFiles = Array.from(event.dataTransfer.files ?? []).filter(
                 (file) => file.type.startsWith('image/') || file.type.startsWith('video/'),
               );
               if (droppedFiles.length > 0) {
                 onDropFiles?.(slotOption.value, droppedFiles);
-                return;
               }
-
-              const from = event.dataTransfer.getData('text/plain');
-              if (from && reorderable) swap(from, slotOption.value);
             }}
             className={`relative rounded-xl overflow-hidden aspect-[4/3] w-full border transition-all duration-200 group ${
               item && reorderable ? longPressSlotDragTileClass : ''
