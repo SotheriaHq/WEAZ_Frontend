@@ -1604,17 +1604,17 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         aria-describedby={fieldErrors.requiredMeasurementKeys ? getFieldErrorId('requiredMeasurementKeys') : undefined}
         className={`mt-4 rounded-xl sm:rounded-2xl p-3 sm:p-4 ${fieldErrors.requiredMeasurementKeys ? 'border border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-none bg-transparent'}`}
       >
-        <div className="flex items-center justify-center gap-2 text-sm font-semibold text-slate-900 dark:text-white text-center">
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
           Measurement points <span className="text-rose-500">*</span>
           <span className={infoBadgeClassName} title="This defines which buyer measurements are mandatory and which sizing basis this yard-rule setup belongs to.">i</span>
         </div>
-        <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400 text-center">
+        <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
           Select the measurements buyers must provide for this custom order.
         </p>
         {renderFieldError('requiredMeasurementKeys')}
         {/* Selected keys */}
-        <div className="mt-4">
-          <div className="flex items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <div className="mt-3">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1.5">
             In use
             {selectedMeasurementKeys.length > 0 && (
               <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
@@ -1622,13 +1622,13 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               </span>
             )}
           </div>
-          <div className="mt-2 min-h-[2.75rem] rounded-xl border-none bg-emerald-500/5 p-3.5 dark:bg-emerald-400/10 flex flex-col items-center justify-center">
+          <div className="w-full min-h-[2.75rem] rounded-xl border-none bg-emerald-500/5 p-3 sm:p-4 dark:bg-emerald-400/10">
             {selectedMeasurementKeys.length === 0 ? (
-              <div className="text-xs text-slate-500 dark:text-slate-400 text-center">
+              <div className="text-xs text-slate-500 dark:text-slate-400">
                 Select measurement points below to build this custom order.
               </div>
             ) : (
-              <div className="flex flex-wrap items-center justify-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full">
                 {selectedKeysVisible.map((key) => (
                   <button
                     key={key}
@@ -1664,8 +1664,8 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         </div>
 
         {/* Left in pool */}
-        <div className="mt-4 max-h-none overflow-y-visible rounded-xl border-none p-3.5 dark:bg-white/[0.02] sm:max-h-44 sm:overflow-y-auto flex flex-col items-center justify-center">
-          <div className="mb-2 flex items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <div className="mt-3 w-full max-h-none overflow-y-visible rounded-xl border-none p-3 sm:p-4 dark:bg-white/[0.02] sm:max-h-44 sm:overflow-y-auto">
+          <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Left in pool
             {selectableMeasurementKeys.length > 0 && (
               <span className="rounded-full bg-black/[0.06] px-1.5 py-0.5 text-[10px] font-bold tabular-nums dark:bg-white/[0.08]">
@@ -1673,9 +1673,9 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               </span>
             )}
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full">
           {selectableMeasurementKeys.length === 0 ? (
-            <div className="text-xs text-slate-500 dark:text-slate-400 text-center">
+            <div className="text-xs text-slate-500 dark:text-slate-400">
               {isMeasurementPointsLoading
                 ? 'Loading measurement points...'
                 : measurementPointsError

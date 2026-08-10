@@ -519,31 +519,31 @@ const OrderManagement: React.FC = () => {
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="flex gap-2.5 overflow-x-auto scrollbar-hide py-1 sm:grid sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map((metric) => (
           <article
             key={metric.label}
-            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
+            className="min-w-[150px] shrink-0 sm:min-w-0 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
           >
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{metric.label}</p>
-              <span className="text-lg">{metric.marker}</span>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 truncate">{metric.label}</p>
+              <span className="text-base sm:text-lg shrink-0">{metric.marker}</span>
             </div>
-            <p className="mt-3 text-2xl font-black tracking-tight">{metric.value}</p>
-            <div className="mt-3 flex items-center gap-3">
+            <p className="mt-1.5 sm:mt-3 text-lg sm:text-2xl font-black tracking-tight">{metric.value}</p>
+            <div className="mt-2 sm:mt-3 flex items-center gap-2">
               <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/5">
                 <div className="h-full rounded-full bg-orange-500" style={{ width: `${metric.progress}%` }} />
               </div>
-              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">{metric.helper}</p>
+              <p className="text-[10px] sm:text-[11px] font-medium text-slate-400 dark:text-slate-500 shrink-0">{metric.helper}</p>
             </div>
           </article>
         ))}
       </section>
 
       {/* Tabs + Filters */}
-      <section className="space-y-4">
+      <section className="space-y-3">
         {/* Underline tabs */}
-        <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-white/10">
+        <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-white/10 scrollbar-hide">
           {STATUS_TABS.map((tab) => {
             const active = statusFilter === tab.value;
             return (
@@ -551,7 +551,7 @@ const OrderManagement: React.FC = () => {
                 key={tab.label}
                 type="button"
                 onClick={() => handleStatusChipClick(tab.value)}
-                className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition ${
+                className={`whitespace-nowrap border-b-2 px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${
                   active
                     ? 'border-orange-500 text-orange-600 dark:text-orange-400'
                     : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-white'
@@ -564,19 +564,19 @@ const OrderManagement: React.FC = () => {
         </nav>
 
         {/* Search + filter row */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
           <input
             type="text"
-            placeholder="Search by order ID or customer name..."
-            className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
+            placeholder="Search order ID or customer name..."
+            className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
             value={searchQuery}
             onChange={(event) => {
               setSearchQuery(event.target.value);
               setPage(1);
             }}
           />
-          <div className="flex gap-3">
-            <div className="min-w-[180px]">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-[130px] sm:min-w-[180px]">
               <UniversalSelect
                 value={statusFilter}
                 onChange={(value) => {
@@ -585,12 +585,13 @@ const OrderManagement: React.FC = () => {
                 }}
                 options={STATUS_SELECT_OPTIONS}
                 placeholder="All statuses"
+                compact
               />
             </div>
             <button
               type="button"
               onClick={cycleSort}
-              className="whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:text-white"
+              className="shrink-0 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-600 transition hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:text-white"
               aria-label="Cycle order sort"
             >
               {SORT_OPTIONS.find((option) => option.value === sortBy)?.label || 'Newest'}
@@ -599,8 +600,99 @@ const OrderManagement: React.FC = () => {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
-        <div className="overflow-x-auto scrollbar-hide">
+      {/* Orders List / Table Container */}
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.03] p-2.5 sm:p-0">
+        {/* Mobile View: Compact grouped cards (<640px) */}
+        <div className="block sm:hidden space-y-2.5">
+          {loading ? (
+            <div className="space-y-2 p-2">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div key={idx} className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />
+              ))}
+            </div>
+          ) : sortedOrders.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500">
+              No orders found matching your criteria.
+            </div>
+          ) : (
+            sortedOrders.map((order) => {
+              const fit = summarizeOrderFit(order);
+              const summaryItem = summaryByOrderId[order.id] ?? null;
+              const unreadCount = Number(summaryItem?.unreadCount ?? 0);
+              const hasUnread = unreadCount > 0 || Boolean(summaryItem?.hasUnread);
+
+              return (
+                <div
+                  key={order.id}
+                  onClick={() => setSelectedOrder({ id: order.id })}
+                  className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03] space-y-2 transition cursor-pointer hover:border-orange-300 active:scale-[0.99]"
+                >
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="font-mono font-bold text-orange-600 dark:text-orange-400">
+                      #{order.id.slice(0, 8).toUpperCase()}
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${getStatusClasses(order.status)}`}>
+                        {order.status}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {getRelativeTime(order.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/15 text-xs font-black text-orange-600 shrink-0">
+                      {getInitials(order.customerName)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                        {order.customerName}
+                      </p>
+                      <p className="text-[11px] text-slate-500 truncate">
+                        {fit.primaryName} • {fit.sizingLabel}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-black text-slate-900 dark:text-white">
+                        {formatCurrency(normalizeAmount(order.totalAmount), order.currency)}
+                      </p>
+                      <span className={`inline-flex items-center rounded-full px-1.5 py-0.2 text-[9px] font-bold uppercase ${getPaymentClasses(order.paymentStatus)}`}>
+                        {order.paymentStatus || 'PENDING'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setChatOrder({ id: order.id, customerName: order.customerName });
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 text-xs font-semibold text-slate-700 dark:bg-white/5 dark:text-slate-300 flex items-center gap-1 hover:bg-slate-200"
+                    >
+                      💬 Message {hasUnread ? <span className="text-orange-500 text-[10px]">●</span> : null}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedOrder({ id: order.id });
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-orange-500 text-xs font-semibold text-white hover:bg-orange-600"
+                    >
+                      Details
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop View: Full Table (>=640px) */}
+        <div className="hidden sm:block overflow-x-auto scrollbar-hide">
           <table className="w-full min-w-[900px] border-collapse text-left sm:min-w-[980px] lg:min-w-[1080px]">
             <thead>
               <tr className="bg-slate-50 dark:bg-white/[0.02]">

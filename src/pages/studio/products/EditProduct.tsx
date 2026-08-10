@@ -3301,7 +3301,7 @@ const EditProduct: React.FC = () => {
   return (
     <div className="flex flex-col min-h-full bg-transparent text-theme font-sans">
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-3 py-3 pb-28 sm:px-5 sm:py-5 md:pb-12">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 py-3 pb-48 sm:px-5 sm:py-5 sm:pb-32 md:pb-16">
         <div className="mb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:mb-6">
           <div className="flex flex-col gap-1">
             <div className="flex items-center text-xs text-theme-secondary gap-2">
