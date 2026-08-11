@@ -125,14 +125,19 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
   const accountDisplayName = resolveAccountDisplayName(user);
 
   const isAdmin = user?.role === 'SuperAdmin' || user?.role === 'Admin';
+  // Declared before the fetch effect below, which depends on it.
+  const hasBrandAccess = hasActiveBrandMembership(user);
 
   React.useEffect(() => {
-    if (isAuthenticated && !isAdmin) {
+    // Brand accounts have no bag and no wishlist, so there is nothing here to
+    // fetch — and fetching it would keep a badge count alive for a surface they
+    // can no longer reach.
+    if (isAuthenticated && !isAdmin && !hasBrandAccess) {
       dispatch(fetchCart());
       dispatch(fetchCustomBagCount());
       dispatch(fetchWishlist({ page: 1, limit: 200 }));
     }
-  }, [dispatch, isAuthenticated, isAdmin]);
+  }, [dispatch, isAuthenticated, isAdmin, hasBrandAccess]);
 
   // AuthContext is the single source of truth for session bootstrap/logout.
   // Do NOT rehydrate localStorage here — that recreates ghost sessions after
@@ -163,7 +168,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
     toast.info('Help center coming soon.');
   };
   const profileHomeRoute = user ? getProfileOrHomeUrl(user) : '/profile';
-  const hasBrandAccess = hasActiveBrandMembership(user);
   const savedRoute = hasBrandAccess ? '/profile?tab=Content' : profileHomeRoute;
   const isStudioProfileMenu = profileMenuContext === 'studio';
   const showStudioMenuEntry =
@@ -520,7 +524,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
             </button>
           ) : null}
 
-          {user && !isAdmin ? (
+          {/* Brands sell; they do not shop. Wishlist and Bag are buyer state, and
+              leaving them here gave a seller a route into their own checkout and
+              from there into the buyer orders view — which is not their orders. */}
+          {user && !isAdmin && !hasBrandAccess ? (
             <button
               type="button"
               onClick={() => dispatch(isWishlistOpen ? closeWishlistDrawer() : openWishlistDrawer())}
@@ -536,7 +543,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
             </button>
           ) : null}
 
-          {!isAdmin ? (
+          {!isAdmin && !hasBrandAccess ? (
             <button
               type="button"
               onClick={() => dispatch(isCartOpen ? closeCartDrawer() : openCartDrawer())}
