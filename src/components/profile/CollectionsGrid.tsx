@@ -32,6 +32,8 @@ interface CollectionsGridProps {
    * their status chip rather than repeating the tab heading on every tile.
    */
   impliedStatus?: string | null;
+  /** Entity kind this grid is already known to hold; matching cards drop their chip. */
+  impliedEntityLabel?: string | null;
 }
 
 const areSavedMapsEqual = (left: Record<string, boolean>, right: Record<string, boolean>) => {
@@ -45,6 +47,7 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
   collections,
   compactCards = false,
   impliedStatus = null,
+  impliedEntityLabel = null,
   onEdit,
   onDelete,
   onRestore,
@@ -184,6 +187,7 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
             collection={collection}
             compact={compactCards}
             impliedStatus={impliedStatus}
+            impliedEntityLabel={impliedEntityLabel}
             onClick={onCollectionClick}
             onEdit={onEdit} 
             onDelete={onDelete}

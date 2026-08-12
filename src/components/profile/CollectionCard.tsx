@@ -42,6 +42,11 @@ export interface CollectionCardProps {
    * once already.
    */
   impliedStatus?: string | null;
+  /**
+   * The entity kind the surrounding list is already known to be ("Design" on
+   * the design tab). Cards matching it drop their entity chip.
+   */
+  impliedEntityLabel?: string | null;
 }
 
 const CollectionCardComponent: React.FC<CollectionCardProps> = ({
@@ -62,6 +67,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
   saveBusy: saveBusyProp,
   compact = false,
   impliedStatus = null,
+  impliedEntityLabel = null,
 }) => {
   const {
     title,
@@ -513,12 +519,19 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
             shallower and lighter, and stops well short of the midpoint. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/55 via-black/20 to-transparent" />
         
-        {/* Entity badge (top left) */}
-        <div className="hidden md:block absolute top-3 left-3 z-20">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-500/80 backdrop-blur-sm text-white text-xs font-medium rounded-full">
-            <span>{copy.badgeLabel}</span>
+        {/* Entity badge (top left).
+            Same rule as the review chip: a label that only restates where the
+            user already is earns nothing. In a brand's own catalogue, on a tab
+            of designs, every tile wore a purple "Design" chip over the artwork.
+            `impliedEntityLabel` is what the surrounding list is, so the badge
+            survives only where a list genuinely mixes kinds. */}
+        {copy.badgeLabel.toLowerCase() !== String(impliedEntityLabel ?? '').toLowerCase() ? (
+          <div className="hidden md:block absolute top-3 left-3 z-20">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-500/80 backdrop-blur-sm text-white text-xs font-medium rounded-full">
+              <span>{copy.badgeLabel}</span>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {/* Mobile status badges (top left) */}
         <div className="md:hidden absolute top-2 left-2 z-20 flex flex-col gap-1">

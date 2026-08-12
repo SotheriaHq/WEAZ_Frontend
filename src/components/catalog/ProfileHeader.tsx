@@ -239,9 +239,8 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                 className="font-semibold italic tracking-[0.08em] leading-tight"
               />
               {/* Positive-state badges only; NEVER an unverified badge.
-                  Purple seal = verified · Gold seal = subscribed. Store status
-                  is a worded pill, not a seal — it is a state, not an accolade,
-                  and a third look-alike seal made all three unreadable. */}
+                  All three are SEALS, distinguished by colour + mark:
+                  Purple = verified · Gold = subscribed · Green = open store. */}
               <span className="inline-flex flex-shrink-0 items-center gap-1 align-middle not-italic">
               {(profile as any).isSubscribed ? (
                 <Link
@@ -273,22 +272,44 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                 </Link>
               ) : null}
               {isStoreOpen ? (
-                /* A LABEL, not a third seal.
-                   This was a 23px grey seal with a 9px 🏪 inside it — at that
-                   size the emoji is an indistinct smudge, and sitting in a row
-                   with the verified and subscribed seals it read as a third
-                   award nobody could name. "Open" is not an accolade, it is a
-                   state, so it now says so in words, in green, and stays out of
-                   the badge vocabulary entirely. */
+                /* Same scalloped seal as verified and subscribed — badges are
+                   seals, without exception.
+                   What changed is what is INSIDE it. This carried a 9px 🏪
+                   emoji on a grey seal: at that size the emoji is an
+                   indistinct smudge, and grey reads as "inactive", which is
+                   the opposite of what an open store means. The mark is now a
+                   drawn storefront — awning, door, windows — at full seal
+                   scale like the other two checkmarks, on emerald so the three
+                   seals are told apart by colour at a glance:
+                   purple = verified · gold = subscribed · green = open store. */
                 <span
-                  title="This brand's store is open for orders"
-                  className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-600/20 not-italic dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/25"
+                  title="Store open — this brand is taking orders"
+                  aria-label="Store open"
+                  className="relative inline-flex h-[23px] w-[23px] flex-shrink-0 items-center justify-center align-middle not-italic"
                 >
-                  <span
+                  <svg
+                    className="absolute inset-0 h-full w-full drop-shadow-sm"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
                     aria-hidden="true"
-                    className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500"
-                  />
-                  Open
+                  >
+                    <path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.99-3.818-3.99-.48 0-.941.1-1.356.278C14.774 2.525 13.5 1.5 12 1.5s-2.774 1.025-3.416 2.288C8.17 3.6 7.708 3.5 7.23 3.5 5.12 3.5 3.41 5.28 3.41 7.49c0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.21 1.71 3.99 3.818 3.99.48 0 .941-.1 1.356-.278C9.226 21.475 10.5 22.5 12 22.5s2.774-1.025 3.416-2.288c.415.178.876.278 1.356.278 2.108 0 3.818-1.78 3.818-3.99 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6z" fill="#059669" />
+                    {/* Storefront: awning, fascia, doorway. Drawn rather than
+                        typeset so it stays crisp at 23px. */}
+                    <path
+                      d="M7 8.4h10l.9 2.1a1.55 1.55 0 0 1-2.95.75 1.55 1.55 0 0 1-2.95 0 1.55 1.55 0 0 1-2.95 0 1.55 1.55 0 0 1-2.95-.75L7 8.4z"
+                      fill="#ffffff"
+                    />
+                    <path
+                      d="M8 12.4v4.2h8v-4.2"
+                      stroke="#ffffff"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path d="M10.6 16.6v-2.5h2.8v2.5z" fill="#059669" />
+                  </svg>
                 </span>
               ) : null}
               </span>

@@ -2696,6 +2696,9 @@ const ProfilePage: React.FC = () => {
                           // The visibility tab already names the status, so its
                           // cards do not repeat it.
                           impliedStatus={REVIEW_VISIBILITY_STATUS[visibilityFilter] ?? null}
+                          // The Content tab is designs; the chip would only ever
+                          // say "Design" over a grid of designs.
+                          impliedEntityLabel="Design"
                         />
                       ) : (
                         isOwner ? (

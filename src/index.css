@@ -399,7 +399,13 @@ html {
     --ink-gray-300: 223 227 233;
     --ink-gray-400: 182 189 201;
     --ink-gray-500: 162 170 184;
-    --ink-gray-600: 141 149 164;
+    /* gray-600 keeps its STOCK dark value (#4b5563). It is used as
+       `dark:border-gray-600` in 12 places, and lightening it the way the text
+       shades are lightened turned those hairlines into glowing rules — the
+       shade is shared between text and border utilities, so the dark value has
+       to be the one that suits a border. Its light value is still deepened,
+       which is where its 353 text uses live. */
+    --ink-gray-600: 75 85 99;
     --ink-slate-400: 179 188 203;
     --ink-slate-500: 154 165 183;
 
@@ -408,10 +414,17 @@ html {
        means lighter. #a3a3a3 sat at ~7:1 and read as muted for everything. */
     --text-secondary: #d4d0cb;
     --text-muted: #9d968f;
-    --border-default: rgba(255, 255, 255, 0.08);
-    --border-strong: rgba(255, 255, 255, 0.14);
-    --field-border: rgba(255, 255, 255, 0.20);   /* clearly visible input border on dark */
-    --field-border-hover: rgba(255, 255, 255, 0.34);
+    /* Quieter dark borders.
+       A border's job in a dark theme is to separate, not to announce. At 0.20
+       an input rule is brighter than most of the text sitting next to it, and
+       the eye reads the box before the content — the opposite of the intent.
+       These sit just far enough off the surface to divide, and the FOCUS state
+       (brand colour, 1.5px) is what makes the active field obvious, so nothing
+       is lost by letting the resting state recede. */
+    --border-default: rgba(255, 255, 255, 0.055);
+    --border-strong: rgba(255, 255, 255, 0.10);
+    --field-border: rgba(255, 255, 255, 0.13);
+    --field-border-hover: rgba(255, 255, 255, 0.24);
     --neu-surface: #161616;
     --neu-surface-soft: #1c1c1c;
     --neu-text: #f5f5f5;

@@ -288,7 +288,12 @@ export const ProfileLayout: React.FC = () => {
     }
   };
 
-  const refreshVerificationStatus = async () => {
+  /**
+   * `silent` runs from the automatic watchers below, where a toast on every
+   * poll would be noise — only a deliberate press should announce a result.
+   */
+  const refreshVerificationStatus = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
     if (!user || isCheckingVerification) return;
 
     setIsCheckingVerification(true);
@@ -314,15 +319,50 @@ export const ProfileLayout: React.FC = () => {
           next.delete('next');
           return next;
         }, { replace: true });
-      } else {
+      } else if (!silent) {
         toast.info('Still waiting for verification. Open the email link, then check again.');
       }
     } catch {
-      toast.error('Unable to check verification right now. Please try again shortly.');
+      if (!silent) {
+        toast.error('Unable to check verification right now. Please try again shortly.');
+      }
     } finally {
       setIsCheckingVerification(false);
     }
   };
+
+  /**
+   * The banner verifies its own premise, so nobody has to press "check".
+   *
+   * Verification happens outside this tab by definition — in a mail client,
+   * often on another device — so a cached `isEmailVerified: false` cannot be
+   * trusted while it is the thing putting a banner on screen. Refreshing when
+   * the tab regains focus covers the ordinary path (leave, click the link, come
+   * back); the slow poll covers verifying elsewhere. Both stop the moment the
+   * prompt goes away, because the effect is gated on it being shown.
+   */
+  useEffect(() => {
+    if (!showEmailVerificationPrompt) return;
+
+    const check = () => void refreshVerificationStatus({ silent: true });
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') check();
+    };
+
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', onVisible);
+    const interval = window.setInterval(check, 15_000);
+
+    return () => {
+      window.removeEventListener('focus', check);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.clearInterval(interval);
+    };
+    // `refreshVerificationStatus` is recreated each render and guards itself
+    // with `isCheckingVerification`; depending on it would resubscribe on every
+    // keystroke elsewhere in the layout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showEmailVerificationPrompt]);
 
   if (!isVisitorRoute) {
     if (loading && !user) {
@@ -448,11 +488,9 @@ export const ProfileLayout: React.FC = () => {
                 <EmailVerificationBanner
                   title={verificationPromptDetails.title}
                   description={verificationPromptDetails.description}
-                  statusLabel={verificationPromptDetails.actionLabel}
                   isResending={isResendingVerification}
                   isChecking={isCheckingVerification}
                   onResend={resendVerificationEmail}
-                  onCheckStatus={refreshVerificationStatus}
                 />
               </div>
             </div>
