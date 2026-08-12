@@ -46,6 +46,39 @@ export default {
           secondary: 'var(--text-secondary)',
           muted: 'var(--text-muted)',
         },
+        /**
+         * The four grey shades that actually carry body text, made THEME-AWARE.
+         *
+         * Roughly 3,500 text colours in this app are hardcoded Tailwind greys
+         * rather than our `--text-*` tokens, so deepening the tokens alone moved
+         * about 8% of the text. These four shades are ~2,400 of that total and
+         * are used almost exclusively on text (`gray-500`: 1034 text vs 9 bg vs
+         * 2 border), which makes remapping them safe.
+         *
+         * They cannot be remapped to a FIXED value, though: `gray-500` is a
+         * light-mode workhorse (931 light / 95 dark) while `gray-400` is a
+         * dark-mode one (258 light / 668 dark). Darkening both would fix one
+         * theme and wreck the other. Pointing them at CSS variables lets each
+         * shade resolve deeper on light and lighter on dark — which is what
+         * "deeper" means in each theme — and it reaches every call site,
+         * `dark:`-prefixed or not, without touching 245 files.
+         *
+         * The variables hold SPACE-SEPARATED RGB CHANNELS, not hex, and are
+         * wrapped in `rgb(… / <alpha-value>)`. A bare `var(--x)` breaks every
+         * opacity modifier in the codebase — `dark:bg-gray-600/20` fails to
+         * compile at all, which is how this was caught.
+         */
+        gray: {
+          300: 'rgb(var(--ink-gray-300) / <alpha-value>)',
+          400: 'rgb(var(--ink-gray-400) / <alpha-value>)',
+          500: 'rgb(var(--ink-gray-500) / <alpha-value>)',
+          600: 'rgb(var(--ink-gray-600) / <alpha-value>)',
+        },
+        slate: {
+          400: 'rgb(var(--ink-slate-400) / <alpha-value>)',
+          500: 'rgb(var(--ink-slate-500) / <alpha-value>)',
+        },
+
         // Legacy/Direct overrides
         dark: '#000000',
         'light-gray': '#f5f5f4',
