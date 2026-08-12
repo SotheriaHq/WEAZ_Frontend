@@ -201,8 +201,8 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     dispatch(fetchNotifications({ limit: 30 }));
   }, [dispatch]);
 
-  const handleSettings = useCallback(() => {
-    navigate('/settings?tab=notifications');
+  const handleViewAll = useCallback(() => {
+    navigate('/notifications');
     onClose();
   }, [navigate, onClose]);
 
@@ -420,13 +420,17 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
               <span aria-hidden="true">✅</span>
               Read
             </button>
+            {/* The dropdown is a preview — it fetches the first 30 and paginates
+                inside a panel capped to the viewport. "View all" is the way out
+                to the full list; settings has its own home under /settings and
+                was never what someone reaches for from a notification preview. */}
             <button
-              onClick={handleSettings}
-              className="surface-interactive-hover p-2 rounded-full transition-colors"
-              aria-label="Notification settings"
-              title="Notification settings"
+              type="button"
+              onClick={handleViewAll}
+              className="text-[11px] font-semibold text-[color:var(--brand-primary)] hover:opacity-80 transition-opacity"
+              aria-label="View all notifications"
             >
-              <span aria-hidden="true">⚙️</span>
+              View all
             </button>
           </div>
         </div>

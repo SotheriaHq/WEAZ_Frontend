@@ -692,6 +692,12 @@ export interface AdminContentSubmission {
     isActive?: boolean;
     createdAt?: string | null;
     updatedAt?: string | null;
+    /** Commercial terms. Products only — null on designs, which are not sold. */
+    price?: number | null;
+    salePrice?: number | null;
+    currency?: string | null;
+    customOrderEnabled?: boolean | null;
+    standardCheckoutEnabled?: boolean | null;
   };
   brand?: {
     id: string;
@@ -700,6 +706,10 @@ export interface AdminContentSubmission {
     reviewMode?: string | null;
     latestTrustEvent?: string | null;
     latestTrustEventAt?: string | null;
+    /** Identity signals a reviewer needs before approving a first listing. */
+    verificationStatus?: string | null;
+    isVerified?: boolean | null;
+    emailVerified?: boolean | null;
   } | null;
   submittedBy?: { id: string; username: string } | null;
   reviewedBy?: { id: string; username: string } | null;

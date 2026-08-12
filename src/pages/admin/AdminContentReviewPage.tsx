@@ -148,8 +148,46 @@ const mediaIsVideo = (mediaType?: string | null, mimeType?: string | null) =>
   String(mediaType ?? '').toUpperCase().includes('VIDEO') ||
   String(mimeType ?? '').toLowerCase().startsWith('video/');
 
+/**
+ * Grid/tile source. Prefers the processed variants and only falls back to the
+ * original upload when a file has none (still processing, or uploaded before
+ * variants existed) — the original is a full-resolution camera file, and
+ * pulling several of those into 300px squares is what made this modal crawl.
+ */
 const getMediaPreviewSrc = (media?: Pick<ContentReviewMediaItem, 'previewUrl' | 'thumbnailUrl' | 'url'> | null) =>
   media?.previewUrl?.trim() || media?.thumbnailUrl?.trim() || media?.url?.trim() || null;
+
+/** Small source for a list row's 64px thumbnail. */
+const getMediaThumbnailSrc = (media?: Pick<ContentReviewMediaItem, 'previewUrl' | 'thumbnailUrl' | 'url'> | null) =>
+  media?.thumbnailUrl?.trim() || media?.previewUrl?.trim() || media?.url?.trim() || null;
+
+const formatAmount = (amount?: number | null, currency?: string | null) => {
+  if (amount === null || amount === undefined || Number.isNaN(Number(amount))) return null;
+  const code = (currency || 'NGN').toUpperCase();
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: code,
+      maximumFractionDigits: 2,
+    }).format(Number(amount));
+  } catch {
+    return `${code} ${Number(amount).toLocaleString()}`;
+  }
+};
+
+const VerificationPill: React.FC<{ label: string; ok: boolean }> = ({ label, ok }) => (
+  <span
+    className={
+      'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ' +
+      (ok
+        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200'
+        : 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200')
+    }
+  >
+    <span aria-hidden="true">{ok ? '✅' : '⚠️'}</span>
+    {label}
+  </span>
+);
 
 const MediaUnavailablePreview: React.FC<{ label?: string }> = ({ label = 'Media unavailable' }) => (
   <div className="flex h-full w-full items-center justify-center bg-gray-100 px-4 text-center text-sm font-medium text-gray-500 dark:bg-white/8 dark:text-gray-400">
@@ -157,8 +195,14 @@ const MediaUnavailablePreview: React.FC<{ label?: string }> = ({ label = 'Media 
   </div>
 );
 
-const AdminReviewImagePreview: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+const AdminReviewImagePreview: React.FC<{
+  src: string;
+  alt: string;
+  /** The one tile a reviewer looks at first; everything else waits its turn. */
+  eager?: boolean;
+}> = ({ src, alt, eager = false }) => {
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   if (failed) {
     return <MediaUnavailablePreview />;
@@ -168,7 +212,17 @@ const AdminReviewImagePreview: React.FC<{ src: string; alt: string }> = ({ src, 
     <img
       src={src}
       alt={alt}
-      className="h-full w-full object-cover"
+      // Off-screen tiles in a scrolling queue and a grid below the fold must not
+      // compete for connections with the ones on screen.
+      loading={eager ? 'eager' : 'lazy'}
+      decoding="async"
+      fetchPriority={eager ? 'high' : 'low'}
+      draggable={false}
+      className={
+        'h-full w-full object-cover transition-opacity duration-200 ' +
+        (loaded ? 'opacity-100' : 'opacity-0')
+      }
+      onLoad={() => setLoaded(true)}
       onError={() => setFailed(true)}
     />
   );
@@ -560,7 +614,7 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
               <tbody className="divide-y divide-gray-100 dark:divide-white/8">
                 {submissions.map((submission) => {
                   const thumbnail = submission.media[0];
-                  const thumbnailSrc = getMediaPreviewSrc(thumbnail);
+                  const thumbnailSrc = getMediaThumbnailSrc(thumbnail);
                   return (
                     <tr key={submission.id} className="align-top text-gray-700 dark:text-gray-200">
                       <td className="px-4 py-3">
@@ -704,18 +758,57 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
         ) : (
           <div className="space-y-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">{selected.target.title || 'Untitled content'}</h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   {selected.entityType === 'PRODUCT' ? 'Product' : 'Design'} · {selected.brand?.name ?? 'Unknown brand'}
                 </p>
+                {/* Whether the brand is verified, and whether its owner ever
+                    confirmed their email, changes how much benefit of the doubt
+                    a first listing earns. */}
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <VerificationPill
+                    label={selected.brand?.isVerified ? 'Brand verified' : `Brand ${friendlyEnum(selected.brand?.verificationStatus).toLowerCase()}`}
+                    ok={Boolean(selected.brand?.isVerified)}
+                  />
+                  <VerificationPill
+                    label={selected.brand?.emailVerified ? 'Email verified' : 'Email unverified'}
+                    ok={Boolean(selected.brand?.emailVerified)}
+                  />
+                  {selected.entityType === 'PRODUCT' && selected.target.customOrderEnabled !== null && selected.target.customOrderEnabled !== undefined ? (
+                    <span
+                      className={
+                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ' +
+                        (selected.target.customOrderEnabled
+                          ? 'bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-200'
+                          : 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300')
+                      }
+                    >
+                      <span aria-hidden="true">🧵</span>
+                      {selected.target.customOrderEnabled ? 'Custom orders on' : 'Custom orders off'}
+                    </span>
+                  ) : null}
+                </div>
               </div>
-              <span className={`inline-flex rounded-full px-3 py-1.5 text-sm font-semibold ${statusTone[selected.status]}`}>
+              <span className={`inline-flex shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold ${statusTone[selected.status]}`}>
                 {statusLabel[selected.status]}
               </span>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {selected.entityType === 'PRODUCT' ? (
+                <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Price</p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                    {formatAmount(selected.target.salePrice ?? selected.target.price, selected.target.currency) ?? '-'}
+                  </p>
+                  {selected.target.salePrice !== null && selected.target.salePrice !== undefined ? (
+                    <p className="mt-0.5 text-xs text-gray-500 line-through">
+                      {formatAmount(selected.target.price, selected.target.currency) ?? ''}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Trust tier</p>
                 <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{friendlyEnum(selected.brand?.trustTier)}</p>
@@ -732,8 +825,24 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
               </div>
             </div>
 
+            {/* The description is half of what is being approved — a listing can
+                pass on photos and fail on its copy. The API had always returned
+                it; the modal simply never showed it. */}
+            {selected.target.description?.trim() ? (
+              <div className="rounded-lg border border-gray-200 p-4 dark:border-white/10">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Description</h3>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-600 dark:text-gray-300">
+                  {selected.target.description}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-gray-200 p-4 text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
+                No description was submitted with this {selected.entityType === 'PRODUCT' ? 'product' : 'design'}.
+              </div>
+            )}
+
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {selected.media.map((media) => {
+              {selected.media.map((media, mediaIndex) => {
                 const mediaPreviewSrc = getMediaPreviewSrc(media);
                 const isVideo = mediaIsVideo(media.mediaType, media.mimeType);
                 return (
@@ -743,6 +852,7 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
                         <AdminReviewImagePreview
                           src={mediaPreviewSrc}
                           alt={`${media.slotLabel} media`}
+                          eager={mediaIndex === 0}
                         />
                       ) : (
                         <MediaUnavailablePreview label={isVideo ? 'Video preview unavailable' : 'Media unavailable'} />
