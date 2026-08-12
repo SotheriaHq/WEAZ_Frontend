@@ -19,7 +19,25 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import useDebounce from '@/hooks/useDebounce';
 
-type TabKey = 'taxonomy' | 'measurements' | 'custom-order-configurations';
+/**
+ * `*-pending` are first-class tabs, not filter presets.
+ *
+ * Reviewing submissions was previously reachable only by knowing to change a
+ * status dropdown — the queue that needs daily attention was hidden behind a
+ * control that looks like refinement, and nothing on the page said how much was
+ * waiting. Each section now has a Pending tab that pins its own filter and
+ * carries a count.
+ */
+type TabKey =
+  | 'taxonomy'
+  | 'taxonomy-pending'
+  | 'measurements'
+  | 'measurements-pending'
+  | 'custom-order-configurations';
+
+const baseTabOf = (tab: TabKey) =>
+  tab.replace(/-pending$/, '') as 'taxonomy' | 'measurements' | 'custom-order-configurations';
+const isPendingTab = (tab: TabKey) => tab.endsWith('-pending');
 
 type AdminSubCategory = {
   id: string;
@@ -219,12 +237,20 @@ const AdminTaxonomyPage: React.FC = () => {
 
   const initialTab = useMemo<TabKey>(() => {
     const fromQuery = searchParams.get('tab');
-    if (fromQuery === 'measurements') return 'measurements';
+    if (
+      fromQuery === 'measurements' ||
+      fromQuery === 'measurements-pending' ||
+      fromQuery === 'taxonomy-pending'
+    ) {
+      return fromQuery;
+    }
     return 'taxonomy';
   }, [searchParams]);
 
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
-  const isMeasurementsRoute = activeTab === 'measurements';
+  const baseTab = baseTabOf(activeTab);
+  const pendingOnly = isPendingTab(activeTab);
+  const isMeasurementsRoute = baseTab === 'measurements';
   const { hasPermission } = useAdminPermissions();
   const canReadMeasurementLifecycle = hasPermission('MEASUREMENTS_READ');
   const canReviewMeasurementLifecycle = hasPermission('MEASUREMENTS_REVIEW');
@@ -243,6 +269,14 @@ const AdminTaxonomyPage: React.FC = () => {
     next.set('tab', activeTab);
     setSearchParams(next, { replace: true });
   }, [activeTab, searchParams, setSearchParams]);
+
+  // The Pending tab OWNS the status filter — the whole point is that the queue
+  // is not something you have to configure your way into.
+  useEffect(() => {
+    if (pendingOnly) {
+      setMeasurementLifecycleStatusMode('brand_only');
+    }
+  }, [pendingOnly]);
 
   const [showInactive, setShowInactive] = useState(false);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
@@ -296,6 +330,15 @@ const AdminTaxonomyPage: React.FC = () => {
   const [queueError, setQueueError] = useState<string | null>(null);
   const [freeformPoints, setFreeformPoints] = useState<AdminMeasurementPointRow[]>([]);
   const [sizeCharts, setSizeCharts] = useState<PendingSizeChart[]>([]);
+  /**
+   * What is actually waiting on an admin: brand-submitted measurement points
+   * plus size charts awaiting approval. Shown on the Pending tab so the size of
+   * the queue is legible before anyone opens it.
+   */
+  const pendingReviewCount = useMemo(
+    () => freeformPoints.length + sizeCharts.length,
+    [freeformPoints.length, sizeCharts.length],
+  );
   const [freeformQueuePage, setFreeformQueuePage] = useState(1);
   const [sizeChartQueuePage, setSizeChartQueuePage] = useState(1);
   const [selectedSizeChart, setSelectedSizeChart] = useState<PendingSizeChart | null>(null);
@@ -794,13 +837,13 @@ const AdminTaxonomyPage: React.FC = () => {
   }, [activeTab, fetchMeasurementLifecycleRows]);
 
   useEffect(() => {
-    if (activeTab !== 'custom-order-configurations') return;
+    if (baseTab !== 'custom-order-configurations') return;
 
     void Promise.all([fetchMeasurementPoints(), fetchGlobalYardBases()]);
   }, [activeTab, fetchGlobalYardBases, fetchMeasurementPoints]);
 
   useEffect(() => {
-    if (activeTab === 'taxonomy') {
+    if (baseTab === 'taxonomy') {
       void fetchTaxonomy();
     }
   }, [activeTab, fetchTaxonomy]);
@@ -1374,13 +1417,13 @@ const AdminTaxonomyPage: React.FC = () => {
             </p>
           </div>
 
-          {activeTab !== 'custom-order-configurations' && (
+          {baseTab !== 'custom-order-configurations' && (
             <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-100/80 p-1.5 dark:border-white/10 dark:bg-white/5">
               <button
                 type="button"
                 onClick={() => setActiveTab('taxonomy')}
                 className={`rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
-                  activeTab === 'taxonomy'
+                  baseTab === 'taxonomy'
                     ? 'bg-white text-indigo-700 shadow-sm dark:bg-slate-800 dark:text-indigo-300'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                 }`}
@@ -1391,12 +1434,35 @@ const AdminTaxonomyPage: React.FC = () => {
                 type="button"
                 onClick={() => setActiveTab('measurements')}
                 className={`rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
-                  activeTab === 'measurements'
+                  baseTab === 'measurements'
                     ? 'bg-white text-indigo-700 shadow-sm dark:bg-slate-800 dark:text-indigo-300'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                 }`}
               >
                 Measurement Points
+              </button>
+              {/* The review queue, promoted out of the status dropdown. The
+                  count is the point: an empty queue should be visible without
+                  opening the tab. */}
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveTab(
+                    baseTab === 'measurements' ? 'measurements-pending' : 'taxonomy-pending',
+                  )
+                }
+                className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
+                  pendingOnly
+                    ? 'bg-white text-amber-700 shadow-sm dark:bg-slate-800 dark:text-amber-300'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                }`}
+              >
+                Pending
+                {pendingReviewCount > 0 && (
+                  <span className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                    {pendingReviewCount > 99 ? '99+' : pendingReviewCount}
+                  </span>
+                )}
               </button>
             </div>
           )}
@@ -1418,7 +1484,7 @@ const AdminTaxonomyPage: React.FC = () => {
         </div>
       </div>
 
-      {activeTab === 'taxonomy' ? (
+      {baseTab === 'taxonomy' ? (
         <section className="space-y-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
@@ -1583,7 +1649,7 @@ const AdminTaxonomyPage: React.FC = () => {
             </div>
           )}
         </section>
-      ) : activeTab === 'measurements' ? (
+      ) : baseTab === 'measurements' ? (
         <section className="space-y-6">
           {/* Measurement Points Search & Toolbar */}
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

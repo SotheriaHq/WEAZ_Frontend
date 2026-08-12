@@ -105,8 +105,14 @@ const Tabs: React.FC<TabsProps> = ({
         ref={navRef}
         role="tablist"
         aria-label="Tabs"
+        // `gap`, not `space-x`. Tailwind's `space-x-*` compiles to
+        // `> * + * { margin-left: … }`, which matches EVERY subsequent child —
+        // including the absolutely-positioned indicator below. An abspos element
+        // still honours its own margin, so `left: 0` became `left: 24px` and the
+        // bar sat exactly one gap to the right of the tab it belonged to. `gap`
+        // only affects flex items, and an abspos child is not one.
         className={`no-scrollbar relative flex overflow-x-auto ${
-          compact ? 'space-x-4' : 'space-x-6'
+          compact ? 'gap-4' : 'gap-6'
         }`}
       >
         {tabs.map((tab) => {

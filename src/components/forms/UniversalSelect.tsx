@@ -65,8 +65,20 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
   searchPlaceholder = 'Search options...',
   emptyMessage = 'No matching options',
   optionCompact = false,
-  optionAllowWrap = false,
-  selectedAllowWrap = false,
+  /**
+   * Wraps by default.
+   *
+   * This defaulted to `false`, i.e. `truncate` — so every dropdown in the app
+   * clipped its own option labels unless a caller remembered to opt out. A
+   * truncated option is the one thing a picker must never do: the label IS the
+   * choice, and "Chest (across bust, unde…" and "Chest (across back, unde…" are
+   * the same option as far as the reader can tell. Wrapping costs a row of
+   * height; truncation costs the decision.
+   */
+  optionAllowWrap = true,
+  // Same reasoning as `optionAllowWrap`: the closed control must show which
+  // option is actually selected, not a prefix of it.
+  selectedAllowWrap = true,
   menuLayer = 'dropdown',
   size = 'md',
   compact = false,

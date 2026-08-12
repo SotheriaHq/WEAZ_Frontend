@@ -2693,6 +2693,9 @@ const ProfilePage: React.FC = () => {
                           onRetryPublish={handleRetryPublishCheck}
                           onDismiss={isOwner ? handleDismissFailedCard : undefined}
                           highlightId={highlightDesignId}
+                          // The visibility tab already names the status, so its
+                          // cards do not repeat it.
+                          impliedStatus={REVIEW_VISIBILITY_STATUS[visibilityFilter] ?? null}
                         />
                       ) : (
                         isOwner ? (

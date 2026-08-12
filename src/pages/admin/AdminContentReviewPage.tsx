@@ -427,12 +427,28 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
         await adminContentReviewApi.approveSubmission(submission.id);
         toast.success('Content approved and published');
         // Fresh catalog/market data must paint after publish without a hard refresh.
+        //
+        // `['runway']` was missing, and Runway is the surface an admin lands on
+        // straight after approving — so the newly published designs were absent
+        // until a manual reload. Invalidating by ROOT key covers every
+        // parameterised variant (`['runway','feed',{…}]` per filter/category),
+        // which a single exact key would not.
+        //
+        // `refetchType: 'all'` matters here: by default React Query only
+        // refetches queries that are currently mounted, and Runway is not
+        // mounted yet at this moment. Without it the feed is merely marked
+        // stale, and whether it refetches on arrival depends on staleTime —
+        // which is exactly the "had to refresh manually" symptom.
         await Promise.allSettled([
-          queryClient.invalidateQueries({ queryKey: ['market'] }),
-          queryClient.invalidateQueries({ queryKey: queryKeys.market.sections() }),
-          queryClient.invalidateQueries({ queryKey: ['designs'] }),
-          queryClient.invalidateQueries({ queryKey: ['products'] }),
-          queryClient.invalidateQueries({ queryKey: ['catalog'] }),
+          queryClient.invalidateQueries({ queryKey: ['runway'], refetchType: 'all' }),
+          queryClient.invalidateQueries({ queryKey: ['market'], refetchType: 'all' }),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.market.sections(),
+            refetchType: 'all',
+          }),
+          queryClient.invalidateQueries({ queryKey: ['designs'], refetchType: 'all' }),
+          queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'all' }),
+          queryClient.invalidateQueries({ queryKey: ['catalog'], refetchType: 'all' }),
         ]);
       } else if (action === 'reject') {
         await adminContentReviewApi.rejectSubmission(submission.id, {

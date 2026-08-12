@@ -15,6 +15,7 @@ const CatalogEntityCard: React.FC<CatalogEntityCardProps> = ({
   compact,
   ...props
 }) => {
+  // `impliedStatus` rides along in ...props to whichever branch renders.
   const fallback = fallbackEntityType ?? (collection.isAvailableInStore ? 'COLLECTION' : 'DESIGN');
   const branch = resolveCatalogEntityCardBranch(collection, fallback);
 

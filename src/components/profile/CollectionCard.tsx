@@ -36,6 +36,12 @@ export interface CollectionCardProps {
   onToggleSave?: (id: string) => void;
   saveBusy?: boolean;
   compact?: boolean;
+  /**
+   * The review status the surrounding list is already filtered to. Cards whose
+   * status matches it suppress their status chip — the tab heading has said it
+   * once already.
+   */
+  impliedStatus?: string | null;
 }
 
 const CollectionCardComponent: React.FC<CollectionCardProps> = ({
@@ -55,6 +61,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
   onToggleSave,
   saveBusy: saveBusyProp,
   compact = false,
+  impliedStatus = null,
 }) => {
   const {
     title,
@@ -107,11 +114,25 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
     progress: publishProgress,
   });
   const backendStatus = String(collection.publicationStatus ?? collection.status ?? '').toUpperCase();
+  /**
+   * A status badge earns its place only when the status is NOT already implied.
+   *
+   * Every card in the In Review tab wore an "In Review" chip, every card in
+   * Changes Requested wore "Changes" — restating the heading the user just
+   * tapped, on every tile, in the one corner the artwork needed. `impliedStatus`
+   * is the bucket the surrounding list is already filtered to, so the chip now
+   * appears only when a card's status differs from its surroundings, which is
+   * the only time it carries information.
+   */
+  const statusIsImplied =
+    Boolean(impliedStatus) &&
+    String(impliedStatus).toUpperCase() === backendStatus;
   const reviewStatusLabel =
-    backendStatus === 'IN_REVIEW' ||
-    backendStatus === 'CHANGES_REQUESTED' ||
-    backendStatus === 'REJECTED' ||
-    backendStatus === 'FAILED'
+    !statusIsImplied &&
+    (backendStatus === 'IN_REVIEW' ||
+      backendStatus === 'CHANGES_REQUESTED' ||
+      backendStatus === 'REJECTED' ||
+      backendStatus === 'FAILED')
       ? getContentStatusLabel(backendStatus)
       : null;
   const reviewStatusClassName = reviewStatusLabel
@@ -340,8 +361,11 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Background Media */}
-      <div className="relative aspect-[4/5] w-full overflow-hidden bg-transparent">
+      {/* Background Media.
+          4:5 → 4:5.5 is exactly +10% height. At two cards per row the width is
+          fixed by the grid, so height is the only dimension that can give the
+          artwork more room. */}
+      <div className="relative aspect-[4/5.5] w-full overflow-hidden bg-transparent">
         {(isPublishing || publishFailed) && (
           <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/70 px-4 text-center text-white backdrop-blur-sm">
             {isPublishing ? (
@@ -483,8 +507,11 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
             </div>
           )}
         
-        {/* Always-visible gradient overlay for text readability - lighter for more image visibility */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 via-black/35 to-transparent" />
+        {/* Readability scrim. Was from-black/70 via-black/35 over the bottom
+            40% — deep enough to read as a separate dark panel laid on top of
+            the photo. It only has to carry the title and price, so it is now
+            shallower and lighter, and stops well short of the midpoint. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/55 via-black/20 to-transparent" />
         
         {/* Entity badge (top left) */}
         <div className="hidden md:block absolute top-3 left-3 z-20">
@@ -715,17 +742,23 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
           </div>
         </div>
 
-        {/* Mobile Bottom Info */}
-        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-black/45 backdrop-blur-md z-10 flex items-center justify-between min-h-[32px] max-h-[38px] border-t border-white/10" onClick={(e) => e.stopPropagation()}>
-          <div className="flex-1 min-w-0 flex flex-col justify-center pl-1">
-            <h3 
-              className="font-bold text-white truncate leading-none uppercase"
+        {/* Mobile bottom info.
+            This was `bg-black/45 backdrop-blur-md` with its own top border —
+            a frosted slab sitting ON the photo, reading as a separate object
+            stuck to the card rather than part of it. The scrim above already
+            does the readability work, so the bar now contributes no surface of
+            its own: no fill, no blur, no border. Title and price simply sit in
+            the card's bottom margin, over its own artwork. */}
+        <div className="md:hidden absolute bottom-0 left-0 right-0 px-2.5 pb-2 pt-1 z-10 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <h3
+              className="font-bold text-white truncate leading-tight uppercase tracking-wide drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)]"
               style={{ fontSize: '12px' }}
             >
               {displayTitle}
             </h3>
             {(baseBand || saleBand) && (
-              <span className="text-white/85 leading-none mt-0.5" style={{ fontSize: '12px' }}>
+              <span className="text-white font-semibold leading-tight mt-0.5 drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)]" style={{ fontSize: '12px' }}>
                 {singleBand}
               </span>
             )}

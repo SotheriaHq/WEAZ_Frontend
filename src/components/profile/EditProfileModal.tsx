@@ -69,6 +69,13 @@ const profileSchema = z
     brandCountry: z.string().optional(),
     brandState: z.string().optional(),
     brandCity: z.string().optional(),
+    // Free text: real addresses carry digits, commas and slashes, so this gets
+    // a length cap and nothing else.
+    brandStreetAddress: z
+      .string()
+      .trim()
+      .max(255, { message: 'Address must be 255 characters or fewer' })
+      .optional(),
     brandTags: z
       .array(z.string())
       .max(BRAND_TAG_SELECTION_LIMIT, {
@@ -218,6 +225,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       brandCountry: brandProfile?.country || user.brandCountry || '',
       brandState: brandProfile?.state || user.brandState || '',
       brandCity: brandProfile?.city || user.brandCity || '',
+      brandStreetAddress: brandProfile?.streetAddress || '',
       brandTags:
         brandProfile?.tags ||
         user.brandTags ||
@@ -391,6 +399,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
           brandCountry,
           brandState,
           brandCity,
+          // Sent even when cleared: '' tells the API to erase a stored address,
+          // where `undefined` would silently keep it.
+          brandStreetAddress: values.brandStreetAddress?.trim() ?? '',
           brandTags: selectedTags,
           socialInstagram: normalizeSocialLink('instagram', values.socialInstagram),
           socialFacebook: normalizeSocialLink('facebook', values.socialFacebook),
@@ -771,6 +782,38 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   {errors.brandCountry && (
                     <p className="text-xs text-red-500 font-medium">{errors.brandCountry.message}</p>
                   )}
+
+                  {/* The exact address. Country/state/city give the line shown
+                      under a brand name; this is where the brand actually is,
+                      and it is owner-only — it follows the same "show my
+                      location" privacy toggle as the rest. */}
+                  <div className="mt-4 space-y-2">
+                    <label htmlFor="brand-street-address" className="block text-sm font-semibold text-theme">
+                      Street address <span className="font-normal text-theme-secondary">(optional)</span>
+                    </label>
+                    <input
+                      id="brand-street-address"
+                      type="text"
+                      autoComplete="street-address"
+                      maxLength={255}
+                      value={watch('brandStreetAddress') || ''}
+                      onChange={(event) =>
+                        setValue('brandStreetAddress', event.target.value, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        })
+                      }
+                      disabled={isSubmitting}
+                      placeholder="12 Adeola Odeku St, Victoria Island"
+                      className="w-full rounded-lg border border-[color:var(--field-border)] bg-[color:var(--surface-primary)] px-3 py-2.5 text-sm text-theme placeholder:text-theme-muted focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary disabled:opacity-60"
+                    />
+                    <p className="text-xs text-theme-secondary">
+                      Only you can see this. Hidden entirely when “Show my location” is off in Settings.
+                    </p>
+                    {errors.brandStreetAddress && (
+                      <p className="text-xs text-red-500 font-medium">{errors.brandStreetAddress.message}</p>
+                    )}
+                  </div>
               </div>
 
               <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">

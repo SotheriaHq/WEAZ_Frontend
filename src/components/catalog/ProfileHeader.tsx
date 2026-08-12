@@ -239,7 +239,9 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                 className="font-semibold italic tracking-[0.08em] leading-tight"
               />
               {/* Positive-state badges only; NEVER an unverified badge.
-                  Purple = verified · Gold = subscribed · Gray (🏪) = open store. */}
+                  Purple seal = verified · Gold seal = subscribed. Store status
+                  is a worded pill, not a seal — it is a state, not an accolade,
+                  and a third look-alike seal made all three unreadable. */}
               <span className="inline-flex flex-shrink-0 items-center gap-1 align-middle not-italic">
               {(profile as any).isSubscribed ? (
                 <Link
@@ -271,24 +273,22 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                 </Link>
               ) : null}
               {isStoreOpen ? (
-                /* Scalloped/wavy seal silhouette (same shape as the verified &
-                   subscribed badges) so the store marker reads round and spherical
-                   with curly edges instead of a flat rounded-rect pill. */
+                /* A LABEL, not a third seal.
+                   This was a 23px grey seal with a 9px 🏪 inside it — at that
+                   size the emoji is an indistinct smudge, and sitting in a row
+                   with the verified and subscribed seals it read as a third
+                   award nobody could name. "Open" is not an accolade, it is a
+                   state, so it now says so in words, in green, and stays out of
+                   the badge vocabulary entirely. */
                 <span
-                  title="Store open"
-                  aria-label="Store open"
-                  className="relative inline-flex h-[23px] w-[23px] flex-shrink-0 items-center justify-center align-middle not-italic"
+                  title="This brand's store is open for orders"
+                  className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-600/20 not-italic dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-400/25"
                 >
-                  <svg
-                    className="absolute inset-0 h-full w-full drop-shadow-sm"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
+                  <span
                     aria-hidden="true"
-                  >
-                    <path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.99-3.818-3.99-.48 0-.941.1-1.356.278C14.774 2.525 13.5 1.5 12 1.5s-2.774 1.025-3.416 2.288C8.17 3.6 7.708 3.5 7.23 3.5 5.12 3.5 3.41 5.28 3.41 7.49c0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.21 1.71 3.99 3.818 3.99.48 0 .941-.1 1.356-.278C9.226 21.475 10.5 22.5 12 22.5s2.774-1.025 3.416-2.288c.415.178.876.278 1.356.278 2.108 0 3.818-1.78 3.818-3.99 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6z" fill="#64748b" />
-                  </svg>
-                  <span aria-hidden="true" className="relative text-[9px] leading-none">🏪</span>
+                    className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500"
+                  />
+                  Open
                 </span>
               ) : null}
               </span>

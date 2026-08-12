@@ -87,6 +87,8 @@ export interface BrandProfileDto {
   state: string | null;
   city: string | null;
   location: string | null;
+  /** Exact street address. Owner-only, and null when "show my location" is off. */
+  streetAddress?: string | null;
   bannerImage: string | null;
   bannerImageMeta?: BrandMediaAssetDto | null;
   logoImage: string | null;

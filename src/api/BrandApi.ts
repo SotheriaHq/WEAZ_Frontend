@@ -29,6 +29,8 @@ export interface UpdateBrandProfilePayload {
   brandCountry?: string;
   brandState?: string;
   brandCity?: string;
+  /** Exact street address. '' clears it; `undefined` leaves it untouched. */
+  brandStreetAddress?: string;
   brandTags?: string[];
   socialInstagram?: string;
   socialFacebook?: string;

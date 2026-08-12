@@ -44,6 +44,7 @@ export default {
         ink: {
           primary: 'var(--text-primary)',
           secondary: 'var(--text-secondary)',
+          muted: 'var(--text-muted)',
         },
         // Legacy/Direct overrides
         dark: '#000000',

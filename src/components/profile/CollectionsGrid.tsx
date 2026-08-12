@@ -27,6 +27,11 @@ interface CollectionsGridProps {
   onDismiss?: (id: string) => void;
   /** Transiently ring + scroll to a specific card (e.g. from a notification). */
   highlightId?: string | null;
+  /**
+   * The review status this grid is already filtered to. Cards matching it drop
+   * their status chip rather than repeating the tab heading on every tile.
+   */
+  impliedStatus?: string | null;
 }
 
 const areSavedMapsEqual = (left: Record<string, boolean>, right: Record<string, boolean>) => {
@@ -39,6 +44,7 @@ const areSavedMapsEqual = (left: Record<string, boolean>, right: Record<string, 
 const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
   collections,
   compactCards = false,
+  impliedStatus = null,
   onEdit,
   onDelete,
   onRestore,
@@ -177,6 +183,7 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
           <CatalogEntityCard
             collection={collection}
             compact={compactCards}
+            impliedStatus={impliedStatus}
             onClick={onCollectionClick}
             onEdit={onEdit} 
             onDelete={onDelete}

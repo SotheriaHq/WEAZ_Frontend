@@ -327,8 +327,15 @@ html {
     --surface-primary: #ffffff;
     --surface-secondary: #f5f5f4;  /* warm gray — no purple cast */
     --surface-muted: #e7e5e4;      /* warm mid-gray for dividers, disabled */
-    --text-primary: #0d0d0d;       /* true near-black, warmer than blue-black */
-    --text-secondary: #78716c;     /* warm stone-gray */
+    --text-primary: #0a0a0a;       /* near-black, a shade deeper than before */
+    /* Was #78716c — stone-500. Against a white page that is ~4.7:1: legal, but
+       it reads as disabled text, and it is what most secondary copy in the app
+       uses. Stone-700 keeps the warm cast and roughly doubles the contrast, so
+       the LEAST prominent tier is still unmistakably ink rather than grey. */
+    --text-secondary: #44403c;
+    /* A genuine third tier, so anything that truly is de-emphasised has
+       somewhere to go other than making `secondary` lighter again. */
+    --text-muted: #6b6560;
     --border-default: #e5e5e5;     /* standard 1px card/input border */
     --border-strong: #d4d4d4;      /* stronger border for emphasis */
     --field-border: #cfcfcf;       /* clearly visible form input border */
@@ -373,8 +380,11 @@ html {
     --surface-primary: #0a0a0a;    /* true near-black */
     --surface-secondary: #141414;  /* slightly lifted dark surface */
     --surface-muted: #1c1c1c;      /* raised dark surface */
-    --text-primary: #f5f5f5;
-    --text-secondary: #a3a3a3;     /* warm neutral gray, not cool blue */
+    --text-primary: #fafafa;
+    /* Dark-mode equivalent of the same move: on a near-black ground "deeper"
+       means lighter. #a3a3a3 sat at ~7:1 and read as muted for everything. */
+    --text-secondary: #d4d0cb;
+    --text-muted: #9d968f;
     --border-default: rgba(255, 255, 255, 0.08);
     --border-strong: rgba(255, 255, 255, 0.14);
     --field-border: rgba(255, 255, 255, 0.20);   /* clearly visible input border on dark */
@@ -431,6 +441,10 @@ html {
 
   .text-theme-secondary {
     color: var(--text-secondary);
+  }
+
+  .text-theme-muted {
+    color: var(--text-muted);
   }
 
   .border-theme {
@@ -1115,13 +1129,21 @@ body.modal-open {
   color: var(--text-primary);
 }
 
-/* Functional tier — Plus Jakarta Sans. For all UI chrome. */
+/* Functional tier — Plus Jakarta Sans. For all UI chrome.
+ *
+ * The weight ramp was 600 / 500 / 400 / 400 — a heading one step above body and
+ * two tiers sharing 400, which is not a ramp anyone can read. It is now
+ * 700 / 600 / 500 / 500, so a heading is unambiguously a heading and body text
+ * has some ink in it. 500 is also the lightest weight used anywhere in UI
+ * chrome: Plus Jakarta Sans at 400 on a bright surface is what made the app
+ * look thin.
+ */
 .type-ui-heading {
   font-family: 'Plus Jakarta Sans', Inter, sans-serif;
   font-size: 1.125rem;
   line-height: 1.4;
-  font-weight: 600;
-  letter-spacing: -0.005em;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
 }
 
@@ -1129,7 +1151,7 @@ body.modal-open {
 .type-ui-label {
   font-family: 'Plus Jakarta Sans', Inter, sans-serif;
   font-size: 0.6875rem;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-secondary);
@@ -1139,7 +1161,7 @@ body.modal-open {
   font-family: 'Plus Jakarta Sans', Inter, sans-serif;
   font-size: 0.9375rem;
   line-height: 1.6;
-  font-weight: 400;
+  font-weight: 500;
   color: var(--text-primary);
 }
 
@@ -1147,7 +1169,7 @@ body.modal-open {
   font-family: 'Plus Jakarta Sans', Inter, sans-serif;
   font-size: 0.75rem;
   line-height: 1.5;
-  font-weight: 400;
+  font-weight: 500;
   color: var(--text-secondary);
 }
 

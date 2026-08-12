@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useLocation } from 'react-router-dom';
 
@@ -60,11 +60,57 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
     }
   }, [itemMatchesLocation, items, optimisticActiveKey]);
 
-  const markOptimisticActive = useCallback((item: IslandBottomNavItem) => {
-    if (!item.disabled) {
-      setOptimisticActiveKey(item.key);
-    }
+  /**
+   * Press-time feedback that a scroll can take back.
+   *
+   * The optimistic highlight used to be applied on `pointerdown`/`touchstart`
+   * and never withdrawn. The dock scrolls horizontally, so starting a swipe
+   * necessarily puts a finger down on some item — that item lit up, the gesture
+   * turned out to be a scroll, no `click` ever followed, and the highlight
+   * stayed on a tab the user never chose. The indicator effectively tracked
+   * wherever a finger had last rested.
+   *
+   * A press is now only a CANDIDATE. It lights up immediately (feedback still
+   * arrives on touch, not on release) but is withdrawn the moment the gesture
+   * proves to be a drag or a scroll. `click` only fires for a real tap, so the
+   * committed state still comes from the route change as before.
+   */
+  const pendingPressRef = useRef<{ key: string; x: number; y: number } | null>(null);
+  // Comfortably below the platform tap slop (~10px on both iOS and Android),
+  // so a steady finger is never mistaken for a drag.
+  const DRAG_SLOP_PX = 8;
+
+  const cancelPendingPress = useCallback(() => {
+    if (!pendingPressRef.current) return;
+    const cancelledKey = pendingPressRef.current.key;
+    pendingPressRef.current = null;
+    setOptimisticActiveKey((current) => (current === cancelledKey ? null : current));
   }, []);
+
+  const beginPress = useCallback(
+    (item: IslandBottomNavItem, event: React.PointerEvent<HTMLButtonElement>) => {
+      if (item.disabled) return;
+      pendingPressRef.current = {
+        key: item.key,
+        x: event.clientX,
+        y: event.clientY,
+      };
+      setOptimisticActiveKey(item.key);
+    },
+    [],
+  );
+
+  const trackPress = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const pending = pendingPressRef.current;
+      if (!pending) return;
+      const movedFar =
+        Math.abs(event.clientX - pending.x) > DRAG_SLOP_PX ||
+        Math.abs(event.clientY - pending.y) > DRAG_SLOP_PX;
+      if (movedFar) cancelPendingPress();
+    },
+    [cancelPendingPress],
+  );
 
   if (items.length === 0) {
     return null;
@@ -81,7 +127,15 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
           maxWidthClassName,
         )}
       >
-        <div className="flex h-full items-center gap-1 overflow-x-auto scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          // A scroll is the definitive proof the press was not a tap — the
+          // strip cannot scroll unless the finger dragged it.
+          onScroll={cancelPendingPress}
+          onPointerMove={trackPress}
+          onPointerCancel={cancelPendingPress}
+          onPointerLeave={cancelPendingPress}
+          className="flex h-full items-center gap-1 overflow-x-auto scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
           {items.map((item) => {
             const visual = item.icon ?? item.emoji;
             const isSelected = Boolean(
@@ -95,16 +149,19 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
                 key={item.key}
                 type="button"
                 disabled={item.disabled}
-                onPointerDown={item.disabled ? undefined : () => markOptimisticActive(item)}
-                onMouseDown={item.disabled ? undefined : () => markOptimisticActive(item)}
-                onTouchStart={item.disabled ? undefined : () => markOptimisticActive(item)}
+                // Pointer events only: they cover mouse and touch, and the old
+                // trio (pointerdown + mousedown + touchstart) fired the same
+                // handler up to three times for one press.
+                onPointerDown={item.disabled ? undefined : (event) => beginPress(item, event)}
                 onClick={
                   item.disabled
                     ? undefined
                     : () => {
+                        pendingPressRef.current = null;
                         // Re-tapping the current tab must not stack another
                         // history entry (mobile back-button pollution).
                         if (itemMatchesLocation(item)) return;
+                        setOptimisticActiveKey(item.key);
                         onSelect(item);
                       }
                 }
