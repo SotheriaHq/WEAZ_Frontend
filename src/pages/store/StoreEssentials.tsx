@@ -5,7 +5,12 @@ import { ArrowRight, Sparkles, Store, CheckCircle2, Circle } from 'lucide-react'
 import type { RootState } from '@/store';
 import { getStoreWizardPrefill, updateStoreProfile } from '@/api/StoreApi';
 import Input from '@/components/ui/Input';
-import { readStoreProgressLocally, saveStoreProgressLocally } from '@/utils/storeSetup';
+import {
+  readStoreProgressLocally,
+  resolveStoreSetupDestination,
+  saveStoreProgressLocally,
+} from '@/utils/storeSetup';
+import StoreSetupProgress from '@/components/store/StoreSetupProgress';
 
 const MAX_SPECIALIZATIONS = 4;
 const MAX_DESCRIPTION = 500;
@@ -122,6 +127,23 @@ const StoreEssentials: React.FC = () => {
 
         if (prefill.flags?.hasLiveStore) {
           navigate('/studio/store', { replace: true });
+          return;
+        }
+
+        /**
+         * Essentials is the FRONT DOOR of store setup, so it has to be safe to
+         * send anyone here and let this page decide where they belong.
+         *
+         * Callers used to have to run `resolveStoreSetupDestination` themselves
+         * to avoid re-asking a brand for essentials they had already given.
+         * The native app could not do that — the resolver reads localStorage,
+         * which native has no access to — so it linked straight at the wizard
+         * and every brand started setup on the Social step with Essentials
+         * never collected. Owning the decision here means one entry point that
+         * is correct from every surface.
+         */
+        if (resolveStoreSetupDestination(user?.id) === '/studio/store/setup') {
+          navigate('/studio/store/setup', { replace: true });
           return;
         }
 
@@ -298,6 +320,9 @@ const StoreEssentials: React.FC = () => {
             </h2>
             <p className="text-gray-600">Just a few quick details to jumpstart your store</p>
           </div>
+
+          {/* Same rail the wizard shows — setup is one flow across two pages. */}
+          <StoreSetupProgress current="essentials" className="mb-6" />
 
           {/* Main card */}
           <div className="glass-panel rounded-3xl p-6 sm:p-8">

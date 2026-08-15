@@ -36,6 +36,7 @@ import {
   saveStoreProgressLocally,
 } from '@/utils/storeSetup';
 import { primeStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
+import StoreSetupProgress from '@/components/store/StoreSetupProgress';
 import { invalidateRequireStoreSetupCache } from '@/components/store/RequireStoreSetup';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/query/queryKeys';
@@ -654,6 +655,9 @@ const StoreCreationWizard: React.FC = () => {
   // --- RENDER ---
   return (
     <div className="transition-colors">
+      {/* Numbered across BOTH setup pages — see StoreSetupProgress. */}
+      <StoreSetupProgress current={currentStep} className="mb-6" />
+
       {/* Social & Verification */}
       {currentStep === 'social' && (
         <StoreSocialStep
