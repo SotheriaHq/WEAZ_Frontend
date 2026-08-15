@@ -154,14 +154,14 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
       {/* Header */}
-      <div className="border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-[#1a1a1a]/50 backdrop-blur-sm sticky top-0 z-10">
+      <div className="border-b border-[color:var(--border-default)] dark:border-gray-800 bg-white/80 dark:bg-[#1a1a1a]/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-3 py-4 sm:px-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-2xl font-bold text-[color:var(--text-primary)] dark:text-white">
                 Review & Publish
               </h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-sm text-[color:var(--text-secondary)] dark:text-gray-400 mt-1">
                 Final review before going live
               </p>
             </div>
@@ -196,7 +196,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
           {/* Left Column - Store Preview & Sections */}
           <div className="lg:col-span-2 space-y-6">
             {/* Store Preview Card */}
-            <div className="bg-white dark:bg-[#1e1e1e]/50 backdrop-blur-sm border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+            <div className="bg-[color:var(--surface-secondary)] dark:bg-[#1e1e1e]/50 backdrop-blur-sm border border-[color:var(--border-default)] dark:border-gray-800 rounded-2xl overflow-hidden">
               {/* Banner */}
               {data.bannerPreview ? (
                 <MediaRenderer
@@ -214,7 +214,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
               {/* Store Header */}
               <div className="p-6 -mt-16 relative">
                 <div className="flex items-start gap-4">
-                  <div className="bg-white dark:bg-[#1e1e1e] border-4 border-white dark:border-[#0f0f0f] rounded-2xl flex-shrink-0 shadow-lg">
+                  <div className="bg-[color:var(--surface-secondary)] dark:bg-[#1e1e1e] border-4 border-white dark:border-[#0f0f0f] rounded-2xl flex-shrink-0 shadow-lg">
                     {data.logoPreview ? (
                       <MediaRenderer
                         kind="image"
@@ -232,10 +232,10 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                     )}
                   </div>
                   <div className="flex-1 mt-8">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    <h2 className="text-2xl font-bold text-[color:var(--text-primary)] dark:text-white">
                       {data.name || 'Your Store Name'}
                     </h2>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">
+                    <p className="text-[color:var(--text-secondary)] dark:text-gray-400 mt-1">
                       {data.tagline || 'Your store tagline will appear here'}
                     </p>
                     <div className="flex flex-wrap items-center gap-3 mt-3">
@@ -312,7 +312,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                     <SocialItem platform="TikTok" username={data.tiktok} />
                   )}
                   {!data.instagram && !data.twitter && !data.tiktok && (
-                    <p className="text-sm text-gray-500">No social accounts connected</p>
+                    <p className="text-sm text-[color:var(--text-secondary)]">No social accounts connected</p>
                   )}
                 </div>
               </SectionCard>
@@ -393,7 +393,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
 
           {/* Right Column - Readiness Panel */}
           <div className="lg:col-span-1 space-y-6">
-            <div className="bg-gradient-to-br from-white/80 dark:from-[#1e1e1e]/80 to-gray-50 dark:to-[#1e1e1e]/40 backdrop-blur-xl border border-gray-200 dark:border-gray-800/50 rounded-2xl p-6 lg:sticky lg:top-24">
+            <div className="bg-gradient-to-br from-white/80 dark:from-[#1e1e1e]/80 to-gray-50 dark:to-[#1e1e1e]/40 backdrop-blur-xl border border-[color:var(--border-default)] dark:border-gray-800/50 rounded-2xl p-6 lg:sticky lg:top-24">
               <div className="flex items-center gap-3 mb-6">
                 <div className={`w-12 h-12 border rounded-xl flex items-center justify-center ${
                   allRequirementsMet 
@@ -405,10 +405,10 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                 </span>
                 </div>
                 <div>
-                  <h3 className="text-gray-900 dark:text-white font-bold">
+                  <h3 className="text-[color:var(--text-primary)] dark:text-white font-bold">
                     {allRequirementsMet ? 'Ready to Publish' : 'Almost Ready'}
                   </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-[color:var(--text-secondary)] dark:text-gray-400">
                     {allRequirementsMet ? 'All requirements met' : 'Complete the items below'}
                   </p>
                 </div>
@@ -435,17 +435,17 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                 </button>
               ) : null}
 
-              <div className="border-t border-gray-200 dark:border-gray-800 pt-6 space-y-4">
+              <div className="border-t border-[color:var(--border-default)] dark:border-gray-800 pt-6 space-y-4">
                 <BrandSettlementNoteFlag userId={user?.id} />
 
-                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700 transition-colors">
+                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl bg-[color:var(--surface-secondary)] dark:bg-[#1a1a1a] border border-[color:var(--border-default)] dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700 transition-colors">
                   <input
                     type="checkbox"
                     checked={data.termsAccepted}
                     onChange={(e) => handleTermsChange(e.target.checked)}
-                    className="w-5 h-5 mt-0.5 bg-gray-100 dark:bg-[#1a1a1a] border-gray-300 dark:border-gray-700 rounded text-purple-600 focus:ring-purple-500 focus:ring-offset-0"
+                    className="w-5 h-5 mt-0.5 bg-[color:var(--surface-muted)] dark:bg-[#1a1a1a] border-[color:var(--field-border)] dark:border-gray-700 rounded text-purple-600 focus:ring-purple-500 focus:ring-offset-0"
                   />
-                  <span className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                  <span className="text-sm text-[color:var(--text-secondary)] dark:text-gray-400 leading-relaxed">
                     I agree to WIEZ's{' '}
                     <a
                       href="/seller-terms"
@@ -469,13 +469,13 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                   className={`w-full py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
                     allRequirementsMet && data.termsAccepted
                       ? 'bg-gradient-to-r from-purple-600 to-purple-700 hover:shadow-lg hover:shadow-purple-500/20 text-white'
-                      : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
+                      : 'bg-gray-300 dark:bg-gray-700 text-[color:var(--text-secondary)] cursor-not-allowed'
                   }`}
                 >
                   <span aria-hidden="true">🚀</span>
                   {isSaving ? 'Publishing...' : 'Publish Store'}
                 </button>
-                <p className="text-xs text-gray-500 dark:text-gray-400 text-center px-2">
+                <p className="text-xs text-[color:var(--text-secondary)] dark:text-gray-400 text-center px-2">
                   Your store will go live immediately after publishing
                 </p>
 
@@ -483,7 +483,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                   type="button"
                   onClick={() => void handlePreviewLink()}
                   disabled={isCopyingPreview || !data.slug}
-                  className="w-full py-3 bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-white font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-[#1e1e1e] transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full py-3 bg-[color:var(--surface-muted)] dark:bg-[#1a1a1a] border border-[color:var(--border-default)] dark:border-gray-700 text-[color:var(--text-primary)] dark:text-white font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-[#1e1e1e] transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <span aria-hidden="true">🔗</span>
                   {isCopyingPreview ? 'Opening preview...' : 'Get Preview Link'}
@@ -494,10 +494,10 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-800">
+        <div className="mt-8 pt-6 border-t border-[color:var(--border-default)] dark:border-gray-800">
           <button
             onClick={onBack}
-            className="px-6 py-3 bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-white font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-[#1e1e1e] transition-colors flex items-center gap-2"
+            className="px-6 py-3 bg-[color:var(--surface-muted)] dark:bg-[#1a1a1a] border border-[color:var(--border-default)] dark:border-gray-700 text-[color:var(--text-primary)] dark:text-white font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-[#1e1e1e] transition-colors flex items-center gap-2"
           >
             <span aria-hidden="true">⬅️</span>
             Back
@@ -529,7 +529,7 @@ const SectionCard: React.FC<SectionCardProps> = ({
   onEdit,
   children,
 }) => (
-  <div className="bg-white dark:bg-[#1e1e1e]/50 backdrop-blur-sm border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+  <div className="bg-[color:var(--surface-secondary)] dark:bg-[#1e1e1e]/50 backdrop-blur-sm border border-[color:var(--border-default)] dark:border-gray-800 rounded-xl overflow-hidden">
     <div className="p-5 flex items-center justify-between">
       <button
         onClick={onToggle}
@@ -547,8 +547,8 @@ const SectionCard: React.FC<SectionCardProps> = ({
           </span>
         </div>
         <div>
-          <h3 className="text-gray-900 dark:text-white font-semibold">{title}</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
+          <h3 className="text-[color:var(--text-primary)] dark:text-white font-semibold">{title}</h3>
+          <p className="text-sm text-[color:var(--text-secondary)] dark:text-gray-400">{subtitle}</p>
         </div>
       </button>
       <div className="flex items-center gap-3">
@@ -563,7 +563,7 @@ const SectionCard: React.FC<SectionCardProps> = ({
         )}
         <button onClick={onToggle}>
           <span
-            className={`inline-block text-sm text-gray-400 transition-transform ${
+            className={`inline-block text-sm text-[color:var(--text-muted)] transition-transform ${
               isExpanded ? 'rotate-180' : ''
             }`}
             aria-hidden="true"
@@ -574,7 +574,7 @@ const SectionCard: React.FC<SectionCardProps> = ({
       </div>
     </div>
     {isExpanded && (
-      <div className="px-5 pb-5 border-t border-gray-200 dark:border-gray-800">
+      <div className="px-5 pb-5 border-t border-[color:var(--border-default)] dark:border-gray-800">
         {children}
       </div>
     )}
@@ -583,8 +583,8 @@ const SectionCard: React.FC<SectionCardProps> = ({
 
 const InfoItem: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div>
-    <p className="text-xs text-gray-500 dark:text-gray-500 mb-1">{label}</p>
-    <p className="text-gray-900 dark:text-white">{value}</p>
+    <p className="text-xs text-[color:var(--text-secondary)] dark:text-gray-500 mb-1">{label}</p>
+    <p className="text-[color:var(--text-primary)] dark:text-white">{value}</p>
   </div>
 );
 
@@ -592,12 +592,12 @@ const SocialItem: React.FC<{ platform: string; username: string }> = ({
   platform,
   username,
 }) => (
-  <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-[#1a1a1a] rounded-lg">
+  <div className="flex items-center justify-between p-3 bg-[color:var(--surface-muted)] dark:bg-[#1a1a1a] rounded-lg">
     <div className="flex items-center gap-3">
       {platform === 'Instagram' && <span aria-hidden="true">📸</span>}
       {platform === 'Twitter' && <span aria-hidden="true">✖️</span>}
       {platform === 'TikTok' && <span aria-hidden="true">🎵</span>}
-      <span className="text-gray-900 dark:text-white">@{username}</span>
+      <span className="text-[color:var(--text-primary)] dark:text-white">@{username}</span>
     </div>
     <span className="text-xs text-green-500">Connected</span>
   </div>
@@ -610,7 +610,7 @@ const ReadinessItem: React.FC<{ label: string; checked: boolean }> = ({
   <div className="flex items-center gap-3">
     <span aria-hidden="true">{checked ? '✅' : '⬜'}</span>
     <span
-      className={checked ? 'text-sm text-gray-700 dark:text-gray-300' : 'text-sm text-gray-500'}
+      className={checked ? 'text-sm text-[color:var(--text-primary)] dark:text-gray-300' : 'text-sm text-[color:var(--text-secondary)]'}
     >
       {label}
     </span>

@@ -308,17 +308,17 @@ const StoreEssentials: React.FC = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full mb-4 shadow-lg">
               <Store className="w-7 h-7 text-white" />
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl sm:text-4xl font-bold text-[color:var(--text-primary)] mb-2">
               Welcome,{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">
                 {brandName}
               </span>
               !
             </h1>
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-2">
+            <h2 className="text-xl sm:text-2xl font-semibold text-[color:var(--text-primary)] mb-2">
               Let&apos;s Get Your Store Ready
             </h2>
-            <p className="text-gray-600">Just a few quick details to jumpstart your store</p>
+            <p className="text-[color:var(--text-secondary)]">Just a few quick details to jumpstart your store</p>
           </div>
 
           {/* Same rail the wizard shows — setup is one flow across two pages. */}
@@ -326,20 +326,20 @@ const StoreEssentials: React.FC = () => {
 
           {/* Main card */}
           <div className="glass-panel rounded-3xl p-6 sm:p-8">
-            <div className="flex items-center gap-2 mb-6 pb-4 border-b border-gray-200 dark:border-white/10">
+            <div className="flex items-center gap-2 mb-6 pb-4 border-b border-[color:var(--border-default)]">
               <Sparkles className="w-4 h-4 text-purple-600" />
-              <span className="text-lg font-semibold text-gray-800 dark:text-white">Store Essentials</span>
+              <span className="text-lg font-semibold text-[color:var(--text-primary)]">Store Essentials</span>
             </div>
 
             {/* Form */}
             <div className="space-y-6">
               {/* Brand specialization */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-[color:var(--text-primary)] mb-2">
                   What best describes your brand?{' '}
-                  <span className="text-gray-500 font-normal">(Select up to {MAX_SPECIALIZATIONS})</span>
+                  <span className="text-[color:var(--text-secondary)] font-normal">(Select up to {MAX_SPECIALIZATIONS})</span>
                 </label>
-                <p className="mb-3 text-xs text-gray-500">
+                <p className="mb-3 text-xs text-[color:var(--text-secondary)]">
                   Choose up to {MAX_SPECIALIZATIONS}. This helps customers understand your store focus.
                 </p>
 
@@ -348,7 +348,7 @@ const StoreEssentials: React.FC = () => {
                     Array.from({ length: 4 }).map((_, index) => (
                       <div
                         key={`cat-skeleton-${index}`}
-                        className="h-[68px] rounded-xl bg-white/60 border border-gray-200 animate-pulse"
+                        className="h-[68px] rounded-xl bg-[color:var(--surface-muted)] border border-[color:var(--border-default)] animate-pulse"
                       />
                     ))
                   ) : (
@@ -367,8 +367,8 @@ const StoreEssentials: React.FC = () => {
                             (isSelected
                               ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white border-purple-600 shadow-lg'
                               : isDisabled
-                                ? 'bg-white/60 text-gray-400 border-gray-200 cursor-not-allowed'
-                                : 'bg-white/60 backdrop-blur-sm border-gray-200 text-gray-700 hover:border-purple-300 hover:bg-purple-50/50')
+                                ? 'bg-[color:var(--surface-secondary)] text-[color:var(--text-muted)] border-[color:var(--border-default)] cursor-not-allowed opacity-70'
+                                : 'bg-[color:var(--surface-secondary)] backdrop-blur-sm border-[color:var(--border-default)] text-[color:var(--text-primary)] hover:border-purple-400 hover:bg-purple-500/10')
                           }
                         >
                           <div className="flex flex-col items-center gap-1">
@@ -380,7 +380,7 @@ const StoreEssentials: React.FC = () => {
                   )}
                 </div>
 
-                <p className="text-sm text-gray-500">{selected.length} of {MAX_SPECIALIZATIONS} selected</p>
+                <p className="text-sm text-[color:var(--text-secondary)]">{selected.length} of {MAX_SPECIALIZATIONS} selected</p>
               </div>
 
               {/* Tagline */}
@@ -402,7 +402,7 @@ const StoreEssentials: React.FC = () => {
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-[color:var(--text-primary)] mb-2">
                   Store Description <span className="text-purple-500">*</span>
                 </label>
                 <textarea
@@ -412,9 +412,9 @@ const StoreEssentials: React.FC = () => {
                   disabled={isLoading}
                   rows={4}
                   placeholder="Tell shoppers what your brand is about..."
-                  className="w-full rounded-xl border border-gray-300/80 bg-white/80 px-4 py-3 text-sm font-medium text-gray-900 shadow-sm transition-all duration-200 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/30 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:opacity-60"
+                  className="w-full rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-secondary)] px-4 py-3 text-sm font-medium text-[color:var(--text-primary)] shadow-sm transition-all duration-200 placeholder:text-[color:var(--text-muted)] focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/30 disabled:cursor-not-allowed disabled:opacity-60"
                 />
-                <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
+                <div className="mt-1 flex items-center justify-between text-xs text-[color:var(--text-secondary)]">
                   <span>Required to publish your store.</span>
                   <span>{description.length}/{MAX_DESCRIPTION}</span>
                 </div>
@@ -424,14 +424,14 @@ const StoreEssentials: React.FC = () => {
 
             {/* Live Preview */}
             <div className="mt-8 p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl border-2 border-purple-200">
-              <p className="text-xs text-gray-600 mb-3 text-center">This is how your store will appear</p>
-              <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+              <p className="text-xs text-[color:var(--text-secondary)] mb-3 text-center">This is how your store will appear</p>
+              <div className="bg-[color:var(--surface-secondary)] border border-[color:var(--border-default)] rounded-xl shadow-lg overflow-hidden">
                 <div className="h-24 bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400" />
                 <div className="p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-gray-900">{brandName}</h3>
-                      <p className="text-sm text-gray-600 mt-1 min-h-[20px]">{tagline.trim() || ''}</p>
+                      <h3 className="text-lg font-bold text-[color:var(--text-primary)]">{brandName}</h3>
+                      <p className="text-sm text-[color:var(--text-secondary)] mt-1 min-h-[20px]">{tagline.trim() || ''}</p>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-3">
@@ -449,19 +449,19 @@ const StoreEssentials: React.FC = () => {
             </div>
 
             {/* Readiness */}
-            <div className="mt-6 p-4 bg-transparent rounded-xl border border-gray-200/70 dark:border-white/10">
+            <div className="mt-6 p-4 bg-transparent rounded-xl border border-[color:var(--border-default)]">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  <span className="text-sm text-gray-700">Brand Name</span>
+                  <span className="text-sm text-[color:var(--text-primary)]">Brand Name</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {canContinue ? (
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
                   ) : (
-                    <Circle className="w-4 h-4 text-gray-300" />
+                    <Circle className="w-4 h-4 text-[color:var(--text-muted)]" />
                   )}
-                  <span className={"text-sm " + (canContinue ? 'text-gray-700' : 'text-gray-500')}>
+                  <span className={"text-sm " + (canContinue ? 'text-[color:var(--text-primary)]' : 'text-[color:var(--text-secondary)]')}>
                     Brand focus (at least 1 required)
                   </span>
                 </div>
@@ -469,9 +469,9 @@ const StoreEssentials: React.FC = () => {
                   {taglineValid ? (
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
                   ) : (
-                    <Circle className="w-4 h-4 text-gray-300" />
+                    <Circle className="w-4 h-4 text-[color:var(--text-muted)]" />
                   )}
-                  <span className={`text-sm ${taglineValid ? 'text-gray-700' : 'text-gray-400'}`}>
+                  <span className={`text-sm ${taglineValid ? 'text-[color:var(--text-primary)]' : 'text-[color:var(--text-secondary)]'}`}>
                     Tagline {taglineValid ? '' : '(optional)'}
                   </span>
                 </div>
@@ -479,15 +479,15 @@ const StoreEssentials: React.FC = () => {
                   {descriptionValid ? (
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
                   ) : (
-                    <Circle className="w-4 h-4 text-gray-300" />
+                    <Circle className="w-4 h-4 text-[color:var(--text-muted)]" />
                   )}
-                  <span className={"text-sm " + (descriptionValid ? 'text-gray-700' : 'text-gray-500')}>
+                  <span className={"text-sm " + (descriptionValid ? 'text-[color:var(--text-primary)]' : 'text-[color:var(--text-secondary)]')}>
                     Description
                   </span>
                 </div>
               </div>
 
-              <p className={"text-sm font-semibold mt-3 " + (canContinue ? 'text-green-600' : 'text-gray-400')}>
+              <p className={"text-sm font-semibold mt-3 " + (canContinue ? 'text-green-600 dark:text-green-400' : 'text-[color:var(--text-secondary)]')}>
                 {canContinue ? 'Ready to continue!' : 'Add a description and select at least 1 brand focus'}
               </p>
             </div>
@@ -507,7 +507,7 @@ const StoreEssentials: React.FC = () => {
                 type="button"
                 disabled={isLoading || !canSkip || isSubmitting}
                 onClick={() => void persistAndContinue(true)}
-                className="shrink-0 px-3 py-3 text-xs font-medium text-gray-600 transition-colors duration-200 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:py-4 sm:text-base"
+                className="shrink-0 px-3 py-3 text-xs font-medium text-[color:var(--text-secondary)] transition-colors duration-200 hover:text-[color:var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:py-4 sm:text-base"
               >
                 Skip
               </button>

@@ -63,7 +63,7 @@ const StoreSetupProgress: React.FC<Props> = ({ current, className }) => {
         aria-valuenow={currentIndex + 1}
         aria-valuetext={`Step ${currentIndex + 1} of ${total}: ${STORE_SETUP_STEPS[currentIndex]?.label}`}
       >
-        <div className="h-1.5 w-full rounded-full bg-[color:var(--surface-tertiary)]">
+        <div className="h-1.5 w-full rounded-full bg-[color:var(--surface-muted)]">
           <div
             className="h-1.5 rounded-full bg-indigo-600 transition-[width] duration-300 ease-out dark:bg-indigo-500"
             style={{ width: `${fillPercent}%` }}
@@ -83,7 +83,7 @@ const StoreSetupProgress: React.FC<Props> = ({ current, className }) => {
                       ? 'bg-indigo-600 text-white dark:bg-indigo-500'
                       : isCurrent
                         ? 'bg-indigo-600 text-white ring-4 ring-indigo-600/20 dark:bg-indigo-500 dark:ring-indigo-500/25'
-                        : 'bg-[color:var(--surface-tertiary)] text-[color:var(--text-secondary)]'
+                        : 'bg-[color:var(--surface-muted)] text-[color:var(--text-secondary)]'
                   }`}
                 >
                   {isDone ? '✓' : index + 1}

@@ -247,13 +247,13 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
       <div className="flex-1 flex items-start justify-center p-3 sm:p-6 lg:p-12 overflow-y-auto">
         <div className="w-full max-w-[720px]">
-          <div className="rounded-2xl overflow-hidden bg-white/80 dark:bg-white/[0.03] backdrop-blur-xl border border-gray-200/50 dark:border-purple-500/10 shadow-xl">
+          <div className="rounded-2xl overflow-hidden bg-white/80 dark:bg-white/[0.03] backdrop-blur-xl border border-[color:var(--border-default)]/50 dark:border-purple-500/10 shadow-xl">
             <div className="origin-top scale-[0.92] space-y-5 p-4 sm:scale-100 sm:space-y-8 sm:p-8">
               <div className="text-center space-y-2">
-                <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+                <h1 className="text-2xl md:text-3xl font-bold text-[color:var(--text-primary)] dark:text-white tracking-tight">
                   Connect Your Socials
                 </h1>
-                <p className="text-gray-600 dark:text-gray-400 text-sm md:text-base">
+                <p className="text-[color:var(--text-secondary)] dark:text-gray-400 text-sm md:text-base">
                   Optionally connect one social profile or your website. You can also skip this step entirely.
                 </p>
               </div>
@@ -273,7 +273,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                   return (
                     <div
                       key={platform.id}
-                      className={`group rounded-xl border border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] transition-all hover:bg-gray-100/50 dark:hover:bg-white/[0.04] p-4 ${
+                      className={`group rounded-xl border border-[color:var(--border-default)]/50 dark:border-white/5 bg-[color:var(--surface-secondary)]/50 dark:bg-white/[0.02] transition-all hover:bg-gray-100/50 dark:hover:bg-white/[0.04] p-4 ${
                         isBlocked ? 'opacity-60' : ''
                       }`}
                     >
@@ -285,7 +285,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                             {platform.icon}
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-gray-900 dark:text-white font-medium flex items-center gap-2">
+                            <span className="text-[color:var(--text-primary)] dark:text-white font-medium flex items-center gap-2">
                               {platform.name}
                               {isConnected && (
                                 <span
@@ -300,7 +300,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                               )}
                             </span>
                             {!isConnected && (
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs text-[color:var(--text-secondary)]">
                                 {isBlocked
                                   ? `Disconnect ${connectedSocialPlatform?.name} first`
                                   : 'Connect to display on store'}
@@ -311,7 +311,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
 
                         <div className="flex-1 flex gap-2">
                           <div className="relative flex-1">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-secondary)] text-sm">
                               {platform.prefix}
                             </span>
                             <input
@@ -322,11 +322,11 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                                 handleSocialChange(platform.id, e.target.value)
                               }
                               placeholder={platform.placeholder}
-                              className={`w-full bg-white dark:bg-black/30 border ${
+                              className={`w-full bg-[color:var(--surface-secondary)] dark:bg-black/30 border ${
                                 !isValid
                                   ? 'border-red-500'
-                                  : 'border-gray-300 dark:border-white/10'
-                              } rounded-lg py-2 pl-7 pr-4 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-all`}
+                                  : 'border-[color:var(--field-border)] dark:border-white/10'
+                              } rounded-lg py-2 pl-7 pr-4 text-sm text-[color:var(--text-primary)] dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-all`}
                             />
                           </div>
                           {isConnected ? (
@@ -342,7 +342,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                               </div>
                               <button
                                 onClick={() => handleSocialChange(platform.id, '')}
-                                className="text-xs text-gray-500 hover:text-red-500 transition-colors underline"
+                                className="text-xs text-[color:var(--text-secondary)] hover:text-red-500 transition-colors underline"
                               >
                                 Disconnect
                               </button>
@@ -356,7 +356,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                                 )
                               }
                               disabled={isChecking || isBlocked}
-                              className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 text-sm font-medium text-gray-700 dark:text-white transition-colors inline-flex items-center gap-2 disabled:opacity-60"
+                              className="px-4 py-2 rounded-lg bg-[color:var(--surface-muted)] dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 border border-[color:var(--border-default)] dark:border-white/10 text-sm font-medium text-[color:var(--text-primary)] dark:text-white transition-colors inline-flex items-center gap-2 disabled:opacity-60"
                             >
                               {isChecking && <VLoader size={16} phase="loading" showLabel={false} />}
                               {isChecking ? 'Checking' : 'Connect'}
@@ -375,14 +375,14 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                   );
                 })}
 
-                <div className="group rounded-xl border border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] transition-all hover:bg-gray-100/50 dark:hover:bg-white/[0.04] p-4">
+                <div className="group rounded-xl border border-[color:var(--border-default)]/50 dark:border-white/5 bg-[color:var(--surface-secondary)]/50 dark:bg-white/[0.02] transition-all hover:bg-gray-100/50 dark:hover:bg-white/[0.04] p-4">
                   <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-4">
                     <div className="flex min-w-[120px] items-center gap-3 sm:min-w-[140px] sm:gap-4">
                       <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-lg">
                         <Globe className="w-5 h-5" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-gray-900 dark:text-white font-medium flex items-center gap-2">
+                        <span className="text-[color:var(--text-primary)] dark:text-white font-medium flex items-center gap-2">
                           Website
                           {data.website && (
                             <span className="text-[10px] bg-green-500/20 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded border border-green-500/20">
@@ -391,7 +391,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                           )}
                         </span>
                         {!data.website && (
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-[color:var(--text-secondary)]">
                             Your brand website
                           </span>
                         )}
@@ -403,21 +403,21 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                         value={data.website || ''}
                         onChange={(e) => onChange({ website: e.target.value })}
                         placeholder="https://yourstore.com"
-                        className={`w-full bg-white dark:bg-black/30 border ${
+                        className={`w-full bg-[color:var(--surface-secondary)] dark:bg-black/30 border ${
                           data.website && !websiteIsValid
                             ? 'border-red-500'
-                            : 'border-gray-300 dark:border-white/10'
-                        } rounded-lg py-2 px-4 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-all`}
+                            : 'border-[color:var(--field-border)] dark:border-white/10'
+                        } rounded-lg py-2 px-4 text-sm text-[color:var(--text-primary)] dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-all`}
                       />
                       {data.website ? (
                         <button
                           onClick={() => onChange({ website: '' })}
-                          className="p-2 rounded-lg text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                          className="p-2 rounded-lg text-[color:var(--text-secondary)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                         >
                           <X className="w-4 h-4" />
                         </button>
                       ) : (
-                        <div className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm font-medium text-gray-700 dark:text-white flex items-center">
+                        <div className="px-4 py-2 rounded-lg bg-[color:var(--surface-muted)] dark:bg-white/5 border border-[color:var(--border-default)] dark:border-white/10 text-sm font-medium text-[color:var(--text-primary)] dark:text-white flex items-center">
                           Optional
                         </div>
                       )}
@@ -442,7 +442,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
               </div>
 
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <h4 className="text-xs font-semibold text-[color:var(--text-secondary)] uppercase tracking-wider">
                   Potential Trust Badges
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -450,14 +450,14 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                     className={`flex flex-col items-center justify-center p-3 rounded-xl text-center gap-2 transition-all ${
                       hasSocialConnected
                         ? 'bg-purple-600/5 border border-purple-500/20'
-                        : 'bg-gray-100/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 opacity-60'
+                        : 'bg-[color:var(--surface-muted)]/50 dark:bg-white/[0.02] border border-[color:var(--border-default)]/50 dark:border-white/5 opacity-60'
                     }`}
                   >
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center ${
                         hasSocialConnected
                           ? 'bg-purple-600/20 text-purple-600 dark:text-purple-400'
-                          : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
+                          : 'bg-gray-200 dark:bg-gray-800 text-[color:var(--text-muted)] dark:text-gray-500'
                       }`}
                     >
                       <Share2 className="w-4 h-4" />
@@ -465,8 +465,8 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                     <span
                       className={`text-xs font-medium ${
                         hasSocialConnected
-                          ? 'text-gray-900 dark:text-white'
-                          : 'text-gray-500 dark:text-gray-400'
+                          ? 'text-[color:var(--text-primary)] dark:text-white'
+                          : 'text-[color:var(--text-secondary)] dark:text-gray-400'
                       }`}
                     >
                       Social Connected
@@ -477,19 +477,19 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                     className={`flex flex-col items-center justify-center p-3 rounded-xl text-center gap-2 transition-all ${
                       hasVerifiedHandle
                         ? 'bg-emerald-500/5 border border-emerald-500/20'
-                        : 'bg-gray-100/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 opacity-60'
+                        : 'bg-[color:var(--surface-muted)]/50 dark:bg-white/[0.02] border border-[color:var(--border-default)]/50 dark:border-white/5 opacity-60'
                     }`}
                   >
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center ${
                         hasVerifiedHandle
                           ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
+                          : 'bg-gray-200 dark:bg-gray-800 text-[color:var(--text-muted)] dark:text-gray-500'
                       }`}
                     >
                       <Check className="w-4 h-4" />
                     </div>
-                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <span className="text-xs font-medium text-[color:var(--text-secondary)] dark:text-gray-400">
                       Handles Verified
                     </span>
                   </div>
@@ -498,19 +498,19 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                     className={`flex flex-col items-center justify-center p-3 rounded-xl text-center gap-2 transition-all ${
                       data.website
                         ? 'bg-blue-500/5 border border-blue-500/20'
-                        : 'bg-gray-100/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 opacity-60'
+                        : 'bg-[color:var(--surface-muted)]/50 dark:bg-white/[0.02] border border-[color:var(--border-default)]/50 dark:border-white/5 opacity-60'
                     }`}
                   >
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center ${
                         data.website
                           ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
-                          : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
+                          : 'bg-gray-200 dark:bg-gray-800 text-[color:var(--text-muted)] dark:text-gray-500'
                       }`}
                     >
                       <Globe className="w-4 h-4" />
                     </div>
-                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <span className="text-xs font-medium text-[color:var(--text-secondary)] dark:text-gray-400">
                       Website Added
                     </span>
                   </div>
@@ -518,12 +518,12 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
               </div>
             </div>
 
-            <div className="flex flex-row items-center justify-between gap-2 border-t border-gray-200/50 bg-gray-50/50 p-4 dark:border-white/5 dark:bg-black/20 sm:gap-4 sm:p-6">
+            <div className="flex flex-row items-center justify-between gap-2 border-t border-[color:var(--border-default)]/50 bg-[color:var(--surface-secondary)]/50 p-4 dark:border-white/5 dark:bg-black/20 sm:gap-4 sm:p-6">
               <button
                 type="button"
                 onClick={onSkip}
                 disabled={isSaving}
-                className="shrink-0 px-2 py-2 text-xs font-medium text-gray-500 transition-colors hover:text-gray-900 disabled:opacity-50 dark:hover:text-white sm:px-4 sm:text-sm"
+                className="shrink-0 px-2 py-2 text-xs font-medium text-[color:var(--text-secondary)] transition-colors hover:text-gray-900 disabled:opacity-50 dark:hover:text-white sm:px-4 sm:text-sm"
               >
                 Skip
               </button>
@@ -532,7 +532,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                   type="button"
                   onClick={onBack}
                   disabled={isSaving}
-                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-white/10 dark:text-white dark:hover:bg-white/5 sm:gap-2 sm:px-6 sm:py-2.5 sm:text-sm"
+                  className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[color:var(--border-default)] px-3 py-2 text-xs font-medium text-[color:var(--text-primary)] transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-white/10 dark:text-white dark:hover:bg-white/5 sm:gap-2 sm:px-6 sm:py-2.5 sm:text-sm"
                 >
                   <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   Back
