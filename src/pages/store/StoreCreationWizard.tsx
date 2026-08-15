@@ -558,7 +558,11 @@ const StoreCreationWizard: React.FC = () => {
       setCurrentStep(STEP_ORDER[currentIndex - 1]);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      navigate('/studio/store/essentials');
+      // `fromWizard` tells Essentials this is a deliberate step BACKWARDS, so it
+      // does not forward straight here again. Without it, Back from the first
+      // step bounced off Essentials and returned to Social — the start of setup
+      // was unreachable.
+      navigate('/studio/store/essentials', { state: { fromWizard: true } });
     }
   }, [currentStep, navigate]);
 

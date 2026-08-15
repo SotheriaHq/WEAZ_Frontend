@@ -933,6 +933,13 @@ export interface StoreWizardPrefillResponse {
   flags: {
     isEmailVerified: boolean;
     hasLiveStore: boolean;
+    /**
+     * Server truth for "has Essentials been saved". Prefer this over the
+     * localStorage flag, which the mobile WebView cannot be trusted to hold
+     * and which strands brands mid-flow when it is stale. Optional so an older
+     * API build degrades to the local hint rather than to `false`.
+     */
+    essentialsComplete?: boolean;
   };
 }
 

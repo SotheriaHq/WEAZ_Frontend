@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import IslandBottomNav from '@/components/navigation/IslandBottomNav';
 import { useMessagingUnreadCount } from '@/hooks/useMessagingUnreadCount';
@@ -23,8 +23,26 @@ const ALL_ITEMS = [
 
 export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const storeSetupComplete = useStoreSetupStatus();
-  const isSetupLocked = storeSetupComplete === false;
+  /**
+   * Being ON a setup route is proof that setup is unfinished, and it needs no
+   * network to know it.
+   *
+   * `useStoreSetupStatus` is the right general signal but it cannot lock
+   * anything while it is undecided: it returns `null` in flight and `true` on
+   * error (deliberately — a failed /store/status must never strand a live
+   * store). Both leave `=== false` unmet, so during the exact window a brand
+   * is working through setup on a slow or flaky connection, every nav item
+   * stayed clickable and they could wander out of the flow into sections that
+   * have nothing to show yet.
+   *
+   * The route removes that window. `RequireStoreSetup` would only bounce them
+   * back anyway; this stops the trip being offered.
+   */
+  const isOnSetupRoute = location.pathname.startsWith('/studio/store/setup')
+    || location.pathname.startsWith('/studio/store/essentials');
+  const isSetupLocked = storeSetupComplete === false || isOnSetupRoute;
   const groups = [{ title: 'Studio', items: ALL_ITEMS }];
   // Shared with the main SideBar so both badges move together — and so the
   // count also DROPS on `message.read`, which the local copy never listened for.

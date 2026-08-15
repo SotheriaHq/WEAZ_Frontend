@@ -37,70 +37,47 @@ const StoreSetupProgress: React.FC<Props> = ({ current, className }) => {
     STORE_SETUP_STEPS.findIndex((step) => step.key === current),
   );
   const total = STORE_SETUP_STEPS.length;
-  // Fill to the CENTRE of the active pip, so the bar reads as "you are here"
-  // rather than "this step is finished" — it is not finished, it is open.
-  const fillPercent = (currentIndex / (total - 1)) * 100;
+  /**
+   * Each step is an equal share, and being ON a step counts it as reached:
+   * Essentials 20 · Social 40 · Policies 60 · Hours 80 · Review 100.
+   *
+   * The bar and the label are the same number by construction, so they cannot
+   * drift out of sync — which is the whole point of them sitting together.
+   */
+  const percentComplete = Math.round(((currentIndex + 1) / total) * 100);
 
   return (
     <div className={className}>
-      <div className="mb-2 flex items-baseline justify-between">
+      {/*
+        Just the filler and where you are.
+        The step pips and a "Step 2 of 5" counter said the same thing three
+        times over; the percentage now carries the step name, so one line
+        answers both "how far" and "where".
+      */}
+      <div className="mb-2 flex items-baseline justify-between gap-3">
         <p className="text-sm font-bold text-[color:var(--text-primary)]">
-          Step {currentIndex + 1} of {total}
+          {percentComplete}%
           <span className="ml-2 font-semibold text-[color:var(--text-secondary)]">
             {STORE_SETUP_STEPS[currentIndex]?.label}
           </span>
         </p>
-        <p className="text-xs font-semibold text-[color:var(--text-secondary)]">
-          {Math.round(((currentIndex + 1) / total) * 100)}% complete
+        <p className="shrink-0 text-xs font-semibold text-[color:var(--text-secondary)]">
+          Store setup
         </p>
       </div>
 
       <div
-        className="relative"
+        className="h-2 w-full overflow-hidden rounded-full bg-[color:var(--surface-muted)]"
         role="progressbar"
-        aria-valuemin={1}
-        aria-valuemax={total}
-        aria-valuenow={currentIndex + 1}
-        aria-valuetext={`Step ${currentIndex + 1} of ${total}: ${STORE_SETUP_STEPS[currentIndex]?.label}`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percentComplete}
+        aria-valuetext={`${percentComplete}% complete — ${STORE_SETUP_STEPS[currentIndex]?.label}`}
       >
-        <div className="h-1.5 w-full rounded-full bg-[color:var(--surface-muted)]">
-          <div
-            className="h-1.5 rounded-full bg-indigo-600 transition-[width] duration-300 ease-out dark:bg-indigo-500"
-            style={{ width: `${fillPercent}%` }}
-          />
-        </div>
-
-        <ol className="mt-3 flex justify-between">
-          {STORE_SETUP_STEPS.map((step, index) => {
-            const isDone = index < currentIndex;
-            const isCurrent = index === currentIndex;
-            return (
-              <li key={step.key} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
-                <span
-                  aria-hidden
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${
-                    isDone
-                      ? 'bg-indigo-600 text-white dark:bg-indigo-500'
-                      : isCurrent
-                        ? 'bg-indigo-600 text-white ring-4 ring-indigo-600/20 dark:bg-indigo-500 dark:ring-indigo-500/25'
-                        : 'bg-[color:var(--surface-muted)] text-[color:var(--text-secondary)]'
-                  }`}
-                >
-                  {isDone ? '✓' : index + 1}
-                </span>
-                <span
-                  className={`truncate text-center text-[11px] font-semibold ${
-                    isCurrent
-                      ? 'text-[color:var(--text-primary)]'
-                      : 'text-[color:var(--text-secondary)]'
-                  }`}
-                >
-                  {step.label}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
+        <div
+          className="h-full rounded-full bg-indigo-600 transition-[width] duration-300 ease-out dark:bg-indigo-500"
+          style={{ width: `${percentComplete}%` }}
+        />
       </div>
     </div>
   );

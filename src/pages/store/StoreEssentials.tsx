@@ -5,11 +5,7 @@ import { ArrowRight, Sparkles, Store, CheckCircle2, Circle } from 'lucide-react'
 import type { RootState } from '@/store';
 import { getStoreWizardPrefill, updateStoreProfile } from '@/api/StoreApi';
 import Input from '@/components/ui/Input';
-import {
-  readStoreProgressLocally,
-  resolveStoreSetupDestination,
-  saveStoreProgressLocally,
-} from '@/utils/storeSetup';
+import { readStoreProgressLocally, saveStoreProgressLocally } from '@/utils/storeSetup';
 import StoreSetupProgress from '@/components/store/StoreSetupProgress';
 
 const MAX_SPECIALIZATIONS = 4;
@@ -131,21 +127,27 @@ const StoreEssentials: React.FC = () => {
         }
 
         /**
-         * Essentials is the FRONT DOOR of store setup, so it has to be safe to
-         * send anyone here and let this page decide where they belong.
+         * Store setup STARTS at the start. This page never skips itself.
          *
-         * Callers used to have to run `resolveStoreSetupDestination` themselves
-         * to avoid re-asking a brand for essentials they had already given.
-         * The native app could not do that — the resolver reads localStorage,
-         * which native has no access to — so it linked straight at the wizard
-         * and every brand started setup on the Social step with Essentials
-         * never collected. Owning the decision here means one entry point that
-         * is correct from every surface.
+         * It used to auto-forward to the wizard whenever it judged essentials
+         * "already done", and every version of that judgement was wrong for
+         * somebody:
+         *
+         *  - Reading the localStorage flag meant the mobile WebView, whose
+         *    storage is not the brand's, jumped straight to the Social step for
+         *    brands who had never filled essentials at all.
+         *  - Reading the server was accurate but no kinder. A brand whose
+         *    description and tags happen to be populated still expects the
+         *    first screen of setup to be the first screen of setup.
+         *  - Worst of all, the wizard's Back button lands here, so ANY forward
+         *    bounced the user straight back to Social. The start of setup was
+         *    unreachable and Back looked broken.
+         *
+         * The cost of not forwarding is one extra tap on Continue for a brand
+         * who has already filled this in — and the fields below are prefilled
+         * from the server, so there is nothing to redo. That is a far better
+         * trade than a flow that can trap someone.
          */
-        if (resolveStoreSetupDestination(user?.id) === '/studio/store/setup') {
-          navigate('/studio/store/setup', { replace: true });
-          return;
-        }
 
         // Best-effort prefill for quick-start
         const localProgress = readStoreProgressLocally<StoreEssentialsProgress>(
@@ -160,14 +162,29 @@ const StoreEssentials: React.FC = () => {
             )
           : [];
 
-        // Chips must NEVER come pre-selected unless the user picked them in
-        // THIS flow (saved store progress). Brand-profile hashtags used to be
-        // mapped onto these chips — users had to unselect choices they never
-        // made (client-reported).
-        const resolvedCategories = localCategories;
+        /**
+         * Chips come pre-selected only from choices made in THIS flow.
+         *
+         * The original rule was "localStorage only", because brand-profile
+         * hashtags had once been mapped onto these chips and users had to
+         * unselect choices they never made. That concern stands — but
+         * `brand.tags` is not those hashtags: `persistAndContinue` below writes
+         * `tags: selected` from this very screen, so the server copy IS the
+         * saved essentials selection.
+         *
+         * It has to be read, too. Now that this page no longer skips itself, a
+         * returning brand lands here with their selection intact instead of
+         * empty chips they must re-pick to get past `canContinue`. localStorage
+         * still wins when present — it is the more recent of the two.
+         */
+        const serverCategories = normalizeSpecializationSelection(
+          Array.isArray(prefill.brand?.tags) ? prefill.brand.tags : [],
+          BRAND_SPECIALIZATION_OPTIONS,
+        );
+        const resolvedCategories = localCategories.length > 0 ? localCategories : serverCategories;
 
-        if (localCategories.length > 0) {
-          setSelected(localCategories);
+        if (resolvedCategories.length > 0) {
+          setSelected(resolvedCategories);
         }
 
         const resolvedDescription =
