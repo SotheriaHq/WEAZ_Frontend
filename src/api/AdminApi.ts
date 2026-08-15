@@ -466,6 +466,39 @@ export const adminTaxonomyApi = {
     apiClient.patch(`/admin/categories/${id}/deactivate`),
   deleteCategory: (id: string) =>
     apiClient.delete(`/admin/categories/${id}`),
+  /**
+   * Brand-proposed garment categories awaiting a decision.
+   *
+   * `CategorySuggestionsApi` was stubbed to `[]` at some point ("legacy client
+   * removed"), but the backend never went away — `CategorySuggestionsAdminController`
+   * still serves these under TAXONOMY_READ. The result was a moderation queue
+   * that accrued submissions with no surface anywhere in the admin app.
+   */
+  listCategorySuggestions: (status: AdminCategorySuggestionStatus = 'PENDING') =>
+    apiClient.get<AdminCategorySuggestion[]>('/admin/categories/suggestions', {
+      params: { status },
+    }),
+  moderateCategorySuggestion: (
+    id: string,
+    data: { status: 'APPROVED' | 'REJECTED'; rejectionReason?: string },
+  ) => apiClient.patch<AdminCategorySuggestion>(`/admin/categories/suggestions/${id}`, data),
+};
+
+export type AdminCategorySuggestionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export type AdminCategorySuggestion = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  status: AdminCategorySuggestionStatus;
+  proposedByUserId: string;
+  proposedByUser?: { id: string; username?: string | null; email?: string | null } | null;
+  rejectionReason?: string | null;
+  approvedCategoryId?: string | null;
+  decidedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 // ── Tags ──

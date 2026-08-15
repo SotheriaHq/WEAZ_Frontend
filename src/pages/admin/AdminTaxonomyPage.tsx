@@ -4,7 +4,12 @@ import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import UniversalSelect from '@/components/forms/UniversalSelect';
-import { adminAuditApi, adminModerationApi, adminTaxonomyApi } from '@/api/AdminApi';
+import {
+  adminAuditApi,
+  adminModerationApi,
+  adminTaxonomyApi,
+  type AdminCategorySuggestion,
+} from '@/api/AdminApi';
 import { customOrdersAdminApi, type CustomFabricRuleBasis } from '@/api/CustomOrderApi';
 import { unwrapApiResponse } from '@/types/auth';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -20,13 +25,18 @@ import type { RootState } from '@/store';
 import useDebounce from '@/hooks/useDebounce';
 
 /**
- * `*-pending` are first-class tabs, not filter presets.
+ * Pending is a scope WITHIN a section, never a section of its own.
  *
- * Reviewing submissions was previously reachable only by knowing to change a
- * status dropdown — the queue that needs daily attention was hidden behind a
- * control that looks like refinement, and nothing on the page said how much was
- * waiting. Each section now has a Pending tab that pins its own filter and
- * carries a count.
+ * The first cut of this put Pending in the top-level tab group beside "Garment
+ * categories" and "Measurement Points". Two bugs fell straight out of that:
+ * selecting it lit the Pending pill while the section pill stayed lit (both
+ * derive from the same `activeTab`, and a section is still active when its
+ * queue is open), and a single global Pending had nothing to show on the
+ * taxonomy side.
+ *
+ * So the top group selects the SECTION and nothing else, and each section
+ * renders its own All/Pending scope with its own count. Reaching a queue is
+ * still one click with no filter to configure, which was the original point.
  */
 type TabKey =
   | 'taxonomy'
@@ -38,6 +48,61 @@ type TabKey =
 const baseTabOf = (tab: TabKey) =>
   tab.replace(/-pending$/, '') as 'taxonomy' | 'measurements' | 'custom-order-configurations';
 const isPendingTab = (tab: TabKey) => tab.endsWith('-pending');
+
+/**
+ * The All/Pending scope inside one section. Rendered by each section with its
+ * own count, so a section's queue size is legible without opening it and the
+ * two sections can never contradict each other's indicator.
+ */
+const PendingScopeTabs: React.FC<{
+  pendingOnly: boolean;
+  pendingCount: number;
+  allLabel: string;
+  pendingLabel: string;
+  onSelect: (pendingOnly: boolean) => void;
+}> = ({ pendingOnly, pendingCount, allLabel, pendingLabel, onSelect }) => (
+  <div
+    role="tablist"
+    aria-label={`${allLabel} scope`}
+    className="inline-flex rounded-2xl border border-slate-200 bg-slate-100/70 p-1 dark:border-white/10 dark:bg-white/5"
+  >
+    <button
+      type="button"
+      role="tab"
+      aria-selected={!pendingOnly}
+      onClick={() => onSelect(false)}
+      className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+        pendingOnly
+          ? 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+          : 'bg-white text-indigo-700 shadow-sm dark:bg-slate-800 dark:text-indigo-300'
+      }`}
+    >
+      {allLabel}
+    </button>
+    <button
+      type="button"
+      role="tab"
+      aria-selected={pendingOnly}
+      onClick={() => onSelect(true)}
+      className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+        pendingOnly
+          ? 'bg-white text-amber-700 shadow-sm dark:bg-slate-800 dark:text-amber-300'
+          : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+      }`}
+    >
+      {pendingLabel}
+      <span
+        className={`inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${
+          pendingCount > 0
+            ? 'bg-amber-500 text-white'
+            : 'bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-slate-300'
+        }`}
+      >
+        {pendingCount > 99 ? '99+' : pendingCount}
+      </span>
+    </button>
+  </div>
+);
 
 type AdminSubCategory = {
   id: string;
@@ -232,6 +297,138 @@ const measurementLifecycleRowMatchesFilters = (
   return true;
 };
 
+const CategorySuggestionQueue: React.FC<{
+  suggestions: AdminCategorySuggestion[];
+  loading: boolean;
+  error: string | null;
+  canModerate: boolean;
+  moderatingId: string | null;
+  rejectReasons: Record<string, string>;
+  onRejectReasonChange: (id: string, value: string) => void;
+  onModerate: (suggestion: AdminCategorySuggestion, decision: 'APPROVED' | 'REJECTED') => void;
+  onRetry: () => void;
+}> = ({
+  suggestions,
+  loading,
+  error,
+  canModerate,
+  moderatingId,
+  rejectReasons,
+  onRejectReasonChange,
+  onModerate,
+  onRetry,
+}) => {
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="h-28 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-white/10" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-between gap-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+        <span>{error}</span>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded-xl border border-rose-300 px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-500/40 dark:text-rose-200 dark:hover:bg-rose-500/20"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (suggestions.length === 0) {
+    return (
+      <div className="rounded-3xl border border-slate-200/80 bg-white px-6 py-14 text-center dark:border-white/10 dark:bg-slate-900">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-500/20">
+          <svg className="h-6 w-6 text-emerald-700 dark:text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white">Nothing waiting</h3>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          Brand-proposed garment categories land here for a decision.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {suggestions.map((suggestion) => {
+        const busy = moderatingId === suggestion.id;
+        const reason = rejectReasons[suggestion.id] ?? '';
+        return (
+          <div
+            key={suggestion.id}
+            className="rounded-3xl border border-amber-200/80 bg-amber-50/40 p-5 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/5"
+          >
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">{suggestion.name}</h3>
+                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  Slug: {suggestion.slug}
+                  {suggestion.proposedByUser?.username
+                    ? ` · Proposed by ${suggestion.proposedByUser.username}`
+                    : ''}
+                  {suggestion.createdAt
+                    ? ` · ${new Date(suggestion.createdAt).toLocaleDateString()}`
+                    : ''}
+                </p>
+                {suggestion.description ? (
+                  <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate-700 dark:text-slate-300">
+                    {suggestion.description}
+                  </p>
+                ) : null}
+              </div>
+
+              {canModerate ? (
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onModerate(suggestion, 'APPROVED')}
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {busy ? 'Working…' : 'Approve'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onModerate(suggestion, 'REJECTED')}
+                    className="rounded-xl border border-rose-300 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60 dark:border-rose-500/40 dark:text-rose-200 dark:hover:bg-rose-500/10"
+                  >
+                    Reject
+                  </button>
+                </div>
+              ) : (
+                <span className="shrink-0 rounded-xl bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                  View only
+                </span>
+              )}
+            </div>
+
+            {canModerate ? (
+              <input
+                value={reason}
+                onChange={(event) => onRejectReasonChange(suggestion.id, event.target.value)}
+                placeholder="Reason (required to reject) — the brand sees this"
+                className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 dark:border-white/10 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
+              />
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const AdminTaxonomyPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -257,6 +454,8 @@ const AdminTaxonomyPage: React.FC = () => {
   const canReadModerationQueue = hasPermission('MODERATION_READ');
   const canReviewModerationQueue = hasPermission('MODERATION_REVIEW');
   const canReadAuditLogs = hasPermission('AUDIT_READ');
+  const canReadTaxonomy = hasPermission('TAXONOMY_READ');
+  const canModerateCategorySuggestions = hasPermission('TAXONOMY_SUGGESTIONS_MODERATE');
   const notifications = useSelector((state: RootState) => state.notifications.items);
   const lastMeasurementNotificationIdRef = useRef<string | null>(null);
 
@@ -331,14 +530,21 @@ const AdminTaxonomyPage: React.FC = () => {
   const [freeformPoints, setFreeformPoints] = useState<AdminMeasurementPointRow[]>([]);
   const [sizeCharts, setSizeCharts] = useState<PendingSizeChart[]>([]);
   /**
-   * What is actually waiting on an admin: brand-submitted measurement points
-   * plus size charts awaiting approval. Shown on the Pending tab so the size of
-   * the queue is legible before anyone opens it.
+   * What is actually waiting on an admin in the MEASUREMENTS section:
+   * brand-submitted measurement points plus size charts awaiting approval.
    */
-  const pendingReviewCount = useMemo(
+  const measurementPendingCount = useMemo(
     () => freeformPoints.length + sizeCharts.length,
     [freeformPoints.length, sizeCharts.length],
   );
+
+  // ── Garment category suggestions (the taxonomy section's own queue) ──
+  const [categorySuggestions, setCategorySuggestions] = useState<AdminCategorySuggestion[]>([]);
+  const [categorySuggestionsLoading, setCategorySuggestionsLoading] = useState(false);
+  const [categorySuggestionsError, setCategorySuggestionsError] = useState<string | null>(null);
+  const [moderatingSuggestionId, setModeratingSuggestionId] = useState<string | null>(null);
+  const [suggestionRejectReason, setSuggestionRejectReason] = useState<Record<string, string>>({});
+  const taxonomyPendingCount = categorySuggestions.length;
   const [freeformQueuePage, setFreeformQueuePage] = useState(1);
   const [sizeChartQueuePage, setSizeChartQueuePage] = useState(1);
   const [selectedSizeChart, setSelectedSizeChart] = useState<PendingSizeChart | null>(null);
@@ -503,6 +709,68 @@ const AdminTaxonomyPage: React.FC = () => {
       setTaxonomyLoading(false);
     }
   }, [hydrateSubCategories]);
+
+  const fetchCategorySuggestions = useCallback(async () => {
+    if (!canReadTaxonomy) {
+      setCategorySuggestions([]);
+      return;
+    }
+    setCategorySuggestionsLoading(true);
+    setCategorySuggestionsError(null);
+    try {
+      const res = await adminTaxonomyApi.listCategorySuggestions('PENDING');
+      const payload = unwrapApiResponse<
+        AdminCategorySuggestion[] | { items?: AdminCategorySuggestion[] }
+      >(res.data as any);
+      const rows = Array.isArray(payload) ? payload : payload?.items ?? [];
+      setCategorySuggestions(rows.filter((row) => row.status === 'PENDING'));
+    } catch (error: any) {
+      setCategorySuggestions([]);
+      setCategorySuggestionsError(
+        error?.response?.data?.message || 'Failed to load category suggestions',
+      );
+    } finally {
+      setCategorySuggestionsLoading(false);
+    }
+  }, [canReadTaxonomy]);
+
+  const handleModerateSuggestion = useCallback(
+    async (suggestion: AdminCategorySuggestion, decision: 'APPROVED' | 'REJECTED') => {
+      const reason = (suggestionRejectReason[suggestion.id] ?? '').trim();
+      if (decision === 'REJECTED' && !reason) {
+        toast.error('A rejection reason is required so the brand knows what to change.');
+        return;
+      }
+      setModeratingSuggestionId(suggestion.id);
+      try {
+        await adminTaxonomyApi.moderateCategorySuggestion(suggestion.id, {
+          status: decision,
+          ...(decision === 'REJECTED' ? { rejectionReason: reason } : {}),
+        });
+        toast.success(
+          decision === 'APPROVED'
+            ? `"${suggestion.name}" is now a garment category.`
+            : `"${suggestion.name}" was rejected.`,
+        );
+        setSuggestionRejectReason((prev) => {
+          const next = { ...prev };
+          delete next[suggestion.id];
+          return next;
+        });
+        // Approving mints a real category, so the list behind this queue is
+        // stale the moment the decision lands.
+        await Promise.all([
+          fetchCategorySuggestions(),
+          decision === 'APPROVED' ? fetchTaxonomy() : Promise.resolve(),
+        ]);
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Failed to moderate suggestion');
+      } finally {
+        setModeratingSuggestionId(null);
+      }
+    },
+    [fetchCategorySuggestions, fetchTaxonomy, suggestionRejectReason],
+  );
 
   const fetchMeasurementQueue = useCallback(async () => {
     setQueueLoading(true);
@@ -824,17 +1092,36 @@ const AdminTaxonomyPage: React.FC = () => {
     }
   }, []);
 
+  /**
+   * `baseTab`, not `activeTab`. These gated on the literal 'measurements' tab,
+   * so opening the pending scope ('measurements-pending') skipped the fetch
+   * that populates the queue it exists to show.
+   */
   useEffect(() => {
-    if (activeTab !== 'measurements') return;
+    if (baseTab !== 'measurements') return;
 
     void Promise.all([fetchMeasurementQueue(), fetchMeasurementPoints()]);
-  }, [activeTab, fetchMeasurementPoints, fetchMeasurementQueue]);
+  }, [baseTab, fetchMeasurementPoints, fetchMeasurementQueue]);
 
   useEffect(() => {
-    if (activeTab !== 'measurements') return;
+    if (baseTab !== 'measurements') return;
 
     void fetchMeasurementLifecycleRows();
-  }, [activeTab, fetchMeasurementLifecycleRows]);
+  }, [baseTab, fetchMeasurementLifecycleRows]);
+
+  /**
+   * Both queue counts ride on the SECTION pills, so they have to be known
+   * before either section is opened — otherwise the badge only ever appears
+   * after you visit the tab it is meant to save you from visiting.
+   */
+  useEffect(() => {
+    void fetchCategorySuggestions();
+  }, [fetchCategorySuggestions]);
+
+  useEffect(() => {
+    if (baseTab === 'measurements') return;
+    void fetchMeasurementQueue();
+  }, [baseTab, fetchMeasurementQueue]);
 
   useEffect(() => {
     if (baseTab !== 'custom-order-configurations') return;
@@ -849,7 +1136,7 @@ const AdminTaxonomyPage: React.FC = () => {
   }, [activeTab, fetchTaxonomy]);
 
   useEffect(() => {
-    if (activeTab !== 'measurements') return;
+    if (baseTab !== 'measurements') return;
 
     const latestMeasurementNotification = notifications.find((notification) => {
       const payload = notification.payload as Record<string, unknown> | undefined;
@@ -1417,50 +1704,47 @@ const AdminTaxonomyPage: React.FC = () => {
             </p>
           </div>
 
+          {/* Section selector ONLY. Exactly one pill is ever lit here, because
+              exactly one section is ever open. Pending lives inside a section. */}
           {baseTab !== 'custom-order-configurations' && (
-            <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-100/80 p-1.5 dark:border-white/10 dark:bg-white/5">
+            <div
+              role="tablist"
+              aria-label="Taxonomy section"
+              className="inline-flex rounded-2xl border border-slate-200 bg-slate-100/80 p-1.5 dark:border-white/10 dark:bg-white/5"
+            >
               <button
                 type="button"
+                role="tab"
+                aria-selected={baseTab === 'taxonomy'}
                 onClick={() => setActiveTab('taxonomy')}
-                className={`rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
+                className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
                   baseTab === 'taxonomy'
                     ? 'bg-white text-indigo-700 shadow-sm dark:bg-slate-800 dark:text-indigo-300'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                 }`}
               >
                 Garment categories
+                {taxonomyPendingCount > 0 && (
+                  <span className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                    {taxonomyPendingCount > 99 ? '99+' : taxonomyPendingCount}
+                  </span>
+                )}
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected={baseTab === 'measurements'}
                 onClick={() => setActiveTab('measurements')}
-                className={`rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
+                className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
                   baseTab === 'measurements'
                     ? 'bg-white text-indigo-700 shadow-sm dark:bg-slate-800 dark:text-indigo-300'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                 }`}
               >
                 Measurement Points
-              </button>
-              {/* The review queue, promoted out of the status dropdown. The
-                  count is the point: an empty queue should be visible without
-                  opening the tab. */}
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveTab(
-                    baseTab === 'measurements' ? 'measurements-pending' : 'taxonomy-pending',
-                  )
-                }
-                className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
-                  pendingOnly
-                    ? 'bg-white text-amber-700 shadow-sm dark:bg-slate-800 dark:text-amber-300'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
-                }`}
-              >
-                Pending
-                {pendingReviewCount > 0 && (
+                {measurementPendingCount > 0 && (
                   <span className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                    {pendingReviewCount > 99 ? '99+' : pendingReviewCount}
+                    {measurementPendingCount > 99 ? '99+' : measurementPendingCount}
                   </span>
                 )}
               </button>
@@ -1486,6 +1770,30 @@ const AdminTaxonomyPage: React.FC = () => {
 
       {baseTab === 'taxonomy' ? (
         <section className="space-y-5">
+          <PendingScopeTabs
+            pendingOnly={pendingOnly}
+            pendingCount={taxonomyPendingCount}
+            allLabel="All categories"
+            pendingLabel="Pending suggestions"
+            onSelect={(next) => setActiveTab(next ? 'taxonomy-pending' : 'taxonomy')}
+          />
+
+          {pendingOnly ? (
+            <CategorySuggestionQueue
+              suggestions={categorySuggestions}
+              loading={categorySuggestionsLoading}
+              error={categorySuggestionsError}
+              canModerate={canModerateCategorySuggestions}
+              moderatingId={moderatingSuggestionId}
+              rejectReasons={suggestionRejectReason}
+              onRejectReasonChange={(id, value) =>
+                setSuggestionRejectReason((prev) => ({ ...prev, [id]: value }))
+              }
+              onModerate={handleModerateSuggestion}
+              onRetry={fetchCategorySuggestions}
+            />
+          ) : (
+          <>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
               <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200">
@@ -1648,9 +1956,19 @@ const AdminTaxonomyPage: React.FC = () => {
               </table>
             </div>
           )}
+          </>
+          )}
         </section>
       ) : baseTab === 'measurements' ? (
         <section className="space-y-6">
+          <PendingScopeTabs
+            pendingOnly={pendingOnly}
+            pendingCount={measurementPendingCount}
+            allLabel="All measurement points"
+            pendingLabel="Pending review"
+            onSelect={(next) => setActiveTab(next ? 'measurements-pending' : 'measurements')}
+          />
+
           {/* Measurement Points Search & Toolbar */}
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
