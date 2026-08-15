@@ -226,7 +226,29 @@ const StoreEssentials: React.FC = () => {
   }, [navigate, user?.brandDescription, user?.id]);
 
   useEffect(() => {
-    // Confetti once on mount (best-effort)
+    /**
+     * Confetti marks STARTING store setup, once.
+     *
+     * It fired on every mount of this page, and this page is where the wizard's
+     * Back button lands — so walking back from Social threw confetti again, and
+     * again on every lap. A celebration that repeats on backward navigation
+     * stops reading as a celebration and starts reading as a bug.
+     *
+     * Keyed per brand in sessionStorage: it re-arms for a genuinely new visit
+     * (new tab, or after the browser session ends) but never for movement
+     * inside the flow. Session rather than local storage so a brand who comes
+     * back another day is still greeted.
+     */
+    if (!user?.id) return;
+    const seenKey = `wiez.storeSetup.welcomed:${user.id}`;
+    try {
+      if (window.sessionStorage.getItem(seenKey)) return;
+      window.sessionStorage.setItem(seenKey, '1');
+    } catch {
+      // Storage unavailable (private mode, restricted WebView). Fall through and
+      // celebrate — a duplicate confetti is a smaller failure than none at all.
+    }
+
     const fire = async () => {
       try {
         const confetti = (await import('canvas-confetti')).default;
