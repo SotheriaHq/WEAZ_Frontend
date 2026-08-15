@@ -13,29 +13,9 @@ import { getAvatarFallback } from '@/utils/profileImage';
 import { DraftExpiryStats as DraftExpiryStatsComponent } from '@/components/collections/DraftExpiryComponents';
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 import useCachedResource from '@/hooks/useCachedResource';
-import { normalizeNotification } from '@/utils/notificationAdapter';
-import { determineNotificationRoute } from '@/utils/notificationRouting';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
 
-type ActivityTone = 'order' | 'patch' | 'stock' | 'review';
-
-type ActivityItemViewModel = {
-  id: string;
-  type: ActivityTone;
-  category: string;
-  title: string;
-  description: string;
-  time: string;
-  action?: string;
-  route?: string;
-};
-
-const stripHtml = (value?: string | null) =>
-  String(value || '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
+/** Keep an Action Required link inside Studio rather than the buyer surfaces. */
 const normalizeBrandDashboardRoute = (route?: string | null) => {
   if (!route) return undefined;
 
@@ -53,79 +33,19 @@ const normalizeBrandDashboardRoute = (route?: string | null) => {
 
 const buildDashboardReturnQuery = () => {
   const params = new URLSearchParams();
-  params.set('returnTo', '/studio?tab=dashboard');
+  params.set('returnTo', '/studio?tab=overview');
   params.set('returnLabel', 'Back to dashboard');
   return params.toString();
 };
-
-const deriveActivityTone = (item: any): ActivityTone => {
-  const haystack = [
-    item?.type,
-    item?.title,
-    item?.description,
-    item?.route,
-  ]
-    .map((value) => String(value || '').toUpperCase())
-    .join(' ');
-
-  if (haystack.includes('REVIEW')) return 'review';
-  if (
-    haystack.includes('STOCK') ||
-    haystack.includes('INVENTORY') ||
-    haystack.includes('LOW_STOCK') ||
-    haystack.includes('OUT_OF_STOCK')
-  ) {
-    return 'stock';
-  }
-  if (
-    haystack.includes('MESSAGE') ||
-    haystack.includes('PATCH') ||
-    haystack.includes('FOLLOW')
-  ) {
-    return 'patch';
-  }
-  return 'order';
-};
-
-const getActivityCategoryLabel = (tone: ActivityTone) => {
-  switch (tone) {
-    case 'patch':
-      return 'Messages';
-    case 'stock':
-      return 'Inventory';
-    case 'review':
-      return 'Reviews';
-    default:
-      return 'Orders';
-  }
-};
-
-function getRelativeTime(value?: string | null) {
-  if (!value) return 'Just now';
-  const timestamp = new Date(value).getTime();
-  if (Number.isNaN(timestamp)) return 'Just now';
-
-  const diffMinutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
-  if (diffMinutes < 1) return 'Just now';
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-
-  const diffHours = Math.round(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-
-  const diffDays = Math.round(diffHours / 24);
-  return `${diffDays}d ago`;
-}
 
 const DashboardHome: React.FC = () => {
   const navigate = useNavigate();
   const isEmbeddedMobile = useEmbeddedSurface() === 'mobile-app';
   const user = useSelector((state: RootState) => state.user.profile);
-  const notificationItems = useSelector((state: RootState) => state.notifications.items);
   const [range, setRange] = useState<'7d' | '30d' | 'ytd'>('30d');
 
   type DashboardHomeData = {
     overview: any;
-    activityFeed: any[];
     draftStats: DraftExpiryStats | null;
     storeOpenStatus: boolean | null;
   };
@@ -150,7 +70,6 @@ const DashboardHome: React.FC = () => {
       isLive: false,
     },
     actionRequired: [],
-    recentActivity: [],
     recentOrders: [],
     storeHealth: {
       score: 0,
@@ -166,17 +85,18 @@ const DashboardHome: React.FC = () => {
       if (!user?.id) throw new Error('No user ID');
 
       try {
-        const [overviewData, , activityFeedData, draftStatsData, statusData] = await Promise.all([
+        const [overviewData, , draftStatsData, statusData] = await Promise.all([
           brandApi.getDashboardOverview(user.id),
           brandApi.getDashboardAnalytics(user.id, range),
-          brandApi.getDashboardActivityFeed(user.id, 12),
-          getDraftExpiryStats().catch(() => null),
+          // STORE-scoped on purpose: the card's "View All" opens the store
+          // collections list, so counting design drafts here produced a number
+          // that led straight to an empty screen.
+          getDraftExpiryStats('STORE').catch(() => null),
           getStoreStatus().catch(() => null),
         ]);
 
         return {
           overview: overviewData,
-          activityFeed: Array.isArray(activityFeedData?.items) ? activityFeedData.items : [],
           draftStats: draftStatsData,
           storeOpenStatus: statusData?.isStoreOpen ?? null,
         };
@@ -184,7 +104,6 @@ const DashboardHome: React.FC = () => {
         console.warn('Failed to fetch dashboard data, using demo data', error);
         return {
           overview: buildFallbackOverview(),
-          activityFeed: [],
           draftStats: null,
           storeOpenStatus: null,
         };
@@ -196,7 +115,6 @@ const DashboardHome: React.FC = () => {
   });
 
   const overview = dashboardData?.overview ?? null;
-  const activityFeed = dashboardData?.activityFeed ?? [];
   const draftStats = dashboardData?.draftStats ?? null;
   const storeOpenStatus = dashboardData?.storeOpenStatus ?? null;
 
@@ -224,72 +142,6 @@ const DashboardHome: React.FC = () => {
       link: normalizeBrandDashboardRoute(item?.link),
     }));
   }, [actionRequired]);
-
-  const notificationActivity = useMemo(() => {
-    return (notificationItems || []).slice(0, 12).map((raw: any) => {
-      const normalized = normalizeNotification(raw);
-      const route = normalizeBrandDashboardRoute(determineNotificationRoute(normalized));
-      const type = String(normalized.type || '').toUpperCase();
-
-      let mappedType: ActivityTone = 'order';
-      if (type.includes('MESSAGE') || type.includes('FOLLOW') || type.includes('PATCH')) mappedType = 'patch';
-      if (type.includes('REVIEW')) mappedType = 'review';
-      if (type.includes('LOW_STOCK') || type.includes('OUT_OF_STOCK')) mappedType = 'stock';
-
-      return {
-        id: normalized.id || undefined,
-        type: mappedType,
-        title: stripHtml(normalized.message || 'Recent update') || 'Recent update',
-        description: normalized.actor
-          ? `From ${normalized.actor.firstName || normalized.actor.username || 'system'}`
-          : 'System update',
-        createdAt: normalized.createdAt,
-        time: getRelativeTime(normalized.createdAt),
-        action: route ? 'Open' : undefined,
-        route,
-      };
-    });
-  }, [notificationItems]);
-
-  const recentActivity = useMemo<ActivityItemViewModel[]>(() => {
-    const source =
-      (activityFeed.length
-        ? activityFeed
-        : overview?.recentActivity?.length
-          ? overview.recentActivity
-          : notificationActivity) || [];
-
-    return source.map((item: any, index: number) => {
-      const type = deriveActivityTone(item);
-      const route = normalizeBrandDashboardRoute(item?.route);
-
-      return {
-        id: item?.id || `${type}-${index}`,
-        type,
-        category: getActivityCategoryLabel(type),
-        title: stripHtml(item?.title || 'Recent update') || 'Recent update',
-        description: stripHtml(item?.description || 'System update') || 'System update',
-        time: item?.time || getRelativeTime(item?.createdAt),
-        action: route ? item?.action || 'Open' : undefined,
-        route,
-      };
-    });
-  }, [activityFeed, notificationActivity, overview?.recentActivity]);
-
-  const activitySummary = useMemo(() => {
-    return recentActivity.reduce(
-      (acc, item) => {
-        const route = String(item.route || '');
-        acc.total += 1;
-        if (route.includes('/messages')) acc.messages += 1;
-        else if (route.includes('custom-orders')) acc.customOrders += 1;
-        else if (route.includes('order')) acc.orders += 1;
-        else acc.updates += 1;
-        return acc;
-      },
-      { total: 0, orders: 0, customOrders: 0, messages: 0, updates: 0 },
-    );
-  }, [recentActivity]);
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(val);
@@ -477,59 +329,30 @@ const DashboardHome: React.FC = () => {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
-        {/* Action Required column renders FIRST on phones (order-1) — urgent
-            items must not hide below the activity feed (client-requested). */}
-        <div className="order-2 flex flex-col rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-[#1a1a1a] sm:p-4 lg:order-1 lg:col-span-2 lg:min-h-[620px] lg:p-6">
-          <div className="mb-3 flex items-center justify-between sm:mb-4 lg:mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activity</h2>
-            <Link
-              to="/studio?tab=orders"
-              className="text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
-            >
-              View All
-            </Link>
-          </div>
+      {/*
+        Recent Activity was REMOVED from the brand dashboard (2026-08-15).
 
-          {recentActivity.length > 0 ? (
-            <div className="mb-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2 lg:mb-4">
-              <ActivitySummaryPill label="All" value={activitySummary.total} />
-              <ActivitySummaryPill label="Orders" value={activitySummary.orders + activitySummary.customOrders} />
-              <ActivitySummaryPill label="Messages" value={activitySummary.messages} />
-              <ActivitySummaryPill label="Updates" value={activitySummary.updates} />
-            </div>
-          ) : null}
+        Every row rendered as "Recent update" / "System update" — the feed had no
+        access to what the event actually was, so a brand looked at five
+        identical lines and could not tell an order from a review from a message.
+        A panel that occupies two thirds of the dashboard and says the same
+        sentence five times is worse than nothing: it teaches the owner to ignore
+        the area where real signals would appear.
 
-          {recentActivity.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center py-6 text-center sm:py-8 lg:py-12">
-              <div>
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-2xl dark:bg-gray-800 sm:h-16 sm:w-16 sm:text-3xl">
-                  <span aria-hidden="true">🗂️</span>
-                </div>
-                <h3 className="mb-1 font-medium text-gray-900 dark:text-white">No activity yet</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Orders, patches, and reviews will appear here
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 overflow-hidden lg:max-h-[500px]">
-              <div className="h-full overflow-y-auto pr-1 scrollbar-hide">
-                <div className="space-y-2 pr-1 sm:space-y-3">
-                  {recentActivity.map((item) => (
-                    <ActivityItem
-                      key={item.id}
-                      {...item}
-                      onAction={item.route ? () => navigate(item.route!) : undefined}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        The signals themselves are NOT lost — Action Required (right) carries
+        anything needing a decision, the bell carries the full notification
+        history with real per-type copy (`notificationSections` /
+        `NotificationsPage`), and Orders/Messages own their own queues. The admin
+        console keeps its activity feed (`AdminDashboard`), where the events are
+        typed and the audit trail is the point.
 
-        <div className="order-1 space-y-4 lg:order-2 lg:space-y-6">
+        If this returns, it must render the specific event ("Order #1042 paid",
+        "Ada left a 5★ review") — bring back `deriveActivityTone`,
+        `getActivityCategoryLabel`, `ActivityItem` and `ActivitySummaryPill` from
+        git history at that point, not the generic version.
+      */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
+        <div className="space-y-4 lg:space-y-6">
           <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-[#1a1a1a] sm:p-4 lg:p-6">
             <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white lg:mb-4">
               <span aria-hidden="true">🔔</span>
@@ -548,7 +371,9 @@ const DashboardHome: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
 
+        <div className="space-y-4 lg:space-y-6">
           <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-[#1a1a1a] sm:p-4 lg:p-6">
             <div className="mb-3 flex items-center justify-between lg:mb-4">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Store Health</h2>
@@ -598,18 +423,22 @@ const DashboardHome: React.FC = () => {
             </div>
           </div>
 
-          {/* Always render draft counts — a 0 is information, not absence
-              (client-requested: numbers should show even when zero). */}
-          {draftStats ? (
-            <DraftExpiryStatsComponent
-              total={draftStats.totalDrafts}
-              expiringSoon={draftStats.expiringIn7Days}
-              expiringToday={draftStats.expiringToday}
-              onViewAll={() =>
-                navigate(`/studio/store?view=collections&collectionStatus=draft&${buildDashboardReturnQuery()}`)
-              }
-            />
-          ) : null}
+          {/*
+            Always render draft counts — a 0 is information, not absence
+            (client-requested: numbers should show even when zero). The `?? 0`
+            guards matter: the API omitted `expiringIn7Days`/`expiringToday`
+            entirely until 2026-08-15, so those two cells rendered blank while
+            "Total Drafts" showed a number, which is what made the card look
+            like it was reporting something it could not explain.
+          */}
+          <DraftExpiryStatsComponent
+            total={draftStats?.totalDrafts ?? 0}
+            expiringSoon={draftStats?.expiringIn7Days ?? 0}
+            expiringToday={draftStats?.expiringToday ?? 0}
+            onViewAll={() =>
+              navigate(`/studio/store?view=collections&collectionStatus=draft&${buildDashboardReturnQuery()}`)
+            }
+          />
         </div>
       </div>
     </div>
@@ -668,61 +497,6 @@ const QuickActionButton: React.FC<{
     </span>
   </button>
 );
-
-const ActivitySummaryPill: React.FC<{ label: string; value: number }> = ({ label, value }) => (
-  <div className="rounded-xl border border-gray-200 bg-gray-50/80 px-2 py-1.5 text-center dark:border-white/10 dark:bg-white/[0.03] sm:px-3 sm:py-2">
-    <p className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-400 dark:text-gray-500 sm:tracking-[0.16em]">{label}</p>
-    <p className="mt-0.5 text-base font-bold leading-5 text-gray-900 dark:text-white sm:mt-1 sm:text-lg">{value}</p>
-  </div>
-);
-
-const ActivityItem: React.FC<ActivityItemViewModel & { onAction?: () => void }> = ({
-  type,
-  category,
-  title,
-  description,
-  time,
-  action,
-  onAction,
-}) => {
-  const iconMap: Record<ActivityTone, { marker: string; bg: string; color: string }> = {
-    order: { marker: '📦', bg: 'bg-green-500/20', color: 'text-green-500' },
-    patch: { marker: '💬', bg: 'bg-indigo-500/20', color: 'text-indigo-500' },
-    stock: { marker: '🪡', bg: 'bg-orange-500/20', color: 'text-orange-500' },
-    review: { marker: '⭐', bg: 'bg-yellow-500/20', color: 'text-yellow-500' },
-  };
-
-  const { marker, bg, color } = iconMap[type] || iconMap.order;
-
-  // Compact single-line rows (client-requested): marker · title · meta · action.
-  // The old stacked card layout wasted a full card per event.
-  return (
-    <div className="rounded-lg border border-gray-200/80 bg-gray-50/70 px-2.5 py-2 transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-white/[0.025] dark:hover:bg-white/[0.05] sm:rounded-xl sm:px-3">
-      <div className="flex items-center gap-2.5">
-        <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-sm ${bg} ${color}`}>
-          <span aria-hidden="true">{marker}</span>
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-gray-900 dark:text-white" title={description || title}>
-            {title}
-          </p>
-          <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
-            {category} • {time}
-          </p>
-        </div>
-        {action ? (
-          <button
-            type="button"
-            onClick={onAction}
-            className="flex-shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
-          >
-            {action}
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
-};
 
 const AlertItem: React.FC<{
   type?: string;

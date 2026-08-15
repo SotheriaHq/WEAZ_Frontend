@@ -231,11 +231,19 @@ export interface DraftExpiryStats {
 }
 
 /**
- * Get draft expiry statistics for the current user
- * Used for dashboard display and notifications
+ * Draft expiry statistics for the CURRENT user (JWT subject; no id is sent).
+ *
+ * `domain` scopes the count to one kind of draft. `Collection` backs both
+ * designs and store collections, so an unscoped count mixes them — and a
+ * surface that only links to one of the two then shows a number it cannot
+ * account for. Pass the domain that matches wherever "View All" goes.
  */
-export async function getDraftExpiryStats(): Promise<DraftExpiryStats> {
-  const resp = await apiClient.get('/collections/my/draft-stats');
+export async function getDraftExpiryStats(
+  domain?: 'DESIGN' | 'STORE',
+): Promise<DraftExpiryStats> {
+  const resp = await apiClient.get('/collections/my/draft-stats', {
+    params: domain ? { domain } : undefined,
+  });
   let data = resp.data;
   if (data && typeof data === 'object' && 'data' in data) {
     data = (data as Record<string, unknown>).data;

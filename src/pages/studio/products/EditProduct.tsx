@@ -3240,6 +3240,40 @@ const EditProduct: React.FC = () => {
     navigateBack();
   }, [hasChanges, navigateBack]);
 
+  /**
+   * Where this product sits in the review lifecycle, from the server's own
+   * status rather than the local form status. `CHANGES_REQUESTED` / `REJECTED`
+   * mean the owner is answering the review team, and the action bar has to say
+   * so — "Save Changes" reads as a metadata edit and left owners believing
+   * their resubmission never went anywhere.
+   *
+   * THESE TWO `useMemo`s MUST STAY ABOVE THE EARLY RETURNS BELOW.
+   *
+   * They used to sit after `if (loading) return <StudioPageSkeleton/>`, which
+   * made the hook count depend on `loading`. In create mode `loading` starts
+   * false, so nothing ever went wrong. In EDIT mode it starts true (see the
+   * `useState` initialiser: `isEditMode && cachedProductDetail === undefined`)
+   * — first render took the early return with N hooks, the product arrived,
+   * `loading` flipped, and the next render ran N+2. React throws #310
+   * ("Rendered more hooks than during the previous render") and the error
+   * boundary paints the 500 screen.
+   *
+   * That is not a corner case: `/studio/store/products/:id/edit` is exactly
+   * where "Retry" on a failed product upload sends the owner
+   * (`StoreProductsPanel.handleRetryProductPublish` — a draft already exists
+   * server-side, so retrying opens it rather than creating a duplicate). So a
+   * brand whose upload died could never reach the screen that would have let
+   * them finish it.
+   */
+  const productReviewStatus = useMemo(
+    () => normalizeContentReviewStatus(contentStatus),
+    [contentStatus],
+  );
+  const productReviewHint = useMemo(
+    () => reviewStateHint(productReviewStatus),
+    [productReviewStatus],
+  );
+
   // =====================
   // Loading State
   // =====================
@@ -3260,22 +3294,7 @@ const EditProduct: React.FC = () => {
   // Render
   // =====================
   const isDraftEditMode = isEditMode && form.status === "DRAFT";
-  /**
-   * Where this product sits in the review lifecycle, from the server's own
-   * status rather than the local form status. `CHANGES_REQUESTED` / `REJECTED`
-   * mean the owner is answering the review team, and the action bar has to say
-   * so — "Save Changes" reads as a metadata edit and left owners believing
-   * their resubmission never went anywhere.
-   */
-  const productReviewStatus = useMemo(
-    () => normalizeContentReviewStatus(contentStatus),
-    [contentStatus],
-  );
   const isResubmission = needsResubmission(productReviewStatus);
-  const productReviewHint = useMemo(
-    () => reviewStateHint(productReviewStatus),
-    [productReviewStatus],
-  );
 
   // Drafts are allowed to be incomplete — that is what a draft is for. Only
   // submissions that will actually reach the server's publish validation are
@@ -3290,18 +3309,59 @@ const EditProduct: React.FC = () => {
   const blockingPublishFields: ProductPublishField[] = isDraftOnlySubmit
     ? []
     : [...step1Missing, ...step2Missing];
-  const canAdvanceFromCurrentStep =
-    isDraftOnlySubmit ||
-    (wizardStep === 1
-      ? step1Complete
-      : wizardStep === 2
-        ? step2Complete
-        : true);
+  const currentStepMissing =
+    isDraftOnlySubmit || wizardStep === 3
+      ? []
+      : wizardStep === 1
+        ? step1Missing
+        : step2Missing;
+  const canAdvanceFromCurrentStep = currentStepMissing.length === 0;
+
+  /**
+   * Continue is ALWAYS pressable, and answers when it cannot advance.
+   *
+   * It used to be `disabled={!canAdvanceFromCurrentStep}`. On a fresh product
+   * the first blocker is Description — a step-1 field — so the very first thing
+   * a brand meets is a primary button that does nothing at all when pressed.
+   * There is no click event on a disabled button, so no toast, no focus, no
+   * scroll, no cursor feedback on touch (`:disabled` cursor rules mean nothing
+   * to a finger); the only hint was 40% opacity on a purple pill and a `title`
+   * tooltip that phones do not render. Reported exactly as "the button was not
+   * functional, user pressed and pressed, but no effect".
+   *
+   * The gate itself is right — step 2 asks for pricing and variants that only
+   * make sense once step 1 is real. What was wrong is a control that refuses
+   * silently. Now the press reveals the field errors, scrolls to the first
+   * blocker and names it.
+   */
+  const handleContinue = () => {
+    if (canAdvanceFromCurrentStep) {
+      goToStep((wizardStep + 1) as 1 | 2 | 3);
+      return;
+    }
+
+    currentStepMissing.forEach(markPublishFieldTouched);
+    const firstMissing = currentStepMissing[0];
+    if (firstMissing) {
+      focusPublishField(firstMissing);
+      toast.error(
+        `${PRODUCT_PUBLISH_FIELD_LABEL[firstMissing]} is needed before you continue.`,
+      );
+    }
+  };
 
   return (
-    <div className="flex flex-col min-h-full bg-transparent text-theme font-sans">
+    /*
+      `min-h-dvh` so a short step still fills the viewport and the sticky action
+      bar lands at the bottom of the screen rather than floating halfway up it
+      with dead space underneath. `pb-28` on the main column is the sticky
+      footer's own height plus a little air — `pb-48` (192px) was reserving more
+      than twice what the bar occupies, which read as yet more empty space at
+      the end of the form.
+    */
+    <div className="flex min-h-dvh flex-col bg-transparent text-theme font-sans">
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-3 py-3 pb-48 sm:px-5 sm:py-5 sm:pb-32 md:pb-16">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 py-3 pb-28 sm:px-5 sm:py-5 sm:pb-28 md:pb-16">
         <div className="mb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:mb-6">
           <div className="flex flex-col gap-1">
             <div className="flex items-center text-xs text-theme-secondary gap-2">
@@ -5150,14 +5210,18 @@ const EditProduct: React.FC = () => {
             {wizardStep < 3 ? (
               <button
                 type="button"
-                onClick={() => goToStep((wizardStep + 1) as 1 | 2 | 3)}
-                disabled={!canAdvanceFromCurrentStep}
+                onClick={handleContinue}
+                aria-disabled={!canAdvanceFromCurrentStep}
                 title={
                   canAdvanceFromCurrentStep
                     ? undefined
                     : "Complete this step's required fields first"
                 }
-                className="relative inline-flex min-h-11 flex-1 items-center justify-center gap-1 rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-purple-600/40 disabled:shadow-none md:min-h-10 md:flex-initial md:px-6 md:text-sm"
+                className={`relative inline-flex min-h-11 flex-1 items-center justify-center gap-1 rounded-lg px-4 py-2 text-xs font-semibold text-white transition-all md:min-h-10 md:flex-initial md:px-6 md:text-sm ${
+                  canAdvanceFromCurrentStep
+                    ? "bg-purple-600 shadow-lg shadow-purple-500/20 hover:bg-purple-500"
+                    : "bg-purple-600/45 shadow-none hover:bg-purple-600/60"
+                }`}
               >
                 Continue to {wizardStep === 1 ? "Operations" : "Review"}
                 <ChevronRight className="h-4 w-4" />

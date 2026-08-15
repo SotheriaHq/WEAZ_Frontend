@@ -82,7 +82,7 @@ export default function StoreManagement() {
   const status = statusBundle?.status ?? null;
   const verification = statusBundle?.verification ?? null;
 
-  const { data: overviewBundle, loading: overviewLoading } = useCachedResource<{
+  const { data: overviewBundle } = useCachedResource<{
     overview: any;
     analytics: any;
   }>({
@@ -712,11 +712,10 @@ export default function StoreManagement() {
         </aside>
       ) : null}
 
-      {overviewLoading ? (
-        <div className="rounded-2xl border border-gray-200 bg-white/70 p-4 text-sm text-gray-500 dark:border-white/10 dark:bg-white/5">
-          Loading store stats...
-        </div>
-      ) : null}
+      {/* Store stats revalidate in the background and feed a panel that is
+          collapsed by default — a captioned "Loading store stats..." slab under
+          the product grid was one more thing announcing itself on a screen the
+          client already called over-loaded. It resolves silently now. */}
     </div>
   );
 }

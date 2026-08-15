@@ -1969,7 +1969,17 @@ const AdminTaxonomyPage: React.FC = () => {
             onSelect={(next) => setActiveTab(next ? 'measurements-pending' : 'measurements')}
           />
 
-          {/* Measurement Points Search & Toolbar */}
+          {/*
+            The measurements section takes `pendingOnly` from the tab above and,
+            until now, did nothing with it — `PendingScopeTabs` rendered
+            "Pending review" as selected while the toolbar and the full registry
+            below carried on showing all 100 points. The taxonomy section
+            directly above has always branched on the same flag; this one never
+            did, so the tab looked broken while working exactly as written.
+
+            Pending scope = the review queue and nothing else.
+          */}
+          {pendingOnly ? null : (
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
               <span className="rounded-full bg-indigo-100 px-3 py-1 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-200">
@@ -2070,6 +2080,7 @@ const AdminTaxonomyPage: React.FC = () => {
               </button>
             </div>
           </div>
+          )}
 
           {/* Pending Moderation Queues Section */}
           {canReviewModerationQueue && (freeformPoints.length > 0 || sizeCharts.length > 0) && (
@@ -2149,8 +2160,28 @@ const AdminTaxonomyPage: React.FC = () => {
             </div>
           )}
 
+          {/* Nothing is waiting — say so, rather than falling through to the
+              full registry and making the tab look like it did nothing. */}
+          {pendingOnly && measurementPendingCount === 0 ? (
+            <div className="rounded-3xl border border-dashed border-slate-300 bg-white/60 px-6 py-14 text-center dark:border-white/10 dark:bg-white/5">
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                Nothing waiting for review
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Brand-submitted measurement points and size charts land here.
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveTab('measurements')}
+                className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/10"
+              >
+                View all measurement points
+              </button>
+            </div>
+          ) : null}
+
           {/* Measurement Points Main Grid / List Display */}
-          {measurementPointsLoading ? (
+          {pendingOnly ? null : measurementPointsLoading ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 6 }).map((_, idx) => (
                 <div key={idx} className="h-36 animate-pulse rounded-3xl bg-slate-200/70 dark:bg-white/10" />

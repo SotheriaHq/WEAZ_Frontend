@@ -349,6 +349,90 @@ const getCollectionPreviewSources = (
   return out;
 };
 
+/**
+ * Collection actions: a "+" menu on phones, the inline pair from `sm` up.
+ *
+ * Both branches render the same two commands and both are always in the DOM as
+ * real buttons — the phone branch is not a reduced feature set, only a reduced
+ * footprint. `sm` (640px) keeps every tablet, portrait iPad included, on the
+ * inline layout the client asked to leave alone.
+ */
+const CollectionActionsControl: React.FC<{
+  onCreate: () => void;
+  onManage: () => void;
+}> = ({ onCreate, onManage }) => {
+  const [open, setOpen] = useState(false);
+
+  const items: Array<{ key: string; marker: string; label: string; onSelect: () => void }> = [
+    { key: 'create', marker: '➕', label: 'Create collection', onSelect: onCreate },
+    { key: 'manage', marker: '🗂️', label: 'Manage collections', onSelect: onManage },
+  ];
+
+  return (
+    <>
+      {/* Phones */}
+      <div className="relative sm:hidden">
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label="Collection actions"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-lg font-semibold leading-none text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+        >
+          <span aria-hidden="true">+</span>
+        </button>
+
+        {open ? (
+          <>
+            {/* Tap-away layer. A menu opened by touch has no blur to close it. */}
+            <button
+              type="button"
+              aria-label="Close collection actions"
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 z-40 cursor-default"
+            />
+            <div
+              role="menu"
+              className="absolute right-0 z-50 mt-2 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-white/10 dark:bg-[#15151b]"
+            >
+              {items.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    item.onSelect();
+                  }}
+                  className="flex min-h-11 w-full items-center gap-2.5 px-3.5 text-left text-xs font-semibold text-gray-800 transition-colors hover:bg-purple-50 dark:text-gray-100 dark:hover:bg-white/5"
+                >
+                  <span aria-hidden="true">{item.marker}</span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : null}
+      </div>
+
+      {/* Tablet and up — unchanged */}
+      <div className="hidden items-center gap-2 sm:flex">
+        {items.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={item.onSelect}
+            className="min-h-9 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+};
+
 const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   layoutMode = false,
   onToggleLayoutMode,
@@ -2002,22 +2086,19 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 Slow carousel preview with cover images always visible.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => navigate('/studio/store/collections/new')}
-                className="min-h-9 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
-              >
-                Create collection
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/studio/store?view=collections')}
-                className="min-h-9 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
-              >
-                Manage collections
-              </button>
-            </div>
+            {/*
+              Phones get a "+" that opens the two actions; tablets and desktop
+              keep both buttons inline. Two full-width word pills next to a
+              heading left the collections header wrapping onto three lines on a
+              narrow screen, before any collection was even visible.
+
+              Breakpoint is `sm` (640px), so iPad — portrait included — stays on
+              the inline pair exactly as it is today.
+            */}
+            <CollectionActionsControl
+              onCreate={() => navigate('/studio/store/collections/new')}
+              onManage={() => navigate('/studio/store?view=collections')}
+            />
           </div>
 
           {collectionsLoading ? (

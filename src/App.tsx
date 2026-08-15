@@ -47,6 +47,7 @@ import RequireAdmin from './components/admin/RequireAdmin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { useNotificationsBootstrap } from '@/hooks/useNotifications';
+import { useStudioNativeNavBridge } from '@/hooks/useStudioNativeNavBridge';
 import { ThemeBackendSync } from '@/components/theme/ThemeBackendSync';
 import { useVerificationStateSync } from '@/hooks/useVerificationStateSync';
 import ScrollRestoreProvider from '@/components/ScrollRestoreProvider';
@@ -156,14 +157,15 @@ const StudioRouteFallback: React.FC = () => {
         isEmbeddedMobile ? 'min-h-[calc(100dvh-8rem)]' : 'min-h-[420px]'
       }`}
     >
-      <div className="w-full max-w-sm">
-        <div
-          className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[color:rgba(var(--brand-primary-rgb),0.22)] border-t-[color:var(--brand-primary)]"
-          aria-hidden="true"
-        />
-        <div className="text-base font-semibold">Studio</div>
-        <p className="mt-2 text-sm text-[color:var(--text-secondary)]">Loading workspace</p>
-      </div>
+      {/* A spinner and nothing else. This used to add "Studio" + "Loading
+          workspace" underneath — the third narrated loading screen for one
+          Studio navigation, after the native shell's staged copy and the
+          handoff gate's own caption. */}
+      <div
+        className="h-8 w-8 animate-spin rounded-full border-2 border-[color:rgba(var(--brand-primary-rgb),0.22)] border-t-[color:var(--brand-primary)]"
+        role="progressbar"
+        aria-label="Loading"
+      />
     </div>
   );
 };
@@ -313,6 +315,9 @@ const RootLayout: React.FC = () => {
   // authenticated surface receives notifications" true by construction rather
   // than by remembering to add a line to each new shell.
   useNotificationsBootstrap();
+  // Lets the native Studio dock switch sections with a client-side route change
+  // instead of `location.assign` (a full document reload). See the hook.
+  useStudioNativeNavBridge();
   const [showRouteIntentProgress, setShowRouteIntentProgress] = useState(false);
   const routeIntentTimeoutRef = useRef<number | null>(null);
 

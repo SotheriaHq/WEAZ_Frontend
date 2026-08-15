@@ -38,10 +38,26 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
           page; the mobile island dock lives inside it and self-shows on < lg. */}
       {!isEmbeddedMobile ? <StudioSidebar active={active} onSelect={onSelect} /> : null}
 
+      {/*
+        The embedded surface reserves NO bottom space for the island.
+
+        `threadly-mobile/app/(tabs)/studio/webview.tsx` already insets the whole
+        WebView by `useScreenChrome().standardScreenBottomPadding`, so the
+        viewport handed to this document stops above the floating dock. Adding
+        6rem here reserved it a SECOND time — and because Studio pages pin their
+        action bar with `sticky bottom-0`, that bar stuck to the bottom of its
+        containing block rather than the viewport, parking ~96px of empty page
+        underneath it once you scrolled to the end. That is the gap reported
+        below the create-product footer.
+
+        The non-embedded branch keeps the padding: on a mobile browser the web
+        app draws its own island inside this viewport, and there the reservation
+        is the only one there is.
+      */}
       <div
         className={
           isEmbeddedMobile
-            ? 'min-h-dvh bg-[color:var(--surface-primary)] px-3 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-2 sm:px-4'
+            ? 'min-h-dvh bg-[color:var(--surface-primary)] px-3 pb-[env(safe-area-inset-bottom)] pt-2 sm:px-4'
             : 'min-h-dvh bg-[color:var(--surface-primary)] px-3 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-20 sm:px-4 lg:pb-10 lg:pl-[236px]'
         }
       >
