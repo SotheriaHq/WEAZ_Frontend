@@ -10,6 +10,7 @@ import {
 } from '@/api/StoreApi';
 import {
   sanitizeCustomOrderLeadTime,
+  sanitizeProcessingTime,
   sanitizeResponseTimeSla,
   sanitizeReturnWindow,
   sanitizeShippingRegions,
@@ -79,7 +80,7 @@ const StorePoliciesSettings: React.FC = () => {
           ...prev,
           contactEmail: settings.contactEmail || prev.contactEmail,
           shippingRegions: sanitizeShippingRegions(policies.shippingRegions || prev.shippingRegions),
-          processingTime: policies.processingTime || prev.processingTime,
+          processingTime: sanitizeProcessingTime(policies.processingTime || prev.processingTime),
           shippingMethods: policies.shippingMethods || prev.shippingMethods,
           freeShippingThreshold:
             policies.freeShippingThreshold !== null && policies.freeShippingThreshold !== undefined

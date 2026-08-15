@@ -37,12 +37,14 @@ import {
 } from '@/utils/storeSetup';
 import { primeStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
 import StoreSetupProgress from '@/components/store/StoreSetupProgress';
+import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 import { invalidateRequireStoreSetupCache } from '@/components/store/RequireStoreSetup';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/query/queryKeys';
 import type { StoreStatusResponse } from '@/api/StoreApi';
 import {
   sanitizeCustomOrderLeadTime,
+  sanitizeProcessingTime,
   sanitizeResponseTimeSla,
   sanitizeReturnWindow,
   sanitizeShippingRegions,
@@ -412,7 +414,7 @@ const StoreCreationWizard: React.FC = () => {
             shippingRegions: policy.shippingRegions?.length
               ? sanitizeShippingRegions(policy.shippingRegions)
               : nextData.shippingRegions,
-            processingTime: policy.processingTime || nextData.processingTime,
+            processingTime: sanitizeProcessingTime(policy.processingTime || nextData.processingTime),
             shippingMethods: policy.shippingMethods?.length ? policy.shippingMethods : nextData.shippingMethods,
             freeShippingThreshold:
               policy.freeShippingThreshold !== null && policy.freeShippingThreshold !== undefined
@@ -611,6 +613,21 @@ const StoreCreationWizard: React.FC = () => {
             : previous,
       );
       void queryClient.invalidateQueries({ queryKey: queryKeys.store.status() });
+
+      /**
+       * Tell the native shell, which holds a THIRD copy of this answer.
+       *
+       * Everything above fixes the two caches inside this document. The mobile
+       * app runs Studio in a WebView and gates its own nav dock on its own
+       * `useStoreSetupStatus` query — a different process, unreachable from
+       * here by any amount of local cache work. Without this the brand
+       * published successfully, landed on the dashboard, and found every dock
+       * chip still greyed out until they restarted the app.
+       *
+       * No-ops on desktop (`window.ReactNativeWebView` is undefined).
+       */
+      postStudioNativeEvent({ type: 'ACTION_COMPLETE', action: 'STORE_SETUP_COMPLETE' });
+
       markStoreOpenPending(user?.id);
       
       // Clear the localStorage draft since setup is complete
@@ -630,7 +647,10 @@ const StoreCreationWizard: React.FC = () => {
           onSelect: () => navigate('/studio/verification'),
         },
       });
-      navigate('/store/my');
+      // The Studio dashboard, not the public storefront. Finishing setup hands
+      // the brand a workspace to run; `/store/my` showed them the shop as a
+      // buyer sees it, which is not where any of the next actions live.
+      navigate('/studio');
     } catch (error) {
       console.error('Failed to publish store', error);
       const missingFields: string[] | undefined =

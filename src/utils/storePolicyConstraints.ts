@@ -15,6 +15,23 @@ export const ALLOWED_RETURN_WINDOWS = ['7', '14'] as const;
 export const ALLOWED_RESPONSE_TIME_SLAS = ['2h', 'same-day', '24h'] as const;
 export const ALLOWED_CUSTOM_ORDER_LEAD_TIMES = ['1-2', '2-4', '4-7'] as const;
 
+/**
+ * Nothing a brand promises to MAKE may exceed 7 days.
+ *
+ * Custom-order lead times were already capped here, but order processing time
+ * was a separate list defined inline in `StorePoliciesStep` and still offered
+ * "7-14 business days" — so the same store could promise a 4-7 day custom
+ * garment and a 7-14 day dispatch on stock, which is both contradictory and
+ * over the ceiling. Both now live here so the cap cannot drift again.
+ */
+export const ALLOWED_PROCESSING_TIMES = ['1-2', '3-5', '5-7'] as const;
+
+export const STORE_PROCESSING_TIME_OPTIONS = [
+  { value: '1-2', label: '1-2 business days' },
+  { value: '3-5', label: '3-5 business days' },
+  { value: '5-7', label: '5-7 business days' },
+] as const;
+
 export const STORE_RETURN_WINDOW_OPTIONS = [
   { value: '7', label: '7 days' },
   { value: '14', label: '14 days' },
@@ -80,6 +97,31 @@ export const sanitizeCustomOrderLeadTime = (
     return normalized as (typeof ALLOWED_CUSTOM_ORDER_LEAD_TIMES)[number];
   }
   return LEGACY_LEAD_TIME_MAP[normalized] ?? fallback;
+};
+
+/**
+ * Stores that already saved an over-cap processing time keep working — the value
+ * is pulled down to the longest option still allowed rather than silently reset
+ * to the default, so a brand that chose the slowest bracket stays on the slowest
+ * bracket. Without this, a store holding '7-14' would render a select with no
+ * matching option and read as blank.
+ */
+const LEGACY_PROCESSING_TIME_MAP: Record<string, (typeof ALLOWED_PROCESSING_TIMES)[number]> = {
+  '7-14': '5-7',
+  '14-21': '5-7',
+  '21-30': '5-7',
+  '30-plus': '5-7',
+};
+
+export const sanitizeProcessingTime = (
+  value: string | undefined | null,
+  fallback: (typeof ALLOWED_PROCESSING_TIMES)[number] = '3-5',
+): (typeof ALLOWED_PROCESSING_TIMES)[number] => {
+  const normalized = String(value ?? '').trim();
+  if ((ALLOWED_PROCESSING_TIMES as readonly string[]).includes(normalized)) {
+    return normalized as (typeof ALLOWED_PROCESSING_TIMES)[number];
+  }
+  return LEGACY_PROCESSING_TIME_MAP[normalized] ?? fallback;
 };
 
 export type StorePoliciesStepValidation = {

@@ -19,6 +19,7 @@ import VLoader from '@/components/loaders/VLoader';
 import {
   getStorePoliciesStepValidation,
   STORE_CUSTOM_ORDER_LEAD_TIME_OPTIONS,
+  STORE_PROCESSING_TIME_OPTIONS,
   STORE_REFUND_METHOD_OPTIONS,
   STORE_RESPONSE_SLA_OPTIONS,
   STORE_RETURN_WINDOW_OPTIONS,
@@ -37,13 +38,10 @@ interface StorePoliciesStepProps {
 
 const SHIPPING_COUNTRIES = STORE_SHIPPING_COUNTRIES;
 
-// Processing times
-const PROCESSING_TIMES = [
-  { value: '1-2', label: '1-2 business days' },
-  { value: '3-5', label: '3-5 business days' },
-  { value: '5-7', label: '5-7 business days' },
-  { value: '7-14', label: '7-14 business days' },
-];
+// Processing times. Capped at 7 days and shared from storePolicyConstraints —
+// this list used to be defined here and still offered "7-14 business days",
+// above the ceiling every other production promise already respected.
+const PROCESSING_TIMES = STORE_PROCESSING_TIME_OPTIONS;
 
 // Shipping methods
 const SHIPPING_METHODS = [
@@ -360,7 +358,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       label="Processing Time"
                       value={data.processingTime}
                       onChange={(value) => onChange({ processingTime: value })}
-                      options={PROCESSING_TIMES}
+                      options={[...PROCESSING_TIMES]}
                       placeholder="Select processing time"
                       {...SELECT_WRAP_PROPS}
                     />
