@@ -26,6 +26,7 @@ import {
 } from '@/lib/baggingAccess';
 import { BAG_IT_LABEL } from '@/constants/bagging';
 import { formatPrice } from '@/utils/helpers';
+import { CustomOrderIndicator } from '@/components/custom-orders/CustomOrderIndicator';
 
 interface DesignCardProps {
   item: MarketItem;
@@ -78,7 +79,6 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   const [isHidden, setIsHidden] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showTags, setShowTags] = useState(false);
-  const [showCustomLabel, setShowCustomLabel] = useState(false);
   const [isSavedLocal, setIsSavedLocal] = useState(false);
   const [saveBusyLocal, setSaveBusyLocal] = useState(false);
   const isRegular = user?.type === 'REGULAR';
@@ -256,7 +256,6 @@ export const DesignCard: React.FC<DesignCardProps> = ({
       onMouseLeave={() => {
         setShowMenu(false);
         setShowTags(false);
-        setShowCustomLabel(false);
       }}
     >
       {/* Full Image Background — aspect box reserves layout (CLS) before paint */}
@@ -324,28 +323,11 @@ export const DesignCard: React.FC<DesignCardProps> = ({
             </div>
           )}
           {isCustomAvailable && (
-            <div className="relative mt-2 inline-flex">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowCustomLabel((prev) => !prev);
-                }}
-                onMouseEnter={() => setShowCustomLabel(true)}
-                onMouseLeave={() => setShowCustomLabel(false)}
-                onFocus={() => setShowCustomLabel(true)}
-                onBlur={() => setShowCustomLabel(false)}
-                className="inline-flex items-center justify-center rounded-full border border-purple-300/50 bg-purple-500/25 px-1.5 py-0.5 text-[10px] leading-none text-white shadow-md sm:px-2 sm:py-1 sm:text-sm"
-                aria-label="Custom available"
-                title="Custom available"
-              >
-                <span role="img" aria-hidden="true">{String.fromCodePoint(0x2702, 0xfe0f)}</span>
-              </button>
-              {showCustomLabel && (
-                <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded-full bg-black/80 px-2 py-1 text-[10px] font-semibold text-white shadow-lg backdrop-blur whitespace-nowrap">
-                  Custom Available
-                </span>
-              )}
+            <div className="relative mt-2 inline-flex items-center">
+              <CustomOrderIndicator
+                pointsCount={(item as any)?.customMeasurementKeys?.length ?? (item as any)?.requiredMeasurementKeys?.length}
+                size="sm"
+              />
             </div>
           )}
         </div>

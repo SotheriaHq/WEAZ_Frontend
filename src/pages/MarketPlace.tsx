@@ -32,6 +32,7 @@ import { useMarketSignals } from '@/hooks/useMarketSignals';
 import useMarketSections from '@/hooks/useMarketSections';
 import { queryKeys } from '@/query/queryKeys';
 import { useScrollRestore } from '@/components/ScrollRestoreProvider';
+import { useScrollLock } from '@/hooks/useScrollLock';
 import { useMarketSurfacePrefetch } from '@/hooks/useMarketSurfacePrefetch';
 import { useOverlayBackClose } from '@/hooks/useOverlayBackClose';
 import { selectIsMobile } from '@/features/uiSlice';
@@ -445,6 +446,7 @@ const MarketPlace: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<MarketplaceProduct | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const isMobileViewportUi = useSelector(selectIsMobile);
+  useScrollLock(Boolean(selectedProduct));
   // Rule 29: an OS/browser Back gesture closes the open product view in place
   // instead of popping the underlying route.
   useOverlayBackClose(
@@ -1186,7 +1188,7 @@ const MarketPlace: React.FC = () => {
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 18 }}
-              className="mx-auto max-h-[92vh] w-full max-w-6xl overflow-y-auto lg:overflow-hidden rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-[#120d18] sm:p-6 glass-scrollbar flex flex-col"
+              className="mx-auto max-h-[92vh] w-full max-w-6xl overflow-y-auto overscroll-contain rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-[#120d18] sm:p-6 glass-scrollbar flex flex-col"
             >
               <div className="mb-3 flex justify-end">
                 <button

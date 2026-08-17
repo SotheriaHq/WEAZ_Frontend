@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import {
   Building2,
   Facebook,
@@ -168,8 +169,13 @@ export const AboutBrand: React.FC<AboutBrandProps> = ({ brandData }) => (
           <span>Shipping: Standard &amp; Express available</span>
         </li>
         <li className="flex items-center gap-3">
-          <Ruler className="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-300" />
-          <span>View our official Size Guide</span>
+          <Ruler className="h-4 w-4 flex-shrink-0 text-purple-500 dark:text-purple-400" />
+          <Link
+            to="/size-charts"
+            className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium hover:underline transition-colors"
+          >
+            View our official Size &amp; Measurement Guide
+          </Link>
         </li>
       </ul>
     </InfoCard>

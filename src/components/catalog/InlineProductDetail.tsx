@@ -22,6 +22,7 @@ import { useActiveCustomOrderConfiguration } from '@/hooks/useActiveCustomOrderC
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagging } from '@/hooks/useBagging';
 import { BAG_IT_EMOJI, BAG_IT_LABEL } from '@/constants/bagging';
+import { CustomOrderIndicator } from '@/components/custom-orders/CustomOrderIndicator';
 import {
   isCustomOrderOnlyProduct,
   isStrictlyOutOfStockProduct,
@@ -194,15 +195,10 @@ export default function InlineProductDetail({
   // Fetch the FULL product exactly once (single request, cached 5 min) so the
   // gallery has every photo. Swiping never fires additional API calls — it just
   // moves an index over the already-loaded (and preloaded) image list.
-  const propMediaCount = Array.isArray((product as any)?.media)
-    ? ((product as any).media as unknown[]).length
-    : Array.isArray(product.images)
-      ? product.images.length
-      : 0;
   const productDetailQuery = useQuery({
     queryKey: ['market', 'product-detail', product.id],
     queryFn: () => productApi.getProduct(product.id),
-    enabled: Boolean(product.id) && propMediaCount <= 1,
+    enabled: Boolean(product.id),
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
@@ -211,11 +207,9 @@ export default function InlineProductDetail({
     if (!detail) return product;
     const detailMedia = Array.isArray(detail.media) ? detail.media : [];
     const detailImages = Array.isArray(detail.images) ? detail.images : [];
-    if (detailMedia.length <= propMediaCount && detailImages.length <= propMediaCount) {
-      return product;
-    }
     return {
       ...product,
+      ...detail,
       // Prefer fileUploadId so per-image signed-URL resolution targets a real
       // FileUpload id (media.id is the ProductMedia row id on detail payloads).
       media: detailMedia.length > 0
@@ -229,7 +223,7 @@ export default function InlineProductDetail({
       images: detailImages.length > 0 ? detailImages : product.images,
       thumbnail: detail.thumbnail ?? product.thumbnail,
     } as StoreProduct;
-  }, [product, productDetailQuery.data, propMediaCount]);
+  }, [product, productDetailQuery.data]);
 
   // Get product images
   const getProductImages = () => {
@@ -720,12 +714,14 @@ export default function InlineProductDetail({
             )}
             <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">{product.name}</h1>
             {isCustomOrderProduct && (
-              <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-purple-400/40 bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300">
-                <span>✂️</span>
-                <span>Custom Order</span>
-                {requiredMeasurementKeys.length > 0 ? (
-                  <span className="text-[11px] opacity-80">({requiredMeasurementKeys.length} points)</span>
-                ) : null}
+              <div className="mt-2 inline-flex items-center gap-2">
+                <CustomOrderIndicator
+                  pointsCount={requiredMeasurementKeys.length}
+                  size="md"
+                />
+                <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">
+                  Custom Order
+                </span>
               </div>
             )}
             
@@ -754,7 +750,17 @@ export default function InlineProductDetail({
           {/* Size Selection */}
           {sizes.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Size</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Size</h3>
+                <button
+                  type="button"
+                  onClick={() => navigate('/size-charts')}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 transition-colors"
+                >
+                  <span aria-hidden="true">📏</span>
+                  <span>Size Guide</span>
+                </button>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {sizes.map((size) => (
                   <button
@@ -843,7 +849,7 @@ export default function InlineProductDetail({
                 {isCustomOrderOnly
                   ? 'Custom order only'
                   : !isOutOfStock
-                    ? `${product.totalStock} in stock`
+                    ? (isOwnProduct ? `${product.totalStock} in stock` : 'In stock')
                     : 'Out of stock'}
               </span>
             </div>
@@ -885,38 +891,41 @@ export default function InlineProductDetail({
               ) : null}
             </div>
           ) : null}
-          <div className="flex gap-3 pt-4">
-            {isOwnProduct ? (
-              <div className="flex-1 flex items-center justify-center px-6 py-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-sm font-medium text-gray-600 dark:text-gray-300">
-                Your product
-              </div>
-            ) : (
-              <div className="flex-1 flex items-center justify-center px-6 py-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-sm font-medium text-gray-600 dark:text-gray-300">
-                {isCustomOrderOnly ? 'Custom-order only' : 'Bag the item above to continue'}
-              </div>
-            )}
+
+          <div className="flex gap-3 pt-2">
             {!isOwnProduct ? (
               <>
                 <button
                   type="button"
                   onClick={handleToggleWishlist}
                   disabled={wishlistBusy}
-                  className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:text-pink-500 hover:border-pink-300 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 h-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:text-pink-500 hover:border-pink-300 transition-all flex items-center justify-center gap-2 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                 >
                   <span aria-hidden="true">{isWishlisted ? '❤️' : '🤍'}</span>
+                  <span>{isWishlisted ? 'Wishlisted' : 'Wishlist'}</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleShare}
-                  className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:text-purple-500 hover:border-purple-300 transition-all flex items-center justify-center"
+                  className="flex-1 h-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:text-purple-500 hover:border-purple-300 transition-all flex items-center justify-center gap-2 font-medium text-sm"
                   aria-label="Share product"
                 >
                   <span aria-hidden="true">🔗</span>
+                  <span>Share</span>
                 </button>
               </>
-            ) : null}
-            {/* QR button disabled — only brand profile QR codes active */}
+            ) : (
+              <button
+                type="button"
+                onClick={handleShare}
+                className="w-full h-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:text-purple-500 hover:border-purple-300 transition-all flex items-center justify-center gap-2 font-medium text-sm"
+                aria-label="Share product"
+              >
+                <span aria-hidden="true">🔗</span>
+                <span>Share Product</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

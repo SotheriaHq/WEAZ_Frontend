@@ -207,6 +207,17 @@ const BagFittingsModal: React.FC<BagFittingsModalProps> = ({
                         ? 'Refresh only the stale measurements needed for this request.'
                         : 'Add the missing measurements before this request can move forward.'}
                     </p>
+                    <div className="pt-1">
+                      <a
+                        href="/size-charts"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 hover:underline transition-colors"
+                      >
+                        <span aria-hidden="true">📏</span>
+                        <span>Need measuring instructions? View Size &amp; Measurement Guide</span>
+                      </a>
+                    </div>
                   </div>
 
                   <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5 sm:mt-6 sm:rounded-3xl sm:p-4">

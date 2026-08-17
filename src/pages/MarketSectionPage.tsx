@@ -23,6 +23,7 @@ import {
   mapSectionProductToMarketplaceProduct,
 } from '@/utils/marketSectionMapper';
 import { useScrollRestore } from '@/components/ScrollRestoreProvider';
+import { useScrollLock } from '@/hooks/useScrollLock';
 
 const SECTION_DETAIL_LIMIT = 24;
 
@@ -116,6 +117,7 @@ const MarketSectionPage: React.FC = () => {
   const { anonymousSessionId, flushMarketSignals, trackMarketSignal } =
     useMarketSignals('MARKET_SECTION_DETAIL');
   const [selectedProduct, setSelectedProduct] = useState<MarketplaceProduct | null>(null);
+  useScrollLock(Boolean(selectedProduct));
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const observedItemKeysRef = useRef<Set<string>>(new Set());
   const viewedSectionKeyRef = useRef<string | null>(null);
@@ -420,7 +422,7 @@ const MarketSectionPage: React.FC = () => {
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 18 }}
-                className="mx-auto max-h-[92vh] w-full max-w-6xl overflow-y-auto lg:overflow-hidden rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-[#120d18] sm:p-6 glass-scrollbar flex flex-col"
+                className="mx-auto max-h-[92vh] w-full max-w-6xl overflow-y-auto overscroll-contain rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-[#120d18] sm:p-6 glass-scrollbar flex flex-col"
               >
                 <div className="mb-3 flex justify-end">
                   <button

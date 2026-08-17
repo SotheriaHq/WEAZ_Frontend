@@ -9,6 +9,7 @@ import type { CatalogEntityType } from '@/constants/catalogDomain';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagging } from '@/hooks/useBagging';
 import { BAG_IT_LABEL } from '@/constants/bagging';
+import { CustomOrderIndicator } from '@/components/custom-orders/CustomOrderIndicator';
 import {
   getProductStockState,
   isCustomOrderOnlyProduct,
@@ -177,7 +178,6 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 
   const [imgError, setImgError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [showCustomLabel, setShowCustomLabel] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [failedGalleryKeys, setFailedGalleryKeys] = useState<string[]>([]);
@@ -778,10 +778,11 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         ) : null}
 
         {isCustomOrderOnly ? (
-          <div className="absolute inset-x-0 top-4 z-20 flex justify-center px-4">
-            <span className="rounded-full bg-violet-600/90 px-3 py-1 text-xs font-semibold text-white shadow-xl backdrop-blur-sm">
-              ✂️ Custom order only
-            </span>
+          <div className="absolute inset-x-0 top-3 z-20 flex justify-center px-4">
+            <CustomOrderIndicator
+              pointsCount={product.customMeasurementKeys?.length}
+              size="sm"
+            />
           </div>
         ) : null}
 
@@ -816,25 +817,12 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               ) : null}
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               {isCustomAvailable ? (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setShowCustomLabel((prev) => !prev);
-                  }}
-                  onMouseEnter={() => setShowCustomLabel(true)}
-                  onMouseLeave={() => setShowCustomLabel(false)}
-                  onFocus={() => setShowCustomLabel(true)}
-                  onBlur={() => setShowCustomLabel(false)}
-                  className="inline-flex items-center gap-1 rounded-full bg-purple-500/80 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm"
-                  aria-label="Custom available"
-                  title="Custom available"
-                >
-                  <span role="img" aria-hidden="true">{String.fromCodePoint(0x2702, 0xfe0f)}</span>
-                  {showCustomLabel ? <span>Custom</span> : null}
-                </button>
+                <CustomOrderIndicator
+                  pointsCount={product.customMeasurementKeys?.length}
+                  size="sm"
+                />
               ) : null}
 
               {!isOwnerView ? (
