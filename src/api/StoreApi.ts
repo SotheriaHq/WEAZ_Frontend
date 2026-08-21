@@ -907,6 +907,8 @@ export interface StoreProfileUpdateData {
   banner?: string;
   tags?: string[];
   contactEmail?: string;
+  /** Publish `contactEmail` on the public brand profile. Brand-only. */
+  contactEmailPublic?: boolean;
   socialInstagram?: string;
   socialTwitter?: string;
   socialTiktok?: string;
@@ -953,6 +955,8 @@ export interface StoreGeneralSettingsResponse {
   banner: string;
   tags: string[];
   contactEmail: string;
+  /** Whether the contact email is currently shown on the public profile. */
+  contactEmailPublic?: boolean;
   isEmailVerified: boolean;
   isStoreOpen: boolean;
   /** True only after the owner pressed Publish AND data is complete. */

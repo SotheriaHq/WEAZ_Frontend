@@ -72,6 +72,14 @@ const StoreGeneralSettings: React.FC = () => {
   const [tagline, setTagline] = useState('');
   const [description, setDescription] = useState('');
   const [contactEmail, setContactEmail] = useState('');
+  /**
+   * Whether the address above appears on the public brand profile.
+   *
+   * Off by default and off for every existing brand: an address given to WIEZ
+   * for operational contact is not consent to publish it to every visitor. Only
+   * the brand can change this — there is no admin path that sets it.
+   */
+  const [contactEmailPublic, setContactEmailPublic] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [responseTime, setResponseTime] = useState('24h');
   const [brandColor, setBrandColor] = useState('#8B5CF6');
@@ -103,6 +111,7 @@ const StoreGeneralSettings: React.FC = () => {
         setTagline(settings.tagline || '');
         setDescription(settings.description || '');
         setContactEmail(settings.contactEmail || '');
+        setContactEmailPublic(Boolean(settings.contactEmailPublic));
         setSelectedCategories(normalizeSpecializationSelection(settings.tags || []));
         setResponseTime(resolveResponseTime(settings.responseTimeSla));
         setIsLive(Boolean(settings.isStoreOpen));
@@ -155,6 +164,7 @@ const StoreGeneralSettings: React.FC = () => {
           description: description.trim(),
           tags: selectedCategories,
           contactEmail: contactEmail.trim(),
+          contactEmailPublic,
         }),
         updateStorePolicies({
           responseTimeSla: responseTime,
@@ -167,6 +177,7 @@ const StoreGeneralSettings: React.FC = () => {
         description: description.trim(),
         tags: selectedCategories,
         contactEmail: contactEmail.trim(),
+        contactEmailPublic,
         responseTimeSla: responseTime,
       });
 
@@ -395,6 +406,26 @@ const StoreGeneralSettings: React.FC = () => {
               disabled={isLoading}
               className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all disabled:opacity-60"
             />
+
+            <label className="flex items-start gap-3 pt-1 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={contactEmailPublic}
+                onChange={(e) => setContactEmailPublic(e.target.checked)}
+                disabled={isLoading || !contactEmail.trim()}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 dark:border-white/20 text-purple-600 focus:ring-purple-500 disabled:opacity-50"
+              />
+              <span className="text-sm">
+                <span className="font-medium text-gray-900 dark:text-white">
+                  Show this email on my public profile
+                </span>
+                <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {contactEmail.trim()
+                    ? 'Shoppers browsing your catalog will be able to email you directly. Your account sign-in email is never shown.'
+                    : 'Add a contact email above to make it public.'}
+                </span>
+              </span>
+            </label>
           </div>
         </div>
       </section>
@@ -564,6 +595,7 @@ const StoreGeneralSettings: React.FC = () => {
             setTagline(initialSettings.tagline || '');
             setDescription(initialSettings.description || '');
             setContactEmail(initialSettings.contactEmail || '');
+            setContactEmailPublic(Boolean(initialSettings.contactEmailPublic));
             setSelectedCategories(normalizeSpecializationSelection(initialSettings.tags || []));
             setResponseTime(resolveResponseTime(initialSettings.responseTimeSla));
           }}
