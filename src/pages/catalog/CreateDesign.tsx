@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import VLoader from "@/components/loaders/VLoader";
+import { getRangeError } from "@/utils/rangeValidation";
 import {
   FiArrowLeft,
   FiTrash2,
@@ -289,6 +290,17 @@ const CreateDesignInner: React.FC = () => {
   const [description, setDescription] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+  /**
+   * Inverted price range, caught at the field.
+   *
+   * The backend has always refused this (`PRICE_RANGE_INVALID`), but only at
+   * submit — after the whole design had been filled in and the upload started.
+   * Same rule and wording as the mobile composer, from the shared helper.
+   */
+  const priceRangeError = useMemo(
+    () => getRangeError(minPrice, maxPrice, { label: "price" }),
+    [maxPrice, minPrice],
+  );
   const [isMadeToOrder, setIsMadeToOrder] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>(
@@ -2259,7 +2271,13 @@ const CreateDesignInner: React.FC = () => {
                       onChange={(e) => setMinPrice(e.target.value)}
                       placeholder="15,000"
                       disabled={disabled}
-                      className="surface-control placeholder-theme w-full pl-8 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      aria-invalid={priceRangeError.min ? true : undefined}
+                      aria-describedby={priceRangeError.summary ? "design-price-range-error" : undefined}
+                      className={`surface-control placeholder-theme w-full pl-8 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2 ${
+                        priceRangeError.min
+                          ? "border-red-500 focus:ring-red-500/50"
+                          : "focus:ring-purple-500/50"
+                      }`}
                     />
                     <span className="absolute -bottom-5 left-0 text-xs text-theme-secondary">
                       Minimum Price
@@ -2275,13 +2293,28 @@ const CreateDesignInner: React.FC = () => {
                       onChange={(e) => setMaxPrice(e.target.value)}
                       placeholder="45,000"
                       disabled={disabled}
-                      className="surface-control placeholder-theme w-full pl-8 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      aria-invalid={priceRangeError.max ? true : undefined}
+                      aria-describedby={priceRangeError.summary ? "design-price-range-error" : undefined}
+                      className={`surface-control placeholder-theme w-full pl-8 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2 ${
+                        priceRangeError.max
+                          ? "border-red-500 focus:ring-red-500/50"
+                          : "focus:ring-purple-500/50"
+                      }`}
                     />
                     <span className="absolute -bottom-5 left-0 text-xs text-theme-secondary">
                       Maximum Price
                     </span>
                   </div>
                 </div>
+                {priceRangeError.summary ? (
+                  <p
+                    id="design-price-range-error"
+                    role="alert"
+                    className="mt-7 text-xs text-red-600 dark:text-red-400"
+                  >
+                    {priceRangeError.summary}
+                  </p>
+                ) : null}
               </div>
 
               {/* Info box */}

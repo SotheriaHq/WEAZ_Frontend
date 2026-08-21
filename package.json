@@ -26,6 +26,7 @@
     "check:perf-regressions": "node scripts/check-perf-regressions.cjs",
     "check:security-headers": "node scripts/check-security-headers.cjs",
     "purge:cloudflare": "node scripts/purge-cloudflare-cache.cjs",
+    "create:sit-users": "node scripts/create-sit-users.cjs",
     "ci:phase8": "npm run build && npm run lint && npm test -- --run src/__tests__/RequireStoreSetup.test.tsx src/__tests__/useBrandProfile.renderIsolation.test.tsx src/__tests__/renderableMedia.test.ts && npm run check:perf-regressions"
   },
   "dependencies": {

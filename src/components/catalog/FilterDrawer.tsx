@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Filter, RotateCcw, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { getRangeError } from '@/utils/rangeValidation';
 
 const COLOR_HEX_MAP: Record<string, string> = {
   Black: '#000000', White: '#FFFFFF', Navy: '#1E3A5F', Red: '#DC2626',
@@ -47,6 +48,12 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
   availableSizes,
 }) => {
   const [localFilters, setLocalFilters] = useState<FilterState>(initialFilters);
+  // An inverted range matched no product and rendered an empty result set, which
+  // reads as "there is nothing here" rather than "your max is below your min".
+  const priceRangeError = useMemo(
+    () => getRangeError(localFilters.minPrice, localFilters.maxPrice, { label: 'price' }),
+    [localFilters.maxPrice, localFilters.minPrice],
+  );
 
   // Reset local state when drawer opens with new props
   useEffect(() => {
@@ -176,7 +183,10 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
                           value={localFilters.minPrice ?? ''}
                           onChange={(e) => setLocalFilters(prev => ({ ...prev, minPrice: e.target.value ? Number(e.target.value) : undefined }))}
                           placeholder="0"
-                          className="wiez-search-input px-3 py-2.5 text-sm"
+                          aria-invalid={priceRangeError.min ? true : undefined}
+                          className={`wiez-search-input px-3 py-2.5 text-sm ${
+                            priceRangeError.min ? 'border-red-500' : ''
+                          }`}
                         />
                       </div>
                       <div className="text-gray-400 mt-5">-</div>
@@ -187,10 +197,18 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
                           value={localFilters.maxPrice ?? ''}
                           onChange={(e) => setLocalFilters(prev => ({ ...prev, maxPrice: e.target.value ? Number(e.target.value) : undefined }))}
                           placeholder="Any"
-                          className="wiez-search-input px-3 py-2.5 text-sm"
+                          aria-invalid={priceRangeError.max ? true : undefined}
+                          className={`wiez-search-input px-3 py-2.5 text-sm ${
+                            priceRangeError.max ? 'border-red-500' : ''
+                          }`}
                         />
                       </div>
                     </div>
+                    {priceRangeError.summary ? (
+                      <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">
+                        {priceRangeError.summary}
+                      </p>
+                    ) : null}
                   </section>
 
                   {/* Status / Sort */}
@@ -311,7 +329,8 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
                     </button>
                     <button
                       onClick={handleApply}
-                      className="flex-1 px-4 py-3 rounded-xl bg-purple-600 text-white font-semibold text-sm shadow-lg shadow-purple-600/25 hover:bg-purple-700 active:scale-[0.98] transition-all"
+                      disabled={priceRangeError.summary !== null}
+                      className="flex-1 px-4 py-3 rounded-xl bg-purple-600 text-white font-semibold text-sm shadow-lg shadow-purple-600/25 hover:bg-purple-700 active:scale-[0.98] transition-all disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none dark:disabled:bg-white/10 dark:disabled:text-gray-500"
                     >
                       Show Results
                     </button>

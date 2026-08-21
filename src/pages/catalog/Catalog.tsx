@@ -111,6 +111,16 @@ const VISIBILITY_SHORT_LABELS: Partial<Record<VisibilityFilter, string>> = {
   Deleted: 'Deleted',
 };
 
+const VISIBILITY_ICONS: Partial<Record<VisibilityFilter, React.ReactNode>> = {
+  Public: '🌍',
+  Private: '🔒',
+  Drafts: '📝',
+  'In Review': <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-amber-100 text-[10px] font-bold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">R</span>,
+  'Changes Requested': <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-orange-100 text-[10px] font-bold text-orange-800 dark:bg-orange-900/50 dark:text-orange-200">!</span>,
+  Rejected: <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-rose-100 text-[10px] font-bold text-rose-800 dark:bg-rose-900/50 dark:text-rose-200">✕</span>,
+  Deleted: '🗑️',
+};
+
 const MODERATION_RESOLVED_STATUSES = new Set([
   'PUBLISHED',
   'IN_REVIEW',
@@ -2475,47 +2485,18 @@ const ProfilePage: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Visibility filter chips */}
+                    {/* Visibility filter tabs with sliding active indicator */}
                     <div className="mb-6">
-                      <div className="flex gap-5 overflow-x-auto border-b border-gray-200/80 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10">
-                        {(isOwner ? OWNER_VISIBILITY_FILTERS : VISIBILITY_FILTERS).map((opt) => (
-                          <button
-                            key={opt}
-                            onClick={() => handleVisibilityFilterChange(opt)}
-                            aria-pressed={visibilityFilter === opt}
-                            className={`relative flex shrink-0 items-center gap-2 pb-3 pt-2 ${
-                              isMobile ? 'text-xs font-medium' : 'text-sm font-semibold'
-                            } transition-colors ${
-                              visibilityFilter === opt
-                                ? 'text-purple-700 dark:text-purple-300'
-                                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
-                            }`}
-                          >
-                            <span>
-                              {opt === 'Public'
-                                  ? '🌍'
-                                  : opt === 'Private'
-                                    ? '🔒'
-                                    : opt === 'Drafts'
-                                      ? '📝'
-                                      : opt === 'In Review'
-                                        ? 'R'
-                                        : opt === 'Changes Requested'
-                                          ? '!'
-                                          : opt === 'Rejected'
-                                            ? 'X'
-                                            : '🗑️'}
-                            </span>
-                            {isMobile ? (VISIBILITY_SHORT_LABELS[opt] ?? opt) : opt}
-                            <span
-                              aria-hidden="true"
-                              className={`absolute inset-x-0 bottom-0 mx-auto h-0.5 w-7 rounded-full transition-all ${
-                                visibilityFilter === opt ? 'bg-purple-600 dark:bg-purple-300' : 'bg-transparent'
-                              }`}
-                            />
-                          </button>
-                        ))}
-                      </div>
+                      <Tabs
+                        tabs={isOwner ? OWNER_VISIBILITY_FILTERS : VISIBILITY_FILTERS}
+                        activeTab={visibilityFilter}
+                        compact={isMobile}
+                        size="sm"
+                        icons={VISIBILITY_ICONS}
+                        labels={isMobile ? VISIBILITY_SHORT_LABELS : undefined}
+                        onTabChange={(tab) => handleVisibilityFilterChange(tab as VisibilityFilter)}
+                        ariaLabel="Visibility filter tabs"
+                      />
                     </div>
 
                     {/* Collections Grid (Owner or Visitor/Public) */}
