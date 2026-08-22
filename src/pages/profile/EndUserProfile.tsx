@@ -121,6 +121,99 @@ const describeAlphaFit = (value?: string | null): string | null => {
   return labels[normalized] ? `${labels[normalized]} (${normalized})` : normalized;
 };
 
+/**
+ * Canonical slot for a stored measurement key, mirroring the backend's
+ * `measurement-normalization.service.ts`.
+ *
+ * The API does not store one key per measurement. It stores up to THREE: the
+ * key the shopper filled in, the canonical slot it maps to, and the gendered
+ * registry spelling — so a single "shoulder width, 59" comes back as
+ * SHOULDER_WIDTH, SHOULDER and WOMEN_SHOULDER_WIDTH. Rendering the raw object
+ * therefore paints the same body measurement two or three times, which is the
+ * duplicated carousel.
+ */
+const FITTING_CANONICAL_SLOTS: Record<string, string> = {
+  HEIGHT: 'HEIGHT',
+  BODY_HEIGHT: 'HEIGHT',
+  STATURE: 'HEIGHT',
+  CHEST: 'CHEST_BUST',
+  BUST: 'CHEST_BUST',
+  FULL_BUST: 'CHEST_BUST',
+  CHEST_BUST: 'CHEST_BUST',
+  CHEST_FULL_BUST: 'CHEST_BUST',
+  WAIST: 'WAIST',
+  NATURAL_WAIST: 'WAIST',
+  HIP: 'HIP_SEAT',
+  HIPS: 'HIP_SEAT',
+  SEAT: 'HIP_SEAT',
+  HIP_SEAT: 'HIP_SEAT',
+  SHOULDER: 'SHOULDER',
+  SHOULDER_WIDTH: 'SHOULDER',
+  SLEEVE: 'SLEEVE_LENGTH',
+  SLEEVE_LENGTH: 'SLEEVE_LENGTH',
+  SLEEVE_LENGTH_LONG: 'SLEEVE_LENGTH',
+  SLEEVE_LENGTH_SHORT: 'SLEEVE_LENGTH',
+  ARM_LENGTH: 'SLEEVE_LENGTH',
+  INSEAM: 'INSEAM',
+  INSIDE_LEG: 'INSEAM',
+  NECK: 'NECK_COLLAR',
+  COLLAR: 'NECK_COLLAR',
+  COLLAR_SIZE: 'NECK_COLLAR',
+  NECK_GIRTH: 'NECK_COLLAR',
+  NECK_COLLAR: 'NECK_COLLAR',
+};
+
+const CANONICAL_SLOT_NAMES = new Set(Object.values(FITTING_CANONICAL_SLOTS));
+
+const stripGenderPrefix = (key: string) =>
+  key.replace(/^(MEN|WOMEN|MENS|WOMENS|UNISEX)_/i, '').toUpperCase();
+
+/**
+ * Which of several spellings of one measurement to show.
+ *
+ * Highest wins. The key the shopper actually filled in is the one the sheet
+ * labelled, so it reads best — that is the spelling that is neither a bare
+ * canonical slot nor gender-namespaced.
+ */
+const measurementKeyRank = (key: string): number => {
+  const isGendered = /^(MEN|WOMEN|MENS|WOMENS|UNISEX)_/i.test(key);
+  if (isGendered) return 0;
+  return CANONICAL_SLOT_NAMES.has(key.toUpperCase()) ? 1 : 2;
+};
+
+/**
+ * Collapse the API's fan-out back to one entry per real measurement.
+ *
+ * Keyed on slot AND value, not slot alone: SLEEVE_LENGTH_LONG at 71 and
+ * SLEEVE_LENGTH at 71 are the same number written twice and must merge, while a
+ * separately-entered SLEEVE_LENGTH_SHORT at 25 is a different measurement and
+ * has to survive. Keys outside the canonical table (there are 38 registry
+ * points and only 8 canonical slots) are always kept — they have no duplicate
+ * to merge with.
+ */
+function dedupeMeasurementEntries(
+  entries: Array<[string, unknown]>,
+): Array<[string, unknown]> {
+  const bySlot = new Map<string, [string, unknown]>();
+  const passthrough: Array<[string, unknown]> = [];
+
+  for (const entry of entries) {
+    const [key, value] = entry;
+    const slot = FITTING_CANONICAL_SLOTS[stripGenderPrefix(key)];
+    if (!slot) {
+      passthrough.push(entry);
+      continue;
+    }
+    const dedupeKey = `${slot}:${String(value).trim()}`;
+    const existing = bySlot.get(dedupeKey);
+    if (!existing || measurementKeyRank(key) > measurementKeyRank(existing[0])) {
+      bySlot.set(dedupeKey, entry);
+    }
+  }
+
+  return [...bySlot.values(), ...passthrough];
+}
+
 const sizeFitRegionForDisplayChart = (family: CustomOrderChartFamily): SizingRegion => {
   switch (family) {
     case 'UK':
@@ -954,8 +1047,10 @@ export const EndUserProfile: React.FC = () => {
       .toLowerCase()
       .replace(/_/g, ' ')
       .replace(/\b\w/g, (ch) => ch.toUpperCase());
-  const savedMeasurementEntries = Object.entries(sizeFitProfile?.measurements ?? {}).filter(
-    ([, value]) => String(value ?? '').trim().length > 0,
+  const savedMeasurementEntries = dedupeMeasurementEntries(
+    Object.entries(sizeFitProfile?.measurements ?? {}).filter(
+      ([, value]) => String(value ?? '').trim().length > 0,
+    ),
   );
   const measurementUnitLabel = (sizeFitProfile?.preferredLengthUnit ?? 'CM').toLowerCase();
   const profileActions: ProfileAction[] = [
@@ -1238,19 +1333,37 @@ export const EndUserProfile: React.FC = () => {
                   .filter((row) => row.length > 0)
                   .map((row, rowIndex) => (
                     <div key={rowIndex} className="fittings-marquee overflow-hidden">
+                      {/*
+                        The second copy exists ONLY to make the loop seamless —
+                        the track translates -50% and the clone slides into the
+                        gap. A short row does not overflow its container, so the
+                        clone has no gap to fill and simply sits beside the
+                        original as a visible repeat. Below the threshold the
+                        row renders once and stays put, which is what "restart
+                        from the last end" means for a list that already fits.
+
+                        The clone is aria-hidden so assistive tech reads each
+                        measurement once regardless.
+                      */}
                       <div
-                        className={`fittings-marquee-track flex w-max gap-1.5 ${rowIndex === 1 ? 'fittings-marquee-track-alt' : ''}`}
+                        className={`fittings-marquee-track flex w-max gap-1.5 ${
+                          row.length > 3 ? '' : 'fittings-marquee-track-static'
+                        } ${rowIndex === 1 ? 'fittings-marquee-track-alt' : ''}`}
                       >
-                        {[...row, ...row].map(([key, value], chipIndex) => (
-                          <button
-                            key={`${key}-${chipIndex}`}
-                            type="button"
-                            onClick={() => setIsSizeFitOpen(true)}
-                            className="shrink-0 rounded-lg border border-gray-200/70 bg-gray-50/80 px-2 py-1 text-xs font-semibold text-gray-700 transition hover:border-indigo-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-indigo-400/50"
-                          >
-                            {formatMeasurementLabel(key)} · {String(value)} {measurementUnitLabel}
-                          </button>
-                        ))}
+                        {(row.length > 3 ? [...row, ...row] : row).map(
+                          ([key, value], chipIndex) => (
+                            <button
+                              key={`${key}-${chipIndex}`}
+                              type="button"
+                              aria-hidden={chipIndex >= row.length || undefined}
+                              tabIndex={chipIndex >= row.length ? -1 : undefined}
+                              onClick={() => setIsSizeFitOpen(true)}
+                              className="shrink-0 rounded-lg border border-gray-200/70 bg-gray-50/80 px-2 py-1 text-xs font-semibold text-gray-700 transition hover:border-indigo-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-indigo-400/50"
+                            >
+                              {formatMeasurementLabel(key)} · {String(value)} {measurementUnitLabel}
+                            </button>
+                          ),
+                        )}
                       </div>
                     </div>
                   ))}

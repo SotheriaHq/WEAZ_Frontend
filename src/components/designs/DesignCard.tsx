@@ -539,12 +539,23 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                       contextDesignCoverFileId: item.coverMediaId ?? item.media.fileId ?? undefined,
                       contextDesignCoverUrl: item.media.url ?? item.media.previewUrl ?? undefined,
                     });
+                    /*
+                      Send and stay. The runway is a feed, not a funnel.
+
+                      This used to `navigate()` to the thread the moment the
+                      message landed, which tore the shopper out of a scroll
+                      position they cannot get back and made a one-line question
+                      cost them their whole browsing session. The message is
+                      already delivered by this point and the reply arrives in
+                      the inbox either way, so the navigation bought nothing and
+                      charged everything.
+
+                      `result` is still awaited — the toast must only fire on a
+                      real send — the thread id simply is not needed here.
+                    */
+                    void result;
                     setDirectMessageText('');
-                    toast.success('Message sent');
-                    const threadId = result?.thread?.id;
-                    if (threadId) {
-                      navigate(`/messages?thread=${encodeURIComponent(threadId)}`);
-                    }
+                    toast.success('Message sent — the reply lands in your inbox.');
                   } catch (err: any) {
                     toast.error(err?.response?.data?.message ?? 'Failed to send message');
                   } finally { setDirectMessageBusy(false); }

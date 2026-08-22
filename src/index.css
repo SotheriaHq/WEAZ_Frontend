@@ -2439,6 +2439,13 @@ html:not(.dark) .input-glass:focus {
 .fittings-marquee-track-alt {
   animation-duration: 41s;
 }
+/* A row short enough to fit needs no loop — and must not run one, because the
+   -50% translate assumes a duplicated track. Declared after -alt so the
+   shorthand reset wins over that rule's duration. */
+.fittings-marquee-track-static {
+  animation: none;
+  transform: none;
+}
 .fittings-marquee:hover .fittings-marquee-track {
   animation-play-state: paused;
 }

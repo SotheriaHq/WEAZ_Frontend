@@ -210,7 +210,7 @@ describe('DesignCard direct message flow', () => {
     expect(mockedMessagingApi.sendBrandMessage).not.toHaveBeenCalled();
   });
 
-  it('sends direct messages, clears the input, and routes to the thread', async () => {
+  it('sends direct messages and clears the input WITHOUT leaving the runway', async () => {
     mockedMessagingApi.sendBrandMessage.mockResolvedValueOnce({
       thread: { id: 'thread-1' },
     });
@@ -229,9 +229,12 @@ describe('DesignCard direct message flow', () => {
       );
     });
 
-    expect(navigateMock).toHaveBeenCalledWith('/messages?thread=thread-1');
+    // The whole point of the change: the feed position survives the send.
+    expect(navigateMock).not.toHaveBeenCalled();
     expect(screen.getByPlaceholderText('Message brand...')).toHaveValue('');
-    expect(mockedToast.success).toHaveBeenCalledWith('Message sent');
+    expect(mockedToast.success).toHaveBeenCalledWith(
+      'Message sent — the reply lands in your inbox.',
+    );
   });
 
   it('does not expose direct messaging to the brand owner viewing their own design', () => {
