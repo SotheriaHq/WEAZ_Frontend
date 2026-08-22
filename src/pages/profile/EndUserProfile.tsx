@@ -27,6 +27,7 @@ import { buildProfileUrl, shareOrCopyLink } from '@/utils/publicLinks';
 import { customOrdersBuyerApi, type CustomOrderChartFamily } from '@/api/CustomOrderApi';
 import { DISPLAY_CHART_OPTIONS } from '@/lib/sizeCharts';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import MediaRenderer from '@/components/media/MediaRenderer';
 import ProfileImageModal from '@/components/profile/ProfileImageModal';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import {
@@ -188,6 +189,17 @@ export const EndUserProfile: React.FC = () => {
   const [chartSaving, setChartSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  /**
+   * The just-uploaded blob, held under the incoming remote image.
+   *
+   * On success the preview used to be revoked immediately and the avatar
+   * switched to the new file id — which starts resolving a signed URL from
+   * scratch. For the whole of that round trip there was nothing to paint, so
+   * the photo the shopper had just watched upload blinked out and the initials
+   * came back. Keeping the blob underneath until the real image reports it has
+   * painted makes the handover a crossfade with nothing missing in between.
+   */
+  const [avatarSettlingUrl, setAvatarSettlingUrl] = useState<string | null>(null);
   const [avatarActionsOpen, setAvatarActionsOpen] = useState(false);
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
@@ -414,11 +426,39 @@ export const EndUserProfile: React.FC = () => {
 
   useEffect(() => {
     return () => {
+      if (avatarSettlingUrl) {
+        URL.revokeObjectURL(avatarSettlingUrl);
+      }
       if (avatarPreviewUrl) {
         URL.revokeObjectURL(avatarPreviewUrl);
       }
     };
-  }, [avatarPreviewUrl]);
+  }, [avatarPreviewUrl, avatarSettlingUrl]);
+
+  /**
+   * Safety net for the crossfade.
+   *
+   * The blob underlay is cleared when the remote image reports it painted. If
+   * that never happens — the signed URL 403s, the network dies — this stops the
+   * overlay outliving the upload and masking the real state of the avatar.
+   */
+  useEffect(() => {
+    if (!avatarSettlingUrl) return;
+    const timer = setTimeout(() => {
+      setAvatarSettlingUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [avatarSettlingUrl]);
+
+  const handleAvatarSettled = useCallback(() => {
+    setAvatarSettlingUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+  }, []);
 
   useEffect(() => {
     if (!avatarActionsOpen) return;
@@ -489,58 +529,59 @@ export const EndUserProfile: React.FC = () => {
     [dispatch, isOwner, profile, queryClient],
   );
 
-  const handleSaveSizeFitMeasurements = useCallback(
+  /**
+   * One save for the Custom Size/Fits dialog.
+   *
+   * Measurements and permissions are still two endpoints — that is the API's
+   * shape, not a choice this screen gets to make — but they are now one user
+   * action, one spinner and one toast. They run in series rather than
+   * `Promise.all` because both write the same `UserSizeFitProfile` row and
+   * `requireUpdateEveryDays` belongs to both payloads; concurrent writes would
+   * race for it.
+   *
+   * `updateProfile` returns the whole profile and `updateSettings` a partial,
+   * so the settings response is layered on top.
+   */
+  const handleSaveSizeFit = useCallback(
     async (payload: {
       measurements: Record<string, unknown>;
       notes?: string;
-      requireUpdateEveryDays?: number;
       preferredLengthUnit?: 'CM' | 'IN';
+      requireUpdateEveryDays?: number;
+      visibility?: 'PUBLIC' | 'PRIVATE';
+      sharePolicy?: 'OWNER_ONLY' | 'REQUIRE_PERMISSION' | 'ALLOW_ANYONE';
+      notifyOnShare?: boolean;
     }) => {
       setSizeFitSaving(true);
       try {
-        const updated = await SizeFitApi.updateProfile(payload);
-        setSizeFitProfile(updated);
+        const updatedProfile = await SizeFitApi.updateProfile({
+          measurements: payload.measurements,
+          notes: payload.notes,
+          preferredLengthUnit: payload.preferredLengthUnit,
+          requireUpdateEveryDays: payload.requireUpdateEveryDays,
+        });
+        const updatedSettings = await SizeFitApi.updateSettings({
+          visibility: payload.visibility,
+          sharePolicy: payload.sharePolicy,
+          notifyOnShare: payload.notifyOnShare,
+          requireUpdateEveryDays: payload.requireUpdateEveryDays,
+        });
+        const merged = { ...updatedProfile, ...updatedSettings } as SizeFitProfile;
+
+        setSizeFitProfile(merged);
         if (currentUser?.id) {
-          queryClient.setQueryData(queryKeys.sizeFit.myProfile(currentUser.id), updated);
+          queryClient.setQueryData(queryKeys.sizeFit.myProfile(currentUser.id), merged);
         }
         await loadComputedSizeFit(true);
-        toast.success('Size fitting profile updated.');
+        toast.success('Custom size/fits updated.');
       } catch (err) {
-        console.error('Failed to update size fitting profile', err);
+        console.error('Failed to update custom size/fits', err);
         toast.error('Failed to update custom size/fits.');
       } finally {
         setSizeFitSaving(false);
       }
     },
     [currentUser?.id, loadComputedSizeFit, queryClient],
-  );
-
-  const handleSaveSizeFitSettings = useCallback(
-    async (payload: {
-      visibility?: 'PUBLIC' | 'PRIVATE';
-      sharePolicy?: 'OWNER_ONLY' | 'REQUIRE_PERMISSION' | 'ALLOW_ANYONE';
-      notifyOnShare?: boolean;
-      requireUpdateEveryDays?: number;
-    }) => {
-      setSizeFitSaving(true);
-      try {
-        const updated = await SizeFitApi.updateSettings(payload);
-        setSizeFitProfile((prev) => (prev ? { ...prev, ...updated } : prev));
-        if (currentUser?.id) {
-          queryClient.setQueryData<SizeFitProfile | null>(
-            queryKeys.sizeFit.myProfile(currentUser.id),
-            (current) => (current ? { ...current, ...updated } : current),
-          );
-        }
-        toast.success('Size fitting permissions updated.');
-      } catch (err) {
-        console.error('Failed to update size fitting settings', err);
-        toast.error('Failed to update permissions.');
-      } finally {
-        setSizeFitSaving(false);
-      }
-    },
-    [currentUser?.id, queryClient],
   );
 
   const handleShareSizeFit = useCallback(
@@ -710,9 +751,18 @@ export const EndUserProfile: React.FC = () => {
             : null,
         }));
 
-        setAvatarPreviewUrl((current) => {
+        /*
+          Stop DRIVING the avatar with the blob, but keep it painted.
+
+          Clearing `avatarPreviewUrl` is what lets `avatar` resolve to the new
+          file id; moving the same object URL into `avatarSettlingUrl` keeps it
+          on screen underneath while that resolves. It is revoked in
+          `handleAvatarSettled` once the remote image has painted.
+        */
+        setAvatarPreviewUrl(null);
+        setAvatarSettlingUrl((current) => {
           if (current) URL.revokeObjectURL(current);
-          return null;
+          return nextPreviewUrl;
         });
         toast.success('Profile image updated.');
       } catch (err) {
@@ -962,6 +1012,7 @@ export const EndUserProfile: React.FC = () => {
             {/* Avatar */}
             <div className="relative shrink-0">
               <div
+                aria-busy={avatarUploading || undefined}
                 className={`relative h-32 w-32 overflow-hidden rounded-xl border-2 transition-colors duration-300 sm:h-44 sm:w-44 ${avatarRingClass}`}
               >
                 <button
@@ -971,6 +1022,27 @@ export const EndUserProfile: React.FC = () => {
                   disabled={!hasAvatarImage}
                   aria-label="View profile photo"
                 >
+                {/*
+                  The outgoing photo, painted underneath the incoming one.
+
+                  Only present between "upload succeeded" and "the stored image
+                  has painted". `ImageWithFallback` fades in over the top of it
+                  and then calls `onLoaded`, which revokes this. Without it the
+                  frame is empty for the length of a signed-URL round trip.
+                */}
+                {avatarSettlingUrl ? (
+                  <MediaRenderer
+                    kind="image"
+                    src={avatarSettlingUrl}
+                    alt=""
+                    fit="cover"
+                    loading="eager"
+                    className="absolute inset-0 h-full w-full"
+                    mediaClassName="h-full w-full rounded-[inherit] object-cover"
+                    maxHeightClassName="max-h-full"
+                    maxWidthClassName="max-w-full"
+                  />
+                ) : null}
                 <ImageWithFallback
                   src={avatar.src}
                   fileId={avatar.fileId}
@@ -978,18 +1050,42 @@ export const EndUserProfile: React.FC = () => {
                   fit="cover"
                   rounded="xl"
                   fallbackName={avatarFallback}
-                  containerClassName="h-full w-full"
-                  className="h-full w-full rounded-[inherit] object-cover"
+                  onLoaded={handleAvatarSettled}
+                  containerClassName="relative z-10 h-full w-full"
+                  className={`h-full w-full rounded-[inherit] object-cover transition duration-500 ${
+                    avatarUploading ? 'scale-105 blur-[3px] grayscale-[0.6]' : ''
+                  }`}
                   maxHeightClassName="max-h-full"
                 />
                 </button>
+                {/*
+                  Skeleton, not a caption.
+
+                  This was a black scrim with the word "Uploading…" in a pill,
+                  and a SECOND pill saying "Uploading photo…" sat beside the
+                  name — two labels for one event, and the outer one was in
+                  document flow, so it shoved the name block down on appear and
+                  back up on finish. That is the shake. What is left says the
+                  same thing without words: the subject blurs and desaturates
+                  (above), a scrim pulses, and a bar sweeps the bottom edge.
+                  Screen readers get the announcement they need via role=status.
+                */}
                 {avatarUploading && (
-                  <div className="absolute inset-0 flex items-center justify-center rounded-[inherit] bg-black/55">
-                    <div className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-slate-900">
-                      Uploading…
+                  <div
+                    className="pointer-events-none absolute inset-0 z-20 rounded-[inherit]"
+                    aria-hidden="true"
+                  >
+                    <div className="absolute inset-0 animate-pulse rounded-[inherit] bg-slate-900/25" />
+                    <div className="absolute inset-x-2 bottom-2 h-1 overflow-hidden rounded-full bg-white/30">
+                      <div className="h-full w-1/2 animate-pulse rounded-full bg-white/90" />
                     </div>
                   </div>
                 )}
+                {avatarUploading ? (
+                  <span role="status" className="sr-only">
+                    Uploading profile photo
+                  </span>
+                ) : null}
               </div>
               {/* Avatar action button */}
               {isOwner ? (
@@ -1063,13 +1159,12 @@ export const EndUserProfile: React.FC = () => {
                 </div>
               ) : null}
 
-              {/* Upload status pill — only shown while uploading */}
-              {avatarUploading ? (
-                <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-1 text-[11px] font-semibold text-purple-800 dark:bg-purple-500/15 dark:text-purple-200">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-purple-500" />
-                  Uploading photo…
-                </div>
-              ) : null}
+              {/*
+                The upload pill that lived here has been removed. Progress
+                belongs on the thing being changed — it is now the skeleton over
+                the avatar itself — and a block that appears and disappears in
+                this column reflows the name and handle every time.
+              */}
             </div>
 
             {/* ── Compact inline size widget (owner only) ── */}
@@ -1332,8 +1427,7 @@ export const EndUserProfile: React.FC = () => {
         saving={sizeFitSaving}
         profile={sizeFitProfile}
         onClose={() => setIsSizeFitOpen(false)}
-        onSaveMeasurements={handleSaveSizeFitMeasurements}
-        onSaveSettings={handleSaveSizeFitSettings}
+        onSave={handleSaveSizeFit}
       />
 
       <EndUserSizeFitQuickShareModal

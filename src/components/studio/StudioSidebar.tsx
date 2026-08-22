@@ -21,6 +21,20 @@ const ALL_ITEMS = [
   { key: 'finance', label: 'Finance', path: '/studio?tab=finance', emoji: '💰', requiresSetup: true },
 ];
 
+/**
+ * Studio sections that only earn a slot on the desktop sidebar.
+ *
+ * `ALL_ITEMS` drives two very different surfaces: a 220px vertical `<aside>`
+ * with room for nine labelled rows, and the island dock — a single phone-width
+ * strip where every extra chip shrinks the ones that matter. Reviews and Staff
+ * are deliberate, low-frequency, read-mostly destinations a brand opens from a
+ * desk; they are not what anyone reaches for one-handed mid-task.
+ *
+ * They stay in the aside untouched. This list only withholds them where
+ * horizontal space is the binding constraint.
+ */
+const DESKTOP_ONLY_ITEM_KEYS = new Set(['reviews', 'staff']);
+
 export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,7 +67,10 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
     navigate(path, options);
   };
 
-  const flatItems = groups.flatMap((group) => group.items);
+  // Dock-only list. The aside above still renders `groups` in full.
+  const flatItems = groups
+    .flatMap((group) => group.items)
+    .filter((item) => !DESKTOP_ONLY_ITEM_KEYS.has(item.key));
 
   return (
     <>

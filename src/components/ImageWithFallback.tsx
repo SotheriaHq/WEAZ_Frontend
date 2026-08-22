@@ -30,6 +30,12 @@ interface ImageWithFallbackProps {
   loading?: 'lazy' | 'eager';
   /** Fetch priority hint forwarded to the underlying <img>. */
   fetchPriority?: 'high' | 'low' | 'auto';
+  /**
+   * Fires when the resolved image has actually painted. Lets a caller hold a
+   * local preview underneath until the real one is on screen, so the swap is a
+   * crossfade instead of a gap.
+   */
+  onLoaded?: () => void;
 }
 
 const roundClass = (rounded: ImageWithFallbackProps['rounded']) => {
@@ -245,6 +251,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   keepPreviousOnReload = false,
   loading = 'eager',
   fetchPriority,
+  onLoaded,
 }) => {
   const sourceCacheKey = resolveSourceCacheKey(fileId, src);
   const cachedLastGoodUrl = sourceCacheKey ? lastGoodUrlCache.get(sourceCacheKey) ?? null : null;
@@ -418,8 +425,24 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         brandApi.invalidateSignedUrlCache(src);
       }
 
+      /*
+       * On retry, ask for a SIGNED url — not the public one that just failed.
+       *
+       * `getSignedFileUrl` tries `/uploads/public-url` first and only falls
+       * through to the signed endpoint when the public one returns nothing. A
+       * public url that RESOLVES but cannot be fetched defeats that: the server
+       * keeps handing back the same string, the <img> keeps 403ing, and the
+       * retry re-runs the identical request. The image is then permanently the
+       * initials fallback, unchanged by a reload — which is exactly what a
+       * misconfigured MEDIA_PUBLIC_BASE_URL produces, since the code builds
+       * `${base}/${key}` and returns it without ever checking it is readable.
+       *
+       * The signed endpoint is the authoritative path and is what the fallback
+       * existed for. Going straight there turns a hard outage into one slow
+       * frame.
+       */
       const fetcher = fileId
-        ? () => brandApi.getSignedFileUrl(fileId, { forceRefresh: true })
+        ? () => brandApi.getPrivateSignedFileUrl(fileId, { forceRefresh: true })
         : src && isS3LikeUrl(src)
           ? () => brandApi.getSignedS3Url(src, { forceRefresh: true })
           : src && !/^https?:\/\//i.test(src)
@@ -466,6 +489,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     if (!image) return;
     if (image.complete && image.naturalWidth > 0) {
       setLoaded(true);
+      onLoaded?.();
       if (resolved) {
         setLastGoodUrl(resolved);
         if (sourceCacheKey) {
@@ -473,10 +497,14 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         }
       }
     }
+    // `onLoaded` is deliberately absent: callers pass an inline closure, and
+    // depending on it would re-run this cache-warming effect every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isResolving, loaded, resolved, showFallback, sourceCacheKey]);
 
   const handleImageLoaded = () => {
     setLoaded(true);
+    onLoaded?.();
     if (resolved) {
       setLastGoodUrl(resolved);
       if (sourceCacheKey) {

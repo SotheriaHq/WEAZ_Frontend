@@ -9,17 +9,23 @@ interface EndUserSizeFitModalProps {
   saving: boolean;
   profile: SizeFitProfile | null;
   onClose: () => void;
-  onSaveMeasurements: (payload: {
+  /**
+   * One save for the whole dialog.
+   *
+   * This replaced a pair of `onSaveMeasurements` / `onSaveSettings` props that
+   * backed a button each. Beyond the split being invisible to the user, both
+   * payloads carried `requireUpdateEveryDays` from the SAME field, so the two
+   * buttons wrote conflicting values for it and the later press won. One
+   * payload means the reminder cycle is sent exactly once.
+   */
+  onSave: (payload: {
     measurements: Record<string, unknown>;
     notes?: string;
-    requireUpdateEveryDays?: number;
     preferredLengthUnit?: 'CM' | 'IN';
-  }) => Promise<void>;
-  onSaveSettings: (payload: {
+    requireUpdateEveryDays?: number;
     visibility?: 'PUBLIC' | 'PRIVATE';
     sharePolicy?: 'OWNER_ONLY' | 'REQUIRE_PERMISSION' | 'ALLOW_ANYONE';
     notifyOnShare?: boolean;
-    requireUpdateEveryDays?: number;
   }) => Promise<void>;
 }
 
@@ -29,8 +35,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
   saving,
   profile,
   onClose,
-  onSaveMeasurements,
-  onSaveSettings,
+  onSave,
 }) => {
   const toInches = (cm: number) => cm / 2.54;
   const toCentimeters = (inch: number) => inch * 2.54;
@@ -92,7 +97,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
 
   if (!open) return null;
 
-  const handleSaveMeasurements = async () => {
+  const handleSave = async () => {
     const measurements: Record<string, unknown> = {};
     for (const point of baselinePoints) {
       const value = values[point.key] ?? '';
@@ -107,11 +112,14 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
         measurements[point.key] = value.trim();
       }
     }
-    await onSaveMeasurements({
+    await onSave({
       measurements,
       notes,
-      requireUpdateEveryDays: reminderDays,
       preferredLengthUnit: lengthUnit,
+      requireUpdateEveryDays: reminderDays,
+      visibility,
+      sharePolicy,
+      notifyOnShare,
     });
   };
 
@@ -131,15 +139,6 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
       return converted;
     });
     setLengthUnit(nextUnit);
-  };
-
-  const handleSaveSettings = async () => {
-    await onSaveSettings({
-      visibility,
-      sharePolicy,
-      notifyOnShare,
-      requireUpdateEveryDays: reminderDays,
-    });
   };
 
   return (
@@ -279,25 +278,24 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                     />
                   </label>
                 </div>
-                <div className="mt-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => void handleSaveMeasurements()}
-                    disabled={saving || baselinePoints.length === 0}
-                    className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-3 py-1.5 disabled:opacity-60 sm:text-sm sm:px-4 sm:py-2"
-                  >
-                    {saving ? 'Saving…' : 'Save Measurements'}
-                  </button>
-                </div>
-              </details>
+                {/*
+                  Permissions sit in the same panel as the measurements they
+                  govern, under one save.
 
-              <details className="rounded-2xl neu-modal-inset p-4">
-                <summary className="cursor-pointer font-semibold text-[color:var(--neu-text)] flex items-center gap-2">
-                  <span aria-hidden="true">🛡️</span>
-                  Permissions & Visibility
-                </summary>
+                  They were a sibling <details> with a button of their own. Two
+                  save buttons in one dialog put the burden of knowing which
+                  half each commits onto the shopper, and a collapsed section
+                  hid the second one entirely — change a measurement and a share
+                  rule, press the visible button, and the share rule was quietly
+                  dropped.
+                */}
+                <div className="mt-5 border-t border-black/10 pt-4 dark:border-white/10">
+                  <h3 className="flex items-center gap-2 font-semibold text-[color:var(--neu-text)]">
+                    <span aria-hidden="true">🛡️</span>
+                    Permissions &amp; Visibility
+                  </h3>
 
-                <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
                   <UniversalSelect
                     label="Visibility"
                     value={visibility}
@@ -334,25 +332,30 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                   Notify me whenever my fittings are shared.
                 </label>
 
-                <div className="mt-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => void handleSaveSettings()}
-                    disabled={saving}
-                    className="rounded-xl border border-gray-300/80 dark:border-white/20 text-xs font-medium px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-60 sm:text-sm sm:px-4 sm:py-2"
-                  >
-                    {saving ? 'Saving…' : 'Save Permission Settings'}
-                  </button>
                 </div>
               </details>
 
-              <div className="flex justify-end pt-1">
+              {/*
+                Sticky so the single save is reachable at any scroll position.
+                The measurement grid is long enough on a phone that a footer
+                pinned to the end of the document would sit below the fold for
+                most of the editing session.
+              */}
+              <div className="neu-modal-surface sticky bottom-0 -mx-3.5 flex items-center justify-end gap-2 border-t border-black/10 px-3.5 py-3 dark:border-white/10 sm:-mx-5 sm:px-5">
                 <button
                   type="button"
                   onClick={onClose}
                   className="rounded-xl neu-modal-inset px-3 py-1.5 text-xs font-medium text-[color:var(--neu-text)] sm:text-sm sm:px-4 sm:py-2"
                 >
                   Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSave()}
+                  disabled={saving}
+                  className="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-60 sm:text-sm sm:px-4 sm:py-2"
+                >
+                  {saving ? 'Saving…' : 'Save changes'}
                 </button>
               </div>
             </div>
