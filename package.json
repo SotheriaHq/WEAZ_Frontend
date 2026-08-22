@@ -10,6 +10,7 @@
     "dev": "vite",
     "build": "node scripts/sync-legal-docs.cjs && node scripts/generate-security-headers.cjs && tsc -b && vite build",
     "generate:legal-docs": "node scripts/sync-legal-docs.cjs",
+    "test:legal-sync-ci-contract": "node scripts/test-legal-sync-ci-contract.cjs",
     "generate:security-headers": "node scripts/generate-security-headers.cjs",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -27,7 +28,7 @@
     "check:perf-regressions": "node scripts/check-perf-regressions.cjs",
     "check:security-headers": "node scripts/check-security-headers.cjs",
     "purge:cloudflare": "node scripts/purge-cloudflare-cache.cjs",
-    "ci:phase8": "npm run build && npm run lint && npm test -- --run src/__tests__/RequireStoreSetup.test.tsx src/__tests__/useBrandProfile.renderIsolation.test.tsx src/__tests__/renderableMedia.test.ts && npm run check:perf-regressions"
+    "ci:phase8": "npm run test:legal-sync-ci-contract && npm run build && npm run lint && npm test -- --run src/__tests__/RequireStoreSetup.test.tsx src/__tests__/useBrandProfile.renderIsolation.test.tsx src/__tests__/renderableMedia.test.ts && npm run check:perf-regressions"
   },
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",
