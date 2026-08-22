@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { brandApi } from '@/api/BrandApi';
 import { messagingApi, type ThreadSummaryByContextItem } from '@/api/MessagingApi';
-import { getStoreStatus } from '@/api/StoreApi';
+import { getStoreStatus, getCachedStoreStatus } from '@/api/StoreApi';
 import OrderDetailsModal from '@/components/dashboard/OrderDetailsModal';
 import OrderChatDrawer from '@/components/messaging/OrderChatDrawer';
 import ImageWithFallback from '@/components/ImageWithFallback';
@@ -260,7 +260,16 @@ const OrderManagement: React.FC = () => {
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
   const [selectedOrder, setSelectedOrder] = useState<{ id: string } | null>(null);
   const [chatOrder, setChatOrder] = useState<{ id: string; customerName?: string } | null>(null);
-  const [brandId, setBrandId] = useState<string | null>(null);
+  /*
+     * Seeded from the warm cache so a revisit paints immediately.
+     *
+     * Starting at `null` and filling it in from an effect meant the data query
+     * below was disabled for the first render of EVERY visit, so the screen
+     * showed a skeleton before it was allowed to read the cache it already had.
+     */
+  const [brandId, setBrandId] = useState<string | null>(
+    () => getCachedStoreStatus()?.brandId ?? null,
+  );
 
   const preselectedOrderId = searchParams.get('orderId');
   const preselectedMessageId = searchParams.get('messageId');

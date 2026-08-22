@@ -2038,6 +2038,7 @@ const CreateDesignInner: React.FC = () => {
 
                         <UniversalSelect
                           label="Age group"
+                          required
                           value={targetAgeGroup}
                           onChange={handleAgeGroupChange}
                           options={DESIGN_TARGET_AGE_OPTIONS.map((option) => ({
@@ -2052,6 +2053,7 @@ const CreateDesignInner: React.FC = () => {
                       <div className="grid grid-cols-2 gap-3">
                         <UniversalSelect
                           label="What is it?"
+                          required
                           value={categoryId}
                           onChange={handleCategoryChange}
                           options={filteredCategories.map((c) => ({
@@ -2072,6 +2074,7 @@ const CreateDesignInner: React.FC = () => {
 
                         <UniversalSelect
                           label="Garment type"
+                          required
                           value={categoryTypeId}
                           onChange={setCategoryTypeId}
                           options={categoryTypeOptions.map((categoryType) => ({
@@ -2402,6 +2405,7 @@ const CreateDesignInner: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <UniversalSelect
                   label="Fit Preference"
+                          required
                   value={fitPreference}
                   onChange={(value) => setFitPreference(value as DesignFitPreference)}
                   options={DESIGN_FIT_PREFERENCE_OPTIONS.map((option) => ({

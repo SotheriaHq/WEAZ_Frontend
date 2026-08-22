@@ -809,8 +809,56 @@ const EditProduct: React.FC = () => {
   // Custom order: on new product, hidden by default. On edit, shown if a
   // configuration already exists (resolved via the editor's own load logic).
   const [showCustomOrderForm, setShowCustomOrderForm] = useState(false);
+  const customOrderSectionRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * What the custom-order setup is still waiting for, reported as it is typed.
+   *
+   * Drives the warning on the summary card, so the incomplete state is visible
+   * BEFORE "Go live" is pressed rather than only as a toast afterwards.
+   */
+  const [customOrderMissingFields, setCustomOrderMissingFields] = useState<string[]>([]);
   const customOrderEditorRef =
     useRef<CustomOrderConfigurationEditorHandle | null>(null);
+
+  /**
+   * If custom orders are on, the setup section is open. Always.
+   *
+   * `showCustomOrderForm` started `false` and was only ever set by the checkbox
+   * `onChange`, so opening a SAVED product that already has custom orders
+   * enabled left the section closed — and with it the editor unmounted and
+   * `customOrderEditorRef.current` null. Pressing "Go live" then found no
+   * draft, and the whole gate collapsed into one toast: no field errors,
+   * no focus, and the section it was talking about not even on screen. That is
+   * the "why didn't it tell me which field, why didn't it take me there"
+   * report — there was nothing mounted to ask.
+   *
+   * Keeping the section bound to the setting means the editor is always there
+   * to be validated, which is what makes everything below possible.
+   */
+  useEffect(() => {
+    if (form.customOrderEnabled) setShowCustomOrderForm(true);
+  }, [form.customOrderEnabled]);
+
+  /**
+   * Takes the brand to the custom-order setup and marks up what is missing.
+   *
+   * Order matters: `buildConfigurationDraft()` (non-silent) is what populates
+   * the inline field errors and focuses the first one, so it runs first and the
+   * scroll only fills in for the case where nothing could be focused.
+   */
+  const revealCustomOrderProblems = useCallback(() => {
+    setShowCustomOrderForm(true);
+    const handle = customOrderEditorRef.current;
+    // Not mounted yet (the section was closed until a moment ago) — the scroll
+    // still lands the brand on the section, which is the important half.
+    handle?.buildConfigurationDraft();
+    requestAnimationFrame(() => {
+      customOrderSectionRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  }, []);
   const [pendingStatusOverride, setPendingStatusOverride] = useState<
     FormState["status"] | null
   >(null);
@@ -2015,7 +2063,12 @@ const EditProduct: React.FC = () => {
         : undefined;
 
       if (shouldValidatePublish && form.customOrderEnabled && !pendingCustomOrderDraft) {
-        toast.error('Save the custom-order setup before this product goes live.');
+        // Open it, validate it, mark the fields, and scroll there — rather than
+        // naming a section the brand cannot see and leaving them to find it.
+        revealCustomOrderProblems();
+        toast.error(
+          'Custom orders are enabled, so this setup has to be complete before the product goes live. The fields that still need you are highlighted below.',
+        );
         return;
       }
 
@@ -2395,6 +2448,13 @@ const EditProduct: React.FC = () => {
         : null;
 
     if (form.customOrderEnabled && !pendingCustomOrderDraft) {
+      // This used to `return` with nothing at all — confirming the price change
+      // simply did nothing and the dialog sat there.
+      setShowPricePreview(false);
+      revealCustomOrderProblems();
+      toast.error(
+        'The custom-order setup is incomplete. The fields that still need you are highlighted below.',
+      );
       return;
     }
 
@@ -2929,9 +2989,22 @@ const EditProduct: React.FC = () => {
               ),
             );
 
-            return { ok: true as const };
+            return { ok: true as const, reason: null };
           } catch (err) {
             console.error("Upload failed", err);
+            /**
+             * Keep the server's reason. It is the only one that is specific.
+             *
+             * Every upload failure was collapsed into "Failed to upload N
+             * images", which discarded messages the brand could actually act on
+             * — "Product media already has a FRONT view. Replace or delete that
+             * media before uploading another", "You can upload up to 6 images".
+             * Losing them is why a failed upload looked arbitrary.
+             */
+            const reason =
+              (err as any)?.response?.data?.message ??
+              (err as any)?.response?.data?.error ??
+              null;
             setMediaUrls((prev) => {
               const next = normalizePrimary(
                 prev.filter((item) => item.id !== pending.tempId),
@@ -2944,13 +3017,23 @@ const EditProduct: React.FC = () => {
                 prev.filter((item) => item.tempId !== pending.tempId),
               ),
             );
-            return { ok: false as const };
+            return {
+              ok: false as const,
+              reason: typeof reason === 'string' && reason.trim() ? reason.trim() : null,
+            };
           }
         }),
       );
 
       const successCount = results.filter((result) => result.ok).length;
       const failedCount = results.length - successCount;
+      const failureReasons = Array.from(
+        new Set(
+          results
+            .map((result) => (result.ok ? null : result.reason))
+            .filter((reason): reason is string => Boolean(reason)),
+        ),
+      );
 
       if (successCount > 0) {
         notifyProductStudioSync("product-media-uploaded", productId);
@@ -2961,10 +3044,16 @@ const EditProduct: React.FC = () => {
         );
       }
       if (failedCount > 0) {
+        const summary =
+          failedCount === 1 ? "Failed to upload 1 image" : `Failed to upload ${failedCount} images`;
+        // One distinct reason reads better as the whole message; several get
+        // listed, because they are genuinely different problems.
         toast.error(
-          failedCount === 1
-            ? "Failed to upload 1 image"
-            : `Failed to upload ${failedCount} images`,
+          failureReasons.length === 1
+            ? failureReasons[0]
+            : failureReasons.length > 1
+              ? `${summary}: ${failureReasons.join(' ')}`
+              : summary,
         );
       }
       return;
@@ -4520,7 +4609,7 @@ const EditProduct: React.FC = () => {
                   </label>
 
                   {showCustomOrderForm && (
-                    <div className="mt-4">
+                    <div className="mt-4 scroll-mt-24" ref={customOrderSectionRef}>
                       <CustomOrderConfigurationEditor
                         ref={customOrderEditorRef}
                         sourceType="PRODUCT"
@@ -4543,6 +4632,7 @@ const EditProduct: React.FC = () => {
                         defaultProductionLeadDays={storeDefaultProductionLeadDays}
                         defaultProductionLeadLabel={storeCustomOrderLeadTimeLabel}
                         disabled={saving}
+                        onCompletenessChange={setCustomOrderMissingFields}
                       />
                     </div>
                   )}
@@ -5069,8 +5159,27 @@ const EditProduct: React.FC = () => {
                 </div>
                 <div>
                   <dt className="text-xs text-theme-secondary">Custom order</dt>
+                  {/*
+                    "Enabled" alone was a promise the product could not keep: a
+                    product with custom orders on and an incomplete setup cannot
+                    go live, and this row said nothing about it. Now the row
+                    reports the state that actually governs publishing, and
+                    names the first things missing.
+                  */}
                   <dd className="text-sm text-theme">
-                    {form.customOrderEnabled ? "Enabled" : "Off"}
+                    {!form.customOrderEnabled ? (
+                      "Off"
+                    ) : customOrderMissingFields.length === 0 ? (
+                      "Enabled"
+                    ) : (
+                      /* The state, not a roll-call. Which fields are missing
+                         is shown by the required mark on each field's own
+                         label in the setup section below — repeating them as a
+                         list here asks the reader to match names to fields. */
+                      <span className="font-semibold text-amber-600 dark:text-amber-400">
+                        Enabled — setup incomplete
+                      </span>
+                    )}
                   </dd>
                 </div>
               </dl>
@@ -5115,29 +5224,23 @@ const EditProduct: React.FC = () => {
 
       {/* Footer */}
       <footer className="sticky bottom-0 z-20 w-full px-4 py-2.5 backdrop-blur-md bg-white/80 dark:bg-zinc-900/80 border-t border-gray-200/40 dark:border-white/10 sm:px-6">
-        {/* Why the primary button is inactive. A disabled control with no
-            explanation is worse than the mid-submit toast it replaces, so the
-            blockers are named here and each one jumps to its field. */}
+        {/*
+          Why the primary button is inactive — stated once, not enumerated.
+
+          This was a roll-call of every blocking field as a row of chips. It
+          answered "what is missing" in the one place where none of those fields
+          are visible, so reading it meant memorising names and then going to
+          look for them. Each field now carries its own required mark where it
+          lives, which is where the question is actually asked; the footer only
+          has to say that something upstream is unfinished.
+        */}
         {blockingPublishFields.length > 0 && !isDraftOnlySubmit && (
-          <div className="mx-auto mb-2 flex max-w-7xl flex-wrap items-center gap-x-2 gap-y-1.5">
-            <span className="text-[11px] font-semibold text-theme-secondary">
-              Still needed:
+          <div className="mx-auto mb-2 max-w-7xl">
+            <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+              {blockingPublishFields.length === 1
+                ? '1 required field is still empty — look for the * marks.'
+                : `${blockingPublishFields.length} required fields are still empty — look for the * marks.`}
             </span>
-            {blockingPublishFields.map((field) => (
-              <button
-                key={field}
-                type="button"
-                onClick={() => focusPublishField(field)}
-                className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20"
-              >
-                {PRODUCT_PUBLISH_FIELD_LABEL[field]}
-                {PRODUCT_PUBLISH_FIELD_STEP[field] !== wizardStep ? (
-                  <span className="opacity-70">
-                    · step {PRODUCT_PUBLISH_FIELD_STEP[field]}
-                  </span>
-                ) : null}
-              </button>
-            ))}
           </div>
         )}
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">

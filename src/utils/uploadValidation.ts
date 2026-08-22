@@ -78,7 +78,10 @@ export const WEB_UPLOAD_POLICIES = {
     // whose photos would not compress that far.
     maxSizeBytes: 8 * MB,
     preferredSizeBytes: 2 * MB,
-    maxFiles: 12,
+    // `StoreService.maxProductMediaCount` is 6, and there are exactly 6 view
+    // slots (front/back/left/right/detail/on-model) to put them in. 12 here
+    // meant the client's own error message quoted a cap the API does not have.
+    maxFiles: 6,
   },
   collectionMedia: {
     label: 'Collection media',

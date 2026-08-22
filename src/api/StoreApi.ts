@@ -766,7 +766,22 @@ export interface StorePaymentAccountSummary {
   updatedAt: string | null;
 }
 
-const STORE_STATUS_TTL_MS = 30 * 1000;
+/**
+ * Store status is invalidated on the things that change it, so it can be held.
+ *
+ * This was 30 seconds. Every Studio screen resolves `brandId` from
+ * `/store/status` before its own query is allowed to run, so a 30-second TTL
+ * meant that navigating around Studio for longer than half a minute put a fresh
+ * blocking request in front of EVERY screen — a loader on arrival at a screen
+ * whose data was already cached and ready. That is the "everything reloads when
+ * I come back" report.
+ *
+ * Nothing here is guessy: `clearStoreStatusCache()` already runs on the
+ * mutations that can change this (opening the store, completing setup), so a
+ * long TTL cannot serve a stale brandId or a stale setup flag. The TTL is only
+ * a backstop for changes made in another tab or by an admin.
+ */
+const STORE_STATUS_TTL_MS = 10 * 60 * 1000;
 let storeStatusCache: { data: StoreStatusResponse; expiresAt: number } | null = null;
 let storeStatusPending: Promise<StoreStatusResponse> | null = null;
 
@@ -1017,6 +1032,22 @@ export const updateStoreName = async (payload: {
 }): Promise<StoreGeneralSettingsResponse> => {
   const res = await apiClient.patch('/store/settings/name', payload);
   return extractData<StoreGeneralSettingsResponse>(res);
+};
+
+/**
+ * The cached status, or null — without awaiting anything.
+ *
+ * `getStoreStatus` is async even on a cache hit, so a component that resolves
+ * `brandId` in an effect renders at least once with `brandId === null`. Screens
+ * gate their data query on `enabled: Boolean(brandId)`, so that one render is
+ * enough to show a skeleton for data that was already in hand. Seeding the
+ * state from this instead means a warm cache costs no render at all.
+ */
+export const getCachedStoreStatus = (): StoreStatusResponse | null => {
+  if (storeStatusCache && storeStatusCache.expiresAt > Date.now()) {
+    return storeStatusCache.data;
+  }
+  return null;
 };
 
 export const getStoreStatus = async (options?: { forceRefresh?: boolean }): Promise<StoreStatusResponse> => {

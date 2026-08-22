@@ -26,6 +26,16 @@ interface CustomOrderConfigurationEditorProps {
   defaultProductionLeadLabel?: string | null;
   disabled?: boolean;
   onRequiredMeasurementKeysChange?: (keys: string[]) => void;
+  /**
+   * Fires whenever the set of still-missing required fields changes.
+   *
+   * The parent needs this to warn BEFORE the brand presses "Go live". Until
+   * now the only thing that knew the setup was incomplete was the gate, and the
+   * gate runs after the click — so the product summary showed a cheerful
+   * "Custom order: Enabled" for a configuration that could not be published.
+   * An empty array means ready.
+   */
+  onCompletenessChange?: (missingFieldLabels: string[]) => void;
 }
 
 export interface CustomOrderConfigurationEditorHandle {
@@ -388,6 +398,26 @@ const requiredFieldLabelClassName =
 const infoBadgeClassName =
   'inline-flex h-4 w-4 items-center justify-center rounded-full bg-black/[0.06] text-[10px] leading-none dark:bg-white/[0.1]';
 
+/**
+ * The required mark that sits on each field's own label.
+ *
+ * Requirements belong to the field they constrain. Listing them in a banner at
+ * the bottom — "Some required fields need attention", then a roll-call of names
+ * — asks the reader to hold a list in their head and go hunting for each entry,
+ * and it only appears AFTER a failed submit, so until then nothing on the form
+ * says which fields are obligatory at all.
+ *
+ * A mark on the label says it up front, in place, for every field, and turns
+ * red on the one that is actually blocking. Nothing to match up, nothing to
+ * scroll back to.
+ */
+const REQUIRED_MARK_BASE =
+  'ml-0.5 select-none text-sm font-bold leading-none transition-colors';
+// Same purple mark `UniversalSelect`/`TextField`/`Input` use, so the app has
+// ONE required indicator rather than a different one per form.
+const REQUIRED_MARK_RESTING = 'text-purple-500 dark:text-purple-400';
+const REQUIRED_MARK_ERROR = 'text-rose-500 dark:text-rose-400';
+
 const KEY_CHIP_PREVIEW_LIMIT = 14;
 
 const mapConfigurationToForm = (configuration: CustomOrderConfiguration): ConfigurationFormState => ({
@@ -431,6 +461,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   defaultProductionLeadLabel,
   disabled = false,
   onRequiredMeasurementKeysChange,
+  onCompletenessChange,
 }, ref) => {
   const [brandId, setBrandId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1113,6 +1144,41 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     }
   };
 
+  /**
+   * The required-field gate, as a pure read.
+   *
+   * `buildConfigurationDraft` owns the authoritative version, but it has side
+   * effects (banner, field errors, focus) so it cannot be called during render.
+   * This mirrors only the COMPLETENESS half - the same list, in the same order -
+   * so the parent can show the state of the section without anything being
+   * clicked. Value-sanity checks (ranges, min <= max) stay in the builder; they
+   * are about correctness, not about being finished.
+   */
+  const missingRequiredFieldLabels = useMemo(() => {
+    const missing = new Set<keyof FieldErrors>();
+    if (!form.baseProductionCharge.trim()) missing.add('baseProductionCharge');
+    if (!form.fabricCostPerYard.trim()) missing.add('fabricCostPerYard');
+    if (!form.productionLeadDays.trim()) missing.add('productionLeadDays');
+    if (!form.deliveryMinDays.trim()) missing.add('deliveryMinDays');
+    if (!form.deliveryMaxDays.trim()) missing.add('deliveryMaxDays');
+    if (form.requiredMeasurementKeys.length === 0) missing.add('requiredMeasurementKeys');
+    if (showFabricRules && !form.fabricRuleBasisId.trim()) missing.add('fabricRuleBasisId');
+    if (!form.revisionPolicy.trim()) missing.add('revisionPolicy');
+    if (!form.returnPolicy.trim()) missing.add('returnPolicy');
+    if (!form.defectPolicy.trim()) missing.add('defectPolicy');
+    if (form.rushEnabled) {
+      if (!form.rushFee.trim()) missing.add('rushFee');
+      if (!form.rushProductionLeadDays.trim()) missing.add('rushProductionLeadDays');
+    }
+    return FIELD_ERROR_FOCUS_ORDER.filter((key) => missing.has(key)).map(
+      (key) => CONFIGURATION_FIELD_LABELS[key],
+    );
+  }, [form, showFabricRules]);
+
+  useEffect(() => {
+    onCompletenessChange?.(missingRequiredFieldLabels);
+  }, [missingRequiredFieldLabels, onCompletenessChange]);
+
   const buildConfigurationDraft = useCallback((buildOptions?: { silent?: boolean }) => {
     // Silent mode is used by draft saves: an incomplete custom-order config must
     // never block, toast, or steal focus while saving a draft.
@@ -1461,6 +1527,25 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     `custom-order-${key}-error`;
   const getFieldInputClassName = (key: keyof FieldErrors) =>
     `${fieldClassName} ${fieldErrors[key] ? 'border-rose-400 focus:border-rose-500 dark:border-rose-500/50' : ''}`;
+  /**
+   * `*` on a required field's label; rose while that field is the problem.
+   *
+   * `aria-hidden` because the input itself already carries `required`/
+   * `aria-invalid` and the error text is wired through `aria-describedby` —
+   * a screen reader announcing a literal asterisk adds noise, not information.
+   */
+  const renderRequiredMark = (key: keyof FieldErrors) => (
+    <span
+      aria-hidden="true"
+      title="Required"
+      className={`${REQUIRED_MARK_BASE} ${
+        fieldErrors[key] ? REQUIRED_MARK_ERROR : REQUIRED_MARK_RESTING
+      }`}
+    >
+      *
+    </span>
+  );
+
   const renderFieldError = (key: keyof FieldErrors) =>
     fieldErrors[key] ? (
       <p
@@ -1555,7 +1640,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           className="block"
         >
           <span className={requiredFieldLabelClassName}>
-            Base charge <span className="text-rose-500">*</span>
+            Base charge {renderRequiredMark('baseProductionCharge')}
             <span className={infoBadgeClassName} title="Labor and production-only cost, excluding fabric yard cost.">i</span>
           </span>
           <input
@@ -1586,7 +1671,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           className="block"
         >
           <span className={requiredFieldLabelClassName}>
-            Material cost per yard <span className="text-rose-500">*</span>
+            Material cost per yard {renderRequiredMark('fabricCostPerYard')}
             <span className={infoBadgeClassName} title="Estimated material cost used when pricing custom orders.">i</span>
           </span>
           <input
@@ -1610,7 +1695,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           className="block"
         >
           <span className={requiredFieldLabelClassName}>
-            Lead days <span className="text-rose-500">*</span>
+            Lead days {renderRequiredMark('productionLeadDays')}
             <span className={infoBadgeClassName} title="Production days before dispatch. Must be 1-7 days.">i</span>
           </span>
           <input
@@ -1635,7 +1720,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           className="block"
         >
           <span className={requiredFieldLabelClassName}>
-            Min delivery <span className="text-rose-500">*</span>
+            Min delivery {renderRequiredMark('deliveryMinDays')}
             <span className={infoBadgeClassName} title="Fastest delivery target after dispatch.">i</span>
           </span>
           <input
@@ -1655,7 +1740,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           className="block"
         >
           <span className={requiredFieldLabelClassName}>
-            Max delivery <span className="text-rose-500">*</span>
+            Max delivery {renderRequiredMark('deliveryMaxDays')}
             <span className={infoBadgeClassName} title="Latest delivery target after dispatch.">i</span>
           </span>
           <input
@@ -1683,7 +1768,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         className={`mt-4 rounded-xl sm:rounded-2xl p-3 sm:p-4 ${fieldErrors.requiredMeasurementKeys ? 'border border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-none bg-transparent'}`}
       >
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-          Measurement points <span className="text-rose-500">*</span>
+          Measurement points {renderRequiredMark('requiredMeasurementKeys')}
           <span className={infoBadgeClassName} title="This defines which buyer measurements are mandatory and which sizing basis this yard-rule setup belongs to.">i</span>
         </div>
         <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
@@ -1883,7 +1968,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       {ENABLE_LEGACY_YARD_SETUP_PANEL ? (
       <details className="mt-4 rounded-2xl border border-black/10 p-3 dark:border-white/10" open>
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-          Brand yard setup <span className="text-rose-500">*</span>
+          Brand yard setup {renderRequiredMark('fabricRuleBasisId')}
           <span className={infoBadgeClassName} title="Set base yard for this outfit and extra yards by computed buyer size.">i</span>
         </summary>
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
@@ -2025,7 +2110,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                 className="space-y-1.5"
               >
                 <span className={requiredFieldLabelClassName}>
-                  Rush fee <span className="text-rose-500">*</span>
+                  Rush fee {renderRequiredMark('rushFee')}
                   <span className={infoBadgeClassName} title="Extra amount charged when the buyer selects rush production.">i</span>
                 </span>
                 <input
@@ -2046,7 +2131,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                 className="space-y-1.5"
               >
                 <span className={requiredFieldLabelClassName}>
-                  Rush lead days <span className="text-rose-500">*</span>
+                  Rush lead days {renderRequiredMark('rushProductionLeadDays')}
                   <span className={infoBadgeClassName} title="Must be shorter than the standard lead time and 1-3 days.">i</span>
                 </span>
                 <input
@@ -2073,7 +2158,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               className="space-y-1.5"
             >
               <span className={requiredFieldLabelClassName}>
-                Revision <span className="text-rose-500">*</span>
+                Revision {renderRequiredMark('revisionPolicy')}
                 <span className={infoBadgeClassName} title="How many revisions the buyer gets and under what timeline.">i</span>
               </span>
               <UniversalSelect
@@ -2108,7 +2193,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               className="space-y-1.5"
             >
               <span className={requiredFieldLabelClassName}>
-                Returns <span className="text-rose-500">*</span>
+                Returns {renderRequiredMark('returnPolicy')}
                 <span className={infoBadgeClassName} title="Return/refund expectations for custom orders.">i</span>
               </span>
               <UniversalSelect
@@ -2143,7 +2228,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               className="space-y-1.5"
             >
               <span className={requiredFieldLabelClassName}>
-                Defects <span className="text-rose-500">*</span>
+                Defects {renderRequiredMark('defectPolicy')}
                 <span className={infoBadgeClassName} title="How defect reports are handled (repair/remake/refund flow).">i</span>
               </span>
               <UniversalSelect
@@ -2191,7 +2276,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       {showFabricRules ? (
         <details className="mt-4 rounded-2xl border border-black/10 p-3 dark:border-white/10">
           <summary className="mb-2 flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-            Fabric yard rules builder <span className="text-rose-500">*</span>
+            Fabric yard rules builder {renderRequiredMark('fabricRuleBasisId')}
             <span className={infoBadgeClassName} title="Each rule maps buyer measurements to required fabric yards. Fallback is used when no condition rule matches.">i</span>
           </summary>
           <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
