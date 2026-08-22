@@ -309,7 +309,7 @@ const CustomOrdersPage: React.FC = () => {
         <span className="font-medium">Custom orders</span>
       </div>
 
-      <section className="rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-5 py-4 text-white shadow-sm">
+      <section className="rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-3 py-4 text-white shadow-sm sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">Studio</div>
@@ -333,27 +333,39 @@ const CustomOrdersPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <div className="flex items-center gap-1.5 rounded-xl bg-white/10 px-3.5 py-2">
-            <span className="text-lg font-bold">{metrics.total}</span>
-            <span className="text-xs text-slate-300">in view</span>
+        {/*
+          Four counters, four columns - the same shape the standard-orders tab
+          uses, because they are the same kind of thing.
+
+          `flex-wrap` gave these a different ragged layout at every width: three
+          on one line and a lonely fourth below it, or two and two, depending on
+          how long the numbers happened to be. A grid makes the row stable and
+          makes the two tabs agree with each other.
+
+          Number over label rather than beside it, so the label has the full
+          column width and does not have to compete with the figure for it.
+        */}
+        <div className="mt-4 grid grid-cols-4 gap-2">
+          <div className="min-w-0 rounded-xl bg-white/10 px-2 py-2 sm:px-3.5">
+            <div className="text-base font-bold leading-tight sm:text-lg">{metrics.total}</div>
+            <div className="text-[10px] leading-tight text-slate-300 sm:text-xs">in view</div>
           </div>
-          <div className="flex items-center gap-1.5 rounded-xl bg-amber-500/20 px-3.5 py-2">
-            <span className="text-lg font-bold text-amber-200">{metrics.awaitingMoney}</span>
-            <span className="text-xs text-amber-300/80">awaiting payment</span>
+          <div className="min-w-0 rounded-xl bg-amber-500/20 px-2 py-2 sm:px-3.5">
+            <div className="text-base font-bold leading-tight text-amber-200 sm:text-lg">{metrics.awaitingMoney}</div>
+            <div className="text-[10px] leading-tight text-amber-300/80 sm:text-xs">awaiting payment</div>
           </div>
-          <div className="flex items-center gap-1.5 rounded-xl bg-emerald-500/20 px-3.5 py-2">
-            <span className="text-lg font-bold text-emerald-200">{metrics.active}</span>
-            <span className="text-xs text-emerald-300/80">active pipeline</span>
+          <div className="min-w-0 rounded-xl bg-emerald-500/20 px-2 py-2 sm:px-3.5">
+            <div className="text-base font-bold leading-tight text-emerald-200 sm:text-lg">{metrics.active}</div>
+            <div className="text-[10px] leading-tight text-emerald-300/80 sm:text-xs">active pipeline</div>
           </div>
-          <div className="flex items-center gap-1.5 rounded-xl bg-rose-500/20 px-3.5 py-2">
-            <span className="text-lg font-bold text-rose-200">{metrics.issues}</span>
-            <span className="text-xs text-rose-300/80">needs attention</span>
+          <div className="min-w-0 rounded-xl bg-rose-500/20 px-2 py-2 sm:px-3.5">
+            <div className="text-base font-bold leading-tight text-rose-200 sm:text-lg">{metrics.issues}</div>
+            <div className="text-[10px] leading-tight text-rose-300/80 sm:text-xs">needs attention</div>
           </div>
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-black/10 bg-white/85 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.04]">
+      <section className="rounded-2xl border border-black/10 bg-white/85 p-3 shadow-[0_24px_80px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.04] sm:rounded-[2rem] sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Studio queue</div>

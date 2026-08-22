@@ -2762,13 +2762,30 @@ const EditProduct: React.FC = () => {
   );
 
   const preprocessProductMediaFiles = useCallback(async (files: File[]) => {
-    const maxSizeBytes = WEB_UPLOAD_POLICIES.productMedia.maxSizeBytes;
+    /**
+     * Two limits, not one.
+     *
+     * `maxSizeBytes` is what the API will accept (8MB, matching POST_IMAGE);
+     * `targetSizeBytes` is what we would LIKE the file to be. This function used
+     * a single number for both, so a photo compressed to 2.4MB against a 2MB
+     * target was counted as "could not be prepared" and dropped — even though
+     * uploading it would have worked. That is the size-dependent product upload
+     * failure: it hit exactly the photos that would not squeeze that far.
+     */
+    const policy = WEB_UPLOAD_POLICIES.productMedia;
+    const maxSizeBytes = policy.maxSizeBytes;
+    const targetSizeBytes = policy.preferredSizeBytes ?? maxSizeBytes;
+    /*
+     * Derived from the policy rather than a second hardcoded list. The regex
+     * here used to accept `avif`, which the policy no longer does and the server
+     * never did — so an AVIF skipped preprocessing and went straight to a
+     * rejection. Two lists that must agree should not be written twice.
+     */
+    const acceptedTypes = new Set(policy.allowedMimeTypes.map((type) => type.toLowerCase()));
     const isAlreadyUploadReady = (file: File) => {
       const type = file.type.trim().toLowerCase();
       if (file.size > maxSizeBytes) return false;
-      if (/image\/(jpeg|png|webp|avif|gif)/i.test(type)) return true;
-      if (/\.pre\.(jpe?g|png|webp|avif)$/i.test(file.name)) return true;
-      return false;
+      return acceptedTypes.has(type);
     };
 
     const prepResults = await Promise.all(
@@ -2779,9 +2796,11 @@ const EditProduct: React.FC = () => {
 
         let localFailureReason: 'preprocess-failed' | 'still-over-limit' | null = null;
         try {
+          // Aim for the target...
           const processed = await preprocessImageFile(file, "detail", {
-            maxSizeBytes,
+            maxSizeBytes: targetSizeBytes,
           });
+          // ...but accept anything the API will take.
           if (processed.file.size <= maxSizeBytes) {
             return { ok: true as const, file: processed.file, optimized: !processed.skipped };
           }
@@ -2829,10 +2848,13 @@ const EditProduct: React.FC = () => {
     }
 
     if (failedCount > 0) {
+      // Name the limit. "Could not be prepared" gave a brand nothing to act on,
+      // and the reason is always the same one: the file is still too big.
+      const limitMb = Math.round(maxSizeBytes / (1024 * 1024));
       toast.error(
         failedCount === 1
-          ? "1 image could not be prepared"
-          : `${failedCount} images could not be prepared`,
+          ? `1 image is still over ${limitMb}MB after compression — try a smaller photo`
+          : `${failedCount} images are still over ${limitMb}MB after compression — try smaller photos`,
       );
     }
 

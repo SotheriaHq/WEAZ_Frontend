@@ -126,6 +126,41 @@ type FieldErrors = Partial<Record<
 >>;
 
 const REQUIRED_FIELDS_SUMMARY = 'Some required fields need attention.';
+
+/**
+ * Field labels, so a blocked draft save can name what it is waiting for.
+ *
+ * A draft save runs the same completeness check a publish does, and when it
+ * fails it saves NOTHING — the whole custom-order configuration, base
+ * production charge and rush fee included. That part is forced by the API: the
+ * create endpoint requires the full set and the columns behind it are NOT NULL,
+ * so there is no partial record to write on a first save.
+ *
+ * What was wrong was the silence. The check ran with toasts and inline errors
+ * suppressed (correctly — a draft save must not steal focus), so the brand saw
+ * "Draft saved", came back, and found the prices they had typed were gone with
+ * nothing to explain it. The list below is what turns that into an answer.
+ */
+const CONFIGURATION_FIELD_LABELS: Record<keyof FieldErrors, string> = {
+  buyerInstructionText: 'Buyer instructions',
+  baseProductionCharge: 'Base production charge',
+  fabricCostPerYard: 'Material cost per yard',
+  productionLeadDays: 'Production timeline',
+  deliveryMinDays: 'Minimum delivery days',
+  deliveryMaxDays: 'Maximum delivery days',
+  requiredMeasurementKeys: 'Required measurement points',
+  fabricRuleBasisId: 'Fabric basis',
+  revisionPolicy: 'Revision policy',
+  returnPolicy: 'Return policy',
+  defectPolicy: 'Defect policy',
+  rushFee: 'Rush fee',
+  rushProductionLeadDays: 'Rush production lead days',
+};
+
+const describeMissingConfigurationFields = (errors: FieldErrors): string[] =>
+  FIELD_ERROR_FOCUS_ORDER.filter((key) => Boolean(errors[key])).map(
+    (key) => CONFIGURATION_FIELD_LABELS[key],
+  );
 const MEASUREMENT_REGISTRY_EMPTY_MESSAGE =
   'No measurement points are available. Run the measurement registry seed or contact an admin.';
 const MEASUREMENT_REGISTRY_LOAD_ERROR_MESSAGE =
@@ -428,6 +463,15 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   const [showAllPoolKeys, setShowAllPoolKeys] = useState(false);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  /**
+   * What a silent (draft) save could not persist, and why.
+   *
+   * Kept apart from `validationMessage`/`fieldErrors` because those belong to an
+   * explicit save: they colour fields red and pull focus, which is exactly what
+   * a background draft save must not do. This one only renders a banner.
+   */
+  const [draftBlockedFields, setDraftBlockedFields] = useState<string[]>([]);
+  const [draftBlockedReason, setDraftBlockedReason] = useState<string | null>(null);
   const containerRef = useRef<HTMLElement | null>(null);
   const fieldErrorRefs = useRef<Partial<Record<keyof FieldErrors, HTMLElement | null>>>({});
   const seededMeasurementKeysSignatureRef = useRef<string>('');
@@ -1078,12 +1122,18 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       errors?: FieldErrors,
       options?: { showBanner?: boolean },
     ) => {
-      if (!silent) {
-        setValidationMessage(options?.showBanner === false ? null : message);
-        setFieldErrors(errors ?? {});
-        focusFirstFieldError(errors);
-        toast.error(message);
+      if (silent) {
+        // Say what is missing, quietly. No toast, no red fields, no focus jump —
+        // but no longer nothing, which is what let a draft swallow a brand's
+        // pricing without a word.
+        setDraftBlockedFields(errors ? describeMissingConfigurationFields(errors) : []);
+        setDraftBlockedReason(message);
+        return null;
       }
+      setValidationMessage(options?.showBanner === false ? null : message);
+      setFieldErrors(errors ?? {});
+      focusFirstFieldError(errors);
+      toast.error(message);
       return null;
     };
 
@@ -1333,6 +1383,8 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     if (!draft) {
       return false;
     }
+    setDraftBlockedFields([]);
+    setDraftBlockedReason(null);
 
     let payload: CustomOrderConfigurationUpsertInput = {
       ...draft,
@@ -1439,9 +1491,35 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         </div>
       ) : null}
 
+      {draftBlockedReason ? (
+        <div
+          role="status"
+          className="mb-3 rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
+        >
+          <p className="font-semibold">
+            Your draft was saved, but these custom-order settings were not.
+          </p>
+          {draftBlockedFields.length > 0 ? (
+            <p className="mt-1">
+              A custom-order configuration can only be stored once it is complete, so nothing
+              here is kept — including the base production charge and rush fee — until you
+              fill in: <span className="font-semibold">{draftBlockedFields.join(', ')}</span>.
+            </p>
+          ) : (
+            <p className="mt-1">{draftBlockedReason}</p>
+          )}
+        </div>
+      ) : null}
+
       {!sourceId ? (
         <div className="mt-5 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-4 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">
-          You can fill everything in now — these custom-order settings save together with the item when you save or publish it. Just don't leave this page before saving.
+          {/* This used to promise the settings "save together with the item".
+              They only do once the section is complete — an incomplete
+              configuration cannot be stored at all — and saying otherwise is
+              what made the loss feel like a bug rather than a missing field. */}
+          Fill this in before you save. Custom-order settings are stored as one complete
+          configuration, so they save with the item only once every field below has a value —
+          a part-filled section is not kept, even on a draft.
         </div>
       ) : null}
 

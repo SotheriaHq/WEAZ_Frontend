@@ -202,9 +202,11 @@ describe('CustomOrderConfigurationEditor', () => {
   it('shows the save-first state when the source has not been persisted yet', () => {
     render(<CustomOrderConfigurationEditor sourceType="PRODUCT" measurementKeys={['bust', 'waist']} />);
 
+    // The copy no longer promises the settings save with the item regardless:
+    // a part-filled configuration cannot be stored at all, so it says so.
     expect(
       screen.getByText(
-        /You can fill everything in now .* these custom-order settings save together with the item/i,
+        /Custom-order settings are stored as one complete configuration/i,
       ),
     ).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Select a fabric-rule basis')).not.toBeInTheDocument();

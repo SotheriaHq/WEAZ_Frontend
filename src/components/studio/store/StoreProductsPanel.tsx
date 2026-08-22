@@ -360,12 +360,28 @@ const getCollectionPreviewSources = (
 const CollectionActionsControl: React.FC<{
   onCreate: () => void;
   onManage: () => void;
-}> = ({ onCreate, onManage }) => {
+  onAddProduct: () => void;
+  addProductLabel: string;
+}> = ({ onCreate, onManage, onAddProduct, addProductLabel }) => {
   const [open, setOpen] = useState(false);
 
   const items: Array<{ key: string; marker: string; label: string; onSelect: () => void }> = [
-    { key: 'create', marker: '➕', label: 'Create collection', onSelect: onCreate },
-    { key: 'manage', marker: '🗂️', label: 'Manage collections', onSelect: onManage },
+    { key: 'create', marker: '🗂️', label: 'Create collection', onSelect: onCreate },
+    { key: 'manage', marker: '📁', label: 'Manage collections', onSelect: onManage },
+  ];
+
+  /**
+   * On phones the "+" is the single place new things are made.
+   *
+   * Adding a product had its own gradient button up in the toolbar, competing
+   * with the search field and the filter control for a row that was already
+   * full. It is the same kind of action as the two below it — "make a new
+   * thing" — so it belongs in the same menu, and it goes first because it is
+   * the one brands reach for most.
+   */
+  const phoneItems = [
+    { key: 'add-product', marker: '➕', label: addProductLabel, onSelect: onAddProduct },
+    ...items,
   ];
 
   return (
@@ -396,7 +412,7 @@ const CollectionActionsControl: React.FC<{
               role="menu"
               className="absolute right-0 z-50 mt-2 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-white/10 dark:bg-[#15151b]"
             >
-              {items.map((item) => (
+              {phoneItems.map((item) => (
                 <button
                   key={item.key}
                   type="button"
@@ -497,6 +513,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   
   const listRef = useRef<HTMLDivElement | null>(null);
   const [listMinHeight, setListMinHeight] = useState<number | undefined>(undefined);
+  const statusTabsRef = useRef<HTMLDivElement | null>(null);
   const createdProductHydrationAttemptsRef = useRef(0);
   const galleryTouchRef = useRef({ startX: 0, startY: 0 });
   const productMenuTriggerRefs = useRef<
@@ -1119,12 +1136,50 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     toast.error('Failed to load products for this collection.');
   }, [activeCollectionProductsError]);
 
+  /**
+   * Holds the grid's height only while a filter change is in flight.
+   *
+   * Switching status refetches, and for that moment the grid has no children —
+   * so without this the container collapses to nothing, the page scrolls up to
+   * follow it, and the results drop back in below where you were looking. That
+   * is the "screen shakes when you swipe between tabs" report.
+   *
+   * The height is frozen at the value it had when loading STARTED and released
+   * as soon as the new results are painted. The previous version re-measured on
+   * every `filteredProducts.length` change while the floor was still applied,
+   * so the floor could only ever ratchet upward: after visiting a busy tab, a
+   * tab with three products kept the tall tab's height and left a screen of
+   * blank underneath it.
+   */
   useEffect(() => {
     if (outletView !== 'products') return;
+    if (!loading) {
+      setListMinHeight(undefined);
+      return;
+    }
     if (!listRef.current) return;
     const height = listRef.current.getBoundingClientRect().height;
     if (height > 0) setListMinHeight(height);
-  }, [filteredProducts.length, loading, outletView]);
+  }, [loading, outletView]);
+
+  /**
+   * Keeps the selected status tab visible without moving the page.
+   *
+   * `block: 'nearest'` is the load-bearing part: the default (`'start'`) lets
+   * the browser scroll every ancestor — the document included — to satisfy the
+   * request, so selecting a tab near the end of the strip would yank the whole
+   * screen. `'nearest'` leaves an already-visible axis alone, so only the strip
+   * moves.
+   */
+  useEffect(() => {
+    if (outletView !== 'products') return;
+    const strip = statusTabsRef.current;
+    if (!strip) return;
+    const active = strip.querySelector<HTMLElement>(
+      `[data-status-tab="${filterStatus}"]`,
+    );
+    active?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [filterStatus, outletView]);
 
   // Click-outside handler for expandable search (matches CatalogShopTab pattern)
   useEffect(() => {
@@ -2098,6 +2153,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             <CollectionActionsControl
               onCreate={() => navigate('/studio/store/collections/new')}
               onManage={() => navigate('/studio/store?view=collections')}
+              onAddProduct={() => navigate('/studio/store/products/new')}
+              addProductLabel={primaryProductActionLabel}
             />
           </div>
 
@@ -2275,28 +2332,55 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   />
                 )}
               </div>
+              {/*
+                The bolt sits next to the search, not on a row of its own.
+
+                It used to own a whole strip below the toolbar — one 36pt button
+                and an empty 800px rail — which cost a full row of vertical space
+                on a phone to show a single icon. It is a toolbar control like
+                the two beside it, so it lives in the toolbar; the actions it
+                reveals still expand underneath.
+              */}
+              <button
+                type="button"
+                onClick={() => setShowQuickActions((v) => !v)}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border shadow-sm transition-all sm:h-11 sm:w-11 ${
+                  showQuickActions
+                    ? 'border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300'
+                    : 'border-gray-200 bg-white/80 text-gray-700 hover:bg-purple-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10'
+                }`}
+                aria-expanded={showQuickActions}
+                aria-label={showQuickActions ? 'Hide quick actions' : 'Show quick actions'}
+                title={showQuickActions ? 'Hide quick actions' : 'Show quick actions'}
+              >
+                <span aria-hidden="true" className="text-base">⚡</span>
+              </button>
+              {/* Add Product moved to the collections "+" on phones; the inline
+                  button is still the fastest route on a wider screen. */}
               <button
                 type="button"
                 onClick={() => navigate('/studio/store/products/new')}
-                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-purple-500/40 active:scale-95 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
+                className="hidden items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-purple-500/40 active:scale-95 sm:inline-flex sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
                 aria-label={primaryProductActionLabel}
                 title={primaryProductActionLabel}
               >
                 <span aria-hidden="true">➕</span>
-                <span className="hidden min-[380px]:inline">{primaryProductActionLabel}</span>
+                <span>{primaryProductActionLabel}</span>
               </button>
+              {/* Status now lives in the tab strip below, so this control is
+                  only the three refinements it still owns. */}
               <button
                 type="button"
                 onClick={() => setShowFiltersMenu((v) => !v)}
-                className={`flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-all sm:h-11 sm:w-11 lg:hidden ${
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border shadow-sm transition-all sm:h-11 sm:w-11 lg:hidden ${
                   showFiltersMenu
                     ? 'border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300'
                     : 'border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10'
                 }`}
-                aria-label={showFiltersMenu ? 'Hide filters menu' : 'Show filters menu'}
-                title={showFiltersMenu ? 'Hide filters menu' : 'Show filters menu'}
+                aria-label={showFiltersMenu ? 'Hide refine menu' : 'Refine results'}
+                title={showFiltersMenu ? 'Hide refine menu' : 'Refine results'}
               >
-                ☰
+                ⚙️
               </button>
             </div>
           </div>
@@ -2306,24 +2390,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               ref={filtersMenuRef}
               className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4.25rem)] z-50 max-h-[min(70vh,26rem)] overflow-y-auto rounded-xl border border-gray-200/90 bg-white/98 p-2.5 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#12121a]/98 sm:absolute sm:inset-x-auto sm:right-4 sm:top-[64px] sm:w-[min(92vw,520px)] sm:p-3 lg:hidden"
             >
-              <div className="mb-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
-                {PRODUCT_FILTER_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setFilterStatus(opt.value)}
-                    className={`flex min-h-8 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium transition-all duration-200 sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs ${
-                      filterStatus === opt.value
-                        ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md shadow-purple-500/30'
-                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/10'
-                    }`}
-                  >
-                    <span>{opt.icon}</span>
-                    <span className="max-w-[7rem] truncate">{opt.label}</span>
-                  </button>
-                ))}
-              </div>
-
+              {/* Status used to be repeated here as a chip grid. It is the tab
+                  strip's job now, and having it in two places meant the visible
+                  tab and the menu chip could look like separate controls. */}
               <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-3">
                 <FilterDropdown
                   value={filterCollection}
@@ -2354,6 +2423,63 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           )}
         </div>
 
+        {/*
+          ═══ STATUS TABS (phone / tablet) ═══
+
+          What this replaces: the only way to change status on a phone was to
+          open the ☰ menu, which meant the current status was invisible until
+          you opened something. Tabs put the whole set on screen and the
+          selected one is simply the one that is highlighted.
+
+          Everything here is chosen so that changing tab does not move the page:
+
+          • The strip scrolls horizontally on its own axis (`overflow-x-auto`)
+            and is `snap-x`, so the tabs move and nothing else does.
+          • Labels never wrap and the row height is fixed, so the strip is the
+            same height on every tab regardless of label length.
+          • The active pill is a background on the button itself rather than a
+            separately positioned indicator, so there is no measure-then-move
+            step that could land a frame late and read as a jump.
+          • The selected tab is scrolled into view along the strip's own
+            inline axis with `block: 'nearest'` — `nearest` is what stops the
+            browser from scrolling the PAGE to satisfy the request, which is
+            the classic version of "it shook the screen".
+          • The results grid below keeps its measured `minHeight` across the
+            change (see `listMinHeight`), so a tab with fewer products cannot
+            collapse the container and yank the viewport up.
+        */}
+        <div className="border-t border-gray-200/80 bg-white/92 backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 lg:hidden">
+          <div
+            ref={statusTabsRef}
+            role="tablist"
+            aria-label="Filter products by status"
+            className="scrollbar-hide flex snap-x snap-mandatory items-stretch gap-1 overflow-x-auto overscroll-x-contain px-3 py-2 sm:gap-1.5 sm:px-4"
+          >
+            {PRODUCT_FILTER_OPTIONS.map((opt) => {
+              const selected = filterStatus === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="tab"
+                  id={`product-status-tab-${opt.value}`}
+                  aria-selected={selected}
+                  data-status-tab={opt.value}
+                  onClick={() => setFilterStatus(opt.value)}
+                  className={`flex h-9 shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs font-semibold transition-colors duration-200 ${
+                    selected
+                      ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md shadow-purple-500/25'
+                      : 'bg-gray-100/80 text-gray-600 hover:text-gray-900 dark:bg-white/5 dark:text-gray-300 dark:hover:text-white'
+                  }`}
+                >
+                  <span aria-hidden="true">{opt.icon}</span>
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Desktop status filter buttons */}
         <div className="hidden border-t border-gray-200/80 bg-white/92 px-5 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 lg:sticky lg:top-24 lg:z-20 lg:block">
           <div className="flex flex-wrap items-center gap-2">
@@ -2374,102 +2500,6 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             ))}
           </div>
         </div>
-
-        {/* Quick Actions */}
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide px-5 pb-4 pt-4">
-          <button
-            type="button"
-            onClick={() => setShowQuickActions((v) => !v)}
-            className={`flex-shrink-0 h-9 w-9 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 hover:bg-purple-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center shadow-sm ${
-              showQuickActions
-                ? 'text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-500/10'
-                : 'text-gray-700 dark:text-gray-200'
-            }`}
-            aria-label={showQuickActions ? 'Hide quick actions' : 'Show quick actions'}
-          >
-            <span className="text-sm">⚡</span>
-          </button>
-          <div
-            className={`flex items-center gap-2 transition-all duration-300 ease-out ${
-              showQuickActions
-                ? 'max-w-[calc(100vw-7rem)] overflow-x-auto scrollbar-hide opacity-100 sm:max-w-[800px]'
-                : 'max-w-0 overflow-hidden opacity-0'
-            }`}
-          >
-            <button
-              type="button"
-              onClick={() => navigate('/studio/store/collections/new')}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors whitespace-nowrap"
-            >
-              📦 Add Collection
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate(buildDesignRoute({ mode: 'create' }))}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors whitespace-nowrap"
-            >
-              🎨 Create Look
-            </button>
-            {/* Import action hidden until the bulk-import feature is implemented
-                (button previously rendered with no handler — read as broken). */}
-            {onToggleLayoutMode && (
-              <button
-                type="button"
-                onClick={onToggleLayoutMode}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
-                  layoutMode
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10'
-                }`}
-              >
-                🎯 {layoutMode ? 'Exit Layout' : 'Layout Mode'}
-              </button>
-            )}
-          </div>
-
-          {/* ─── Draft Collections: inline scroll-out ─── */}
-          {(storeDraftCollections.length > 0 || draftCollectionsLoading) && (
-            <>
-              <div className="h-5 w-px bg-gray-200 dark:bg-white/10 mx-1" />
-              <button
-                type="button"
-                onClick={() => setShowDrafts((v) => !v)}
-                className={`flex-shrink-0 h-9 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 hover:bg-amber-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1.5 px-2.5 shadow-sm ${
-                  showDrafts
-                    ? 'text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10'
-                    : 'text-gray-700 dark:text-gray-200'
-                }`}
-                aria-label={showDrafts ? 'Hide draft collections' : 'Show draft collections'}
-              >
-                <span className="text-sm">📝</span>
-                <span className="text-[10px] font-bold tabular-nums">{storeDraftCollections.length}</span>
-              </button>
-              <div
-                className={`flex items-center gap-2 transition-all duration-300 ease-out ${
-                  showDrafts
-                    ? 'max-w-[calc(100vw-7rem)] overflow-x-auto scrollbar-hide opacity-100 sm:max-w-[600px]'
-                    : 'max-w-0 overflow-hidden opacity-0'
-                }`}
-              >
-                {draftCollectionsLoading ? (
-                  <div className="h-9 w-32 rounded-lg bg-gray-100 dark:bg-white/5 animate-pulse" />
-                ) : (
-                  storeDraftCollections.map((draft: any) => (
-                    <button
-                      key={draft.id}
-                      type="button"
-                      onClick={() => navigate(`/studio/store/collections/new?collectionId=${draft.id}`)}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors whitespace-nowrap"
-                    >
-                      📝 {draft.title?.trim() || 'Untitled Draft'}
-                    </button>
-                  ))
-                )}
-              </div>
-            </>
-          )}
-        </div>
-
       </div>
       )}
 
@@ -2872,9 +2902,10 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     key={product.id}
                     type="button"
                     onClick={() => navigateToStudioProductDetails(product.id)}
-                    className="overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-zinc-900/70"
+                    className="overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-zinc-900/70 lg:rounded-xl"
                   >
-                    <div className="aspect-[4/5] bg-gray-100 dark:bg-white/5">
+                    {/* Same cover proportion as the catalog card above. */}
+                    <div className="aspect-[100/158] bg-gray-100 dark:bg-white/5 lg:aspect-[4/5]">
                       <ImageWithFallback
                         src={product.thumbnail || product.images?.[0] || product.media?.[0]?.url || null}
                         fileId={product.media?.find((media) => media.isPrimary)?.id || null}
@@ -3001,6 +3032,103 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       {/* Products - with CSS containment for smooth tab transitions */}
       {outletView === 'products' && !inlineProduct && (
       <div className="rounded-xl border border-gray-200 bg-white/90 shadow-lg dark:border-white/10 dark:bg-white/5 sm:rounded-2xl">
+        {/*
+          Quick Actions — the drawer the ⚡ in the toolbar opens.
+
+          It lives INSIDE the results card, above the grid, rather than as its
+          own strip between two panels. Create-a-collection, create-a-look and
+          layout mode all act on the catalog you are looking at, so they belong
+          in the same container as the catalog; floating between panels made
+          them read as chrome belonging to neither, and cost a band of vertical
+          space on a phone.
+
+          Collapsed it is genuinely zero-height (max-height and opacity animate
+          together on one element), so a closed drawer costs nothing instead of
+          leaving an empty padded strip.
+        */}
+        <div
+          aria-hidden={!showQuickActions}
+          className={`overflow-hidden transition-all duration-300 ease-out ${
+            showQuickActions ? 'max-h-24 opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          <div
+            className="scrollbar-hide flex items-center gap-2 overflow-x-auto px-5 pb-4 pt-4"
+          >
+            <button
+              type="button"
+              onClick={() => navigate('/studio/store/collections/new')}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors whitespace-nowrap"
+            >
+              📦 Add Collection
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(buildDesignRoute({ mode: 'create' }))}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors whitespace-nowrap"
+            >
+              🎨 Create Look
+            </button>
+            {/* Import action hidden until the bulk-import feature is implemented
+                (button previously rendered with no handler — read as broken). */}
+            {onToggleLayoutMode && (
+              <button
+                type="button"
+                onClick={onToggleLayoutMode}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
+                  layoutMode
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10'
+                }`}
+              >
+                🎯 {layoutMode ? 'Exit Layout' : 'Layout Mode'}
+              </button>
+            )}
+
+            {/* ─── Draft Collections: inline scroll-out ─── */}
+            {(storeDraftCollections.length > 0 || draftCollectionsLoading) && (
+              <>
+                <div className="h-5 w-px bg-gray-200 dark:bg-white/10 mx-1" />
+              <button
+                type="button"
+                onClick={() => setShowDrafts((v) => !v)}
+                className={`flex-shrink-0 h-9 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 hover:bg-amber-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1.5 px-2.5 shadow-sm ${
+                  showDrafts
+                    ? 'text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10'
+                    : 'text-gray-700 dark:text-gray-200'
+                }`}
+                aria-label={showDrafts ? 'Hide draft collections' : 'Show draft collections'}
+              >
+                <span className="text-sm">📝</span>
+                <span className="text-[10px] font-bold tabular-nums">{storeDraftCollections.length}</span>
+              </button>
+              <div
+                className={`flex items-center gap-2 transition-all duration-300 ease-out ${
+                  showDrafts
+                    ? 'max-w-[calc(100vw-7rem)] overflow-x-auto scrollbar-hide opacity-100 sm:max-w-[600px]'
+                    : 'max-w-0 overflow-hidden opacity-0'
+                }`}
+              >
+                {draftCollectionsLoading ? (
+                  <div className="h-9 w-32 rounded-lg bg-gray-100 dark:bg-white/5 animate-pulse" />
+                ) : (
+                  storeDraftCollections.map((draft: any) => (
+                    <button
+                      key={draft.id}
+                      type="button"
+                      onClick={() => navigate(`/studio/store/collections/new?collectionId=${draft.id}`)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors whitespace-nowrap"
+                    >
+                      📝 {draft.title?.trim() || 'Untitled Draft'}
+                    </button>
+                  ))
+                )}
+              </div>
+              </>
+            )}
+          </div>
+        </div>
+
         {/* Inline filter dropdowns */}
         <div className="hidden lg:flex items-center gap-3 px-4 pt-4 sm:px-6 sm:pt-5">
           <FilterDropdown
@@ -3038,7 +3166,18 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             }}
             className={`transition-opacity duration-300 ease-out ${loading ? 'opacity-50' : 'opacity-100'}`}
           >
-            <div className="grid grid-cols-2 gap-2 transition-all duration-300 min-[520px]:grid-cols-3 lg:grid-cols-4">
+            {/*
+              Two columns at the native catalog's proportions.
+
+              The native catalog card (`CollectionCard`) is laid out as two
+              columns with a 12pt gutter and a cover of `width * 1.58`. Studio
+              was two columns with an 8px gutter and a 5:6 cover — a visibly
+              shorter, wider card — so the same product looked like a different
+              object depending on which screen a brand was on. `gap-3` is 12px
+              and `aspect-[100/158]` is the same 1.58, so the two now scale
+              together at any phone width.
+            */}
+            <div className="grid grid-cols-2 gap-3 transition-all duration-300 min-[520px]:grid-cols-3 lg:grid-cols-4">
             {visibleProductFillers.map((task) => (
               <ProductPublishFillerCard
                 key={task.id}
@@ -3063,7 +3202,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 <div
                   key={product.id}
                   className={[
-                    'group relative aspect-[5/6] overflow-hidden rounded-xl shadow-sm transition-all duration-300 ease-out',
+                    // Native parity below `lg`; the desktop grid keeps 5:6,
+                    // where four columns of a tall card would be unusable.
+                    'group relative aspect-[100/158] overflow-hidden rounded-2xl shadow-sm transition-all duration-300 ease-out lg:aspect-[5/6] lg:rounded-xl',
                     selectedProducts.includes(product.id)
                       ? 'ring-2 ring-purple-500 border-purple-300 dark:border-purple-500/30'
                       : 'hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30',

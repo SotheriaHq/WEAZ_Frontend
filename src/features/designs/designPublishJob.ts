@@ -79,11 +79,14 @@ const isAlreadyUploadReady = (file: File, maxSizeBytes: number) => {
   const type = file.type.trim().toLowerCase();
   // Media-store already server-normalizes HEIC/unknown into JPEG at selection.
   // Re-running canvas preprocess on go-live is the multi-second mobile stall.
-  if (file.size <= maxSizeBytes && /image\/(jpeg|png|webp|avif|gif)/i.test(type)) {
+  // No `avif`: the server accepts none, so letting one through untouched here
+  // only moves the rejection to multer, where nothing can explain it. Without
+  // the short-circuit it goes to the preprocessor, which re-encodes to webp.
+  if (file.size <= maxSizeBytes && /image\/(jpeg|png|webp|gif)/i.test(type)) {
     return true;
   }
   // .pre.* naming from preprocessImageFile / selection pipeline
-  if (file.size <= maxSizeBytes && /\.pre\.(jpe?g|png|webp|avif)$/i.test(file.name)) {
+  if (file.size <= maxSizeBytes && /\.pre\.(jpe?g|png|webp)$/i.test(file.name)) {
     return true;
   }
   return false;

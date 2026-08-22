@@ -162,10 +162,13 @@ const isAlreadyUploadReady = (file: File, maxSizeBytes: number) => {
   // Selection-time media-store normalization already produces browser-safe
   // JPEG/PNG/WebP/AVIF under the limit. Re-running createImageBitmap here was the
   // multi-second mobile go-live stall.
-  if (file.size <= maxSizeBytes && /image\/(jpeg|png|webp|avif|gif)/i.test(type)) {
+  // No `avif`: the server accepts none, so letting one through untouched here
+  // only moves the rejection to multer, where nothing can explain it. Without
+  // the short-circuit it goes to the preprocessor, which re-encodes to webp.
+  if (file.size <= maxSizeBytes && /image\/(jpeg|png|webp|gif)/i.test(type)) {
     return true;
   }
-  if (file.size <= maxSizeBytes && /\.pre\.(jpe?g|png|webp|avif)$/i.test(file.name)) {
+  if (file.size <= maxSizeBytes && /\.pre\.(jpe?g|png|webp)$/i.test(file.name)) {
     return true;
   }
   return false;

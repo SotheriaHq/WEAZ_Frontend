@@ -61,13 +61,19 @@ const EMPTY_SUMMARY: OrdersSummary = {
   returnedCount: 0,
 };
 
+/**
+ * `shortLabel` is what a phone shows, so six tabs fit one row without scrolling.
+ *
+ * Only the labels that cannot be shrunk by type size alone are abbreviated -
+ * the rest are already short enough at the phone type scale.
+ */
 const STATUS_TABS = [
-  { label: 'All Orders', value: '' },
-  { label: 'Pending', value: 'PENDING' },
-  { label: 'Processing', value: 'PROCESSING' },
-  { label: 'Shipped', value: 'SHIPPED' },
-  { label: 'Delivered', value: 'DELIVERED' },
-  { label: 'Returns', value: 'RETURNED' },
+  { label: 'All Orders', shortLabel: 'All', value: '' },
+  { label: 'Pending', shortLabel: 'Pending', value: 'PENDING' },
+  { label: 'Processing', shortLabel: 'Active', value: 'PROCESSING' },
+  { label: 'Shipped', shortLabel: 'Shipped', value: 'SHIPPED' },
+  { label: 'Delivered', shortLabel: 'Sent', value: 'DELIVERED' },
+  { label: 'Returns', shortLabel: 'Returns', value: 'RETURNED' },
 ] as const;
 
 const SORT_OPTIONS = [
@@ -519,22 +525,39 @@ const OrderManagement: React.FC = () => {
         </div>
       </section>
 
-      <section className="flex gap-2.5 overflow-x-auto scrollbar-hide py-1 sm:grid sm:grid-cols-2 xl:grid-cols-4">
+      {/*
+        Four metrics, four columns, at every width.
+
+        This was a `min-w-[150px]` flex rail below `sm`, so on a phone - which is
+        what the native app embeds - 600px of cards sat in a 390px viewport and
+        the summary of the whole screen could only be read by swiping. A metric
+        you have to go looking for is not a summary. There are exactly four of
+        these, so four columns divide any screen evenly and the number (the part
+        that matters) is always on screen.
+
+        The progress bar and its helper line are the parts that genuinely do not
+        survive a ~90px column, so they drop below `sm` rather than being
+        squeezed into illegibility. The label wraps instead of truncating: a
+        clipped "Total Rev..." is worse than two short lines.
+      */}
+      <section className="grid grid-cols-4 gap-2 py-1 sm:gap-3">
         {metrics.map((metric) => (
           <article
             key={metric.label}
-            className="min-w-[150px] shrink-0 sm:min-w-0 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
+            className="min-w-0 rounded-xl border border-slate-200 bg-white p-2 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03] sm:rounded-2xl sm:p-4"
           >
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 truncate">{metric.label}</p>
-              <span className="text-base sm:text-lg shrink-0">{metric.marker}</span>
+            <div className="flex items-start justify-between gap-1">
+              <p className="min-w-0 text-[9px] font-semibold uppercase leading-tight tracking-tight text-slate-500 dark:text-slate-400 sm:text-xs sm:tracking-[0.14em]">
+                {metric.label}
+              </p>
+              <span className="shrink-0 text-sm leading-none sm:text-lg">{metric.marker}</span>
             </div>
-            <p className="mt-1.5 sm:mt-3 text-lg sm:text-2xl font-black tracking-tight">{metric.value}</p>
-            <div className="mt-2 sm:mt-3 flex items-center gap-2">
+            <p className="mt-1.5 truncate text-sm font-black tracking-tight sm:mt-3 sm:text-2xl">{metric.value}</p>
+            <div className="mt-3 hidden items-center gap-2 sm:flex">
               <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/5">
                 <div className="h-full rounded-full bg-orange-500" style={{ width: `${metric.progress}%` }} />
               </div>
-              <p className="text-[10px] sm:text-[11px] font-medium text-slate-400 dark:text-slate-500 shrink-0">{metric.helper}</p>
+              <p className="shrink-0 text-[11px] font-medium text-slate-400 dark:text-slate-500">{metric.helper}</p>
             </div>
           </article>
         ))}
@@ -543,7 +566,18 @@ const OrderManagement: React.FC = () => {
       {/* Tabs + Filters */}
       <section className="space-y-3">
         {/* Underline tabs */}
-        <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-white/10 scrollbar-hide">
+        {/*
+          The six status tabs divide the row rather than run off the end of it.
+
+          `flex-1` below `sm` gives each tab an equal share of whatever width
+          there is, so the set always ends where the screen ends and the tab you
+          want is never off-screen. Type size and letter-spacing come down to
+          match - uppercase at `tracking-wider` is what made these labels wide in
+          the first place - and the abbreviated `shortLabel` covers the two that
+          are still too long at that size. `sm:flex-none` hands the row back to
+          natural widths as soon as there is room for them.
+        */}
+        <nav className="flex gap-0.5 border-b border-slate-200 dark:border-white/10 sm:gap-1">
           {STATUS_TABS.map((tab) => {
             const active = statusFilter === tab.value;
             return (
@@ -551,13 +585,15 @@ const OrderManagement: React.FC = () => {
                 key={tab.label}
                 type="button"
                 onClick={() => handleStatusChipClick(tab.value)}
-                className={`whitespace-nowrap border-b-2 px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${
+                title={tab.label}
+                className={`min-w-0 flex-1 truncate border-b-2 px-1 py-2 text-[10px] font-bold uppercase tracking-tight transition sm:flex-none sm:px-3 sm:text-xs sm:tracking-wider ${
                   active
                     ? 'border-orange-500 text-orange-600 dark:text-orange-400'
                     : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-white'
                 }`}
               >
-                {tab.label}
+                <span className="sm:hidden">{tab.shortLabel}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
               </button>
             );
           })}
@@ -603,7 +639,17 @@ const OrderManagement: React.FC = () => {
       {/* Orders List / Table Container */}
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.03] p-2.5 sm:p-0">
         {/* Mobile View: Compact grouped cards (<640px) */}
-        <div className="block sm:hidden space-y-2.5">
+        {/*
+          Cards up to `lg`, table above it.
+
+          The switch used to be `sm` (640px) while the table declares
+          `min-w-[900px]`, so every width from 640 to 900 got a table that could
+          only be read by dragging it sideways - tablets and the native app's
+          landscape webview included. The card list is a complete view of the
+          same order, not a fallback, so it is the better answer right up to the
+          point where a nine-column table genuinely fits.
+        */}
+        <div className="block lg:hidden space-y-2.5">
           {loading ? (
             <div className="space-y-2 p-2">
               {Array.from({ length: 4 }).map((_, idx) => (
@@ -691,9 +737,9 @@ const OrderManagement: React.FC = () => {
           )}
         </div>
 
-        {/* Desktop View: Full Table (>=640px) */}
-        <div className="hidden sm:block overflow-x-auto scrollbar-hide">
-          <table className="w-full min-w-[900px] border-collapse text-left sm:min-w-[980px] lg:min-w-[1080px]">
+        {/* Desktop View: Full Table (>=1024px, where nine columns fit) */}
+        <div className="hidden lg:block overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-0 border-collapse text-left xl:min-w-[1080px]">
             <thead>
               <tr className="bg-slate-50 dark:bg-white/[0.02]">
                 <th className="w-[10%] min-w-[95px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Order ID</th>

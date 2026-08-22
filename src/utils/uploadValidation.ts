@@ -4,7 +4,24 @@ export type UploadPolicy = {
   label: string;
   allowedMimeTypes: readonly string[];
   allowedExtensions: readonly string[];
+  /**
+   * The hard ceiling — above this the upload is refused.
+   *
+   * This must not be tighter than the server's own limit for the endpoint
+   * (`DIRECT_UPLOAD_HARD_LIMIT_BYTES` in `bthreadly/src/upload/upload-policy.ts`)
+   * or the client refuses files the API would have accepted.
+   */
   maxSizeBytes: number;
+  /**
+   * What the preprocessor aims for, when that is smaller than the ceiling.
+   *
+   * These are two different numbers and conflating them is what broke product
+   * uploads: `preprocessProductMediaFiles` compressed toward the target and
+   * then REJECTED anything that did not reach it, so a photo that squeezed down
+   * to 2.4MB was thrown away even though the API takes 8MB. Compress hard, but
+   * refuse only at the ceiling.
+   */
+  preferredSizeBytes?: number;
   videoMaxSizeBytes?: number;
   maxFiles?: number;
 };
@@ -19,8 +36,21 @@ export class UploadValidationError extends Error {
   }
 }
 
-const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'] as const;
-const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif'] as const;
+/**
+ * No AVIF. Not a preference — no server endpoint accepts it.
+ *
+ * `bthreadly/src/upload/upload-policy.ts` lists the allowed types per
+ * `FileType`, and `image/avif` appears in none of them: not POST_IMAGE, not
+ * PROFILE_IMAGE, not REVIEW_IMAGE, not MESSAGE_IMAGE. It was listed here, so an
+ * AVIF passed every check the browser makes and was then rejected by multer
+ * with a message the upload UI has no way to explain. Keeping the two lists
+ * honest is the fix; adding AVIF support is a server change, not a client one.
+ *
+ * The preprocessor only ever emits webp/png/jpeg, so this affects the
+ * pass-through path — a small AVIF chosen straight from a photo library.
+ */
+const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'] as const;
 const VIDEO_MIME_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'] as const;
 const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov'] as const;
 
@@ -43,7 +73,11 @@ export const WEB_UPLOAD_POLICIES = {
     label: 'Product media',
     allowedMimeTypes: IMAGE_MIME_TYPES,
     allowedExtensions: IMAGE_EXTENSIONS,
-    maxSizeBytes: 2 * MB,
+    // Matches DIRECT_UPLOAD_HARD_LIMIT_BYTES[POST_IMAGE] = 8MB on the server.
+    // It was 2MB, which is why "some" product uploads failed: exactly the ones
+    // whose photos would not compress that far.
+    maxSizeBytes: 8 * MB,
+    preferredSizeBytes: 2 * MB,
     maxFiles: 12,
   },
   collectionMedia: {
