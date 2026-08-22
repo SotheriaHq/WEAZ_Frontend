@@ -12,8 +12,7 @@ export default function LegalIndexPage() {
           </p>
           <h1 className="mt-2 text-3xl font-black sm:text-4xl">{APP_NAME} Legal</h1>
           <p className="mt-3 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-            These documents are versioned for product enforcement and acceptance tracking.
-            Current draft copy is marked for counsel review before public launch.
+            Official operating terms, consumer protections, merchant standards, and privacy directives governing the {APP_NAME} platform.
           </p>
         </div>
 

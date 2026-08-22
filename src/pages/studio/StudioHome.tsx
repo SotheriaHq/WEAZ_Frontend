@@ -28,7 +28,13 @@ const StudioHome: React.FC = () => {
 
   const setActive = (key: string) => {
     // Tab switches are UI state — replace so mobile back doesn't replay them.
-    setSearchParams({ tab: key }, { replace: true });
+    // Preserve existing params (especially `surface=mobile-app`). Replacing
+    // the whole search with `{ tab }` dropped the embedded marker, which
+    // unregistered the native nav bridge and made the next dock tap reload
+    // the document.
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', key);
+    setSearchParams(next, { replace: true });
   };
 
   return (

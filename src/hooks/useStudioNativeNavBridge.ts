@@ -8,17 +8,16 @@ declare global {
     /**
      * Client-side navigation entry point for the native Studio shell.
      *
-     * `threadly-mobile/app/(tabs)/studio/webview.tsx` → `navigateStudioInPlace`
-     * injects a script that prefers this function and falls back to
-     * `window.location.assign(...)`. The function had never existed on this
-     * side, so the fallback WAS the behaviour: every Studio dock tap
-     * (Dashboard ↔ Store ↔ Orders ↔ Reviews ↔ Messages) tore down the document
-     * and re-ran the whole boot — HTML, JS bundle, React mount, Redux hydrate,
-     * every query refetched from zero — which is why a section switch replayed
-     * the full loading sequence instead of the warm session the native shell
-     * carefully avoids re-handing-off for.
+     * `threadly-mobile/app/(tabs)/studio/webview.tsx` injects
+     * `__WIEZ_STUDIO_NAV_GO__`, which calls this when it is present and
+     * otherwise queues the path on `__WIEZ_STUDIO_NAV_PENDING__`. A missing
+     * handler used to fall through to `location.assign` — a full document
+     * reload on every dock tap.
      */
     __WIEZ_STUDIO_NAV__?: (path: string) => void;
+    __WIEZ_STUDIO_NAV_GO__?: (path: string) => void;
+    __WIEZ_STUDIO_NAV_PENDING__?: string | null;
+    ReactNativeWebView?: { postMessage: (message: string) => void };
   }
 }
 
@@ -47,12 +46,22 @@ function withEmbeddedSurface(path: string): string {
  * property of "this document is inside the native shell", which is what it
  * actually is.
  */
+function isNativeStudioWebView(): boolean {
+  return typeof window !== 'undefined' && Boolean(window.ReactNativeWebView);
+}
+
 export function useStudioNativeNavBridge(): void {
   const navigate = useNavigate();
   const isEmbeddedMobile = useEmbeddedSurface() === 'mobile-app';
 
   useEffect(() => {
-    if (!isEmbeddedMobile) return;
+    // Register whenever this document is inside the native WebView, not only
+    // when `surface=mobile-app` is currently on the URL. StudioHome used to
+    // `setSearchParams({ tab })` and wipe `surface`, which unregistered the
+    // bridge; the next dock tap then `location.assign`'d and reloaded the
+    // whole bundle. SessionStorage still marks the surface as embedded, but
+    // the native injector cannot wait on that.
+    if (!isEmbeddedMobile && !isNativeStudioWebView()) return;
 
     const handler = (path: string) => {
       if (typeof path !== 'string' || !path.startsWith('/')) return;
@@ -64,6 +73,11 @@ export function useStudioNativeNavBridge(): void {
     };
 
     window.__WIEZ_STUDIO_NAV__ = handler;
+    const pending = window.__WIEZ_STUDIO_NAV_PENDING__;
+    if (typeof pending === 'string' && pending.startsWith('/')) {
+      window.__WIEZ_STUDIO_NAV_PENDING__ = null;
+      handler(pending);
+    }
 
     return () => {
       if (window.__WIEZ_STUDIO_NAV__ === handler) {
