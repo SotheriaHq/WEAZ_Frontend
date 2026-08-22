@@ -2415,6 +2415,7 @@ const EditProduct: React.FC = () => {
     },
     [
       form,
+      revealCustomOrderProblems,
       selectedFilterValueIds,
       hasDuplicateVariants,
       isEditMode,
@@ -2642,6 +2643,7 @@ const EditProduct: React.FC = () => {
     }
   }, [
     form,
+    revealCustomOrderProblems,
     selectedFilterValueIds,
     user,
     isCollectionFlow,
@@ -3628,8 +3630,23 @@ const EditProduct: React.FC = () => {
               {/* Carousel for media (shows one at a time with navigation) */}
               {mediaUrls.length > 0 ? (
                 <div className="relative">
-                  {/* Main carousel view */}
-                  <div className="relative rounded-xl bg-theme-muted aspect-[4/5] overflow-hidden">
+                  {/*
+                    Main preview, sized by the media — the same treatment the
+                    design creation screen uses.
+
+                    This was a fixed `aspect-[4/5]` box with `object-contain`,
+                    so a portrait garment shot — which is most of them — sat
+                    letterboxed inside a ratio it does not have, showing small
+                    with bars down both sides. That is the "just shows all the
+                    contents with a small view of each" report: the grid below
+                    was doing the real work because the preview above it was not
+                    big enough to be one.
+
+                    A min-height that grows with the breakpoint and an 85vh
+                    ceiling lets the photograph decide, exactly as design
+                    creation does, while still never running off the screen.
+                  */}
+                  <div className="relative flex max-h-[85vh] min-h-[300px] w-full items-center justify-center overflow-hidden rounded-xl border border-theme sm:min-h-[440px] lg:min-h-[620px]">
                     {mediaUrls[carouselIndex] && (
                       <>
                         <MediaRenderer
@@ -3637,10 +3654,10 @@ const EditProduct: React.FC = () => {
                           src={mediaUrls[carouselIndex].url}
                           alt="Product"
                           fit="contain"
-                          maxHeightClassName="max-h-full"
+                          maxHeightClassName="max-h-[85vh]"
                           maxWidthClassName="max-w-full"
-                          className="w-full h-full"
-                          mediaClassName="w-full h-full object-contain"
+                          className="flex h-full w-full items-center justify-center"
+                          mediaClassName="h-full w-full object-contain"
                         />
 
                         {/* Slot label overlay */}
@@ -4417,11 +4434,32 @@ const EditProduct: React.FC = () => {
 
                               {/* Size rows */}
                               {group.variants.length > 0 && (
-                                <div className="px-3 pt-1.5 flex items-center gap-2 text-[9px] font-semibold uppercase tracking-wide text-gray-400">
-                                  <span className="w-20">Size</span>
-                                  <span className="w-24">Price (₦)</span>
-                                  <span className="w-16">Stock</span>
-                                  <span className="flex-1" />
+                                /*
+                                  A grid that fits, instead of a row that does not.
+
+                                  These columns were fixed widths (`w-20`,
+                                  `w-24`, `w-16`) inside a flex row that also
+                                  carried the SKU and a remove button. On a phone
+                                  — which is what the Studio WebView is — that
+                                  totals more than the viewport, so the row
+                                  overflowed and the container scrolled
+                                  sideways. Focusing the Stock input made the
+                                  browser scroll it into view, which pushed Size
+                                  off the left edge with no way back short of a
+                                  refresh. That is the reported bug, and it is
+                                  caused entirely by the widths.
+
+                                  Fractional columns cannot overflow: they divide
+                                  whatever width there is. The SKU is a generated
+                                  placeholder for most rows, so it earns its
+                                  column only from `sm` up.
+                                */
+                                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_auto] items-center gap-2 px-3 pt-1.5 text-[9px] font-semibold uppercase tracking-wide text-gray-400 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,1fr)_auto]">
+                                  <span>Size</span>
+                                  <span>Price (₦)</span>
+                                  <span>Stock</span>
+                                  <span className="hidden sm:block">SKU</span>
+                                  <span className="w-6" />
                                 </div>
                               )}
                               <div className="divide-y divide-gray-100 dark:divide-white/5">
@@ -4429,7 +4467,7 @@ const EditProduct: React.FC = () => {
                                   ({ variant, originalIndex }) => (
                                     <div
                                       key={variant.id || originalIndex}
-                                      className="px-3 py-1.5 flex items-center gap-2 hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors"
+                                      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_auto] items-center gap-2 px-3 py-1.5 transition-colors hover:bg-gray-50/50 dark:hover:bg-white/[0.02] sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,1fr)_auto]"
                                     >
                                       <Input
                                         type="text"
@@ -4442,8 +4480,7 @@ const EditProduct: React.FC = () => {
                                         }
                                         placeholder="Size"
                                         inputSize="sm"
-                                        fullWidth={false}
-                                        className="w-20"
+                                        className="w-full min-w-0"
                                       />
                                       <Input
                                         type="number"
@@ -4467,8 +4504,7 @@ const EditProduct: React.FC = () => {
                                           </span>
                                         }
                                         inputSize="sm"
-                                        fullWidth={false}
-                                        className="w-24"
+                                        className="w-full min-w-0"
                                       />
                                       <Input
                                         type="number"
@@ -4490,10 +4526,9 @@ const EditProduct: React.FC = () => {
                                         }
                                         placeholder="Stock"
                                         inputSize="sm"
-                                        fullWidth={false}
-                                        className="w-16"
+                                        className="w-full min-w-0"
                                       />
-                                      <span className="text-[9px] text-gray-400 truncate flex-1 min-w-0">
+                                      <span className="hidden min-w-0 truncate text-[9px] text-gray-400 sm:block">
                                         {variant.sku || "auto-SKU"}
                                       </span>
                                       <button
@@ -4969,10 +5004,18 @@ const EditProduct: React.FC = () => {
                       key={m.id}
                       className="relative h-16 w-16 overflow-hidden rounded-lg border border-theme"
                     >
-                      <img
+                      {/* MediaRenderer, not a raw <img> — the project's media
+                          invariant (enforced by `threadly/no-raw-media-elements`).
+                          Pre-existing violation; fixed here because these
+                          thumbnails render blob previews and signed URLs, which
+                          is exactly what the shared renderer exists to handle. */}
+                      <MediaRenderer
+                        kind="image"
                         src={m.url}
                         alt=""
-                        className="h-full w-full object-cover"
+                        fit="cover"
+                        className="h-full w-full"
+                        mediaClassName="h-full w-full object-cover"
                       />
                       {m.isPrimary && (
                         <span className="absolute inset-x-0 bottom-0 bg-purple-600/80 text-center text-[10px] text-white">

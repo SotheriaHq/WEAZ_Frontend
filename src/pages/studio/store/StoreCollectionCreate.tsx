@@ -431,6 +431,14 @@ const StoreCollectionCreate: React.FC = () => {
     "existing",
   );
 
+  /**
+   * Which half of the page a narrow screen is showing. Ignored from `lg` up,
+   * where both are visible side by side. See the step control in the layout.
+   */
+  const [mobileStep, setMobileStep] = useState<"products" | "details">(
+    "products",
+  );
+
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [primaryProductId, setPrimaryProductId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -2446,8 +2454,56 @@ const StoreCollectionCreate: React.FC = () => {
         </div>
       </div>
 
+      {/*
+        One job at a time on a phone; both at once where there is room.
+
+        This page asks for two unrelated things — WHICH products are in the
+        collection, and WHAT the collection is called and how it behaves. Side
+        by side on a desktop that reads as one workspace. Stacked into a single
+        phone column it becomes an unbroken scroll where the details form sits
+        below a product grid of unknown length, so a brand cannot tell how much
+        is left or that the two halves are separate decisions.
+
+        Below `lg` they become steps. Above it nothing changes: the grid is
+        still two columns of one continuous workspace, which is the right shape
+        when both fit on screen together.
+      */}
+      <div className="mb-4 flex items-center gap-2 lg:hidden">
+        {(['products', 'details'] as const).map((step, index) => {
+          const active = mobileStep === step;
+          return (
+            <button
+              key={step}
+              type="button"
+              onClick={() => setMobileStep(step)}
+              aria-current={active ? 'step' : undefined}
+              className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-left transition ${
+                active
+                  ? 'border-purple-500 bg-purple-50/70 dark:bg-purple-500/10'
+                  : 'border-theme text-theme-secondary'
+              }`}
+            >
+              <span
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                  active ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-600 dark:bg-white/10 dark:text-gray-300'
+                }`}
+              >
+                {index + 1}
+              </span>
+              <span className="truncate text-xs font-semibold">
+                {step === 'products' ? 'Products' : 'Details'}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <section className="lg:col-span-2 space-y-6">
+        <section
+          className={`lg:col-span-2 space-y-6 ${
+            mobileStep === 'products' ? '' : 'hidden lg:block'
+          }`}
+        >
           <div className="surface-card rounded-2xl border p-6">
             <h2 className="text-base font-semibold text-theme">
               How would you like to build this collection?
@@ -2581,7 +2637,14 @@ const StoreCollectionCreate: React.FC = () => {
                     No products found.
                   </div>
                 ) : (
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  /*
+                    Two per row on a phone. `grid-cols-1` gave each product the
+                    full width of the screen, so picking from a catalogue of any
+                    size meant scrolling past one enormous card at a time and
+                    never seeing two options together — which is the whole point
+                    of a selection grid.
+                  */
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                     {displayedProducts.map((product) =>
                       renderProductSelectionCard(product),
                     )}
@@ -2599,7 +2662,7 @@ const StoreCollectionCreate: React.FC = () => {
                     items to this collection.
                   </div>
                 ) : (
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                     {sessionProducts.map((product) =>
                       renderProductSelectionCard(product, {
                         showLinkedBadge: false,
@@ -2644,9 +2707,33 @@ const StoreCollectionCreate: React.FC = () => {
               </>
             )}
           </div>
+
+          {/* The step control above is a jump; this is the flow. Phones only —
+              on `lg` the details are already beside this column. */}
+          <button
+            type="button"
+            onClick={() => setMobileStep('details')}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/25 transition hover:-translate-y-0.5 lg:hidden"
+          >
+            Next: Collection details
+            <span aria-hidden="true">→</span>
+          </button>
         </section>
 
-        <section className="space-y-6 lg:sticky lg:top-4 self-start">
+        <section
+          className={`space-y-6 lg:sticky lg:top-4 self-start ${
+            mobileStep === 'details' ? '' : 'hidden lg:block'
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => setMobileStep('products')}
+            className="flex items-center gap-1.5 text-xs font-semibold text-theme-secondary transition hover:text-theme lg:hidden"
+          >
+            <span aria-hidden="true">←</span>
+            Back to products
+          </button>
+
           <div className="relative overflow-hidden rounded-2xl border border-purple-100/70 dark:border-white/10 bg-white/90 dark:bg-white/5 p-6 space-y-4">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400" />
             <h2 className="text-lg font-semibold text-theme relative">

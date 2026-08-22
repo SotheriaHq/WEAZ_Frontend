@@ -37,6 +37,15 @@ export type ProductPublishJobInput = {
   /** The status the product should end on ('ACTIVE' to go live, 'DRAFT', …). */
   finalStatus: ProductCreateDto['status'];
   pendingUploads: ProductPublishUpload[];
+  /**
+   * Resume into a product that was already created by a previous attempt.
+   *
+   * The job creates the product FIRST and uploads media after, so a failed
+   * upload leaves a real, media-less product behind. Re-running from scratch
+   * would create a duplicate; this lets a retry pick up exactly where it
+   * stopped, using the File blobs still held in `retryableInputs`.
+   */
+  existingProductId?: string | null;
   pendingCustomOrderDraft?: Omit<
     CustomOrderConfigurationUpsertInput,
     'sourceId'
@@ -157,24 +166,57 @@ export async function runProductPublishJob(
       }
     }
 
-    setProgress(8, 'Creating…');
-    const created = await productApi.createProduct(
-      createAsDraftForUploads
-        ? { ...input.payload, status: 'DRAFT' }
-        : input.payload,
-    );
-    productId = created.id;
-    setProgress(20, 'Uploading…');
+    let created: { id: string };
+    if (input.existingProductId) {
+      // Resuming: the product exists, only its media never landed.
+      created = { id: input.existingProductId };
+      productId = input.existingProductId;
+      setProgress(20, 'Uploading…');
+    } else {
+      setProgress(8, 'Creating…');
+      created = await productApi.createProduct(
+        createAsDraftForUploads
+          ? { ...input.payload, status: 'DRAFT' }
+          : input.payload,
+      );
+      productId = created.id;
+      setProgress(20, 'Uploading…');
+    }
 
     const uploadedMediaIds: string[] = [];
     for (let i = 0; i < input.pendingUploads.length; i += 1) {
       const upload = input.pendingUploads[i];
-      const result = await productApi.uploadProductMedia(
-        created.id,
-        upload.file,
-        upload.isPrimary,
-        upload.viewSlot,
-      );
+      /*
+       * One retry per file before giving up on the whole submission.
+       *
+       * The product row is already created by this point, so a single dropped
+       * request — a flaky connection mid-upload is the common case on mobile —
+       * used to abandon the job at whatever percentage it had reached and leave
+       * a media-less product behind. Retrying the individual file costs one
+       * request and resolves the overwhelmingly common cause.
+       */
+      let result: { id: string };
+      try {
+        result = await productApi.uploadProductMedia(
+          created.id,
+          upload.file,
+          upload.isPrimary,
+          upload.viewSlot,
+        );
+      } catch (uploadError) {
+        addClientDiagnostic('warn', 'product-publish-job', 'Media upload retrying', {
+          taskId: input.taskId,
+          productId: created.id,
+          fileIndex: i,
+          error: uploadError instanceof Error ? uploadError.message : 'unknown',
+        });
+        result = await productApi.uploadProductMedia(
+          created.id,
+          upload.file,
+          upload.isPrimary,
+          upload.viewSlot,
+        );
+      }
       uploadedMediaIds.push(result.id);
       setProgress(
         20 + Math.round(((i + 1) / input.pendingUploads.length) * 60),
@@ -241,9 +283,14 @@ export async function runProductPublishJob(
         designId: productId,
         legacyCollectionId: productId,
         collectionId: productId,
+        /*
+         * Say what went wrong. "Upload didn't finish" is true of every failure
+         * here and actionable for none of them; the server's reason ("already
+         * has a FRONT view", "up to 6 images") is the one a brand can act on.
+         */
         message: productId
-          ? "Upload didn't finish — retry or remove"
-          : 'Create failed — retry or remove',
+          ? `Upload didn't finish — ${err.message}`
+          : `Create failed — ${err.message}`,
         error: err.message,
       },
       scope,

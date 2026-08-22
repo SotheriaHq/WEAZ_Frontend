@@ -250,12 +250,100 @@ const OrderManagement: React.FC = () => {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [summaryByOrderId, setSummaryByOrderId] = useState<Record<string, ThreadSummaryByContextItem['summary']>>({});
   const [summary, setSummary] = useState<OrdersSummary>(EMPTY_SUMMARY);
-  const [page, setPage] = useState(() => {
+  /**
+   * Status and page are DERIVED from the URL. They are not state.
+   *
+   * They used to be `useState` mirrored to `searchParams` by two effects — one
+   * copying URL→state, the other state→URL — with both listing `searchParams`
+   * AND the state in their dependencies. Each effect's write re-ran the other,
+   * and because each read the other's value from its own render closure, they
+   * could settle into a stable two-cycle instead of converging: state says
+   * SHIPPED, effect B writes SHIPPED to the URL; effect A then reads RETURNED
+   * (the value it had just been asked to apply) and writes it back to state;
+   * round and round.
+   *
+   * That is the loop in the device logs — an endless alternation of
+   * `status=RETURNED` / `status=SHIPPED` ROUTE_CHANGED messages. Inside the
+   * native WebView each of those is a `replace()`, so it also flooded the
+   * bridge, forced repeated reloads (the duplicated READY messages), defeated
+   * the warm-session shortcut in `webview.tsx` — which is why EVERY Studio
+   * screen went back to a cold handoff and a full page load — and eventually
+   * got the handoff endpoint to answer 401, which is what bounced the brand
+   * back to Orders on its own.
+   *
+   * With one owner there is nothing to synchronise and no cycle to enter.
+   */
+  const statusFilter = searchParams.get('status') || '';
+  const page = (() => {
     const parsed = Number(searchParams.get('page') || 1);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
-  });
+  })();
+
+  /**
+   * Writes the URL, and is the only way status/page change.
+   *
+   * `replace` so filtering does not build a back-stack of every tab the brand
+   * tried, and the equality check means a no-op selection writes nothing —
+   * which matters most in the WebView, where every write is a bridge message.
+   */
+  const updateOrderParams = useCallback(
+    (changes: { status?: string; page?: number; q?: string }) => {
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+
+          if (changes.status !== undefined) {
+            if (changes.status) next.set('status', changes.status);
+            else next.delete('status');
+          }
+          if (changes.q !== undefined) {
+            if (changes.q.trim()) next.set('q', changes.q.trim());
+            else next.delete('q');
+          }
+          if (changes.page !== undefined) {
+            if (changes.page > 1) next.set('page', String(changes.page));
+            else next.delete('page');
+          }
+
+          return next.toString() === current.toString() ? current : next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  /*
+   * Kept callable with an updater fn, because the pagination buttons use that
+   * form. The current page is read from the URL inside the setter rather than
+   * captured, so a stale render cannot send the pager backwards.
+   */
+  const setPage = useCallback(
+    (value: number | ((current: number) => number)) => {
+      setSearchParams(
+        (current) => {
+          const currentPage = (() => {
+            const parsed = Number(current.get('page') || 1);
+            return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+          })();
+          const nextPage =
+            typeof value === 'function'
+              ? (value as (page: number) => number)(currentPage)
+              : value;
+          if (nextPage === currentPage) return current;
+
+          const next = new URLSearchParams(current);
+          if (nextPage > 1) next.set('page', String(nextPage));
+          else next.delete('page');
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
   const [totalPages, setTotalPages] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<string>(() => searchParams.get('status') || '');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
   const [selectedOrder, setSelectedOrder] = useState<{ id: string } | null>(null);
@@ -373,40 +461,28 @@ const OrderManagement: React.FC = () => {
     setChatOrder({ id: preselectedOrderId });
   }, [preselectedOrderId, shouldOpenChat]);
 
+  /*
+   * The two effects that used to live here — URL→state and state→URL — are
+   * gone. Status and page read straight from `searchParams` (see above), and
+   * the search box syncs ONE WAY below.
+   */
+
+  /**
+   * The search box keeps local state so typing stays responsive, and pushes to
+   * the URL only after the debounce settles.
+   *
+   * One direction only. Reading the URL back into the box is what turned the
+   * search field into a third participant in the same loop, and it buys
+   * nothing: the box is already showing what the user typed.
+   */
   useEffect(() => {
-    const nextStatus = searchParams.get('status') || '';
-    const nextQuery = searchParams.get('q') || '';
-    const nextPage = Number(searchParams.get('page') || 1);
-
-    if (nextStatus !== statusFilter) {
-      setStatusFilter(nextStatus);
-    }
-    if (nextQuery !== searchQuery) {
-      setSearchQuery(nextQuery);
-    }
-    if (Number.isFinite(nextPage) && nextPage > 0 && nextPage !== page) {
-      setPage(nextPage);
-    }
-  }, [page, searchParams, searchQuery, statusFilter]);
-
-  useEffect(() => {
-    const next = new URLSearchParams(searchParams);
-
-    if (statusFilter) next.set('status', statusFilter);
-    else next.delete('status');
-
-    if (searchQuery.trim()) next.set('q', searchQuery.trim());
-    else next.delete('q');
-
-    if (page > 1) next.set('page', String(page));
-    else next.delete('page');
-
-    const current = searchParams.toString();
-    const target = next.toString();
-    if (current !== target) {
-      setSearchParams(next, { replace: true });
-    }
-  }, [page, searchParams, searchQuery, setSearchParams, statusFilter]);
+    if ((searchParams.get('q') || '') === debouncedSearchQuery.trim()) return;
+    updateOrderParams({ q: debouncedSearchQuery, page: 1 });
+    // `searchParams` is deliberately not a dependency: this effect reacts to
+    // the DEBOUNCED INPUT, and re-running it when the URL changes is exactly
+    // the round trip being removed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearchQuery, updateOrderParams]);
 
   useEffect(() => {
     const unsubscribe = onNotification((payload: any) => {
@@ -496,8 +572,9 @@ const OrderManagement: React.FC = () => {
   };
 
   const handleStatusChipClick = (value: string) => {
-    setStatusFilter(value);
-    setPage(1);
+    // Selecting the tab you are already on must not write anything.
+    if (value === statusFilter && page === 1) return;
+    updateOrderParams({ status: value, page: 1 });
   };
 
   const cycleSort = () => {
@@ -544,25 +621,25 @@ const OrderManagement: React.FC = () => {
         these, so four columns divide any screen evenly and the number (the part
         that matters) is always on screen.
 
-        The progress bar and its helper line are the parts that genuinely do not
-        survive a ~90px column, so they drop below `sm` rather than being
-        squeezed into illegibility. The label wraps instead of truncating: a
-        clipped "Total Rev..." is worse than two short lines.
+        Two columns on a phone, four once there is room. Four across a 390px
+        viewport gave each card ~90px, which is enough for the number and
+        nothing else; 2x2 gives every card real width, so the progress bar and
+        helper line survive and the whole summary is still on one screen.
       */}
-      <section className="grid grid-cols-4 gap-2 py-1 sm:gap-3">
+      <section className="grid grid-cols-2 gap-2 py-1 sm:gap-3 lg:grid-cols-4">
         {metrics.map((metric) => (
           <article
             key={metric.label}
             className="min-w-0 rounded-xl border border-slate-200 bg-white p-2 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03] sm:rounded-2xl sm:p-4"
           >
             <div className="flex items-start justify-between gap-1">
-              <p className="min-w-0 text-[9px] font-semibold uppercase leading-tight tracking-tight text-slate-500 dark:text-slate-400 sm:text-xs sm:tracking-[0.14em]">
+              <p className="min-w-0 text-[10px] font-semibold uppercase leading-tight tracking-tight text-slate-500 dark:text-slate-400 sm:text-xs sm:tracking-[0.14em]">
                 {metric.label}
               </p>
               <span className="shrink-0 text-sm leading-none sm:text-lg">{metric.marker}</span>
             </div>
-            <p className="mt-1.5 truncate text-sm font-black tracking-tight sm:mt-3 sm:text-2xl">{metric.value}</p>
-            <div className="mt-3 hidden items-center gap-2 sm:flex">
+            <p className="mt-1.5 truncate text-lg font-black tracking-tight sm:mt-3 sm:text-2xl">{metric.value}</p>
+            <div className="mt-2 flex items-center gap-2 sm:mt-3">
               <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/5">
                 <div className="h-full rounded-full bg-orange-500" style={{ width: `${metric.progress}%` }} />
               </div>
@@ -616,8 +693,9 @@ const OrderManagement: React.FC = () => {
             className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
             value={searchQuery}
             onChange={(event) => {
+              // Page reset rides with the debounced URL write above, so a
+              // keystroke does not touch the URL (or the WebView bridge).
               setSearchQuery(event.target.value);
-              setPage(1);
             }}
           />
           <div className="flex items-center gap-2">
@@ -625,8 +703,7 @@ const OrderManagement: React.FC = () => {
               <UniversalSelect
                 value={statusFilter}
                 onChange={(value) => {
-                  setStatusFilter(value);
-                  setPage(1);
+                  updateOrderParams({ status: value, page: 1 });
                 }}
                 options={STATUS_SELECT_OPTIONS}
                 placeholder="All statuses"

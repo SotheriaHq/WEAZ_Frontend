@@ -1343,31 +1343,48 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const handleRetryProductPublish = useCallback(
     (task: PublishTask) => {
       const productId = getPublishTaskDesignId(task);
-      // A draft product already exists on the server (create succeeded, upload/
-      // publish failed) — open it to finish rather than re-creating a duplicate.
+      const input = getRetryableProductPublishJob(task.id);
+
+      /**
+       * Retry means RETRY — finish the upload that failed.
+       *
+       * This used to see that a product id existed (create succeeded, upload
+       * failed) and respond by discarding the retained job and navigating to
+       * the product's edit screen. The retained job is the only place the File
+       * blobs live, so that threw away the images and dropped the brand onto an
+       * edit screen for a product with no media and a disabled continue button
+       * — guaranteed, in exactly the situation Retry exists to handle.
+       *
+       * With the files still in memory the right move is to resume: upload into
+       * the product that already exists (no duplicate), then finalise.
+       */
+      if (input) {
+        if (isProductPublishJobRunning(task.id)) {
+          toast.info('Already retrying.');
+          return;
+        }
+        updatePublishTask(
+          task.id,
+          { status: 'uploading', progress: 1, message: 'Retrying…', error: undefined },
+          productPublishScope,
+        );
+        void runProductPublishJob({ ...input, existingProductId: productId ?? null });
+        return;
+      }
+
+      // No files to resume with — a different device, or a reloaded tab. The
+      // edit screen is then the only way forward, and the product is real.
       if (productId) {
         clearRetryableProductPublishJob(task.id);
         removePublishTask(task.id, productPublishScope);
         navigate(`/studio/store/products/${productId}/edit`);
+        toast.info('Add the product images here to finish publishing.');
         return;
       }
-      const input = getRetryableProductPublishJob(task.id);
-      if (!input) {
-        toast.error(
-          "This upload can't be retried on this device. Remove it and create the product again.",
-        );
-        return;
-      }
-      if (isProductPublishJobRunning(task.id)) {
-        toast.info('Already retrying.');
-        return;
-      }
-      updatePublishTask(
-        task.id,
-        { status: 'uploading', progress: 1, message: 'Retrying…', error: undefined },
-        productPublishScope,
+
+      toast.error(
+        "This upload can't be retried on this device. Remove it and create the product again.",
       );
-      void runProductPublishJob(input);
     },
     [navigate, productPublishScope],
   );
@@ -3274,34 +3291,18 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     />
                   )}
 
-                  {/* Quick action icons - always visible */}
-                  {!product.deletedAt && (
-                    <div className="absolute bottom-[5.25rem] right-2 z-30 flex items-center gap-1 sm:bottom-[5.75rem] sm:gap-1.5">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleProductAction('edit', product);
-                        }}
-                        title="Edit product"
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-purple-600 sm:h-8 sm:w-8"
-                      >
-                        <span className="text-sm">✏️</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleProductAction('delete', product);
-                        }}
-                        title="Delete product"
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-red-500 sm:h-8 sm:w-8"
-                      >
-                        <span className="text-sm">🗑️</span>
-                      </button>
-                    </div>
-                  )}
-                  
+                  {/*
+                    Edit and delete now live in the copy panel (see below).
+
+                    They used to float on the photograph, pinned to a
+                    `bottom-[5.25rem]` offset measured against the panel's
+                    height — two dark circles sitting on the garment, and an
+                    offset that had to be re-guessed whenever the panel's
+                    contents changed. Inside the panel they sit in the card's
+                    one text surface, and their position follows the layout
+                    instead of being hand-tuned against it.
+                  */}
+
                   {/* Layout mode drag handle */}
                   {layoutMode && (
                     <div className="absolute bottom-4 right-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 dark:bg-zinc-800/90 text-gray-500 dark:text-zinc-400 shadow-lg">
@@ -3436,6 +3437,36 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                                 : `🟢 ${product.totalStock} in stock`}
                         </span>
                         
+                        {/* Edit / delete, at the bottom-right of the text area. */}
+                        {!product.deletedAt && (
+                          <span className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleProductAction('edit', product);
+                              }}
+                              title="Edit product"
+                              aria-label="Edit product"
+                              className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+                            >
+                              <span className="text-xs">✏️</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleProductAction('delete', product);
+                              }}
+                              title="Delete product"
+                              aria-label="Delete product"
+                              className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-rose-500/80 hover:text-white"
+                            >
+                              <span className="text-xs">🗑️</span>
+                            </button>
+                          </span>
+                        )}
+
                         {/* Creation time */}
                         {product.createdAt && (
                           <span 
