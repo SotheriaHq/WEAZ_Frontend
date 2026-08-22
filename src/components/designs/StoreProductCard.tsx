@@ -792,22 +792,29 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           never read "in full") and its perceived weight swung with the image —
           invisible over dark media, a heavy black band over light media.
           A constant blurred tint is legible against ANY content because it does
-          not depend on what is underneath. black/55 is the floor that keeps
-          white text above 4.5:1 even over pure-white media, and the blur only
-          softens what is already behind it.
+          not depend on what is underneath.
+
+          The tint was black/55, chosen as the opacity that alone holds white
+          text above 4.5:1 over pure-white media. Carrying the entire contrast
+          budget in opacity is what made the bar read as a dark slab bolted to
+          the photograph. The same floor is now met by three cooperating layers
+          instead of one: a lighter /40 tint, a heavier blur that collapses the
+          luminance range of whatever is behind it, and a real text shadow on
+          every glyph. The shadow is the part that does the work over bright
+          media — it travels with the text rather than with the panel.
         */}
-        <div className="hidden md:block absolute inset-x-0 bottom-0 z-10 border-t border-white/10 bg-black/55 px-4 pb-3 pt-2.5 backdrop-blur-md">
-          <h3 className="line-clamp-1 text-sm font-semibold leading-snug text-white drop-shadow-sm">
+        <div className="hidden md:block absolute inset-x-0 bottom-0 z-10 border-t border-white/10 bg-black/40 px-4 pb-3 pt-2.5 backdrop-blur-xl backdrop-saturate-150">
+          <h3 className="line-clamp-1 text-sm font-semibold leading-snug text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
             {product.name}
           </h3>
 
-          <p className="mt-0.5 line-clamp-1 text-[11px] text-white/70">
+          <p className="mt-0.5 line-clamp-1 text-[11px] text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">
             {product.brand.name}
           </p>
 
           <div className="mt-1.5 flex items-center justify-between">
             <div className="flex items-baseline gap-1.5">
-              <span className={`text-sm font-bold drop-shadow-sm ${product.isOnSale ? 'text-rose-300' : 'text-white'}`}>
+              <span className={`text-sm font-bold [text-shadow:0_1px_3px_rgba(0,0,0,0.85)] ${product.isOnSale ? 'text-rose-300' : 'text-white'}`}>
                 {formatPrice(product.effectivePrice, product.brand.currency)}
               </span>
               {product.isOnSale && product.salePrice ? (
@@ -866,16 +873,17 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         </div>
 
         {/* Mobile View Bottom Overlay */}
-        {/* Same frosted treatment as desktop; /45 -> /55 for the contrast floor. */}
-        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-black/55 backdrop-blur-md z-10 flex items-center justify-between min-h-[32px] max-h-[38px] border-t border-white/10" onClick={(e) => e.stopPropagation()}>
+        {/* Same frosted treatment as desktop, same reasoning: lighter tint,
+            heavier blur, contrast carried by the text shadow. */}
+        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-black/40 backdrop-blur-xl backdrop-saturate-150 z-10 flex items-center justify-between min-h-[32px] max-h-[38px] border-t border-white/10" onClick={(e) => e.stopPropagation()}>
           <div className="flex-1 min-w-0 flex flex-col justify-center pl-1">
-            <h3 
-              className="font-bold text-white truncate leading-none uppercase"
+            <h3
+              className="font-bold text-white truncate leading-none uppercase [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]"
               style={{ fontSize: '12px' }}
             >
               {product.name}
             </h3>
-            <span className="text-white/85 leading-none mt-0.5" style={{ fontSize: '12px' }}>
+            <span className="text-white/90 leading-none mt-0.5 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]" style={{ fontSize: '12px' }}>
               {formatPrice(product.effectivePrice, product.brand.currency)}
             </span>
           </div>

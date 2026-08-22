@@ -2295,6 +2295,16 @@ html:not(.dark) .input-glass:focus {
   line-height: 1;
 }
 
+/* The chip carries an infinite transform animation AND the emoji glyph.
+   That combination promotes it to its own compositor layer, and the layer can
+   be rasterized before the emoji has a glyph to paint — leaving an empty white
+   chip that only fills in when some unrelated repaint (a hover background
+   change) invalidates the tile. That is the "emoji appears when I hover it"
+   report. Declaring `will-change` builds the layer deliberately and up front,
+   and `backface-visibility` keeps it on the fast path once built.
+
+   `font-size` comes from the icon's own size (see BagPulseIcon.tsx) instead of
+   whatever the surrounding card inherits. */
 .bag-pulse-core {
   position: relative;
   z-index: 1;
@@ -2308,6 +2318,10 @@ html:not(.dark) .input-glass:focus {
   background: rgba(255, 255, 255, 0.86);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
   transform-origin: center;
+  font-size: var(--bag-glyph-size, 18px);
+  line-height: 1;
+  will-change: transform;
+  backface-visibility: hidden;
   animation: bag-breathe var(--bag-pulse-duration, 1500ms) ease-in-out infinite;
 }
 
