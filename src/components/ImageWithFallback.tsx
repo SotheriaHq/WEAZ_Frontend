@@ -442,7 +442,19 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
        * frame.
        */
       const fetcher = fileId
-        ? () => brandApi.getPrivateSignedFileUrl(fileId, { forceRefresh: true })
+        ? async () =>
+            /*
+             * Private FIRST, public as the fallback — not private alone.
+             *
+             * Going straight to the signed endpoint fixes the case where a
+             * public url resolves but cannot be fetched. On its own it breaks a
+             * different one: `/uploads/signed-url/:id` authorises by ownership,
+             * so viewing SOMEONE ELSE'S avatar or a brand's catalogue image
+             * would fail closed and stick on the initials. Trying both, in the
+             * order that inverts the primary path, covers both cases.
+             */
+            (await brandApi.getPrivateSignedFileUrl(fileId, { forceRefresh: true })) ??
+            (await brandApi.getPublicFileUrl(fileId, { forceRefresh: true }))
         : src && isS3LikeUrl(src)
           ? () => brandApi.getSignedS3Url(src, { forceRefresh: true })
           : src && !/^https?:\/\//i.test(src)

@@ -278,6 +278,17 @@ export const EndUserProfile: React.FC = () => {
   const [computedSize, setComputedSize] = useState<string | null>(null);
   const [computedAlphaSize, setComputedAlphaSize] = useState<string | null>(null);
   const [computedMissingBaseline, setComputedMissingBaseline] = useState<string[]>([]);
+  /**
+   * Why there is no size, when it is not the shopper's fault.
+   *
+   * The widget had exactly two states: a size, or "Add <fields> to see your
+   * size". When the backend answers with every measurement present but no
+   * result — no approved sizing chart exists for the region, which is a data
+   * problem on the server, not something the shopper can act on — both were
+   * wrong, so it rendered a bare em dash and explained nothing. The response
+   * carries a `warnings` array saying precisely this; it was being discarded.
+   */
+  const [computedWarning, setComputedWarning] = useState<string | null>(null);
   const [chartLoading, setChartLoading] = useState(false);
   const [chartSaving, setChartSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -466,10 +477,23 @@ export const EndUserProfile: React.FC = () => {
       setComputedSize(nextComputedSize);
       setComputedAlphaSize(extractAlphaSizeFromLabel(nextComputedSize));
       setComputedMissingBaseline(computed?.missingBaselineMeasurements ?? []);
+      /*
+        Warnings live per category, not on the envelope — the profile response
+        aggregates `categoryBreakdown`, and each entry carries its own
+        `warnings[]`. "No approved sizing chart is available" arrives there.
+      */
+      setComputedWarning(
+        nextComputedSize
+          ? null
+          : (Object.values(computed?.categoryBreakdown ?? {})
+              .flatMap((entry) => entry?.warnings ?? [])
+              .find((warning) => Boolean(warning)) ?? null),
+      );
     } catch (err) {
       setComputedSize(null);
       setComputedAlphaSize(null);
       setComputedMissingBaseline([]);
+      setComputedWarning(null);
       console.error('Failed to load computed size fit', err);
     } finally {
       setChartLoading(false);
@@ -517,16 +541,40 @@ export const EndUserProfile: React.FC = () => {
     setActiveTab((prev) => (availableTabs.includes(prev) ? prev : availableTabs[0]));
   }, [availableTabs]);
 
+  /**
+   * The live object URL, owned by a ref — NOT by an effect's dependency list.
+   *
+   * This cleanup used to list `[avatarPreviewUrl, avatarSettlingUrl]` and revoke
+   * both on every change. React runs an effect's cleanup with the PREVIOUS
+   * render's values, so the moment the upload handed the blob from
+   * `avatarPreviewUrl` to `avatarSettlingUrl` — two setStates in one commit —
+   * the cleanup fired holding the old `avatarPreviewUrl` and revoked the exact
+   * URL that had just been handed over. Both <img> tags pointing at it died
+   * instantly: the two `blob:… (failed) net::ERR` rows in the network panel.
+   *
+   * A ref has no dependency list, so a handover cannot trigger a revoke. The URL
+   * is released in exactly three places, all deliberate: replacing it with a new
+   * upload, the settle callback, and unmount.
+   */
+  const avatarBlobRef = useRef<string | null>(null);
+
+  const releaseAvatarBlob = useCallback(() => {
+    if (avatarBlobRef.current) {
+      URL.revokeObjectURL(avatarBlobRef.current);
+      avatarBlobRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
+    // Unmount only. Empty deps is the point: nothing about a state change should
+    // invalidate a blob that is still on screen.
     return () => {
-      if (avatarSettlingUrl) {
-        URL.revokeObjectURL(avatarSettlingUrl);
-      }
-      if (avatarPreviewUrl) {
-        URL.revokeObjectURL(avatarPreviewUrl);
+      if (avatarBlobRef.current) {
+        URL.revokeObjectURL(avatarBlobRef.current);
+        avatarBlobRef.current = null;
       }
     };
-  }, [avatarPreviewUrl, avatarSettlingUrl]);
+  }, []);
 
   /**
    * Safety net for the crossfade.
@@ -538,20 +586,16 @@ export const EndUserProfile: React.FC = () => {
   useEffect(() => {
     if (!avatarSettlingUrl) return;
     const timer = setTimeout(() => {
-      setAvatarSettlingUrl((current) => {
-        if (current) URL.revokeObjectURL(current);
-        return null;
-      });
+      setAvatarSettlingUrl(null);
+      releaseAvatarBlob();
     }, 8000);
     return () => clearTimeout(timer);
-  }, [avatarSettlingUrl]);
+  }, [avatarSettlingUrl, releaseAvatarBlob]);
 
   const handleAvatarSettled = useCallback(() => {
-    setAvatarSettlingUrl((current) => {
-      if (current) URL.revokeObjectURL(current);
-      return null;
-    });
-  }, []);
+    setAvatarSettlingUrl(null);
+    releaseAvatarBlob();
+  }, [releaseAvatarBlob]);
 
   useEffect(() => {
     if (!avatarActionsOpen) return;
@@ -760,11 +804,12 @@ export const EndUserProfile: React.FC = () => {
         return;
       }
 
+      // Replacing a preview is one of the three deliberate release points.
+      releaseAvatarBlob();
       const nextPreviewUrl = URL.createObjectURL(file);
-      setAvatarPreviewUrl((current) => {
-        if (current) URL.revokeObjectURL(current);
-        return nextPreviewUrl;
-      });
+      avatarBlobRef.current = nextPreviewUrl;
+      setAvatarSettlingUrl(null);
+      setAvatarPreviewUrl(nextPreviewUrl);
 
       const formData = new FormData();
       formData.append('file', file);
@@ -853,23 +898,19 @@ export const EndUserProfile: React.FC = () => {
           `handleAvatarSettled` once the remote image has painted.
         */
         setAvatarPreviewUrl(null);
-        setAvatarSettlingUrl((current) => {
-          if (current) URL.revokeObjectURL(current);
-          return nextPreviewUrl;
-        });
+        setAvatarSettlingUrl(nextPreviewUrl);
         toast.success('Profile image updated.');
       } catch (err) {
         console.error('Failed to upload profile image', err);
-        setAvatarPreviewUrl((current) => {
-          if (current) URL.revokeObjectURL(current);
-          return null;
-        });
+        setAvatarPreviewUrl(null);
+        setAvatarSettlingUrl(null);
+        releaseAvatarBlob();
         toast.error('Unable to upload profile image right now.');
       } finally {
         setAvatarUploading(false);
       }
     },
-    [currentUser, dispatch, queryClient],
+    [currentUser, dispatch, queryClient, releaseAvatarBlob],
   );
 
   const handleRemoveAvatar = useCallback(async () => {
@@ -1310,6 +1351,10 @@ export const EndUserProfile: React.FC = () => {
                     >
                       Add {computedMissingBaseline.map((key) => formatMeasurementLabel(key)).join(' · ')} to see your size →
                     </button>
+                  ) : !chartLoading && !computedSize && computedWarning ? (
+                    <p className="mt-1 max-w-[210px] text-right text-[11px] leading-snug text-amber-600 dark:text-amber-400">
+                      {computedWarning}
+                    </p>
                   ) : null}
                 </div>
               </div>
