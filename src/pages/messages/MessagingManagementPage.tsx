@@ -8,6 +8,11 @@ import { customOrdersBuyerApi, customOrdersBrandApi, type CustomOrderDetail } fr
 import { getStoreStatus } from '@/api/StoreApi';
 import { isRateLimited, shouldAnnounceRateLimit } from '@/api/httpClient';
 import { useSuppressIslandBottomNav } from '@/components/navigation/IslandBottomNav';
+import DesignViewModal from '@/components/designs/DesignViewModal';
+import { getDesignDetail } from '@/api/DesignApi';
+import { toMarketItem } from '@/api/MarketApi';
+import { selectIsMobile } from '@/features/uiSlice';
+import type { MarketItem } from '@/types/market';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import MessageBubble, { formatDate } from '@/components/messaging/MessageBubble';
@@ -924,6 +929,18 @@ const MessagingManagementPage: React.FC = () => {
   */
   useSuppressIslandBottomNav(Boolean(activeId));
 
+  /**
+   * The referenced design, shown in place on a desktop.
+   *
+   * On a wide screen the conversation stays useful while you look at what it is
+   * about, so the reference opens over the thread and closes back onto it. On a
+   * phone there is no room for both, so the same tap routes to the design view
+   * and `state.returnTo` brings the reader back — see `handleOpenDesignContext`.
+   */
+  const isMobileViewport = useSelector(selectIsMobile);
+  const [designContextItem, setDesignContextItem] = useState<MarketItem | null>(null);
+  const [designContextLoading, setDesignContextLoading] = useState(false);
+
   const refreshRef = useRef(refresh);
   const refreshInboxRef = useRef(refreshInbox);
   const activeConversationRef = useRef(activeConversation);
@@ -1123,14 +1140,40 @@ const MessagingManagementPage: React.FC = () => {
    * place in the thread, which is why the reference was worth avoiding.
    */
   const handleOpenDesignContext = useCallback(
-    (designId: string) => {
+    async (designId: string) => {
       if (!designId) return;
-      const returnTo = `${window.location.pathname}${window.location.search}`;
-      navigate(`/designs/${encodeURIComponent(designId)}`, {
-        state: { returnTo, fromMessages: true },
-      });
+
+      const routeToDesign = () => {
+        const returnTo = `${window.location.pathname}${window.location.search}`;
+        navigate(`/designs/${encodeURIComponent(designId)}`, {
+          state: { returnTo, fromMessages: true },
+        });
+      };
+
+      if (isMobileViewport) {
+        routeToDesign();
+        return;
+      }
+
+      setDesignContextLoading(true);
+      try {
+        const raw = await getDesignDetail(designId);
+        const item = toMarketItem((raw ?? {}) as Record<string, unknown>);
+        // A design that cannot be mapped to something the viewer can render is
+        // not worth opening an empty modal for — fall back to the full page,
+        // which has its own loading and error states.
+        if (!item?.id) {
+          routeToDesign();
+          return;
+        }
+        setDesignContextItem(item);
+      } catch {
+        routeToDesign();
+      } finally {
+        setDesignContextLoading(false);
+      }
     },
-    [navigate],
+    [isMobileViewport, navigate],
   );
 
   const handleRequestExtension = useCallback(async (days: number, reason: string) => {
@@ -1240,12 +1283,40 @@ const MessagingManagementPage: React.FC = () => {
       tracks the live viewport, and the fallback keeps older browsers on the old
       behaviour rather than on nothing.
     */
-    <div className="flex h-[calc(100vh-4rem)] h-[calc(100dvh-4rem)] overflow-hidden rounded-2xl border border-gray-200/60 dark:border-transparent bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
+    <div
+      /*
+        Height comes from a CSS custom property with a `vh` fallback, not from
+        two competing Tailwind `h-` classes. Emitting both let the STYLESHEET's
+        order decide which won rather than the source's, so which unit applied
+        was an implementation detail of the build.
+
+        `dvh` matters because `100vh` on a mobile browser is the viewport with
+        the URL bar retracted — while it is showing, the container is taller than
+        what you can see, which pushed the header up and left the composer below
+        an unscrollable fold.
+      */
+      style={{ height: 'calc(var(--messages-viewport, 100vh) - 4rem)' }}
+      className="flex overflow-hidden rounded-2xl border border-gray-200/60 dark:border-transparent bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
 
       {/* ============================================================ */}
       {/*  LEFT PANEL — Conversation List                               */}
       {/* ============================================================ */}
-      <div className={`w-80 shrink-0 flex-col border-r border-gray-200/60 dark:border-white/[0.04] bg-white/70 dark:bg-white/[0.02] ${activeId ? 'hidden lg:flex' : 'flex'}`}>
+      {/*
+        Full width on a phone, a 320px rail from `lg`.
+
+        `w-80 shrink-0` is a desktop rail measurement, and it was applied at
+        every width. On a 390px phone showing the conversation list, that is a
+        320px column with dead space beside it — the layout reads as a desktop
+        page shrunk to fit, which is exactly what it is. It only stopped looking
+        that way once a thread was opened and the rail switched to `hidden`,
+        which is the "adjusts after a couple of seconds" part: not a timer, but
+        the thread resolving from the URL and flipping this branch.
+
+        `min-w-0` because a `shrink-0` column with long conversation titles can
+        push its own container wider than the viewport, and a page that overflows
+        horizontally is one a mobile browser will scale down to fit.
+      */}
+      <div className={`w-full min-w-0 flex-col border-r border-gray-200/60 dark:border-white/[0.04] bg-white/70 dark:bg-white/[0.02] lg:w-80 lg:shrink-0 ${activeId ? 'hidden lg:flex' : 'flex'}`}>
         {/* Header */}
         <div className="shrink-0 px-4 pt-4 pb-3">
           <h1 className="text-base font-semibold text-theme">Messages</h1>
@@ -1627,6 +1698,30 @@ const MessagingManagementPage: React.FC = () => {
               <ChatContactSidebar {...contactSidebarProps} />
             </div>
           </div>
+        </div>
+      ) : null}
+
+      {/*
+        The referenced design, over the conversation rather than instead of it.
+
+        Only reached on a desktop-width viewport — `handleOpenDesignContext`
+        routes on a phone, where a modal over a thread would leave neither
+        usable. Closing returns the reader to exactly the scroll position they
+        left, which is the whole reason for opening in place.
+      */}
+      <DesignViewModal
+        open={Boolean(designContextItem)}
+        item={designContextItem}
+        onClose={() => setDesignContextItem(null)}
+      />
+
+      {designContextLoading ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 left-1/2 z-layer-modal -translate-x-1/2 rounded-full bg-black/80 px-4 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-sm"
+        >
+          Opening design…
         </div>
       ) : null}
     </div>

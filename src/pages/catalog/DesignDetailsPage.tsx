@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import DesignViewModal from '@/components/designs/DesignViewModal';
 import VLoader from '@/components/loaders/VLoader';
@@ -13,6 +13,30 @@ const DesignDetailsPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  /**
+   * Where closing this design should land.
+   *
+   * It went to `/runway` unconditionally, which is fine when the design WAS
+   * opened from the runway and wrong everywhere else. Following a design
+   * reference out of a conversation and being dropped into the feed costs the
+   * reader their place in the thread and gives them no way back to it — the
+   * exact reason a reference is easier to ignore than to follow.
+   *
+   * `returnTo` is set by whoever navigated here. It is validated as a
+   * same-origin PATH before use: a caller-supplied destination that could carry
+   * an absolute URL is an open-redirect, and this one arrives through router
+   * state that anything on the page can set.
+   */
+  const returnTo = (() => {
+    const candidate = (location.state as { returnTo?: unknown } | null)?.returnTo;
+    if (typeof candidate !== 'string') return null;
+    if (!candidate.startsWith('/') || candidate.startsWith('//')) return null;
+    return candidate;
+  })();
+
+  const closeTo = returnTo ?? '/runway';
   const queryClient = useQueryClient();
   const openMediaId = searchParams.get('openMedia');
   const isLocalTaskRoute = isLocalPublishTaskId(id);
@@ -72,10 +96,10 @@ const DesignDetailsPage: React.FC = () => {
         <h1 className="text-2xl font-bold text-theme">Design unavailable</h1>
         <p className="text-sm text-theme-secondary">{error ?? 'This design could not be opened.'}</p>
         <Link
-          to="/runway"
+          to={closeTo}
           className="rounded-full bg-[color:var(--text-primary)] px-5 py-2.5 text-sm font-semibold text-[color:var(--surface-primary)]"
         >
-          Back to market
+          {returnTo ? 'Back' : 'Back to market'}
         </Link>
       </div>
     );
@@ -86,7 +110,7 @@ const DesignDetailsPage: React.FC = () => {
       <DesignViewModal
         open
         item={item}
-        onClose={() => navigate('/runway')}
+        onClose={() => navigate(closeTo)}
       />
     </div>
   );

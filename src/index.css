@@ -2442,6 +2442,27 @@ html:not(.dark) .input-glass:focus {
    horizontally under the fittings box. The track holds its content twice, so
    translating -50% loops seamlessly. Compositor-only (transform), pauses on
    hover, and stops entirely for reduced-motion users. */
+/* Live viewport height for full-height app screens (the messages pane).
+
+   Declared as a variable with a `vh` fallback so a browser without `dvh` keeps
+   the old behaviour instead of losing its height entirely, and so the value is
+   set in ONE place rather than as two competing utility classes whose winner
+   depends on stylesheet order.
+
+   `100vh` on a mobile browser measures the viewport with the URL bar retracted.
+   While the bar is visible the element is taller than the screen, which pushes
+   the top under the header and leaves the bottom unreachable — and because the
+   page itself does not overflow, there is nothing to scroll back. */
+:root {
+  --messages-viewport: 100vh;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --messages-viewport: 100dvh;
+  }
+}
+
 .fittings-marquee {
   -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
   mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
