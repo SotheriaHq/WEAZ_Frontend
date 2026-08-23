@@ -4,6 +4,11 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 import ImageWithFallback from '@/components/ImageWithFallback';
 
 interface MessageBubbleProps {
+  /**
+   * Open the design this message refers to. Omitted where there is nowhere
+   * sensible to go, in which case the reference stays a static card.
+   */
+  onOpenDesignContext?: (designId: string) => void;
   message: ThreadMessage & { _optimistic?: 'sending' | 'failed' };
   isOwn: boolean;
   /** When true, hidden/redacted messages are shown with a visual indicator (admin view). */
@@ -63,7 +68,7 @@ const DoubleTick: React.FC<{ className?: string }> = ({ className }) => (
 
 const SWIPE_THRESHOLD = 52; // px required to trigger reply
 
-const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, showModerated = false, onRetry, onReply }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, showModerated = false, onRetry, onReply, onOpenDesignContext }) => {
   const isSystem = message.kind === 'SYSTEM' || message.kind === 'MODERATION_NOTICE';
   const isHidden = message.visibilityState === 'HIDDEN';
   const isRedacted = message.visibilityState === 'REDACTED';
@@ -124,7 +129,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
   // Prefer direct URL; fall back to fileId resolution
   const coverSrc = designCoverUrl || (!isFileId(designCoverFileId) ? designCoverFileId : undefined);
   const coverFileId = !coverSrc && isFileId(designCoverFileId) ? designCoverFileId : undefined;
+  const designContextId = message.metadataJson?.contextDesignId as string | undefined;
   const hasDesignCard = Boolean(designTitle);
+  // Only an addressable reference is actionable. Older messages carry a title
+  // and cover but no id; those stay as they are rather than becoming a button
+  // that goes nowhere.
+  const canOpenDesignContext = Boolean(designContextId && onOpenDesignContext);
 
   const renderTicks = () => {
     if (!isOwn) return null;
@@ -195,9 +205,35 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
           </span>
         )}
 
-        {/* Design context card — sits ABOVE the bubble, no background fill */}
+        {/*
+          Design context card — sits ABOVE the bubble, no background fill.
+
+          The reference is what the message is ABOUT, so it has to be a way to
+          get to the thing. Rendering it as inert decoration left the recipient
+          reading "did you make this in red?" next to a picture they could not
+          open, with no way to answer without hunting the catalogue by hand.
+        */}
         {hasDesignCard && !isRedacted && (
-          <div className={`mb-1 rounded-xl overflow-hidden border border-gray-200/70 dark:border-white/12 bg-transparent`}>
+          <div
+            {...(canOpenDesignContext
+              ? {
+                  role: 'button' as const,
+                  tabIndex: 0,
+                  onClick: () => onOpenDesignContext?.(String(designContextId)),
+                  onKeyDown: (event: React.KeyboardEvent) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    onOpenDesignContext?.(String(designContextId));
+                  },
+                  'aria-label': `Open ${String(designTitle)}`,
+                }
+              : {})}
+            className={`mb-1 rounded-xl overflow-hidden border border-gray-200/70 dark:border-white/12 bg-transparent ${
+              canOpenDesignContext
+                ? 'cursor-pointer transition hover:border-purple-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 dark:hover:border-purple-500/60'
+                : ''
+            }`}
+          >
             {(coverSrc || coverFileId) && (
               <div className="w-full h-[120px] bg-gray-100 dark:bg-white/5">
                 <ImageWithFallback
@@ -214,6 +250,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
             <div className="px-2.5 py-1.5 bg-white/80 dark:bg-black/30 backdrop-blur-sm">
               <p className="text-[11px] font-semibold text-gray-800 dark:text-gray-100 truncate leading-snug">
                 🎨 {String(designTitle)}
+                {canOpenDesignContext ? (
+                  <span className="ml-1 font-normal text-purple-600 dark:text-purple-300">
+                    · View
+                  </span>
+                ) : null}
               </p>
             </div>
           </div>

@@ -214,6 +214,80 @@ function dedupeMeasurementEntries(
   return [...bySlot.values(), ...passthrough];
 }
 
+/**
+ * Renders one marquee row, cloning its content only when it actually overflows.
+ *
+ * The seamless loop works by holding the content twice and translating -50%. If
+ * the content is NARROWER than the viewport there is no gap for the clone to
+ * slide into, so both copies are simply on screen at once and every chip appears
+ * twice — read, correctly, as duplicate data. A fixed chip-count threshold
+ * cannot decide this: the same four chips overflow a phone and fit a desktop.
+ *
+ * So measure. `ResizeObserver` watches both the track and its container and the
+ * clone appears only when it is needed; when it is not, the row renders once and
+ * holds still, which is what "start again after the last one" means for a list
+ * that already fits.
+ */
+const FittingsMarqueeRow: React.FC<{
+  row: Array<[string, unknown]>;
+  alt: boolean;
+  unitLabel: string;
+  formatLabel: (key: string) => string;
+  onSelect: () => void;
+}> = ({ row, alt, unitLabel, formatLabel, onSelect }) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const [overflows, setOverflows] = useState(false);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const track = trackRef.current;
+    if (!container || !track) return;
+
+    const measure = () => {
+      // Compare the FIRST copy's width against the container. `scrollWidth`
+      // would already include the clone once it exists, which would latch the
+      // decision on permanently.
+      const singlePassWidth = overflows ? track.scrollWidth / 2 : track.scrollWidth;
+      setOverflows(singlePassWidth > container.clientWidth + 1);
+    };
+
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    observer.observe(track);
+    return () => observer.disconnect();
+  }, [overflows, row.length]);
+
+  const chips = overflows ? [...row, ...row] : row;
+
+  return (
+    <div ref={containerRef} className="fittings-marquee overflow-hidden">
+      <div
+        ref={trackRef}
+        className={`fittings-marquee-track flex w-max gap-1.5 ${
+          overflows ? '' : 'fittings-marquee-track-static'
+        } ${alt ? 'fittings-marquee-track-alt' : ''}`}
+      >
+        {chips.map(([key, value], chipIndex) => (
+          <button
+            key={`${key}-${chipIndex}`}
+            type="button"
+            // The clone is decoration; assistive tech must read each fitting once.
+            aria-hidden={chipIndex >= row.length || undefined}
+            tabIndex={chipIndex >= row.length ? -1 : undefined}
+            onClick={onSelect}
+            className="shrink-0 rounded-lg border border-gray-200/70 bg-gray-50/80 px-2 py-1 text-xs font-semibold text-gray-700 transition hover:border-indigo-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-indigo-400/50"
+          >
+            {formatLabel(String(key))} · {String(value)} {unitLabel}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const sizeFitRegionForDisplayChart = (family: CustomOrderChartFamily): SizingRegion => {
   switch (family) {
     case 'UK':
@@ -305,6 +379,16 @@ export const EndUserProfile: React.FC = () => {
    */
   const [avatarSettlingUrl, setAvatarSettlingUrl] = useState<string | null>(null);
   const [avatarActionsOpen, setAvatarActionsOpen] = useState(false);
+  /**
+   * Which way the avatar menu opens.
+   *
+   * It was hard-coded to `top-full` — always downward. The trigger sits at the
+   * BOTTOM-RIGHT of the avatar, so on a phone, or any short viewport, the menu
+   * opened straight off the bottom of the screen with no way to reach "Remove
+   * photo". Measured on open, because whether there is room depends on scroll
+   * position, not on breakpoint.
+   */
+  const [avatarMenuDirection, setAvatarMenuDirection] = useState<'down' | 'up'>('down');
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const avatarActionsRef = useRef<HTMLDivElement | null>(null);
@@ -786,6 +870,31 @@ export const EndUserProfile: React.FC = () => {
     [currentUser?.id, displayChartFamily, queryClient],
   );
 
+  useEffect(() => {
+    if (!avatarActionsOpen) return;
+    const anchor = avatarActionsRef.current;
+    if (!anchor) return;
+
+    const decide = () => {
+      const rect = anchor.getBoundingClientRect();
+      // Menu height plus the 8px offset and a little breathing room.
+      const NEEDED_BELOW = 132;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      setAvatarMenuDirection(
+        spaceBelow < NEEDED_BELOW && spaceAbove > spaceBelow ? 'up' : 'down',
+      );
+    };
+
+    decide();
+    window.addEventListener('resize', decide);
+    window.addEventListener('scroll', decide, { passive: true });
+    return () => {
+      window.removeEventListener('resize', decide);
+      window.removeEventListener('scroll', decide);
+    };
+  }, [avatarActionsOpen]);
+
   const handleTriggerAvatarUpload = useCallback(() => {
     setAvatarActionsOpen(false);
     avatarInputRef.current?.click();
@@ -1246,7 +1355,11 @@ export const EndUserProfile: React.FC = () => {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -8, scale: 0.98 }}
                         transition={{ duration: 0.16 }}
-                        className="glass-menu absolute right-0 top-full mt-2 w-44 overflow-hidden p-1"
+                        className={`glass-menu absolute right-0 w-44 overflow-hidden p-1 ${
+                          avatarMenuDirection === 'up'
+                            ? 'bottom-full mb-2'
+                            : 'top-full mt-2'
+                        }`}
                       >
                         <button
                           type="button"
@@ -1377,40 +1490,14 @@ export const EndUserProfile: React.FC = () => {
                   savedMeasurementEntries.filter((_, index) => index % 2 === 1)]
                   .filter((row) => row.length > 0)
                   .map((row, rowIndex) => (
-                    <div key={rowIndex} className="fittings-marquee overflow-hidden">
-                      {/*
-                        The second copy exists ONLY to make the loop seamless —
-                        the track translates -50% and the clone slides into the
-                        gap. A short row does not overflow its container, so the
-                        clone has no gap to fill and simply sits beside the
-                        original as a visible repeat. Below the threshold the
-                        row renders once and stays put, which is what "restart
-                        from the last end" means for a list that already fits.
-
-                        The clone is aria-hidden so assistive tech reads each
-                        measurement once regardless.
-                      */}
-                      <div
-                        className={`fittings-marquee-track flex w-max gap-1.5 ${
-                          row.length > 3 ? '' : 'fittings-marquee-track-static'
-                        } ${rowIndex === 1 ? 'fittings-marquee-track-alt' : ''}`}
-                      >
-                        {(row.length > 3 ? [...row, ...row] : row).map(
-                          ([key, value], chipIndex) => (
-                            <button
-                              key={`${key}-${chipIndex}`}
-                              type="button"
-                              aria-hidden={chipIndex >= row.length || undefined}
-                              tabIndex={chipIndex >= row.length ? -1 : undefined}
-                              onClick={() => setIsSizeFitOpen(true)}
-                              className="shrink-0 rounded-lg border border-gray-200/70 bg-gray-50/80 px-2 py-1 text-xs font-semibold text-gray-700 transition hover:border-indigo-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-indigo-400/50"
-                            >
-                              {formatMeasurementLabel(key)} · {String(value)} {measurementUnitLabel}
-                            </button>
-                          ),
-                        )}
-                      </div>
-                    </div>
+                    <FittingsMarqueeRow
+                      key={rowIndex}
+                      row={row}
+                      alt={rowIndex === 1}
+                      unitLabel={measurementUnitLabel}
+                      formatLabel={formatMeasurementLabel}
+                      onSelect={() => setIsSizeFitOpen(true)}
+                    />
                   ))}
               </div>
             </div>

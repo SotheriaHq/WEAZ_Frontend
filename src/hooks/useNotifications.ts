@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { RootState, AppDispatch } from '@/store';
 import { useRealtime } from '@/realtime';
 import { toast } from 'sonner';
+import { summarizeNotificationForToast } from '@/utils/notificationToast';
 import { determineNotificationRoute } from '@/utils/notificationRouting';
 import { refreshOwnerCatalogQueries, useNotificationSettingsQuery } from '@/query/queries';
 
@@ -134,9 +135,10 @@ export function useNotificationsBootstrap() {
           targetUrl: payload.targetUrl ?? payload.payload?.targetUrl ?? undefined,
         }),
       );
-      // Show toast for real-time notification
-      if (payload.message) {
-        toast.info(payload.message);
+      // One line, actor + action. The text itself stays in the list and thread.
+      const toastLine = summarizeNotificationForToast(payload);
+      if (toastLine) {
+        toast.info(toastLine);
       }
 
       const type = String(payload?.type || '').toUpperCase();

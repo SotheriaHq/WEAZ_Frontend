@@ -420,10 +420,16 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
           aria-label="Comments"
           title="Comments"
         >
+          {/*
+            The label sits under a 40px circle holding a 20px glyph, so ~10px of
+            empty circle already separates them before any margin is added — the
+            count read as detached from its icon. A negative margin closes that
+            padding without shrinking the touch target.
+          */}
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/25 backdrop-blur-sm">
-            <MessageCircle className="h-5 w-5" aria-hidden />
+            <MessageCircle className="h-5 w-5 text-purple-300" aria-hidden />
           </span>
-          <span className="mt-0.5 text-[10px] font-bold drop-shadow">
+          <span className="-mt-1 text-[10px] font-bold text-purple-200 drop-shadow">
             {commentCount > 0 ? commentCount : '·'}
           </span>
         </button>
@@ -445,7 +451,7 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
               aria-hidden
             />
           </span>
-          <span className="mt-0.5 text-[10px] font-bold drop-shadow">{isSaved ? 'Saved' : 'Save'}</span>
+          <span className="-mt-1 text-[10px] font-bold drop-shadow">{isSaved ? 'Saved' : 'Save'}</span>
         </button>
 
         {canPatch && brandId ? (

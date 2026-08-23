@@ -27,6 +27,62 @@ export const ISLAND_BOTTOM_NAV_MOBILE_CLEARANCE_CLASS =
 export const ISLAND_BOTTOM_NAV_CLEARANCE_CLASS =
   `${ISLAND_BOTTOM_NAV_MOBILE_CLEARANCE_CLASS} lg:pb-8`;
 
+/**
+ * Lets a full-screen view suppress the island for as long as it is mounted.
+ *
+ * An open message thread owns the bottom of the screen: the composer, the
+ * attachment control and the quick replies all live there, and a floating pill
+ * on top of them means every send is a near-miss. The native app already hides
+ * its island on a thread; the web island had no way to be told.
+ *
+ * Reference-counted, because more than one view can legitimately ask at once
+ * (a thread behind a media viewer) and the LAST one to unmount must be the one
+ * that restores it — a plain boolean would let the first unmount bring the
+ * island back underneath the view still covering the screen.
+ */
+type IslandSuppressionListener = (suppressed: boolean) => void;
+
+let islandSuppressionCount = 0;
+const islandSuppressionListeners = new Set<IslandSuppressionListener>();
+
+const emitIslandSuppression = () => {
+  const suppressed = islandSuppressionCount > 0;
+  islandSuppressionListeners.forEach((listener) => listener(suppressed));
+};
+
+export const suppressIslandBottomNav = (): (() => void) => {
+  islandSuppressionCount += 1;
+  emitIslandSuppression();
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    islandSuppressionCount = Math.max(0, islandSuppressionCount - 1);
+    emitIslandSuppression();
+  };
+};
+
+export const useIslandBottomNavSuppressed = (): boolean => {
+  const [suppressed, setSuppressed] = useState(islandSuppressionCount > 0);
+  useEffect(() => {
+    const listener: IslandSuppressionListener = (next) => setSuppressed(next);
+    islandSuppressionListeners.add(listener);
+    setSuppressed(islandSuppressionCount > 0);
+    return () => {
+      islandSuppressionListeners.delete(listener);
+    };
+  }, []);
+  return suppressed;
+};
+
+/** Mount-scoped helper: hides the island while `active` is true. */
+export const useSuppressIslandBottomNav = (active: boolean): void => {
+  useEffect(() => {
+    if (!active) return;
+    return suppressIslandBottomNav();
+  }, [active]);
+};
+
 const ITEM_BASE_CLASS =
   'flex h-11 min-w-[64px] flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-2 text-[11px] font-semibold leading-none transition-colors';
 
@@ -37,6 +93,7 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
   maxWidthClassName = 'max-w-[420px]',
 }) => {
   const location = useLocation();
+  const islandSuppressed = useIslandBottomNavSuppressed();
   const [optimisticActiveKey, setOptimisticActiveKey] = useState<string | null>(null);
   const currentLocation = useMemo(
     () => `${location.pathname}${location.search}`,
@@ -115,6 +172,10 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
   if (items.length === 0) {
     return null;
   }
+
+  // A full-screen view that owns the bottom of the screen (an open message
+  // thread) has asked for the island to stand down.
+  if (islandSuppressed) return null;
 
   return (
     <nav

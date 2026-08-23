@@ -6,6 +6,8 @@ import type { RootState } from '@/store';
 import { messagingApi, type InboxItem, type ThreadMessage, type ThreadOrderItem, type ResolvedThreadRoute } from '@/api/MessagingApi';
 import { customOrdersBuyerApi, customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
 import { getStoreStatus } from '@/api/StoreApi';
+import { isRateLimited, shouldAnnounceRateLimit } from '@/api/httpClient';
+import { useSuppressIslandBottomNav } from '@/components/navigation/IslandBottomNav';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import MessageBubble, { formatDate } from '@/components/messaging/MessageBubble';
@@ -507,11 +509,26 @@ const MessagingManagementPage: React.FC = () => {
   const messageNodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   /* ---- Derived ---- */
-  const activeConversation =
-    conversations.find((item) => item.id === activeId) ||
-    (resolvedThreadFallback && resolvedThreadFallback.threadId === activeId
-      ? synthesizeConversationFromRoute(resolvedThreadFallback)
-      : null);
+  /**
+   * Memoized, because its IDENTITY is a dependency of five effects.
+   *
+   * This was recomputed inline every render, and the fallback branch built a
+   * brand-new object each time. Every re-render therefore produced a new
+   * `activeConversation`, which produced new `fetchMessages` /
+   * `fetchThreadOrders` / `fetchCustomOrderDetail` / `refresh` callbacks, which
+   * tore down and re-established both socket subscriptions and the 25s poll
+   * timer. Since `refresh()` sets state, it re-entered that cycle every time it
+   * ran — the churn behind 87 message fetches and 85 order fetches in one
+   * window, against a 120/min budget shared by the whole app.
+   */
+  const activeConversation = useMemo(
+    () =>
+      conversations.find((item) => item.id === activeId) ||
+      (resolvedThreadFallback && resolvedThreadFallback.threadId === activeId
+        ? synthesizeConversationFromRoute(resolvedThreadFallback)
+        : null),
+    [activeId, conversations, resolvedThreadFallback],
+  );
   const activeAvatarSource = resolveAvatarMediaSource(activeConversation?.participantImage);
   const contactSidebarProps = activeConversation
     ? {
@@ -846,7 +863,20 @@ const MessagingManagementPage: React.FC = () => {
     try {
       await Promise.all([fetchMessages(), fetchCustomOrderDetail(), fetchThreadOrders()]);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Unable to load messages');
+      /*
+        A 429 here is the app rate-limiting ITSELF, and it arrives once per
+        in-flight request — which is how one screen produced a stack of
+        identical toasts. Say it at most once per window, and never in the
+        server's words: "ThrottlerException: Too Many Requests" means nothing
+        to a shopper.
+      */
+      if (isRateLimited(error)) {
+        if (shouldAnnounceRateLimit()) {
+          toast.error('Refreshing too quickly — pausing for a moment.');
+        }
+      } else {
+        toast.error(error?.response?.data?.message || 'Unable to load messages');
+      }
     } finally {
       setMessagesLoading(false);
       scrollToBottom();
@@ -876,54 +906,91 @@ const MessagingManagementPage: React.FC = () => {
     void fetchThreadOrders();
   }, [orderFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * Always-current handles for the effects below.
+   *
+   * `refresh` and `refreshInbox` are rebuilt whenever their inputs change, which
+   * is often. Listing them as effect dependencies meant the poll timer and both
+   * socket subscriptions were torn down and rebuilt constantly — and a timer
+   * re-armed on every render never survives long enough to reach its interval,
+   * while a subscription replaced mid-flight can deliver the same event twice.
+   * Reading them through a ref keeps every call on the latest closure while the
+   * effects depend only on the conversation actually changing.
+   */
+  /*
+    An open thread owns the bottom of the screen — composer, attachments and
+    quick replies all live there — so the floating island must stand down while
+    it is open. The thread LIST keeps the island, matching the native app.
+  */
+  useSuppressIslandBottomNav(Boolean(activeId));
+
+  const refreshRef = useRef(refresh);
+  const refreshInboxRef = useRef(refreshInbox);
+  const activeConversationRef = useRef(activeConversation);
+  useEffect(() => {
+    refreshRef.current = refresh;
+    refreshInboxRef.current = refreshInbox;
+    activeConversationRef.current = activeConversation;
+  });
+
   /* ---- Polling ---- */
   useEffect(() => {
-    if (!activeConversation) return;
+    if (!activeId) return;
     let intervalId: number | null = null;
     const setup = () => {
       if (intervalId) window.clearInterval(intervalId);
       if (document.visibilityState === 'visible') {
-        intervalId = window.setInterval(() => void refresh(), 25000);
+        intervalId = window.setInterval(() => void refreshRef.current(), 25000);
       }
     };
     setup();
-    const onVis = () => { setup(); if (document.visibilityState === 'visible') void refresh(); };
+    const onVis = () => {
+      setup();
+      if (document.visibilityState === 'visible') void refreshRef.current();
+    };
     document.addEventListener('visibilitychange', onVis);
     return () => { document.removeEventListener('visibilitychange', onVis); if (intervalId) window.clearInterval(intervalId); };
-  }, [activeConversation, refresh]);
+  }, [activeId]);
 
   /* ---- Real-time ---- */
   // Direct socket events — immediate, no worker dependency
   useEffect(() => {
     const handleMessageEvent = (payload: any) => {
       const pThreadId = String(payload?.threadId ?? '');
-      void refreshInbox();
-      if (!activeConversation) return;
-      const contextId = getContextId(activeConversation);
-      const threadId = activeConversation.threadId;
+      void refreshInboxRef.current();
+      const current = activeConversationRef.current;
+      if (!current) return;
+      const contextId = getContextId(current);
+      const threadId = current.threadId;
       if (pThreadId && (pThreadId === contextId || pThreadId === threadId)) {
-        void refresh();
+        void refreshRef.current();
       }
     };
     const unsub1 = onMessageEvent('message.created', handleMessageEvent);
     const unsub2 = onMessageEvent('thread.updated', handleMessageEvent);
     return () => { unsub1(); unsub2(); };
-  }, [activeConversation, getContextId, onMessageEvent, refresh, refreshInbox]);
+    // Subscribe ONCE per socket. Everything variable is read from a ref inside
+    // the handler, so this must not re-run when those values change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onMessageEvent]);
 
   // notification.created — backup path via notification worker
   useEffect(() => {
     const unsubscribe = onNotification((payload: any) => {
       const type = String(payload?.type ?? '');
       if (type !== 'MESSAGE_RECEIVED' && type !== 'MESSAGE_MODERATED' && type !== 'MESSAGE_UNREAD_REMINDER' && type !== 'MESSAGE_THREAD_REOPENED') return;
-      void refreshInbox();
-      if (!activeConversation) return;
-      const contextId = getContextId(activeConversation);
-      const threadId = activeConversation.threadId;
+      void refreshInboxRef.current();
+      const current = activeConversationRef.current;
+      if (!current) return;
+      const contextId = getContextId(current);
+      const threadId = current.threadId;
       const pId = String(payload?.payload?.threadId ?? payload?.payload?.customOrderId ?? payload?.payload?.orderId ?? '');
-      if (pId === contextId || pId === threadId) void refresh();
+      if (pId === contextId || pId === threadId) void refreshRef.current();
     });
     return unsubscribe;
-  }, [activeConversation, getContextId, onNotification, refresh, refreshInbox]);
+    // Same as above: one subscription, latest values read through refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onNotification]);
 
   /* ---- Highlight message ---- */
   useEffect(() => {
@@ -1023,7 +1090,16 @@ const MessagingManagementPage: React.FC = () => {
     }
 
     setReplyToMessage(null);
-    await refresh();
+    /*
+      The send already succeeded. A refresh that trips the rate limit must not
+      surface as a send failure — the message IS delivered, and the socket will
+      deliver it back anyway.
+    */
+    try {
+      await refresh();
+    } catch (refreshError) {
+      if (!isRateLimited(refreshError)) throw refreshError;
+    }
 
     // Update conversation list card with latest message preview
     setConversations((prev) => prev.map((c) =>
@@ -1036,6 +1112,26 @@ const MessagingManagementPage: React.FC = () => {
       }
     ));
   }, [activeConversation, activeId, brandId, getContextId, refresh, surface, useThreadTransport]);
+
+  /**
+   * Open the design a message refers to, and be able to come back.
+   *
+   * `state.returnTo` carries the exact thread URL, so the design view's back
+   * affordance — the on-screen arrow, the Android hardware button, or a browser
+   * Back — lands the reader back in the conversation they were reading rather
+   * than at the top of a feed. Without it, following a reference costs you your
+   * place in the thread, which is why the reference was worth avoiding.
+   */
+  const handleOpenDesignContext = useCallback(
+    (designId: string) => {
+      if (!designId) return;
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      navigate(`/designs/${encodeURIComponent(designId)}`, {
+        state: { returnTo, fromMessages: true },
+      });
+    },
+    [navigate],
+  );
 
   const handleRequestExtension = useCallback(async (days: number, reason: string) => {
     if (!activeConversation || !selectedOrder || surface !== 'BRAND' || !brandId) return;
@@ -1133,7 +1229,18 @@ const MessagingManagementPage: React.FC = () => {
   /* ================================================================ */
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-2xl border border-gray-200/60 dark:border-transparent bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
+    /*
+      `dvh`, not `vh`.
+
+      On a mobile browser `100vh` is the viewport with the URL bar RETRACTED, so
+      while it is showing, the container is taller than what you can actually
+      see. The top slid under the header, the composer sat below the fold, and
+      because the page itself did not overflow there was nothing to scroll back
+      — exactly the "screen pushes itself up and won't come back" report. `dvh`
+      tracks the live viewport, and the fallback keeps older browsers on the old
+      behaviour rather than on nothing.
+    */
+    <div className="flex h-[calc(100vh-4rem)] h-[calc(100dvh-4rem)] overflow-hidden rounded-2xl border border-gray-200/60 dark:border-transparent bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
 
       {/* ============================================================ */}
       {/*  LEFT PANEL — Conversation List                               */}
@@ -1436,6 +1543,7 @@ const MessagingManagementPage: React.FC = () => {
                         <MessageBubble
                           message={msg}
                           isOwn={isOwnMessage(msg)}
+                          onOpenDesignContext={handleOpenDesignContext}
                           onReply={(m) => setReplyToMessage({
                             id: m.id,
                             bodyText: m.bodyText,

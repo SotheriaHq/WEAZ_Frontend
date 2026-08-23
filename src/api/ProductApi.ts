@@ -4,6 +4,7 @@ import { unwrapApiResponse } from "../types/auth";
 import type { SizingMode } from '@/types/sizing';
 import { filterV1GarmentCategories } from '@/utils/v1Taxonomy';
 import { WEB_UPLOAD_POLICIES, assertValidUploadFile } from '@/utils/uploadValidation';
+import { getNormalizedImageFile } from '@/api/UploadApi';
 import {
   type MediaViewSlot,
   toBackendMediaViewSlot,
@@ -747,9 +748,40 @@ export const productApi = {
     viewSlot?: MediaViewSlot | string | null,
   ): Promise<{ id: string; url: string; viewSlot?: string | null }> {
     try {
-      assertValidUploadFile(file, WEB_UPLOAD_POLICIES.productMedia);
+      /*
+        iPad and iPhone cameras write HEIC.
+
+        The server's POST_IMAGE policy accepts jpg/jpeg/png/webp/gif and nothing
+        else, and the web policy mirrors it — so a photo straight off an iPad was
+        rejected before it ever left the browser, and the product was created
+        with no media. Designs never hit this because `CreateDesign` runs every
+        file through `getNormalizedImageFile` first; product media simply never
+        got the same treatment.
+
+        Two cases, one fix. A file that declares itself HEIC fails validation on
+        type. A file that is HEIC DATA carrying a .jpg name and an image/jpeg
+        MIME — which is what iOS produces when sharing rather than picking —
+        passes validation here and fails server-side instead. Normalising on any
+        validation failure covers both: the transcode endpoint accepts HEIC,
+        returns JPEG, and shrinks oversized photos on the way through, so it also
+        rescues the 12MP shot that breaks the 8MB cap.
+      */
+      let uploadable = file;
+      try {
+        assertValidUploadFile(uploadable, WEB_UPLOAD_POLICIES.productMedia);
+      } catch (validationError) {
+        try {
+          uploadable = await getNormalizedImageFile(file);
+          // Re-validate: if the normalized JPEG still fails, that is a real
+          // problem worth surfacing, and the ORIGINAL error is the useful one.
+          assertValidUploadFile(uploadable, WEB_UPLOAD_POLICIES.productMedia);
+        } catch {
+          throw validationError;
+        }
+      }
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", uploadable);
       formData.append("isPrimary", String(isPrimary));
       if (viewSlot) {
         formData.append("viewSlot", toBackendMediaViewSlot(viewSlot));

@@ -1340,6 +1340,30 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     });
   }, [productPublishTasks, productIdSet, filterStatus]);
 
+  /**
+   * Products whose failure card is already on screen.
+   *
+   * A failed publish leaves BOTH a stranded draft row (create succeeded) and a
+   * failure filler (upload did not) — and the rule above deliberately keeps the
+   * filler so the failure stays visible and retryable. The cost was two cards
+   * for one product: a red "failed" card, and a second card with no image whose
+   * text panel is fully populated, which reads as a mysterious half-created
+   * duplicate.
+   *
+   * The filler is the one that carries Retry and Remove, so the filler is the
+   * one that stays. Hiding the row here is a display decision only — the draft
+   * still exists, and it reappears the moment the task is retried or removed.
+   */
+  const failedFillerProductIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const task of visibleProductFillers) {
+      if (task.status !== 'failed') continue;
+      const productId = getPublishTaskDesignId(task);
+      if (productId) ids.add(productId);
+    }
+    return ids;
+  }, [visibleProductFillers]);
+
   const handleRetryProductPublish = useCallback(
     (task: PublishTask) => {
       const productId = getPublishTaskDesignId(task);
@@ -3203,7 +3227,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 onRemove={handleRemoveProductFiller}
               />
             ))}
-            {filteredProducts.map((product) => {
+            {filteredProducts
+              .filter((product) => !failedFillerProductIds.has(product.id))
+              .map((product) => {
               const collectionLabel =
                 product.collection?.title ||
                 collections.find((c) => c.id === product.collectionId)?.name ||
