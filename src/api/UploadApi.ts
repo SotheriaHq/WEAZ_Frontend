@@ -21,16 +21,16 @@ const MAX_CACHED_NORMALIZED_BLOBS = 24;
  * server exactly once, and the result serves preview AND upload.
  */
 const NORMALIZED_IMAGE_MAX_WIDTH = 2048;
-const NORMALIZED_IMAGE_QUALITY = 82;
+const NORMALIZED_IMAGE_QUALITY = 99;
 const NORMALIZED_IMAGE_MAX_BYTES = WEB_UPLOAD_POLICIES.designMedia.maxSizeBytes;
 
-type TranscodeOptions = {
+export type ImageTranscodeOptions = {
   maxWidth: number;
   quality: number;
   maxBytes: number;
 };
 
-const CANONICAL_TRANSCODE_OPTIONS: TranscodeOptions = {
+const CANONICAL_TRANSCODE_OPTIONS: ImageTranscodeOptions = {
   maxWidth: NORMALIZED_IMAGE_MAX_WIDTH,
   quality: NORMALIZED_IMAGE_QUALITY,
   maxBytes: NORMALIZED_IMAGE_MAX_BYTES,
@@ -40,7 +40,7 @@ const CANONICAL_TRANSCODE_OPTIONS: TranscodeOptions = {
 // identical lastModified (pick time, or 0) across different photos, and
 // generated gallery names recur. A content fingerprint keeps the cache from
 // ever serving one photo's bytes as another's preview or upload.
-const fileCacheKey = async (file: File, options: TranscodeOptions) =>
+const fileCacheKey = async (file: File, options: ImageTranscodeOptions) =>
   [
     file.name,
     file.size,
@@ -87,7 +87,7 @@ const rememberResolvedBlob = (key: string, blob: Blob) => {
 
 const requestServerTranscode = async (
   file: File,
-  options: TranscodeOptions,
+  options: ImageTranscodeOptions,
 ): Promise<Blob> => {
   const key = await fileCacheKey(file, options);
 
@@ -163,8 +163,15 @@ const toNormalizedFile = (file: File, blob: Blob): File => {
  * named .jpg, privacy-blocked canvas): returns a JPEG File under the design
  * media size cap. Deduped + cached, so previews and uploads share one call.
  */
-export const getNormalizedImageFile = async (file: File): Promise<File> => {
-  const blob = await requestServerTranscode(file, CANONICAL_TRANSCODE_OPTIONS);
+export const getNormalizedImageFile = async (
+  file: File,
+  options: Partial<ImageTranscodeOptions> = {},
+): Promise<File> => {
+  const normalizedOptions: ImageTranscodeOptions = {
+    ...CANONICAL_TRANSCODE_OPTIONS,
+    ...options,
+  };
+  const blob = await requestServerTranscode(file, normalizedOptions);
   return toNormalizedFile(file, blob);
 };
 

@@ -4,6 +4,7 @@ import {
   getPublishTaskRuntimePreview,
   type PublishTask,
 } from '@/utils/publishTracker';
+import { MediaRenderer } from '@/components/media/MediaRenderer';
 
 /**
  * Live status card shown in the store products grid while a just-submitted
@@ -35,10 +36,14 @@ export const ProductPublishFillerCard: React.FC<{
   return (
     <div className="group relative aspect-[5/6] overflow-hidden rounded-xl border border-black/5 shadow-sm dark:border-white/10">
       {preview ? (
-        <img
+        <MediaRenderer
+          kind="image"
           src={preview}
           alt={task.title}
-          className="absolute inset-0 h-full w-full object-cover"
+          fit="cover"
+          maxHeightClassName="max-h-none"
+          className="absolute inset-0 h-full w-full"
+          mediaClassName="h-full w-full object-cover"
         />
       ) : (
         <div className="absolute inset-0 bg-gray-100 dark:bg-white/5" />
@@ -51,6 +56,11 @@ export const ProductPublishFillerCard: React.FC<{
               ⚠️
             </span>
             <div className="text-xs font-semibold">Upload didn’t finish</div>
+            {task.error ? (
+              <p className="max-w-full break-words text-[11px] leading-4 text-white/85">
+                {task.error}
+              </p>
+            ) : null}
             <div className="flex flex-wrap items-center justify-center gap-2">
               <button
                 type="button"
@@ -84,7 +94,7 @@ export const ProductPublishFillerCard: React.FC<{
       </div>
 
       <div className="absolute inset-x-0 bottom-0 z-30 border-t border-white/10 bg-black/40 p-1.5 backdrop-blur-xl">
-        <h3 className="line-clamp-1 text-xs font-semibold text-white drop-shadow-sm">
+        <h3 className="break-words text-xs font-semibold leading-4 text-white drop-shadow-sm">
           {task.title}
         </h3>
         <p className="text-[10px] text-white/60">

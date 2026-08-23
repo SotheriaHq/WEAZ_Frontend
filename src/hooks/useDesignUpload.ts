@@ -138,7 +138,11 @@ const prepareViaServerTranscode = async (
     return null;
   }
   try {
-    const transcoded = await getNormalizedImageFile(file);
+    const transcoded = await getNormalizedImageFile(file, {
+      maxWidth: 2048,
+      quality: 99,
+      maxBytes: Math.max(100 * 1024, Math.min(maxSizeBytes, Math.floor(file.size * 0.1))),
+    });
     if (transcoded.size > maxSizeBytes) return null;
     addClientDiagnostic('info', 'design-upload', 'Server media transcode succeeded', {
       original: fileDiagnostic(file),
@@ -159,13 +163,10 @@ const prepareViaServerTranscode = async (
 const isAlreadyUploadReady = (file: File, maxSizeBytes: number) => {
   if (!isImageUploadFile(file)) return file.size <= maxSizeBytes;
   const type = file.type.trim().toLowerCase();
-  // Selection-time media-store normalization already produces browser-safe
-  // JPEG/PNG/WebP/AVIF under the limit. Re-running createImageBitmap here was the
-  // multi-second mobile go-live stall.
-  // No `avif`: the server accepts none, so letting one through untouched here
-  // only moves the rejection to multer, where nothing can explain it. Without
-  // the short-circuit it goes to the preprocessor, which re-encodes to webp.
-  if (file.size <= maxSizeBytes && /image\/(jpeg|png|webp|gif)/i.test(type)) {
+  // Animated GIF is the sole preservation exception. Browser canvas would turn
+  // it into a still image; all static images must carry the optimizer's `.pre`
+  // marker before this upload boundary can skip reprocessing.
+  if (file.size <= maxSizeBytes && /image\/gif/i.test(type)) {
     return true;
   }
   if (file.size <= maxSizeBytes && /\.pre\.(jpe?g|png|webp)$/i.test(file.name)) {
@@ -198,6 +199,9 @@ const prepareDesignUploadItems = async (
       try {
         const processed = await preprocessImageFile(file, 'detail', {
           maxSizeBytes,
+          targetReductionRatio: 0.9,
+          quality: 0.99,
+          minQuality: 0.9,
         });
         if (processed.file.size <= maxSizeBytes || !isImageUploadFile(file)) {
           return {

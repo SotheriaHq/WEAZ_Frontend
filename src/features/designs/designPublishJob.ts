@@ -77,12 +77,9 @@ const isAlreadyUploadReady = (file: File, maxSizeBytes: number) => {
     return file.size <= maxSizeBytes;
   }
   const type = file.type.trim().toLowerCase();
-  // Media-store already server-normalizes HEIC/unknown into JPEG at selection.
-  // Re-running canvas preprocess on go-live is the multi-second mobile stall.
-  // No `avif`: the server accepts none, so letting one through untouched here
-  // only moves the rejection to multer, where nothing can explain it. Without
-  // the short-circuit it goes to the preprocessor, which re-encodes to webp.
-  if (file.size <= maxSizeBytes && /image\/(jpeg|png|webp|gif)/i.test(type)) {
+  // Animated GIF must remain animated. Every other static image needs the
+  // optimizer's `.pre` marker before it can bypass this final upload boundary.
+  if (file.size <= maxSizeBytes && /image\/gif/i.test(type)) {
     return true;
   }
   // .pre.* naming from preprocessImageFile / selection pipeline
@@ -111,7 +108,12 @@ async function prepareFiles(
 
       let localFailureReason: 'preprocess-failed' | 'still-over-limit' | null = null;
       try {
-        const processed = await preprocessImageFile(file, 'detail', { maxSizeBytes });
+        const processed = await preprocessImageFile(file, 'detail', {
+          maxSizeBytes,
+          targetReductionRatio: 0.9,
+          quality: 0.99,
+          minQuality: 0.9,
+        });
         if (processed.file.size <= maxSizeBytes) {
           return { file: processed.file, viewSlot };
         }
@@ -128,7 +130,11 @@ async function prepareFiles(
           !isBrowserDisplayableSniff(sniffed))
       ) {
         try {
-          const transcoded = await getNormalizedImageFile(file);
+          const transcoded = await getNormalizedImageFile(file, {
+            maxWidth: 2048,
+            quality: 99,
+            maxBytes: Math.max(100 * 1024, Math.min(maxSizeBytes, Math.floor(file.size * 0.1))),
+          });
           if (transcoded.size <= maxSizeBytes) {
             return { file: transcoded, viewSlot };
           }

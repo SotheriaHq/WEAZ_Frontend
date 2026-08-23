@@ -90,11 +90,6 @@ import {
   getStoreProcessingTimeLabel,
 } from "@/utils/storeProcessing";
 import { preprocessImageFile } from "@/utils/imagePreprocess";
-import {
-  isBrowserDisplayableSniff,
-  isUnreadableSniff,
-  sniffImageFormat,
-} from "@/utils/imageByteSniff";
 import { WEB_UPLOAD_POLICIES } from "@/utils/uploadValidation";
 import { getNormalizedImageFile } from "@/api/UploadApi";
 import {
@@ -2837,51 +2832,45 @@ const EditProduct: React.FC = () => {
     const policy = WEB_UPLOAD_POLICIES.productMedia;
     const maxSizeBytes = policy.maxSizeBytes;
     const targetSizeBytes = policy.preferredSizeBytes ?? maxSizeBytes;
+    const compressionTargetBytes = (file: File) =>
+      Math.max(100 * 1024, Math.min(targetSizeBytes, Math.floor(file.size * 0.1)));
+    const isGif = (file: File) =>
+      file.type.trim().toLowerCase() === 'image/gif' || /\.gif$/i.test(file.name);
     /*
      * Derived from the policy rather than a second hardcoded list. The regex
      * here used to accept `avif`, which the policy no longer does and the server
      * never did — so an AVIF skipped preprocessing and went straight to a
      * rejection. Two lists that must agree should not be written twice.
      */
-    const acceptedTypes = new Set(policy.allowedMimeTypes.map((type) => type.toLowerCase()));
-    const isAlreadyUploadReady = (file: File) => {
-      const type = file.type.trim().toLowerCase();
-      if (file.size > maxSizeBytes) return false;
-      return acceptedTypes.has(type);
-    };
-
-    const prepResults = await Promise.all(
-      files.map(async (file) => {
-        if (isAlreadyUploadReady(file)) {
+    const prepareFile = async (file: File) => {
+        if (isGif(file) && file.size <= maxSizeBytes) {
           return { ok: true as const, file, optimized: false };
         }
 
-        let localFailureReason: 'preprocess-failed' | 'still-over-limit' | null = null;
         try {
           // Aim for the target...
           const processed = await preprocessImageFile(file, "detail", {
             maxSizeBytes: targetSizeBytes,
+            targetReductionRatio: 0.9,
+            quality: 0.99,
+            minQuality: 0.9,
           });
           // ...but accept anything the API will take.
           if (processed.file.size <= maxSizeBytes) {
             return { ok: true as const, file: processed.file, optimized: !processed.skipped };
           }
-          localFailureReason = 'still-over-limit';
         } catch {
-          localFailureReason = 'preprocess-failed';
+          // A Safari/HEIC local-decode failure is recovered by the server pass.
         }
 
         try {
-          const sniffedFormat = await sniffImageFormat(file);
-          const needsServerTranscode =
-            !isUnreadableSniff(sniffedFormat) &&
-            (file.size > maxSizeBytes ||
-              localFailureReason === 'still-over-limit' ||
-              !isBrowserDisplayableSniff(sniffedFormat));
-
-          if (needsServerTranscode) {
-            const transcoded = await getNormalizedImageFile(file);
-            if (transcoded.size <= maxSizeBytes) {
+          if (!isGif(file)) {
+            const transcoded = await getNormalizedImageFile(file, {
+              maxWidth: 2048,
+              quality: 99,
+              maxBytes: compressionTargetBytes(file),
+            });
+            if (transcoded.size <= maxSizeBytes && transcoded.size < file.size) {
               return { ok: true as const, file: transcoded, optimized: true };
             }
           }
@@ -2889,11 +2878,17 @@ const EditProduct: React.FC = () => {
           /* Server normalize unavailable — fall through to raw checks. */
         }
 
-        return file.size <= maxSizeBytes
-          ? { ok: true as const, file, optimized: false }
-          : { ok: false as const, file };
-      }),
-    );
+        return { ok: false as const, file };
+    };
+
+    // Two-at-a-time prevents a six-photo iPad selection from exhausting the
+    // browser tab while canvas decoding is in progress.
+    const prepResults: Awaited<ReturnType<typeof prepareFile>>[] = [];
+    for (let index = 0; index < files.length; index += 2) {
+      prepResults.push(
+        ...(await Promise.all(files.slice(index, index + 2).map(prepareFile))),
+      );
+    }
 
     const validFiles = prepResults
       .filter((result) => result.ok)

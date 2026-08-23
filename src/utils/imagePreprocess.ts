@@ -9,6 +9,13 @@ export interface ImagePreprocessResult {
 
 export interface ImagePreprocessOptions {
   maxSizeBytes?: number;
+  /**
+   * A best-effort reduction target expressed as a fraction of the source
+   * file. `0.9` means "try to make the result at least 90% smaller". It is a
+   * target rather than a guarantee: a small, already-efficient image should
+   * never be enlarged or visibly destroyed merely to hit a byte number.
+   */
+  targetReductionRatio?: number;
   quality?: number;
   minQuality?: number;
 }
@@ -22,9 +29,10 @@ const profileMaxWidth: Record<ImagePreprocessProfile, number> = {
 
 const MAX_INPUT_PIXELS = 50_000_000;
 const MIN_OUTPUT_WIDTH = 720;
-const DEFAULT_JPEG_QUALITY = 0.86;
-const DEFAULT_MIN_JPEG_QUALITY = 0.58;
-const MAX_SIZE_ATTEMPTS = 8;
+const MIN_TARGET_BYTES = 64 * 1024;
+const DEFAULT_JPEG_QUALITY = 0.99;
+const DEFAULT_MIN_JPEG_QUALITY = 0.9;
+const MAX_SIZE_ATTEMPTS = 12;
 
 const isGifFile = (file: File) =>
   file.type.trim().toLowerCase() === 'image/gif' || /\.gif$/i.test(file.name);
@@ -123,9 +131,22 @@ export async function preprocessImageFile(
 
     const targetWidth = Math.min(bitmap.width, profileMaxWidth[profile]);
     const needsResize = targetWidth < bitmap.width;
-    const needsSizeReduction =
-      typeof options.maxSizeBytes === 'number' &&
-      workingFile.size > options.maxSizeBytes;
+    const requestedReductionRatio = Math.max(
+      0,
+      Math.min(options.targetReductionRatio ?? 0, 0.95),
+    );
+    const reductionTargetBytes =
+      requestedReductionRatio > 0
+        ? Math.max(
+            MIN_TARGET_BYTES,
+            Math.floor(workingFile.size * (1 - requestedReductionRatio)),
+          )
+        : undefined;
+    const targetSizeBytes = Math.min(
+      options.maxSizeBytes ?? Number.POSITIVE_INFINITY,
+      reductionTargetBytes ?? Number.POSITIVE_INFINITY,
+    );
+    const needsSizeReduction = workingFile.size > targetSizeBytes;
 
     if (!needsResize && !needsSizeReduction) {
       return { file, originalFile: file, skipped: true, reason: 'already-optimal' };
@@ -154,7 +175,8 @@ export async function preprocessImageFile(
       1,
       Math.round(bitmap.height * (currentWidth / bitmap.width)),
     );
-    let blob: Blob | null = null;
+    let bestBlob: Blob | null = null;
+    let bestOutputType = outputType;
 
     for (let attempt = 0; attempt < MAX_SIZE_ATTEMPTS; attempt += 1) {
       canvas.width = currentWidth;
@@ -167,37 +189,54 @@ export async function preprocessImageFile(
       ctx.drawImage(bitmap, 0, 0, currentWidth, currentHeight);
 
       const encoded = await encodeCanvas(canvas, outputType, quality);
-      blob = encoded.blob;
+      const blob = encoded.blob;
       outputType = encoded.outputType;
 
       if (!blob) break;
-      if (!options.maxSizeBytes || blob.size <= options.maxSizeBytes) break;
+      if (!bestBlob || blob.size < bestBlob.size) {
+        bestBlob = blob;
+        bestOutputType = outputType;
+      }
 
-      if (isLossyOutputType(outputType) && quality > minQuality) {
-        quality = Math.max(minQuality, quality - 0.1);
+      if (blob.size <= targetSizeBytes) break;
+
+      const nextWidth = Math.round(currentWidth * 0.84);
+      if (nextWidth >= MIN_OUTPUT_WIDTH && nextWidth < currentWidth) {
+        // Reducing dimensions preserves texture better than repeatedly
+        // lowering JPEG/WebP quality. Keep the 99% starting quality while
+        // there is still useful pixel area to remove.
+        currentWidth = nextWidth;
+        currentHeight = Math.max(
+          1,
+          Math.round(bitmap.height * (currentWidth / bitmap.width)),
+        );
         continue;
       }
 
-      const nextWidth = Math.round(currentWidth * 0.84);
-      if (nextWidth < MIN_OUTPUT_WIDTH || nextWidth >= currentWidth) break;
-      currentWidth = nextWidth;
-      currentHeight = Math.max(
-        1,
-        Math.round(bitmap.height * (currentWidth / bitmap.width)),
-      );
-      quality = Math.max(minQuality, Math.min(quality + 0.08, DEFAULT_JPEG_QUALITY));
+      if (isLossyOutputType(outputType) && quality > minQuality) {
+        quality = Math.max(minQuality, quality - 0.02);
+        continue;
+      }
+
+      break;
     }
 
-    if (!blob) {
+    if (!bestBlob) {
       return { file, originalFile: file, skipped: true, reason: 'blob-failed' };
     }
 
-    if (!needsSizeReduction && blob.size >= workingFile.size) {
+    // A compression pass must never make a creator upload more bytes. This
+    // matters especially for small WebP/JPEG source files that are already
+    // efficiently encoded.
+    if (bestBlob.size >= workingFile.size) {
       return { file, originalFile: file, skipped: true, reason: 'not-smaller' };
     }
 
-    const nextName = buildPreprocessedName(workingFile.name, outputType);
-    const nextFile = new File([blob], nextName, { type: outputType, lastModified: Date.now() });
+    const nextName = buildPreprocessedName(workingFile.name, bestOutputType);
+    const nextFile = new File([bestBlob], nextName, {
+      type: bestOutputType,
+      lastModified: Date.now(),
+    });
 
     return { file: nextFile, originalFile: file, skipped: false };
   } finally {
