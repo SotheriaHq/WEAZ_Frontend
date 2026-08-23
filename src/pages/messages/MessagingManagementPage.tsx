@@ -405,7 +405,7 @@ const MessagingManagementPage: React.FC = () => {
   const surface: Surface = hasActiveBrandMembership(profile) ? 'BRAND' : 'BUYER';
   const [brandId, setBrandId] = useState<string | null>(null);
   const actorId = profile?.id;
-  const { onNotification, onMessageEvent } = useRealtime();
+  const { onNotification, onMessageEvent, socketConnected } = useRealtime();
 
   /**
    * Which side of the conversation a message belongs to.
@@ -741,6 +741,18 @@ const MessagingManagementPage: React.FC = () => {
     notifyMessagingRead();
   }, []);
 
+  /**
+   * Messages already fetched, per conversation.
+   *
+   * Switching threads used to show a spinner every single time, because the
+   * pane had nothing to draw until the network came back. Every messaging app
+   * people compare this to paints the last known conversation instantly and
+   * reconciles behind it — the request still happens, it just stops being the
+   * thing the reader waits on. A ref, not state: writing it must never itself
+   * cause a render.
+   */
+  const messagesCacheRef = useRef<Map<string, ThreadMessage[]>>(new Map());
+
   /* ---- Load messages when active conversation changes ---- */
   const fetchMessages = useCallback(async () => {
     if (!activeConversation) return;
@@ -759,10 +771,18 @@ const MessagingManagementPage: React.FC = () => {
     if (useThreadTransport && threadId) {
       const response = await messagingApi.listThreadMessages(threadId, { limit: 50 });
       const sorted = [...response.items].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      messagesCacheRef.current.set(activeConversation.id, sorted);
       setMessages(sorted);
       const lastId = sorted.at(-1)?.id;
       if (lastId) {
-        await messagingApi.markThreadReadById(threadId, lastId);
+        /*
+          Fire-and-forget. Marking read is a WRITE the reader is not waiting on:
+          awaiting it kept `messagesLoading` true for an extra round trip after
+          the messages were already on screen, so the spinner outlived the data
+          it was covering. `clearLocalUnread` updates the row immediately and the
+          socket echo confirms it.
+        */
+        void messagingApi.markThreadReadById(threadId, lastId).catch(() => undefined);
         clearLocalUnread(activeConversation.id);
       }
       return;
@@ -781,19 +801,23 @@ const MessagingManagementPage: React.FC = () => {
             : await messagingApi.listOrderMessages(contextId, { limit: 50 });
 
     const sorted = [...response.items].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    messagesCacheRef.current.set(activeConversation.id, sorted);
     setMessages(sorted);
 
     const lastId = sorted.at(-1)?.id;
     if (lastId) {
-      if (ct === 'INQUIRY') {
-        await messagingApi.markThreadReadById(contextId, lastId);
-      } else if (ct === 'CUSTOM_ORDER') {
-        if (surface === 'BRAND' && brandId) await messagingApi.markCustomOrderReadForBrand(brandId, contextId, lastId);
-        else await messagingApi.markCustomOrderRead(contextId, lastId);
-      } else {
-        if (surface === 'BRAND' && brandId) await messagingApi.markOrderReadForBrand(brandId, contextId, lastId);
-        else await messagingApi.markOrderRead(contextId, lastId);
-      }
+      // Fire-and-forget, same reasoning as the thread-transport branch above.
+      const markRead =
+        ct === 'INQUIRY'
+          ? messagingApi.markThreadReadById(contextId, lastId)
+          : ct === 'CUSTOM_ORDER'
+            ? surface === 'BRAND' && brandId
+              ? messagingApi.markCustomOrderReadForBrand(brandId, contextId, lastId)
+              : messagingApi.markCustomOrderRead(contextId, lastId)
+            : surface === 'BRAND' && brandId
+              ? messagingApi.markOrderReadForBrand(brandId, contextId, lastId)
+              : messagingApi.markOrderRead(contextId, lastId);
+      void Promise.resolve(markRead).catch(() => undefined);
       clearLocalUnread(activeConversation.id);
     }
   }, [activeConversation, brandId, clearLocalUnread, getContextId, surface, useThreadTransport]);
@@ -855,8 +879,9 @@ const MessagingManagementPage: React.FC = () => {
   }, [activeConversation?.threadId, orderFilter, params]);
 
   const refresh = useCallback(async () => {
+    // Nothing selected: nothing to fetch, and nothing below can be keyed.
+    if (!activeConversation) return;
     if (
-      activeConversation &&
       surface === 'BRAND' &&
       activeConversation.contextType !== 'INQUIRY' &&
       !useThreadTransport &&
@@ -864,9 +889,28 @@ const MessagingManagementPage: React.FC = () => {
     ) {
       return;
     }
-    setMessagesLoading(true);
+    /*
+      Only the MESSAGES gate the message pane.
+
+      This awaited all three fetches together, so the pane stayed on a spinner
+      until the slowest of them finished — a conversation's messages could be in
+      hand for a second while the reader watched a loader, because the custom
+      order detail or the thread's order list had not answered yet. Those two
+      feed side panels; they now resolve on their own schedule and update their
+      own regions.
+
+      The spinner is also skipped entirely when there is something cached to
+      draw: replacing readable content with a loader is a downgrade, not
+      feedback.
+    */
+    const hasCachedMessages = (messagesCacheRef.current.get(activeConversation.id)?.length ?? 0) > 0;
+    if (!hasCachedMessages) setMessagesLoading(true);
+
+    void fetchCustomOrderDetail().catch(() => undefined);
+    void fetchThreadOrders().catch(() => undefined);
+
     try {
-      await Promise.all([fetchMessages(), fetchCustomOrderDetail(), fetchThreadOrders()]);
+      await fetchMessages();
     } catch (error: any) {
       /*
         A 429 here is the app rate-limiting ITSELF, and it arrives once per
@@ -903,6 +947,18 @@ const MessagingManagementPage: React.FC = () => {
     setOrderFilter('all');
     setSelectedOrderKey('');
     setReplyToMessage(null);
+
+    /*
+      Paint on the same tick as the click.
+
+      Whatever is known about this conversation goes up immediately — the cached
+      transcript if we have one, an empty pane if we do not — and the refresh
+      reconciles underneath. Crucially this ALSO clears the previous thread's
+      messages synchronously: leaving them up while the next fetch ran meant a
+      switch showed one person's conversation under another person's name, which
+      is far worse than a brief empty pane.
+    */
+    setMessages(messagesCacheRef.current.get(activeConversation.id) ?? []);
     void refresh();
   }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -941,6 +997,49 @@ const MessagingManagementPage: React.FC = () => {
   const [designContextItem, setDesignContextItem] = useState<MarketItem | null>(null);
   const [designContextLoading, setDesignContextLoading] = useState(false);
 
+  /**
+   * The shell's height, measured against where it actually starts.
+   *
+   * It was `calc(viewport - 4rem)` — a hard-coded guess at the navbar. Whenever
+   * the real chrome is taller than 4rem (it is, on a laptop, once the header and
+   * page padding are counted) the shell is too tall, the DOCUMENT gains a
+   * scrollbar, and scrolling slides the whole conversation — header and all —
+   * up underneath the fixed navbar. Then it springs back, because the panes
+   * inside have nowhere to go. That is the "pushes itself under the navbar and
+   * won't stay down" report.
+   *
+   * Measuring the distance from the top of the viewport to the top of this
+   * element makes the shell exactly fill what is left, whatever the chrome
+   * happens to be, on any device.
+   */
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const [shellHeight, setShellHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    const measure = () => {
+      const node = shellRef.current;
+      if (!node) return;
+      const top = node.getBoundingClientRect().top;
+      // A small tail so the rounded border is not flush with the viewport edge.
+      const next = Math.max(320, window.innerHeight - top - 12);
+      setShellHeight((current) => (current === next ? current : next));
+    };
+
+    measure();
+    window.addEventListener('resize', measure);
+    window.addEventListener('orientationchange', measure);
+    const observer =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    if (observer && shellRef.current?.parentElement) {
+      observer.observe(shellRef.current.parentElement);
+    }
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
+      observer?.disconnect();
+    };
+  }, []);
+
   const refreshRef = useRef(refresh);
   const refreshInboxRef = useRef(refreshInbox);
   const activeConversationRef = useRef(activeConversation);
@@ -951,13 +1050,34 @@ const MessagingManagementPage: React.FC = () => {
   });
 
   /* ---- Polling ---- */
+  /*
+    The poll is a FALLBACK, not the delivery mechanism.
+
+    It ran unconditionally at 25s alongside a working socket that already
+    delivers `message.created` and `thread.updated` instantly — so every open
+    conversation spent a request every 25 seconds re-fetching what it had
+    already been pushed, on a 120/min budget shared with the entire app. That is
+    what kept the throttler tripping and putting "refreshing too quickly" in
+    front of people who were doing nothing wrong.
+
+    While the socket is connected there is nothing for a poll to add, so it does
+    not run. When the socket is down it is the only thing keeping the thread
+    current, so it does — at a calmer interval, since it is now a safety net
+    rather than a heartbeat.
+  */
+  const POLL_WITHOUT_SOCKET_MS = 20000;
+  const POLL_WITH_SOCKET_MS = 120000;
+
   useEffect(() => {
     if (!activeId) return;
     let intervalId: number | null = null;
     const setup = () => {
       if (intervalId) window.clearInterval(intervalId);
       if (document.visibilityState === 'visible') {
-        intervalId = window.setInterval(() => void refreshRef.current(), 25000);
+        intervalId = window.setInterval(
+          () => void refreshRef.current(),
+          socketConnected ? POLL_WITH_SOCKET_MS : POLL_WITHOUT_SOCKET_MS,
+        );
       }
     };
     setup();
@@ -967,7 +1087,7 @@ const MessagingManagementPage: React.FC = () => {
     };
     document.addEventListener('visibilitychange', onVis);
     return () => { document.removeEventListener('visibilitychange', onVis); if (intervalId) window.clearInterval(intervalId); };
-  }, [activeId]);
+  }, [activeId, socketConnected]);
 
   /* ---- Real-time ---- */
   // Direct socket events — immediate, no worker dependency
@@ -1295,7 +1415,12 @@ const MessagingManagementPage: React.FC = () => {
         what you can see, which pushed the header up and left the composer below
         an unscrollable fold.
       */
-      style={{ height: 'calc(var(--messages-viewport, 100vh) - 4rem)' }}
+      ref={shellRef}
+      style={{
+        height: shellHeight
+          ? `${shellHeight}px`
+          : 'calc(var(--messages-viewport, 100vh) - 4rem)',
+      }}
       className="flex overflow-hidden rounded-2xl border border-gray-200/60 dark:border-transparent bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
 
       {/* ============================================================ */}
@@ -1316,7 +1441,21 @@ const MessagingManagementPage: React.FC = () => {
         push its own container wider than the viewport, and a page that overflows
         horizontally is one a mobile browser will scale down to fit.
       */}
-      <div className={`w-full min-w-0 flex-col border-r border-gray-200/60 dark:border-white/[0.04] bg-white/70 dark:bg-white/[0.02] lg:w-80 lg:shrink-0 ${activeId ? 'hidden lg:flex' : 'flex'}`}>
+      {/*
+        `min-h-0` is what makes the inner `overflow-y-auto` actually scroll.
+
+        A flex child defaults to `min-height: auto`, which refuses to shrink
+        below its content. So a long conversation list grew this column past the
+        shell instead of scrolling inside it, the shell overflowed, and the PAGE
+        scrolled — which is why scrolling one region moved everything and no
+        section had independent scrolling. The same omission applies to the two
+        panes beside it.
+
+        Width: the rail is narrower at `lg` (iPad) than at `xl`, because at
+        1024–1279px a 320px rail plus the detail panel leaves the conversation
+        itself squeezed into whatever is left.
+      */}
+      <div className={`w-full min-w-0 min-h-0 flex-col border-r border-gray-200/60 dark:border-white/[0.04] bg-white/70 dark:bg-white/[0.02] lg:w-[17rem] lg:shrink-0 xl:w-80 ${activeId ? 'hidden lg:flex' : 'flex'}`}>
         {/* Header */}
         <div className="shrink-0 px-4 pt-4 pb-3">
           <h1 className="text-base font-semibold text-theme">Messages</h1>
@@ -1357,7 +1496,10 @@ const MessagingManagementPage: React.FC = () => {
         </div>
 
         {/* Conversation list */}
-        <div className="flex-1 overflow-y-auto px-2 pb-2">
+        {/* `overscroll-contain` stops a flick that reaches the end of this list
+            from continuing into the page behind it — the "scrolling one section
+            shakes the whole screen" effect. */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 pb-2">
           {loading ? (
             <div className="space-y-1.5 py-3">
               {Array.from({ length: 6 }).map((_, index) => (
@@ -1439,7 +1581,7 @@ const MessagingManagementPage: React.FC = () => {
       {/* ============================================================ */}
       {/*  CENTER PANEL — Active Chat                                   */}
       {/* ============================================================ */}
-      <div className={`flex flex-1 flex-col min-w-0 ${!activeId ? 'hidden lg:flex' : 'flex'}`}>
+      <div className={`flex flex-1 flex-col min-w-0 min-h-0 ${!activeId ? 'hidden lg:flex' : 'flex'}`}>
         {!activeConversation ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
@@ -1582,7 +1724,7 @@ const MessagingManagementPage: React.FC = () => {
             </div>
 
             {/* Messages area */}
-            <div className="flex-1 overflow-y-auto px-4 py-3">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3">
               {messagesLoading && messages.length === 0 ? (
                 <div className="space-y-3 py-3">
                   {Array.from({ length: 5 }).map((_, index) => (
@@ -1670,13 +1812,22 @@ const MessagingManagementPage: React.FC = () => {
       {/* ============================================================ */}
       {/*  RIGHT PANEL — Contact Sidebar                                */}
       {/* ============================================================ */}
+      {/*
+        Detail panel appears only where there is room for three columns.
+
+        At `xl` (1280px) a 320px rail and a 288px detail panel leave the
+        conversation — the actual point of the screen — with the remainder,
+        which on a landscape tablet reads as a thin strip between two wide
+        panels. It now waits for `2xl`, and scrolls independently like the
+        others.
+      */}
       {activeConversation && (
-        <div className="hidden xl:flex w-72 shrink-0 flex-col border-l border-gray-200/60 dark:border-white/[0.04] bg-white/70 dark:bg-white/[0.02]">
+        <div className="hidden 2xl:flex w-72 shrink-0 min-h-0 flex-col overflow-y-auto overscroll-contain border-l border-gray-200/60 dark:border-white/[0.04] bg-white/70 dark:bg-white/[0.02]">
           {contactSidebarProps ? <ChatContactSidebar {...contactSidebarProps} /> : null}
         </div>
       )}
       {activeConversation && showContactDetails && contactSidebarProps ? (
-        <div className="fixed inset-0 z-layer-modal xl:hidden">
+        <div className="fixed inset-0 z-layer-modal 2xl:hidden">
           <button
             type="button"
             className="absolute inset-0 bg-black/45"

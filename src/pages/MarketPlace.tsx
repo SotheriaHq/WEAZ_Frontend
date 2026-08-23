@@ -343,37 +343,88 @@ const MarketSectionPreviewRail: React.FC<{
                   ? `${item.stats.products} item${item.stats.products === 1 ? '' : 's'}`
                   : null;
 
+            const trackOpen = () => {
+              if (!targetId) return;
+              onTrackSignal({
+                targetType: item.entityType,
+                targetId,
+                signalType: 'OPEN',
+                surface: 'MARKET_HOME',
+                sectionKey: section.key,
+                position: index,
+              });
+            };
+
+            /*
+              A product renders as THE product card. Anything else does not.
+
+              These rails were drawing a card of their own — a white box with a
+              cropped thumbnail on top and text beneath — while every other
+              product surface in the app uses `StoreProductCard`: full-bleed
+              media, the frosted info panel, the custom-order scissors, and the
+              bag control with its heartbeat. So "Hot right now", "Loved near
+              you" and the rest looked like a different product to the rails
+              directly above and below them, and had no bag affordance at all.
+
+              The condition is what the item IS, not which rail it is in. Section
+              items are a mixed bag: "Shop by Style" carries categories and "New
+              designers to watch" carries brands, and neither has a price, stock
+              or a bag action to put on a product card. Those keep the tile.
+            */
+            if (product) {
+              return (
+                <div
+                  key={`${section.key}-${item.sourceType}-${item.sourceId}`}
+                  ref={(node) => setItemRef(signalKey, node)}
+                  data-market-signal-key={signalKey}
+                  className={`shrink-0 ${compact ? 'w-[240px] sm:w-[280px]' : 'w-[300px]'} max-w-[82vw]`}
+                >
+                  <StoreProductCard
+                    product={product}
+                    onViewProduct={(next) => {
+                      trackOpen();
+                      onViewProduct(next);
+                    }}
+                    enableHoverGallery
+                    onPreviewNavigationActiveChange={() => undefined}
+                  />
+                </div>
+              );
+            }
+
+            /*
+              Non-product items wear the SAME card, not a different one.
+
+              A category or a brand has no price, no stock and nothing to bag, so
+              it cannot literally be a `StoreProductCard`. What it can be — and
+              now is — is the same card SHELL: identical width, `aspect-[4/5]`
+              full-bleed media, and the same frosted panel pinned to the bottom
+              with white text over a blurred tint. Only the contents of the panel
+              differ, because only the contents genuinely differ.
+
+              Previously this was a white box with a cropped `h-32` thumbnail and
+              text stacked underneath — a different shape, a different aspect
+              ratio and a different colour treatment sitting in the same scroller
+              as the product cards.
+            */
             return (
               <div
                 key={`${section.key}-${item.sourceType}-${item.sourceId}`}
                 ref={(node) => setItemRef(signalKey, node)}
                 data-market-signal-key={signalKey}
-                className={`group relative shrink-0 overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-gray-200/70 transition hover:-translate-y-0.5 hover:shadow-md dark:bg-white/[0.04] dark:ring-white/10 ${
-                  compact ? 'w-[200px] sm:w-[240px]' : 'w-[260px]'
-                }`}
+                className={`group relative shrink-0 overflow-hidden rounded-2xl bg-transparent text-left shadow-sm transition hover:shadow-lg ${
+                  compact ? 'w-[240px] sm:w-[280px]' : 'w-[300px]'
+                } max-w-[82vw]`}
               >
                 <button
                   type="button"
                   disabled={!canOpen}
                   onClick={() => {
                     if (!canOpen) return;
-                    if (targetId) {
-                      onTrackSignal({
-                        targetType: item.entityType,
-                        targetId,
-                        signalType: 'OPEN',
-                        surface: 'MARKET_HOME',
-                        sectionKey: section.key,
-                        position: index,
-                      });
-                    }
-                    if (product) {
-                      onViewProduct(product);
-                      return;
-                    }
+                    trackOpen();
                     onOpenItem(item);
                   }}
-                  className="block w-full text-left disabled:cursor-default"
+                  className="relative block aspect-[4/5] w-full overflow-hidden rounded-2xl text-left disabled:cursor-default"
                 >
                   {mediaUrl || mediaFileId ? (
                     <ImageWithFallback
@@ -382,25 +433,32 @@ const MarketSectionPreviewRail: React.FC<{
                       alt={item.media?.alt || item.title}
                       fit="cover"
                       rounded="none"
-                      containerClassName={`${compact ? 'h-32 sm:h-36' : 'h-40'} w-full bg-gray-100 dark:bg-white/5`}
+                      containerClassName="absolute inset-0 h-full w-full bg-neutral-950"
                       className="h-full w-full transition-transform duration-500 group-hover:scale-105"
                       maxHeightClassName="max-h-full"
                       fallbackName={item.title}
                     />
                   ) : (
-                    <div className={`flex w-full items-center justify-center bg-gray-100 text-3xl dark:bg-white/5 ${compact ? 'h-32 sm:h-36' : 'h-40'}`}>
+                    <div className="absolute inset-0 flex w-full items-center justify-center bg-gray-100 text-3xl dark:bg-white/5">
                       #
                     </div>
                   )}
-                  <div className={`space-y-1 ${compact ? 'p-2.5' : 'p-3'}`}>
-                    <p className={`line-clamp-1 font-bold text-gray-900 dark:text-white ${compact ? 'text-xs sm:text-sm' : 'text-sm'}`}>{item.title}</p>
+
+                  {/* Same frosted bar as the product card: /40 tint, heavy blur,
+                      contrast carried by a text shadow rather than by opacity. */}
+                  <div className="absolute inset-x-0 bottom-0 z-10 border-t border-white/10 bg-black/40 px-4 pb-3 pt-2.5 backdrop-blur-xl backdrop-saturate-150">
+                    <p className="line-clamp-1 text-sm font-semibold leading-snug text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
+                      {item.title}
+                    </p>
                     {item.subtitle || item.brand?.name ? (
-                      <p className="line-clamp-1 text-xs text-gray-500 dark:text-gray-400">
+                      <p className="mt-0.5 line-clamp-1 text-[11px] text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">
                         {item.subtitle || item.brand?.name}
                       </p>
                     ) : null}
                     {priceLabel ? (
-                      <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">{priceLabel}</p>
+                      <p className="mt-1.5 text-sm font-bold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
+                        {priceLabel}
+                      </p>
                     ) : null}
                   </div>
                 </button>
@@ -865,7 +923,22 @@ const MarketPlace: React.FC = () => {
     >
       <div className="space-y-6">
         <section className="rounded-2xl bg-white/35 p-3 backdrop-blur-[2px] ring-1 ring-gray-200/55 dark:bg-white/[0.03] dark:ring-white/10 sm:p-4">
-          <div className="grid min-h-[7.5rem] grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-2 sm:min-h-[9rem] sm:gap-3 lg:min-h-[54px] lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          {/*
+            An explicit, capped height — the hero no longer sizes itself.
+
+            The row had only `min-h` floors, so its real height came from
+            whatever the content stretched to, and on a desktop the single
+            feature image grew until it owned most of the first screen. A market
+            page whose first screenful is one product buries the nine rails that
+            are the actual point of it.
+
+            Fixed heights make the hero a banner instead of a page: roughly 40%
+            shorter than it was rendering, and predictable at every width. The
+            right-hand column now carries three tiles rather than two, so the
+            same area shows more of the catalogue at a sensible size instead of
+            two very tall slabs.
+          */}
+          <div className="grid h-[13rem] grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-2 sm:h-[16rem] sm:gap-3 lg:h-[22rem] lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <div className="h-full min-h-0">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -928,13 +1001,17 @@ const MarketPlace: React.FC = () => {
               </AnimatePresence>
             </div>
 
-            <div className="grid h-full grid-cols-1 grid-rows-2 gap-2 sm:gap-3 lg:grid-cols-1 lg:grid-rows-2">
-              {heroProducts.slice(0, 2).map((product) => (
+            <div className="grid h-full min-h-0 grid-cols-1 grid-rows-2 gap-2 sm:gap-3 lg:grid-cols-1 lg:grid-rows-3">
+              {heroProducts.slice(0, 3).map((product, secondaryIndex) => (
                 <button
                   key={product.id}
                   type="button"
                   onClick={() => handleOpenProduct(product, { source: 'market_hero_secondary' })}
-                  className="group relative min-h-0 overflow-hidden rounded-lg bg-gray-100 text-left ring-1 ring-gray-200/70 dark:bg-white/5 dark:ring-white/10 sm:rounded-xl lg:h-full"
+                  className={`group relative min-h-0 overflow-hidden rounded-lg bg-gray-100 text-left ring-1 ring-gray-200/70 dark:bg-white/5 dark:ring-white/10 sm:rounded-xl lg:h-full ${
+                    // Below `lg` the column is two rows, so a third tile would
+                    // overflow it.
+                    secondaryIndex === 2 ? 'hidden lg:block' : ''
+                  }`}
                 >
                   <ImageWithFallback
                     src={product.thumbnail || product.images[0] || null}
