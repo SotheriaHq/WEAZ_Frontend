@@ -828,8 +828,17 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
     try {
       const nextPatched = await toggleStatus(brandId);
       toast.success(patchToastMessage(nextPatched));
-    } catch {
-      toast.error('Unable to update patch.');
+    } catch (error) {
+      // The server's reason is the only actionable one — a brand account cannot
+      // patch, an unpatch can race one removed on another device. "Unable to
+      // update patch" tells the shopper nothing and tells us nothing when they
+      // report it.
+      const response = (error as { response?: { data?: { message?: string | string[] } } })?.response;
+      const message = response?.data?.message;
+      const detail = Array.isArray(message) ? message[0] : message;
+      toast.error(
+        typeof detail === 'string' && detail.trim() ? detail.trim() : 'Unable to update patch.',
+      );
     }
   };
 
