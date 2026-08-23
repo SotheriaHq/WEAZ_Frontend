@@ -59,6 +59,21 @@ describe('isEquivalentSignedUrl', () => {
   });
 });
 
+/*
+  Tree fixtures are issued RELATIVE TO NOW.
+
+  `replaceEqualDeepPreservingSignedUrls` reads the real clock -- it has no `now`
+  parameter, because in the app the comparison always happens against the real
+  clock. A hardcoded signing date therefore gives these fixtures a shelf life:
+  `20260808T090000Z` plus the default 7-day expiry meant that from 2026-08-15
+  every fixture below looked expired, the implementation correctly declined to
+  preserve the cached URL, and the suite blamed the code.
+*/
+const amzDate = (ms: number) =>
+  new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+const ISSUED_AT = amzDate(Date.now() - 60_000);
+const RESIGNED_AT = amzDate(Date.now() - 30_000);
+
 describe('replaceEqualDeepPreservingSignedUrls', () => {
   it('keeps the whole tree by reference when only signatures changed', () => {
     // This is the behaviour the flicker depended on: one changed leaf used to
@@ -66,14 +81,14 @@ describe('replaceEqualDeepPreservingSignedUrls', () => {
     // remounted and every <img> reloaded.
     const previous = {
       items: [
-        { id: 'c1', title: 'Resort', coverImage: signed('20260808T090000Z', 'aaa') },
-        { id: 'c2', title: 'Bridal', coverImage: signed('20260808T090000Z', 'ccc') },
+        { id: 'c1', title: 'Resort', coverImage: signed(ISSUED_AT, 'aaa') },
+        { id: 'c2', title: 'Bridal', coverImage: signed(ISSUED_AT, 'ccc') },
       ],
     };
     const next = {
       items: [
-        { id: 'c1', title: 'Resort', coverImage: signed('20260808T091500Z', 'bbb') },
-        { id: 'c2', title: 'Bridal', coverImage: signed('20260808T091500Z', 'ddd') },
+        { id: 'c1', title: 'Resort', coverImage: signed(RESIGNED_AT, 'bbb') },
+        { id: 'c2', title: 'Bridal', coverImage: signed(RESIGNED_AT, 'ddd') },
       ],
     };
 
@@ -86,14 +101,14 @@ describe('replaceEqualDeepPreservingSignedUrls', () => {
   it('still propagates a genuine change, and only where it happened', () => {
     const previous = {
       items: [
-        { id: 'c1', title: 'Resort', coverImage: signed('20260808T090000Z', 'aaa') },
-        { id: 'c2', title: 'Bridal', coverImage: signed('20260808T090000Z', 'ccc') },
+        { id: 'c1', title: 'Resort', coverImage: signed(ISSUED_AT, 'aaa') },
+        { id: 'c2', title: 'Bridal', coverImage: signed(ISSUED_AT, 'ccc') },
       ],
     };
     const next = {
       items: [
-        { id: 'c1', title: 'Resort 2026', coverImage: signed('20260808T091500Z', 'bbb') },
-        { id: 'c2', title: 'Bridal', coverImage: signed('20260808T091500Z', 'ddd') },
+        { id: 'c1', title: 'Resort 2026', coverImage: signed(RESIGNED_AT, 'bbb') },
+        { id: 'c2', title: 'Bridal', coverImage: signed(RESIGNED_AT, 'ddd') },
       ],
     };
 
