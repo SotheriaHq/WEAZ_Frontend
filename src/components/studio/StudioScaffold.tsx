@@ -9,6 +9,7 @@ import { closeSidebar } from '@/features/uiSlice';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 import BrandSwitcher from '@/components/brand/BrandSwitcher';
+import { useShellViewportLocked } from '@/components/navigation/IslandBottomNav';
 
 type StudioScaffoldProps = {
   active: string;
@@ -20,6 +21,7 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
   const dispatch = useDispatch<AppDispatch>();
   const embeddedSurface = useEmbeddedSurface();
   const isEmbeddedMobile = embeddedSurface === 'mobile-app';
+  const viewportLocked = useShellViewportLocked();
 
   useEffect(() => {
     dispatch(closeSidebar());
@@ -54,11 +56,20 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
         app draws its own island inside this viewport, and there the reservation
         is the only one there is.
       */}
+      {/*
+        A viewport-locked page (the messages view) gets neither the minimum
+        height nor the bottom clearance: it measures itself to fill exactly what
+        is left and scrolls inside its own panes. Adding either underneath it
+        makes the document taller than the screen, and scrolling that overflow
+        is what drags the conversation header up under the navbar.
+      */}
       <div
         className={
           isEmbeddedMobile
             ? 'min-h-dvh bg-[color:var(--surface-primary)] px-3 pb-[env(safe-area-inset-bottom)] pt-2 sm:px-4'
-            : 'min-h-dvh bg-[color:var(--surface-primary)] px-3 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-20 sm:px-4 lg:pb-10 lg:pl-[236px]'
+            : viewportLocked
+              ? 'bg-[color:var(--surface-primary)] px-3 pt-20 sm:px-4 lg:pl-[236px]'
+              : 'min-h-dvh bg-[color:var(--surface-primary)] px-3 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-20 sm:px-4 lg:pb-10 lg:pl-[236px]'
         }
       >
         <div className="mx-auto max-w-6xl min-w-0">

@@ -83,6 +83,79 @@ export const useSuppressIslandBottomNav = (active: boolean): void => {
   }, [active]);
 };
 
+/**
+ * The island renders below `lg`. Above it, the rail takes over.
+ *
+ * Exported so a page that has to leave room for the island can ask the same
+ * question the island itself answers, instead of guessing a breakpoint. Getting
+ * this wrong is not cosmetic: reserving island space on a viewport that has no
+ * island is dead space at the bottom of a full-height screen, and on a tablet
+ * that dead space is what pushed the conversation up under the navbar.
+ */
+export const ISLAND_BOTTOM_NAV_BREAKPOINT_PX = 1024;
+
+/** Height of the pill (h-14) plus its bottom offset and a little breathing room. */
+export const ISLAND_BOTTOM_NAV_RESERVED_PX = 84;
+
+/**
+ * Declares that this view sizes itself to the viewport and scrolls internally.
+ *
+ * The app shell adds `min-h-screen` plus bottom clearance for the island to
+ * every page, which is right for a document that scrolls and wrong for a screen
+ * that must not. A messages view measures itself to fill exactly what is left
+ * below the navbar; the shell's clearance was then added UNDER it, so the
+ * document was always ~96px taller than the viewport. Scrolling that overflow
+ * is what slid the conversation header up under the fixed navbar and left a
+ * band of empty space at the bottom — on an iPad, where there is no island at
+ * all, that space was reserved for a control that never renders.
+ *
+ * Reference-counted for the same reason the island suppression is: nested or
+ * overlapping full-screen views must not have the first one to unmount hand the
+ * padding back while another is still on screen.
+ */
+type ViewportLockListener = (locked: boolean) => void;
+
+let viewportLockCount = 0;
+const viewportLockListeners = new Set<ViewportLockListener>();
+
+const emitViewportLock = () => {
+  const locked = viewportLockCount > 0;
+  viewportLockListeners.forEach((listener) => listener(locked));
+};
+
+export const lockShellViewport = (): (() => void) => {
+  viewportLockCount += 1;
+  emitViewportLock();
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    viewportLockCount = Math.max(0, viewportLockCount - 1);
+    emitViewportLock();
+  };
+};
+
+export const useShellViewportLocked = (): boolean => {
+  const [locked, setLocked] = useState(viewportLockCount > 0);
+  useEffect(() => {
+    const listener: ViewportLockListener = (next) => setLocked(next);
+    viewportLockListeners.add(listener);
+    setLocked(viewportLockCount > 0);
+    return () => {
+      viewportLockListeners.delete(listener);
+    };
+  }, []);
+  return locked;
+};
+
+/** Mount-scoped helper: locks the shell to the viewport while `active`. */
+export const useLockShellViewport = (active: boolean): void => {
+  useEffect(() => {
+    if (!active) return;
+    return lockShellViewport();
+  }, [active]);
+};
+
 const ITEM_BASE_CLASS =
   'flex h-11 min-w-[64px] flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-2 text-[11px] font-semibold leading-none transition-colors';
 

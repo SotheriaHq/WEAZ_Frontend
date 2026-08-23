@@ -788,7 +788,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 
         {/*
           Calm frosted bar, not a tall gradient. The old treatment was a
-          `pt-16` `from-black/82` scrim: it covered ~40% of the card (so media
+          `pt-16` `from-black/[0.82]` scrim: it covered ~40% of the card (so media
           never read "in full") and its perceived weight swung with the image —
           invisible over dark media, a heavy black band over light media.
           A constant blurred tint is legible against ANY content because it does

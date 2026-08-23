@@ -80,7 +80,7 @@ type ModalMedia = {
 const ACTION_TILE_CLASS =
   'flex h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-center transition-colors';
 const ACTION_TILE_NEUTRAL_CLASS =
-  'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/8 dark:text-slate-200 dark:hover:bg-white/14';
+  'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/[0.08] dark:text-slate-200 dark:hover:bg-white/[0.14]';
 const ACTION_TILE_LABEL_CLASS = 'w-full truncate text-[9px] font-bold leading-none';
 
 const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountChange }) => {
@@ -732,7 +732,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                           className="group flex min-w-0 items-center gap-2.5 text-left"
                           title={`Open ${brandLabel} catalog`}
                         >
-                          <span className="size-9 shrink-0 overflow-hidden rounded-2xl ring-1 ring-black/8 dark:ring-white/12">
+                          <span className="size-9 shrink-0 overflow-hidden rounded-2xl ring-1 ring-black/[0.08] dark:ring-white/[0.12]">
                             <ImageWithFallback
                               src={avatar.src}
                               fileId={avatar.fileId}
@@ -1012,7 +1012,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
             <div className="flex h-full min-w-0 flex-col overflow-hidden bg-white/65 text-slate-900 dark:bg-[#0f0b11]/70 dark:text-white">
               {/* Fixed metadata header — never scrolls; only the comments feed below does. */}
-              <div className="shrink-0 space-y-2.5 border-b border-slate-900/8 p-3.5 dark:border-white/10 md:p-4">
+              <div className="shrink-0 space-y-2.5 border-b border-slate-900/[0.08] p-3.5 dark:border-white/10 md:p-4">
                 {/* Brand row */}
                 <div className="flex items-center justify-between gap-2 pr-8">
                   <div className="flex min-w-0 items-center gap-2.5">
@@ -1022,7 +1022,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                       className="group flex min-w-0 items-center gap-2.5 text-left"
                       title={`Open ${brandLabel} catalog`}
                     >
-                      <div className="size-9 shrink-0 overflow-hidden rounded-2xl ring-1 ring-black/8 dark:ring-white/12">
+                      <div className="size-9 shrink-0 overflow-hidden rounded-2xl ring-1 ring-black/[0.08] dark:ring-white/[0.12]">
                         <ImageWithFallback
                           src={avatar.src}
                           fileId={avatar.fileId}
@@ -1210,7 +1210,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               </div>
 
               {/* Sticky composer — pinned below the scrolling feed. */}
-              <div className="relative shrink-0 border-t border-slate-900/8 p-3 dark:border-white/10" onClick={(e) => e.stopPropagation()}>
+              <div className="relative shrink-0 border-t border-slate-900/[0.08] p-3 dark:border-white/10" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-1.5 rounded-xl bg-slate-900/5 px-2.5 py-1.5 dark:bg-white/10">
                   <input
                     type="text"

@@ -27,7 +27,7 @@ const isLikelyFileId = (value?: string | null) =>
 
 const getPaymentTone = (status?: string | null) =>
   String(status || '').toUpperCase() === 'PAID'
-    ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20'
+    ? 'bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300 border border-emerald-500/20'
     : 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border border-slate-500/20';
 
 const ORDER_STEPS = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'] as const;
@@ -251,7 +251,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             ) : order ? (
               <>
                 <section className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Order workflow</p>
@@ -302,7 +302,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Payment & totals</p>
                     <div className="mt-4 space-y-3 text-sm">
                       <div className="flex items-center justify-between">
@@ -361,7 +361,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                 </section>
 
                 <section className="grid gap-4 md:grid-cols-3">
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Customer</p>
                     <div className="mt-4 space-y-2 text-sm">
                       <p className="text-lg font-bold">{order.customerName}</p>
@@ -370,7 +370,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Shipping</p>
                     <div className="mt-4 text-sm text-slate-600 dark:text-slate-400">
                       <p>
@@ -379,7 +379,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Order facts</p>
                     <div className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-400">
                       <p>🧾 {lineItems.length} item{lineItems.length === 1 ? '' : 's'}</p>
@@ -422,7 +422,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                         const src = fileId ? undefined : thumb || undefined;
 
                         return (
-                          <article key={item.id || idx} className="rounded-[26px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                          <article key={item.id || idx} className="rounded-[26px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                               <div className="flex flex-1 gap-4">
                                 <div className="h-20 w-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/5">

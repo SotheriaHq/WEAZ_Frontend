@@ -190,7 +190,7 @@ const VerificationPill: React.FC<{ label: string; ok: boolean }> = ({ label, ok 
 );
 
 const MediaUnavailablePreview: React.FC<{ label?: string }> = ({ label = 'Media unavailable' }) => (
-  <div className="flex h-full w-full items-center justify-center bg-gray-100 px-4 text-center text-sm font-medium text-gray-500 dark:bg-white/8 dark:text-gray-400">
+  <div className="flex h-full w-full items-center justify-center bg-gray-100 px-4 text-center text-sm font-medium text-gray-500 dark:bg-white/[0.08] dark:text-gray-400">
     {label}
   </div>
 );
@@ -604,7 +604,7 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
         {loading ? (
           <div className="space-y-3 p-4">
             {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="h-20 animate-pulse rounded-lg bg-gray-100 dark:bg-white/8" />
+              <div key={index} className="h-20 animate-pulse rounded-lg bg-gray-100 dark:bg-white/[0.08]" />
             ))}
           </div>
         ) : submissions.length === 0 ? (
@@ -627,7 +627,7 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
                   <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-white/8">
+              <tbody className="divide-y divide-gray-100 dark:divide-white/[0.08]">
                 {submissions.map((submission) => {
                   const thumbnail = submission.media[0];
                   const thumbnailSrc = getMediaThumbnailSrc(thumbnail);
@@ -635,7 +635,7 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
                     <tr key={submission.id} className="align-top text-gray-700 dark:text-gray-200">
                       <td className="px-4 py-3">
                         <div className="flex min-w-[260px] items-center gap-3">
-                          <div className="h-16 w-16 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/8">
+                          <div className="h-16 w-16 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/[0.08]">
                             {thumbnailSrc && !mediaIsVideo(thumbnail?.mediaType, thumbnail?.mimeType) ? (
                               <AdminReviewImagePreview
                                 src={thumbnailSrc}
@@ -676,7 +676,7 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
                         <button
                           type="button"
                           onClick={() => void loadDetail(submission)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/8"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.08]"
                         >
                           <Eye size={14} />
                           Review
@@ -702,7 +702,7 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
           <Flag size={20} className="text-red-500" />
         </div>
         {reportsLoading ? (
-          <div className="mt-4 h-24 animate-pulse rounded-lg bg-gray-100 dark:bg-white/8" />
+          <div className="mt-4 h-24 animate-pulse rounded-lg bg-gray-100 dark:bg-white/[0.08]" />
         ) : reports.length === 0 ? (
           <div className="mt-4 rounded-lg border border-dashed border-gray-200 p-5 text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
             No reports are waiting for review.
@@ -770,7 +770,7 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
 
       <Modal open={Boolean(selected)} onClose={() => setSelected(null)} title="Review Submission" size="xl" backdropStyle="light">
         {!selected || detailLoading ? (
-          <div className="h-80 animate-pulse rounded-xl bg-gray-100 dark:bg-white/8" />
+          <div className="h-80 animate-pulse rounded-xl bg-gray-100 dark:bg-white/[0.08]" />
         ) : (
           <div className="space-y-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -863,7 +863,7 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
                 const isVideo = mediaIsVideo(media.mediaType, media.mimeType);
                 return (
                   <div key={media.id} className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/10">
-                    <div className="aspect-square bg-gray-100 dark:bg-white/8">
+                    <div className="aspect-square bg-gray-100 dark:bg-white/[0.08]">
                       {mediaPreviewSrc && !isVideo ? (
                         <AdminReviewImagePreview
                           src={mediaPreviewSrc}
@@ -1030,7 +1030,7 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
             <button
               type="button"
               onClick={() => setPendingDecision(null)}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/8"
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.08]"
             >
               Cancel
             </button>

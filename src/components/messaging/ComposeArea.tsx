@@ -209,7 +209,7 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
   }, [handleSend]);
 
   return (
-    <div className="shrink-0 border-t border-gray-200/50 bg-white/60 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm dark:border-white/10 dark:bg-black/20">
+    <div className="shrink-0 bg-white/70 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm dark:bg-white/[0.04]">
       {/* Reply preview */}
       {replyTo && (
         <div className="flex items-center gap-2 mb-2 rounded-xl border-l-4 border-purple-500 bg-purple-50/80 dark:bg-purple-500/10 px-3 py-2">
@@ -233,7 +233,7 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">
           {files.map(f => (
-            <div key={f.fileId} className="flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-white/8 border border-gray-200/60 dark:border-white/10 px-2.5 py-1.5 text-xs">
+            <div key={f.fileId} className="flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.08] px-2.5 py-1.5 text-xs">
               {f.previewUrl ? (
                 <MediaRenderer
                   kind="image"
@@ -265,7 +265,7 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
             type="button"
             onClick={() => setShowEmojiPicker((prev) => !prev)}
             disabled={disabled || sending}
-            className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/8 transition-colors"
+            className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/[0.08] transition-colors"
             title="Open emoji picker"
             aria-label="Open emoji picker"
           >
@@ -279,7 +279,7 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
         </div>
 
         {/* Attach button */}
-        <label className="shrink-0 cursor-pointer p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/8 transition-colors" title="Attach files">
+        <label className="shrink-0 cursor-pointer p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/[0.08] transition-colors" title="Attach files">
           <input
             type="file"
             multiple
@@ -301,7 +301,7 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
           rows={1}
           placeholder={placeholder}
           disabled={disabled || sending}
-          className="flex-1 resize-none rounded-2xl border border-gray-200/60 dark:border-white/10 bg-white/80 dark:bg-white/5 px-3.5 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-shadow"
+          className="flex-1 resize-none rounded-2xl bg-gray-100 dark:bg-white/[0.08] px-3.5 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-shadow"
         />
 
         {/* Send button */}
@@ -327,7 +327,7 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
             type="button"
             onClick={() => appendText(sticker)}
             disabled={disabled || sending}
-            className="rounded-full border border-gray-200/70 bg-gray-100/70 px-2.5 py-1 text-[11px] font-semibold text-gray-600 hover:border-purple-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
+            className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-600 transition-colors hover:bg-purple-100 hover:text-purple-700 dark:bg-white/[0.08] dark:text-gray-300 dark:hover:bg-purple-500/20 dark:hover:text-purple-200"
           >
             {sticker}
           </button>

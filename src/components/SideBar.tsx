@@ -48,7 +48,7 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
             ? 'cursor-not-allowed opacity-50'
             : isSelected
             ? 'bg-[linear-gradient(180deg,rgba(217,70,239,0.12),rgba(255,255,255,0.1))] dark:bg-[linear-gradient(180deg,rgba(168,85,247,0.18),rgba(255,255,255,0.05))]'
-            : 'hover:bg-white/28 dark:hover:bg-white/6'
+            : 'hover:bg-white/[0.28] dark:hover:bg-white/[0.06]'
         }`}
         title={
           disabled
@@ -94,7 +94,7 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
           ? 'cursor-not-allowed opacity-50'
           : isSelected
           ? 'bg-[linear-gradient(90deg,rgba(217,70,239,0.12),rgba(255,255,255,0.12))] font-semibold text-gray-900 dark:bg-[linear-gradient(90deg,rgba(168,85,247,0.18),rgba(255,255,255,0.04))] dark:text-white'
-          : 'text-gray-700 dark:text-gray-300 hover:bg-white/28 dark:hover:bg-white/5'
+          : 'text-gray-700 dark:text-gray-300 hover:bg-white/[0.28] dark:hover:bg-white/5'
       }`}
       title={disabled ? `${label} (locked until store setup is complete)` : isRail ? label : undefined}
     >

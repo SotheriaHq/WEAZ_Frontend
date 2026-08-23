@@ -7,7 +7,12 @@ import { messagingApi, type InboxItem, type ThreadMessage, type ThreadOrderItem,
 import { customOrdersBuyerApi, customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
 import { getStoreStatus } from '@/api/StoreApi';
 import { isRateLimited, shouldAnnounceRateLimit } from '@/api/httpClient';
-import { useSuppressIslandBottomNav } from '@/components/navigation/IslandBottomNav';
+import {
+  ISLAND_BOTTOM_NAV_BREAKPOINT_PX,
+  ISLAND_BOTTOM_NAV_RESERVED_PX,
+  useLockShellViewport,
+  useSuppressIslandBottomNav,
+} from '@/components/navigation/IslandBottomNav';
 import DesignViewModal from '@/components/designs/DesignViewModal';
 import { getDesignDetail } from '@/api/DesignApi';
 import { toMarketItem } from '@/api/MarketApi';
@@ -1015,13 +1020,36 @@ const MessagingManagementPage: React.FC = () => {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const [shellHeight, setShellHeight] = useState<number | null>(null);
 
+  /*
+    This page sizes itself to the viewport, so the app shell must stop adding
+    `min-h-screen` and island clearance underneath it. Without the lock the
+    document is permanently ~96px taller than the screen and every drag scrolls
+    that overflow — the conversation header disappears under the fixed navbar
+    and a dead band opens at the bottom. See `useShellViewportLocked`.
+  */
+  useLockShellViewport(true);
+
   useEffect(() => {
     const measure = () => {
       const node = shellRef.current;
       if (!node) return;
       const top = node.getBoundingClientRect().top;
-      // A small tail so the rounded border is not flush with the viewport edge.
-      const next = Math.max(320, window.innerHeight - top - 12);
+
+      /*
+        Room for the island is reserved only when the island is actually there.
+
+        It renders below `lg` and hides itself while a thread is open, so the
+        cases are: phone + conversation list, leave room; phone + open thread,
+        none needed because the island has stood down and the composer owns the
+        bottom; tablet or desktop, none needed because the island never renders
+        at that width. Reserving unconditionally is what left an empty strip
+        under the conversation on an iPad, and reserving nothing would put the
+        island on top of the last row of the list on a phone.
+      */
+      const islandVisible =
+        !activeId && window.innerWidth < ISLAND_BOTTOM_NAV_BREAKPOINT_PX;
+      const bottomInset = islandVisible ? ISLAND_BOTTOM_NAV_RESERVED_PX : 12;
+      const next = Math.max(320, window.innerHeight - top - bottomInset);
       setShellHeight((current) => (current === next ? current : next));
     };
 
@@ -1038,7 +1066,9 @@ const MessagingManagementPage: React.FC = () => {
       window.removeEventListener('orientationchange', measure);
       observer?.disconnect();
     };
-  }, []);
+    // Opening or leaving a thread changes whether the island is on screen, and
+    // therefore how much room to leave for it.
+  }, [activeId]);
 
   const refreshRef = useRef(refresh);
   const refreshInboxRef = useRef(refreshInbox);
@@ -1110,6 +1140,128 @@ const MessagingManagementPage: React.FC = () => {
     // the handler, so this must not re-run when those values change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onMessageEvent]);
+
+  /*
+    Receipts move the ticks IN PLACE — they never trigger a fetch.
+
+    A tick change is one field on messages already on screen, so re-downloading
+    the conversation to discover it is both the slow way and the expensive way
+    to find out. That refetch is what the delay was: the recipient opened the
+    thread, the server recorded delivery and read within milliseconds of each
+    other, and the sender's client learned about each one on a separate round
+    trip — one tick, pause, two ticks, pause, read.
+
+    Applied to the cache as well as to state, so the ticks survive switching
+    away from the thread and back.
+  */
+  /*
+    Receipts that arrived before the message they describe.
+
+    The delivered event can beat the send response back: the server pushes it
+    the instant presence resolves, while the sender is still waiting on its own
+    POST to return the message it applies to. Holding the ids means an early
+    receipt is applied the moment the bubble exists instead of being dropped and
+    left to a later refetch — which is precisely the stuck first tick.
+  */
+  const pendingDeliveredIdsRef = useRef<Set<string>>(new Set());
+  const pendingReadRef = useRef<{ conversationId: string; lastReadMessageId: string } | null>(null);
+
+  const applyReceiptsToActiveThread = useCallback(() => {
+    const current = activeConversationRef.current;
+    if (!current) return;
+    const deliveredIds = pendingDeliveredIdsRef.current;
+    const pendingRead = pendingReadRef.current;
+    if (deliveredIds.size === 0 && !pendingRead) return;
+
+    setMessages((items) => {
+      if (items.length === 0) return items;
+
+      // Read implies delivered, so it is applied second and wins outright.
+      const readLimit =
+        pendingRead && pendingRead.conversationId === current.id
+          ? (() => {
+              // The reader acknowledges up to the newest message they hold.
+              // When that id is not in view it is newer than anything loaded
+              // here, so every own message on screen has been read.
+              const index = pendingRead.lastReadMessageId
+                ? items.findIndex((message) => message.id === pendingRead.lastReadMessageId)
+                : -1;
+              return index === -1 ? items.length - 1 : index;
+            })()
+          : -1;
+
+      let changed = false;
+      const next = items.map((message, index) => {
+        const own = isOwnMessage(message);
+        if (own && index <= readLimit && message.deliveryStatus !== 'READ') {
+          changed = true;
+          return { ...message, deliveryStatus: 'READ' as const };
+        }
+        // A late delivery event must never walk a read tick backwards.
+        if (
+          deliveredIds.has(message.id) &&
+          message.deliveryStatus !== 'READ' &&
+          message.deliveryStatus !== 'DELIVERED'
+        ) {
+          changed = true;
+          return { ...message, deliveryStatus: 'DELIVERED' as const };
+        }
+        return message;
+      });
+
+      if (!changed) return items;
+      messagesCacheRef.current.set(current.id, next);
+      return next;
+    });
+  }, [isOwnMessage]);
+
+  useEffect(() => {
+    const conversationMatches = (payload: any) => {
+      const current = activeConversationRef.current;
+      if (!current) return false;
+      const pThreadId = String(payload?.threadId ?? '');
+      if (!pThreadId) return false;
+      return pThreadId === getContextId(current) || pThreadId === current.threadId;
+    };
+
+    const handleDelivered = (payload: any) => {
+      if (!conversationMatches(payload)) return;
+      const ids = Array.isArray(payload?.messageIds) ? payload.messageIds : [];
+      if (ids.length === 0) return;
+      ids.forEach((id: unknown) => pendingDeliveredIdsRef.current.add(String(id)));
+      applyReceiptsToActiveThread();
+    };
+
+    const handleRead = (payload: any) => {
+      if (!conversationMatches(payload)) return;
+      // Our own read of somebody else's messages says nothing about our ticks.
+      if (actorId && String(payload?.readByUserId ?? '') === actorId) return;
+      const current = activeConversationRef.current;
+      if (!current) return;
+      pendingReadRef.current = {
+        conversationId: current.id,
+        lastReadMessageId: String(payload?.lastReadMessageId ?? ''),
+      };
+      applyReceiptsToActiveThread();
+    };
+
+    const unsubDelivered = onMessageEvent('message.delivered', handleDelivered);
+    const unsubRead = onMessageEvent('message.read', handleRead);
+    return () => { unsubDelivered(); unsubRead(); };
+  }, [onMessageEvent, actorId, applyReceiptsToActiveThread, getContextId]);
+
+  // Re-apply held receipts whenever the transcript changes, so one that landed
+  // before its message still reaches it.
+  useEffect(() => {
+    applyReceiptsToActiveThread();
+  }, [messages, applyReceiptsToActiveThread]);
+
+  // Receipts are per-conversation; carrying them across a switch would stamp
+  // another thread's bubbles.
+  useEffect(() => {
+    pendingDeliveredIdsRef.current = new Set();
+    pendingReadRef.current = null;
+  }, [activeId]);
 
   // notification.created — backup path via notification worker
   useEffect(() => {
@@ -1403,6 +1555,7 @@ const MessagingManagementPage: React.FC = () => {
       tracks the live viewport, and the fallback keeps older browsers on the old
       behaviour rather than on nothing.
     */
+    <>
     <div
       /*
         Height comes from a CSS custom property with a `vh` fallback, not from
@@ -1455,7 +1608,7 @@ const MessagingManagementPage: React.FC = () => {
         1024–1279px a 320px rail plus the detail panel leaves the conversation
         itself squeezed into whatever is left.
       */}
-      <div className={`w-full min-w-0 min-h-0 flex-col border-r border-gray-200/60 dark:border-white/[0.04] bg-white/70 dark:bg-white/[0.02] lg:w-[17rem] lg:shrink-0 xl:w-80 ${activeId ? 'hidden lg:flex' : 'flex'}`}>
+      <div className={`w-full min-w-0 min-h-0 flex-col bg-gray-50/80 dark:bg-white/[0.03] lg:w-[17rem] lg:shrink-0 xl:w-80 ${activeId ? 'hidden lg:flex' : 'flex'}`}>
         {/* Header */}
         <div className="shrink-0 px-4 pt-4 pb-3">
           <h1 className="text-base font-semibold text-theme">Messages</h1>
@@ -1472,7 +1625,7 @@ const MessagingManagementPage: React.FC = () => {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search conversations..."
-              className="w-full rounded-xl border border-gray-200/60 dark:border-transparent bg-gray-50 dark:bg-white/5 pl-8 pr-3 py-2 text-xs outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/20 transition-all"
+              className="w-full rounded-xl bg-white dark:bg-white/[0.06] pl-8 pr-3 py-2 text-xs text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-1 focus:ring-purple-400/30 transition-all"
             />
           </div>
         </div>
@@ -1592,7 +1745,7 @@ const MessagingManagementPage: React.FC = () => {
         ) : (
           <>
             {/* Chat header */}
-            <div className="shrink-0 flex items-center justify-between gap-3 border-b border-gray-200/60 dark:border-white/[0.04] bg-white/60 dark:bg-white/[0.02] backdrop-blur-sm px-4 py-3">
+            <div className="shrink-0 flex items-center justify-between gap-3 bg-white/70 dark:bg-white/[0.04] backdrop-blur-sm px-4 py-3">
               <div className="flex items-center gap-3 min-w-0">
                 {/* Mobile back button */}
                 <button
@@ -1634,7 +1787,7 @@ const MessagingManagementPage: React.FC = () => {
                     <select
                       value={orderFilter}
                       onChange={(event) => setOrderFilter(event.target.value as typeof orderFilter)}
-                      className="hidden sm:block rounded-lg border border-gray-200/70 bg-white px-2 py-1.5 text-[11px] font-medium text-gray-700 outline-none dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
+                      className="hidden sm:block rounded-lg bg-gray-100 px-2 py-1.5 text-[11px] font-medium text-gray-700 outline-none dark:bg-white/[0.08] dark:text-gray-200"
                       aria-label="Filter orders"
                     >
                       <option value="all">All</option>
@@ -1646,7 +1799,7 @@ const MessagingManagementPage: React.FC = () => {
                     <select
                       value={selectedOrderKey}
                       onChange={(event) => setSelectedOrderKey(event.target.value)}
-                      className="max-w-[180px] rounded-lg border border-gray-200/70 bg-white px-2 py-1.5 text-[11px] font-medium text-gray-700 outline-none dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
+                      className="max-w-[180px] rounded-lg bg-gray-100 px-2 py-1.5 text-[11px] font-medium text-gray-700 outline-none dark:bg-white/[0.08] dark:text-gray-200"
                       aria-label="Select order"
                     >
                       <option value="">Select order</option>
@@ -1747,9 +1900,9 @@ const MessagingManagementPage: React.FC = () => {
                   <div key={group.date}>
                     {/* Date separator */}
                     <div className="flex items-center gap-3 my-3">
-                      <div className="flex-1 h-px bg-gray-200/60 dark:bg-white/8" />
+                      <div className="flex-1 h-px bg-gray-200/60 dark:bg-white/[0.08]" />
                       <span className="text-[10px] font-medium text-theme-secondary uppercase tracking-wider">{group.date}</span>
-                      <div className="flex-1 h-px bg-gray-200/60 dark:bg-white/8" />
+                      <div className="flex-1 h-px bg-gray-200/60 dark:bg-white/[0.08]" />
                     </div>
                     {group.msgs.map((msg) => (
                       <div key={msg.id} ref={(node) => { messageNodeRefs.current[msg.id] = node; }}>
@@ -1822,10 +1975,12 @@ const MessagingManagementPage: React.FC = () => {
         others.
       */}
       {activeConversation && (
-        <div className="hidden 2xl:flex w-72 shrink-0 min-h-0 flex-col overflow-y-auto overscroll-contain border-l border-gray-200/60 dark:border-white/[0.04] bg-white/70 dark:bg-white/[0.02]">
+        <div className="hidden 2xl:flex w-72 shrink-0 min-h-0 flex-col overflow-y-auto overscroll-contain bg-gray-50/80 dark:bg-white/[0.03]">
           {contactSidebarProps ? <ChatContactSidebar {...contactSidebarProps} /> : null}
         </div>
       )}
+    </div>
+
       {activeConversation && showContactDetails && contactSidebarProps ? (
         <div className="fixed inset-0 z-layer-modal 2xl:hidden">
           <button
@@ -1835,7 +1990,7 @@ const MessagingManagementPage: React.FC = () => {
             aria-label="Close conversation details"
           />
           <div className="absolute inset-y-0 right-0 w-[min(88vw,360px)] border-l border-gray-200/60 bg-white shadow-2xl dark:border-white/[0.04] dark:bg-[#111017]">
-            <div className="flex items-center justify-between border-b border-gray-200/60 px-4 py-3 dark:border-white/[0.04]">
+            <div className="flex items-center justify-between px-4 py-3">
               <div className="text-sm font-semibold text-theme">Conversation details</div>
               <button
                 type="button"
@@ -1875,7 +2030,7 @@ const MessagingManagementPage: React.FC = () => {
           Opening design…
         </div>
       ) : null}
-    </div>
+    </>
   );
 };
 

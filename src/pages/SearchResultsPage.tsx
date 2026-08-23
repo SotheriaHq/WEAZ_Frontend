@@ -173,7 +173,7 @@ const SearchResultsPage: React.FC = () => {
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                     activeType === tab.key
                       ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-950'
-                      : 'bg-white text-gray-700 shadow-sm hover:bg-gray-100 dark:bg-white/8 dark:text-gray-200 dark:hover:bg-white/12'
+                      : 'bg-white text-gray-700 shadow-sm hover:bg-gray-100 dark:bg-white/[0.08] dark:text-gray-200 dark:hover:bg-white/[0.12]'
                   }`}
                 >
                   {tab.label}
@@ -193,7 +193,7 @@ const SearchResultsPage: React.FC = () => {
         {isLoading ? (
           <div className="grid gap-4">
             {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="h-28 animate-pulse rounded-[2rem] bg-white/60 dark:bg-white/6" />
+              <div key={index} className="h-28 animate-pulse rounded-[2rem] bg-white/60 dark:bg-white/[0.06]" />
             ))}
           </div>
         ) : null}

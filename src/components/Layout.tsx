@@ -6,7 +6,10 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
 import { setSidebarMode, closeSidebar, selectIsMobile } from '@/features/uiSlice';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
-import { ISLAND_BOTTOM_NAV_CLEARANCE_CLASS } from '@/components/navigation/IslandBottomNav';
+import {
+  ISLAND_BOTTOM_NAV_CLEARANCE_CLASS,
+  useShellViewportLocked,
+} from '@/components/navigation/IslandBottomNav';
 
 interface LayoutProps {
   children?: React.ReactNode;
@@ -38,6 +41,21 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   
   const { sidebarMode, isSidebarOpen } = useSelector((state: RootState) => state.ui);
   const isMobile = useSelector(selectIsMobile);
+  /*
+    A page that owns the viewport gets no shell padding at all.
+
+    `min-h-screen` + island clearance is right for a document you scroll and
+    wrong for a screen that must not scroll. On the messages view the shell was
+    adding ~96px of island clearance BELOW a pane already measured to fill the
+    remaining viewport, so the document was permanently taller than the screen.
+    Every drag scrolled that overflow: the conversation header slid under the
+    fixed navbar and a band of empty space appeared at the bottom.
+
+    On an iPad the clearance was reserved for an island that does not even
+    render — the nav is `lg:hidden`, tablets are `lg` and up — which is why the
+    same page pushed up with nothing at the bottom to show for it.
+  */
+  const viewportLocked = useShellViewportLocked();
 
   // Notifications bootstrap moved UP to `RootLayout` in App.tsx. It was never
   // actually global here: StudioScaffold composes Navbar/Sidebar directly and
@@ -84,7 +102,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
        
       {/* Main Content Area */}
       <main
-        className={`min-h-screen transition-[margin] duration-300 ease-out ${isEmbeddedMobile ? 'pb-4 pt-0' : `${ISLAND_BOTTOM_NAV_CLEARANCE_CLASS} pt-16`}`}
+        className={`transition-[margin] duration-300 ease-out ${
+          isEmbeddedMobile
+            ? 'min-h-screen pb-4 pt-0'
+            : viewportLocked
+              ? 'pt-16'
+              : `min-h-screen ${ISLAND_BOTTOM_NAV_CLEARANCE_CLASS} pt-16`
+        }`}
         style={{ marginLeft: mainMarginLeft }}
       >
         {/* will-change removed from main — it was promoting the entire page to

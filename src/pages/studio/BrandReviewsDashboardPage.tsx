@@ -300,7 +300,7 @@ export default function BrandReviewsDashboardPage() {
                   className={`rounded-xl border p-4 text-left transition ${
                     selected
                       ? 'border-purple-400 bg-purple-50 text-purple-900 dark:border-purple-400/50 dark:bg-purple-500/10 dark:text-purple-100'
-                      : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/8'
+                      : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.08]'
                   }`}
                 >
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{target.targetType}</p>
@@ -329,7 +329,7 @@ export default function BrandReviewsDashboardPage() {
         {loading ? (
           <div className="space-y-3 p-4">
             {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="h-16 animate-pulse rounded-lg bg-gray-100 dark:bg-white/8" />
+              <div key={index} className="h-16 animate-pulse rounded-lg bg-gray-100 dark:bg-white/[0.08]" />
             ))}
           </div>
         ) : dashboard.items.length === 0 ? (
@@ -350,7 +350,7 @@ export default function BrandReviewsDashboardPage() {
                   <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-white/8">
+              <tbody className="divide-y divide-gray-100 dark:divide-white/[0.08]">
                 {dashboard.items.map((review) => (
                   <tr key={review.id} className="align-top text-gray-700 dark:text-gray-200">
                     <td className="px-4 py-3">{review.reviewer?.displayName ?? 'Verified buyer'}</td>
@@ -377,7 +377,7 @@ export default function BrandReviewsDashboardPage() {
                         type="button"
                         onClick={() => setReportingReview(review)}
                         disabled={review.status === 'DELETED'}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/8"
+                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.08]"
                       >
                         Report
                       </button>
@@ -421,7 +421,7 @@ export default function BrandReviewsDashboardPage() {
                   setReportDetails('');
                   setReportReason('OFF_TOPIC');
                 }}
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/8"
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.08]"
               >
                 Cancel
               </button>

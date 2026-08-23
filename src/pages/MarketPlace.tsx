@@ -1064,7 +1064,7 @@ const MarketPlace: React.FC = () => {
         )}
 
         <section className="space-y-5">
-          <div className="sticky top-16 z-20 rounded-2xl border border-gray-200/70 bg-white/72 px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-[#0f0b13]/78">
+          <div className="sticky top-16 z-20 rounded-2xl border border-gray-200/70 bg-white/[0.72] px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-[#0f0b13]/78">
             {/* Heading + search row — on small screens header is compact, search hidden */}
             <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-stretch sm:gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">

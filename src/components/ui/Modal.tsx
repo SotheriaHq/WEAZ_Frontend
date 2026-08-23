@@ -92,7 +92,7 @@ const Modal: React.FC<ModalProps> = ({
                     className={clsx(
                       'absolute inset-0',
                       backdropStyle === 'light'
-                        ? 'bg-gradient-to-br from-slate-700/12 via-indigo-700/10 to-sky-700/12'
+                        ? 'bg-gradient-to-br from-slate-700/[0.12] via-indigo-700/10 to-sky-700/[0.12]'
                         : 'bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40'
                     )}
                   />
@@ -105,7 +105,7 @@ const Modal: React.FC<ModalProps> = ({
                   <div
                     className={clsx(
                       'absolute inset-0',
-                      backdropStyle === 'light' ? 'bg-black/12' : 'bg-black/40'
+                      backdropStyle === 'light' ? 'bg-black/[0.12]' : 'bg-black/40'
                     )}
                   />
                 </>
@@ -114,7 +114,7 @@ const Modal: React.FC<ModalProps> = ({
                   className={clsx(
                     'absolute inset-0',
                     scope === 'parent'
-                      ? 'bg-gradient-to-br from-slate-900/20 via-slate-800/16 to-indigo-900/20 backdrop-blur-[2px]'
+                      ? 'bg-gradient-to-br from-slate-900/20 via-slate-800/[0.16] to-indigo-900/20 backdrop-blur-[2px]'
                       : 'bg-black/50 backdrop-blur-sm'
                   )}
                 />

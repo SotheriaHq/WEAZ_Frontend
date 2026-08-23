@@ -108,7 +108,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
   if (isSystem) {
     return (
       <div className="flex justify-center my-2">
-        <div className="max-w-[85%] rounded-xl bg-gray-100/80 dark:bg-white/5 border border-gray-200/50 dark:border-transparent px-4 py-2 text-center">
+        <div className="max-w-[85%] rounded-xl bg-gray-100/80 dark:bg-white/5 px-4 py-2 text-center">
           <p className="text-xs text-gray-500 dark:text-gray-400 italic">
             {message.bodyText || 'System message'}
           </p>
@@ -228,9 +228,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
                   'aria-label': `Open ${String(designTitle)}`,
                 }
               : {})}
-            className={`mb-1 rounded-xl overflow-hidden border border-gray-200/70 dark:border-white/12 bg-transparent ${
+            /* No outline: the cover image is its own edge, and the frosted
+               caption below already reads as attached to it. */
+            className={`mb-1 overflow-hidden rounded-xl bg-transparent ${
               canOpenDesignContext
-                ? 'cursor-pointer transition hover:border-purple-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 dark:hover:border-purple-500/60'
+                ? 'cursor-pointer transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400'
                 : ''
             }`}
           >
@@ -272,14 +274,32 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
           </div>
         )}
 
-        {/* Main bubble — text + ticks only */}
+        {/*
+          Main bubble — text + ticks only.
+
+          The received bubble is an OPAQUE surface in each theme, not a
+          translucent white. `dark:bg-white/8` never compiled (Tailwind's bare
+          opacity modifier only accepts its 5-step scale, so `/8` produced no
+          rule at all), which left the light-mode `bg-white/80` in force on dark
+          — a near-white bubble carrying `dark:text-gray-100` text. That is the
+          "impossible to read" report, and it could only ever have looked right
+          in one theme.
+
+          Solid colours rather than a tint over the shell: a translucent bubble
+          takes its contrast from whatever happens to be behind it, which on a
+          message list is the previous bubble as often as the background.
+
+          No border either. The fill already separates the bubble from the
+          surface, so an outline on top of it is a second separator doing the
+          same job.
+        */}
         <div
           className={`rounded-2xl px-3.5 py-2 ${
             isModerated && showModerated
-              ? 'bg-red-50/80 dark:bg-red-900/20 border border-red-200/60 dark:border-red-800/40 text-gray-900 dark:text-gray-100 rounded-bl-md'
+              ? 'bg-red-50/80 dark:bg-red-950/40 text-gray-900 dark:text-red-100 rounded-bl-md'
               : isOwn
                 ? 'bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white rounded-br-md'
-                : 'bg-white/80 dark:bg-white/8 border border-gray-200/60 dark:border-transparent text-gray-900 dark:text-gray-100 rounded-bl-md'
+                : 'bg-gray-100 text-gray-900 dark:bg-[#252732] dark:text-gray-50 rounded-bl-md'
           }`}
         >
           {isRedacted && !showModerated ? (

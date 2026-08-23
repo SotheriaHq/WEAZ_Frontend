@@ -313,7 +313,7 @@ const CartDrawer: React.FC = () => {
               aria-label="My Bag"
             >
               {/* Glass panel */}
-              <div className="h-full bg-white/98 dark:bg-gray-950/98 backdrop-blur-2xl border-l border-white/30 dark:border-white/10 shadow-2xl flex flex-col">
+              <div className="h-full bg-white/[0.98] dark:bg-gray-950/[0.98] backdrop-blur-2xl border-l border-white/30 dark:border-white/10 shadow-2xl flex flex-col">
               {drawerView === 'checkout' ? (
                 <div className="h-full overflow-y-auto">
                   <Suspense

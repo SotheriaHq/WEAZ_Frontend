@@ -146,17 +146,17 @@ const getInitials = (name?: string | null) => {
 const getStatusClasses = (status?: string | null) => {
   switch (String(status || '').toUpperCase()) {
     case 'DELIVERED':
-      return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
+      return 'bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300';
     case 'PENDING':
-      return 'bg-amber-500/12 text-amber-700 dark:text-amber-300';
+      return 'bg-amber-500/[0.12] text-amber-700 dark:text-amber-300';
     case 'PROCESSING':
-      return 'bg-blue-500/12 text-blue-700 dark:text-blue-300';
+      return 'bg-blue-500/[0.12] text-blue-700 dark:text-blue-300';
     case 'SHIPPED':
-      return 'bg-indigo-500/12 text-indigo-700 dark:text-indigo-300';
+      return 'bg-indigo-500/[0.12] text-indigo-700 dark:text-indigo-300';
     case 'CANCELLED':
-      return 'bg-rose-500/12 text-rose-700 dark:text-rose-300';
+      return 'bg-rose-500/[0.12] text-rose-700 dark:text-rose-300';
     case 'RETURNED':
-      return 'bg-orange-500/12 text-orange-700 dark:text-orange-300';
+      return 'bg-orange-500/[0.12] text-orange-700 dark:text-orange-300';
     default:
       return 'bg-slate-500/10 text-slate-700 dark:text-slate-300';
   }
@@ -165,9 +165,9 @@ const getStatusClasses = (status?: string | null) => {
 const getPaymentClasses = (status?: string | null) => {
   switch (String(status || '').toUpperCase()) {
     case 'PAID':
-      return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
+      return 'bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300';
     case 'FAILED':
-      return 'bg-rose-500/12 text-rose-700 dark:text-rose-300';
+      return 'bg-rose-500/[0.12] text-rose-700 dark:text-rose-300';
     default:
       return 'bg-slate-500/10 text-slate-700 dark:text-slate-300';
   }

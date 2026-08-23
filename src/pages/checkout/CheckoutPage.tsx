@@ -1306,7 +1306,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     isActive
                       ? 'border-fuchsia-500 bg-fuchsia-500 text-white shadow-[0_0_0_8px_rgba(217,70,239,0.12)]'
                       : isCompleted
-                        ? 'border-fuchsia-400 bg-fuchsia-50 text-fuchsia-600 dark:bg-fuchsia-500/18 dark:text-fuchsia-200'
+                        ? 'border-fuchsia-400 bg-fuchsia-50 text-fuchsia-600 dark:bg-fuchsia-500/[0.18] dark:text-fuchsia-200'
                         : 'border-slate-300 dark:border-zinc-600 text-slate-400 dark:text-zinc-500'
                   }`}
                 >
@@ -1689,7 +1689,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 </div>
               )}
               {/* Shipping summary */}
-              <div className="rounded-[28px] border border-white/60 bg-white/72 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="rounded-[28px] border border-white/60 bg-white/[0.72] p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">📍 Shipping Address</h3>
                   <button type="button" onClick={() => setStep('shipping')} className="text-sm font-semibold text-indigo-700 underline decoration-indigo-300 decoration-2 underline-offset-4 dark:text-indigo-300 dark:decoration-indigo-500">
@@ -1706,7 +1706,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
               </div>
 
               {/* Payment summary */}
-              <div className="rounded-[28px] border border-white/60 bg-white/72 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="rounded-[28px] border border-white/60 bg-white/[0.72] p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">💳 Payment Method</h3>
                   <button type="button" onClick={() => setStep('payment')} className="text-sm font-semibold text-indigo-700 underline decoration-indigo-300 decoration-2 underline-offset-4 dark:text-indigo-300 dark:decoration-indigo-500">
@@ -1727,7 +1727,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
               </div>
 
               {/* Items grouped by brand */}
-              <div className="rounded-[28px] border border-white/60 bg-white/72 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03] space-y-4">
+              <div className="rounded-[28px] border border-white/60 bg-white/[0.72] p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03] space-y-4">
                 <h3 className="font-semibold">{BAG_IT_EMOJI} Bag lines</h3>
 
                 {brandGroups.length > 0 && brandGroups.map((group) => (
@@ -1845,7 +1845,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
               <div className="space-y-4">
                 {cart.items.map((item) => (
-                  <div key={item.id} className="flex items-start gap-3 rounded-[22px] border border-slate-200/80 bg-white/70 p-3 dark:border-white/8 dark:bg-white/[0.03]">
+                  <div key={item.id} className="flex items-start gap-3 rounded-[22px] border border-slate-200/80 bg-white/70 p-3 dark:border-white/[0.08] dark:bg-white/[0.03]">
                     <div className="h-16 w-16 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/70 dark:bg-white/10 dark:ring-white/10">
                       {item.product.thumbnail ? (
                         <ImageWithFallback
@@ -1913,13 +1913,13 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 })}
 
                 {customBagLoading && (
-                  <div className="rounded-[22px] border border-slate-200/80 bg-white/70 p-3 text-xs text-slate-500 dark:border-white/8 dark:bg-white/[0.03] dark:text-slate-400">
+                  <div className="rounded-[22px] border border-slate-200/80 bg-white/70 p-3 text-xs text-slate-500 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-slate-400">
                     Loading custom requests...
                   </div>
                 )}
               </div>
 
-              <div className="space-y-3 border-t border-slate-200/80 pt-4 text-sm dark:border-white/8">
+              <div className="space-y-3 border-t border-slate-200/80 pt-4 text-sm dark:border-white/[0.08]">
                 <div className="flex justify-between text-slate-600 dark:text-slate-400">
                   <span>Store items</span>
                   <span className="text-slate-950 dark:text-white">{formatPrice(cart.subtotal)}</span>
@@ -1942,7 +1942,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 )}
               </div>
 
-              <div className="flex items-end justify-between border-t border-slate-200/80 pt-5 dark:border-white/8">
+              <div className="flex items-end justify-between border-t border-slate-200/80 pt-5 dark:border-white/[0.08]">
                 <div>
                   <p className="text-sm uppercase tracking-[0.2em] text-slate-500 dark:text-slate-500">Total</p>
                   <p className="mt-1 text-3xl font-black tracking-tight">{formatPrice(grandTotal)}</p>

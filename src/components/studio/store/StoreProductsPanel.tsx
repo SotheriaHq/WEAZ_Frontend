@@ -2429,7 +2429,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           {showFiltersMenu && (
             <div
               ref={filtersMenuRef}
-              className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4.25rem)] z-50 max-h-[min(70vh,26rem)] overflow-y-auto rounded-xl border border-gray-200/90 bg-white/98 p-2.5 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#12121a]/98 sm:absolute sm:inset-x-auto sm:right-4 sm:top-[64px] sm:w-[min(92vw,520px)] sm:p-3 lg:hidden"
+              className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4.25rem)] z-50 max-h-[min(70vh,26rem)] overflow-y-auto rounded-xl border border-gray-200/90 bg-white/[0.98] p-2.5 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#12121a]/98 sm:absolute sm:inset-x-auto sm:right-4 sm:top-[64px] sm:w-[min(92vw,520px)] sm:p-3 lg:hidden"
             >
               {/* Status used to be repeated here as a chip grid. It is the tab
                   strip's job now, and having it in two places meant the visible
@@ -2489,7 +2489,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             change (see `listMinHeight`), so a tab with fewer products cannot
             collapse the container and yank the viewport up.
         */}
-        <div className="border-t border-gray-200/80 bg-white/92 backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 lg:hidden">
+        <div className="border-t border-gray-200/80 bg-white/[0.92] backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 lg:hidden">
           <div
             ref={statusTabsRef}
             role="tablist"
@@ -2522,7 +2522,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         </div>
 
         {/* Desktop status filter buttons */}
-        <div className="hidden border-t border-gray-200/80 bg-white/92 px-5 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 lg:sticky lg:top-24 lg:z-20 lg:block">
+        <div className="hidden border-t border-gray-200/80 bg-white/[0.92] px-5 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 lg:sticky lg:top-24 lg:z-20 lg:block">
           <div className="flex flex-wrap items-center gap-2">
             {PRODUCT_FILTER_OPTIONS.map((opt) => (
               <button
