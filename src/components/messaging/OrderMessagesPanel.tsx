@@ -5,6 +5,7 @@ import { useRealtime } from '@/realtime/RealtimeProvider';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import VLoader from '@/components/loaders/VLoader';
+import { resolveParticipantDisplayName } from '@/utils/participantDisplayName';
 
 type ContextType = 'CUSTOM_ORDER' | 'STANDARD_ORDER' | 'INQUIRY';
 type ActorSurface = 'BUYER' | 'BRAND' | 'ADMIN';
@@ -511,7 +512,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
           messages.map((message) => {
             const mine = actorId && message.senderUserId === actorId;
             const sender =
-              message.sender?.firstName || message.sender?.username || roleLabel(message.senderRole);
+              resolveParticipantDisplayName(message.sender, roleLabel(message.senderRole));
 
             return (
               <div

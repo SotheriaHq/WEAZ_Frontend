@@ -29,6 +29,7 @@ import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { useCachedResource } from '@/hooks/useCachedResource';
 import { notifyMessagingRead } from '@/hooks/useMessagingUnreadCount';
 import { queryKeys } from '@/query/queryKeys';
+import { resolveParticipantDisplayName } from '@/utils/participantDisplayName';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -121,7 +122,7 @@ const mapInboxItem = (item: InboxItem): ConversationItem => ({
   title: item.title,
   subtitle: item.subtitle,
   participantName:
-    item.participant?.firstName || item.participant?.username || item.participant?.lastName || 'Participant',
+    resolveParticipantDisplayName(item.participant),
   participantId: item.participant?.id || null,
   participantImage: item.participant?.profileImage || null,
   participantUsername: item.participant?.username || null,
@@ -166,6 +167,52 @@ const synthesizeConversationFromRoute = (route: ResolvedThreadRoute): Conversati
   mutedUntil: null,
   archivedAt: null,
 });
+
+/**
+ * A send, held whole so it can be repeated exactly.
+ *
+ * The `clientMessageId` is part of the draft rather than regenerated per
+ * attempt: the backend dedupes on (thread, sender, clientMessageId), so
+ * retrying with the SAME id is what makes "the message went through but the
+ * response was lost" resolve to one message instead of two.
+ */
+type OutgoingDraft = {
+  conversation: ConversationItem;
+  payload: {
+    bodyText?: string;
+    clientMessageId: string;
+    attachmentFileIds: string[];
+    replyToMessageId?: string;
+  };
+};
+
+const getSendErrorMessage = (error: unknown): string => {
+  const message = (error as any)?.response?.data?.message;
+  return typeof message === 'string' && message.trim()
+    ? message
+    : 'Message not sent. Tap retry to try again.';
+};
+
+/**
+ * Server messages, with this device's in-flight ones kept.
+ *
+ * Sending triggers a refresh, and a refresh replaces the whole list — so
+ * sending a second message while the first was still settling used to erase
+ * the second one's bubble mid-flight, and it reappeared seconds later out of
+ * nowhere. A message that is still sending, or has failed and is waiting to be
+ * retried, exists only here: nothing the server returns can contain it, so it
+ * survives every replacement until it resolves.
+ *
+ * Appended after the server's rows because the list runs oldest-first and these
+ * are, by definition, the newest thing in the thread.
+ */
+const withPendingLocalMessages = (
+  incoming: ThreadMessage[],
+  current: ThreadMessage[],
+): ThreadMessage[] => {
+  const pending = current.filter((message) => message._optimistic);
+  return pending.length > 0 ? [...incoming, ...pending] : incoming;
+};
 
 const nextClientMessageId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -476,6 +523,8 @@ const MessagingManagementPage: React.FC = () => {
   /* ---- Message state ---- */
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  /** Payloads for messages that failed to send, keyed by `clientMessageId`. */
+  const failedDraftsRef = useRef<Map<string, OutgoingDraft>>(new Map());
   const sending = false;
   const [customOrderDetail, setCustomOrderDetail] = useState<CustomOrderDetail | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -777,7 +826,7 @@ const MessagingManagementPage: React.FC = () => {
       const response = await messagingApi.listThreadMessages(threadId, { limit: 50 });
       const sorted = [...response.items].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
       messagesCacheRef.current.set(activeConversation.id, sorted);
-      setMessages(sorted);
+      setMessages((current) => withPendingLocalMessages(sorted, current));
       const lastId = sorted.at(-1)?.id;
       if (lastId) {
         /*
@@ -807,7 +856,7 @@ const MessagingManagementPage: React.FC = () => {
 
     const sorted = [...response.items].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     messagesCacheRef.current.set(activeConversation.id, sorted);
-    setMessages(sorted);
+    setMessages((current) => withPendingLocalMessages(sorted, current));
 
     const lastId = sorted.at(-1)?.id;
     if (lastId) {
@@ -1359,26 +1408,58 @@ const MessagingManagementPage: React.FC = () => {
     if (payload.markRead) notifyMessagingRead();
   };
 
-  const handleSend = useCallback(async (bodyText: string, attachmentFileIds: string[], replyToMessageId?: string) => {
-    if (!activeConversation) return;
-    const contextId = getContextId(activeConversation);
-    const threadId = activeConversation.threadId;
-    const ct = activeConversation.contextType;
-    const payload = { bodyText: bodyText || undefined, clientMessageId: nextClientMessageId(), attachmentFileIds, replyToMessageId };
+  /**
+   * Send one prepared draft, reporting its progress in the thread.
+   *
+   * Split out from `handleSend` because a retry has to run the exact same
+   * request again — same `clientMessageId`, so the backend's idempotency check
+   * recognises a replay rather than posting the message twice if the first
+   * attempt actually landed and only the response was lost.
+   */
+  const dispatchSend = useCallback(async (draft: OutgoingDraft) => {
+    const { conversation, payload } = draft;
+    const contextId = getContextId(conversation);
+    const threadId = conversation.threadId;
+    const ct = conversation.contextType;
 
-    if ((ct === 'INQUIRY' || useThreadTransport) && threadId) {
-      await messagingApi.sendThreadMessage(threadId, payload);
-    } else if (ct === 'INQUIRY') {
-      await messagingApi.sendThreadMessage(contextId, payload);
-    } else if (ct === 'CUSTOM_ORDER') {
-      if (surface === 'BRAND' && brandId) await messagingApi.sendCustomOrderMessageForBrand(brandId, contextId, payload);
-      else await messagingApi.sendCustomOrderMessage(contextId, payload);
-    } else {
-      if (surface === 'BRAND' && brandId) await messagingApi.sendOrderMessageForBrand(brandId, contextId, payload);
-      else await messagingApi.sendOrderMessage(contextId, payload);
+    setMessages((items) =>
+      items.map((message) =>
+        message.id === payload.clientMessageId
+          ? { ...message, _optimistic: 'sending' as const }
+          : message,
+      ),
+    );
+
+    try {
+      if ((ct === 'INQUIRY' || useThreadTransport) && threadId) {
+        await messagingApi.sendThreadMessage(threadId, payload);
+      } else if (ct === 'INQUIRY') {
+        await messagingApi.sendThreadMessage(contextId, payload);
+      } else if (ct === 'CUSTOM_ORDER') {
+        if (surface === 'BRAND' && brandId) await messagingApi.sendCustomOrderMessageForBrand(brandId, contextId, payload);
+        else await messagingApi.sendCustomOrderMessage(contextId, payload);
+      } else {
+        if (surface === 'BRAND' && brandId) await messagingApi.sendOrderMessageForBrand(brandId, contextId, payload);
+        else await messagingApi.sendOrderMessage(contextId, payload);
+      }
+    } catch (error) {
+      /*
+        The bubble stays, marked failed, and the draft is kept for the retry.
+        Removing it would take the writing with it — the one outcome a person
+        who just typed a paragraph cannot recover from.
+      */
+      failedDraftsRef.current.set(payload.clientMessageId, draft);
+      setMessages((items) =>
+        items.map((message) =>
+          message.id === payload.clientMessageId
+            ? { ...message, _optimistic: 'failed' as const }
+            : message,
+        ),
+      );
+      toast.error(getSendErrorMessage(error));
+      return;
     }
 
-    setReplyToMessage(null);
     /*
       The send already succeeded. A refresh that trips the rate limit must not
       surface as a send failure — the message IS delivered, and the socket will
@@ -1390,17 +1471,88 @@ const MessagingManagementPage: React.FC = () => {
       if (!isRateLimited(refreshError)) throw refreshError;
     }
 
+    /*
+      Drop the placeholder only AFTER the refresh has brought the real message
+      in. Clearing it first would empty the space it occupies for the length of
+      a round trip, so the thread would visibly lose a line and get it back.
+    */
+    setMessages((items) =>
+      items.filter((message) => message.id !== payload.clientMessageId),
+    );
+
     // Update conversation list card with latest message preview
     setConversations((prev) => prev.map((c) =>
-      c.id !== activeId ? c : {
+      c.id !== conversation.id ? c : {
         ...c,
-        subtitle: bodyText || (attachmentFileIds.length > 0 ? '📎 Attachment' : c.subtitle),
+        subtitle: payload.bodyText || ((payload.attachmentFileIds?.length ?? 0) > 0 ? '📎 Attachment' : c.subtitle),
         lastMessageAt: new Date().toISOString(),
         unreadCount: 0,
         hasUnread: false,
       }
     ));
-  }, [activeConversation, activeId, brandId, getContextId, refresh, surface, useThreadTransport]);
+  }, [brandId, getContextId, refresh, surface, useThreadTransport]);
+
+  /**
+   * Put the message in the thread, then send it.
+   *
+   * `ComposeArea` used to await this whole function before clearing, so between
+   * pressing Enter and the server answering there was no evidence anything had
+   * happened: the text sat in the box, the thread was unchanged, and on a slow
+   * connection people press Enter again. The bubble now appears on the
+   * keystroke and reports its own state from the thread — sending, sent,
+   * delivered, read, or failed with a way to try again.
+   */
+  const handleSend = useCallback(async (bodyText: string, attachmentFileIds: string[], replyToMessageId?: string) => {
+    if (!activeConversation) return;
+    const conversation = activeConversation;
+    const payload = {
+      bodyText: bodyText || undefined,
+      clientMessageId: nextClientMessageId(),
+      attachmentFileIds,
+      replyToMessageId,
+    };
+
+    setMessages((items) => [
+      ...items,
+      {
+        id: payload.clientMessageId,
+        threadId: conversation.threadId ?? '',
+        senderUserId: actorId ?? null,
+        senderRole: surface === 'BRAND' ? 'BRAND_OWNER' : 'BUYER',
+        kind: 'USER',
+        visibilityState: 'VISIBLE',
+        bodyText: bodyText || null,
+        createdAt: new Date().toISOString(),
+        attachments: [],
+        quotedMessage: replyToMessage
+          ? {
+              id: replyToMessage.id,
+              bodyText: replyToMessage.bodyText,
+              senderRole: '',
+              senderName: replyToMessage.senderName,
+            }
+          : null,
+        _optimistic: 'sending',
+      } as ThreadMessage,
+    ]);
+
+    setReplyToMessage(null);
+    await dispatchSend({ conversation, payload });
+  }, [actorId, activeConversation, dispatchSend, replyToMessage, surface]);
+
+  /** Re-send a message that failed, from the bubble it failed in. */
+  const handleRetryMessage = useCallback((messageId: string) => {
+    const draft = failedDraftsRef.current.get(messageId);
+    if (!draft) return;
+    failedDraftsRef.current.delete(messageId);
+    void dispatchSend(draft);
+  }, [dispatchSend]);
+
+  /** Discard a message that never sent. Unreachable on a delivered message. */
+  const handleDiscardMessage = useCallback((messageId: string) => {
+    failedDraftsRef.current.delete(messageId);
+    setMessages((items) => items.filter((message) => message.id !== messageId));
+  }, []);
 
   /**
    * Open the design a message refers to, and be able to come back.
@@ -1411,6 +1563,25 @@ const MessagingManagementPage: React.FC = () => {
    * than at the top of a feed. Without it, following a reference costs you your
    * place in the thread, which is why the reference was worth avoiding.
    */
+  /**
+   * Open the product a message refers to, and be able to come back.
+   *
+   * Same contract as `handleOpenDesignContext` — `state.returnTo` carries the
+   * thread URL so following the reference does not cost the reader their place
+   * in the conversation. Products go straight to the product page; there is no
+   * in-place modal for them the way there is for designs.
+   */
+  const handleOpenProductContext = useCallback(
+    (productId: string) => {
+      if (!productId) return;
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      navigate(`/products/${encodeURIComponent(productId)}`, {
+        state: { returnTo, fromMessages: true },
+      });
+    },
+    [navigate],
+  );
+
   const handleOpenDesignContext = useCallback(
     async (designId: string) => {
       if (!designId) return;
@@ -1910,10 +2081,13 @@ const MessagingManagementPage: React.FC = () => {
                           message={msg}
                           isOwn={isOwnMessage(msg)}
                           onOpenDesignContext={handleOpenDesignContext}
+                          onOpenProductContext={handleOpenProductContext}
+                          onRetry={() => handleRetryMessage(msg.id)}
+                          onDiscard={() => handleDiscardMessage(msg.id)}
                           onReply={(m) => setReplyToMessage({
                             id: m.id,
                             bodyText: m.bodyText,
-                            senderName: m.sender?.firstName || m.sender?.username || (isOwnMessage(m) ? 'You' : m.senderRole),
+                            senderName: resolveParticipantDisplayName(m.sender, isOwnMessage(m) ? 'You' : m.senderRole),
                           })}
                         />
                       </div>

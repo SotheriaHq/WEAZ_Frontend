@@ -230,11 +230,16 @@ function dedupeMeasurementEntries(
  */
 const FittingsMarqueeRow: React.FC<{
   row: Array<[string, unknown]>;
-  alt: boolean;
+  /**
+   * Scroll the opposite way. Existed so a second, stacked row could counter-run
+   * against the first; the fittings now render as ONE row, so it defaults off
+   * and is kept only for a caller that genuinely wants the reverse direction.
+   */
+  alt?: boolean;
   unitLabel: string;
   formatLabel: (key: string) => string;
   onSelect: () => void;
-}> = ({ row, alt, unitLabel, formatLabel, onSelect }) => {
+}> = ({ row, alt = false, unitLabel, formatLabel, onSelect }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [overflows, setOverflows] = useState(false);
@@ -288,20 +293,47 @@ const FittingsMarqueeRow: React.FC<{
   );
 };
 
-const sizeFitRegionForDisplayChart = (family: CustomOrderChartFamily): SizingRegion => {
+/**
+ * The chart(s) a display family actually computes against.
+ *
+ * This returns a LIST, and that is the whole point. It used to return one
+ * region and map Nigeria and BOTH hybrids onto `NG_WEST_AFRICA`, so three of
+ * the four tabs on this widget issued the identical request and printed the
+ * identical number. Switching between them looked broken because it was: there
+ * was nothing to switch to.
+ *
+ * A hybrid is not a third chart, it is two charts read side by side — that is
+ * what the word means on the custom-order side, where a hybrid quote is priced
+ * off one grade and labelled off another. So it resolves to both of its parts
+ * and the widget shows both answers.
+ */
+const sizeFitRegionsForDisplayChart = (
+  family: CustomOrderChartFamily,
+): SizingRegion[] => {
   switch (family) {
     case 'UK':
-      return 'UK';
+      return ['UK'];
     case 'US':
-      return 'US';
+      return ['US'];
     case 'NIGERIA':
+      return ['NG_WEST_AFRICA'];
     case 'HYBRID_UK_NIGERIA':
+      return ['UK', 'NG_WEST_AFRICA'];
     case 'HYBRID_US_NIGERIA':
-      return 'NG_WEST_AFRICA';
+      return ['US', 'NG_WEST_AFRICA'];
     case 'ASIA':
     default:
-      return 'INTERNATIONAL';
+      return ['INTERNATIONAL'];
   }
+};
+
+/** Short region tag used only when a hybrid has to show two answers at once. */
+const REGION_SHORT_LABEL: Record<SizingRegion, string> = {
+  UK: 'UK',
+  US: 'US',
+  EU: 'EU',
+  NG_WEST_AFRICA: 'NG',
+  INTERNATIONAL: 'INT',
 };
 
 const resolveComputedSizeLabel = (computed?: ComputedSizeFitProfile | null): string | null => {
@@ -399,10 +431,15 @@ export const EndUserProfile: React.FC = () => {
     enabled: Boolean(!isOwner && profileId),
   });
   const availableTabs = useMemo(() => (isOwner ? ['Saved', 'Patches', 'Orders'] : ['Patches']), [isOwner]);
-  const computedSizingRegion = useMemo(
-    () => sizeFitRegionForDisplayChart(displayChartFamily),
+  const computedSizingRegions = useMemo(
+    () => sizeFitRegionsForDisplayChart(displayChartFamily),
     [displayChartFamily],
   );
+  /*
+    Joined, because effect deps compare by identity and a fresh array every
+    render would re-run the fetch on every render.
+  */
+  const computedSizingRegionsKey = computedSizingRegions.join(',');
   const tabParam = searchParams.get('tab');
   const derivedTab = (() => {
     if (tabParam === 'orders' && isOwner) return 'Orders';
@@ -549,27 +586,72 @@ export const EndUserProfile: React.FC = () => {
 
   const loadComputedSizeFit = useCallback(async (forceRefresh = false) => {
     if (!isOwner || !currentUser?.id) return;
+    const regions = computedSizingRegionsKey.split(',') as SizingRegion[];
     setChartLoading(true);
     try {
-      const computed = await fetchMyComputedSizeFitQuery(
-        queryClient,
-        currentUser.id,
-        computedSizingRegion,
-        { forceRefresh },
+      /*
+        One request per chart in the selection, in parallel.
+
+        Each region is its own query key, so a chart already looked at this
+        session resolves from cache and the swap is instant — which is half of
+        why the widget no longer jumps when you change tabs. The other half is
+        that the previous number stays on screen until this resolves.
+      */
+      const results = await Promise.all(
+        regions.map((region) =>
+          fetchMyComputedSizeFitQuery(queryClient, currentUser.id, region, {
+            forceRefresh,
+          }),
+        ),
       );
-      const nextComputedSize = resolveComputedSizeLabel(computed);
+
+      const perRegion = regions.map((region, index) => ({
+        region,
+        computed: results[index],
+        label: resolveComputedSizeLabel(results[index]),
+      }));
+      const answered = perRegion.filter((entry) => Boolean(entry.label));
+
+      /*
+        A single chart prints its size bare. A hybrid prints both of its parts
+        tagged, because "UK 12" and "NG 14" are different answers to different
+        questions and collapsing them to one number would be a guess. When both
+        parts agree there is only one answer to give, so the tags are dropped.
+      */
+      const distinctLabels = Array.from(new Set(answered.map((entry) => entry.label)));
+      const nextComputedSize =
+        answered.length === 0
+          ? null
+          : distinctLabels.length === 1
+            ? distinctLabels[0]
+            : answered
+                .map((entry) => `${REGION_SHORT_LABEL[entry.region]} ${entry.label}`)
+                .join(' · ');
+
       setComputedSize(nextComputedSize);
-      setComputedAlphaSize(extractAlphaSizeFromLabel(nextComputedSize));
-      setComputedMissingBaseline(computed?.missingBaselineMeasurements ?? []);
+      // The alpha band (S/M/L) is a property of the body, not of the labelling
+      // system, so it is read from the first chart that produced one.
+      setComputedAlphaSize(extractAlphaSizeFromLabel(answered[0]?.label ?? null));
+      setComputedMissingBaseline(
+        perRegion[0]?.computed?.missingBaselineMeasurements ?? [],
+      );
       /*
         Warnings live per category, not on the envelope — the profile response
         aggregates `categoryBreakdown`, and each entry carries its own
         `warnings[]`. "No approved sizing chart is available" arrives there.
+
+        Only surfaced when NO chart in the selection produced a size. On a
+        hybrid where one half answered, the shopper has their size; reporting
+        that the other half has no chart is an internal detail that reads as a
+        failure.
       */
       setComputedWarning(
         nextComputedSize
           ? null
-          : (Object.values(computed?.categoryBreakdown ?? {})
+          : (perRegion
+              .flatMap((entry) =>
+                Object.values(entry.computed?.categoryBreakdown ?? {}),
+              )
               .flatMap((entry) => entry?.warnings ?? [])
               .find((warning) => Boolean(warning)) ?? null),
       );
@@ -582,7 +664,7 @@ export const EndUserProfile: React.FC = () => {
     } finally {
       setChartLoading(false);
     }
-  }, [computedSizingRegion, currentUser?.id, isOwner, queryClient]);
+  }, [computedSizingRegionsKey, currentUser?.id, isOwner, queryClient]);
 
   useEffect(() => {
     if (!isOwner) return;
@@ -1446,29 +1528,50 @@ export const EndUserProfile: React.FC = () => {
                     );
                   })}
                 </div>
-                {/* Size number */}
+                {/*
+                  Size number.
+
+                  Changing chart used to blank this to "…" and then to the new
+                  value: two layout changes per tap, in a block the profile
+                  name and handle sit beside, so the whole header stepped
+                  sideways twice. The number now HOLDS its last value while the
+                  next one is fetched and only dims — one change, at the moment
+                  the answer actually arrives.
+
+                  `min-h` on the message slot reserves the tallest thing that
+                  can appear under the number, so a warning arriving does not
+                  push the block either.
+                */}
                 <div className="text-right">
-                  <div className="text-3xl font-black leading-none text-indigo-900 dark:text-indigo-100">
-                    {chartLoading ? '…' : computedSize || '—'}
+                  <div
+                    className={`text-3xl font-black leading-none text-indigo-900 transition-opacity dark:text-indigo-100 ${
+                      chartLoading ? 'opacity-50' : 'opacity-100'
+                    }`}
+                    aria-busy={chartLoading}
+                    aria-live="polite"
+                  >
+                    {computedSize || (chartLoading ? '…' : '—')}
                   </div>
                   {alphaFitLabel ? (
                     <div className="mt-0.5 text-xs font-semibold text-indigo-600 dark:text-indigo-300">
                       {alphaFitLabel}
                     </div>
                   ) : null}
-                  {!chartLoading && !computedSize && computedMissingBaseline.length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsSizeFitOpen(true)}
-                      className="mt-1 max-w-[180px] text-right text-[11px] font-semibold leading-snug text-amber-600 transition hover:text-amber-700 dark:text-amber-300 dark:hover:text-amber-200"
-                    >
-                      Add {computedMissingBaseline.map((key) => formatMeasurementLabel(key)).join(' · ')} to see your size →
-                    </button>
-                  ) : !chartLoading && !computedSize && computedWarning ? (
-                    <p className="mt-1 max-w-[210px] text-right text-[11px] leading-snug text-amber-600 dark:text-amber-400">
-                      {computedWarning}
-                    </p>
-                  ) : null}
+                  <div className="ml-auto max-w-[210px]">
+                    {!chartLoading && !computedSize && computedMissingBaseline.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsSizeFitOpen(true)}
+                        className="mt-1 max-w-[180px] text-right text-[11px] font-semibold leading-snug text-amber-600 transition hover:text-amber-700 dark:text-amber-300 dark:hover:text-amber-200"
+                      >
+                        Add {computedMissingBaseline.map((key) => formatMeasurementLabel(key)).join(' · ')} to see your size →
+                      </button>
+                    ) : !chartLoading && !computedSize && computedWarning ? (
+                      <p className="mt-1 text-right text-[11px] leading-snug text-amber-600 dark:text-amber-400">
+                        {computedWarning}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             ) : null}
@@ -1485,21 +1588,21 @@ export const EndUserProfile: React.FC = () => {
               >
                 📏 My fittings · {savedMeasurementEntries.length}
               </button>
-              <div className="space-y-1.5">
-                {[savedMeasurementEntries.filter((_, index) => index % 2 === 0),
-                  savedMeasurementEntries.filter((_, index) => index % 2 === 1)]
-                  .filter((row) => row.length > 0)
-                  .map((row, rowIndex) => (
-                    <FittingsMarqueeRow
-                      key={rowIndex}
-                      row={row}
-                      alt={rowIndex === 1}
-                      unitLabel={measurementUnitLabel}
-                      formatLabel={formatMeasurementLabel}
-                      onSelect={() => setIsSizeFitOpen(true)}
-                    />
-                  ))}
-              </div>
+              {/*
+                ONE row, not two.
+
+                The fittings used to be dealt into two marquee rows by parity
+                (`index % 2`), which stacked them and made the block twice as
+                tall for no gain — a reader scanning for "Waist" had to check
+                two moving lines instead of one. A single marquee already
+                scrolls, so it holds any number of fittings in one line.
+              */}
+              <FittingsMarqueeRow
+                row={savedMeasurementEntries}
+                unitLabel={measurementUnitLabel}
+                formatLabel={formatMeasurementLabel}
+                onSelect={() => setIsSizeFitOpen(true)}
+              />
             </div>
           ) : null}
 
@@ -1534,9 +1637,16 @@ export const EndUserProfile: React.FC = () => {
                     );
                   })}
                 </div>
-                {/* Size number */}
-                <div className="text-2xl font-black leading-none text-indigo-900 dark:text-indigo-100">
-                  {chartLoading ? '…' : computedSize || '—'}
+                {/* Size number — holds its last value while the next chart
+                    resolves, so a tab tap does not reflow this strip. */}
+                <div
+                  className={`text-2xl font-black leading-none text-indigo-900 transition-opacity dark:text-indigo-100 ${
+                    chartLoading ? 'opacity-50' : 'opacity-100'
+                  }`}
+                  aria-busy={chartLoading}
+                  aria-live="polite"
+                >
+                  {computedSize || (chartLoading ? '…' : '—')}
                 </div>
                 {alphaFitLabel ? (
                   <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">

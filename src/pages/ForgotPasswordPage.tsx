@@ -70,17 +70,17 @@ const ForgotPasswordPage: React.FC = () => {
                   <div className="w-14 h-14 rounded-full bg-[var(--brand-accent)]/15 flex items-center justify-center mx-auto mb-5">
                     <span className="text-2xl">🔑</span>
                   </div>
-                  <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white mb-2">
+                  <h1 className="text-2xl sm:text-3xl font-serif font-bold auth-heading mb-2">
                     Forgot your password?
                   </h1>
-                  <p className="text-sm text-gray-400">
+                  <p className="text-sm auth-muted">
                     Enter your email and we'll send you a reset link.
                   </p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-300 uppercase tracking-wider ml-1">
+                    <label className="text-xs font-medium auth-label uppercase tracking-wider ml-1">
                       Email Address
                     </label>
                     <input
@@ -96,7 +96,7 @@ const ForgotPasswordPage: React.FC = () => {
 
                   {error && (
                     <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3">
-                      <p className="text-xs text-red-300">{error}</p>
+                      <p className="text-xs auth-error-text">{error}</p>
                     </div>
                   )}
 
@@ -124,14 +124,14 @@ const ForgotPasswordPage: React.FC = () => {
                 <div className="w-14 h-14 rounded-full bg-green-500/15 flex items-center justify-center mx-auto mb-5">
                   <span className="text-2xl">📧</span>
                 </div>
-                <h2 className="text-xl sm:text-2xl font-serif font-bold text-white mb-3">
+                <h2 className="text-xl sm:text-2xl font-serif font-bold auth-heading mb-3">
                   Check your inbox
                 </h2>
-                <p className="text-sm text-gray-400 leading-relaxed mb-6">
+                <p className="text-sm auth-muted leading-relaxed mb-6">
                   If an account with that email exists, {COMPANY_NAME} has sent a reset link. Check your inbox.
                 </p>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3 mb-6">
-                  <p className="text-xs text-gray-500">
+                <div className="auth-raised auth-hairline rounded-xl border p-3 mb-6">
+                  <p className="text-xs auth-subtext">
                     Didn't receive an email? Check your spam folder or try again with a different email.
                   </p>
                 </div>
@@ -152,7 +152,7 @@ const ForgotPasswordPage: React.FC = () => {
             <div className="mt-8 text-center">
               <Link
                 to="/login"
-                className="text-sm text-gray-400 hover:text-[var(--brand-primary)] transition-colors"
+                className="text-sm auth-muted hover:text-[var(--brand-primary)] transition-colors"
               >
                 ← Back to Sign In
               </Link>

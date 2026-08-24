@@ -78,7 +78,7 @@ const LoadingScreen = () => (
         <BrandWordmark
           logoSize={48}
           logoClassName="drop-shadow-[0_0_20px_rgba(212,175,55,0.45)]"
-          textClassName="text-3xl font-serif font-bold text-white"
+          textClassName="text-3xl font-serif font-bold text-[var(--text-primary)]"
         />
       </div>
       <div className="flex space-x-2 justify-center mb-4">
@@ -86,7 +86,7 @@ const LoadingScreen = () => (
         <div className="w-3 h-3 bg-[#D4AF37] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
         <div className="w-3 h-3 bg-[#6B21A8] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
       </div>
-      <p className="text-gray-400 text-lg">Welcome to your fashion journey...</p>
+      <p className="text-[var(--text-secondary)] text-lg">Welcome to your fashion journey...</p>
     </div>
   </div>
 );
@@ -269,6 +269,7 @@ const LoginPage = () => {
     formState: { errors },
     reset,
     setError,
+    clearErrors,
     setValue,
     watch,
   } = useForm<LoginFormValues>({
@@ -723,11 +724,21 @@ const LoginPage = () => {
               : 60;
           setLockoutUntil(Date.now() + seconds * 1000);
           setLockoutSecondsLeft(seconds);
-          const msg =
-            (typeof structuredData?.message === 'string' && structuredData.message) ||
-            `Too many failed attempts. Try again in ${seconds}s.`;
-          setError('password', { type: 'server', message: msg });
-          toast.error(msg);
+          /*
+            A lockout used to announce itself THREE times at once: a red field
+            error, a toast, and the countdown panel — all saying the same thing,
+            stacked, with the field error contradicting itself the moment the
+            timer started ticking down from the fixed number baked into its text.
+
+            The countdown panel is the only one of the three that stays true for
+            the whole lockout, and it is the one that tells you what to do next
+            (wait this long, or reset). So it is the single owner of this state:
+            no field error, no toast. `attemptsWarning` is cleared for the same
+            reason — it is the "you have N attempts left" warning, which the
+            lockout has now superseded.
+          */
+          clearErrors('password');
+          setAttemptsWarning('');
           setValue('password', '', { shouldDirty: false });
           setShowPassword(false);
           setIsLoading(false);
@@ -921,12 +932,12 @@ const LoginPage = () => {
               >
                 {/* Email */}
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-300 uppercase tracking-wider ml-1">
+                  <label className="text-xs font-medium auth-label uppercase tracking-wider ml-1">
                     Email Address
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Mail className="h-4 w-4 text-gray-500" />
+                      <Mail className="auth-field-icon h-4 w-4" />
                     </div>
                     <input
                       type="email"
@@ -943,12 +954,12 @@ const LoginPage = () => {
                       }}
                     />
                     {showEmailSuggestions && filteredSuggestions.length > 0 && (
-                      <div className="absolute left-0 right-0 top-full mt-1 bg-[#0a0a0a]/95 border border-white/10 rounded-lg shadow-lg z-30 max-h-40 overflow-auto">
+                      <div className="absolute left-0 right-0 top-full mt-1 auth-popover rounded-lg shadow-lg z-30 max-h-40 overflow-auto">
                         {filteredSuggestions.map((suggestion) => (
                           <button
                             type="button"
                             key={suggestion}
-                            className="w-full text-left px-4 py-2.5 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+                            className="auth-popover-item w-full text-left px-4 py-2.5 text-sm transition-colors"
                             onMouseDown={() => handleSuggestionSelect(suggestion)}
                           >
                             {suggestion}
@@ -957,7 +968,7 @@ const LoginPage = () => {
                       </div>
                     )}
                   </div>
-                  {errors.email && <p className="text-sm text-red-400 ml-1">{errors.email.message}</p>}
+                  {errors.email && <p className="auth-error-text text-sm ml-1" role="alert">{errors.email.message}</p>}
                 </div>
 
                 {loginStep === 'password' && (
@@ -965,7 +976,7 @@ const LoginPage = () => {
                 {/* Password */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center ml-1">
-                    <label className="text-xs font-medium text-gray-300 uppercase tracking-wider">Password</label>
+                    <label className="text-xs font-medium auth-label uppercase tracking-wider">Password</label>
                     <Link
                       to="/forgot-password"
                       tabIndex={-1}
@@ -976,23 +987,32 @@ const LoginPage = () => {
                   </div>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Lock className="h-4 w-4 text-gray-500" />
+                      <Lock className="auth-field-icon h-4 w-4" />
                     </div>
                     <input
                       type={showPassword ? 'text' : 'password'}
                       {...passwordFieldRegistration}
                       placeholder="••••••••"
-                      className="auth-input w-full rounded-xl py-3.5 pl-11 pr-12 text-sm"
+                      autoComplete="current-password"
+                      aria-invalid={errors.password ? true : undefined}
+                      aria-describedby={errors.password ? 'login-password-error' : undefined}
+                      className={`auth-input w-full rounded-xl py-3.5 pl-11 pr-12 text-sm ${errors.password ? 'error' : ''}`}
                     />
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-white transition-colors"
+                      className="auth-field-toggle absolute inset-y-0 right-0 my-1 mr-1 px-3 flex items-center"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-pressed={showPassword}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                     </button>
                   </div>
-                  {errors.password && <p className="text-sm text-red-400 ml-1">{errors.password.message}</p>}
+                  {errors.password && (
+                    <p id="login-password-error" className="auth-error-text text-sm ml-1" role="alert">
+                      {errors.password.message}
+                    </p>
+                  )}
                 </div>
 
                 {/* Remember Me */}
@@ -1007,7 +1027,7 @@ const LoginPage = () => {
                     }}
                     className="auth-checkbox"
                   />
-                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-400 cursor-pointer select-none">
+                  <label htmlFor="remember-me" className="ml-2 block text-sm auth-muted cursor-pointer select-none">
                     Remember me for 30 days
                   </label>
                 </div>
@@ -1016,12 +1036,12 @@ const LoginPage = () => {
 
                 {loginStep === 'code-login' && (
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-300 uppercase tracking-wider ml-1">
+                    <label className="text-xs font-medium auth-label uppercase tracking-wider ml-1">
                       Sign-in Code
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Mail className="h-4 w-4 text-gray-500" />
+                        <Mail className="auth-field-icon h-4 w-4" />
                       </div>
                       <input
                         type={showDirectLoginCode ? 'text' : 'password'}
@@ -1040,7 +1060,7 @@ const LoginPage = () => {
                       <button
                         type="button"
                         aria-label={showDirectLoginCode ? 'Hide sign-in code' : 'Show sign-in code'}
-                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-white transition-colors"
+                        className="auth-field-toggle absolute inset-y-0 right-0 my-1 mr-1 px-3 flex items-center"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => setShowDirectLoginCode((visible) => !visible)}
                       >
@@ -1051,10 +1071,10 @@ const LoginPage = () => {
                         )}
                       </button>
                     </div>
-                    <p className="text-xs text-gray-400 ml-1">
+                    <p className="text-xs auth-muted ml-1">
                       A one-time sign-in code was sent to your email.{' '}
                       {resendCooldownSeconds > 0 ? (
-                        <span className="text-gray-500">Please wait {resendCooldownSeconds}s...</span>
+                        <span className="auth-muted">Please wait {resendCooldownSeconds}s...</span>
                       ) : (
                         <button
                           type="button"
@@ -1077,10 +1097,10 @@ const LoginPage = () => {
 
 
                 {loginStep === 'code' && (
-                  <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div className="auth-raised auth-hairline space-y-3 rounded-xl border p-4">
                     <div>
-                      <p className="text-sm font-medium text-white">Enter your email code</p>
-                      <p className="mt-1 text-xs text-gray-400">
+                      <p className="text-sm font-medium auth-heading">Enter your email code</p>
+                      <p className="mt-1 text-xs auth-muted">
                         Use the code sent to your inbox to create your first password.
                       </p>
                     </div>
@@ -1101,7 +1121,7 @@ const LoginPage = () => {
                       <button
                         type="button"
                         aria-label={showEmailCode ? 'Hide verification code' : 'Show verification code'}
-                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-white transition-colors"
+                        className="auth-field-toggle absolute inset-y-0 right-0 my-1 mr-1 px-3 flex items-center"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => setShowEmailCode((visible) => !visible)}
                       >
@@ -1122,7 +1142,7 @@ const LoginPage = () => {
                         {emailCodeLoading ? 'Checking...' : 'Verify code'}
                       </button>
                       {resendCooldownSeconds > 0 ? (
-                        <span className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-medium text-gray-500">
+                        <span className="auth-hairline auth-muted rounded-xl border px-4 py-2.5 text-xs font-medium">
                           Wait {resendCooldownSeconds}s...
                         </span>
                       ) : (
@@ -1130,7 +1150,7 @@ const LoginPage = () => {
                           type="button"
                           onClick={() => void requestPasswordSetupCode()}
                           disabled={emailCodeLoading}
-                          className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-medium text-gray-300 hover:text-white disabled:opacity-60"
+                          className="auth-hairline auth-subtext auth-hover-strong rounded-xl border px-4 py-2.5 text-xs font-medium disabled:opacity-60"
                         >
                           Resend code
                         </button>
@@ -1140,10 +1160,10 @@ const LoginPage = () => {
                 )}
 
                 {loginStep === 'password-setup' && (
-                  <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div className="auth-raised auth-hairline space-y-3 rounded-xl border p-4">
                     <div>
-                      <p className="text-sm font-medium text-white">Create your password</p>
-                      <p className="mt-1 text-xs text-gray-400">
+                      <p className="text-sm font-medium auth-heading">Create your password</p>
+                      <p className="mt-1 text-xs auth-muted">
                         This creates your first WIEZ password. You will sign in after it is saved.
                       </p>
                     </div>
@@ -1158,7 +1178,7 @@ const LoginPage = () => {
                       minLength={PASSWORD_POLICY_MIN_LENGTH}
                       className="auth-input w-full rounded-xl px-4 py-3.5 text-sm"
                     />
-                    <PasswordPolicyFeedback password={setupPassword} tone="dark" />
+                    <PasswordPolicyFeedback password={setupPassword} />
                     <input
                       type="password"
                       value={setupConfirmPassword}
@@ -1173,7 +1193,7 @@ const LoginPage = () => {
                     <PasswordMatchFeedback
                       password={setupPassword}
                       confirmPassword={setupConfirmPassword}
-                      tone="dark"
+                     
                     />
                     <button
                       type="button"
@@ -1206,7 +1226,7 @@ const LoginPage = () => {
                 )}
 
                 {flowError && (
-                  <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+                  <div className="auth-error-box rounded-xl p-3 text-sm">
                     {flowError}
                   </div>
                 )}
@@ -1231,33 +1251,37 @@ const LoginPage = () => {
                 ) : loginStep === 'password' ? (
                   <>
                     {attemptsWarning && lockoutSecondsLeft <= 0 && (
-                      <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-300">
+                      <div className="auth-notice rounded-xl p-3 text-xs">
                         ⚠️ {attemptsWarning}{' '}
                         <Link
                           to="/forgot-password"
-                          className="font-medium text-amber-200 underline hover:text-white"
+                          className="auth-warn-strong auth-hover-strong font-medium underline"
                         >
                           Forgot your password?
                         </Link>
                       </div>
                     )}
                     {lockoutSecondsLeft > 0 && (
-                      <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-300">
+                      <p
+                        className="auth-notice-plain text-xs"
+                        role="status"
+                        aria-live="polite"
+                      >
                         🔒 Sign-in is paused after repeated failed attempts. You can
                         try again in{' '}
-                        <span className="font-semibold text-amber-100">
+                        <span className="auth-warn-strong font-semibold tabular-nums">
                           {Math.floor(lockoutSecondsLeft / 60)}:
                           {String(lockoutSecondsLeft % 60).padStart(2, '0')}
                         </span>
                         , or{' '}
                         <Link
                           to="/forgot-password"
-                          className="font-medium text-amber-200 underline hover:text-white"
+                          className="auth-warn-text auth-hover-strong font-medium underline"
                         >
                           reset your password
                         </Link>{' '}
                         now.
-                      </div>
+                      </p>
                     )}
                     <button
                       type="submit"
@@ -1298,7 +1322,7 @@ const LoginPage = () => {
                   <button
                     type="button"
                     onClick={resetProgressiveFlow}
-                    className="text-xs font-medium text-gray-400 hover:text-white"
+                    className="auth-quiet-btn text-xs font-medium"
                   >
                     Use a different email
                   </button>
@@ -1306,16 +1330,16 @@ const LoginPage = () => {
               </form>
 
               {showReactivationLink && (
-                <div className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
-                  <p className="text-xs text-amber-300">
+                <div className="auth-notice mt-4 rounded-xl p-3">
+                  <p className="auth-warn-text text-xs">
                     Account access is currently restricted. You can submit a leniency/reactivation request.
                   </p>
                   {showLockoutResetHint && (
-                    <p className="mt-2 text-xs text-amber-300">
+                    <p className="auth-warn-text mt-2 text-xs">
                       Fastest fix:{' '}
                       <Link
                         to="/forgot-password"
-                        className="font-medium text-amber-200 underline hover:text-white"
+                        className="auth-warn-strong auth-hover-strong font-medium underline"
                       >
                         reset your password
                       </Link>{' '}
@@ -1327,7 +1351,7 @@ const LoginPage = () => {
                     to={`/account-reactivation?email=${encodeURIComponent(
                       (watchEmail ?? '').trim(),
                     )}`}
-                    className="mt-2 inline-block text-xs font-medium text-amber-200 hover:text-white underline"
+                    className="auth-warn-strong auth-hover-strong mt-2 inline-block text-xs font-medium underline"
                   >
                     Submit reactivation request
                   </Link>
@@ -1337,10 +1361,10 @@ const LoginPage = () => {
               {/* Divider */}
               <div className="relative my-8">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-white/10"></div>
+                  <div className="auth-hairline w-full border-t"></div>
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="auth-divider-text px-4 text-gray-500">Or continue with</span>
+                  <span className="auth-divider-text px-4">Or continue with</span>
                 </div>
               </div>
 
@@ -1366,7 +1390,7 @@ const LoginPage = () => {
               </div>
 
               {!env.google.configured && (
-                <p className="mt-3 text-center text-xs text-amber-300">
+                <p className="auth-warn-text mt-3 text-center text-xs">
                   Google sign-in needs VITE_GOOGLE_CLIENT_ID in this environment.
                 </p>
               )}
@@ -1386,7 +1410,7 @@ const LoginPage = () => {
                     type="button"
                     onClick={() => void requestPasswordSetupCode()}
                     disabled={emailCodeLoading}
-                    className="mt-4 w-full rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-gray-200 hover:border-white/20 hover:text-white disabled:opacity-60"
+                    className="auth-hairline auth-subtext auth-hover-strong mt-4 w-full rounded-xl border px-4 py-3 text-sm font-medium disabled:opacity-60"
                   >
                     {emailCodeLoading ? 'Sending code...' : 'Create a password with email code'}
                   </button>
@@ -1394,9 +1418,9 @@ const LoginPage = () => {
 
               {/* Sign Up Link */}
               <div className="mt-8 text-center">
-                <p className="text-sm text-gray-400">
+                <p className="text-sm auth-muted">
                   Don't have an account?{' '}
-                  <Link to="/signup" className="text-[#D4AF37] font-medium hover:text-white transition-colors ml-1">
+                  <Link to="/signup" className="auth-hover-strong font-medium transition-colors ml-1 text-[var(--brand-accent)]">
                     Sign Up
                   </Link>
                 </p>
@@ -1404,7 +1428,7 @@ const LoginPage = () => {
             </div>
 
             {/* Trust Badges */}
-            <div className="mt-8 flex justify-center items-center gap-6 text-gray-500 text-xs">
+            <div className="auth-muted mt-8 flex justify-center items-center gap-6 text-xs">
               <div className="flex items-center gap-2">
                 <Shield className="w-4 h-4 text-[#6B21A8]" />
                 <span>Secure Login</span>
