@@ -454,26 +454,9 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
           <span className="-mt-1 text-[10px] font-bold drop-shadow">{isSaved ? 'Saved' : 'Save'}</span>
         </button>
 
-        {canPatch && brandId ? (
-          <button
-            type="button"
-            className="flex flex-col items-center text-white transition-transform active:scale-95 disabled:opacity-50"
-            onClick={(e) => {
-              e.stopPropagation();
-              onTogglePatch?.(brandId);
-            }}
-            disabled={patchBusy}
-            aria-label={isPatched ? 'Unpatch brand' : 'Patch brand'}
-            title={isPatched ? 'Unpatch brand' : 'Patch brand'}
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/25 text-base backdrop-blur-sm">
-              {isPatched ? '✓' : '🧵'}
-            </span>
-            <span className="mt-0.5 text-[10px] font-bold drop-shadow">
-              {isPatched ? 'Patched' : 'Patch'}
-            </span>
-          </button>
-        ) : null}
+        {/* Patch is NOT here any more — it moved onto the brand avatar in the
+            meta overlay below, matching native. Everything left in this rail
+            acts on the design; patching acts on the brand. */}
       </div>
 
       {/* Bottom meta — hidden by default, revealed on tap, auto-hides (native
@@ -494,35 +477,85 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
           style={{ bottom: META_BOTTOM }}
           aria-hidden={!metaRevealed}
         >
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (brandId) onViewBrand?.(brandId, item);
-            }}
-            className="mb-1.5 flex max-w-[85%] items-center gap-2 rounded-lg text-left"
-          >
-            <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-white/35 shadow-md">
-              <ImageWithFallback
-                src={brandAvatar.src}
-                fileId={brandAvatar.fileId}
-                alt={item.brandName ?? item.username ?? 'Brand'}
-                fit="cover"
-                rounded="xl"
-                fallbackName={brandAvatarFallback}
-                containerClassName="h-9 w-9 rounded-xl"
-                className="h-9 w-9 object-cover"
-              />
+          {/*
+            Patching lives ON THE BRAND AVATAR, which is where native puts it.
+
+            It used to be a separate item at the bottom of the right action rail
+            — a 🧵 disc labelled "Patch", sitting under Bag It / thread / Save.
+            Native has never done that: `FeedBrandAvatar` renders a small needle
+            badge on the corner of the avatar, and pressing it patches the brand
+            whose face you are looking at. Two apps, the same feed, two different
+            gestures for the same verb is the thing worth fixing; the rail is
+            also the wrong home for it, because everything else in that rail acts
+            on the DESIGN and patching acts on its maker.
+
+            Split into sibling buttons rather than nested ones: a `<button>`
+            inside a `<button>` is invalid HTML, and the browser's recovery for
+            it is unpredictable. The avatar and the name are each their own
+            control (both opening the brand), with the patch badge positioned
+            over the avatar's corner.
+          */}
+          <div className="mb-1.5 flex max-w-[85%] items-center gap-2">
+            <span className="relative shrink-0">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (brandId) onViewBrand?.(brandId, item);
+                }}
+                className="block h-9 w-9 overflow-hidden rounded-xl border border-white/35 shadow-md transition-transform active:scale-95"
+                aria-label={`Open ${item.brandName ?? item.username ?? 'brand'} profile`}
+              >
+                <ImageWithFallback
+                  src={brandAvatar.src}
+                  fileId={brandAvatar.fileId}
+                  alt={item.brandName ?? item.username ?? 'Brand'}
+                  fit="cover"
+                  rounded="xl"
+                  fallbackName={brandAvatarFallback}
+                  containerClassName="h-9 w-9 rounded-xl"
+                  className="h-9 w-9 object-cover"
+                />
+              </button>
+              {canPatch && brandId ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTogglePatch?.(brandId);
+                  }}
+                  disabled={patchBusy}
+                  className={`absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border text-[10px] leading-none shadow transition-transform active:scale-90 disabled:opacity-60 ${
+                    isPatched
+                      ? 'border-emerald-400 bg-emerald-500 text-white'
+                      : 'border-white/40 bg-black/70 text-white'
+                  }`}
+                  aria-label={isPatched ? 'Unpatch brand' : 'Patch brand'}
+                  aria-pressed={isPatched}
+                  title={isPatched ? 'Unpatch brand' : 'Patch brand'}
+                >
+                  🪡
+                </button>
+              ) : null}
             </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-bold leading-tight text-white drop-shadow">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (brandId) onViewBrand?.(brandId, item);
+              }}
+              className="min-w-0 rounded-lg text-left"
+            >
+              <span className="block truncate text-sm font-bold leading-tight text-white drop-shadow">
                 {item.brandName ?? item.username ?? 'Brand'}
               </span>
               {item.username && item.brandName !== item.username ? (
-                <span className="block text-[11px] leading-tight text-white/80">@{item.username}</span>
+                <span className="block truncate text-[11px] leading-tight text-white/80">
+                  @{item.username}
+                </span>
               ) : null}
-            </span>
-          </button>
+            </button>
+          </div>
 
           <h3 className="max-w-[88%] text-[15px] font-bold leading-snug text-white drop-shadow">
             {item.collectionTitle}

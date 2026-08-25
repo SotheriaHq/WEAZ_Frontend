@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx';
 import { useLocation } from 'react-router-dom';
 
+import CountBadge from '@/components/navigation/CountBadge';
+
 export type IslandBottomNavItem = {
   key: string;
   label: string;
@@ -316,11 +318,7 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
                 {visual ? (
                   <span className="relative text-[17px] leading-none" aria-hidden="true">
                     {visual}
-                    {showBadge && (
-                      <span className="absolute -right-2.5 -top-1.5 min-w-[15px] rounded-full bg-fuchsia-600 px-1 text-[9px] font-bold leading-[15px] text-white shadow">
-                        {(item.badge ?? 0) > 99 ? '99+' : item.badge}
-                      </span>
-                    )}
+                    {showBadge && <CountBadge count={item.badge ?? 0} className="-right-2.5 -top-1.5" />}
                   </span>
                 ) : null}
                 <span className="max-w-full truncate leading-tight">{item.label}</span>

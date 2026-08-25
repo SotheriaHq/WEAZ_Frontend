@@ -36,6 +36,10 @@ import useRunwayFeed from '@/hooks/useRunwayFeed';
 import useRunwayPinnedFeed from '@/hooks/useRunwayPinnedFeed';
 import { createMixSeed, mixFeedItems } from '@/utils/feedMixer';
 import { queryKeys } from '@/query/queryKeys';
+import {
+  NavbarCenterSlot,
+  useAutoHideNavOnScroll,
+} from '@/components/navigation/navbarChrome';
 
 /**
  * Runway page — Design feed UI.
@@ -299,6 +303,13 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   /** Phone + responsive mobile: reels. Wider tablets/iPad keep masonry. */
   const isMobileReels = useSelector(selectIsMobile);
+  /*
+    The floating bar slides away while the feed is moving and returns when it
+    settles. Only enabled on the phone reels stage — on desktop the navbar is a
+    solid bar over a masonry grid and taking it away on scroll would be removing
+    the site's navigation.
+  */
+  const handleReelsScroll = useAutoHideNavOnScroll(isMobileReels);
   const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const {
@@ -865,29 +876,45 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
     </div>
   );
 
-  const reelsCategoryHeader = (
-    <div className="bg-gradient-to-b from-black/70 via-black/35 to-transparent px-2 pb-3 pt-2">
-      <div className="overflow-x-auto no-scrollbar">
-        <div className="flex min-w-max items-center gap-2">
-          {feedCategories.map((cat) => {
-            const active = selectedCategory === cat.key;
-            return (
-              <button
-                type="button"
-                key={cat.key}
-                onClick={() => startTransition(() => setSelectedCategory(cat.key))}
-                aria-pressed={active}
-                className={`relative shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold backdrop-blur-md transition-colors ${
-                  active
-                    ? 'bg-white/90 text-black'
-                    : 'bg-white/15 text-white hover:bg-white/25'
-                }${isPending ? ' opacity-60' : ''}`}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
-        </div>
+  /**
+   * Category chips for the phone Runway — rendered INSIDE the navbar.
+   *
+   * These used to be a second row pinned under the bar (`absolute top-0 pt-16`)
+   * on top of their own black gradient. Three things were wrong with that: the
+   * row was left-aligned and scrolled off the right edge with the last chip cut
+   * in half, it duplicated the scrim the immersive navbar already draws, and it
+   * read as a strip stuck below the bar rather than as chrome belonging to it.
+   *
+   * The navbar's middle region is empty on a phone (its search bar is `sm:flex`)
+   * and sits exactly between the WIEZ mark and the search/notification
+   * controls — which is where the filters for the surface below belong. Portaled
+   * there via `NavbarCenterSlot`; the scrim and the auto-hide come with the bar
+   * for free.
+   *
+   * `justify-center` with `mx-auto` on the inner row means a short set of chips
+   * centres and a long set still scrolls, rather than always hugging the left.
+   */
+  const reelsCategoryChips = (
+    <div className="flex w-full min-w-0 items-center overflow-x-auto scrollbar-wiez">
+      <div className="mx-auto flex min-w-max items-center gap-1.5">
+        {feedCategories.map((cat) => {
+          const active = selectedCategory === cat.key;
+          return (
+            <button
+              type="button"
+              key={cat.key}
+              onClick={() => startTransition(() => setSelectedCategory(cat.key))}
+              aria-pressed={active}
+              className={`relative shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold backdrop-blur-md transition-colors ${
+                active
+                  ? 'bg-white/90 text-black'
+                  : 'bg-white/15 text-white hover:bg-white/25'
+              }${isPending ? ' opacity-60' : ''}`}
+            >
+              {cat.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -1112,6 +1139,10 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
 
     return (
       <div className="relative">
+        {/* Chips live in the navbar on a phone — see `reelsCategoryChips`. One
+            portal for every branch, so the filters do not move between the feed
+            and its empty/error states. */}
+        <NavbarCenterSlot>{reelsCategoryChips}</NavbarCenterSlot>
         {/* Full-bleed stage — see the pinned-mode stage above. */}
         <div
           className={`fixed inset-x-0 top-0 z-10 ${
@@ -1123,12 +1154,10 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
         >
           {showError ? (
             <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 pt-20 pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]">
-              {reelsCategoryHeader}
               <StateDisplay type={detectErrorType(error)} onRetry={() => void refetch()} />
             </div>
           ) : showEmpty ? (
             <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 pt-20 pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]">
-              {reelsCategoryHeader}
               {!activeFeedTag ? (
                 <StateDisplay type="empty" onRetry={() => void loadFeed()} />
               ) : (
@@ -1145,7 +1174,6 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
             </div>
           ) : showFallback ? (
             <div className="flex h-full flex-col overflow-y-auto bg-[color:var(--surface-base)] px-3 pt-20 pb-[calc(env(safe-area-inset-bottom,0px)+7rem)]">
-              {reelsCategoryHeader}
               <section className="mt-4 space-y-4" data-entity-type="PRODUCT" data-card-branch="product">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-theme-secondary">
@@ -1182,7 +1210,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
               isPatched={(brandId) => getPatched(brandId)}
               patchBusy={(brandId) => isPatchLoading(brandId)}
               onTogglePatch={handleTogglePatch}
-              header={reelsCategoryHeader}
+              onFeedScroll={handleReelsScroll}
             />
           )}
         </div>

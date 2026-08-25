@@ -35,6 +35,11 @@ import { COMPANY_NAME } from '@/lib/brand';
 import { hasActiveBrandMembership, resolveAccountDisplayName } from '@/lib/brandAccess';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
+import CountBadge from '@/components/navigation/CountBadge';
+import {
+  NavbarCenterSlotTarget,
+  useImmersiveNavHidden,
+} from '@/components/navigation/navbarChrome';
 import { MY_BAG_EMOJI, MY_BAG_LABEL } from '@/constants/bagging';
 import {
   Dropdown as SharedDropdown,
@@ -76,6 +81,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const navHidden = useImmersiveNavHidden();
   const notificationsButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const { themePreference, setThemePreference } = useSyncedThemePreference();
   const { setLanguage, translate } = useLanguage();
@@ -318,13 +324,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
           */}
           <DropdownItem
             leftIcon="🔔"
-            meta={
-              unreadCount > 0 ? (
-                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
-              ) : null
-            }
+            meta={unreadCount > 0 ? <CountBadge count={unreadCount} placement="inline" /> : null}
             onClick={() => {
               goToNotifications();
               setShowProfileMenu(false);
@@ -443,7 +443,19 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
 
   return (
     <nav
-      className={`fixed top-0 left-0 z-layer-nav h-16 w-full px-4 sm:px-5 ${
+      className={`fixed top-0 left-0 z-layer-nav h-16 w-full px-4 transition-transform duration-200 ease-out sm:px-5 ${
+        /*
+          Immersive only: the bar slides out while the feed under it is being
+          scrolled and comes back when it settles (see `navbarChrome`). A solid
+          bar on an ordinary page must never do this — it would take the site's
+          navigation away on every scroll.
+
+          `-translate-y-full` rather than `display:none` so it animates, and
+          `pointer-events-none` so a hidden bar cannot swallow a tap meant for
+          the media behind it.
+        */
+        immersive && navHidden ? '-translate-y-full pointer-events-none' : 'translate-y-0'
+      } ${
         immersive
           ? 'border-b-0 bg-transparent'
           : minimal
@@ -492,9 +504,24 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
                 navigate('/');
               }}
             >
+              {/*
+                On the immersive phone bar the wordmark TEXT stands down.
+
+                The bar has to hold the mark, the Runway's category chips and
+                the search/notification controls across ~360px. The lockup costs
+                roughly 90px of that, and it is the one element already said by
+                everything around it — the user is inside the app, on its home
+                surface, with the logo mark still present beside it. Giving that
+                width to the chips is the difference between three filters and
+                one and a half.
+
+                Desktop and every non-immersive route keep the full lockup.
+              */}
               <BrandWordmark
                 logoSize={32}
-                textClassName="max-w-[200px] truncate text-lg font-bold tracking-tight text-theme"
+                textClassName={`max-w-[200px] truncate text-lg font-bold tracking-tight text-theme ${
+                  immersive ? 'hidden sm:inline' : ''
+                }`}
               />
               <span className="sr-only">{COMPANY_NAME}</span>
             </div>
@@ -502,14 +529,21 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
         </div>
 
         {!minimal ? (
-          <div className="hidden flex-1 justify-center px-6 sm:flex">
-            <div className="flex w-full items-center gap-2">
-              <SearchBarWithSuggestions
-                placeholder={translate('searchPlaceholder') || 'Search products, brands, styles...'}
-                className="!flex-1"
-              />
+          <>
+            <div className="hidden flex-1 justify-center px-6 sm:flex">
+              <div className="flex w-full items-center gap-2">
+                <SearchBarWithSuggestions
+                  placeholder={translate('searchPlaceholder') || 'Search products, brands, styles...'}
+                  className="!flex-1"
+                />
+              </div>
             </div>
-          </div>
+            {/* Phone layout: the same middle region, offered to the page. The
+                Runway puts its category chips here so they sit centred between
+                the mark and the controls instead of running off the edge in a
+                second row below the bar. */}
+            <NavbarCenterSlotTarget />
+          </>
         ) : null}
 
         <div className="flex min-w-[100px] shrink-0 items-center justify-end space-x-2 sm:space-x-3">
@@ -535,11 +569,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
               aria-label="Wishlist"
             >
               <span aria-hidden="true" className="text-xl">🤍</span>
-              {wishlistTotal > 0 ? (
-                <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
-                  {wishlistTotal > 99 ? '99+' : wishlistTotal}
-                </span>
-              ) : null}
+              <CountBadge count={wishlistTotal} />
             </button>
           ) : null}
 
@@ -596,11 +626,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
                 aria-expanded={isMobileViewport ? undefined : showNotificationsDropdown}
               >
                 <span aria-hidden="true" className="text-xl">🔔</span>
-                {unreadCount > 0 ? (
-                  <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                ) : null}
+                <CountBadge count={unreadCount} />
               </button>
               {isMobileViewport ? null : (
                 <NotificationsDropdown
