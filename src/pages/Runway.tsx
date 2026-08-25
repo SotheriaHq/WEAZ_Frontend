@@ -37,8 +37,9 @@ import useRunwayPinnedFeed from '@/hooks/useRunwayPinnedFeed';
 import { createMixSeed, mixFeedItems } from '@/utils/feedMixer';
 import { queryKeys } from '@/query/queryKeys';
 import {
-  NavbarCenterSlot,
+  IMMERSIVE_NAV_HEIGHT_PX,
   useAutoHideNavOnScroll,
+  useImmersiveNavHidden,
 } from '@/components/navigation/navbarChrome';
 
 /**
@@ -309,7 +310,10 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
     solid bar over a masonry grid and taking it away on scroll would be removing
     the site's navigation.
   */
-  const handleReelsScroll = useAutoHideNavOnScroll(isMobileReels);
+  const reelsScrollHandlers = useAutoHideNavOnScroll(isMobileReels);
+  // The chips read the same state the bar does, so the two can never disagree
+  // about how much room is free.
+  const navHidden = useImmersiveNavHidden();
   const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const {
@@ -877,44 +881,65 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
   );
 
   /**
-   * Category chips for the phone Runway — rendered INSIDE the navbar.
+   * Category chips for the phone Runway — a persistent row that OUTLIVES the navbar.
    *
-   * These used to be a second row pinned under the bar (`absolute top-0 pt-16`)
-   * on top of their own black gradient. Three things were wrong with that: the
-   * row was left-aligned and scrolled off the right edge with the last chip cut
-   * in half, it duplicated the scrim the immersive navbar already draws, and it
-   * read as a strip stuck below the bar rather than as chrome belonging to it.
+   * Two earlier shapes were both wrong. Originally they were a second row pinned
+   * below the bar on its own black gradient — left-aligned, scrolling off the
+   * right edge with the last chip cut in half, duplicating the scrim the
+   * immersive navbar already draws. Then they were portaled INTO the navbar,
+   * which fixed the alignment and broke something worse: the bar auto-hides on
+   * scroll, so the filters went with it. The one control a browsing reader needs
+   * to keep reaching cannot be attached to the chrome that gets out of their way.
    *
-   * The navbar's middle region is empty on a phone (its search bar is `sm:flex`)
-   * and sits exactly between the WIEZ mark and the search/notification
-   * controls — which is where the filters for the surface below belong. Portaled
-   * there via `NavbarCenterSlot`; the scrim and the auto-hide come with the bar
-   * for free.
+   * So the row is its own layer, always visible, and it MOVES to use whatever
+   * room the bar is not using:
    *
-   * `justify-center` with `mx-auto` on the inner row means a short set of chips
-   * centres and a long set still scrolls, rather than always hugging the left.
+   * - Bar visible  → chips sit directly under it, and shrink slightly, so the
+   *                  two rows of chrome together cost less than two full rows.
+   * - Bar hidden   → chips rise into the vacated space at the safe-area top and
+   *                  return to full size.
+   *
+   * One transition drives both, on `transform` only, so it stays on the
+   * compositor and cannot fight the feed's scrolling.
    */
   const reelsCategoryChips = (
-    <div className="flex w-full min-w-0 items-center overflow-x-auto scrollbar-wiez">
-      <div className="mx-auto flex min-w-max items-center gap-1.5">
-        {feedCategories.map((cat) => {
-          const active = selectedCategory === cat.key;
-          return (
-            <button
-              type="button"
-              key={cat.key}
-              onClick={() => startTransition(() => setSelectedCategory(cat.key))}
-              aria-pressed={active}
-              className={`relative shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold backdrop-blur-md transition-colors ${
-                active
-                  ? 'bg-white/90 text-black'
-                  : 'bg-white/15 text-white hover:bg-white/25'
-              }${isPending ? ' opacity-60' : ''}`}
-            >
-              {cat.label}
-            </button>
-          );
-        })}
+    <div
+      className="pointer-events-none fixed inset-x-0 top-0 z-20 transition-transform duration-300 ease-out sm:hidden"
+      style={{
+        transform: navHidden
+          ? 'translateY(calc(env(safe-area-inset-top, 0px) + 8px))'
+          : `translateY(${IMMERSIVE_NAV_HEIGHT_PX}px)`,
+      }}
+    >
+      <div
+        className="pointer-events-auto flex w-full min-w-0 items-center overflow-x-auto px-2 scrollbar-wiez transition-transform duration-300 ease-out"
+        style={{
+          // Scaled from the top-left of the row rather than its centre, so
+          // shrinking never pulls the first chip away from the screen edge.
+          transformOrigin: 'left center',
+          transform: navHidden ? 'scale(1)' : 'scale(0.92)',
+        }}
+      >
+        <div className="flex min-w-max items-center gap-1.5">
+          {feedCategories.map((cat) => {
+            const active = selectedCategory === cat.key;
+            return (
+              <button
+                type="button"
+                key={cat.key}
+                onClick={() => startTransition(() => setSelectedCategory(cat.key))}
+                aria-pressed={active}
+                className={`relative shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold backdrop-blur-md transition-colors ${
+                  active
+                    ? 'bg-white/90 text-black'
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                }${isPending ? ' opacity-60' : ''}`}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -1139,10 +1164,10 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
 
     return (
       <div className="relative">
-        {/* Chips live in the navbar on a phone — see `reelsCategoryChips`. One
-            portal for every branch, so the filters do not move between the feed
-            and its empty/error states. */}
-        <NavbarCenterSlot>{reelsCategoryChips}</NavbarCenterSlot>
+        {/* Rendered once for every branch, so the filters do not move between
+            the feed and its empty/error states — and, being outside the stage,
+            they survive the navbar hiding. */}
+        {reelsCategoryChips}
         {/* Full-bleed stage — see the pinned-mode stage above. */}
         <div
           className={`fixed inset-x-0 top-0 z-10 ${
@@ -1210,7 +1235,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
               isPatched={(brandId) => getPatched(brandId)}
               patchBusy={(brandId) => isPatchLoading(brandId)}
               onTogglePatch={handleTogglePatch}
-              onFeedScroll={handleReelsScroll}
+              scrollHandlers={reelsScrollHandlers}
             />
           )}
         </div>

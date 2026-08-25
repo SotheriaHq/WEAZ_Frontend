@@ -1,106 +1,48 @@
 /**
- * Two channels from a full-bleed page up to the floating navbar.
+ * Auto-hide for the floating navbar over a full-bleed page.
  *
  * The Runway's mobile reels stage is a `fixed inset-0` scroller that owns the
- * whole viewport, with the navbar floating transparently over it. That layout
- * creates two problems the page cannot solve on its own, because the navbar is
- * rendered by `Layout`, not by the page:
+ * whole viewport, with the navbar floating transparently over it. Two
+ * consequences, and both need a channel from the page up to `Layout`'s navbar:
  *
- * 1. **The category chips had nowhere to go.** They were drawn as a second row
- *    pinned below the bar (`absolute top-0 pt-16`), left-aligned and
- *    horizontally scrollable — so on a phone they ran off the right edge with
- *    the last chip cut in half, and they read as a stray strip pasted under the
- *    bar rather than as part of it. The navbar already has an empty middle
- *    region on mobile (the desktop search bar is `sm:flex`), which is exactly
- *    where a row of filters belongs: between the mark on the left and the
- *    controls on the right.
+ * - **The bar could not observe the feed.** The stage scrolls inside its own
+ *   element, so `window.scrollY` never moves and the navbar's own scroll
+ *   listener never fires. It sat at full strength over every design in the feed.
+ * - **The page has to know when the bar is gone**, because the category chips
+ *   move into the space it vacates.
  *
- * 2. **The bar could not get out of the way.** The stage scrolls inside its own
- *    element, so `window.scrollY` never moves and the navbar's own scroll
- *    listener never fires. It sat at full strength over every design in the
- *    feed. Only the feed knows when it is being scrolled, so the feed has to say
- *    so.
+ * A module-level subscribable store rather than context: the producer (a page,
+ * deep in the route tree) and the consumer (the navbar, above it in `Layout`)
+ * share no provider that is not the app root, and adding one would re-render the
+ * entire tree on every scroll frame. Same shape of problem as the
+ * reference-counted `lockShellViewport` in `IslandBottomNav.tsx`.
  *
- * Both are module-level subscribable stores rather than context because the
- * producer (a page, deep in the route tree) and the consumer (the navbar, above
- * it in `Layout`) have no common provider that is not the app root — and adding
- * one would re-render the entire tree on every scroll frame. This mirrors the
- * reference-counted `lockShellViewport` in `IslandBottomNav.tsx`, which exists
- * for the same shape of problem.
+ * ## What this deliberately does NOT do
+ *
+ * There is no tap-to-reveal. A stage whose chrome appears and disappears on
+ * press competes with the feed's own tap gesture (which reveals the design's
+ * meta), so a single tap has to mean two things and the second press means
+ * neither reliably. Scroll state is the only input.
+ *
+ * And the chips are **not** rendered inside the navbar. They were, and hiding
+ * the bar took the filters with it — the one control on the surface that has to
+ * stay reachable while browsing. They are the page's own row now; this module
+ * only tells it how much room it has.
  */
-import React, { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
-import { createPortal } from 'react-dom';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 
-/* ------------------------------------------------------------------ *
- * Centre slot
- * ------------------------------------------------------------------ */
+/** Height of the floating bar (`h-16`), in px. The chips sit under it. */
+export const IMMERSIVE_NAV_HEIGHT_PX = 64;
 
-type SlotListener = () => void;
-
-let slotElement: HTMLElement | null = null;
-const slotListeners = new Set<SlotListener>();
-
-function emitSlotChange() {
-  slotListeners.forEach((listener) => listener());
-}
-
-function subscribeSlot(listener: SlotListener) {
-  slotListeners.add(listener);
-  return () => {
-    slotListeners.delete(listener);
-  };
-}
-
-function getSlotElement() {
-  return slotElement;
-}
-
-/**
- * Rendered by the navbar. Claims the middle region on mobile.
- *
- * Hidden at `sm` and up, where the region belongs to the search bar — the chips
- * are a phone-layout answer and the desktop Runway renders masonry with its own
- * inline filter row.
- */
-export const NavbarCenterSlotTarget: React.FC = () => {
-  const ref = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    slotElement = ref.current;
-    emitSlotChange();
-    return () => {
-      slotElement = null;
-      emitSlotChange();
-    };
-  }, []);
-
-  return <div ref={ref} className="flex min-w-0 flex-1 justify-center px-1 sm:hidden" />;
-};
-
-/**
- * Rendered by a page. Portals its children into the navbar's middle region.
- *
- * Renders nothing until the target exists, which is the normal case on the
- * first paint after a route change — the effect that registers it runs after
- * this component's own first render.
- */
-export const NavbarCenterSlot: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const target = useSyncExternalStore(subscribeSlot, getSlotElement, getSlotElement);
-  if (!target) return null;
-  return createPortal(children, target);
-};
-
-/* ------------------------------------------------------------------ *
- * Auto-hide
- * ------------------------------------------------------------------ */
+type Listener = () => void;
 
 let navHidden = false;
-const hideListeners = new Set<SlotListener>();
+const listeners = new Set<Listener>();
 
-function subscribeHidden(listener: SlotListener) {
-  hideListeners.add(listener);
+function subscribe(listener: Listener) {
+  listeners.add(listener);
   return () => {
-    hideListeners.delete(listener);
+    listeners.delete(listener);
   };
 }
 
@@ -111,53 +53,104 @@ function getHidden() {
 export function setImmersiveNavHidden(hidden: boolean) {
   if (navHidden === hidden) return;
   navHidden = hidden;
-  hideListeners.forEach((listener) => listener());
+  listeners.forEach((listener) => listener());
 }
 
 export function useImmersiveNavHidden() {
-  return useSyncExternalStore(subscribeHidden, getHidden, getHidden);
+  return useSyncExternalStore(subscribe, getHidden, getHidden);
 }
 
 /**
- * Drives the bar from a scroller's own scroll events.
+ * How long the feed must be still before the bar comes back.
  *
- * The rule is the one every full-screen media feed uses: **movement hides the
- * chrome, stillness brings it back.** A feed is scrolled to look at the next
- * design, and a bar over the top of it during that is exactly what the report
- * called horrible. Coming back on settle rather than only on an upward scroll
- * matters because a vertical paging feed has no meaningful "scrolled up" — every
- * gesture lands on a new full-screen page.
- *
- * `SETTLE_MS` is long enough not to flicker between two flicks of a fast scroll
- * and short enough that the chips are back before someone reaches for them.
+ * A second, and the length is the point. Shorter and the bar flickers back
+ * between two flicks of a fast scroll — which is what "not smooth" describes.
+ * The bar returning is a signal that the reader has ARRIVED somewhere, so it
+ * should wait until they have.
  */
-const SETTLE_MS = 450;
+const SETTLE_MS = 1000;
 
-export function useAutoHideNavOnScroll(enabled: boolean) {
+export type ImmersiveScrollHandlers = {
+  onScroll: () => void;
+  onTouchStart: () => void;
+  onTouchEnd: () => void;
+};
+
+/**
+ * Drives the bar from a scroller's own events.
+ *
+ * **Movement hides the chrome; stillness with the finger lifted brings it back.**
+ * Both halves of that condition matter. Scroll events stop firing the moment a
+ * finger stops moving even though it is still down and about to fling again, so
+ * settling on time alone brings the bar back under a resting thumb mid-gesture.
+ * The reveal therefore waits for `touchend` as well, and a touch that starts
+ * while the timer is running cancels it.
+ *
+ * Returns handlers to spread onto the scrolling element rather than attaching
+ * its own listeners, so there is exactly one subscription and the page decides
+ * which element is the feed.
+ */
+export function useAutoHideNavOnScroll(enabled: boolean): ImmersiveScrollHandlers {
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchingRef = useRef(false);
+  const scrollIdleRef = useRef(true);
+
+  const clearTimer = useCallback(() => {
+    if (settleTimer.current) {
+      clearTimeout(settleTimer.current);
+      settleTimer.current = null;
+    }
+  }, []);
+
+  const armReveal = useCallback(() => {
+    clearTimer();
+    settleTimer.current = setTimeout(() => {
+      settleTimer.current = null;
+      scrollIdleRef.current = true;
+      // A finger still on the glass means the gesture is not over, however long
+      // it has been since the last scroll event. `onTouchEnd` re-arms.
+      if (!touchingRef.current) setImmersiveNavHidden(false);
+    }, SETTLE_MS);
+  }, [clearTimer]);
 
   useEffect(() => {
     if (!enabled) {
       setImmersiveNavHidden(false);
-      return;
+      return undefined;
     }
     return () => {
-      // Leaving the feed must always give the bar back — a page that unmounts
+      // Leaving the feed must always give the bar back — a page unmounted
       // mid-scroll would otherwise strand every later route without a navbar.
       setImmersiveNavHidden(false);
-      if (settleTimer.current) clearTimeout(settleTimer.current);
+      clearTimer();
     };
-  }, [enabled]);
+  }, [clearTimer, enabled]);
 
-  return useCallback(() => {
+  const onScroll = useCallback(() => {
     if (!enabled) return;
+    scrollIdleRef.current = false;
     setImmersiveNavHidden(true);
-    if (settleTimer.current) clearTimeout(settleTimer.current);
-    settleTimer.current = setTimeout(() => setImmersiveNavHidden(false), SETTLE_MS);
-  }, [enabled]);
-}
+    armReveal();
+  }, [armReveal, enabled]);
 
-/** Lets a tap-to-reveal surface bring the bar back immediately. */
-export function revealImmersiveNav() {
-  setImmersiveNavHidden(false);
+  const onTouchStart = useCallback(() => {
+    if (!enabled) return;
+    touchingRef.current = true;
+    // A touch that lands while the bar is on its way back cancels the reveal:
+    // the reader is reaching for the next design, not settling on this one.
+    clearTimer();
+  }, [clearTimer, enabled]);
+
+  const onTouchEnd = useCallback(() => {
+    if (!enabled) return;
+    touchingRef.current = false;
+    if (scrollIdleRef.current) {
+      // The finger never moved the feed — nothing was hidden, nothing to restore.
+      setImmersiveNavHidden(false);
+      return;
+    }
+    armReveal();
+  }, [armReveal, enabled]);
+
+  return { onScroll, onTouchStart, onTouchEnd };
 }

@@ -40,6 +40,51 @@ let inflightUnreadFetch: Promise<number | null> | null = null;
 let trailingRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
+ * The last count we actually know, at MODULE scope, plus everyone watching it.
+ *
+ * This used to be `useState(0)` per hook instance, and the hook lives in
+ * components that unmount on navigation (`SideBar`, `StudioSidebar`). So every
+ * tab change threw the number away and re-rendered the badge at zero — which
+ * hides it — and the count only came back when a fetch resolved. Worse, the
+ * coalescing above deliberately defers a refetch by up to
+ * `MIN_REFRESH_INTERVAL_MS`, so the badge could sit blank for a full five
+ * seconds after a navigation. That is the "counts disappear until the screen is
+ * settled" report, and it is a rendering artefact: the number never changed,
+ * only the component holding it did.
+ *
+ * Unread state belongs to the SESSION, not to whichever nav happens to be
+ * mounted. Seeding from here means a newly mounted badge paints the last known
+ * value on its first frame and only ever moves when a real number arrives.
+ *
+ * Publishing to every subscriber is the other half: two navs are mounted at
+ * once in some layouts, and without it the one that did not trigger the fetch
+ * would keep showing a stale number.
+ */
+let lastKnownUnreadCount = 0;
+const unreadSubscribers = new Set<(value: number) => void>();
+
+function publishUnreadCount(value: number) {
+  lastKnownUnreadCount = value;
+  unreadSubscribers.forEach((notify) => notify(value));
+}
+
+/**
+ * Drop the cached count on sign-out.
+ *
+ * Without this the next account to sign in on this tab inherits the previous
+ * one's badge until its first fetch resolves — the same stale-paint problem the
+ * cache exists to prevent, pointed at the wrong person.
+ */
+export function resetMessagingUnreadCount() {
+  lastUnreadFetchAt = 0;
+  if (trailingRefreshTimer) {
+    clearTimeout(trailingRefreshTimer);
+    trailingRefreshTimer = null;
+  }
+  publishUnreadCount(0);
+}
+
+/**
  * One request per window, one in flight at a time, and a trailing call so the
  * last event in a burst is never the one that gets dropped.
  */
@@ -74,7 +119,9 @@ function fetchUnreadCountCoalesced(): Promise<number | null> {
  */
 export function useMessagingUnreadCount(): { unreadCount: number; refresh: () => void } {
   const userId = useSelector((state: RootState) => state.user.profile?.id);
-  const [unreadCount, setUnreadCount] = useState(0);
+  // Seeded from the session-scoped value, so a remount paints the number it
+  // already knew instead of flashing an empty badge.
+  const [unreadCount, setUnreadCount] = useState(() => lastKnownUnreadCount);
   const { onMessageEvent, onNotification } = useRealtime();
   const mountedRef = useRef(true);
 
@@ -85,14 +132,28 @@ export function useMessagingUnreadCount(): { unreadCount: number; refresh: () =>
     };
   }, []);
 
+  // Every mounted badge follows the same value, whoever fetched it.
+  useEffect(() => {
+    const notify = (value: number) => {
+      if (mountedRef.current) setUnreadCount(value);
+    };
+    unreadSubscribers.add(notify);
+    // Re-sync on mount: a fetch may have landed between the initial state
+    // being read and this effect running.
+    notify(lastKnownUnreadCount);
+    return () => {
+      unreadSubscribers.delete(notify);
+    };
+  }, []);
+
   const applyCount = useCallback((value: number | null) => {
     if (value == null) return; // badge is decorative; never surface a failure
-    if (mountedRef.current) setUnreadCount(value);
+    publishUnreadCount(value);
   }, []);
 
   const refresh = useCallback(() => {
     if (!userId) {
-      setUnreadCount(0);
+      resetMessagingUnreadCount();
       return;
     }
 

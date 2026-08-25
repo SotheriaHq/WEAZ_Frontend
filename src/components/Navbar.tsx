@@ -36,10 +36,7 @@ import { hasActiveBrandMembership, resolveAccountDisplayName } from '@/lib/brand
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
 import CountBadge from '@/components/navigation/CountBadge';
-import {
-  NavbarCenterSlotTarget,
-  useImmersiveNavHidden,
-} from '@/components/navigation/navbarChrome';
+import { useImmersiveNavHidden } from '@/components/navigation/navbarChrome';
 import { MY_BAG_EMOJI, MY_BAG_LABEL } from '@/constants/bagging';
 import {
   Dropdown as SharedDropdown,
@@ -504,24 +501,9 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
                 navigate('/');
               }}
             >
-              {/*
-                On the immersive phone bar the wordmark TEXT stands down.
-
-                The bar has to hold the mark, the Runway's category chips and
-                the search/notification controls across ~360px. The lockup costs
-                roughly 90px of that, and it is the one element already said by
-                everything around it — the user is inside the app, on its home
-                surface, with the logo mark still present beside it. Giving that
-                width to the chips is the difference between three filters and
-                one and a half.
-
-                Desktop and every non-immersive route keep the full lockup.
-              */}
               <BrandWordmark
                 logoSize={32}
-                textClassName={`max-w-[200px] truncate text-lg font-bold tracking-tight text-theme ${
-                  immersive ? 'hidden sm:inline' : ''
-                }`}
+                textClassName="max-w-[200px] truncate text-lg font-bold tracking-tight text-theme"
               />
               <span className="sr-only">{COMPANY_NAME}</span>
             </div>
@@ -529,21 +511,14 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
         </div>
 
         {!minimal ? (
-          <>
-            <div className="hidden flex-1 justify-center px-6 sm:flex">
-              <div className="flex w-full items-center gap-2">
-                <SearchBarWithSuggestions
-                  placeholder={translate('searchPlaceholder') || 'Search products, brands, styles...'}
-                  className="!flex-1"
-                />
-              </div>
+          <div className="hidden flex-1 justify-center px-6 sm:flex">
+            <div className="flex w-full items-center gap-2">
+              <SearchBarWithSuggestions
+                placeholder={translate('searchPlaceholder') || 'Search products, brands, styles...'}
+                className="!flex-1"
+              />
             </div>
-            {/* Phone layout: the same middle region, offered to the page. The
-                Runway puts its category chips here so they sit centred between
-                the mark and the controls instead of running off the edge in a
-                second row below the bar. */}
-            <NavbarCenterSlotTarget />
-          </>
+          </div>
         ) : null}
 
         <div className="flex min-w-[100px] shrink-0 items-center justify-end space-x-2 sm:space-x-3">

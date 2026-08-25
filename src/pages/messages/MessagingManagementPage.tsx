@@ -1918,13 +1918,28 @@ const MessagingManagementPage: React.FC = () => {
             {/* Chat header */}
             <div className="shrink-0 flex items-center justify-between gap-3 bg-white/70 dark:bg-white/[0.04] backdrop-blur-sm px-4 py-3">
               <div className="flex items-center gap-3 min-w-0">
-                {/* Mobile back button */}
+                {/*
+                  The way back to the message list — and on a phone, the ONLY way.
+
+                  An open thread suppresses the island bottom nav (a conversation
+                  is a drill-down, not a tab), so this control is the entire exit.
+                  It was a 32px box holding a 16px grey `←`: below the 44px
+                  minimum tap target, and reading as decoration rather than as
+                  the one thing to press. Reported as there being no back control
+                  at all, which is a fair description of a control nobody sees.
+
+                  👈 and 44px match `AppBackButton` on native, so the same
+                  gesture looks the same in both apps. `aria-label` because an
+                  emoji alone announces as its unicode name.
+                */}
                 <button
                   type="button"
                   onClick={() => setActiveId('')}
-                  className="lg:hidden shrink-0 h-8 w-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/5"
+                  aria-label="Back to messages"
+                  title="Back to messages"
+                  className="lg:hidden -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl transition-colors hover:bg-gray-100 active:bg-gray-200 dark:hover:bg-white/10 dark:active:bg-white/[0.15]"
                 >
-                  <span aria-hidden="true" className="text-base">←</span>
+                  <span aria-hidden="true">👈</span>
                 </button>
 
                 <div className="h-9 w-9 rounded-2xl overflow-hidden shrink-0">

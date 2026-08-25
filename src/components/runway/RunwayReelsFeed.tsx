@@ -21,14 +21,19 @@ export type RunwayReelsFeedProps = {
   /** Optional overlay (category chips) rendered above the snap scroller. */
   header?: React.ReactNode;
   /**
-   * Called on every scroll frame of the stage.
+   * Scroll and touch handlers for the stage, from `useAutoHideNavOnScroll`.
    *
    * The stage is its own `overflow-y-auto` element, so `window.scrollY` never
    * moves and nothing above this component can observe the feed being scrolled.
-   * The Runway uses this to slide the floating navbar out of the way while a
-   * design is being scrolled past and bring it back when the feed settles.
+   * The touch pair is not optional: scroll events stop firing the moment a
+   * finger stops moving even though it is still down and about to fling again,
+   * so without them the navbar returns under a resting thumb mid-gesture.
    */
-  onFeedScroll?: () => void;
+  scrollHandlers?: {
+    onScroll: () => void;
+    onTouchStart: () => void;
+    onTouchEnd: () => void;
+  };
   className?: string;
 };
 
@@ -66,7 +71,7 @@ export const RunwayReelsFeed: React.FC<RunwayReelsFeedProps> = ({
   patchBusy,
   onTogglePatch,
   header,
-  onFeedScroll,
+  scrollHandlers,
   className,
 }) => {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -195,7 +200,10 @@ export const RunwayReelsFeed: React.FC<RunwayReelsFeedProps> = ({
 
       <div
         ref={scrollerRef}
-        onScroll={onFeedScroll}
+        onScroll={scrollHandlers?.onScroll}
+        onTouchStart={scrollHandlers?.onTouchStart}
+        onTouchEnd={scrollHandlers?.onTouchEnd}
+        onTouchCancel={scrollHandlers?.onTouchEnd}
         role="feed"
         aria-label="Runway reels"
         tabIndex={0}

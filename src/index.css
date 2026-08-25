@@ -802,8 +802,27 @@ html {
       0 4px 16px rgba(0, 0, 0, 0.2);
   }
 
+  /*
+    The RESTING navbar surface — opaque.
+
+    This was `background: transparent`, which meant that on every ordinary route
+    the bar had no surface at all until the page was scrolled. On Market that is
+    worst case: the page opens on a full-bleed hero photograph, so the logo,
+    search and bell sat directly on the image with nothing behind them, and
+    scrolling back to the top made the bar disappear again. It read as the navbar
+    being absent, because visually it was.
+
+    A transparent bar is a deliberate treatment and it already has a name — the
+    `immersive` prop, used by the phone Runway, which pairs transparency with a
+    gradient scrim and white controls so they stay legible over media. Nothing
+    else opts into that, so nothing else should get it by default.
+
+    `-muted` (scrolled) keeps the step: a slightly lifted surface plus a bottom
+    rule and a blur. The change on scroll is now a border and a tint appearing,
+    rather than the entire bar appearing.
+  */
   .wiez-nav-surface {
-    background: transparent;
+    background-color: var(--surface-primary);
     border-color: transparent;
     box-shadow: none;
   }
@@ -815,7 +834,7 @@ html {
   }
 
   :is(.dark) .wiez-nav-surface {
-    background: transparent;
+    background-color: var(--surface-primary);
     border-color: transparent;
     box-shadow: none;
   }
