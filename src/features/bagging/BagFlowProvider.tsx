@@ -166,7 +166,7 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
         // a toast auto-dismissed before slower readers finished the sentence,
         // leaving only a dead button. This one waits to be dismissed.
         showNotice({
-          title: 'Cannot bag this yet',
+          title: 'Not available',
           message: status.ui.disabledReason || 'This product cannot be bagged.',
         });
         return;

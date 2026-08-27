@@ -2493,3 +2493,45 @@ html:not(.dark) .input-glass:focus {
   font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
   --font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
 }
+
+/* Jump-to-message highlight.
+
+   Replaces a hard `ring-2 ring-orange-400` that landed on the full-width
+   message row and drew a warning-coloured rectangle across the whole
+   conversation pane. A soft accent band that blooms and decays reads as
+   attention rather than alarm, and leaves nothing behind.
+
+   Drawn on a pseudo-element so only OPACITY animates — background-color
+   transitions repaint, this composites. Inset negatively so the band hugs the
+   bubble with a little air rather than clipping it. */
+.wiez-message-jump {
+  position: relative;
+}
+.wiez-message-jump::before {
+  content: '';
+  position: absolute;
+  inset: -0.35rem -0.6rem;
+  border-radius: 0.9rem;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    100deg,
+    rgb(147 51 234 / 0.20) 0%,
+    rgb(217 70 239 / 0.12) 55%,
+    rgb(147 51 234 / 0.04) 100%
+  );
+  animation: wiez-message-jump 2.2s ease-out forwards;
+}
+@keyframes wiez-message-jump {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  65%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Hold the band instead of pulsing it; the timeout still clears the class. */
+  .wiez-message-jump::before {
+    animation: none;
+    opacity: 1;
+  }
+}

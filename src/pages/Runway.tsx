@@ -38,8 +38,8 @@ import { createMixSeed, mixFeedItems } from '@/utils/feedMixer';
 import { queryKeys } from '@/query/queryKeys';
 import {
   IMMERSIVE_NAV_HEIGHT_PX,
-  useAutoHideNavOnScroll,
-  useImmersiveNavHidden,
+  RUNWAY_CHIPS_HEIGHT_PX,
+  RUNWAY_CHROME_HEIGHT_PX,
 } from '@/components/navigation/navbarChrome';
 
 /**
@@ -305,15 +305,18 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
   /** Phone + responsive mobile: reels. Wider tablets/iPad keep masonry. */
   const isMobileReels = useSelector(selectIsMobile);
   /*
-    The floating bar slides away while the feed is moving and returns when it
-    settles. Only enabled on the phone reels stage — on desktop the navbar is a
-    solid bar over a masonry grid and taking it away on scroll would be removing
-    the site's navigation.
+    The bar no longer hides on scroll here.
+
+    Auto-hide only earns its keep when the chrome is OVERLAPPING the content —
+    it buys back the pixels it is covering. Now that the bar has its own band
+    and covers nothing, hiding it would buy back nothing and leave a black gap
+    where it had been, because the stage below is anchored to a fixed offset.
+    A bar that is sometimes there is also a worse bar: the whole complaint was
+    not being able to rely on where the navigation is.
+
+    `useAutoHideNavOnScroll` and `useImmersiveNavHidden` still exist for a
+    surface that genuinely goes full-bleed; nothing does today.
   */
-  const reelsScrollHandlers = useAutoHideNavOnScroll(isMobileReels);
-  // The chips read the same state the bar does, so the two can never disagree
-  // about how much room is free.
-  const navHidden = useImmersiveNavHidden();
   const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const {
@@ -904,22 +907,21 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
    */
   const reelsCategoryChips = (
     <div
-      className="pointer-events-none fixed inset-x-0 top-0 z-20 transition-transform duration-300 ease-out sm:hidden"
+      className="fixed inset-x-0 z-20 bg-black sm:hidden"
       style={{
-        transform: navHidden
-          ? 'translateY(calc(env(safe-area-inset-top, 0px) + 8px))'
-          : `translateY(${IMMERSIVE_NAV_HEIGHT_PX}px)`,
+        top: `${IMMERSIVE_NAV_HEIGHT_PX}px`,
+        height: `${RUNWAY_CHIPS_HEIGHT_PX}px`,
       }}
     >
-      <div
-        className="pointer-events-auto flex w-full min-w-0 items-center overflow-x-auto px-2 scrollbar-wiez transition-transform duration-300 ease-out"
-        style={{
-          // Scaled from the top-left of the row rather than its centre, so
-          // shrinking never pulls the first chip away from the screen edge.
-          transformOrigin: 'left center',
-          transform: navHidden ? 'scale(1)' : 'scale(0.92)',
-        }}
-      >
+      {/*
+        `scrollbar-hide`, not `scrollbar-wiez`.
+
+        A styled scrollbar is right on a panel a reader deliberately scrolls
+        through. Under a one-line filter row it is a stray purple rule sitting
+        across the top of the feed, which is what it was reported as. The row
+        still scrolls; it just does not narrate that it can.
+      */}
+      <div className="flex h-full w-full min-w-0 items-center overflow-x-auto px-2 scrollbar-hide">
         <div className="flex min-w-max items-center gap-1.5">
           {feedCategories.map((cat) => {
             const active = selectedCategory === cat.key;
@@ -929,10 +931,21 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
                 key={cat.key}
                 onClick={() => startTransition(() => setSelectedCategory(cat.key))}
                 aria-pressed={active}
-                className={`relative shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold backdrop-blur-md transition-colors ${
+                /*
+                  The native stage-nav chip, ported.
+
+                  `threadly-mobile` settled this on the same surface: an
+                  unselected chip carries NO fill — a plate behind every label
+                  reads as UI pasted onto the photograph — and the text does the
+                  work, bright white when selected, dimmed white when merely
+                  available. The selected state is a soft white pill, not an
+                  opaque white one, so it sits on the stage instead of punching a
+                  hole in it. See `components/ui/Chip.tsx` → `isStageNav`.
+                */
+                className={`relative shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
                   active
-                    ? 'bg-white/90 text-black'
-                    : 'bg-white/20 text-white hover:bg-white/30'
+                    ? 'bg-white/[0.14] text-white'
+                    : 'text-white/60 hover:text-white/85'
                 }${isPending ? ' opacity-60' : ''}`}
               >
                 {cat.label}
@@ -952,13 +965,14 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
     if (isMobileReels) {
       return (
         <div className="relative">
-          {/* Full-bleed stage: owns the whole viewport, with the navbar floating
-              transparently over it (Layout → `immersive`). It used to start at
-              `top-16`, handing the top 64px of a media surface to a solid bar —
-              which is what read as the nav pushing everything down. */}
+          {/* The stage starts BELOW the chrome. It used to be `top-0` with a
+              transparent bar floating over it, which put the wordmark, the bell
+              and the avatar on top of the design a reader came to look at.
+              Chrome owns its band; the photograph owns the rest. */}
           <div
-            className="fixed inset-x-0 top-0 z-10 bg-black"
+            className="fixed inset-x-0 z-10 bg-black"
             style={{
+              top: `${RUNWAY_CHROME_HEIGHT_PX}px`,
               bottom: 0,
             }}
           >
@@ -1168,12 +1182,13 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
             the feed and its empty/error states — and, being outside the stage,
             they survive the navbar hiding. */}
         {reelsCategoryChips}
-        {/* Full-bleed stage — see the pinned-mode stage above. */}
+        {/* Stage — see the pinned-mode stage above. Starts below the chrome. */}
         <div
-          className={`fixed inset-x-0 top-0 z-10 ${
+          className={`fixed inset-x-0 z-10 ${
             showsReels ? 'bg-black' : 'bg-[color:var(--surface-base)]'
           }`}
           style={{
+            top: `${RUNWAY_CHROME_HEIGHT_PX}px`,
             bottom: 0,
           }}
         >
@@ -1235,7 +1250,6 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
               isPatched={(brandId) => getPatched(brandId)}
               patchBusy={(brandId) => isPatchLoading(brandId)}
               onTogglePatch={handleTogglePatch}
-              scrollHandlers={reelsScrollHandlers}
             />
           )}
         </div>

@@ -129,7 +129,7 @@ export async function runDesignBagFlow(options: {
     // and opened the composer while the card showed "source is unavailable".
     if (!status.canBag || status.ui.defaultAction === 'DISABLED') {
       showNotice({
-      title: 'Cannot bag this yet',
+      title: 'Not available',
       message: status.ui.disabledReason || 'This design cannot be bagged right now.',
     });
       return 'blocked';
@@ -161,7 +161,7 @@ export async function runDesignBagFlow(options: {
     }
 
     showNotice({
-      title: 'Cannot bag this yet',
+      title: 'Not available',
       message: status.ui.disabledReason || 'This design cannot be bagged right now.',
     });
     return 'blocked';

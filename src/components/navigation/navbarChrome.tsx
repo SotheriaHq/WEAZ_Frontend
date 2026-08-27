@@ -31,8 +31,22 @@
  */
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 
-/** Height of the floating bar (`h-16`), in px. The chips sit under it. */
+/** Height of the bar (`h-16`), in px. The chips sit under it. */
 export const IMMERSIVE_NAV_HEIGHT_PX = 64;
+
+/** Height of the Runway category-chip row that sits directly under the bar. */
+export const RUNWAY_CHIPS_HEIGHT_PX = 44;
+
+/**
+ * Everything above the Runway stage: the bar plus the chip row.
+ *
+ * The reels stage starts here rather than at 0. The bar used to float over the
+ * media — full-bleed looked right in the abstract and meant, in practice, that
+ * a model's face sat behind the hamburger and the wordmark. Chrome gets its own
+ * band; the photograph gets the rest.
+ */
+export const RUNWAY_CHROME_HEIGHT_PX =
+  IMMERSIVE_NAV_HEIGHT_PX + RUNWAY_CHIPS_HEIGHT_PX;
 
 type Listener = () => void;
 

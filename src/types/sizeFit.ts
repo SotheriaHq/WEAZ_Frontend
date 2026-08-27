@@ -75,10 +75,11 @@ export interface SizeFitProfile {
  */
 export type MeasurementProblem = {
   key: string;
-  code: 'IMPLAUSIBLE' | 'INCONSISTENT' | 'LIKELY_HALF_GIRTH' | 'LIKELY_INCHES';
+  code: 'IMPLAUSIBLE' | 'OUT_OF_PROPORTION' | 'LIKELY_HALF_GIRTH' | 'LIKELY_INCHES';
   value: number;
   message: string;
-  conflictsWith?: string;
+  /** The height-anchored band this value should have fallen in. */
+  expected?: { min: number; max: number };
   suggestedValue?: number;
 };
 
@@ -106,6 +107,7 @@ export interface SizeRecommendationResponse {
   normalizedMeasurements?: Record<string, number>;
   measurementProblems?: MeasurementProblem[];
   primaryMeasurementUnavailable?: boolean;
+  measurementsDisagree?: boolean;
   userFitPreference?: FitPreference | string | null;
   productFitType?: string | null;
   fabricStretch?: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN' | null;

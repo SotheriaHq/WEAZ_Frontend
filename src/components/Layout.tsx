@@ -68,13 +68,22 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isRouteSidebarHidden = location.pathname.startsWith('/studio') || isEmbeddedMobile;
 
   /**
-   * Mobile Runway renders full-bleed reels (`Runway.tsx` → `isMobileReels`), so
-   * the bar floats over the stage instead of taking the top 64px of it. Both
-   * `/` and `/runway` are the design feed; masonry (>= 768px) keeps the normal
-   * solid bar, which is why this is gated on `isMobile` and not the route alone.
+   * The navbar is never immersive.
+   *
+   * Mobile Runway used to float the bar transparently over the reels stage, so
+   * the design a reader came to look at ran underneath the wordmark, the bell
+   * and the avatar — a model's face behind the hamburger. Reported twice, and
+   * the second time as "why are you destroying my app", which is the correct
+   * reading: the top of a photograph is not spare canvas.
+   *
+   * The bar owns a band at the top of the screen now, and the stage starts
+   * below it (`RUNWAY_CHROME_HEIGHT_PX`). Nothing overlaps anything.
+   *
+   * Kept as a named constant rather than deleting the `immersive` prop —
+   * `Navbar` still supports the treatment, and a future full-bleed surface that
+   * genuinely wants it can opt in. Nothing does today.
    */
-  const isImmersiveNav =
-    isMobile && (location.pathname === '/' || location.pathname === '/runway');
+  const isImmersiveNav = false;
 
   // Update sidebar mode when route or viewport changes
   useEffect(() => {

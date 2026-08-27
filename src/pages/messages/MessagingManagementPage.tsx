@@ -68,6 +68,15 @@ type ConversationItem = {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
+/**
+ * How long the "jumped to this message" wash stays on screen.
+ *
+ * Must be >= the `wiez-message-jump` keyframe duration in `index.css`, or the
+ * class is pulled mid-animation and the band disappears in a step instead of a
+ * fade.
+ */
+const MESSAGE_JUMP_HIGHLIGHT_MS = 2400;
+
 const FILTERS = [
   { label: 'All', value: 'all' },
   { label: 'Unread', value: 'unread' },
@@ -1336,9 +1345,31 @@ const MessagingManagementPage: React.FC = () => {
     const node = messageNodeRefs.current[highlightedMessageId];
     if (!node) return;
     node.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    node.classList.add('ring-2', 'ring-orange-400');
-    const t = window.setTimeout(() => node.classList.remove('ring-2', 'ring-orange-400'), 1800);
-    return () => window.clearTimeout(t);
+
+    /*
+      A wash, not an outline.
+
+      This used to add `ring-2 ring-orange-400`, and because the node it lands on
+      is the full-width message ROW rather than the bubble, it drew a hard orange
+      rectangle across the entire conversation pane. Orange is this app's warning
+      colour, so arriving from "you have a new message" looked like arriving at an
+      error — and a static 1.8s box gives no sense of "here, this one".
+
+      Messenger, WhatsApp and Slack all do the same thing instead: a soft band in
+      the product's own accent that blooms and fades. It reads as attention rather
+      than alarm, and because it decays it does not leave the transcript looking
+      permanently marked up. The animation is opacity-only on a pseudo-element, so
+      it stays on the compositor, and `prefers-reduced-motion` gets a plain hold.
+    */
+    node.classList.add('wiez-message-jump');
+    const t = window.setTimeout(
+      () => node.classList.remove('wiez-message-jump'),
+      MESSAGE_JUMP_HIGHLIGHT_MS,
+    );
+    return () => {
+      window.clearTimeout(t);
+      node.classList.remove('wiez-message-jump');
+    };
   }, [highlightedMessageId, messages]);
 
   /* ---- Scroll on new messages ---- */
@@ -1847,10 +1878,29 @@ const MessagingManagementPage: React.FC = () => {
                   key={item.id}
                   type="button"
                   onClick={() => selectConversation(item)}
-                  className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all mb-0.5 ${
+                  /*
+                    Unread has to LOOK unread.
+
+                    A read row and an unread row used to differ by
+                    `border-transparent` vs `border-transparent` — that is, by
+                    nothing at all except the weight of the name — so scanning
+                    the list for what needed answering meant reading every line.
+                    Messenger, Instagram DMs and WhatsApp all separate the two
+                    states with a filled surface plus a solid dot, and they carry
+                    the signal on THREE channels at once (surface, weight, dot)
+                    so it survives colour-blindness and a dimmed screen.
+
+                    Order matters: active beats unread beats read. A conversation
+                    you are looking at is by definition read, so the two never
+                    actually collide, but the ordering keeps it that way if the
+                    read receipt is slow.
+                  */
+                  className={`group w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors mb-0.5 border-l-[3px] ${
                     isActive
-                      ? 'bg-purple-50 dark:bg-purple-500/10 border-l-2 border-purple-500'
-                      : 'hover:bg-gray-50 dark:hover:bg-white/[0.03] border-l-2 border-transparent'
+                      ? 'border-purple-500 bg-purple-100/70 dark:bg-purple-500/15'
+                      : item.hasUnread
+                        ? 'border-purple-500 bg-gradient-to-r from-purple-50 to-fuchsia-50/40 hover:from-purple-100 hover:to-fuchsia-100/50 dark:from-purple-500/[0.14] dark:to-fuchsia-500/[0.06] dark:hover:from-purple-500/20'
+                        : 'border-transparent hover:bg-gray-50 dark:hover:bg-white/[0.03]'
                   }`}
                 >
                   {/* Avatar */}
@@ -1879,20 +1929,55 @@ const MessagingManagementPage: React.FC = () => {
                   {/* Content */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1">
-                      <span className={`truncate text-[13px] ${isActive ? 'font-semibold text-purple-900 dark:text-purple-200' : item.hasUnread ? 'font-semibold text-theme' : 'font-medium text-theme-secondary'}`}>
+                      <span className={`truncate text-[13px] ${isActive ? 'font-semibold text-purple-900 dark:text-purple-200' : item.hasUnread ? 'font-bold text-theme' : 'font-medium text-theme-secondary'}`}>
                         {item.participantName}
                       </span>
-                      <span className="shrink-0 text-[10px] text-theme-secondary">
+                      {/*
+                        The timestamp joins the unread signal instead of staying
+                        grey. On an unread row the recency IS the urgency, and
+                        tabular figures stop the column jittering as it ticks.
+                      */}
+                      <span
+                        className={`shrink-0 text-[10px] tabular-nums ${
+                          item.hasUnread && !isActive
+                            ? 'font-bold text-purple-600 dark:text-purple-300'
+                            : 'text-theme-secondary'
+                        }`}
+                      >
                         {formatRelative(item.lastMessageAt || item.createdAt)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-1 mt-0.5">
-                      <p className="truncate text-[11px] text-theme-secondary">{item.subtitle || item.title}</p>
-                      {item.unreadCount > 0 && (
-                        <span className="shrink-0 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1 text-[9px] font-bold text-white">
+                      {/*
+                        An unread preview must not be muted — it is the one line
+                        that tells you whether this needs answering now, and
+                        `text-theme-secondary` on both states was throwing that
+                        away on exactly the rows that needed it.
+                      */}
+                      <p
+                        className={`truncate text-[11px] ${
+                          item.hasUnread && !isActive
+                            ? 'font-semibold text-theme'
+                            : 'text-theme-secondary'
+                        }`}
+                      >
+                        {item.subtitle || item.title}
+                      </p>
+                      {item.unreadCount > 0 ? (
+                        <span
+                          className="shrink-0 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1 text-[9px] font-bold tabular-nums text-white"
+                          aria-label={`${item.unreadCount} unread`}
+                        >
                           {item.unreadCount > 99 ? '99+' : item.unreadCount}
                         </span>
-                      )}
+                      ) : item.hasUnread ? (
+                        /* Unread, but the server did not send a count — the dot
+                           is the honest form of "there is something here". */
+                        <span
+                          className="shrink-0 h-2 w-2 rounded-full bg-purple-600"
+                          aria-label="Unread"
+                        />
+                      ) : null}
                     </div>
                   </div>
                 </button>

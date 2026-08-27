@@ -136,6 +136,41 @@ export function relativePreviewRoute(preview?: string): string | null {
     return allowed ? preview : null;
 }
 
+/**
+ * The notification types whose destination is an order message thread.
+ *
+ * Every one of these declares `threadId` in its backend payload schema, so a
+ * type added to this set without one routes nowhere and falls through the chain
+ * exactly as before — safe by construction.
+ */
+const MESSAGE_NOTIFICATION_TYPES = new Set<string>([
+    NotificationTypes.MESSAGE_RECEIVED,
+    NotificationTypes.MESSAGE_UNREAD_REMINDER,
+    NotificationTypes.MESSAGE_THREAD_REOPENED,
+    NotificationTypes.MESSAGE_MODERATED,
+]);
+
+function buildMessageThreadRoute(
+    payload: Record<string, unknown> | undefined,
+): string | null {
+    const threadId =
+        typeof payload?.threadId === 'string' && payload.threadId.trim()
+            ? payload.threadId.trim()
+            : typeof payload?.conversationId === 'string' && payload.conversationId.trim()
+                ? payload.conversationId.trim()
+                : null;
+    if (!threadId) return null;
+
+    /*
+      A brand reads the same threads inside Studio, and sending them to the
+      shopper inbox would drop them out of the console they were working in.
+      `brandId` is only set on the brand-facing copy of the notification.
+    */
+    const isBrandSide = typeof payload?.brandId === 'string' && payload.brandId.trim().length > 0;
+    const base = isBrandSide ? '/studio/messages' : '/messages';
+    return `${base}?threadId=${encodeURIComponent(threadId)}`;
+}
+
 export function determineNotificationRoute(notification: NormalizedNotification): string {
     const { type, target, subTargetId, targetUrl, actor, payload } = notification;
 
@@ -169,6 +204,27 @@ export function determineNotificationRoute(notification: NormalizedNotification)
                     : fallbackUrl;
         }
         // COLLECTION_COLLAB / legacy patch payloads fall through to the registry.
+    }
+
+    /*
+      Message notifications open the THREAD.
+
+      All five message types carry `threadId` in their payload — the backend
+      registry makes it a required field — and all five had
+      `routePattern: () => null` in `NotificationRegistry`, so every one of them
+      fell through the chain to `/settings?tab=notifications`. Tapping "You have
+      unread order messages waiting" landed on the notifications screen, which is
+      the screen the reader just came FROM.
+
+      It has to be handled here rather than in the registry because
+      `routePattern` is only handed `(target, subTargetId, actorId)` — it never
+      sees the payload, and the thread id lives nowhere else. `MessagingManagementPage`
+      already reads `?threadId=`, so the deep link has always worked; nothing
+      ever produced it.
+    */
+    if (MESSAGE_NOTIFICATION_TYPES.has(type)) {
+        const messageRoute = buildMessageThreadRoute(payload as Record<string, unknown> | undefined);
+        if (messageRoute) return messageRoute;
     }
 
     // Try registry-based routing first

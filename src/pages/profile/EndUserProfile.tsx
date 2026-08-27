@@ -1592,16 +1592,6 @@ export const EndUserProfile: React.FC = () => {
                     </button>
                   </div>
 
-                  {computedMeasurementProblems.length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsSizeFitOpen(true)}
-                      className="block w-full rounded-lg bg-amber-50 px-2 py-1 text-left text-[11px] font-semibold leading-snug text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] dark:bg-amber-500/10 dark:text-amber-300"
-                    >
-                      {computedMeasurementProblems[0].message}
-                    </button>
-                  ) : null}
-
                   {savedMeasurementEntries.length > 0 ? (
                     <FittingsChipCloud
                       row={savedMeasurementEntries}
@@ -1682,20 +1672,15 @@ export const EndUserProfile: React.FC = () => {
                   ) : null}
                   <div className="ml-auto max-w-[210px]">
                     {/*
-                      A withheld measurement outranks a missing one. "Add Chest"
-                      is the wrong instruction when the chest field already holds
-                      a number — it is the number that is wrong, and only this
-                      message says so.
+                      The measurement notice does NOT live here.
+
+                      It used to, and it was 11px right-aligned inside a 210px
+                      column — a full sentence set ragged-left over five lines,
+                      which is the least readable arrangement available. It is a
+                      full-width notice under the header row now, where a
+                      sentence can be a sentence.
                     */}
-                    {!chartLoading && computedMeasurementProblems.length > 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => setIsSizeFitOpen(true)}
-                        className="mt-1 block rounded-md text-right text-[11px] font-semibold leading-snug text-amber-600 transition hover:text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] dark:text-amber-300 dark:hover:text-amber-200"
-                      >
-                        {computedMeasurementProblems[0].message}
-                      </button>
-                    ) : !chartLoading && !computedSize && computedMissingBaseline.length > 0 ? (
+                    {!chartLoading && !computedSize && computedMissingBaseline.length > 0 ? (
                       <button
                         type="button"
                         onClick={() => setIsSizeFitOpen(true)}
@@ -1713,6 +1698,53 @@ export const EndUserProfile: React.FC = () => {
               </div>
             ) : null}
           </div>
+
+          {/*
+            ── Measurement notice ──
+
+            One notice, full width, at reading size. Previously this was 11px
+            amber text right-aligned inside a 210px column: a whole sentence set
+            ragged-left across five short lines, which is the hardest way to
+            read anything, and it was duplicated in two places at two different
+            sizes.
+
+            It is a notice, so it is built like one — a marker, a short title
+            saying what state this is, and the server's own sentence as body copy
+            at 13px with normal line-height and a measure worth reading. The
+            server's sentence already names the value, the expected range and how
+            to take the measurement, so it must not be squeezed.
+          */}
+          {isOwner && !chartLoading && computedMeasurementProblems.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setIsSizeFitOpen(true)}
+              className="mt-3 flex w-full items-start gap-3 rounded-2xl border border-amber-300/70 bg-amber-50/80 px-4 py-3 text-left transition hover:border-amber-400 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] dark:border-amber-400/30 dark:bg-amber-500/[0.08] dark:hover:bg-amber-500/[0.12]"
+            >
+              <span aria-hidden="true" className="mt-0.5 shrink-0 text-base leading-none">
+                📏
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-bold text-amber-900 dark:text-amber-200">
+                  {computedMeasurementProblems.length === 1
+                    ? 'One measurement is worth checking'
+                    : `${computedMeasurementProblems.length} measurements are worth checking`}
+                </span>
+                <span className="mt-1 block max-w-prose text-[13px] leading-relaxed text-amber-800 dark:text-amber-300/90">
+                  {computedMeasurementProblems[0].message}
+                </span>
+                {computedMeasurementProblems.length > 1 ? (
+                  <span className="mt-1.5 block text-[12px] font-semibold text-amber-700 dark:text-amber-400">
+                    Tap to see the {computedMeasurementProblems.length - 1} other
+                    {computedMeasurementProblems.length - 1 === 1 ? '' : 's'} →
+                  </span>
+                ) : (
+                  <span className="mt-1.5 block text-[12px] font-semibold text-amber-700 dark:text-amber-400">
+                    Tap to update it →
+                  </span>
+                )}
+              </span>
+            </button>
+          ) : null}
 
           {/*
             The full-width fittings band that used to sit here is gone. It ran

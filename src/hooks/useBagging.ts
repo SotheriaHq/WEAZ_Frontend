@@ -337,7 +337,7 @@ export function useBagging() {
 
       if (!status.canBag || status.ui.defaultAction === 'DISABLED') {
         showNotice({
-          title: 'Cannot bag this yet',
+          title: 'Not available',
           message: status.ui.disabledReason || 'This product cannot be bagged.',
         });
         if (bagFlow) {
