@@ -18,6 +18,7 @@ import { EndUserProfileQrModal } from './EndUserProfileQrModal';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import type {
   ComputedSizeFitProfile,
+  MeasurementProblem,
   SizeFitProfile,
   SizeFitSharesPayload,
   SizingRegion,
@@ -228,67 +229,64 @@ function dedupeMeasurementEntries(
  * holds still, which is what "start again after the last one" means for a list
  * that already fits.
  */
-const FittingsMarqueeRow: React.FC<{
+/**
+ * The saved fittings, beside the name — as a wrapping cloud, not a marquee.
+ *
+ * It used to be a 32-second infinite marquee under a fade mask. Three problems,
+ * all of them reported: the mask cut chips mid-word at both edges so a reader
+ * saw "eat · 26 cm" and read it as broken data; a chip you want to read walks
+ * away from the pointer; and it is unpaused autoplay motion sitting alongside
+ * content, which needs a stop control it never had. A shopper's own body is
+ * reference material — it should hold still and be readable at a glance.
+ *
+ * Wrapping also puts the fittings in the empty column beside the avatar rather
+ * than in a full-width band beneath it, which is where they were asked for and
+ * where the eye already is after the name.
+ */
+const FittingsChipCloud: React.FC<{
   row: Array<[string, unknown]>;
-  /**
-   * Scroll the opposite way. Existed so a second, stacked row could counter-run
-   * against the first; the fittings now render as ONE row, so it defaults off
-   * and is kept only for a caller that genuinely wants the reverse direction.
-   */
-  alt?: boolean;
   unitLabel: string;
   formatLabel: (key: string) => string;
   onSelect: () => void;
-}> = ({ row, alt = false, unitLabel, formatLabel, onSelect }) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const trackRef = useRef<HTMLDivElement | null>(null);
-  const [overflows, setOverflows] = useState(false);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    const track = trackRef.current;
-    if (!container || !track) return;
-
-    const measure = () => {
-      // Compare the FIRST copy's width against the container. `scrollWidth`
-      // would already include the clone once it exists, which would latch the
-      // decision on permanently.
-      const singlePassWidth = overflows ? track.scrollWidth / 2 : track.scrollWidth;
-      setOverflows(singlePassWidth > container.clientWidth + 1);
-    };
-
-    measure();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(container);
-    observer.observe(track);
-    return () => observer.disconnect();
-  }, [overflows, row.length]);
-
-  const chips = overflows ? [...row, ...row] : row;
-
+  /** Keys the server withheld as unusable, so the chip can say so. */
+  problemKeys?: Set<string>;
+}> = ({ row, unitLabel, formatLabel, onSelect, problemKeys }) => {
   return (
-    <div ref={containerRef} className="fittings-marquee overflow-hidden">
-      <div
-        ref={trackRef}
-        className={`fittings-marquee-track flex w-max gap-1.5 ${
-          overflows ? '' : 'fittings-marquee-track-static'
-        } ${alt ? 'fittings-marquee-track-alt' : ''}`}
-      >
-        {chips.map(([key, value], chipIndex) => (
+    <div className="flex flex-wrap gap-1">
+      {row.map(([key, value]) => {
+        /*
+          Chips are keyed by whatever the profile stored (`MEN_CHEST`,
+          `CHEST_FULL_BUST`, …) while the server reports problems against the
+          canonical key, so the gender prefix is stripped before matching — the
+          same normalisation `formatLabel` already does for display.
+        */
+        const flagged = problemKeys?.has(
+          String(key)
+            .toUpperCase()
+            .replace(/^(MEN|WOMEN|MENS|WOMENS|UNISEX)_/, ''),
+        );
+        return (
           <button
-            key={`${key}-${chipIndex}`}
+            key={String(key)}
             type="button"
-            // The clone is decoration; assistive tech must read each fitting once.
-            aria-hidden={chipIndex >= row.length || undefined}
-            tabIndex={chipIndex >= row.length ? -1 : undefined}
             onClick={onSelect}
-            className="shrink-0 rounded-lg border border-gray-200/70 bg-gray-50/80 px-2 py-1 text-xs font-semibold text-gray-700 transition hover:border-indigo-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-indigo-400/50"
+            title={
+              flagged
+                ? 'This measurement cannot be right — tap to fix it.'
+                : undefined
+            }
+            className={`rounded-lg border px-1.5 py-0.5 text-[11px] font-semibold tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] ${
+              flagged
+                ? 'border-amber-400/70 bg-amber-50 text-amber-700 hover:border-amber-500 dark:border-amber-400/40 dark:bg-amber-500/10 dark:text-amber-300'
+                : 'border-gray-200/70 bg-gray-50/80 text-gray-700 hover:border-indigo-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-indigo-400/50'
+            }`}
           >
-            {formatLabel(String(key))} · {String(value)} {unitLabel}
+            {flagged ? <span aria-hidden="true">⚠ </span> : null}
+            {formatLabel(String(key))}&nbsp;·&nbsp;{String(value)}
+            {unitLabel}
           </button>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 };
@@ -395,6 +393,20 @@ export const EndUserProfile: React.FC = () => {
    * carries a `warnings` array saying precisely this; it was being discarded.
    */
   const [computedWarning, setComputedWarning] = useState<string | null>(null);
+  /*
+    Measurements the server would not size against. Distinct from
+    `computedMissingBaseline`, which is what was never entered — telling someone
+    to "add Chest" when the chest field already holds 45 sends them to a field
+    that looks filled in and reads as the app being broken.
+  */
+  const [computedMeasurementProblems, setComputedMeasurementProblems] = useState<
+    MeasurementProblem[]
+  >([]);
+  const computedProblemKeys = useMemo(
+    () =>
+      new Set(computedMeasurementProblems.map((problem) => problem.key.toUpperCase())),
+    [computedMeasurementProblems],
+  );
   const [chartLoading, setChartLoading] = useState(false);
   const [chartSaving, setChartSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -636,6 +648,20 @@ export const EndUserProfile: React.FC = () => {
         perRegion[0]?.computed?.missingBaselineMeasurements ?? [],
       );
       /*
+        The audit is per-measurement, so every region reports the same problems.
+        Deduped by key rather than concatenated, or a two-chart hybrid tells the
+        shopper about the same bad chest twice.
+      */
+      setComputedMeasurementProblems(
+        Array.from(
+          new Map(
+            perRegion
+              .flatMap((entry) => entry.computed?.measurementProblems ?? [])
+              .map((problem) => [problem.key, problem]),
+          ).values(),
+        ),
+      );
+      /*
         Warnings live per category, not on the envelope — the profile response
         aggregates `categoryBreakdown`, and each entry carries its own
         `warnings[]`. "No approved sizing chart is available" arrives there.
@@ -659,6 +685,7 @@ export const EndUserProfile: React.FC = () => {
       setComputedSize(null);
       setComputedAlphaSize(null);
       setComputedMissingBaseline([]);
+      setComputedMeasurementProblems([]);
       setComputedWarning(null);
       console.error('Failed to load computed size fit', err);
     } finally {
@@ -1273,6 +1300,37 @@ export const EndUserProfile: React.FC = () => {
   // Quick-access fittings (parity with the native profile): every saved
   // measurement as a compact chip. Keys carry MEN_/WOMEN_ namespacing that must
   // never surface as a label — the brand already chose who the design is for.
+  /*
+    Chip labels, short.
+
+    The chips sit in the column beside the avatar, which on a 390px phone is
+    ~220px wide. At full label length ("Sleeve Length Long") one chip fills a
+    line and eight fittings become eight lines. The words below are what a tape
+    measure and a tailor call these points, so nothing is lost by dropping the
+    registry's qualifiers; anything not in the map keeps its full label.
+  */
+  const COMPACT_MEASUREMENT_LABELS: Record<string, string> = {
+    HEIGHT: 'Height',
+    CHEST_BUST: 'Chest',
+    CHEST_FULL_BUST: 'Chest',
+    WAIST: 'Waist',
+    HIP_SEAT: 'Hip',
+    HIP: 'Hip',
+    SHOULDER: 'Shoulder',
+    SHOULDER_WIDTH: 'Shoulder',
+    SLEEVE_LENGTH: 'Sleeve',
+    SLEEVE_LENGTH_LONG: 'Sleeve',
+    SLEEVE_LENGTH_SHORT: 'Sleeve (short)',
+    INSEAM: 'Inseam',
+    NECK_COLLAR: 'Neck',
+    NECK: 'Neck',
+  };
+  const compactMeasurementLabel = (key: string): string => {
+    const canonical = key
+      .toUpperCase()
+      .replace(/^(MEN|WOMEN|MENS|WOMENS|UNISEX)_/, '');
+    return COMPACT_MEASUREMENT_LABELS[canonical] ?? formatMeasurementLabel(key);
+  };
   const formatMeasurementLabel = (key: string): string =>
     key
       .replace(/^(MEN|WOMEN|MENS|WOMENS|UNISEX)_/i, '')
@@ -1496,11 +1554,76 @@ export const EndUserProfile: React.FC = () => {
                 the avatar itself — and a block that appears and disappears in
                 this column reflows the name and handle every time.
               */}
+
+              {/*
+                ── Size + fittings, in the column beside the avatar ──
+
+                This column was empty below the handle on every phone-width
+                screen while the fittings ran as a full-width band under the
+                avatar and the size sat in a strip under the action bar — three
+                separate places to look for one answer, none of them next to the
+                name. They are one block now, in the space that was already
+                there. The wide right-hand widget below takes over at `lg`,
+                where there is genuinely room for it beside this column.
+              */}
+              {isOwner ? (
+                <div className="mt-2 space-y-1.5 lg:hidden">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span
+                      className={`text-2xl font-black leading-none tabular-nums text-indigo-900 transition-opacity dark:text-indigo-100 ${
+                        chartLoading ? 'opacity-50' : 'opacity-100'
+                      }`}
+                      aria-busy={chartLoading}
+                      aria-live="polite"
+                    >
+                      {computedSize || (chartLoading ? 'Loading…' : '—')}
+                    </span>
+                    {alphaFitLabel ? (
+                      <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">
+                        {alphaFitLabel}
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => setIsSizeFitOpen(true)}
+                      className="rounded-md px-1 text-[11px] font-bold uppercase tracking-wide text-gray-500 transition hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] dark:text-gray-400 dark:hover:text-indigo-300"
+                    >
+                      <span aria-hidden="true">📏</span> {savedMeasurementEntries.length} fittings
+                    </button>
+                  </div>
+
+                  {computedMeasurementProblems.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsSizeFitOpen(true)}
+                      className="block w-full rounded-lg bg-amber-50 px-2 py-1 text-left text-[11px] font-semibold leading-snug text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] dark:bg-amber-500/10 dark:text-amber-300"
+                    >
+                      {computedMeasurementProblems[0].message}
+                    </button>
+                  ) : null}
+
+                  {savedMeasurementEntries.length > 0 ? (
+                    <FittingsChipCloud
+                      row={savedMeasurementEntries}
+                      unitLabel={measurementUnitLabel}
+                      formatLabel={compactMeasurementLabel}
+                      onSelect={() => setIsSizeFitOpen(true)}
+                      problemKeys={computedProblemKeys}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             {/* ── Compact inline size widget (owner only) ── */}
+            {/*
+              `lg`, not `sm`. At `sm` this block is ~210px of `shrink-0` sitting
+              beside a `min-w-0` identity column, so between 640px and 1024px it
+              ate the name: "Jayde Druid" rendered as "J…". Below `lg` the same
+              information lives in the identity column above.
+            */}
             {isOwner ? (
-              <div className="hidden shrink-0 flex-col items-end gap-2 sm:flex">
+              <div className="hidden shrink-0 flex-col items-end gap-2 lg:flex">
                 {/* Chart family tabs */}
                 <div className="flex gap-0.5 rounded-lg bg-indigo-50 p-0.5 dark:bg-indigo-950/40">
                   {DISPLAY_CHART_OPTIONS.slice(0, 4).map((option) => {
@@ -1558,7 +1681,21 @@ export const EndUserProfile: React.FC = () => {
                     </div>
                   ) : null}
                   <div className="ml-auto max-w-[210px]">
-                    {!chartLoading && !computedSize && computedMissingBaseline.length > 0 ? (
+                    {/*
+                      A withheld measurement outranks a missing one. "Add Chest"
+                      is the wrong instruction when the chest field already holds
+                      a number — it is the number that is wrong, and only this
+                      message says so.
+                    */}
+                    {!chartLoading && computedMeasurementProblems.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsSizeFitOpen(true)}
+                        className="mt-1 block rounded-md text-right text-[11px] font-semibold leading-snug text-amber-600 transition hover:text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] dark:text-amber-300 dark:hover:text-amber-200"
+                      >
+                        {computedMeasurementProblems[0].message}
+                      </button>
+                    ) : !chartLoading && !computedSize && computedMissingBaseline.length > 0 ? (
                       <button
                         type="button"
                         onClick={() => setIsSizeFitOpen(true)}
@@ -1577,31 +1714,29 @@ export const EndUserProfile: React.FC = () => {
             ) : null}
           </div>
 
-          {/* ── MY FITTINGS carousel: every saved fitting from baggings, moving
-                two-by-two at the bottom of the fittings box ── */}
+          {/*
+            The full-width fittings band that used to sit here is gone. It ran
+            under the avatar, which is the one place on this screen that is
+            never short of room, while the column beside the name sat empty —
+            and being full-width is what forced it to be a marquee in the first
+            place. The chips are in the identity column now; at `lg` they are
+            joined there by the wide size widget.
+          */}
           {isOwner && savedMeasurementEntries.length > 0 ? (
-            <div className="mt-3">
+            <div className="mt-3 hidden lg:block">
               <button
                 type="button"
                 onClick={() => setIsSizeFitOpen(true)}
-                className="mb-1.5 text-xs font-bold uppercase tracking-wide text-gray-500 transition hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-300"
+                className="mb-1.5 rounded-md text-xs font-bold uppercase tracking-wide text-gray-500 transition hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] dark:text-gray-400 dark:hover:text-indigo-300"
               >
-                📏 My fittings · {savedMeasurementEntries.length}
+                <span aria-hidden="true">📏</span> My fittings · {savedMeasurementEntries.length}
               </button>
-              {/*
-                ONE row, not two.
-
-                The fittings used to be dealt into two marquee rows by parity
-                (`index % 2`), which stacked them and made the block twice as
-                tall for no gain — a reader scanning for "Waist" had to check
-                two moving lines instead of one. A single marquee already
-                scrolls, so it holds any number of fittings in one line.
-              */}
-              <FittingsMarqueeRow
+              <FittingsChipCloud
                 row={savedMeasurementEntries}
                 unitLabel={measurementUnitLabel}
-                formatLabel={formatMeasurementLabel}
+                formatLabel={compactMeasurementLabel}
                 onSelect={() => setIsSizeFitOpen(true)}
+                problemKeys={computedProblemKeys}
               />
             </div>
           ) : null}
@@ -1613,12 +1748,23 @@ export const EndUserProfile: React.FC = () => {
             </div>
           ) : null}
 
-          {/* ── SIZE/FIT strip (mobile: compact inline below actions) ── */}
+          {/*
+            ── Sizing region switch (below lg) ──
+
+            What is left of the old mobile size strip. The size number and the
+            fit label moved up beside the name, so repeating them here would put
+            the same answer in two places on one screen and make a reader check
+            which one is current. This keeps only the control the identity
+            column has no room for: which regional chart the size is read
+            against.
+          */}
           {isOwner ? (
-            <div className="mt-3 sm:hidden">
-              <div className="flex items-center gap-3 rounded-2xl border border-indigo-200/60 bg-indigo-50/70 px-4 py-2.5 dark:border-indigo-500/20 dark:bg-indigo-950/30">
-                {/* Chart tabs */}
-                <div className="flex gap-0.5 rounded-md bg-white/60 p-0.5 dark:bg-white/10">
+            <div className="mt-3 lg:hidden">
+              <div className="flex items-center gap-2 overflow-x-auto rounded-2xl border border-indigo-200/60 bg-indigo-50/70 px-3 py-2 scrollbar-hide dark:border-indigo-500/20 dark:bg-indigo-950/30">
+                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
+                  Sized against
+                </span>
+                <div className="flex shrink-0 gap-0.5 rounded-md bg-white/60 p-0.5 dark:bg-white/10">
                   {DISPLAY_CHART_OPTIONS.slice(0, 4).map((option) => {
                     const active = displayChartFamily === option.value;
                     return (
@@ -1628,39 +1774,18 @@ export const EndUserProfile: React.FC = () => {
                         onClick={() => void handleDisplayChartChange(option.value)}
                         disabled={chartSaving}
                         aria-pressed={active}
-                        className={`rounded px-1.5 py-0.5 text-[9px] font-bold transition ${
+                        className={`whitespace-nowrap rounded px-2 py-1 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] ${
                           active ? 'bg-indigo-600 text-white' : 'text-indigo-500 dark:text-indigo-300'
                         }`}
                       >
-                        {option.label.replace('Nigeria', 'NG').replace('UK-Nigeria Hybrid', 'UK-NG').replace('US-Nigeria Hybrid', 'US-NG')}
+                        {option.label
+                          .replace('Nigeria', 'NG')
+                          .replace('UK-Nigeria Hybrid', 'UK-NG')
+                          .replace('US-Nigeria Hybrid', 'US-NG')}
                       </button>
                     );
                   })}
                 </div>
-                {/* Size number — holds its last value while the next chart
-                    resolves, so a tab tap does not reflow this strip. */}
-                <div
-                  className={`text-2xl font-black leading-none text-indigo-900 transition-opacity dark:text-indigo-100 ${
-                    chartLoading ? 'opacity-50' : 'opacity-100'
-                  }`}
-                  aria-busy={chartLoading}
-                  aria-live="polite"
-                >
-                  {computedSize || (chartLoading ? '…' : '—')}
-                </div>
-                {alphaFitLabel ? (
-                  <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">
-                    {alphaFitLabel}
-                  </div>
-                ) : !chartLoading && !computedSize && computedMissingBaseline.length > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => setIsSizeFitOpen(true)}
-                    className="min-w-0 flex-1 text-left text-[10px] font-semibold leading-snug text-amber-600 dark:text-amber-300"
-                  >
-                    Add {computedMissingBaseline.map((key) => formatMeasurementLabel(key)).join(' · ')} →
-                  </button>
-                ) : null}
               </div>
             </div>
           ) : null}

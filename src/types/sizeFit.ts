@@ -64,6 +64,24 @@ export interface SizeFitProfile {
   };
 }
 
+/**
+ * A saved measurement the server refused to size against, and why.
+ *
+ * Emitted by the backend measurement audit. A value that cannot describe a body
+ * (a 45 cm chest, a 26 cm hip) is withheld from the computation rather than
+ * scored badly — scored badly it went silent and let the remaining measurements
+ * elect a size on their own. `key` is a canonical measurement key so a client
+ * can point at the field that needs correcting.
+ */
+export type MeasurementProblem = {
+  key: string;
+  code: 'IMPLAUSIBLE' | 'INCONSISTENT' | 'LIKELY_HALF_GIRTH' | 'LIKELY_INCHES';
+  value: number;
+  message: string;
+  conflictsWith?: string;
+  suggestedValue?: number;
+};
+
 export interface SizeRecommendationResponse {
   estimatedSize: string | null;
   recommendedSize: string | null;
@@ -86,6 +104,8 @@ export interface SizeRecommendationResponse {
   staleMeasurementWarning?: boolean;
   sizeChartUnavailable?: boolean;
   normalizedMeasurements?: Record<string, number>;
+  measurementProblems?: MeasurementProblem[];
+  primaryMeasurementUnavailable?: boolean;
   userFitPreference?: FitPreference | string | null;
   productFitType?: string | null;
   fabricStretch?: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN' | null;
@@ -101,6 +121,7 @@ export interface ComputedSizeFitProfile {
   fitPreference: FitPreference | null;
   categoryBreakdown: Record<string, SizeRecommendationResponse>;
   missingBaselineMeasurements: string[];
+  measurementProblems?: MeasurementProblem[];
   staleMeasurementWarning?: boolean;
   measurementUpdatePrompt?: {
     requiredMeasurements: string[];

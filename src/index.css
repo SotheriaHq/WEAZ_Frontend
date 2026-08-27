@@ -2482,40 +2482,6 @@ html:not(.dark) .input-glass:focus {
   }
 }
 
-.fittings-marquee {
-  -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-  mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-}
-.fittings-marquee-track {
-  animation: fittings-marquee 32s linear infinite;
-  will-change: transform;
-}
-.fittings-marquee-track-alt {
-  animation-duration: 41s;
-}
-/* A row short enough to fit needs no loop — and must not run one, because the
-   -50% translate assumes a duplicated track. Declared after -alt so the
-   shorthand reset wins over that rule's duration. */
-.fittings-marquee-track-static {
-  animation: none;
-  transform: none;
-}
-.fittings-marquee:hover .fittings-marquee-track {
-  animation-play-state: paused;
-}
-@keyframes fittings-marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .fittings-marquee-track {
-    animation: none;
-  }
-}
 
 /* PrimeReact's lara theme points :root and --font-family at its bundled
    "Inter var" (339 kB InterVariable woff2 + italic — the largest non-image
