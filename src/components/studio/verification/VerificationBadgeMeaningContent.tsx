@@ -19,8 +19,8 @@ export default function VerificationBadgeMeaningContent({
 
   return (
     <div className={wrapperClass}>
-      <section className={`${sectionClass} border border-emerald-200 bg-emerald-50`}>
-        <p className={`${headingClass} text-emerald-700`}>
+      <section className={`${sectionClass} border border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10`}>
+        <p className={`${headingClass} text-emerald-700 dark:text-emerald-300`}>
           What it means
         </p>
         <p className={compact ? 'mt-2' : 'mt-3'}>
@@ -41,8 +41,8 @@ export default function VerificationBadgeMeaningContent({
         </div>
       </section>
 
-      <section className={`${sectionClass} border border-amber-200 bg-amber-50`}>
-        <p className={`${headingClass} text-amber-700`}>
+      <section className={`${sectionClass} border border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10`}>
+        <p className={`${headingClass} text-amber-700 dark:text-amber-300`}>
           Why it may disappear
         </p>
         <div className={compact ? 'mt-2 space-y-2' : 'mt-3 space-y-3'}>

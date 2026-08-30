@@ -631,7 +631,7 @@ export default function StoreManagement() {
                             mediaClassName="h-full w-full object-cover"
                           />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-gray-100 text-xs text-gray-500">
+                          <div className="flex h-full w-full items-center justify-center bg-gray-100 text-xs text-gray-500 dark:bg-white/10">
                             No Image
                           </div>
                         )}
@@ -668,7 +668,7 @@ export default function StoreManagement() {
                           {order.items?.length || 0} items
                         </p>
                       </div>
-                      <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-semibold text-green-600">
+                      <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-semibold text-green-600 dark:bg-green-500/10">
                         {order.status || 'Paid'}
                       </span>
                     </div>

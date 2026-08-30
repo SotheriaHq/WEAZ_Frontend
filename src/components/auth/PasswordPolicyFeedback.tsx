@@ -51,7 +51,7 @@ const toneClasses: Record<
   light: {
     muted: 'text-gray-600',
     danger: 'text-red-600',
-    success: 'text-emerald-700',
+    success: 'text-emerald-700 dark:text-emerald-300',
     track: 'bg-gray-200',
     fill: 'bg-amber-500',
   },

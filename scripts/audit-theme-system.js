@@ -272,6 +272,103 @@ for (const file of allFiles) {
   });
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   G_UNDEFINED_TOKEN_VARS
+
+   The bug this exists to prevent: five verification screens were written
+   against a Material 3 vocabulary (`bg-surface-container-lowest`,
+   `text-on-surface`, `border-outline-variant/20`) that was never added to
+   tailwind.config.js. An undefined utility is not an error in Tailwind — it
+   simply emits nothing — so 192 classes silently did nothing, the cards had no
+   background, and their `border` fell through to the preflight default of
+   #e5e7eb. In dark mode that is a near-white rectangle, which is exactly what
+   was reported.
+
+   Nothing in the type system, the linter, or the build can see that. So:
+   every CSS variable the Tailwind config resolves a colour to must actually be
+   declared in index.css, and — because the whole point is theming — declared
+   in BOTH the light and dark blocks.
+   ────────────────────────────────────────────────────────────────────────── */
+const tailwindConfigPath = path.join(ROOT_DIR, 'tailwind.config.js');
+const indexCssPath = path.join(SRC_DIR, 'index.css');
+
+if (fs.existsSync(tailwindConfigPath) && fs.existsSync(indexCssPath)) {
+  const configSource = fs.readFileSync(tailwindConfigPath, 'utf8');
+  const cssSource = fs.readFileSync(indexCssPath, 'utf8');
+
+  // Only the theme-scoped families. Brand/menu/etc. are declared elsewhere and
+  // some are deliberately identical across themes.
+  const referenced = new Set(
+    (configSource.match(/var\(--(?:bd|m3)-[a-z0-9-]+\)/g) || []).map((raw) =>
+      raw.slice(4, -1),
+    ),
+  );
+
+  const darkBlock = cssSource.slice(cssSource.indexOf('.dark {'));
+  const lightBlock = cssSource.slice(0, cssSource.indexOf('.dark {'));
+
+  for (const variable of [...referenced].sort()) {
+    const declaration = `${variable}:`;
+    const inLight = lightBlock.includes(declaration);
+    const inDark = darkBlock.includes(declaration);
+    if (inLight && inDark) continue;
+    const missing = !inLight && !inDark
+      ? 'declared nowhere'
+      : inLight
+        ? 'missing from the .dark block'
+        : 'missing from :root (light)';
+    console.error(`[FAIL] G_UNDEFINED_TOKEN_VARS: --${variable} is ${missing}`);
+    console.error('       Referenced by tailwind.config.js. A colour that resolves to an');
+    console.error('       undeclared variable renders as nothing, silently.');
+    console.error(`       Suggestion: declare --${variable} in BOTH blocks of src/index.css`);
+    hasErrors = true;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   H_LIGHT_ONLY_SURFACES  (ratchet, not a gate)
+
+   A pastel fill or border with no `dark:` counterpart is a light-theme
+   decision that reaches dark mode intact — a mint block or a bright hairline
+   on near-black. The neutral families are NOT counted: `borderColor` in
+   tailwind.config.js remaps those to the `--bd-*` ramp, so they are already
+   theme-aware wherever they appear.
+
+   A baseline rather than zero because the remaining cases are `bg-white`,
+   which is a card surface in some places and a toggle knob or dot in others.
+   Those need a human to say which, so they are counted, not auto-fixed. The
+   number may fall; it must never rise.
+   ────────────────────────────────────────────────────────────────────────── */
+const LIGHT_ONLY_BASELINE = 67;
+const HUE_GROUP = 'emerald|amber|rose|red|sky|blue|purple|indigo|green|violet|fuchsia|orange|teal|pink|cyan';
+const LIGHT_SURFACE = new RegExp(
+  `(^|\\s)(bg-(white|(?:gray|slate|zinc|neutral|stone|${HUE_GROUP})-(?:50|100|200))` +
+    `|border-(?:${HUE_GROUP})-(?:100|200|300))(\\/[0-9]+)?(?=\\s|$)`,
+);
+
+let lightOnly = 0;
+for (const file of allFiles) {
+  if (!file.endsWith('.tsx') || checkAllowlist(file)) continue;
+  for (const chunk of fs.readFileSync(file, 'utf8').split(/['"`]/)) {
+    if (!LIGHT_SURFACE.test(` ${chunk} `)) continue;
+    if (/(^|\s)dark:(bg|border)-/.test(chunk)) continue;
+    lightOnly += 1;
+  }
+}
+
+if (lightOnly > LIGHT_ONLY_BASELINE) {
+  console.error(
+    `[FAIL] H_LIGHT_ONLY_SURFACES: ${lightOnly} light-only surfaces, baseline is ${LIGHT_ONLY_BASELINE}`,
+  );
+  console.error('       A pastel fill or border with no dark: counterpart stays light on a');
+  console.error('       near-black page. Pair it, e.g. bg-emerald-50 dark:bg-emerald-500/10.');
+  hasErrors = true;
+} else if (lightOnly < LIGHT_ONLY_BASELINE) {
+  console.log(
+    `[INFO] H_LIGHT_ONLY_SURFACES improved: ${lightOnly} (baseline ${LIGHT_ONLY_BASELINE}) — lower the baseline.`,
+  );
+}
+
 // Check for migration artifacts in the root directory
 const rootFiles = fs.readdirSync(ROOT_DIR);
 const migrationArtifacts = rootFiles.filter(f => f === 'migrate.js' || f === 'migrate2.js' || f.match(/migrate.*\.js$/i));

@@ -729,11 +729,11 @@ export default function VerificationWizardPage() {
       </div>
 
       {wizardLockMessage ? (
-        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm shrink-0">
-          <p className="text-xs font-bold uppercase tracking-widest text-amber-800">
+        <section className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10 p-4 shadow-sm shrink-0">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-800 dark:text-amber-300">
             Submission locked
           </p>
-          <p className="mt-1.5 text-xs leading-relaxed text-amber-900">
+          <p className="mt-1.5 text-xs leading-relaxed text-amber-900 dark:text-amber-300">
             {wizardLockMessage}
           </p>
           <div className="mt-3">
@@ -1085,7 +1085,7 @@ export default function VerificationWizardPage() {
                         error={isExpiryDateTooSoon(form.idDocumentExpiryDate) ? 'ID expires within 1 week or is already expired' : undefined}
                       />
                       {isExpiryDateTooSoon(form.idDocumentExpiryDate) ? (
-                        <div className="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 font-medium flex items-center gap-1.5">
+                        <div className="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300 font-medium flex items-center gap-1.5">
                           <span>⚠️</span>
                           <span>Document Expiry Warning: Your ID expires within 7 days or is already expired. Please provide a document valid for more than 1 week.</span>
                         </div>
@@ -1135,7 +1135,7 @@ export default function VerificationWizardPage() {
                             isDragActive
                               ? 'border-primary bg-primary/10 scale-[0.99]'
                               : value
-                                ? 'border-emerald-300 bg-emerald-50/40'
+                                ? 'border-emerald-300 bg-emerald-50/40 dark:border-emerald-500/40 dark:bg-emerald-500/10'
                                 : 'border-outline-variant/40 bg-surface-container-low hover:border-primary/50'
                           }`}
                           onDragOver={(e) => {
@@ -1161,15 +1161,15 @@ export default function VerificationWizardPage() {
                           <div>
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-xs font-bold uppercase tracking-widest text-on-surface">{item.label}</span>
-                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${value ? 'bg-emerald-100 text-emerald-800' : 'bg-surface-container-high text-on-surface-variant'}`}>
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${value ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-surface-container-high text-on-surface-variant'}`}>
                                 {value ? 'Uploaded' : 'Required'}
                               </span>
                             </div>
                             <p className="text-xs text-on-surface-variant mb-4">{item.hint}</p>
 
                             {value ? (
-                              <div className="mb-4 rounded-xl border border-emerald-200 bg-white p-3 shadow-sm">
-                                <p className="truncate text-xs font-semibold text-emerald-900">
+                              <div className="mb-4 rounded-xl border border-emerald-200 bg-theme dark:border-emerald-500/30 p-3 shadow-sm">
+                                <p className="truncate text-xs font-semibold text-emerald-900 dark:text-emerald-300">
                                   📄 {String(value).split('/').pop() || 'Uploaded file'}
                                 </p>
                                 <div className="mt-2 flex items-center gap-3">
@@ -1179,7 +1179,7 @@ export default function VerificationWizardPage() {
                                         kind="image"
                                         src={previewUrl}
                                         alt={`${item.label} preview`}
-                                        className="w-12 h-12 rounded-lg border border-emerald-200 bg-white"
+                                        className="w-12 h-12 rounded-lg border border-emerald-200 bg-theme dark:border-emerald-500/30"
                                         mediaClassName="object-contain"
                                         maxHeightClassName="max-h-12"
                                         maxWidthClassName="max-w-[3rem]"
@@ -1298,22 +1298,22 @@ export default function VerificationWizardPage() {
                             if (!value) return null;
                             const previewUrl = getPreviewUrl(item.key as UploadFieldKey);
                             return (
-                              <div key={item.key} className="rounded-xl border border-emerald-200 bg-white p-3 shadow-sm flex items-center gap-3">
+                              <div key={item.key} className="rounded-xl border border-emerald-200 bg-theme dark:border-emerald-500/30 p-3 shadow-sm flex items-center gap-3">
                                 {previewUrl && /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?|$)|blob:/i.test(previewUrl) ? (
                                   <MediaRenderer
                                     kind="image"
                                     src={previewUrl}
                                     alt={`${item.label} preview`}
-                                    className="w-12 h-12 rounded-lg border border-emerald-200 bg-white shrink-0"
+                                    className="w-12 h-12 rounded-lg border border-emerald-200 bg-theme dark:border-emerald-500/30 shrink-0"
                                     mediaClassName="object-contain"
                                     maxHeightClassName="max-h-12"
                                     maxWidthClassName="max-w-[3rem]"
                                   />
                                 ) : (
-                                  <div className="w-12 h-12 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-xl shrink-0">📄</div>
+                                  <div className="w-12 h-12 rounded-lg bg-emerald-50 border border-emerald-200 dark:border-emerald-500/30 dark:bg-emerald-500/10 flex items-center justify-center text-xl shrink-0">📄</div>
                                 )}
                                 <div className="min-w-0 flex-1">
-                                  <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">{item.label}</p>
+                                  <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">{item.label}</p>
                                   <p className="truncate text-xs font-semibold text-emerald-950 mt-0.5">{value.split('/').pop() || 'Uploaded document'}</p>
                                 </div>
                               </div>
@@ -1333,16 +1333,16 @@ export default function VerificationWizardPage() {
                         </div>
 
                         {form.letterKey ? (
-                          <div className="mt-3.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900">
+                          <div className="mt-3.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
                             <p className="font-bold">✅ Verification letter digitally signed</p>
-                            <p className="mt-0.5 text-[11px] text-emerald-800">
+                            <p className="mt-0.5 text-[11px] text-emerald-800 dark:text-emerald-300">
                               {lastSignedAt
                                 ? `Signed on ${new Date(lastSignedAt).toLocaleString()}`
                                 : 'Signature captured for submission attempt.'}
                             </p>
                           </div>
                         ) : (
-                          <div className="mt-3.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                          <div className="mt-3.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
                             Sign the letter below to confirm legal declaration before final submission.
                           </div>
                         )}
@@ -1461,22 +1461,22 @@ export default function VerificationWizardPage() {
                 if (!value) return null;
                 const previewUrl = getPreviewUrl(item.key as UploadFieldKey);
                 return (
-                  <div key={item.key} className="rounded-xl border border-emerald-200 bg-white p-3 shadow-sm flex items-center gap-3">
+                  <div key={item.key} className="rounded-xl border border-emerald-200 bg-theme dark:border-emerald-500/30 p-3 shadow-sm flex items-center gap-3">
                     {previewUrl && /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?|$)|blob:/i.test(previewUrl) ? (
                       <MediaRenderer
                         kind="image"
                         src={previewUrl}
                         alt={`${item.label} preview`}
-                        className="w-12 h-12 rounded-lg border border-emerald-200 bg-white shrink-0"
+                        className="w-12 h-12 rounded-lg border border-emerald-200 bg-theme dark:border-emerald-500/30 shrink-0"
                         mediaClassName="object-contain"
                         maxHeightClassName="max-h-12"
                         maxWidthClassName="max-w-[3rem]"
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-xl shrink-0">📄</div>
+                      <div className="w-12 h-12 rounded-lg bg-emerald-50 border border-emerald-200 dark:border-emerald-500/30 dark:bg-emerald-500/10 flex items-center justify-center text-xl shrink-0">📄</div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">{item.label}</p>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">{item.label}</p>
                       <p className="truncate text-xs font-semibold text-emerald-950 mt-0.5">{value.split('/').pop() || value}</p>
                     </div>
                   </div>

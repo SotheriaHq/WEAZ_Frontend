@@ -354,6 +354,75 @@ html {
     --field-border: #cfcfcf;       /* clearly visible form input border */
     --field-border-hover: #9ca3af; /* input border on hover */
 
+    /* ------------------------------------------------------------------
+       BORDER RAMP — the shades that hardcoded `border-*` utilities land on.
+
+       Same problem the `--ink-gray-*` remap above solves for text, and the
+       same solution, but it has to be a SEPARATE set of variables because a
+       shade means opposite things to the two utilities. `gray-300` is a
+       readable secondary text colour on a dark ground and a glaring hairline
+       on the same ground; the note on `--ink-gray-600` below records where
+       that collision was already noticed and worked around by holding one
+       text shade back. Tailwind lets `borderColor` be themed independently of
+       `colors`, so borders now resolve here and text keeps resolving to
+       `--ink-*`. Neither has to compromise for the other.
+
+       LIGHT holds each family's STOCK Tailwind value, so light mode renders
+       byte-identical to before this existed. Every correction is in `.dark`.
+
+       Channel triplets, not hex: `border-gray-200/70` appears ~200 times and
+       a bare `var(--x)` makes every one of those fail to compile. Wrapped in
+       `rgb(… / <alpha-value>)` in tailwind.config.js.                      */
+    --bd-gray-50: 249 250 251;
+    --bd-gray-100: 243 244 246;
+    --bd-gray-200: 229 231 235;
+    --bd-gray-300: 209 213 219;
+    --bd-gray-400: 156 163 175;
+    --bd-gray-500: 107 114 128;
+    --bd-gray-600: 75 85 99;
+    --bd-gray-700: 55 65 81;
+    --bd-gray-800: 31 41 55;
+    --bd-gray-900: 17 24 39;
+    --bd-slate-100: 241 245 249;
+    --bd-slate-200: 226 232 240;
+    --bd-slate-300: 203 213 225;
+    --bd-slate-400: 148 163 184;
+    --bd-slate-500: 100 116 139;
+    --bd-slate-600: 71 85 105;
+    --bd-slate-700: 51 65 85;
+    --bd-slate-900: 15 23 42;
+    --bd-slate-950: 2 6 23;
+    --bd-zinc-600: 82 82 91;
+    --bd-zinc-700: 63 63 70;
+    --bd-zinc-800: 39 39 42;
+    --bd-zinc-900: 24 24 27;
+
+    /* ------------------------------------------------------------------
+       MATERIAL-3 COMPATIBILITY TOKENS.
+
+       The verification screens were built against a Material 3 vocabulary
+       (`outline-variant`, `surface-container-*`, `on-surface*`) that was
+       never defined in tailwind.config.js. Undefined utilities emit no CSS,
+       so those cards had no background and no text colour, and their `border`
+       fell through to the preflight default. Mapping the names onto the WIEZ
+       tokens keeps ONE source of truth for the palette while letting the
+       existing markup resolve. Channel form throughout — these are used with
+       `/20`, `/30`, `/40`, `/60`, `/70` and `/95`.
+
+       `outline-variant` is a mid-grey used at 20–40%, never at full strength,
+       so its value is picked for what those fractions land on rather than for
+       the line itself: at /20 on white it is #e4e4e4, which is what these
+       screens accidentally rendered before, so light mode does not move.   */
+    --m3-outline-variant: 120 120 120;
+    --m3-surface-lowest: 255 255 255;
+    --m3-surface-low: 245 245 244;
+    --m3-surface-high: 231 229 228;
+    --m3-surface-highest: 214 211 209;
+    --m3-on-surface: 10 10 10;
+    --m3-on-surface-variant: 68 64 60;
+    --m3-on-primary: 255 255 255;
+    --m3-tertiary: 212 175 55;
+
     /* Dark scheme helpers (kept for legacy selectors) */
     --dark-bg-primary: #0a0a0a;
     --dark-bg-secondary: #141414;
@@ -425,6 +494,68 @@ html {
     --border-strong: rgba(255, 255, 255, 0.10);
     --field-border: rgba(255, 255, 255, 0.13);
     --field-border-hover: rgba(255, 255, 255, 0.24);
+
+    /* ------------------------------------------------------------------
+       BORDER RAMP — dark.
+
+       Every neutral family collapses onto ONE neutral ramp here. Two reasons.
+
+       Brightness: `gray-700` is #374151, which on this near-black ground is
+       about three times the luminance of the `dark:border-white/10` idiom the
+       rest of the app uses (1140 call sites). A border at that strength is
+       read before the content it encloses.
+
+       Cast: `gray`, `slate` and `zinc` are all BLUE-tinted at their dark
+       steps. Against a neutral #0a0a0a a blue hairline reads as a colour, not
+       a division — which is most of why these screens felt like a different
+       product than the sidebar next to them.
+
+       The values are white-alpha composited onto `--surface-primary`, kept
+       solid so the `<alpha-value>` modifiers keep working. On the lifted
+       surfaces (#141414, #1c1c1c) they land slightly softer, which is right:
+       a panel that already separates by fill needs less line to do it.
+
+       Ordering is preserved WITHIN each role. Light steps (50–300) are
+       light-theme hairlines that leak into dark, and ascend 20→34. High steps
+       (600–900) are the deliberate dark-theme hairlines, and descend 48→22,
+       because on a dark ground a higher step number means a quieter line.
+       Anyone who chose 800 over 700 wanted less, and still gets less.      */
+    --bd-gray-50: 20 20 20;
+    --bd-gray-100: 23 23 23;   /* = --border-default (white .055) */
+    --bd-gray-200: 28 28 28;   /* the workhorse — 742 call sites */
+    --bd-gray-300: 34 34 34;   /* = --border-strong (white .10) */
+    --bd-gray-400: 42 42 42;   /* = --field-border (white .13) */
+    --bd-gray-500: 48 48 48;
+    --bd-gray-600: 48 48 48;
+    --bd-gray-700: 38 38 38;
+    --bd-gray-800: 28 28 28;
+    --bd-gray-900: 22 22 22;
+    --bd-slate-100: 23 23 23;
+    --bd-slate-200: 28 28 28;
+    --bd-slate-300: 34 34 34;
+    --bd-slate-400: 42 42 42;
+    --bd-slate-500: 48 48 48;
+    --bd-slate-600: 48 48 48;
+    --bd-slate-700: 38 38 38;
+    --bd-slate-900: 22 22 22;
+    --bd-slate-950: 18 18 18;
+    --bd-zinc-600: 48 48 48;
+    --bd-zinc-700: 38 38 38;
+    --bd-zinc-800: 28 28 28;
+    --bd-zinc-900: 22 22 22;
+
+    /* M3 compatibility — dark. `outline-variant` drops to 100 so even the
+       heaviest use (/40, on the dashed upload targets) stays under the
+       `--field-border` ceiling: /20 → 28, /30 → 37, /40 → 46.             */
+    --m3-outline-variant: 100 100 100;
+    --m3-surface-lowest: 10 10 10;
+    --m3-surface-low: 20 20 20;
+    --m3-surface-high: 28 28 28;
+    --m3-surface-highest: 38 38 38;
+    --m3-on-surface: 250 250 250;
+    --m3-on-surface-variant: 212 208 203;
+    --m3-on-primary: 255 255 255;
+    --m3-tertiary: 212 175 55;
     --neu-surface: #161616;
     --neu-surface-soft: #1c1c1c;
     --neu-text: #f5f5f5;

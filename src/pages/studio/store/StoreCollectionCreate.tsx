@@ -3015,12 +3015,12 @@ const StoreCollectionCreate: React.FC = () => {
                         <span className="line-clamp-1 flex items-center gap-2">
                           {displayName}
                           {isPrimary && (
-                            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
                               Primary
                             </span>
                           )}
                           {isDraft && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
                               Draft
                             </span>
                           )}
@@ -3028,8 +3028,8 @@ const StoreCollectionCreate: React.FC = () => {
                             <span
                               className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                                 entry.status === "failed"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-sky-100 text-sky-700"
+                                  ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                                  : "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300"
                               }`}
                             >
                               {statusLabel}
@@ -3123,7 +3123,7 @@ const StoreCollectionCreate: React.FC = () => {
               type="button"
               onClick={() => handleSubmit("draft")}
               disabled={submitting || hasPendingSelectedProducts}
-              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60 inline-flex items-center gap-2"
+              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60 inline-flex items-center gap-2 dark:bg-white/10"
             >
               {submitting && submitAction === "draft" && (
                 <VLoader size={14} phase="loading" showLabel={false} />

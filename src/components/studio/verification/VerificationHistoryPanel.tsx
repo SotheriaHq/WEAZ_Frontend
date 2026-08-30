@@ -26,7 +26,7 @@ export default function VerificationHistoryPanel({
         {attempts.map((attempt) => (
           <article
             key={attempt.id}
-            className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4"
+            className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4 dark:bg-white/5"
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -52,7 +52,7 @@ export default function VerificationHistoryPanel({
               </div>
             </div>
             {attempt.rejectionReasons && attempt.rejectionReasons.length > 0 ? (
-              <ul className="mt-4 space-y-2 text-sm text-rose-700">
+              <ul className="mt-4 space-y-2 text-sm text-rose-700 dark:text-rose-300">
                 {attempt.rejectionReasons.map((reason) => (
                   <li key={`${attempt.id}-${reason.code}-${reason.label}`}>
                     • {reason.label}

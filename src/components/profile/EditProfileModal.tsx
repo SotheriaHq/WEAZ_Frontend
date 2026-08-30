@@ -652,7 +652,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     ></textarea>
                      <div className="text-right">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                            (descriptionValue?.length || 0) < 20 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
+                            (descriptionValue?.length || 0) < 20 ? 'bg-red-100 text-red-600 dark:bg-red-500/20' : 'bg-green-100 text-green-600 dark:bg-green-500/20'
                         }`}>
                              Minimum 20 chars ({descriptionValue?.length || 0}/2000)
                         </span>

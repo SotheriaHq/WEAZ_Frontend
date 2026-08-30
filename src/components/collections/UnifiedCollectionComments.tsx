@@ -82,9 +82,9 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
       const el = document.getElementById(`comment-${highlightCommentId}`);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        el.classList.add('bg-purple-50', 'dark:bg-purple-900/20', 'transition-colors', 'duration-1000');
+        el.classList.add('bg-purple-50 dark:bg-purple-500/10', 'dark:bg-purple-900/20', 'transition-colors', 'duration-1000');
         setTimeout(() => {
-          el.classList.remove('bg-purple-50', 'dark:bg-purple-900/20');
+          el.classList.remove('bg-purple-50 dark:bg-purple-500/10', 'dark:bg-purple-900/20');
         }, 3000);
       }
     }

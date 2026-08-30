@@ -98,7 +98,7 @@ const AdminResetPasswordPage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-[#faf8ff] via-[#f5f0ff] to-[#ede9f7]">
-      <div className="w-full max-w-md p-6 rounded-2xl border border-purple-200/40 bg-white/90 shadow-sm space-y-4">
+      <div className="w-full max-w-md p-6 rounded-2xl border border-purple-200/40 bg-white/90 shadow-sm space-y-4 dark:border-purple-500/30">
         <h1 className="text-xl font-bold text-gray-900">🔑 Admin Reset Password</h1>
 
         {showRequestForm ? (
@@ -123,7 +123,7 @@ const AdminResetPasswordPage: React.FC = () => {
           </form>
         ) : showCheckEmailState ? (
           <div className="space-y-4 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl dark:bg-green-500/20">
               📧
             </div>
             <div className="space-y-2">
@@ -133,7 +133,7 @@ const AdminResetPasswordPage: React.FC = () => {
               </p>
             </div>
             <p className="text-xs text-gray-500">{message}</p>
-            <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-4 text-left">
+            <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-4 text-left dark:bg-white/5">
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                 Next steps
               </p>
@@ -162,7 +162,7 @@ const AdminResetPasswordPage: React.FC = () => {
           </div>
         ) : showSuccessState ? (
           <div className="space-y-4 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl dark:bg-green-500/20">
               ✅
             </div>
             <div className="space-y-2">
@@ -171,7 +171,7 @@ const AdminResetPasswordPage: React.FC = () => {
                 Your admin password has been updated. You can now sign in with the new password.
               </p>
             </div>
-            <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-4 text-left">
+            <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-4 text-left dark:bg-white/5">
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                 Recommended next step
               </p>

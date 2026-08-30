@@ -357,7 +357,7 @@ const SizeChartsPage: React.FC = () => {
                       {activeGuide.summary}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-purple-300/40 bg-purple-500/10 px-3 py-1.5 text-right">
+                  <div className="rounded-xl border border-purple-300/40 bg-purple-500/10 px-3 py-1.5 text-right dark:border-purple-500/40">
                     <span className="block text-[10px] font-semibold text-purple-600 dark:text-purple-400 uppercase">
                       Typical Range
                     </span>

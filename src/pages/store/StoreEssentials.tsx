@@ -462,7 +462,7 @@ const StoreEssentials: React.FC = () => {
             </div>
 
             {/* Live Preview */}
-            <div className="mt-8 p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl border-2 border-purple-200">
+            <div className="mt-8 p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl border-2 border-purple-200 dark:border-purple-500/30">
               <p className="text-xs text-[color:var(--text-secondary)] mb-3 text-center">This is how your store will appear</p>
               <div className="bg-[color:var(--surface-secondary)] border border-[color:var(--border-default)] rounded-xl shadow-lg overflow-hidden">
                 <div className="h-24 bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400" />
@@ -477,7 +477,7 @@ const StoreEssentials: React.FC = () => {
                     {selectedLabels.map((label) => (
                       <span
                         key={label}
-                        className="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full"
+                        className="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full dark:bg-purple-500/20 dark:text-purple-300"
                       >
                         {label}
                       </span>

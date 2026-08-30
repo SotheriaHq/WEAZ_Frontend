@@ -263,7 +263,7 @@ const BrandStaffPage: React.FC = () => {
                         </button>
                       ) : null}
                       {member.role !== 'OWNER' && member.status !== 'REMOVED' ? (
-                        <button type="button" onClick={() => void updateMemberStatus(member.id, 'REMOVED')} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-semibold text-rose-600">
+                        <button type="button" onClick={() => void updateMemberStatus(member.id, 'REMOVED')} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-semibold text-rose-600 dark:border-rose-500/30">
                           Remove
                         </button>
                       ) : null}
@@ -289,7 +289,7 @@ const BrandStaffPage: React.FC = () => {
                 <div className="font-semibold text-slate-900 dark:text-white">{invite.email}</div>
                 <div className="text-xs text-slate-500">{STATUS_LABELS[invite.status]} · {invite.role}</div>
               </div>
-              <button type="button" onClick={() => void cancelInvite(invite.id)} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-semibold text-rose-600">
+              <button type="button" onClick={() => void cancelInvite(invite.id)} className="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-semibold text-rose-600 dark:border-rose-500/30">
                 Cancel
               </button>
             </div>

@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import type { CountryCode } from 'libphonenumber-js';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
@@ -9,6 +15,37 @@ import {
   PHONE_COUNTRIES,
   splitE164,
 } from '@/utils/phoneCountries';
+
+/**
+ * Tailwind's `md` breakpoint in this project is 640px (see tailwind.config.js —
+ * the scale is shifted, `sm` is 480). Kept in JS because the trigger's label is
+ * a string prop on `UniversalSelect`, so a CSS-only swap is not available.
+ */
+const COUNTRY_NAME_MIN_WIDTH = '(min-width: 640px)';
+
+const matchMedia = (query: string) =>
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia(query)
+    : null;
+
+const useMediaQuery = (query: string) => {
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      const list = matchMedia(query);
+      if (!list) return () => {};
+      list.addEventListener('change', onStoreChange);
+      return () => list.removeEventListener('change', onStoreChange);
+    },
+    [query],
+  );
+  const getSnapshot = useCallback(
+    () => matchMedia(query)?.matches ?? false,
+    [query],
+  );
+  // Server snapshot is `false`, i.e. the compact label. A first paint that is
+  // narrower than the final one settles outward without reflowing neighbours.
+  return useSyncExternalStore(subscribe, getSnapshot, () => false);
+};
 
 /**
  * Phone entry with an explicit country code and per-country completeness rules.
@@ -65,6 +102,8 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
   const [iso2, setIso2] = useState<CountryCode>(initial.iso2);
   const [nationalNumber, setNationalNumber] = useState(initial.nationalNumber);
   const [touched, setTouched] = useState(false);
+  const compactCountryLabel = !useMediaQuery(COUNTRY_NAME_MIN_WIDTH);
+  const dialCodeId = inputId ? `${inputId}-dial-code` : undefined;
 
   // Adopt a country the parent supplies only while the field is still empty —
   // e.g. the user picks "Ghana" in the profile form before typing a number.
@@ -89,14 +128,38 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
     );
   };
 
+  /**
+   * The picker names a COUNTRY; the field shows the dial code. Never both.
+   *
+   * They used to show the same thing side by side — the trigger read "🇳🇬 +234"
+   * with "+234" printed again two millimetres to its right, inside the input.
+   * Repeating it is not just noise: it reads as two separate inputs, and a
+   * reader who has been shown a code twice reasonably wonders whether they are
+   * expected to type it a third time.
+   *
+   * So the country is the only thing the picker says, and the code appears
+   * exactly once, in the place it actually applies to.
+   *
+   * Below `md` the trigger is too narrow for "United Arab Emirates", and a
+   * truncated country name is a country name you cannot read. It falls back to
+   * the ISO 3166-1 alpha-2 code beside the flag, and the full name moves into
+   * the option's second line so the OPEN LIST is always browsable — a compact
+   * trigger must never make the list itself unreadable. Both forms stay
+   * searchable either way; `UniversalSelect` matches label, description and
+   * value, so "Nigeria", "NG" and "234" all still find the same row.
+   */
   const countryOptions = useMemo(
     () =>
       PHONE_COUNTRIES.map((country) => ({
         value: country.iso2,
-        label: `${country.flag} +${country.callingCode}`,
-        description: country.name,
+        label: compactCountryLabel
+          ? `${country.flag} ${country.iso2}`
+          : `${country.flag} ${country.name}`,
+        description: compactCountryLabel
+          ? `${country.name} · +${country.callingCode}`
+          : `+${country.callingCode}`,
       })),
-    [],
+    [compactCountryLabel],
   );
 
   const placeholder = useMemo(
@@ -142,13 +205,24 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
           emptyMessage="No matching country"
           disabled={disabled}
           menuLayer={menuLayer}
-          className="w-[5.25rem] sm:w-[6rem] shrink-0"
+          className="w-[5.75rem] md:w-[11.5rem] shrink-0"
           fitContent={false}
           compact
         />
 
         <div className="relative flex-1 min-w-0">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-500">
+          {/*
+            The dial code is derived, never typed. It is a `<span>` rather than
+            a disabled input on purpose: a disabled input is still a tab stop in
+            some browsers and reads to a screen reader as a field the user has
+            failed to fill in, when in fact there is nothing here to fill in.
+            The divider is what says "this part is not yours to edit" — the
+            country picker to its left is where it changes.
+          */}
+          <span
+            id={dialCodeId}
+            className="pointer-events-none absolute left-0 top-1/2 flex h-6 -translate-y-1/2 items-center border-r border-gray-200 pl-3 pr-2.5 text-sm font-semibold tabular-nums text-gray-500 dark:border-white/10"
+          >
             {getDialCode(iso2)}
           </span>
           <input
@@ -156,6 +230,7 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
             type="tel"
             inputMode="tel"
             autoComplete="tel-national"
+            aria-describedby={dialCodeId}
             disabled={disabled}
             value={formatAsYouType(nationalNumber, iso2)}
             placeholder={placeholder}
@@ -171,7 +246,9 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
             onBlur={() => setTouched(true)}
             className="form-field h-12 w-full rounded-lg pr-4 text-sm"
             style={{
-              paddingLeft: `${Math.max(3.25, getDialCode(iso2).length * 0.65 + 1.9)}rem`,
+              // Clears the locked dial-code segment and its divider: the
+              // span is pl-3 + code + pr-2.5, and the code is not fixed width.
+              paddingLeft: `${Math.max(3.5, getDialCode(iso2).length * 0.55 + 1.975)}rem`,
             }}
           />
         </div>

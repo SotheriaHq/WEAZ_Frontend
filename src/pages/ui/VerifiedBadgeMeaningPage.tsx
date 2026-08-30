@@ -39,7 +39,7 @@ export default function VerifiedBadgeMeaningPage() {
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
             to={returnTo}
-            className="inline-flex items-center rounded-full border border-indigo-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-indigo-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50"
+            className="inline-flex items-center rounded-full border border-indigo-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-indigo-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-500/30 dark:text-indigo-300"
           >
             Return to previous page
           </Link>
@@ -51,7 +51,7 @@ export default function VerifiedBadgeMeaningPage() {
           </Link>
           <Link
             to="/studio/verification"
-            className="inline-flex items-center rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50"
+            className="inline-flex items-center rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-500/30 dark:text-emerald-300"
           >
             Open verification workspace
           </Link>

@@ -393,7 +393,7 @@ const AdminMessagingPage: React.FC = () => {
                         </div>
                         <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{item.title}</p>
                         <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5">{item.subtitle}</p>
-                        <span className={`inline-block mt-1 rounded-full px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider ${STATUS_BADGE[item.status] || 'bg-gray-100 text-gray-500'}`}>
+                        <span className={`inline-block mt-1 rounded-full px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider ${STATUS_BADGE[item.status] || 'bg-gray-100 text-gray-500 dark:bg-white/10'}`}>
                           {item.status}
                         </span>
                       </div>

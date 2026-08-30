@@ -43,24 +43,24 @@ const REQUEST_FIELD_OPTIONS = [
 
 const statusTone = (status?: string) => {
   if (status === 'IN_REVIEW') {
-    return 'border-sky-200 bg-sky-50 text-sky-800';
+    return 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300';
   }
   if (status === 'ADDITIONAL_INFO_REQUESTED') {
-    return 'border-amber-200 bg-amber-50 text-amber-800';
+    return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300';
   }
   if (status === 'APPROVED') {
-    return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+    return 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300';
   }
   if (status === 'REJECTED') {
-    return 'border-rose-200 bg-rose-50 text-rose-800';
+    return 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300';
   }
-  return 'border-gray-200 bg-gray-50 text-gray-700';
+  return 'border-gray-200 bg-gray-50 text-gray-700 dark:bg-white/5';
 };
 
 const badgeTone = (isVisible?: boolean) =>
   isVisible
-    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-    : 'border-gray-200 bg-gray-50 text-gray-700';
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
+    : 'border-gray-200 bg-gray-50 text-gray-700 dark:bg-white/5';
 
 const isPdfDocument = (document: VerificationDocumentItem | null) =>
   document?.mimeType?.toLowerCase().includes('pdf') ||
@@ -540,7 +540,7 @@ export default function AdminBrandVerificationReviewPage() {
           <div className="min-w-0">
             <Link
               to="/admin/users?tab=in-review"
-              className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700"
+              className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700 dark:text-sky-300"
             >
               Back to review queue
             </Link>
@@ -613,10 +613,10 @@ export default function AdminBrandVerificationReviewPage() {
           <span
             className={`ml-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
               assignment.isMine
-                ? 'bg-emerald-100 text-emerald-800'
+                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
                 : assignment.isClaimed
-                  ? 'bg-amber-100 text-amber-800'
-                  : 'bg-gray-100 text-gray-600'
+                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
+                  : 'bg-gray-100 text-gray-600 dark:bg-white/10'
             }`}
           >
             {assignment.isMine
@@ -658,7 +658,7 @@ export default function AdminBrandVerificationReviewPage() {
                     <button
                       type="button"
                       onClick={() => setIsRevealNinDialogOpen(true)}
-                      className="rounded-full bg-gray-100 px-2 py-0.5 font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-600 transition hover:bg-gray-200"
+                      className="rounded-full bg-gray-100 px-2 py-0.5 font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-600 transition hover:bg-gray-200 dark:bg-white/10"
                     >
                       Reveal
                     </button>
@@ -740,7 +740,7 @@ export default function AdminBrandVerificationReviewPage() {
                     href={selectedDocument.signedUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center rounded-full bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-800 transition hover:bg-sky-100"
+                    className="inline-flex items-center rounded-full bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-800 transition hover:bg-sky-100 dark:bg-sky-500/10 dark:text-sky-300"
                   >
                     Open in new tab
                   </a>
@@ -757,8 +757,8 @@ export default function AdminBrandVerificationReviewPage() {
                     onClick={() => setSelectedDocumentKey(document.key)}
                     className={`w-full rounded-[1.25rem] px-4 py-3 text-left transition ${
                       selectedDocument?.key === document.key
-                        ? 'bg-sky-50 ring-1 ring-sky-200'
-                        : 'bg-gray-50 hover:bg-gray-100'
+                        ? 'bg-sky-50 ring-1 ring-sky-200 dark:bg-sky-500/10'
+                        : 'bg-gray-50 hover:bg-gray-100 dark:bg-white/5'
                     }`}
                   >
                     <p className="text-sm font-semibold text-gray-900">{document.label}</p>
@@ -778,7 +778,7 @@ export default function AdminBrandVerificationReviewPage() {
                     reviewers read as "this IS the letter" — so a document that was
                     right there in the list looked unviewable. It is now a summary
                     that opens the real file. */}
-                <div className="rounded-[1.25rem] bg-indigo-50 px-4 py-4">
+                <div className="rounded-[1.25rem] bg-indigo-50 px-4 py-4 dark:bg-indigo-500/10">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-600">
                     Signed verification letter
                   </p>
@@ -786,7 +786,7 @@ export default function AdminBrandVerificationReviewPage() {
                     The owner confirms that submitted business and identity details are
                     accurate, and accepts platform verification terms.
                   </p>
-                  <dl className="mt-3 divide-y divide-indigo-200/60 text-indigo-900">
+                  <dl className="mt-3 divide-y divide-indigo-200/60 text-indigo-900 dark:text-indigo-300">
                     <div className="flex items-baseline justify-between gap-3 py-1.5">
                       <dt className="text-[10px] font-medium uppercase tracking-[0.12em] text-indigo-500">
                         Method
@@ -832,21 +832,21 @@ export default function AdminBrandVerificationReviewPage() {
                           href={letterDocument.signedUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700 transition hover:bg-indigo-100"
+                          className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700 transition hover:bg-indigo-100 dark:text-indigo-300"
                         >
                           Download
                         </a>
                       ) : null}
                     </div>
                   ) : (
-                    <p className="mt-3 text-[12px] font-semibold text-rose-700">
+                    <p className="mt-3 text-[12px] font-semibold text-rose-700 dark:text-rose-300">
                       No letter file is attached to this attempt.
                     </p>
                   )}
                 </div>
               </div>
 
-              <div className="min-w-0 overflow-hidden rounded-[1.5rem] bg-gray-50 ring-1 ring-gray-100">
+              <div className="min-w-0 overflow-hidden rounded-[1.5rem] bg-gray-50 ring-1 ring-gray-100 dark:bg-white/5">
                 {selectedDocument?.signedUrl ? (
                   isPdfDocument(selectedDocument) ? (
                     <iframe
@@ -980,19 +980,19 @@ export default function AdminBrandVerificationReviewPage() {
               {requestInfoItems.map((item) => (
                 <div
                   key={`${item.field}-${item.label}`}
-                  className="rounded-[1.25rem] bg-amber-50 px-4 py-3"
+                  className="rounded-[1.25rem] bg-amber-50 px-4 py-3 dark:bg-amber-500/10"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-amber-900">{item.label}</p>
+                      <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">{item.label}</p>
                       {item.message ? (
-                        <p className="mt-1 text-sm text-amber-800">{item.message}</p>
+                        <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">{item.message}</p>
                       ) : null}
                     </div>
                     <button
                       type="button"
                       onClick={() => removeRequestField(item.field, item.label)}
-                      className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700"
+                      className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300"
                     >
                       Remove
                     </button>
@@ -1028,7 +1028,7 @@ export default function AdminBrandVerificationReviewPage() {
               {reasons.map((reason) => (
                 <label
                   key={reason.code}
-                  className="flex items-start gap-3 rounded-[1.25rem] bg-gray-50 px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-100"
+                  className="flex items-start gap-3 rounded-[1.25rem] bg-gray-50 px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-100 dark:bg-white/5"
                 >
                   <input
                     type="checkbox"
@@ -1073,7 +1073,7 @@ export default function AdminBrandVerificationReviewPage() {
                 had failed. */}
             {details.verificationStatus === 'APPROVED' &&
             !details.badgeState?.verificationBadgeVisible ? (
-              <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+              <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:bg-amber-500/10 dark:text-amber-300">
                 This brand is approved, but the verified badge stays hidden until the
                 brand opens their store and the owner account is active. Nothing further
                 is needed from you.
@@ -1118,8 +1118,8 @@ export default function AdminBrandVerificationReviewPage() {
                     key={`${event.kind}-${event.id}`}
                     className={`rounded-xl px-3 py-2.5 text-sm ring-1 ${
                       event.kind === 'INFO_REQUESTED'
-                        ? 'bg-amber-50 text-amber-900 ring-amber-100'
-                        : 'bg-gray-50 text-gray-700 ring-gray-100'
+                        ? 'bg-amber-50 text-amber-900 ring-amber-100 dark:bg-amber-500/10 dark:text-amber-300'
+                        : 'bg-gray-50 text-gray-700 ring-gray-100 dark:bg-white/5'
                     }`}
                   >
                     <div className="flex items-baseline justify-between gap-3">
@@ -1208,7 +1208,7 @@ export default function AdminBrandVerificationReviewPage() {
               {(details.verificationNotes ?? []).map((note) => (
                 <article
                   key={note.id}
-                  className="rounded-[1.25rem] bg-gray-50 px-4 py-4"
+                  className="rounded-[1.25rem] bg-gray-50 px-4 py-4 dark:bg-white/5"
                 >
                   <p className="text-sm text-gray-700">{note.text}</p>
                   <p className="mt-2 text-xs text-gray-500">

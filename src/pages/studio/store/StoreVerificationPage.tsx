@@ -362,11 +362,11 @@ export default function StoreVerificationPage() {
       status?.verificationStatus !== 'APPROVED' &&
       status?.verificationStatus !== 'PENDING' &&
       status?.verificationStatus !== 'IN_REVIEW' ? (
-        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-widest text-amber-800">
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-800 dark:text-amber-300">
             ⚠️ Finish your store first
           </p>
-          <p className="mt-2 text-sm leading-relaxed text-amber-900">
+          <p className="mt-2 text-sm leading-relaxed text-amber-900 dark:text-amber-300">
             You can apply for verification once your store is complete and published.
             Being verified only shows a badge on an open store, so we hold the
             application until these are done:
@@ -379,10 +379,10 @@ export default function StoreVerificationPage() {
                   state={{
                     from: `${location.pathname}${location.search}${location.hash}`,
                   }}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-white/80 p-3 text-sm text-amber-900 transition hover:border-amber-300 hover:bg-white"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-white/80 p-3 text-sm text-amber-900 transition hover:border-amber-300 hover:bg-theme dark:border-amber-500/30 dark:text-amber-300"
                 >
                   <span className="font-semibold">{step.label}</span>
-                  <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-amber-700">
+                  <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
                     Fix →
                   </span>
                 </Link>
@@ -394,17 +394,17 @@ export default function StoreVerificationPage() {
 
       {status?.verificationStatus === 'REJECTED' &&
       status.rejectionReasons.length > 0 ? (
-        <section className="rounded-2xl border border-rose-200 bg-rose-50 p-6 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-widest text-rose-700">
+        <section className="rounded-2xl border border-rose-200 bg-rose-50 p-6 shadow-sm dark:border-rose-500/30 dark:bg-rose-500/10">
+          <p className="text-xs font-bold uppercase tracking-widest text-rose-700 dark:text-rose-300">
             Review Outcome Feedback
           </p>
-          <ul className="mt-3 space-y-2 text-xs text-rose-900">
+          <ul className="mt-3 space-y-2 text-xs text-rose-900 dark:text-rose-300">
             {status.rejectionReasons.map((reason) => (
               <li key={`${reason.code}-${reason.label}`}>• {reason.label}</li>
             ))}
           </ul>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-rose-200/80 bg-white/80 p-4">
+            <div className="rounded-xl border border-rose-200/80 bg-white/80 p-4 dark:border-rose-500/30">
               <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">
                 Applied on
               </p>
@@ -414,7 +414,7 @@ export default function StoreVerificationPage() {
                   : 'Not recorded'}
               </p>
             </div>
-            <div className="rounded-xl border border-rose-200/80 bg-white/80 p-4">
+            <div className="rounded-xl border border-rose-200/80 bg-white/80 p-4 dark:border-rose-500/30">
               <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">
                 Reapply Window
               </p>
@@ -423,13 +423,13 @@ export default function StoreVerificationPage() {
                   <p className="mt-1 text-xs font-semibold text-rose-950">
                     {cooldownTarget.toLocaleString()}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-rose-700">
+                  <p className="mt-0.5 text-[11px] text-rose-700 dark:text-rose-300">
                     {cooldownRemainingText}
                   </p>
                 </>
               ) : (
                 <div className="mt-1 flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-emerald-700">
+                  <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                     Eligible to reapply now
                   </p>
                   <Button
@@ -452,21 +452,21 @@ export default function StoreVerificationPage() {
       ) : null}
 
       {status?.verificationStatus === 'ADDITIONAL_INFO_REQUESTED' ? (
-        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-widest text-amber-800">
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-800 dark:text-amber-300">
             More Information Requested
           </p>
           {status.infoRequestMessage ? (
-            <p className="mt-2 text-xs leading-relaxed text-amber-900">
+            <p className="mt-2 text-xs leading-relaxed text-amber-900 dark:text-amber-300">
               {status.infoRequestMessage}
             </p>
           ) : null}
           {infoItems.length > 0 ? (
-            <ul className="mt-4 space-y-2 text-xs text-amber-900">
+            <ul className="mt-4 space-y-2 text-xs text-amber-900 dark:text-amber-300">
               {infoItems.map((item: VerificationInfoItem) => (
                 <li
                   key={`${item.field}-${item.label}`}
-                  className="rounded-xl border border-amber-200 bg-white/80 p-3"
+                  className="rounded-xl border border-amber-200 bg-white/80 p-3 dark:border-amber-500/30"
                 >
                   <span className="font-semibold">{item.label}</span>
                   {item.message ? `: ${item.message}` : ''}
@@ -507,8 +507,8 @@ export default function StoreVerificationPage() {
               </span>
               <h3 className={`text-lg font-extrabold ${
                 status?.badgeState.isVerifiedBrand 
-                  ? 'text-emerald-700' 
-                  : 'text-amber-700'
+                  ? 'text-emerald-700 dark:text-emerald-300' 
+                  : 'text-amber-700 dark:text-amber-300'
               }`}>
                 {status?.badgeState.isVerifiedBrand ? 'Verified Brand' : 'Verification Incomplete'}
               </h3>
@@ -525,12 +525,12 @@ export default function StoreVerificationPage() {
                 <span className="text-xs text-on-surface-variant">Verification Status</span>
                 <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
                   status?.verificationStatus === 'APPROVED'
-                    ? 'bg-emerald-100 text-emerald-800'
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
                     : status?.verificationStatus === 'REJECTED'
-                      ? 'bg-rose-100 text-rose-800'
+                      ? 'bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300'
                       : status?.verificationStatus === 'PENDING' || status?.verificationStatus === 'IN_REVIEW'
-                        ? 'bg-sky-100 text-sky-800'
-                        : 'bg-amber-100 text-amber-800'
+                        ? 'bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-300'
+                        : 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
                 }`}>
                   <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
                   {statusDisplayLabel}
@@ -572,11 +572,11 @@ export default function StoreVerificationPage() {
                 <span className="text-xs font-medium text-on-surface-variant">Reapply Lockout</span>
                 <div className={`rounded-xl border p-3 ${
                   status?.cooldownRemainingDays
-                    ? 'border-amber-200 bg-amber-50'
-                    : 'border-emerald-200 bg-emerald-50'
+                    ? 'border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10'
+                    : 'border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10'
                 }`}>
                   <p className={`text-xs font-semibold ${
-                    status?.cooldownRemainingDays ? 'text-amber-800' : 'text-emerald-800'
+                    status?.cooldownRemainingDays ? 'text-amber-800 dark:text-amber-300' : 'text-emerald-800 dark:text-emerald-300'
                   }`}>
                     {status?.cooldownRemainingDays
                       ? cooldownRemainingText ?? `${status.cooldownRemainingDays} day(s)`
