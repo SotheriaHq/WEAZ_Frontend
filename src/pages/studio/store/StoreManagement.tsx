@@ -704,7 +704,7 @@ export default function StoreManagement() {
             <button
               type="button"
               onClick={() => setAnalyticsCollapsed(true)}
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:bg-white/5 dark:text-gray-300"
             >
               Close Analytics
             </button>

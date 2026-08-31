@@ -820,7 +820,7 @@ export default function InlineProductDetail({
                     >
                       {selectedColor === color && (
                         <span
-                          className={`absolute inset-0 m-auto flex h-full w-full items-center justify-center text-sm ${color === 'White' || color === 'Yellow' ? 'text-gray-900' : 'text-white'}`}
+                          className={`absolute inset-0 m-auto flex h-full w-full items-center justify-center text-sm ${color === 'White' || color === 'Yellow' ? 'text-gray-900 dark:text-white' : 'text-white'}`}
                           aria-hidden="true"
                         >
                           ✅

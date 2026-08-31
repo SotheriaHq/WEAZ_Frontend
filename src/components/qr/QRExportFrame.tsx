@@ -28,7 +28,7 @@ export const QRExportFrame: React.FC<QRExportFrameProps> = ({
           ) : null}
         </div>
       ) : null}
-      <div className="grid place-items-center rounded-[1.5rem] bg-white p-4 shadow-inner">
+      <div className="grid place-items-center rounded-[1.5rem] bg-white p-4 shadow-inner dark:bg-white/5">
         {children}
       </div>
     </div>

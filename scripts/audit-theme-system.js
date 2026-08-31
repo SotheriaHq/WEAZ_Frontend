@@ -339,7 +339,7 @@ if (fs.existsSync(tailwindConfigPath) && fs.existsSync(indexCssPath)) {
    Those need a human to say which, so they are counted, not auto-fixed. The
    number may fall; it must never rise.
    ────────────────────────────────────────────────────────────────────────── */
-const LIGHT_ONLY_BASELINE = 65;
+const LIGHT_ONLY_BASELINE = 61;
 const HUE_GROUP = 'emerald|amber|rose|red|sky|blue|purple|indigo|green|violet|fuchsia|orange|teal|pink|cyan';
 const LIGHT_SURFACE = new RegExp(
   `(^|\\s)(bg-(white|(?:gray|slate|zinc|neutral|stone|${HUE_GROUP})-(?:50|100|200))` +

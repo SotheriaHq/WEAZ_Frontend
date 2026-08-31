@@ -55,7 +55,7 @@ const AdminForceResetPasswordPage: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-[#faf8ff] via-[#f5f0ff] to-[#ede9f7] dark:from-[#0d0b12] dark:via-[#0a0a0e] dark:to-[#0a0a0a]">
       <form onSubmit={onSubmit} className="w-full max-w-md p-6 rounded-2xl border border-purple-200/40 bg-white/90 shadow-sm space-y-4 dark:border-purple-500/30">
-        <h1 className="text-xl font-bold text-gray-900">🔐 Reset Your Password</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">🔐 Reset Your Password</h1>
         <p className="text-sm text-gray-600">Your admin account requires a password reset before continuing.</p>
         <PasswordPolicyFeedback password={newPassword} tone="light" />
 

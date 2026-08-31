@@ -326,7 +326,7 @@ const CustomOrdersPage: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('/studio?tab=orders')}
-              className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-950"
+              className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-950 dark:bg-white/5"
             >
               Standard orders
             </button>

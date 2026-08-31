@@ -762,7 +762,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                 event.stopPropagation();
                 onEdit?.(product);
               }}
-              className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 shadow-xl transition-all hover:bg-gray-100 active:scale-95"
+              className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 shadow-xl transition-all hover:bg-gray-100 active:scale-95 dark:bg-white/5 dark:text-white"
             >
               Edit Product
             </button>

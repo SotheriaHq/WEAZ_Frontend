@@ -54,13 +54,13 @@ const statusTone = (status?: string) => {
   if (status === 'REJECTED') {
     return 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300';
   }
-  return 'border-gray-200 bg-gray-50 text-gray-700 dark:bg-white/5';
+  return 'border-gray-200 bg-gray-50 text-gray-700 dark:bg-white/5 dark:text-gray-300';
 };
 
 const badgeTone = (isVisible?: boolean) =>
   isVisible
     ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
-    : 'border-gray-200 bg-gray-50 text-gray-700 dark:bg-white/5';
+    : 'border-gray-200 bg-gray-50 text-gray-700 dark:bg-white/5 dark:text-gray-300';
 
 const isPdfDocument = (document: VerificationDocumentItem | null) =>
   document?.mimeType?.toLowerCase().includes('pdf') ||
@@ -140,7 +140,7 @@ const DetailRow: FC<{
       {label}
     </dt>
     <dd
-      className={`mt-0.5 break-words text-[13px] font-semibold leading-snug text-gray-900 ${
+      className={`mt-0.5 break-words text-[13px] font-semibold leading-snug text-gray-900 dark:text-white ${
         mono ? 'font-mono text-[12px] tracking-tight' : ''
       }`}
     >
@@ -157,7 +157,7 @@ const DetailRow: FC<{
  * actually came for — a full screen down the page.
  */
 const SummaryCard: FC<{ title: string; children: ReactNode }> = ({ title, children }) => (
-  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 dark:bg-white/5 dark:ring-white/10">
     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">
       {title}
     </p>
@@ -526,7 +526,7 @@ export default function AdminBrandVerificationReviewPage() {
 
   if (!details) {
     return (
-      <div className="rounded-[1.75rem] bg-white p-6 text-sm text-gray-500 shadow-sm ring-1 ring-gray-100">
+      <div className="rounded-[1.75rem] bg-white p-6 text-sm text-gray-500 shadow-sm ring-1 ring-gray-100 dark:bg-white/5 dark:ring-white/10">
         Loading verification review...
       </div>
     );
@@ -552,7 +552,7 @@ export default function AdminBrandVerificationReviewPage() {
             >
               Back to review queue
             </Link>
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-gray-900">
+            <h1 className="mt-3 text-3xl font-black tracking-tight text-gray-900 dark:text-white">
               {details.name || 'Unnamed brand'}
             </h1>
             <p className="mt-2 break-words text-sm text-gray-600">
@@ -725,13 +725,13 @@ export default function AdminBrandVerificationReviewPage() {
             </SummaryCard>
           </section>
 
-          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100">
+          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100 dark:bg-white/5 dark:ring-white/10">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
                   Evidence review
                 </p>
-                <h2 className="mt-1 text-lg font-black text-gray-900">Document workspace</h2>
+                <h2 className="mt-1 text-lg font-black text-gray-900 dark:text-white">Document workspace</h2>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {(details.documents ?? []).some((document) => document.signedUrl) ? (
@@ -769,7 +769,7 @@ export default function AdminBrandVerificationReviewPage() {
                         : 'bg-gray-50 hover:bg-gray-100 dark:bg-white/5'
                     }`}
                   >
-                    <p className="text-sm font-semibold text-gray-900">{document.label}</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{document.label}</p>
                     <p className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] text-gray-500">
                       <span className="uppercase tracking-[0.12em]">
                         {document.mimeType?.split('/')[1] || 'File'}
@@ -840,7 +840,7 @@ export default function AdminBrandVerificationReviewPage() {
                           href={letterDocument.signedUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700 transition hover:bg-indigo-100 dark:text-indigo-300"
+                          className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700 transition hover:bg-indigo-100 dark:text-indigo-300 dark:bg-white/5"
                         >
                           Download
                         </a>
@@ -854,13 +854,13 @@ export default function AdminBrandVerificationReviewPage() {
                 </div>
               </div>
 
-              <div className="min-w-0 overflow-hidden rounded-[1.5rem] bg-gray-50 ring-1 ring-gray-100 dark:bg-white/5">
+              <div className="min-w-0 overflow-hidden rounded-[1.5rem] bg-gray-50 ring-1 ring-gray-100 dark:bg-white/5 dark:ring-white/10">
                 {selectedDocument?.signedUrl ? (
                   isPdfDocument(selectedDocument) ? (
                     <iframe
                       title={selectedDocument.label}
                       src={selectedDocument.signedUrl}
-                      className="h-[50vh] min-h-[320px] w-full bg-white sm:h-[56vh] sm:min-h-[380px] xl:h-[62vh] xl:min-h-[420px]"
+                      className="h-[50vh] min-h-[320px] w-full bg-white sm:h-[56vh] sm:min-h-[380px] xl:h-[62vh] xl:min-h-[420px] dark:bg-white/5"
                     />
                   ) : (
                     // The preview is boxed by its column, so ID scans render too
@@ -882,7 +882,7 @@ export default function AdminBrandVerificationReviewPage() {
                   )
                 ) : (
                   <div className="flex min-h-[420px] flex-col items-center justify-center gap-1 px-6 text-center">
-                    <p className="text-sm font-semibold text-gray-700">
+                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                       {selectedDocument
                         ? `${selectedDocument.label} could not be loaded`
                         : 'No evidence was submitted with this attempt'}
@@ -898,7 +898,7 @@ export default function AdminBrandVerificationReviewPage() {
             </div>
           </section>
 
-          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100">
+          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100 dark:bg-white/5 dark:ring-white/10">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
                 Evidence manifest
@@ -928,7 +928,7 @@ export default function AdminBrandVerificationReviewPage() {
                   <tbody className="divide-y divide-gray-100">
                     {manifestRows.map((row) => (
                       <tr key={row.id} className="align-top">
-                        <td className="py-2.5 pr-4 font-semibold text-gray-900">{row.label}</td>
+                        <td className="py-2.5 pr-4 font-semibold text-gray-900 dark:text-white">{row.label}</td>
                         <td className="py-2.5 pr-4 text-gray-600">{row.mimeType}</td>
                         <td className="py-2.5 pr-4 tabular-nums text-gray-600">{row.size}</td>
                         <td className="py-2.5 pr-4 text-gray-600">{row.uploadedAt}</td>
@@ -948,7 +948,7 @@ export default function AdminBrandVerificationReviewPage() {
         </div>
 
         <div className="min-w-0 space-y-6">
-          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100">
+          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100 dark:bg-white/5 dark:ring-white/10">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
               Request information
             </p>
@@ -1028,7 +1028,7 @@ export default function AdminBrandVerificationReviewPage() {
             </Button>
           </section>
 
-          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100">
+          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100 dark:bg-white/5 dark:ring-white/10">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
               Review decision
             </p>
@@ -1036,7 +1036,7 @@ export default function AdminBrandVerificationReviewPage() {
               {reasons.map((reason) => (
                 <label
                   key={reason.code}
-                  className="flex items-start gap-3 rounded-[1.25rem] bg-gray-50 px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-100 dark:bg-white/5"
+                  className="flex items-start gap-3 rounded-[1.25rem] bg-gray-50 px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-100 dark:bg-white/5 dark:text-gray-300"
                 >
                   <input
                     type="checkbox"
@@ -1096,7 +1096,7 @@ export default function AdminBrandVerificationReviewPage() {
             replied there was no record left of what had been asked, by whom,
             or how many times. This reads the append-only trail instead.
           */}
-          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100">
+          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100 dark:bg-white/5 dark:ring-white/10">
             <div className="flex items-baseline justify-between gap-3">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
                 Request history
@@ -1127,7 +1127,7 @@ export default function AdminBrandVerificationReviewPage() {
                     className={`rounded-xl px-3 py-2.5 text-sm ring-1 ${
                       event.kind === 'INFO_REQUESTED'
                         ? 'bg-amber-50 text-amber-900 ring-amber-100 dark:bg-amber-500/10 dark:text-amber-300'
-                        : 'bg-gray-50 text-gray-700 ring-gray-100 dark:bg-white/5'
+                        : 'bg-gray-50 text-gray-700 ring-gray-100 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10'
                     }`}
                   >
                     <div className="flex items-baseline justify-between gap-3">
@@ -1191,7 +1191,7 @@ export default function AdminBrandVerificationReviewPage() {
             )}
           </section>
 
-          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100">
+          <section className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-gray-100 dark:bg-white/5 dark:ring-white/10">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
               Reviewer notes
             </p>
@@ -1218,7 +1218,7 @@ export default function AdminBrandVerificationReviewPage() {
                   key={note.id}
                   className="rounded-[1.25rem] bg-gray-50 px-4 py-4 dark:bg-white/5"
                 >
-                  <p className="text-sm text-gray-700">{note.text}</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{note.text}</p>
                   <p className="mt-2 text-xs text-gray-500">
                     {new Date(note.createdAt).toLocaleString()}
                   </p>

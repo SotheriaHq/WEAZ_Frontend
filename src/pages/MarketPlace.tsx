@@ -978,7 +978,7 @@ const MarketPlace: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleOpenProduct(activeHero, { source: 'market_hero' })}
-                            className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-gray-900 transition-transform hover:scale-[1.02] sm:px-4 sm:py-1.5 sm:text-xs"
+                            className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-gray-900 transition-transform hover:scale-[1.02] sm:px-4 sm:py-1.5 sm:text-xs dark:bg-white/5 dark:text-white"
                           >
                             👀 View product
                           </button>

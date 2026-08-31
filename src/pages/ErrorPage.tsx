@@ -231,7 +231,7 @@ const ErrorPage: React.FC = () => {
         >
           <button
             onClick={() => window.location.reload()}
-            className={`flex items-center gap-2 px-6 py-3 rounded-full bg-white text-gray-900 font-medium hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5`}
+            className={`flex items-center gap-2 px-6 py-3 rounded-full bg-white text-gray-900 font-medium hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 dark:bg-white/5 dark:text-white`}
           >
             <RefreshCcw className="w-5 h-5" />
             Try Again

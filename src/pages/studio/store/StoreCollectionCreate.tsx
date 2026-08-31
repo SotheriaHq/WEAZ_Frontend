@@ -3123,7 +3123,7 @@ const StoreCollectionCreate: React.FC = () => {
               type="button"
               onClick={() => handleSubmit("draft")}
               disabled={submitting || hasPendingSelectedProducts}
-              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60 inline-flex items-center gap-2 dark:bg-white/10"
+              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60 inline-flex items-center gap-2 dark:bg-white/10 dark:text-gray-300"
             >
               {submitting && submitAction === "draft" && (
                 <VLoader size={14} phase="loading" showLabel={false} />

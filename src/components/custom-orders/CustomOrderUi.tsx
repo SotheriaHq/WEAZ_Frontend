@@ -565,7 +565,7 @@ export const CustomOrderMediaPreview: React.FC<{
                   aria-current={index === activeIndex}
                   className={`h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border transition ${
                     index === activeIndex
-                      ? 'border-white ring-2 ring-white'
+                      ? 'border-white ring-2 ring-white dark:ring-white/10'
                       : 'border-white/40 opacity-80 hover:opacity-100'
                   }`}
                 >

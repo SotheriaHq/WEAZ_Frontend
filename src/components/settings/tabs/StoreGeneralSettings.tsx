@@ -339,7 +339,7 @@ const StoreGeneralSettings: React.FC = () => {
                           ? 'bg-purple-600 text-white border-purple-600'
                           : isDisabled
                             ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed dark:bg-white/10'
-                            : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-purple-300 hover:text-purple-600 dark:bg-white/5')
+                            : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-purple-300 hover:text-purple-600 dark:bg-white/5 dark:text-gray-300')
                       }
                     >
                       {cat.label}

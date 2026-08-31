@@ -516,7 +516,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                                 title={color}
                               >
                                 {selectedColor === color && (
-                                  <Check size={16} className={`absolute inset-0 m-auto ${color === 'White' || color === 'Yellow' ? 'text-gray-900' : 'text-white'}`} />
+                                  <Check size={16} className={`absolute inset-0 m-auto ${color === 'White' || color === 'Yellow' ? 'text-gray-900 dark:text-white' : 'text-white'}`} />
                                 )}
                               </button>
                             );

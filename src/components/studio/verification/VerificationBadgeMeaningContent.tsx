@@ -6,8 +6,8 @@ export default function VerificationBadgeMeaningContent({
   compact = false,
 }: VerificationBadgeMeaningContentProps) {
   const wrapperClass = compact
-    ? 'space-y-2 text-xs leading-6 text-gray-700'
-    : 'space-y-4 text-sm leading-7 text-gray-700';
+    ? 'space-y-2 text-xs leading-6 text-gray-700 dark:text-gray-300'
+    : 'space-y-4 text-sm leading-7 text-gray-700 dark:text-gray-300';
 
   const sectionClass = compact
     ? 'rounded-2xl p-3'
@@ -30,7 +30,7 @@ export default function VerificationBadgeMeaningContent({
         </p>
       </section>
 
-      <section className={`${sectionClass} border border-gray-200 bg-white shadow-sm`}>
+      <section className={`${sectionClass} border border-gray-200 bg-white shadow-sm dark:bg-white/5`}>
         <p className={`${headingClass} text-gray-500`}>
           What it does not mean
         </p>
