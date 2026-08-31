@@ -339,7 +339,7 @@ if (fs.existsSync(tailwindConfigPath) && fs.existsSync(indexCssPath)) {
    Those need a human to say which, so they are counted, not auto-fixed. The
    number may fall; it must never rise.
    ────────────────────────────────────────────────────────────────────────── */
-const LIGHT_ONLY_BASELINE = 67;
+const LIGHT_ONLY_BASELINE = 65;
 const HUE_GROUP = 'emerald|amber|rose|red|sky|blue|purple|indigo|green|violet|fuchsia|orange|teal|pink|cyan';
 const LIGHT_SURFACE = new RegExp(
   `(^|\\s)(bg-(white|(?:gray|slate|zinc|neutral|stone|${HUE_GROUP})-(?:50|100|200))` +
@@ -366,6 +366,60 @@ if (lightOnly > LIGHT_ONLY_BASELINE) {
 } else if (lightOnly < LIGHT_ONLY_BASELINE) {
   console.log(
     `[INFO] H_LIGHT_ONLY_SURFACES improved: ${lightOnly} (baseline ${LIGHT_ONLY_BASELINE}) — lower the baseline.`,
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   I_HARDCODED_LIGHT_HEX  (ratchet)
+
+   The third blind spot, and the one that hid the admin verification hero: a
+   literal light hex inside a Tailwind ARBITRARY value —
+   `bg-[linear-gradient(135deg,_#f9fcff,_#ffffff_48%,_#f7f7ff)]`.
+
+   There is no palette class to match, so the named-colour rules above read the
+   page as clean while it painted a near-white slab on a near-black console.
+   Detection is by luminance rather than by name, because the whole problem is
+   that these colours have no names.
+   ────────────────────────────────────────────────────────────────────────── */
+// Baseline 1: EmailVerify's brand gradient ends on a light lavender by design
+// (a purple ramp, not a surface). Everything else is paired.
+const HARDCODED_HEX_BASELINE = 1;
+const ARBITRARY_COLOR = /\b(bg|text|border|from|via|to)-\[[^\]]*#[0-9a-fA-F]{3,8}[^\]]*\]/g;
+
+const isLightHex = (hex) => {
+  const full = hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex.slice(0, 6);
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b > 200;
+};
+
+let hardcodedLight = 0;
+for (const file of allFiles) {
+  if (!file.endsWith('.tsx') || checkAllowlist(file)) continue;
+  for (const chunk of fs.readFileSync(file, 'utf8').split(/['"`]/)) {
+    if (!/#[0-9a-fA-F]{3,8}/.test(chunk)) continue;
+    let match;
+    ARBITRARY_COLOR.lastIndex = 0;
+    while ((match = ARBITRARY_COLOR.exec(chunk)) !== null) {
+      const hexes = [...match[0].matchAll(/#([0-9a-fA-F]{3,8})/g)].map((m) => m[1]);
+      if (!hexes.some(isLightHex)) continue;
+      if (chunk.includes(`dark:${match[1]}-[`)) continue;
+      hardcodedLight += 1;
+    }
+  }
+}
+
+if (hardcodedLight > HARDCODED_HEX_BASELINE) {
+  console.error(
+    `[FAIL] I_HARDCODED_LIGHT_HEX: ${hardcodedLight} light hex colours in arbitrary values with no dark: counterpart (baseline ${HARDCODED_HEX_BASELINE})`,
+  );
+  console.error('       A literal #ffffff in bg-[...] is invisible to every name-based check.');
+  console.error('       Pair it with a dark:bg-[...] or move the colour to a CSS variable.');
+  hasErrors = true;
+} else if (hardcodedLight < HARDCODED_HEX_BASELINE) {
+  console.log(
+    `[INFO] I_HARDCODED_LIGHT_HEX improved: ${hardcodedLight} (baseline ${HARDCODED_HEX_BASELINE}) — lower the baseline.`,
   );
 }
 

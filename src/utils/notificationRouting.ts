@@ -150,16 +150,33 @@ const MESSAGE_NOTIFICATION_TYPES = new Set<string>([
     NotificationTypes.MESSAGE_MODERATED,
 ]);
 
-function buildMessageThreadRoute(
-    payload: Record<string, unknown> | undefined,
-): string | null {
+/**
+ * Where a message notification goes. **Always somewhere in messaging.**
+ *
+ * This returns a route unconditionally, and that is the whole point. The
+ * previous version returned null when it could not find a thread id, which
+ * dropped the caller into the shared fallback chain and ended at
+ * `/settings?tab=notifications` — the screen the reader had just tapped FROM.
+ *
+ * `MESSAGE_UNREAD_REMINDER` ("You have unread order messages waiting") is a
+ * DIGEST. It is about several threads at once, so it carries no `threadId` and
+ * never will, which made it hit that hole every single time. A notification
+ * about unread messages must land in the inbox even when it cannot say which
+ * message — the reader can take it from there, and the one place that is
+ * certainly wrong is the settings page.
+ */
+function buildMessageRoute(payload: Record<string, unknown> | undefined): string {
+    // `MessagingManagementPage` reads exactly one param, `threadId`, so these
+    // are the only two keys worth looking for. The other identifiers native
+    // resolves from (messageId, orderId, customOrderId) have no web resolver
+    // to hand them to, and inventing one to open a thread we may not have
+    // matched correctly is worse than opening the inbox.
     const threadId =
         typeof payload?.threadId === 'string' && payload.threadId.trim()
             ? payload.threadId.trim()
             : typeof payload?.conversationId === 'string' && payload.conversationId.trim()
                 ? payload.conversationId.trim()
                 : null;
-    if (!threadId) return null;
 
     /*
       A brand reads the same threads inside Studio, and sending them to the
@@ -168,7 +185,7 @@ function buildMessageThreadRoute(
     */
     const isBrandSide = typeof payload?.brandId === 'string' && payload.brandId.trim().length > 0;
     const base = isBrandSide ? '/studio/messages' : '/messages';
-    return `${base}?threadId=${encodeURIComponent(threadId)}`;
+    return threadId ? `${base}?threadId=${encodeURIComponent(threadId)}` : base;
 }
 
 export function determineNotificationRoute(notification: NormalizedNotification): string {
@@ -222,9 +239,10 @@ export function determineNotificationRoute(notification: NormalizedNotification)
       already reads `?threadId=`, so the deep link has always worked; nothing
       ever produced it.
     */
+    // Returns unconditionally — a message notification never falls through to
+    // the generic chain, because the end of that chain is the settings page.
     if (MESSAGE_NOTIFICATION_TYPES.has(type)) {
-        const messageRoute = buildMessageThreadRoute(payload as Record<string, unknown> | undefined);
-        if (messageRoute) return messageRoute;
+        return buildMessageRoute(payload as Record<string, unknown> | undefined);
     }
 
     // Try registry-based routing first

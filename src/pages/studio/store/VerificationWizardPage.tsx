@@ -98,7 +98,6 @@ export default function VerificationWizardPage() {
   );
   const [stepIndex, setStepIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [hasDraft, setHasDraft] = useState(false);
   const [draftSource, setDraftSource] =
     useState<VerificationDraftResponse['source']>(undefined);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -217,18 +216,10 @@ export default function VerificationWizardPage() {
         if (draftData.draftData) {
           setForm((current) => mergeDraftIntoForm(current, draftData.draftData!));
         }
-        const loadedDraft = draftData?.draftData;
-        const loadedHasDraft =
-          !!draftData?.lastSavedAt ||
-          Object.values(loadedDraft ?? {}).some((value) => {
-            if (typeof value === 'string') return value.trim().length > 0;
-            if (typeof value === 'number') return Number.isFinite(value);
-            if (!value || typeof value !== 'object') return false;
-            return Object.values(value as Record<string, unknown>).some((nested) =>
-              typeof nested === 'string' ? nested.trim().length > 0 : nested != null,
-            );
-          });
-        setHasDraft(loadedHasDraft);
+        // The "does a draft exist" probe used to walk every field of the saved
+        // draft looking for one non-empty value. Its only consumer was the
+        // "Drafted" pill, which is gone — the wizard autosaves, so the answer
+        // was always "yes" a moment after the owner started typing anyway.
         const draftStep = Number(
           (draftData.draftData as Record<string, unknown> | null)?.currentStep ??
             1,
@@ -719,12 +710,21 @@ export default function VerificationWizardPage() {
             <span className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Completion</span>
             <span className="text-xs font-bold text-primary tabular-nums">{completionStats.percent}% ({completionStats.completedCount}/{completionStats.totalCount})</span>
           </div>
-          <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wider ${verificationStatusTone(status?.verificationStatus)}`}>
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
-            {status?.verificationStatus === 'NOT_SUBMITTED' && hasDraft
-              ? 'Drafted'
-              : verificationStatusLabel(status?.verificationStatus)}
-          </div>
+          {/*
+            No status pill until there IS a status.
+
+            Before submission this said "Drafted", which describes our autosave
+            rather than the application, and sat beside a live completion
+            percentage that already tells the owner where they are. Once
+            something has actually been sent, the pill carries a real review
+            state and earns its place.
+          */}
+          {status && status.verificationStatus !== 'NOT_SUBMITTED' ? (
+            <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wider ${verificationStatusTone(status.verificationStatus)}`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+              {verificationStatusLabel(status.verificationStatus)}
+            </div>
+          ) : null}
         </div>
       </div>
 

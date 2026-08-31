@@ -535,7 +535,15 @@ export default function AdminBrandVerificationReviewPage() {
   return (
     <div className="min-w-0 space-y-6">
       <AdminBreadcrumb segments={[{ label: 'Users', path: '/admin/users?tab=in-review' }, { label: 'Verification Review' }]} />
-      <section className="min-w-0 rounded-[2rem] border border-white/70 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_28%),linear-gradient(135deg,_#f9fcff,_#ffffff_48%,_#f7f7ff)] p-6 shadow-[0_30px_80px_-40px_rgba(14,165,233,0.35)]">
+      {/*
+        The hero paints itself from literal hex stops inside an arbitrary
+        value. Nothing can audit that: there is no palette class to match, so
+        every theme check in this repo — including the two added alongside this
+        change — reads the page as clean while it renders a near-white slab on
+        a near-black console. The sky tint is `rgba()` and survives both themes;
+        only the base stops need a dark counterpart.
+      */}
+      <section className="min-w-0 rounded-[2rem] border border-white/70 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_28%),linear-gradient(135deg,_#f9fcff,_#ffffff_48%,_#f7f7ff)] p-6 shadow-[0_30px_80px_-40px_rgba(14,165,233,0.35)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_28%),linear-gradient(135deg,_#101418,_#0a0a0a_48%,_#101018)] dark:shadow-[0_30px_80px_-40px_rgba(0,0,0,0.8)]">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <Link
@@ -861,7 +869,7 @@ export default function AdminBrandVerificationReviewPage() {
                       type="button"
                       onClick={() => setIsEvidenceViewerOpen(true)}
                       title="Click to view full size"
-                      className="flex min-h-[420px] w-full cursor-zoom-in items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_36%),linear-gradient(180deg,_#ffffff,_#f8fafc)] p-4"
+                      className="flex min-h-[420px] w-full cursor-zoom-in items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_36%),linear-gradient(180deg,_#ffffff,_#f8fafc)] p-4 dark:bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_36%),linear-gradient(180deg,_#101418,_#0a0a0a)]"
                     >
                       <MediaRenderer
                         kind="image"

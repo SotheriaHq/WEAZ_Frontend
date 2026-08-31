@@ -24,7 +24,7 @@ export default function VerifiedBadgeMeaningPage() {
         <span className="text-slate-800">Verified badge meaning</span>
       </nav>
 
-      <section className="overflow-hidden rounded-[2rem] border border-white/70 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_30%),linear-gradient(135deg,_#f8fcff,_#ffffff_48%,_#eef8ff)] p-8 shadow-[0_30px_80px_-40px_rgba(14,165,233,0.45)]">
+      <section className="overflow-hidden rounded-[2rem] border border-white/70 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_30%),linear-gradient(135deg,_#f8fcff,_#ffffff_48%,_#eef8ff)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_30%),linear-gradient(135deg,_#101418,_#0a0a0a_48%,_#0d1116)] p-8 shadow-[0_30px_80px_-40px_rgba(14,165,233,0.45)]">
         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-600">
           Seller trust
         </p>

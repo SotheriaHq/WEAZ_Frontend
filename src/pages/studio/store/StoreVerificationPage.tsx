@@ -117,10 +117,20 @@ export default function StoreVerificationPage() {
     [hasDraft, status],
   );
 
-  const statusDisplayLabel =
-    status?.verificationStatus === 'NOT_SUBMITTED' && hasDraft
-      ? 'Drafted'
-      : verificationStatusLabel(status?.verificationStatus);
+  /*
+    "Drafted" is not a status, it is an autosave.
+
+    Every keystroke in the wizard is persisted, so labelling the record
+    "Drafted" told the owner about our storage rather than about their
+    application — and it read as a state the reviewer might be looking at, when
+    nothing has been sent. The honest label for an unsent application is the one
+    the server already gives it. The word "draft" now appears in exactly one
+    place: the toast that fires when someone presses Save draft, where it
+    confirms an action they took.
+  */
+  const statusDisplayLabel = verificationStatusLabel(
+    status?.verificationStatus,
+  );
 
   const handleCancel = async () => {
     if (!brandId || !status) return;
@@ -196,10 +206,22 @@ export default function StoreVerificationPage() {
     const diffMs = cooldownTarget.getTime() - countdownNow;
     if (diffMs <= 0) return 'You can reapply now';
 
-    const totalHours = Math.floor(diffMs / (60 * 60 * 1000));
-    const days = Math.floor(totalHours / 24);
-    const hours = totalHours % 24;
-    return `${days} day${days === 1 ? '' : 's'}, ${hours} hour${hours === 1 ? '' : 's'} remaining`;
+    const totalMinutes = Math.floor(diffMs / (60 * 1000));
+    const days = Math.floor(totalMinutes / (60 * 24));
+    const hours = Math.floor(totalMinutes / 60) % 24;
+    const minutes = totalMinutes % 60;
+
+    // The unit has to follow the magnitude down, or the last hour of a lockout
+    // reads "0 days, 0 hours remaining" — which says the wait is over while the
+    // button is still disabled, and is the only part of this a brand is
+    // actually watching.
+    if (days > 0) {
+      return `${days} day${days === 1 ? '' : 's'}, ${hours} hour${hours === 1 ? '' : 's'} remaining`;
+    }
+    if (hours > 0) {
+      return `${hours} hour${hours === 1 ? '' : 's'}, ${minutes} min remaining`;
+    }
+    return `${Math.max(1, minutes)} min remaining`;
   }, [cooldownTarget, countdownNow]);
 
   const handlePrimaryAction = () => {

@@ -23,6 +23,54 @@ import {
  */
 const COUNTRY_NAME_MIN_WIDTH = '(min-width: 640px)';
 
+/**
+ * Flags are IMAGES, not emoji.
+ *
+ * `PHONE_COUNTRIES[].flag` is a regional-indicator pair (🇳🇬 = U+1F1F3 U+1F1EC).
+ * **Windows ships no flag glyphs at all** — not in Segoe UI Emoji, not anywhere
+ * — so every browser on Windows falls back to drawing the two letters. That is
+ * why the picker read "NG Nigeria" and looked like it was still printing a
+ * country code: the "NG" *was* the flag, failing. No amount of styling fixes
+ * that, because there is no glyph to style.
+ *
+ * `public/flags/` holds the 4x3 SVG set (271 files, ~2.4MB). Served as static
+ * assets rather than bundled: the bundler would inline the small ones into the
+ * CSS as base64 and emit the rest as hashed chunks, when what we want is 271
+ * cache-forever files of which any one page fetches one or two. `loading="lazy"`
+ * keeps the open list from requesting all of them at once.
+ */
+const CountryFlag: React.FC<{ iso2: string; title?: string }> = ({
+  iso2,
+  title,
+}) => (
+  /*
+    `no-raw-media-elements` guards UPLOADED media, so that everything a brand
+    posts flows through `MediaRenderer` and keeps its intrinsic sizing. A 20px
+    flag is chrome, not content, and `MediaRenderer` would resolve signed URLs
+    and apply the uncropped-media invariant to a fixed-ratio icon.
+
+    A CSS background would sidestep the rule without an exemption, and was the
+    first thing tried — but background images have no lazy loading, so opening
+    the picker would fetch all 271 flags (~2.4MB) at once. `loading="lazy"` on a
+    real <img> fetches the eight or so actually on screen.
+  */
+  // eslint-disable-next-line threadly/no-raw-media-elements
+  <img
+    src={`/flags/${iso2.toLowerCase()}.svg`}
+    alt=""
+    title={title}
+    loading="lazy"
+    width={20}
+    height={15}
+    className="h-[15px] w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-black/10 dark:ring-white/15"
+    onError={(event) => {
+      // libphonenumber knows a few territories the flag set does not. Losing
+      // the flag is survivable; a broken-image icon in a form is not.
+      event.currentTarget.style.visibility = 'hidden';
+    }}
+  />
+);
+
 const matchMedia = (query: string) =>
   typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     ? window.matchMedia(query)
@@ -152,9 +200,11 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
     () =>
       PHONE_COUNTRIES.map((country) => ({
         value: country.iso2,
-        label: compactCountryLabel
-          ? `${country.flag} ${country.iso2}`
-          : `${country.flag} ${country.name}`,
+        // The flag is the `icon`, so it renders on the trigger AND in the list
+        // without being part of the searchable text. The label is the country
+        // and nothing else.
+        icon: <CountryFlag iso2={country.iso2} title={country.name} />,
+        label: compactCountryLabel ? country.iso2 : country.name,
         description: compactCountryLabel
           ? `${country.name} · +${country.callingCode}`
           : `+${country.callingCode}`,
@@ -190,7 +240,7 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
         </label>
       ) : null}
 
-      <div className="flex items-stretch gap-2 w-full min-w-0">
+      <div className="flex items-center gap-2 w-full min-w-0">
         <UniversalSelect
           value={iso2}
           onChange={(next) => {
@@ -205,9 +255,18 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
           emptyMessage="No matching country"
           disabled={disabled}
           menuLayer={menuLayer}
-          className="w-[5.75rem] md:w-[11.5rem] shrink-0"
+          /*
+            The picker is the SMALLER of the two controls. The number is what
+            someone actually types, so it gets the remaining width — the other
+            way round left about 200px to type a phone number into.
+
+            `compact` is deliberately NOT set: it renders px-3/py-2/text-xs,
+            roughly 32px tall, beside an h-12 input. That height difference is
+            why the pair read as two separate rows instead of one control. The
+            default size lands at ~48px and lines up.
+          */
+          className="w-[6.75rem] md:w-[10rem] shrink-0"
           fitContent={false}
-          compact
         />
 
         <div className="relative flex-1 min-w-0">
@@ -244,7 +303,7 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
               emit(digits, iso2);
             }}
             onBlur={() => setTouched(true)}
-            className="form-field h-12 w-full rounded-lg pr-4 text-sm"
+            className="form-field h-12 w-full rounded-2xl pr-4 text-sm"
             style={{
               // Clears the locked dial-code segment and its divider: the
               // span is pl-3 + code + pr-2.5, and the code is not fixed width.

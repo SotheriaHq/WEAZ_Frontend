@@ -54,7 +54,24 @@ export const prefersCanvasImagePreview = (): boolean => {
   const coarsePointer = matchMedia?.('(pointer: coarse)').matches ?? false;
   const narrowViewport = matchMedia?.('(max-width: 1024px)').matches ?? false;
 
-  return touchCapable && (coarsePointer || narrowViewport);
+  /*
+    A COARSE PRIMARY POINTER is what identifies a phone or tablet. Touch
+    capability is not — every touchscreen laptop reports `maxTouchPoints > 0`
+    while driving a mouse, and the old test (`touchCapable && (coarse ||
+    narrow)`) classified one as mobile the moment its window went under 1024px.
+
+    That misclassification is expensive, not cosmetic. It is the switch that
+    sends `useMediaStore` down the proactive branch, where every selected image
+    at or above 1MB is UPLOADED TO THE SERVER and transcoded before its preview
+    settles — a full-file round trip per image, on the 15s client default, to
+    produce a thumbnail the browser had already produced locally as a blob.
+    Pick four photos on a windowed touchscreen laptop and that is four uploads
+    before anything appears.
+
+    `coarse && (touch || narrow)` keeps every real phone and tablet on the safe
+    path — they report both — and takes desktops back off it.
+  */
+  return coarsePointer && (touchCapable || narrowViewport);
 };
 
 export const normalizeImageFile = (file: File): File => {

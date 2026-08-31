@@ -70,6 +70,40 @@ describe('imagePreview', () => {
     window.matchMedia = originalMatchMedia;
   });
 
+  /*
+    A windowed touchscreen laptop: touch capable, viewport under 1024px, but a
+    MOUSE — so the primary pointer is fine, not coarse.
+
+    This must stay false. It is the switch that sends `useMediaStore` down the
+    proactive branch, where every picked image at or above 1MB is uploaded to
+    the server and transcoded before its preview settles. Classifying a desktop
+    as mobile here costs a full-file round trip per image, on the 15s client
+    default, to rebuild a thumbnail the browser already made locally.
+  */
+  it('does not prefer canvas output on a windowed touchscreen laptop (fine pointer)', () => {
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: (query: string) => ({
+        matches: query.includes('max-width: 1024px'), // narrow, but pointer is fine
+        media: query,
+        onchange: null,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        dispatchEvent: () => false,
+      }),
+    });
+    Object.defineProperty(navigator, 'maxTouchPoints', {
+      writable: true,
+      value: 10,
+    });
+
+    expect(prefersCanvasImagePreview()).toBe(false);
+    window.matchMedia = originalMatchMedia;
+  });
+
   it('falls back to the raw data: URL when every canvas strategy fails (privacy browsers)', async () => {
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
