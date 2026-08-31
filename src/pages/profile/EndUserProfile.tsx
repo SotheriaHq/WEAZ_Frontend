@@ -334,11 +334,23 @@ const REGION_SHORT_LABEL: Record<SizingRegion, string> = {
   INTERNATIONAL: 'INT',
 };
 
+const CATEGORY_SIZE_LABELS: Record<string, string> = {
+  tops: 'Tops',
+  bottoms: 'Bottoms',
+  gownsDresses: 'Dresses',
+  formalShirts: 'Shirts',
+  jackets: 'Jackets',
+};
+
 const resolveComputedSizeLabel = (computed?: ComputedSizeFitProfile | null): string | null => {
   if (!computed) return null;
+  const breakdown = Object.values(computed.categoryBreakdown ?? {});
   const primaryBreakdown =
-    computed.categoryBreakdown?.tops ??
-    Object.values(computed.categoryBreakdown ?? {}).find(
+    (computed.categoryBreakdown?.tops?.recommendedSize ||
+    computed.categoryBreakdown?.tops?.estimatedSize
+      ? computed.categoryBreakdown.tops
+      : null) ??
+    breakdown.find(
       (entry) => entry?.recommendedSize || entry?.estimatedSize || entry?.displayRange,
     ) ??
     null;
@@ -351,6 +363,19 @@ const resolveComputedSizeLabel = (computed?: ComputedSizeFitProfile | null): str
     primaryBreakdown?.displayRange ??
     null
   );
+};
+
+const resolveCategorySizeChips = (
+  computed?: ComputedSizeFitProfile | null,
+): Array<{ key: string; label: string; size: string }> => {
+  if (!computed?.categoryBreakdown) return [];
+  return Object.entries(computed.categoryBreakdown)
+    .map(([key, entry]) => ({
+      key,
+      label: CATEGORY_SIZE_LABELS[key] ?? key,
+      size: entry?.recommendedSize || entry?.estimatedSize || entry?.displayRange || '',
+    }))
+    .filter((entry) => Boolean(entry.size));
 };
 
 const extractAlphaSizeFromLabel = (value?: string | null): string | null => {
@@ -393,6 +418,9 @@ export const EndUserProfile: React.FC = () => {
    * carries a `warnings` array saying precisely this; it was being discarded.
    */
   const [computedWarning, setComputedWarning] = useState<string | null>(null);
+  const [computedCategorySizes, setComputedCategorySizes] = useState<
+    Array<{ key: string; label: string; size: string }>
+  >([]);
   /*
     Measurements the server would not size against. Distinct from
     `computedMissingBaseline`, which is what was never entered — telling someone
@@ -641,6 +669,9 @@ export const EndUserProfile: React.FC = () => {
                 .join(' · ');
 
       setComputedSize(nextComputedSize);
+      setComputedCategorySizes(
+        resolveCategorySizeChips(answered[0]?.computed ?? perRegion[0]?.computed),
+      );
       // The alpha band (S/M/L) is a property of the body, not of the labelling
       // system, so it is read from the first chart that produced one.
       setComputedAlphaSize(extractAlphaSizeFromLabel(answered[0]?.label ?? null));
@@ -684,6 +715,7 @@ export const EndUserProfile: React.FC = () => {
     } catch (err) {
       setComputedSize(null);
       setComputedAlphaSize(null);
+      setComputedCategorySizes([]);
       setComputedMissingBaseline([]);
       setComputedMeasurementProblems([]);
       setComputedWarning(null);
@@ -1578,6 +1610,18 @@ export const EndUserProfile: React.FC = () => {
                     >
                       {computedSize || (chartLoading ? 'Loading…' : '—')}
                     </span>
+                    {computedCategorySizes.length > 1 ? (
+                      <span className="flex flex-wrap gap-1">
+                        {computedCategorySizes.map((entry) => (
+                          <span
+                            key={entry.key}
+                            className="rounded-full border border-indigo-200/80 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-950/40 dark:text-indigo-100"
+                          >
+                            {entry.label} {entry.size}
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
                     {alphaFitLabel ? (
                       <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">
                         {alphaFitLabel}
@@ -1665,6 +1709,18 @@ export const EndUserProfile: React.FC = () => {
                   >
                     {computedSize || (chartLoading ? '…' : '—')}
                   </div>
+                  {computedCategorySizes.length > 1 ? (
+                    <div className="mt-1.5 flex flex-wrap justify-end gap-1">
+                      {computedCategorySizes.map((entry) => (
+                        <span
+                          key={entry.key}
+                          className="rounded-full border border-indigo-200/80 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-950/40 dark:text-indigo-100"
+                        >
+                          {entry.label} {entry.size}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   {alphaFitLabel ? (
                     <div className="mt-0.5 text-xs font-semibold text-indigo-600 dark:text-indigo-300">
                       {alphaFitLabel}

@@ -1,14 +1,26 @@
 import React, { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { apiClient } from '@/api/httpClient';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { Select } from '@/components/ui/Select';
+import { setUser } from '@/features/userSlice';
+import {
+  PROFILE_GENDER_OPTIONS,
+  profileGenderLabel,
+  type ProfileGender,
+} from '@/lib/profileGender';
+import type { RootState } from '@/store';
 import type { SizeFitProfile } from '@/types/sizeFit';
 
 const SizeFitSettings: React.FC = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const user = useSelector((state: RootState) => state.user.profile);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingGender, setSavingGender] = useState(false);
   const [profile, setProfile] = useState<SizeFitProfile | null>(null);
 
   useEffect(() => {
@@ -53,6 +65,22 @@ const SizeFitSettings: React.FC = () => {
 
   if (!profile) return null;
 
+  const saveGender = async (gender: ProfileGender) => {
+    if (!user || savingGender) return;
+    setSavingGender(true);
+    try {
+      const response = await apiClient.patch('/users/me/profile', { gender });
+      const payload = response.data?.data ?? response.data;
+      const updated = payload?.user ?? payload;
+      dispatch(setUser({ ...user, gender: updated?.gender ?? gender }));
+      toast.success('Saved.');
+    } catch {
+      toast.error('Unable to save that just now.');
+    } finally {
+      setSavingGender(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -60,6 +88,39 @@ const SizeFitSettings: React.FC = () => {
         <p className="text-gray-600 dark:text-gray-400">
           Configure visibility, sharing policy, and reminder frequency.
         </p>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-gray-950">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">How we size clothes for you</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Are you a man, a woman, non-binary, or would you rather not say? This picks the right size chart. You can change it any time.
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          {PROFILE_GENDER_OPTIONS.map((option) => {
+            const selected = user?.gender === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                disabled={savingGender}
+                aria-pressed={selected}
+                onClick={() => void saveGender(option.value)}
+                className={`min-h-11 rounded-2xl border px-3 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] ${
+                  selected
+                    ? 'border-indigo-600 bg-indigo-600 text-white'
+                    : 'border-indigo-200/80 bg-indigo-50/70 text-indigo-900 hover:border-indigo-400 dark:border-indigo-500/30 dark:bg-indigo-950/40 dark:text-indigo-100'
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+        {user?.gender ? (
+          <p className="mt-3 text-sm text-gray-500">
+            Currently sized as {profileGenderLabel(user.gender)}.
+          </p>
+        ) : null}
       </div>
 
       <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-4">

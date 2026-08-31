@@ -53,6 +53,7 @@ import { useVerificationStateSync } from '@/hooks/useVerificationStateSync';
 import ScrollRestoreProvider from '@/components/ScrollRestoreProvider';
 import MobileExitGuard from '@/components/navigation/MobileExitGuard';
 import { isNewBuildAvailable } from '@/utils/buildVersionGuard';
+import { GenderPrompt } from '@/components/profile/GenderPrompt';
 
 const Runway = lazy(() => import('./pages/Runway'));
 const CartDrawer = lazy(() => import('./components/designs/CartDrawer'));
@@ -398,6 +399,7 @@ const RootLayout: React.FC = () => {
         <Suspense fallback={<AppRouteFallback />}>
           <Outlet />
         </Suspense>
+        <GenderPrompt />
       </>
     </BagFlowProvider>
   );

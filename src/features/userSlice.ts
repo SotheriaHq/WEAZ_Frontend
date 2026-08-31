@@ -43,6 +43,7 @@ const normalizeUser = (user: AuthUserDto): AuthUserDto => ({
     user.verificationBadgeVisible ?? user.isVerifiedBrand,
   ),
   verifiedExplanationUrl: user.verifiedExplanationUrl ?? null,
+  gender: user.gender ?? null,
 });
 
 const parsePersistedProfile = (raw: string | null): AuthUserDto | null => {
