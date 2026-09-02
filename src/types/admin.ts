@@ -688,6 +688,12 @@ export interface AdminContentSubmission {
   reasonCode?: ContentReviewReasonCode | null;
   reasonLabel?: string | null;
   reasonNote?: string | null;
+  /**
+   * What the brand changed since the previous submission, e.g.
+   * ["1 image(s) replaced", "Description edited"]. Empty for a first
+   * submission, and for rows that predate change detection.
+   */
+  changeSummary?: string[];
   submittedAt: string;
   reviewedAt?: string | null;
   target: {

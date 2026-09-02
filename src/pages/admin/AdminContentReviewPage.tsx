@@ -665,6 +665,17 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
                                 Answered a change request
                               </div>
                             )}
+                            {/*
+                              What actually changed, computed server-side when
+                              the brand resubmitted. Without it a reviewer has
+                              to reopen the item and remember what it looked
+                              like — which is how change requests got forgotten.
+                            */}
+                            {(submission.changeSummary?.length ?? 0) > 0 && (
+                              <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                                {submission.changeSummary!.join(' · ')}
+                              </div>
+                            )}
                             {submission.slotCompleteness.missing.length > 0 && (
                               <div className="mt-1 text-xs text-red-600 dark:text-red-300">
                                 Missing {submission.slotCompleteness.missing.map(friendlyEnum).join(', ')}
