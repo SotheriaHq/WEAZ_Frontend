@@ -10,6 +10,7 @@ import type { AuthTokensResponse } from '../types/auth';
 import { env } from '../config/env';
 import { finishNetworkTrace, startNetworkTrace } from './networkTrace';
 import { createRequestId } from '../utils/requestId';
+import { getWebDeviceId, WIEZ_DEVICE_ID_HEADER } from '../utils/deviceId';
 
 let consecutiveRefreshFailures = 0;
 let lastRefreshFailureAt = 0;
@@ -264,6 +265,16 @@ const attachRequestMetadata = (config: InternalAxiosRequestConfig) => {
   const headers = getHeaders(config);
   if (!headers.get('x-request-id')) {
     headers.set('x-request-id', createRequestId());
+  }
+
+  // Durable, locally generated device id. The server uses it for exactly one
+  // thing — suppressing a duplicate view count — so it never carries authority.
+  // It is what keeps a view from being counted twice when the same person
+  // views something signed out, signs in, and views it again: the user identity
+  // changes, this does not.
+  if (!headers.get(WIEZ_DEVICE_ID_HEADER)) {
+    const deviceId = getWebDeviceId();
+    if (deviceId) headers.set(WIEZ_DEVICE_ID_HEADER, deviceId);
   }
 
   const token = volatileAccessToken;

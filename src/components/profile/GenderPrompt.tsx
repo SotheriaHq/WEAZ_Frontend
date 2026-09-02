@@ -14,7 +14,20 @@ import {
 } from '@/lib/profileGender';
 import type { RootState } from '@/store';
 
-const SKIP_PATHS = [
+/**
+ * Screens the prompt must never cover.
+ *
+ * These are all mid-flow: the person is proving who they are, not shopping, and
+ * a modal asking how to size their clothes lands on top of the thing they were
+ * actually doing. `/verify-email` is the case that reached SIT — the list said
+ * `/verify`, and the matcher only accepted an exact hit or a `/verify/` prefix,
+ * so `/verify-email` fell straight through and the prompt opened over the
+ * "your email is verified" screen.
+ *
+ * Matching is a plain prefix, so a route and everything nested under it are
+ * both covered without needing a second entry.
+ */
+export const SKIP_PATH_PREFIXES = [
   '/login',
   '/signup',
   '/forgot-password',
@@ -23,7 +36,11 @@ const SKIP_PATHS = [
   '/legal',
   '/accept-invite',
   '/account-reactivation',
+  '/admin',
 ];
+
+export const isGenderPromptSuppressedPath = (pathname: string): boolean =>
+  SKIP_PATH_PREFIXES.some((path) => pathname.startsWith(path));
 
 export const GenderPrompt: React.FC = () => {
   const dispatch = useDispatch();
@@ -35,10 +52,7 @@ export const GenderPrompt: React.FC = () => {
   const embedded = useEmbeddedSurface();
   const [saving, setSaving] = useState<ProfileGender | null>(null);
 
-  const hidden = SKIP_PATHS.some(
-    (path) =>
-      location.pathname === path || location.pathname.startsWith(`${path}/`),
-  );
+  const hidden = isGenderPromptSuppressedPath(location.pathname);
 
   const open =
     isAuthenticated &&

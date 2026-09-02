@@ -503,6 +503,8 @@ export interface AdminProduct {
   images?: string[];
   primaryMediaUrl?: string | null;
   orderCount?: number;
+  /** Deduped views. Named to match the admin designs list. */
+  viewCount?: number;
   createdAt: string;
   updatedAt: string;
   brand?: { id: string; name: string | null };

@@ -1,7 +1,8 @@
 import { marketApi, type MarketSignalEvent } from '@/api/MarketApi';
+import { getWebDeviceId, WEB_DEVICE_ID_STORAGE_KEY } from '@/utils/deviceId';
 
 export const WEB_MARKET_SIGNAL_ANONYMOUS_SESSION_STORAGE_KEY =
-  'wiez.market.anonymousSessionId.v1';
+  WEB_DEVICE_ID_STORAGE_KEY;
 export const WEB_MARKET_SIGNAL_QUEUE_STORAGE_KEY =
   'wiez.market.signalQueue.v1';
 export const WEB_MARKET_SIGNAL_RECENT_STORAGE_KEY =
@@ -157,14 +158,14 @@ const compactQueue = () => {
   }
 };
 
-export const getWebMarketSignalAnonymousSessionId = () => {
-  const existing = safeReadStorage(WEB_MARKET_SIGNAL_ANONYMOUS_SESSION_STORAGE_KEY);
-  if (existing) return existing;
-
-  const created = createWebMarketSignalClientId('anon');
-  safeWriteStorage(WEB_MARKET_SIGNAL_ANONYMOUS_SESSION_STORAGE_KEY, created);
-  return created;
-};
+/**
+ * Delegates to the shared device id so signal batches and the
+ * `x-wiez-device-id` request header carry the SAME value — view dedupe spans
+ * both paths, and two different ids would count the same person twice. Same
+ * storage key as before, so existing ids carry over.
+ */
+export const getWebMarketSignalAnonymousSessionId = () =>
+  getWebDeviceId() ?? createWebMarketSignalClientId('anon');
 
 const isNoisySignal = (event: MarketSignalEvent) =>
   event.signalType === 'IMPRESSION' ||
