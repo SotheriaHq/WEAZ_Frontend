@@ -61,6 +61,7 @@ const STATUS_OPTIONS = [
   { value: 'REJECTED', label: 'Rejected' },
   { value: 'APPROVED', label: 'Approved/Published' },
   { value: 'CANCELLED', label: 'Cancelled' },
+  { value: 'SUPERSEDED', label: 'Superseded' },
 ];
 
 const TYPE_OPTIONS = [
@@ -98,6 +99,7 @@ const statusLabel: Record<ContentSubmissionStatus, string> = {
   REJECTED: 'Rejected',
   CHANGES_REQUESTED: 'Changes Requested',
   CANCELLED: 'Cancelled',
+  SUPERSEDED: 'Superseded',
 };
 
 const statusTone: Record<ContentSubmissionStatus, string> = {
@@ -106,6 +108,7 @@ const statusTone: Record<ContentSubmissionStatus, string> = {
   REJECTED: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-200',
   CHANGES_REQUESTED: 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-200',
   CANCELLED: 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300',
+  SUPERSEDED: 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300',
 };
 
 const reportStatusTone: Record<ContentReportStatus, string> = {
@@ -622,7 +625,16 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
                   <th className="px-4 py-3">Brand</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Trust</th>
-                  <th className="px-4 py-3">Slots</th>
+                  {/*
+                    The "Slots" column is gone. It showed
+                    slotCompleteness.present/required — the required media views
+                    (Front, Back, Left, Right) — but content cannot be submitted
+                    without all four, so it read "4/4" on every row and carried no
+                    information. Incompleteness is now surfaced where it matters:
+                    inline on the row when it actually happens (a media deleted
+                    after submission), and in full on the review drawer's
+                    "Required slots" checklist.
+                  */}
                   <th className="px-4 py-3">Submitted</th>
                   <th className="px-4 py-3 text-right">Action</th>
                 </tr>
@@ -648,6 +660,16 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
                           <div>
                             <div className="font-semibold text-gray-900 dark:text-white">{submission.target.title || 'Untitled content'}</div>
                             <div className="text-xs text-gray-500">{submission.entityType === 'PRODUCT' ? 'Product' : 'Design'}</div>
+                            {submission.previousStatus === 'CHANGES_REQUESTED' && (
+                              <div className="mt-1 inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800 dark:bg-violet-500/15 dark:text-violet-200">
+                                Answered a change request
+                              </div>
+                            )}
+                            {submission.slotCompleteness.missing.length > 0 && (
+                              <div className="mt-1 text-xs text-red-600 dark:text-red-300">
+                                Missing {submission.slotCompleteness.missing.map(friendlyEnum).join(', ')}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -660,16 +682,6 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
                       <td className="px-4 py-3 text-xs">
                         <div>{friendlyEnum(submission.brand?.trustTier)}</div>
                         <div className="mt-1 text-gray-500">{friendlyEnum(submission.brand?.reviewMode)}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm font-semibold">
-                          {submission.slotCompleteness.present}/{submission.slotCompleteness.required}
-                        </div>
-                        {submission.slotCompleteness.missing.length > 0 && (
-                          <div className="mt-1 text-xs text-red-600 dark:text-red-300">
-                            Missing {submission.slotCompleteness.missing.map(friendlyEnum).join(', ')}
-                          </div>
-                        )}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">{formatDate(submission.submittedAt)}</td>
                       <td className="px-4 py-3 text-right">

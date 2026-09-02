@@ -112,6 +112,23 @@ const verificationState = (brand: AdminBrand): { label: string; tone: string; hi
   };
 };
 
+/**
+ * The store override is only offered where it can do something.
+ *
+ * Closing is offered on an open store. Opening is offered only once the brand
+ * has published a storefront at least once (`storePublishedAt`) — that is the
+ * same completeness signal `/store/status` reports as `isPublished`, and it
+ * means bank details, policy and profile are all in place. Forcing a store open
+ * before then publishes a storefront the brand never finished, which then fails
+ * every downstream gate anyway (`resolvePublicStorefrontBySlug` returns null,
+ * and orders are blocked by the verification gate).
+ *
+ * A brand that has published and later closed its store keeps the button — the
+ * setup did not un-happen.
+ */
+const canOverrideStore = (brand: AdminBrand): boolean =>
+  Boolean(brand.isStoreOpen) || Boolean(brand.storePublishedAt);
+
 const normalizeStatus = (status: string | undefined | null): StatusFilter | 'UNKNOWN' => {
   const value = String(status ?? '').toUpperCase();
   if (value === 'ACTIVE') return 'ACTIVE';
@@ -249,7 +266,7 @@ const BrandsPanel: React.FC = () => {
   };
 
   const requestToggleStore = (brand: AdminBrand) => {
-    if (!canStoreOverride) return;
+    if (!canStoreOverride || !canOverrideStore(brand)) return;
     setConfirmStore({ brand, nextOpen: !brand.isStoreOpen });
   };
 
@@ -337,7 +354,15 @@ const BrandsPanel: React.FC = () => {
                   <th className="px-3 py-3">Owner</th>
                   <th className="px-3 py-3">Email</th>
                   <th className="px-3 py-3">Store</th>
-                  <th className="px-3 py-3">Verification</th>
+                  {/*
+                    "Verification" alone reads as email verification. This
+                    column is the BRAND's verification outcome
+                    (Brand.verificationStatus) — the badge, the order gate — and
+                    has nothing to do with the owner's email. The neighbouring
+                    "Account" column is the owner's account status, so a bare
+                    "Status" here would collide with it.
+                  */}
+                  <th className="px-3 py-3">Brand verification</th>
                   <th className="px-3 py-3">Account</th>
                   <th className="px-3 py-3">Joined</th>
                   <th className="px-3 py-3">Actions</th>
@@ -394,11 +419,15 @@ const BrandsPanel: React.FC = () => {
                       <td className="px-3 py-3">
                         <div className="flex flex-wrap gap-2">
                           <button type="button" onClick={() => openManageModal(brand)} className="rounded-lg bg-indigo-100 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:hover:bg-indigo-500/30">⚙ Manage</button>
-                          {canStoreOverride && (
+                          {canStoreOverride && canOverrideStore(brand) ? (
                             <button type="button" disabled={actionLoadingBrandId === brand.id} onClick={() => requestToggleStore(brand)} className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${brand.isStoreOpen ? 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-200 dark:hover:bg-rose-500/30' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30'} disabled:cursor-not-allowed disabled:opacity-60`}>
                               {actionLoadingBrandId === brand.id ? 'Saving...' : brand.isStoreOpen ? 'Close store' : 'Open store'}
                             </button>
-                          )}
+                          ) : canStoreOverride ? (
+                            <span className="rounded-lg bg-gray-100 px-2.5 py-1.5 text-xs font-semibold text-gray-500 dark:bg-white/5 dark:text-gray-400" title="This brand has never published a storefront, so there is nothing to open.">
+                              Setup incomplete
+                            </span>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -444,11 +473,15 @@ const BrandsPanel: React.FC = () => {
                     </div>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => openManageModal(brand)} className="flex-1 rounded-lg bg-indigo-100 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:hover:bg-indigo-500/30">⚙ Manage</button>
-                      {canStoreOverride && (
+                      {canStoreOverride && canOverrideStore(brand) ? (
                         <button type="button" disabled={actionLoadingBrandId === brand.id} onClick={() => requestToggleStore(brand)} className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold ${brand.isStoreOpen ? 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-200 dark:hover:bg-rose-500/30' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30'} disabled:cursor-not-allowed disabled:opacity-60`}>
                           {actionLoadingBrandId === brand.id ? 'Saving...' : brand.isStoreOpen ? 'Close store' : 'Open store'}
                         </button>
-                      )}
+                      ) : canStoreOverride ? (
+                        <span className="flex-1 rounded-lg bg-gray-100 px-3 py-2 text-center text-xs font-semibold text-gray-500 dark:bg-white/5 dark:text-gray-400" title="This brand has never published a storefront, so there is nothing to open.">
+                          Setup incomplete
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                 </article>

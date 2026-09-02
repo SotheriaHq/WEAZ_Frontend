@@ -43,7 +43,7 @@ export const GenderPrompt: React.FC = () => {
   const open =
     isAuthenticated &&
     Boolean(user?.id) &&
-    needsGenderPrompt(user?.gender) &&
+    needsGenderPrompt(user) &&
     !hidden &&
     embedded !== 'mobile-app';
 

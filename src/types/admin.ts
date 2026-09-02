@@ -129,6 +129,12 @@ export interface AdminBrand {
   ownerId?: string;
   isStoreOpen?: boolean;
   /**
+   * Null until the brand completes setup and publishes its storefront. An admin
+   * store override is only meaningful once this is set — before that there is no
+   * storefront to open.
+   */
+  storePublishedAt?: string | null;
+  /**
    * Raw verification outcome. Note this is NOT the same as "shows a verified
    * badge" — the badge additionally requires an open store and an active owner.
    */
@@ -580,7 +586,10 @@ export type ContentSubmissionStatus =
   | 'APPROVED'
   | 'REJECTED'
   | 'CHANGES_REQUESTED'
-  | 'CANCELLED';
+  /** The brand withdrew the item from review. */
+  | 'CANCELLED'
+  /** A newer submission for the same item replaced this row. */
+  | 'SUPERSEDED';
 export type ContentMediaViewSlot =
   | 'FRONT'
   | 'BACK'
