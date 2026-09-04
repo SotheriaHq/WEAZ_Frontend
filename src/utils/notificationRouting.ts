@@ -165,6 +165,43 @@ const MESSAGE_NOTIFICATION_TYPES = new Set<string>([
  * message — the reader can take it from there, and the one place that is
  * certainly wrong is the settings page.
  */
+/**
+ * Every route that counts as "inside messaging".
+ *
+ * Used to decide whether a stored `targetUrl` on a message notification can be
+ * trusted. `/admin/custom-orders/:id#messages` is here because that is the
+ * admin-side messaging deep link — it opens the thread, on the screen an
+ * operator reads threads from.
+ */
+const MESSAGING_ROUTE_PREFIXES = [
+    '/messages',
+    '/studio/messages',
+    '/admin/messaging',
+    '/admin/custom-orders',
+];
+
+const isMessagingRoute = (route: string): boolean => {
+    /*
+      The brand order chat is a messaging destination that does not look like
+      one. `/studio?tab=orders&orderId=…&openChat=1` opens the order with its
+      chat panel already open, which is where a brand reads an order thread —
+      and `openChat=1` is exactly what distinguishes it from a plain link to the
+      orders tab. Without this a brand's message notification would be sent to
+      the generic studio inbox instead of the conversation it names. Found by
+      the backend contract test, not by reading this function.
+    */
+    if (route.startsWith('/studio?tab=orders') && route.includes('openChat=1')) {
+        return true;
+    }
+    return MESSAGING_ROUTE_PREFIXES.some(
+        (prefix) =>
+            route === prefix ||
+            route.startsWith(`${prefix}?`) ||
+            route.startsWith(`${prefix}/`) ||
+            route.startsWith(`${prefix}#`),
+    );
+};
+
 function buildMessageRoute(payload: Record<string, unknown> | undefined): string {
     // `MessagingManagementPage` reads exactly one param, `threadId`, so these
     // are the only two keys worth looking for. The other identifiers native
@@ -443,9 +480,35 @@ export function resolveNotificationClickRoute(
         notification.type === NotificationTypes.MESSAGE_THREAD_REOPENED ||
         notification.type === NotificationTypes.MESSAGE_MODERATED;
 
+    /*
+      A stored targetUrl does NOT get to take a message notification out of
+      messaging.
+
+      This is the half that was missing, and it is why this bug was reported
+      fixed and then reported again. `determineNotificationRoute` below handles
+      the message types correctly — but it is only reached when there is no
+      targetUrl, and the server writes one into the payload of every message
+      notification. When the thread had no order, custom order or thread id to
+      point at, `resolveThreadTargetUrl` returned the literal string
+      '/settings?tab=notifications', which was stored and then obeyed here. The
+      reader tapped "You have unread order messages waiting" and arrived at the
+      notifications settings screen — the screen they had just tapped from.
+
+      The server no longer writes that, but rows written before the fix are
+      still sitting unread in people's inboxes, dated weeks back. This check is
+      what makes those rows work: for a message notification, a targetUrl that
+      does not lead into messaging is discarded and the type-based routing
+      decides instead. Anything already inside messaging is honoured exactly,
+      because that is where the thread id lives.
+    */
+    const usableTargetUrl =
+        exactTargetUrl && (!isMessageNotification || isMessagingRoute(exactTargetUrl))
+            ? exactTargetUrl
+            : null;
+
     let route: string;
-    if (exactTargetUrl) {
-        route = exactTargetUrl;
+    if (usableTargetUrl) {
+        route = usableTargetUrl;
     } else if (context.isBrand && isOrderNotification && payloadOrderId) {
         route = `/studio?tab=orders&orderId=${encodeURIComponent(payloadOrderId)}`;
     } else if (context.isBrand && isMessageNotification && payloadCustomOrderId) {
