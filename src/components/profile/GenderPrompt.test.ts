@@ -41,8 +41,16 @@ describe('needsGenderPrompt', () => {
     expect(needsGenderPrompt({ gender: null, role: 'SuperAdmin' })).toBe(false);
   });
 
+  it('does not ask a brand account — a brand signs up to sell', () => {
+    expect(needsGenderPrompt({ gender: null, type: 'BRAND' })).toBe(false);
+    expect(
+      needsGenderPrompt({ gender: null, type: 'BRAND', role: 'User' }),
+    ).toBe(false);
+  });
+
   it('asks a shopper who has not answered', () => {
     expect(needsGenderPrompt({ gender: null, role: 'User' })).toBe(true);
+    expect(needsGenderPrompt({ gender: null, type: 'REGULAR' })).toBe(true);
     expect(needsGenderPrompt({ gender: null })).toBe(true);
   });
 
