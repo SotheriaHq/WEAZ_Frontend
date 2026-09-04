@@ -20,7 +20,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
 import { ISLAND_BOTTOM_NAV_CLEARANCE_CLASS } from '@/components/navigation/IslandBottomNav';
-import { hasActiveBrandMembership } from '@/lib/brandAccess';
+import { isBrandAccount } from '@/lib/brandAccess';
 import { setUser } from '@/features/userSlice';
 import { unwrapApiResponse } from '@/types/auth';
 import type { AuthProfileResponse, AuthUserDto } from '@/types/auth';
@@ -496,8 +496,14 @@ export const ProfileLayout: React.FC = () => {
             </div>
           ) : null}
           <div className="px-0 sm:px-2">
+            {/*
+              Identity, not capability: a brand that has not finished store
+              setup is still a brand. `hasActiveBrandMembership` is false until
+              a store exists, which sent every freshly verified brand to the
+              shopper profile.
+            */}
             {location.pathname === '/profile' ? (
-              hasActiveBrandMembership(user) ? (
+              isBrandAccount(user) ? (
                 <Suspense fallback={<ProfileContentLoadingFallback brandSetupPrompt={isBrandSetupPrompt} />}>
                   <Profile />
                 </Suspense>

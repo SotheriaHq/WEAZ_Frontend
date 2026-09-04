@@ -108,6 +108,39 @@ export function hasActiveBrandMembership(user?: Pick<AuthUserDto, 'brandMembersh
 }
 
 /**
+ * Is this account a BRAND — regardless of how far through setup it is?
+ *
+ * Two different questions were being answered by `hasActiveBrandMembership`,
+ * and only one of them is about identity:
+ *
+ *   CAPABILITY — "can this account manage a store right now?" That is what
+ *   `hasActiveBrandMembership` answers, and it is right to answer false for a
+ *   brand that has not created a store yet: there is nothing to manage, and
+ *   `GlobalModalRouter` relies on that false to show the brand-setup modal.
+ *
+ *   IDENTITY — "whose UI is this?" A brand that signed up an hour ago and has
+ *   not touched store setup is still a brand and must never be shown shopper
+ *   UI. `getActiveBrandMembership` synthesizes a membership for a BRAND account
+ *   only when `storeId` is set, so a freshly verified brand has no memberships,
+ *   no storeId, and reads as a shopper — which is how a brand clicking "go to
+ *   your profile" straight after email verification landed on the end-user
+ *   profile.
+ *
+ * Use THIS for identity, and `hasActiveBrandMembership` for capability. Never
+ * substitute one for the other: widening the capability predicate would hide
+ * the setup flow from the accounts that need it.
+ *
+ * `type === 'BRAND'` covers the brand owner; the membership check still covers
+ * staff, who are REGULAR accounts holding a membership on someone's brand.
+ */
+export function isBrandAccount(
+  user?: Pick<AuthUserDto, 'brandMemberships' | 'activeBrandId' | 'storeId' | 'type' | 'brandFullName'> | null,
+): boolean {
+  if (!user) return false;
+  return user.type === 'BRAND' || hasActiveBrandMembership(user);
+}
+
+/**
  * Canonical identity display name for the AUTHENTICATED account (Rule 1 + Rule 28).
  *
  * A brand account (`type === 'BRAND'`) IS the brand: its avatar shows the brand
