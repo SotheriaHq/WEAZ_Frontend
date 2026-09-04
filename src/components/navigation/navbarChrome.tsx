@@ -48,6 +48,43 @@ export const RUNWAY_CHIPS_HEIGHT_PX = 44;
 export const RUNWAY_CHROME_HEIGHT_PX =
   IMMERSIVE_NAV_HEIGHT_PX + RUNWAY_CHIPS_HEIGHT_PX;
 
+/**
+ * The Runway stage on a phone browser: no top bar at all.
+ *
+ * There have been three shapes here and it is worth knowing why this is the
+ * third. A transparent bar floating over the media was rejected twice, and
+ * correctly — the wordmark, the bell and the avatar sat on a model's face.
+ * Giving the bar its own solid band fixed the overlap and cost 108px of a
+ * ~640px viewport, which is the screen "looking short": a sixth of a
+ * full-bleed photograph spent on chrome the reader is not using while
+ * browsing.
+ *
+ * The native app resolves this by not having a top bar on the Runway at all,
+ * and that is what the phone browser does now. The critical difference from
+ * the rejected version is WHAT overlaps: the wordmark, hamburger, search, bell
+ * and avatar are gone rather than made transparent. Only the category chips
+ * remain over the media — one thin row, the same control native floats, on the
+ * same gradient scrim.
+ *
+ * The trade-off is real and deliberate: search and notifications are not
+ * reachable from this one route on a phone browser. Every other route keeps
+ * the full bar, and the floating island still reaches Market, Subs, Messages
+ * and Profile.
+ */
+export const RUNWAY_STAGE_CHROME_HEIGHT_PX = RUNWAY_CHIPS_HEIGHT_PX;
+
+/**
+ * Routes that render the full-bleed Runway stage.
+ *
+ * Shared so `Layout` (which decides whether to render the bar) and `Runway`
+ * (which positions the stage under it) cannot disagree. If they do, the result
+ * is either a floating bar over the media or a black band where the bar used
+ * to be.
+ */
+export function isRunwayStagePath(pathname: string): boolean {
+  return pathname === '/' || pathname === '/runway';
+}
+
 type Listener = () => void;
 
 let navHidden = false;

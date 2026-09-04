@@ -10,6 +10,7 @@ import {
   ISLAND_BOTTOM_NAV_CLEARANCE_CLASS,
   useShellViewportLocked,
 } from '@/components/navigation/IslandBottomNav';
+import { isRunwayStagePath } from '@/components/navigation/navbarChrome';
 
 interface LayoutProps {
   children?: React.ReactNode;
@@ -85,6 +86,20 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
    */
   const isImmersiveNav = false;
 
+  /**
+   * The phone Runway renders no top bar at all — see
+   * `RUNWAY_STAGE_CHROME_HEIGHT_PX` for why this is not a return to the
+   * rejected immersive treatment. The bar is removed, not made transparent, so
+   * nothing lands on the design; only the category chips float, exactly as
+   * native does.
+   */
+  const hidesNavbarForRunwayStage = isMobile && isRunwayStagePath(location.pathname);
+
+  // The 64px top padding exists solely to clear the fixed bar. With no bar
+  // there is nothing to clear, and keeping it leaves an empty band exactly
+  // where the bar used to be — the reclaimed height would go straight back.
+  const navbarSpacingClass = hidesNavbarForRunwayStage ? 'pt-0' : 'pt-16';
+
   // Update sidebar mode when route or viewport changes
   useEffect(() => {
     if (computedSidebarMode !== sidebarMode) {
@@ -104,7 +119,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="min-h-screen wiez-shell-bg text-gray-900 dark:text-white">
         
       {/* Navbar */}
-      {!isEmbeddedMobile ? <Navbar immersive={isImmersiveNav} /> : null}
+      {!isEmbeddedMobile && !hidesNavbarForRunwayStage ? (
+        <Navbar immersive={isImmersiveNav} />
+      ) : null}
 
       {/* Sidebar */}
       {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
@@ -115,8 +132,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           isEmbeddedMobile
             ? 'min-h-screen pb-4 pt-0'
             : viewportLocked
-              ? 'pt-16'
-              : `min-h-screen ${ISLAND_BOTTOM_NAV_CLEARANCE_CLASS} pt-16`
+              ? navbarSpacingClass
+              : `min-h-screen ${ISLAND_BOTTOM_NAV_CLEARANCE_CLASS} ${navbarSpacingClass}`
         }`}
         style={{ marginLeft: mainMarginLeft }}
       >

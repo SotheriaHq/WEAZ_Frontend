@@ -37,9 +37,8 @@ import useRunwayPinnedFeed from '@/hooks/useRunwayPinnedFeed';
 import { createMixSeed, mixFeedItems } from '@/utils/feedMixer';
 import { queryKeys } from '@/query/queryKeys';
 import {
-  IMMERSIVE_NAV_HEIGHT_PX,
   RUNWAY_CHIPS_HEIGHT_PX,
-  RUNWAY_CHROME_HEIGHT_PX,
+  RUNWAY_STAGE_CHROME_HEIGHT_PX,
 } from '@/components/navigation/navbarChrome';
 
 /**
@@ -907,10 +906,24 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
    */
   const reelsCategoryChips = (
     <div
-      className="fixed inset-x-0 z-20 bg-black sm:hidden"
+      /*
+        Floats over the media at the very top, on a gradient scrim — the same
+        treatment native uses. There is no bar above it any more, so `top` is
+        the safe-area inset rather than the bar's height, and the background is
+        a scrim rather than solid black: a solid band here would simply
+        reinstate the chrome band that was costing the stage its height.
+
+        Only the chips overlap the design. The wordmark, hamburger, search,
+        bell and avatar are not hidden behind transparency — they are not
+        rendered on this route at all, which is what makes this different from
+        the immersive bar that put controls on a model's face.
+      */
+      className="fixed inset-x-0 z-20 sm:hidden"
       style={{
-        top: `${IMMERSIVE_NAV_HEIGHT_PX}px`,
+        top: 'env(safe-area-inset-top, 0px)',
         height: `${RUNWAY_CHIPS_HEIGHT_PX}px`,
+        background:
+          'linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0) 100%)',
       }}
     >
       {/*
@@ -965,14 +978,21 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
     if (isMobileReels) {
       return (
         <div className="relative">
-          {/* The stage starts BELOW the chrome. It used to be `top-0` with a
-              transparent bar floating over it, which put the wordmark, the bell
-              and the avatar on top of the design a reader came to look at.
-              Chrome owns its band; the photograph owns the rest. */}
+          {/* The stage owns the whole viewport.
+
+              There is no top bar on this route (Layout skips it — see
+              `RUNWAY_STAGE_CHROME_HEIGHT_PX`), so the 108px that chrome used
+              to occupy goes back to the photograph. That band is a sixth of a
+              phone viewport, and spending it on a wordmark and a bell is what
+              made the screen read as short.
+
+              This is NOT the rejected immersive treatment: those controls are
+              gone rather than transparent. Only the thin category-chip row
+              floats, on its own scrim, exactly as native does. */}
           <div
             className="fixed inset-x-0 z-10 bg-black"
             style={{
-              top: `${RUNWAY_CHROME_HEIGHT_PX}px`,
+              top: 0,
               bottom: 0,
             }}
           >
@@ -1182,13 +1202,18 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
             the feed and its empty/error states — and, being outside the stage,
             they survive the navbar hiding. */}
         {reelsCategoryChips}
-        {/* Stage — see the pinned-mode stage above. Starts below the chrome. */}
+        {/* Stage — see the pinned-mode stage above.
+
+            Full-bleed in reels mode, where the chips float over it. The
+            non-reels branches (error, empty) are documents rather than a
+            stage, so they keep clearance for the chip row and add their own
+            top padding below. */}
         <div
           className={`fixed inset-x-0 z-10 ${
             showsReels ? 'bg-black' : 'bg-[color:var(--surface-base)]'
           }`}
           style={{
-            top: `${RUNWAY_CHROME_HEIGHT_PX}px`,
+            top: showsReels ? 0 : `${RUNWAY_STAGE_CHROME_HEIGHT_PX}px`,
             bottom: 0,
           }}
         >
