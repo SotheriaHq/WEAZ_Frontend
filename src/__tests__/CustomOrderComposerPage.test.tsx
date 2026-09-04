@@ -201,4 +201,90 @@ describe('CustomOrderComposerPage', () => {
       );
     });
   });
+
+  /*
+    A failed submit has to say WHICH field, under that field.
+
+    The toast used to be the entire error report - it named the section and
+    left the reader to find the input, which on this form is usually off
+    screen. scrollIntoView and focus are not assertable in jsdom, so this
+    covers the part that carries the meaning: the per-field flag, its wording,
+    and that it clears the moment the field is corrected.
+  */
+  it('flags each incomplete delivery field by name instead of only toasting', async () => {
+    getById.mockResolvedValue({
+      id: 'configuration-1',
+      brandId: 'brand-1',
+      sourceType: 'PRODUCT',
+      sourceId: 'product-1',
+      title: 'Bespoke blazer',
+      requiredMeasurementKeys: ['WOMEN_WAIST'],
+      requiredFreeformPointIds: [],
+      baseProductionCharge: '120000',
+      fabricCostPerYard: '10000',
+      rushEnabled: false,
+      rushFee: null,
+      productionLeadDays: 7,
+      deliveryMinDays: 2,
+      deliveryMaxDays: 5,
+      deliveryScope: 'Nigeria',
+      revisionPolicy: 'One revision.',
+      returnPolicy: 'No returns.',
+      defectPolicy: 'Defects only.',
+      fabricSourcingMode: 'BRAND_SOURCED',
+      isActive: true,
+      currentVersion: 1,
+      brand: { id: 'brand-1', name: 'Ada Atelier' },
+      rules: [],
+      versions: [{ id: 'version-1', version: 1, createdAt: '2026-03-12T00:00:00.000Z' }],
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/custom-orders/new?configurationId=configuration-1']}>
+        <Routes>
+          <Route path="/custom-orders/new" element={<CustomOrderComposerPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Bespoke blazer')).toBeInTheDocument();
+    });
+
+    // Lock a preview so the bag button is reachable at all.
+    fireEvent.change(screen.getAllByPlaceholderText('0')[0], { target: { value: '70' } });
+    fireEvent.click(
+      screen
+        .getByText(/I confirm these measurement values/i)
+        .closest('label')!
+        .querySelector('input')!,
+    );
+    // Only rendered when the saved profile is stale enough to need re-confirming.
+    const recency = screen.queryByText(/I confirm these measurements were reviewed/i);
+    if (recency) {
+      fireEvent.click(recency.closest('label')!.querySelector('input')!);
+    }
+    fireEvent.click(screen.getByRole('button', { name: /Lock price preview/i }));
+    await waitFor(() => expect(previewPrice).toHaveBeenCalled());
+
+    // Empty two fields the profile had filled, then try to bag it.
+    const street = document.getElementById('custom-order-delivery-street') as HTMLInputElement;
+    const phone = document.getElementById('custom-order-delivery-contactPhone') as HTMLInputElement;
+    fireEvent.change(street, { target: { value: '' } });
+    fireEvent.change(phone, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /Add custom order to bag/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Street is required')).toBeInTheDocument();
+    });
+    expect(street.getAttribute('aria-invalid')).toBe('true');
+    // The phone flag is its own wording, not the generic required line.
+    expect(screen.queryByText('Phone is required')).not.toBeInTheDocument();
+
+    // Correcting the field clears its flag without another submit.
+    fireEvent.change(street, { target: { value: '42 Allen Avenue' } });
+    await waitFor(() => {
+      expect(screen.queryByText('Street is required')).not.toBeInTheDocument();
+    });
+  });
 });

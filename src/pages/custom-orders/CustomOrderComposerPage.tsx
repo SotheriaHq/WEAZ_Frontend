@@ -96,6 +96,42 @@ const formatCurrency = (value: number | undefined, currency = 'NGN') =>
 const inputClassName =
   'w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-400 dark:border-white/10 dark:bg-slate-950 dark:text-white';
 
+/* Same shape, red border - the flag under the field carries the words. */
+const inputErrorClassName =
+  'w-full rounded-2xl border border-rose-400 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-rose-500 dark:border-rose-500/60 dark:bg-slate-950 dark:text-white';
+
+/*
+  The delivery fields, in the order they appear on screen.
+
+  Order matters: it decides which field a failed submit scrolls to, and the
+  reader expects that to be the first one they can see is wrong, not whichever
+  key happened to come first out of an object.
+*/
+const DELIVERY_FIELD_ORDER = [
+  'customerName',
+  'contactEmail',
+  'contactPhone',
+  'street',
+  'city',
+  'stateRegion',
+  'country',
+] as const;
+
+type DeliveryFieldKey = (typeof DELIVERY_FIELD_ORDER)[number];
+
+/* The label the reader sees, so the flag names the field they are looking at. */
+const DELIVERY_FIELD_LABELS: Record<DeliveryFieldKey, string> = {
+  customerName: 'Customer name',
+  contactEmail: 'Email',
+  contactPhone: 'Phone',
+  street: 'Street',
+  city: 'City',
+  stateRegion: 'State',
+  country: 'Country',
+};
+
+const deliveryFieldDomId = (field: DeliveryFieldKey) => 'custom-order-delivery-' + field;
+
 const buildMeasurementSignature = (values: Record<string, number>) =>
   JSON.stringify(
     Object.entries(values)
@@ -148,6 +184,20 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   const [pricingChartFamily, setPricingChartFamily] = useState<CustomOrderChartFamily>('HYBRID_UK_NIGERIA');
   const [noDirectMatchAcknowledged, setNoDirectMatchAcknowledged] = useState(false);
 
+  /*
+    Which delivery fields failed validation, keyed by field.
+
+    The toast was the entire error report: it named a section rather than a
+    field, and on a form this long the offending input was usually off screen,
+    so the reader was told something was wrong and left to hunt for it. This
+    map drives the flag under each field, the scroll and the focus together, so
+    one failed submit puts the first broken field in front of them with its own
+    reason attached.
+  */
+  const [deliveryFieldErrors, setDeliveryFieldErrors] = useState<
+    Partial<Record<DeliveryFieldKey, string>>
+  >({});
+
   const createKeyRef = useRef(createIdempotencyKey());
   const configurationId = configurationIdOverride ?? searchParams.get('configurationId');
 
@@ -160,6 +210,33 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   useEffect(() => {
     setCustomerName([profile?.firstName, profile?.lastName].filter(Boolean).join(' ').trim());
   }, [profile?.firstName, profile?.lastName]);
+
+  /*
+    Seed the contact fields when the profile ARRIVES, not only at mount.
+
+    These were useState(profile?.phoneNumber ?? "") - an initial value read
+    exactly once, on the first render. The composer routinely mounts before the
+    Redux profile is hydrated, so the initialiser read undefined and the field
+    stayed empty for the rest of the session. customerName already had a
+    corrective effect right above this one; the contact fields did not, which is
+    why somebody with a phone number on file was still asked to type it here.
+
+    Seeding happens exactly ONCE, the first render at which a profile exists,
+    and the ref is what makes that true. Without it this runs on every render
+    where the profile reference changes - which for a selector returning a fresh
+    object is every render - and "fill it if it is empty" then becomes "refuse to
+    let it be empty": clear the phone field to retype it and the old value snaps
+    straight back under your cursor. After the one seed these fields belong to
+    the reader, including when the reader wants them blank.
+  */
+  const contactSeededRef = useRef(false);
+  useEffect(() => {
+    if (contactSeededRef.current || !profile) return;
+    contactSeededRef.current = true;
+    setContactEmail((current) => current.trim() || profile.email || '');
+    setContactPhone((current) => current.trim() || profile.phoneNumber || '');
+    setStreet((current) => current.trim() || profile.address || '');
+  }, [profile]);
 
   const applySavedAddress = useCallback((address: CustomOrderSavedAddress) => {
     setCustomerName(address.customerName);
@@ -515,6 +592,99 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
     }
   };
 
+  const collectDeliveryFieldErrors = useCallback(() => {
+    const errors: Partial<Record<DeliveryFieldKey, string>> = {};
+    const requiredText: Array<[DeliveryFieldKey, string]> = [
+      ['customerName', customerName],
+      ['contactEmail', contactEmail],
+      ['street', street],
+      ['city', city],
+      ['stateRegion', stateRegion],
+      ['country', country],
+    ];
+    for (const [field, value] of requiredText) {
+      if (!value.trim()) {
+        errors[field] = DELIVERY_FIELD_LABELS[field] + ' is required';
+      }
+    }
+    // Phone has its own two failures - absent, and present but unusable - and
+    // they are not the same message to somebody staring at the field.
+    if (isEmptyPhone(contactPhone)) errors.contactPhone = PHONE_REQUIRED_MESSAGE;
+    else if (!isValidPhone(contactPhone)) errors.contactPhone = PHONE_INVALID_MESSAGE;
+    return errors;
+  }, [customerName, contactEmail, contactPhone, street, city, stateRegion, country]);
+
+  const revealFirstDeliveryError = useCallback(
+    (errors: Partial<Record<DeliveryFieldKey, string>>) => {
+      const first = DELIVERY_FIELD_ORDER.find((field) => errors[field]);
+      if (!first) return;
+      // A field inside a collapsed form cannot be scrolled to, so open it
+      // first. Harmless when it is already open.
+      setShowAddressForm(true);
+      // One frame, so the form is in the document before we look for it.
+      window.requestAnimationFrame(() => {
+        const element = document.getElementById(deliveryFieldDomId(first));
+        if (!element) return;
+        // Feature-checked, because scrolling is the optional half of this. It
+        // is absent in jsdom and in some embedded webviews, and an exception
+        // here would take the focus call down with it - leaving the reader with
+        // a flagged field and no cursor in it, which is the worse failure.
+        if (typeof element.scrollIntoView === 'function') {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        // preventScroll, or focus fights the smooth scroll and jumps.
+        (element as HTMLInputElement).focus({ preventScroll: true });
+      });
+    },
+    [],
+  );
+
+  const clearDeliveryFieldError = useCallback((field: DeliveryFieldKey) => {
+    setDeliveryFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }, []);
+
+  const renderDeliveryField = (
+    field: DeliveryFieldKey,
+    value: string,
+    onChange: (next: string) => void,
+    options?: { wide?: boolean; inputMode?: 'tel' },
+  ) => {
+    const error = deliveryFieldErrors[field];
+    const domId = deliveryFieldDomId(field);
+    return (
+      <label className={options?.wide ? 'block md:col-span-2' : 'block'}>
+        <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          {DELIVERY_FIELD_LABELS[field]}
+        </span>
+        <input
+          id={domId}
+          value={value}
+          onChange={(event) => {
+            onChange(event.target.value);
+            clearDeliveryFieldError(field);
+          }}
+          inputMode={options?.inputMode}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? domId + '-error' : undefined}
+          className={error ? inputErrorClassName : inputClassName}
+        />
+        {error ? (
+          <span
+            id={domId + '-error'}
+            className="mt-2 block text-xs font-medium text-rose-600 dark:text-rose-300"
+          >
+            {error}
+          </span>
+        ) : null}
+      </label>
+    );
+  };
+
   const handleCreateOrder = async () => {
     // Guard against double-submit: state updates are async so we gate at
     // the top of the handler before setSubmitting(true) is reached.
@@ -540,16 +710,21 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       toast.error('Review and confirm that these measurements are current within the last 14 days.');
       return;
     }
-    if (!customerName.trim() || !contactEmail.trim() || !street.trim() || !city.trim() || !stateRegion.trim() || !country.trim()) {
-      toast.error('Complete the delivery and contact information first.');
-      return;
-    }
-    if (isEmptyPhone(contactPhone)) {
-      toast.error(PHONE_REQUIRED_MESSAGE);
-      return;
-    }
-    if (!isValidPhone(contactPhone)) {
-      toast.error(PHONE_INVALID_MESSAGE);
+    const deliveryErrors = collectDeliveryFieldErrors();
+    setDeliveryFieldErrors(deliveryErrors);
+    const deliveryErrorCount = Object.keys(deliveryErrors).length;
+    if (deliveryErrorCount > 0) {
+      // One problem gets named outright; several get a count, because the flags
+      // under the fields are now the detailed report and the toast only has to
+      // say how much is left.
+      toast.error(
+        deliveryErrorCount === 1
+          ? String(Object.values(deliveryErrors)[0])
+          : 'Complete the delivery and contact information first. ' +
+            deliveryErrorCount +
+            ' fields need attention.',
+      );
+      revealFirstDeliveryError(deliveryErrors);
       return;
     }
 
@@ -906,13 +1081,13 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
                   ) : null}
                 </div>
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
-                  <label className="block md:col-span-2"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Customer name</span><input value={customerName} onChange={(event) => setCustomerName(event.target.value)} className={inputClassName} /></label>
-                  <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Email</span><input value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} className={inputClassName} /></label>
-                  <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Phone</span><input value={contactPhone} onChange={(event) => setContactPhone(sanitizePhoneInput(event.target.value))} className={inputClassName} inputMode="tel" /></label>
-                  <label className="block md:col-span-2"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Street</span><input value={street} onChange={(event) => setStreet(event.target.value)} className={inputClassName} /></label>
-                  <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">City</span><input value={city} onChange={(event) => setCity(event.target.value)} className={inputClassName} /></label>
-                  <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">State</span><input value={stateRegion} onChange={(event) => setStateRegion(event.target.value)} className={inputClassName} /></label>
-                  <label className="block md:col-span-2"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Country</span><input value={country} onChange={(event) => setCountry(event.target.value)} className={inputClassName} /></label>
+                  {renderDeliveryField('customerName', customerName, setCustomerName, { wide: true })}
+                  {renderDeliveryField('contactEmail', contactEmail, setContactEmail)}
+                  {renderDeliveryField('contactPhone', contactPhone, (next) => setContactPhone(sanitizePhoneInput(next)), { inputMode: 'tel' })}
+                  {renderDeliveryField('street', street, setStreet, { wide: true })}
+                  {renderDeliveryField('city', city, setCity)}
+                  {renderDeliveryField('stateRegion', stateRegion, setStateRegion)}
+                  {renderDeliveryField('country', country, setCountry, { wide: true })}
                 </div>
                 <div className="mt-4 flex flex-wrap justify-end gap-2">
                   {savedAddresses.length > 0 ? (
