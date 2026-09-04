@@ -10,6 +10,7 @@ export type RunwayReelsFeedProps = {
   isFetchingMore?: boolean;
   onLoadMore?: () => void;
   onOpenView?: (item: MarketItem) => void;
+  onOpenComments?: (item: MarketItem) => void;
   onViewBrand?: (brandId: string, item: MarketItem) => void;
   onViewCollection?: (collectionId: string) => void;
   isSaved?: (id: string) => boolean;
@@ -63,6 +64,7 @@ export const RunwayReelsFeed: React.FC<RunwayReelsFeedProps> = ({
   isFetchingMore = false,
   onLoadMore,
   onOpenView,
+  onOpenComments,
   onViewBrand,
   isSaved,
   saveBusy,
@@ -240,6 +242,7 @@ export const RunwayReelsFeed: React.FC<RunwayReelsFeedProps> = ({
               isPatched={item.brandId ? isPatched?.(item.brandId) : false}
               patchBusy={item.brandId ? patchBusy?.(item.brandId) : false}
               onOpenView={onOpenView}
+              onOpenComments={onOpenComments}
               onViewBrand={onViewBrand}
               onToggleSave={onToggleSave}
               onTogglePatch={onTogglePatch}

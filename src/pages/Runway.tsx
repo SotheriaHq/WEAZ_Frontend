@@ -12,6 +12,10 @@ import DesignSkeleton from '@/components/designs/DesignSkeleton';
 import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreProductCard';
 import DesignViewModal from '@/components/designs/DesignViewModal';
 import { RunwayReelsFeed } from '@/components/runway/RunwayReelsFeed';
+import {
+  RunwayCommentsSheet,
+  RUNWAY_COMMENTS_SHEET_HEIGHT_RATIO,
+} from '@/components/runway/RunwayCommentsSheet';
 import { setEngagementState } from '@/features/engagementSlice';
 import { selectIsMobile } from '@/features/uiSlice';
 import { apiClient } from '@/api/httpClient';
@@ -299,6 +303,14 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('discover');
   const [viewItem, setViewItem] = useState<MarketItem | null>(null);
+  /**
+   * The reel whose comments are open, or null.
+   *
+   * Held here rather than inside the reel item because the STAGE has to react
+   * to it — the design scales into the band the sheet leaves free — and the
+   * stage is a sibling of the feed, not a child of the item.
+   */
+  const [commentsItem, setCommentsItem] = useState<MarketItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   /** Phone + responsive mobile: reels. Wider tablets/iPad keep masonry. */
@@ -994,6 +1006,22 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
             style={{
               top: 0,
               bottom: 0,
+              /*
+                With comments open the design scales into the band the sheet
+                leaves free, so the reader can still see what they are talking
+                about. Transform only — animating height or `top` would
+                relayout the whole feed every frame, which is exactly the
+                juddering the comment view was reported for.
+
+                `transform-origin: top` makes it shrink toward the top edge
+                rather than the centre, so the design settles into the visible
+                band instead of drifting up out of it.
+              */
+              transform: commentsItem
+                ? `scale(${1 - RUNWAY_COMMENTS_SHEET_HEIGHT_RATIO * 0.82})`
+                : 'scale(1)',
+              transformOrigin: 'top center',
+              transition: 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)',
             }}
           >
             <RunwayReelsFeed
@@ -1007,6 +1035,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
                 }
               }}
               onOpenView={(it) => setViewItem(it)}
+              onOpenComments={(it) => setCommentsItem(it)}
               onViewBrand={handleViewBrand}
               isSaved={(id) => savedMap[id] ?? false}
               saveBusy={(id) => savingIds.has(id)}
@@ -1046,6 +1075,18 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
               }
             }}
           />
+          {/*
+            The sheet lives beside the modal, not inside the feed: the stage
+            scales in response to it, and the stage is the feed's sibling.
+          */}
+          <RunwayCommentsSheet
+            open={Boolean(commentsItem)}
+            onClose={() => setCommentsItem(null)}
+            collectionId={commentsItem?.collectionId ?? commentsItem?.id ?? null}
+            title={commentsItem?.collectionTitle ?? null}
+            commentCount={commentsItem?.commentsCount ?? 0}
+          />
+
         </div>
       );
     }
@@ -1268,6 +1309,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
                 void handleReelsLoadMore();
               }}
               onOpenView={(it) => setViewItem(it)}
+              onOpenComments={(it) => setCommentsItem(it)}
               onViewBrand={handleViewBrand}
               isSaved={(id) => savedMap[id] ?? false}
               saveBusy={(id) => savingIds.has(id)}

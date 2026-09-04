@@ -32,6 +32,7 @@ export type RunwayReelsItemProps = {
   isPatched?: boolean;
   patchBusy?: boolean;
   onOpenView?: (item: MarketItem) => void;
+  onOpenComments?: (item: MarketItem) => void;
   onViewBrand?: (brandId: string, item: MarketItem) => void;
   onToggleSave?: (id: string) => void;
   onTogglePatch?: (brandId: string) => void;
@@ -70,6 +71,7 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
   isPatched = false,
   patchBusy = false,
   onOpenView,
+  onOpenComments,
   onViewBrand,
   onToggleSave,
   onTogglePatch,
@@ -415,7 +417,16 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
           className="flex flex-col items-center text-white transition-transform active:scale-95"
           onClick={(e) => {
             e.stopPropagation();
-            onOpenView?.(item);
+            /*
+              Opens the comment sheet over the live reel. This used to call
+              `onOpenView`, which swapped the whole screen for the design modal
+              — the reel was gone, the design became a strip at the top of a
+              document, and getting back meant leaving and re-entering the
+              feed. Falls back to the modal only where no sheet handler is
+              wired, so nothing loses its comments.
+            */
+            if (onOpenComments) onOpenComments(item);
+            else onOpenView?.(item);
           }}
           aria-label="Comments"
           title="Comments"
