@@ -293,6 +293,28 @@ apiClient.interceptors.request.use((config) =>
 apiClient.interceptors.response.use(
   (response) => {
     finishNetworkTrace(response.config, response);
+
+    /*
+      A successful write invalidates the read cache. All of it.
+
+      The GET settle window exists to collapse duplicate reads inside one
+      render burst; it was never meant to answer a read that happens AFTER a
+      write. Without this, a save followed by a re-read within the window is
+      answered with pre-save data — which is exactly how a shopper could type
+      their measurements into the bag fittings sheet, have them saved, and then
+      be asked for the same measurements again by the custom-order composer,
+      whose fields seeded from a profile fetched moments earlier.
+
+      Clearing everything rather than guessing which reads a write affects: the
+      window is three seconds, so the cost is at most a few redundant requests
+      right after a mutation, and a resource-scoped guess would be wrong the
+      first time a write changed something under a different path — an order
+      that changes a bag count, a save that changes a saved-items list.
+      Correctness is worth more here than a handful of coalesced GETs.
+    */
+    const method = String(response.config?.method ?? 'get').toUpperCase();
+    if (method !== 'GET') invalidateGetDedupe();
+
     return response;
   },
   async (error: AxiosError) => {

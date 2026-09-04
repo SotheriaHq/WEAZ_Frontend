@@ -1,4 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import {
+  readProfileSizeCategory,
+  resolveDisplayCategory,
+  writeProfileSizeCategory,
+} from '@/lib/profileSizePreference';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import type { SizeFitProfile } from '@/types/sizeFit';
@@ -8,6 +13,11 @@ interface EndUserSizeFitModalProps {
   loading: boolean;
   saving: boolean;
   profile: SizeFitProfile | null;
+  /**
+   * Computed sizes, so the shopper can choose which one their profile leads
+   * with. The profile shows exactly one now, and this is where that is picked.
+   */
+  categorySizes?: Array<{ key: string; label: string; size: string }>;
   onClose: () => void;
   /**
    * One save for the whole dialog.
@@ -34,9 +44,17 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
   loading,
   saving,
   profile,
+  categorySizes = [],
   onClose,
   onSave,
 }) => {
+  const [profileSizeCategory, setProfileSizeCategory] = useState(() =>
+    readProfileSizeCategory(),
+  );
+  const selectedProfileCategory = resolveDisplayCategory(
+    profileSizeCategory,
+    categorySizes,
+  );
   const toInches = (cm: number) => cm / 2.54;
   const toCentimeters = (inch: number) => inch * 2.54;
   const round = (value: number) => Math.round(value * 100) / 100;
@@ -184,6 +202,48 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
             </div>
           ) : (
             <div className="px-3.5 pb-3.5 space-y-3.5 flex-1 overflow-y-auto scrollbar-hide overscroll-contain sm:px-5 sm:pb-5 sm:space-y-4">
+              {/*
+                Which size the PROFILE leads with.
+
+                The profile used to list every computed category at once. It
+                shows one now, so the choice of which one has to live
+                somewhere — and it belongs beside the sizes themselves rather
+                than on the profile it configures.
+              */}
+              {categorySizes.length > 0 ? (
+                <div className="rounded-2xl neu-modal-inset p-4">
+                  <p className="font-semibold text-[color:var(--neu-text)]">
+                    Shown on your profile
+                  </p>
+                  <p className="mt-1 text-xs text-[color:var(--neu-text-muted)]">
+                    Your profile shows one size. Pick the one that matters most to you.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {categorySizes.map((entry) => {
+                      const active = entry.key === selectedProfileCategory;
+                      return (
+                        <button
+                          key={entry.key}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => {
+                            writeProfileSizeCategory(entry.key);
+                            setProfileSizeCategory(entry.key);
+                          }}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] ${
+                            active
+                              ? 'border-indigo-500 bg-indigo-600 text-white'
+                              : 'border-gray-300 text-[color:var(--neu-text-muted)] hover:border-indigo-400 dark:border-white/15'
+                          }`}
+                        >
+                          {entry.label} {entry.size}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
               <details
                 open
                 className="rounded-2xl neu-modal-inset p-4"

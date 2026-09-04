@@ -1,4 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  readProfileSizeCategory,
+  resolveDisplayCategory,
+} from '@/lib/profileSizePreference';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -421,6 +425,19 @@ export const EndUserProfile: React.FC = () => {
   const [computedCategorySizes, setComputedCategorySizes] = useState<
     Array<{ key: string; label: string; size: string }>
   >([]);
+  /**
+   * The one size the profile shows.
+   *
+   * Read once on mount rather than subscribed to: on web the size-and-fit
+   * surface is a modal over this page, so the profile re-renders when it closes
+   * and picks up any change then. Falls back to the first computable category,
+   * which is what stops a stale preference blanking the profile.
+   */
+  const preferredSizeCategory = useMemo(() => readProfileSizeCategory(), []);
+  const displayCategorySize = useMemo(() => {
+    const resolved = resolveDisplayCategory(preferredSizeCategory, computedCategorySizes);
+    return computedCategorySizes.find((entry) => entry.key === resolved) ?? null;
+  }, [computedCategorySizes, preferredSizeCategory]);
   /*
     Measurements the server would not size against. Distinct from
     `computedMissingBaseline`, which is what was never entered — telling someone
@@ -1610,21 +1627,21 @@ export const EndUserProfile: React.FC = () => {
                     >
                       {computedSize || (chartLoading ? 'Loading…' : '—')}
                     </span>
-                    {computedCategorySizes.length > 1 ? (
-                      <span className="flex flex-wrap gap-1">
-                        {computedCategorySizes.map((entry) => (
-                          <span
-                            key={entry.key}
-                            className="rounded-full border border-indigo-200/80 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-950/40 dark:text-indigo-100"
-                          >
-                            {entry.label} {entry.size}
-                          </span>
-                        ))}
-                      </span>
-                    ) : null}
-                    {alphaFitLabel ? (
-                      <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">
-                        {alphaFitLabel}
+                    {/*
+                      ONE size, not five, and no measurements.
+
+                      This rendered a pill for every computed category, the
+                      alpha fit label, a fittings count and then a cloud of
+                      eight measurement chips — five answers to a question with
+                      one answer, followed by the raw inputs behind it, on a
+                      screen whose job is to show a person their account. The
+                      breakdown, the measurements and the chart switcher all
+                      live in the size-and-fit surface, one tap away; the
+                      profile shows the one the shopper picked there.
+                    */}
+                    {displayCategorySize ? (
+                      <span className="rounded-full border border-indigo-200/80 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-950/40 dark:text-indigo-100">
+                        {displayCategorySize.label} {displayCategorySize.size}
                       </span>
                     ) : null}
                     <button
@@ -1632,19 +1649,9 @@ export const EndUserProfile: React.FC = () => {
                       onClick={() => setIsSizeFitOpen(true)}
                       className="rounded-md px-1 text-[11px] font-bold uppercase tracking-wide text-gray-500 transition hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] dark:text-gray-400 dark:hover:text-indigo-300"
                     >
-                      <span aria-hidden="true">📏</span> {savedMeasurementEntries.length} fittings
+                      <span aria-hidden="true">📏</span> Sizes &amp; fittings
                     </button>
                   </div>
-
-                  {savedMeasurementEntries.length > 0 ? (
-                    <FittingsChipCloud
-                      row={savedMeasurementEntries}
-                      unitLabel={measurementUnitLabel}
-                      formatLabel={compactMeasurementLabel}
-                      onSelect={() => setIsSizeFitOpen(true)}
-                      problemKeys={computedProblemKeys}
-                    />
-                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -1846,37 +1853,13 @@ export const EndUserProfile: React.FC = () => {
             column has no room for: which regional chart the size is read
             against.
           */}
-          {isOwner ? (
-            <div className="mt-3 lg:hidden">
-              <div className="flex items-center gap-2 overflow-x-auto rounded-2xl border border-indigo-200/60 bg-indigo-50/70 px-3 py-2 scrollbar-hide dark:border-indigo-500/20 dark:bg-indigo-950/30">
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
-                  Sized against
-                </span>
-                <div className="flex shrink-0 gap-0.5 rounded-md bg-white/60 p-0.5 dark:bg-white/10">
-                  {DISPLAY_CHART_OPTIONS.slice(0, 4).map((option) => {
-                    const active = displayChartFamily === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => void handleDisplayChartChange(option.value)}
-                        disabled={chartSaving}
-                        aria-pressed={active}
-                        className={`whitespace-nowrap rounded px-2 py-1 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] ${
-                          active ? 'bg-indigo-600 text-white' : 'text-indigo-500 dark:text-indigo-300'
-                        }`}
-                      >
-                        {option.label
-                          .replace('Nigeria', 'NG')
-                          .replace('UK-Nigeria Hybrid', 'UK-NG')
-                          .replace('US-Nigeria Hybrid', 'US-NG')}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : null}
+          {/*
+            The "Sized against" chart switcher used to sit here as a
+            full-width band under the action row. It is a sizing control, not
+            profile content: it belongs beside the sizes it recalculates, which
+            is the size-and-fit surface. Removing it from the profile is what
+            lets the profile answer one question instead of five.
+          */}
 
         </motion.section>
 
@@ -1994,6 +1977,7 @@ export const EndUserProfile: React.FC = () => {
         loading={sizeFitLoading}
         saving={sizeFitSaving}
         profile={sizeFitProfile}
+        categorySizes={computedCategorySizes}
         onClose={() => setIsSizeFitOpen(false)}
         onSave={handleSaveSizeFit}
       />
