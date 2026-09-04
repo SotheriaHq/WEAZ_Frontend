@@ -846,17 +846,26 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
 
           <section className="rounded-3xl border border-black/10 bg-white/80 p-4 sm:p-6 dark:border-white/10 dark:bg-white/5">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Delivery details</div>
-            <div className="mt-4 rounded-2xl bg-black/[0.03] p-3 sm:p-4 dark:bg-white/[0.04]">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900 dark:text-white">Saved delivery addresses</div>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Your most recently used address is selected first. Add a new one only when you need another saved delivery profile.</p>
+            {/*
+              The saved-address card only exists to let someone pick an address
+              they saved earlier. With nothing saved there is nothing to pick, so
+              it rendered as a header, a line of apology, and an "Add new address"
+              button that opened a form already open below it. Hidden entirely in
+              that state: every path that leaves the list empty (first visit,
+              deleting the last one, cancelling with none saved) also opens the
+              form, so the first address is still one screen away.
+            */}
+            {savedAddresses.length > 0 ? (
+              <div className="mt-4 rounded-2xl bg-black/[0.03] p-3 sm:p-4 dark:bg-white/[0.04]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900 dark:text-white">Saved delivery addresses</div>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Your most recently used address is selected first. Add a new one only when you need another saved delivery profile.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={handleStartNewAddress} className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-black">Add new address</button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={handleStartNewAddress} className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-black">Add new address</button>
-                </div>
-              </div>
-              {savedAddresses.length > 0 ? (
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   {savedAddresses.map((address) => {
                     const isActive = editingAddressId === address.id;
@@ -883,8 +892,8 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
                     );
                   })}
                 </div>
-              ) : <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">No saved delivery addresses yet. Add a new address to continue with delivery details.</p>}
-            </div>
+              </div>
+            ) : null}
             {showAddressForm ? (
               <div className="mt-5 rounded-2xl bg-black/[0.03] p-3 sm:p-4 dark:bg-white/[0.04]">
                 <div className="flex flex-wrap items-center justify-between gap-3">
