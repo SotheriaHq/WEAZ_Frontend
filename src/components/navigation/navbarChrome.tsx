@@ -61,15 +61,18 @@ export const RUNWAY_CHROME_HEIGHT_PX =
  *
  * The native app resolves this by not having a top bar on the Runway at all,
  * and that is what the phone browser does now. The critical difference from
- * the rejected version is WHAT overlaps: the wordmark, hamburger, search, bell
- * and avatar are gone rather than made transparent. Only the category chips
- * remain over the media — one thin row, the same control native floats, on the
- * same gradient scrim.
+ * the rejected version is WHAT overlaps: five controls spread across a solid
+ * band became two at the edges, floating on a gradient scrim, with the centre
+ * of the frame — where a subject's face actually is — left clear.
  *
- * The trade-off is real and deliberate: search and notifications are not
- * reachable from this one route on a phone browser. Every other route keeps
- * the full bar, and the floating island still reaches Market, Subs, Messages
- * and Profile.
+ * That chrome is `RunwayStageChrome`: a single pill (menu + wordmark, carrying
+ * the notifications badge) at the left and search at the right, above the
+ * category chips. It floats rather than displacing, so the photograph still
+ * starts at pixel zero and this constant stays the chip row alone.
+ *
+ * An earlier revision of this file said search and notifications were
+ * unreachable from this route. That was true of the shape that removed the bar
+ * outright, and it was the hole `RunwayStageChrome` exists to close.
  */
 export const RUNWAY_STAGE_CHROME_HEIGHT_PX = RUNWAY_CHIPS_HEIGHT_PX;
 

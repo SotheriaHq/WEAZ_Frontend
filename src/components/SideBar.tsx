@@ -126,6 +126,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
   const isAdminConsoleUser = user?.role === 'SuperAdmin' || user?.role === 'Admin';
   const storeSetupComplete = useStoreSetupStatus();
   const { unreadCount: unreadMessages } = useMessagingUnreadCount();
+  // Notifications only — deliberately NOT combined with unreadMessages. The
+  // island Inbox owns the message count; merging the two would tell a reader
+  // something is unread without telling them where.
+  const notificationsUnread = useSelector(
+    (state: RootState) => state.notifications.unreadCount,
+  );
 
   if (overlayOnly && !isSidebarOpen) {
     return null;
@@ -189,6 +195,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
   ];
 
   const youLinks = [
+    /*
+      Notifications lives here because the phone Runway no longer has a bell.
+      That route's menu pill carries the unread badge, and this is what the
+      badge is FOR — a count on a control that opens a menu with no way to
+      reach the notifications is worse than the bell it replaced, because the
+      reader now has to hunt for something the old glyph handed them directly.
+      The count is repeated on the row so the drawer confirms what the badge
+      claimed.
+    */
+    {
+      emoji: '🔔',
+      label: 'Notifications',
+      path: '/notifications',
+      active: location.pathname === '/notifications',
+      badge: notificationsUnread,
+    },
     { emoji: '🕒', label: 'History', path: '/history', active: location.pathname === '/history' },
     { emoji: '⏰', label: 'Watch Later', path: '/watch-later', active: location.pathname === '/watch-later' },
   ];

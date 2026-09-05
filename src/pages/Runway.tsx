@@ -44,6 +44,9 @@ import {
   RUNWAY_CHIPS_HEIGHT_PX,
   RUNWAY_STAGE_CHROME_HEIGHT_PX,
 } from '@/components/navigation/navbarChrome';
+import RunwayStageChrome, {
+  RUNWAY_STAGE_CONTROLS_HEIGHT_PX,
+} from '@/components/runway/RunwayStageChrome';
 
 /**
  * Runway page — Design feed UI.
@@ -919,23 +922,25 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
   const reelsCategoryChips = (
     <div
       /*
-        Floats over the media at the very top, on a gradient scrim — the same
-        treatment native uses. There is no bar above it any more, so `top` is
-        the safe-area inset rather than the bar's height, and the background is
-        a scrim rather than solid black: a solid band here would simply
-        reinstate the chrome band that was costing the stage its height.
+        Floats over the media, under the control row — the same treatment
+        native uses. There is no solid bar above it, so this displaces nothing:
+        the stage still starts at pixel zero and both rows sit on top of it.
 
-        Only the chips overlap the design. The wordmark, hamburger, search,
-        bell and avatar are not hidden behind transparency — they are not
-        rendered on this route at all, which is what makes this different from
-        the immersive bar that put controls on a model's face.
+        The scrim is drawn by `RunwayStageChrome`, once, covering this row and
+        the controls together. It used to be drawn here as well, and two fades
+        stacked over the same photograph left a visible seam across the top of
+        the feed.
+
+        What overlaps the design is now two edge controls and this row, not the
+        five-control band that put a hamburger on a model's face.
       */
       className="fixed inset-x-0 z-20 sm:hidden"
       style={{
-        top: 'env(safe-area-inset-top, 0px)',
+        // Below the control row rather than at the safe-area edge. The
+        // stage itself still starts at pixel zero - both rows float over
+        // it - so this displaces nothing.
+        top: `calc(env(safe-area-inset-top, 0px) + ${RUNWAY_STAGE_CONTROLS_HEIGHT_PX}px)`,
         height: `${RUNWAY_CHIPS_HEIGHT_PX}px`,
-        background:
-          'linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0) 100%)',
       }}
     >
       {/*
@@ -1242,6 +1247,10 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
         {/* Rendered once for every branch, so the filters do not move between
             the feed and its empty/error states — and, being outside the stage,
             they survive the navbar hiding. */}
+        {/* Menu + wordmark pill and search, floating over the stage on the
+            shared scrim. Rendered next to the chips so the two rows cannot
+            end up on different branches of this component. */}
+        <RunwayStageChrome />
         {reelsCategoryChips}
         {/* Stage — see the pinned-mode stage above.
 
