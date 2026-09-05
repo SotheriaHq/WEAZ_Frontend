@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'threadly:search:recent';
+const STORAGE_KEY = 'wiez:search:recent';
 const MAX_ITEMS = 10;
 const TTL_MS = 90 * 24 * 60 * 60 * 1000;
 

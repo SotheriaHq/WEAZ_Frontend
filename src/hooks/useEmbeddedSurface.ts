@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 
 export type EmbeddedSurface = 'mobile-app' | null;
-const EMBEDDED_SURFACE_SESSION_KEY = 'threadly.studio.embeddedSurface';
+const EMBEDDED_SURFACE_SESSION_KEY = 'wiez.studio.embeddedSurface';
 
 export function getEmbeddedSurface(search: string): EmbeddedSurface {
   const params = new URLSearchParams(search);

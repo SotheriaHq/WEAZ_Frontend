@@ -24,6 +24,7 @@ const PERMISSION_ALIASES: Record<string, string> = {
   COLLECTIONS_MODERATE: 'collections.moderate',
   TAXONOMY_READ: 'taxonomy.read',
   TAXONOMY_WRITE: 'taxonomy.write',
+  TAXONOMY_SUGGESTIONS_MODERATE: 'taxonomy.suggestions.moderate',
   TAGS_READ: 'tags.read',
   TAGS_MODERATE: 'tags.moderate',
   MEASUREMENTS_READ: 'measurements.read',

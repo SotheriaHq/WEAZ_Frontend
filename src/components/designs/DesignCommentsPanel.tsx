@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { CommentV2Dto } from '@/types/comments';
@@ -7,8 +8,8 @@ import { OfflineComments } from '@/lib/offlineComments';
 import CommentItem from '@/components/comments/CommentItem';
 import CommentInput from '@/components/ui/CommentInput';
 import {
-  fetchCommentListQuery,
   fetchCommentRepliesQuery,
+  fetchUnifiedCollectionCommentsQuery,
   invalidateCommentListQueries,
   invalidateUnifiedCollectionCommentsQuery,
 } from '@/query/queries';
@@ -47,14 +48,15 @@ const DesignCommentsPanel: React.FC<Props> = ({
   const queryClient = useQueryClient();
   const [items, setItems] = React.useState<CommentV2Dto[]>([]);
   const [busy, setBusy] = React.useState(false);
-  const [mediaCursor, setMediaCursor] = React.useState<string | null>(null);
-  const [collCursor, setCollCursor] = React.useState<string | null>(null);
-  const [mediaHasNext, setMediaHasNext] = React.useState(false);
-  const [collHasNext, setCollHasNext] = React.useState(false);
+  const [cursor, setCursor] = React.useState<string | null>(null);
+  const [hasNext, setHasNext] = React.useState(false);
   const [text, setText] = React.useState('');
   const [postedOk, setPostedOk] = React.useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
   const errorToastShown = React.useRef(false);
+  const commentNodeRefs = React.useRef<Record<string, HTMLDivElement | null>>({});
+  const [searchParams] = useSearchParams();
+  const highlightCommentId = searchParams.get('commentId');
   const { joinCollection, joinCollectionMedia, joinComment, onComment, degraded } = useRealtime();
 
   const mergeAndSort = (a: CommentV2Dto[], b: CommentV2Dto[]) => {
@@ -82,48 +84,39 @@ const DesignCommentsPanel: React.FC<Props> = ({
     }));
   }, [dispatch, externalComment, items.length, joinComment, mediaId, onCommentAdded]);
 
+  /**
+   * ONE request for the whole design.
+   *
+   * This used to fan out to two endpoints — COLLECTION_MEDIA:<current slide> and
+   * COLLECTION:<design> — and merge them. That was wrong twice over:
+   *
+   *  1. Comments are posted against the media item that was on screen when they
+   *     were written, but the panel only ever asked for the CURRENT slide. A
+   *     shopper who commented on slide 3 was invisible to a brand opening at
+   *     slide 1 — which is exactly what "the notification routed me to the
+   *     content but the comments were not displayed" was.
+   *  2. Any single failure of the pair fired "Some comments could not be
+   *     loaded", so a routine 404 on one leg nagged on every single open.
+   *
+   * `comments-unified` returns COLLECTION + every COLLECTION_MEDIA under it in
+   * one authorized, cursor-paged query, so the design has one comment stream
+   * regardless of which angle is showing, and there is no partial state to
+   * apologise for.
+   */
   const loadInitial = async (forceRefresh = false) => {
     setBusy(true);
     try {
-      // Fetch sources independently so one failure doesn't blank the list
-      const mediaReq = fetchCommentListQuery(queryClient, 'COLLECTION_MEDIA', mediaId, { limit: 20, forceRefresh })
-        .then((r) => ({ ok: true as const, r }))
-        .catch((e) => ({ ok: false as const, e }));
-      const collReq = fetchCommentListQuery(queryClient, 'COLLECTION', collectionId, { limit: 20, forceRefresh })
-        .then((r) => ({ ok: true as const, r }))
-        .catch((e) => ({ ok: false as const, e }));
-      const [mediaRes, collRes] = await Promise.all([mediaReq, collReq]);
-
-  const mediaItemsRaw = mediaRes.ok ? mediaRes.r.items : [];
-  const collItemsRaw = collRes.ok ? collRes.r.items : [];
-  const mediaItems = Array.isArray(mediaItemsRaw) ? mediaItemsRaw : [];
-  const collItems = Array.isArray(collItemsRaw) ? collItemsRaw : [];
-  const merged = mergeAndSort(mediaItems, collItems);
-  setItems(merged);
-  // onCountChange?.(merged.length); // Removed to prevent overwriting total count with partial count
-  // Normalize global comment count for the media item to reflect combined view
-  dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: merged.length }));
-    // Join comment rooms for realtime thread updates
-    merged.forEach((c) => joinComment(c.id));
-
-      if (mediaRes.ok) {
-        setMediaCursor(mediaRes.r.endCursor);
-        setMediaHasNext(mediaRes.r.hasNextPage);
-      }
-      if (collRes.ok) {
-        setCollCursor(collRes.r.endCursor);
-        setCollHasNext(collRes.r.hasNextPage);
-      }
-
-      // Per-source error notices, non-blocking
-      if (!mediaRes.ok || !collRes.ok) {
-        if (!errorToastShown.current) {
-          toast.error('Some comments could not be loaded. Showing available comments.');
-          errorToastShown.current = true;
-        }
-      } else {
-        errorToastShown.current = false;
-      }
+      const res = await fetchUnifiedCollectionCommentsQuery(queryClient, collectionId, {
+        limit: 20,
+        forceRefresh,
+      });
+      const list = Array.isArray(res.items) ? res.items : [];
+      setItems(list);
+      dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: list.length }));
+      list.forEach((c) => joinComment(c.id));
+      setCursor(res.endCursor);
+      setHasNext(res.hasNextPage);
+      errorToastShown.current = false;
     } catch {
       if (!errorToastShown.current) {
         toast.error('Failed to load comments');
@@ -135,106 +128,98 @@ const DesignCommentsPanel: React.FC<Props> = ({
   };
 
   const loadMore = async () => {
-    if (busy || (!mediaHasNext && !collHasNext)) return;
+    if (busy || !hasNext) return;
     setBusy(true);
     try {
-      const mediaReq = mediaHasNext
-        ? fetchCommentListQuery(queryClient, 'COLLECTION_MEDIA', mediaId, { cursor: mediaCursor, limit: 20 }).then((r) => ({ ok: true as const, r })).catch(() => ({ ok: false as const }))
-        : Promise.resolve({ ok: false as const });
-      const collReq = collHasNext
-        ? fetchCommentListQuery(queryClient, 'COLLECTION', collectionId, { cursor: collCursor, limit: 20 }).then((r) => ({ ok: true as const, r })).catch(() => ({ ok: false as const }))
-        : Promise.resolve({ ok: false as const });
-      const [mediaRes, collRes] = await Promise.all([mediaReq, collReq]);
-  const moreMediaRaw = mediaRes.ok ? mediaRes.r.items : [];
-    const moreCollRaw = collRes.ok ? collRes.r.items : [];
-    const moreMedia = Array.isArray(moreMediaRaw) ? moreMediaRaw : [];
-    const moreColl = Array.isArray(moreCollRaw) ? moreCollRaw : [];
-    const next = mergeAndSort([...(items ?? []), ...moreMedia], moreColl);
+      const res = await fetchUnifiedCollectionCommentsQuery(queryClient, collectionId, {
+        cursor,
+        limit: 20,
+      });
+      const more = Array.isArray(res.items) ? res.items : [];
+      const next = mergeAndSort(items ?? [], more);
       setItems(next);
-      // onCountChange?.(next.length); // Removed
-  dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: next.length }));
-      if (mediaRes.ok) { setMediaCursor(mediaRes.r.endCursor); setMediaHasNext(mediaRes.r.hasNextPage); }
-      if (collRes.ok) { setCollCursor(collRes.r.endCursor); setCollHasNext(collRes.r.hasNextPage); }
-    } catch {}
-    finally { setBusy(false); }
+      dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: next.length }));
+      more.forEach((c) => joinComment(c.id));
+      setCursor(res.endCursor);
+      setHasNext(res.hasNextPage);
+    } catch {
+      /* keep what we already have */
+    } finally {
+      setBusy(false);
+    }
   };
 
   React.useEffect(() => {
-    setItems([]); setMediaCursor(null); setCollCursor(null); setMediaHasNext(false); setCollHasNext(false);
+    setItems([]); setCursor(null); setHasNext(false);
     void loadInitial();
     joinCollectionMedia(mediaId);
     joinCollection(collectionId);
-    // Incremental patching for comment events
-    const unsubMedia = onComment(`COLLECTION_MEDIA:${mediaId}`, (p: any) => {
-      // New comment created
-      if (p.comment && p.commentId && p.targetType === 'COLLECTION_MEDIA' && p.targetId === mediaId) {
-        invalidateCommentListQueries(queryClient, 'COLLECTION_MEDIA', mediaId);
-        invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
-        const isReply = !!p.comment.parentId;
-        setItems((prev) => {
-          if (prev.some((c) => c.id === p.commentId)) return prev;
-          if (isReply) {
-            // Update parent only (avoid showing reply as a new top-level item)
-            const parentId = p.comment.parentId as string;
-            return prev.map((c) =>
-              c.id === parentId
-                ? { ...c, replyCount: (c.replyCount ?? 0) + 1, children: c.children && c.children.length > 0 ? [p.comment, ...c.children] : c.children }
-                : c
-            );
-          }
-          const next = [p.comment, ...prev];
-          onCommentAdded?.();
-          joinComment(p.commentId);
-          dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: next.length }));
-          return next;
-        });
-      } else if (!p.comment && p.commentId && p.targetType === 'COLLECTION_MEDIA' && p.targetId === mediaId && (p.deleted || p.event === 'comment.deleted')) {
-        invalidateCommentListQueries(queryClient, 'COLLECTION_MEDIA', mediaId);
-        invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
+
+    // The stream is now design-wide, so one handler serves both rooms: patch
+    // optimistically for instant feedback, and invalidate the unified page so
+    // the next open reads fresh.
+    const applyEvent = (p: any) => {
+      if (!p?.commentId) return;
+      invalidateCommentListQueries(queryClient, p.targetType, p.targetId);
+      invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
+
+      const isDelete = !p.comment && (p.deleted || p.event === 'comment.deleted');
+      if (isDelete) {
         setItems((prev) => {
           const next = prev.filter((c) => c.id !== p.commentId);
-          onCommentRemoved?.();
-          dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: next.length }));
-          return next;
-        });
-      }
-    });
-    const unsubCollection = onComment(`COLLECTION:${collectionId}`, (p: any) => {
-      if (p.comment && p.commentId && p.targetType === 'COLLECTION' && p.targetId === collectionId) {
-        invalidateCommentListQueries(queryClient, 'COLLECTION', collectionId);
-        invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
-        const isReply = !!p.comment.parentId;
-        setItems((prev) => {
-          if (prev.some((c) => c.id === p.commentId)) return prev;
-          if (isReply) {
-            const parentId = p.comment.parentId as string;
-            return prev.map((c) =>
-              c.id === parentId
-                ? { ...c, replyCount: (c.replyCount ?? 0) + 1, children: c.children && c.children.length > 0 ? [p.comment, ...c.children] : c.children }
-                : c
-            );
+          if (next.length !== prev.length) {
+            onCommentRemoved?.();
+            dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: next.length }));
           }
-          const next = [p.comment, ...prev];
-          onCommentAdded?.();
-          joinComment(p.commentId);
-          dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: next.length }));
           return next;
         });
+        return;
       }
-      if (!p.comment && p.commentId && p.targetType === 'COLLECTION' && p.targetId === collectionId && (p.deleted || p.event === 'comment.deleted')) {
-        invalidateCommentListQueries(queryClient, 'COLLECTION', collectionId);
-        invalidateUnifiedCollectionCommentsQuery(queryClient, collectionId);
-        setItems((prev) => {
-          const next = prev.filter((c) => c.id !== p.commentId);
-          onCommentRemoved?.();
-          dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: next.length }));
-          return next;
-        });
-      }
-    });
+
+      if (!p.comment) return;
+      setItems((prev) => {
+        if (prev.some((c) => c.id === p.commentId)) return prev;
+        // Replies belong under their parent, never as a new top-level row.
+        if (p.comment.parentId) {
+          const parentId = p.comment.parentId as string;
+          return prev.map((c) =>
+            c.id === parentId
+              ? { ...c, replyCount: (c.replyCount ?? 0) + 1, children: c.children && c.children.length > 0 ? [p.comment, ...c.children] : c.children }
+              : c,
+          );
+        }
+        const next = [p.comment, ...prev];
+        onCommentAdded?.();
+        joinComment(p.commentId);
+        dispatch(updateCommentCount({ contentType: 'COLLECTION_MEDIA', contentId: mediaId, commentCount: next.length }));
+        return next;
+      });
+    };
+
+    const unsubMedia = onComment(`COLLECTION_MEDIA:${mediaId}`, applyEvent);
+    const unsubCollection = onComment(`COLLECTION:${collectionId}`, applyEvent);
     return () => { unsubMedia(); unsubCollection(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediaId, collectionId]);
+
+  /**
+   * Deep-link target from a comment notification (`?commentId=`).
+   *
+   * The notification already routes here; without this the brand landed on the
+   * design with no idea which comment they were sent to look at.
+   */
+  React.useEffect(() => {
+    if (!highlightCommentId || !items.length) return;
+    const node = commentNodeRefs.current[highlightCommentId];
+    if (!node) return;
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    node.classList.add('ring-2', 'ring-fuchsia-400');
+    const timer = window.setTimeout(
+      () => node.classList.remove('ring-2', 'ring-fuchsia-400'),
+      2200,
+    );
+    return () => window.clearTimeout(timer);
+  }, [highlightCommentId, items]);
 
   // Polling fallback when realtime is degraded
   React.useEffect(() => {
@@ -302,11 +287,15 @@ const DesignCommentsPanel: React.FC<Props> = ({
 
   return (
     <div className={`flex h-full flex-col ${className ?? ''}`}>
-      {/* List */}
-      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide pr-1">
+      {/* List — scrolls inline, no frame of its own; the modal supplies the surface. */}
+      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-wiez overscroll-contain pr-1">
         <div className="space-y-1">
           {items.map((c) => (
-            <div key={c.id} className="py-1.5">
+            <div
+              key={c.id}
+              ref={(node) => { commentNodeRefs.current[c.id] = node; }}
+              className="rounded-xl py-1.5 transition-shadow"
+            >
               <CommentItem
                 comment={c}
                 onReply={loadReplies}
@@ -348,17 +337,24 @@ const DesignCommentsPanel: React.FC<Props> = ({
               )}
             </div>
           ))}
-          {!items.length && (
-            <div className="flex min-h-[180px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/70 px-5 text-center dark:border-white/10 dark:bg-white/5">
-              <div className="mb-3 text-2xl" aria-hidden="true">💬</div>
-              <div className="text-sm font-semibold text-slate-900 dark:text-white">No comments yet</div>
-              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">Start the conversation from the comment box below.</div>
+          {!items.length && !busy && (
+            <div className="flex min-h-[160px] flex-col items-center justify-center px-5 text-center">
+              <div className="mb-2 text-2xl opacity-70" aria-hidden="true">💬</div>
+              <div className="text-sm font-semibold text-slate-800 dark:text-white">No comments yet</div>
+              <div className="mt-1 text-xs text-slate-600 dark:text-slate-300">Start the conversation below.</div>
             </div>
           )}
         </div>
-        {(mediaHasNext || collHasNext) && (
+        {hasNext && (
           <div className="pt-2">
-            <button type="button" className="rounded bg-white/20 px-3 py-2 text-sm" onClick={() => void loadMore()} disabled={busy}>Load more</button>
+            <button
+              type="button"
+              className="w-full rounded-lg px-3 py-2 text-sm font-medium text-fuchsia-700 transition hover:bg-fuchsia-500/10 disabled:opacity-50 dark:text-fuchsia-300"
+              onClick={() => void loadMore()}
+              disabled={busy}
+            >
+              {busy ? 'Loading…' : 'Load more comments'}
+            </button>
           </div>
         )}
       </div>

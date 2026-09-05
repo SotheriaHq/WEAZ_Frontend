@@ -13,14 +13,12 @@ import { addLocalNotification } from '../features/notificationsSlice';
 import { useNavigate, Link } from 'react-router-dom';
 import { apiClient, persistAccessToken, dropStoredAccessToken } from '../api/httpClient';
 import { AuthApi } from '@/api/AuthApi';
-import {
-  getRequiredLegalAcceptances,
-  LEGAL_SIGNUP_DOCUMENT_KEYS,
-} from '@/api/LegalApi';
+import { getRequiredLegalAcceptances, LEGAL_SIGNUP_DOCUMENT_KEYS } from '@/api/LegalApi';
+import { getFriendlyErrorMessage } from '@/utils/errorMessage';
 import { env } from '@/config/env';
 
 import '../styles/auth.css';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import GoogleSignInOverlayButton from '@/components/auth/GoogleSignInOverlayButton';
 import {
@@ -28,11 +26,11 @@ import {
   PasswordPolicyFeedback,
 } from '@/components/auth/PasswordPolicyFeedback';
 import { AppleLogoIcon } from '@/components/auth/SocialAuthIcons';
-import { COMPANY_NAME } from '@/lib/brand';
+import { PRODUCT_NAME } from '@/brand/identity';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { PASSWORD_POLICY_MIN_LENGTH, getPasswordPolicyErrorMessage } from '@/lib/passwordPolicy';
 
-const CONFETTI_STORAGE_KEY = 'threadly-signup-confetti';
+const CONFETTI_STORAGE_KEY = 'wiez-signup-confetti';
 
 const hasCelebratedSignup = (userId: string | undefined | null): boolean => {
   if (!userId || typeof window === 'undefined') return true;
@@ -145,7 +143,7 @@ const LoadingScreen = () => (
         <BrandWordmark
           logoSize={48}
           logoClassName="drop-shadow-[0_0_20px_rgba(212,175,55,0.45)]"
-          textClassName="text-3xl font-bold tracking-tight text-[var(--text-primary)] dark:text-white"
+          
         />
       </div>
       <div className="flex space-x-2 justify-center mb-4">
@@ -203,7 +201,7 @@ const SignUpPage = () => {
 
     dispatch(setUser(user));
     dispatch(addLocalNotification({ message: 'Account created successfully!' }));
-    toast.success(`Welcome to ${COMPANY_NAME}!`);
+    toast.success(`Welcome to ${PRODUCT_NAME}!`);
 
     await celebrateSignupOnce(user.id);
 
@@ -214,7 +212,7 @@ const SignUpPage = () => {
         : '/profile';
 
     if (hasBrandAccess) {
-      localStorage.removeItem('threadly.brandProfileSetup.dismissedUntil');
+      localStorage.removeItem('wiez.brandProfileSetup.dismissedUntil');
     }
 
     navigate(nextRoute, { replace: true });
@@ -246,10 +244,9 @@ const SignUpPage = () => {
       );
       await completeSignup(unwrapApiResponse(signupRes.data));
     } catch (error: unknown) {
+      const responseMessage = getFriendlyErrorMessage(error, 'Sign up failed. Please try again.');
       if (isAxiosError(error)) {
         const data = error.response?.data as Record<string, unknown> | undefined;
-        const responseMessage =
-          (data && typeof data.message === 'string' && data.message) || 'Sign up failed. Please try again.';
 
         if (data && Array.isArray((data as { errors?: unknown }).errors)) {
           const serverErrors = (data as { errors: Array<Record<string, unknown>> }).errors;
@@ -278,7 +275,14 @@ const SignUpPage = () => {
 
           toast.error(displayedMessage || responseMessage);
         } else {
-          setError('email', { type: 'server', message: responseMessage });
+          // Only blame the email field when the email is genuinely the problem
+          // (409 = already registered). Pinning every unattributed failure to
+          // `email` is actively misleading: an unrelated 401/500 then renders as
+          // "Authentication required" under the email input, which sends both
+          // users and debugging down the wrong path.
+          if (error.response?.status === 409) {
+            setError('email', { type: 'server', message: responseMessage });
+          }
           toast.error(responseMessage);
         }
       } else {
@@ -320,6 +324,7 @@ const SignUpPage = () => {
       );
       const payload = await AuthApi.googleAuth({
         idToken,
+        intent: 'SIGNUP',
         type: selectedType,
         ...(selectedType === 'BRAND' ? { brandFullName } : {}),
         legalAcceptances,
@@ -385,7 +390,7 @@ const SignUpPage = () => {
               <BrandWordmark
                 logoSize={40}
                 logoClassName="drop-shadow-[0_0_14px_rgba(212,175,55,0.35)]"
-                textClassName="text-2xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors"
+                
               />
             </Link>
           </div>
@@ -449,7 +454,7 @@ const SignUpPage = () => {
             <BrandWordmark
               logoSize={32}
               logoClassName="drop-shadow-[0_0_12px_rgba(212,175,55,0.45)] group-hover:drop-shadow-[0_0_18px_rgba(212,175,55,0.6)] transition-[filter]"
-              textClassName="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors"
+              
             />
           </Link>
 
@@ -457,14 +462,14 @@ const SignUpPage = () => {
             {/* Sign Up Card - Brighter glass panel */}
             <div className="auth-glass-panel rounded-2xl p-8 sm:p-10 w-full">
               <div className="text-center mb-8">
-                <h1 className="text-4xl font-extrabold tracking-tight text-white mb-3" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>Create Account</h1>
-                <p className="text-gray-300 text-base font-medium">Start your fashion journey with {COMPANY_NAME}.</p>
+                <h1 className="auth-heading text-4xl font-extrabold tracking-tight mb-3" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>Create Account</h1>
+                <p className="auth-subtext text-base font-medium">Start your fashion journey with {PRODUCT_NAME}.</p>
               </div>
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 {/* User Type Selection */}
                 <div className="space-y-3">
-                  <label className="text-sm font-bold text-gray-200 uppercase tracking-widest ml-1">
+                  <label className="text-sm font-bold auth-label uppercase tracking-widest ml-1">
                     I am a...
                   </label>
                   <div className="grid grid-cols-2 gap-3">
@@ -478,13 +483,13 @@ const SignUpPage = () => {
                       <div className="w-10 h-10 rounded-lg bg-[rgba(var(--brand-primary-strong-rgb),0.18)] flex items-center justify-center mb-3 selection-icon">
                         <ShoppingBag className="w-5 h-5" />
                       </div>
-                      <span className="font-bold text-white text-base block mb-1">Fashion Lover</span>
-                      <p className="text-sm text-purple-300 font-medium mb-3">Discover & collect</p>
+                      <span className="auth-heading font-bold text-base block mb-1">Fashion Lover</span>
+                      <p className="auth-brand-text text-sm font-medium mb-3">Discover & collect</p>
                       
                       {/* Feature List */}
                       <ul className="space-y-2">
                         {['Exclusive drops', 'Connect with designers', 'Create wishlists'].map((feat, i) => (
-                           <li key={i} className="flex items-center gap-2 text-xs text-gray-200 font-medium">
+                           <li key={i} className="auth-subtext flex items-center gap-2 text-xs font-medium">
                              <span className="feature-list-check"><Check className="w-2.5 h-2.5" /></span>
                              {feat}
                            </li>
@@ -510,13 +515,13 @@ const SignUpPage = () => {
                           <Sparkles className="absolute -top-2 -right-2 w-4 h-4 text-[var(--brand-gold)] animate-pulse" />
                         )}
                       </div>
-                      <span className="font-bold text-white text-base block mb-1">Fashion Brand</span>
-                      <p className="text-sm text-purple-300 font-medium mb-3">Sell & showcase</p>
+                      <span className="auth-heading font-bold text-base block mb-1">Fashion Brand</span>
+                      <p className="auth-brand-text text-sm font-medium mb-3">Sell & showcase</p>
 
                       {/* Feature List */}
                       <ul className="space-y-2">
                         {['Your own store', 'Analytics dashboard', 'Direct community'].map((feat, i) => (
-                           <li key={i} className="flex items-center gap-2 text-xs text-gray-200 font-medium">
+                           <li key={i} className="auth-subtext flex items-center gap-2 text-xs font-medium">
                              <span className="feature-list-check"><Check className="w-2.5 h-2.5" /></span>
                              {feat}
                            </li>
@@ -537,13 +542,13 @@ const SignUpPage = () => {
                       </div>
                     </div>
                   )}
-                  {errors.userType && <p className="text-sm text-red-400 ml-1">{errors.userType.message}</p>}
+                  {errors.userType && <p className="auth-error-text text-sm ml-1" role="alert">{errors.userType.message}</p>}
                 </div>
 
                 {/* Full Name */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-200 uppercase tracking-widest ml-1">
+                    <label className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
                       First Name
                     </label>
                     <div className="relative">
@@ -562,10 +567,10 @@ const SignUpPage = () => {
                           <Check className="h-4 w-4" />
                        </div>
                     </div>
-                    {errors.firstName && <p className="text-sm text-red-400 ml-1">{errors.firstName.message}</p>}
+                    {errors.firstName && <p className="auth-error-text text-sm ml-1" role="alert">{errors.firstName.message}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-200 uppercase tracking-widest ml-1">
+                    <label className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
                       Last Name
                     </label>
                     <div className="relative">
@@ -584,14 +589,14 @@ const SignUpPage = () => {
                           <Check className="h-4 w-4" />
                        </div>
                     </div>
-                    {errors.lastName && <p className="text-sm text-red-400 ml-1">{errors.lastName.message}</p>}
+                    {errors.lastName && <p className="auth-error-text text-sm ml-1" role="alert">{errors.lastName.message}</p>}
                   </div>
                 </div>
 
                 {/* Brand Full Name - Only for Brand accounts */}
                 {watchUserType === 'BRAND' && (
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-200 uppercase tracking-widest ml-1">
+                    <label className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
                       Brand Full Name
                     </label>
                     <div className="relative">
@@ -605,18 +610,18 @@ const SignUpPage = () => {
                         className="auth-input w-full rounded-xl py-3.5 pl-11 pr-4 text-sm"
                       />
                     </div>
-                    {errors.brandFullName && <p className="text-sm text-red-400 ml-1">{errors.brandFullName.message}</p>}
+                    {errors.brandFullName && <p className="auth-error-text text-sm ml-1" role="alert">{errors.brandFullName.message}</p>}
                   </div>
                 )}
 
                 {/* Email */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-200 uppercase tracking-widest ml-1">
+                  <label className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
                     Email Address
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Mail className="h-4 w-4 text-gray-500" />
+                      <Mail className="auth-field-icon h-4 w-4" />
                     </div>
                     <input
                       type="email"
@@ -630,17 +635,17 @@ const SignUpPage = () => {
                        <Check className="h-4 w-4" />
                     </div>
                   </div>
-                  {errors.email && <p className="text-sm text-red-400 ml-1">{errors.email.message}</p>}
+                  {errors.email && <p className="auth-error-text text-sm ml-1" role="alert">{errors.email.message}</p>}
                 </div>
 
                 {/* Password */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-200 uppercase tracking-widest ml-1">
+                  <label className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
                     Password
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Lock className="h-4 w-4 text-gray-500" />
+                      <Lock className="auth-field-icon h-4 w-4" />
                     </div>
                     <input
                       type={showPassword ? 'text' : 'password'}
@@ -654,7 +659,7 @@ const SignUpPage = () => {
                     />
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-white transition-colors"
+                      className="auth-field-toggle absolute inset-y-0 right-0 my-1 mr-1 px-3 flex items-center"
                       onClick={() => setShowPassword(!showPassword)}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -663,19 +668,19 @@ const SignUpPage = () => {
                   <PasswordPolicyFeedback
                     id="signup-password-policy"
                     password={watchPassword}
-                    tone="dark"
+                   
                   />
-                  {errors.password && <p className="text-sm text-red-400 ml-1">{errors.password.message}</p>}
+                  {errors.password && <p className="auth-error-text text-sm ml-1" role="alert">{errors.password.message}</p>}
                 </div>
 
                 {/* Confirm Password */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-200 uppercase tracking-widest ml-1">
+                  <label className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
                     Confirm Password
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Lock className="h-4 w-4 text-gray-500" />
+                      <Lock className="auth-field-icon h-4 w-4" />
                     </div>
                     <input
                       type={showConfirmPassword ? 'text' : 'password'}
@@ -692,7 +697,7 @@ const SignUpPage = () => {
                     />
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-white transition-colors"
+                      className="auth-field-toggle absolute inset-y-0 right-0 my-1 mr-1 px-3 flex items-center"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     >
                       {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -701,9 +706,9 @@ const SignUpPage = () => {
                   <PasswordMatchFeedback
                     password={watchPassword}
                     confirmPassword={watchConfirmPassword}
-                    tone="dark"
+                   
                   />
-                  {errors.confirmPassword && <p className="text-sm text-red-400 ml-1">{errors.confirmPassword.message}</p>}
+                  {errors.confirmPassword && <p className="auth-error-text text-sm ml-1" role="alert">{errors.confirmPassword.message}</p>}
                 </div>
 
                 {/* Terms Agreement */}
@@ -714,18 +719,18 @@ const SignUpPage = () => {
                     {...register('agreeTerms')}
                     className="auth-checkbox mt-0.5"
                   />
-                  <label htmlFor="agree-terms" className="text-sm text-gray-400 cursor-pointer select-none leading-tight">
+                  <label htmlFor="agree-terms" className="auth-muted text-sm cursor-pointer select-none leading-tight">
                     I agree to the{' '}
-                    <Link to="/terms" className="text-[#D4AF37] hover:text-white transition-colors">
+                    <Link to="/terms" className="auth-hover-strong text-[var(--brand-accent)] transition-colors">
                       Terms of Service
                     </Link>{' '}
                     and{' '}
-                    <Link to="/privacy" className="text-[#D4AF37] hover:text-white transition-colors">
+                    <Link to="/privacy" className="auth-hover-strong text-[var(--brand-accent)] transition-colors">
                       Privacy Policy
                     </Link>
                   </label>
                 </div>
-                {errors.agreeTerms && <p className="text-sm text-red-400 ml-1">{errors.agreeTerms.message}</p>}
+                {errors.agreeTerms && <p className="auth-error-text text-sm ml-1" role="alert">{errors.agreeTerms.message}</p>}
 
                 {/* Submit */}
                 <button
@@ -735,7 +740,7 @@ const SignUpPage = () => {
                 >
                   {isLoading ? (
                     <span className="flex items-center justify-center gap-2">
-                      <VLoader size={16} phase="loading" showLabel={false} />
+                      <MuseLoader size={16} />
                       Creating Account...
                     </span>
                   ) : (
@@ -747,10 +752,10 @@ const SignUpPage = () => {
               {/* Divider */}
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-white/10"></div>
+                  <div className="auth-hairline w-full border-t"></div>
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="auth-divider-text px-4 text-gray-500">Or sign up with</span>
+                  <span className="auth-divider-text px-4">Or sign up with</span>
                 </div>
               </div>
 
@@ -776,16 +781,16 @@ const SignUpPage = () => {
               </div>
 
               {!env.google.configured && (
-                <p className="mt-3 text-center text-xs text-amber-300">
+                <p className="auth-warn-text mt-3 text-center text-xs">
                   Google signup needs VITE_GOOGLE_CLIENT_ID in this environment.
                 </p>
               )}
 
               {/* Sign In Link */}
               <div className="mt-6 text-center">
-                <p className="text-sm text-gray-400">
+                <p className="text-sm auth-muted">
                   Already have an account?{' '}
-                  <Link to="/login" className="text-[#D4AF37] font-medium hover:text-white transition-colors ml-1">
+                  <Link to="/login" className="auth-hover-strong font-medium transition-colors ml-1 text-[var(--brand-accent)]">
                     Sign In
                   </Link>
                 </p>

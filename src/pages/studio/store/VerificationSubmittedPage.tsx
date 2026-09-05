@@ -66,26 +66,37 @@ export default function VerificationSubmittedPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-        <Link to={originPath} className="transition hover:text-gray-700">
-          {originLabel}
-        </Link>
-        <span>/</span>
-        <Link
-          to="/studio/verification"
-          className="transition hover:text-gray-700"
+    <div className="space-y-8 bg-surface min-h-screen">
+      {/* Navigation Breadcrumb */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => navigate('/studio/verification', { state: { from: originPath } })}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant shadow-sm transition-all hover:bg-surface-container-low hover:text-on-surface"
+          aria-label="Back to verification"
         >
-          Verification
-        </Link>
-        <span>/</span>
-        <span className="text-gray-800">Submitted</span>
-      </nav>
+          ←
+        </button>
+        <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-widest text-on-surface-variant">
+          <Link to={originPath} className="transition hover:text-primary">
+            {originLabel}
+          </Link>
+          <span className="text-outline-variant">/</span>
+          <Link
+            to="/studio/verification"
+            className="transition hover:text-primary"
+          >
+            Verification
+          </Link>
+          <span className="text-outline-variant">/</span>
+          <span className="text-primary font-bold">Submitted</span>
+        </nav>
+      </div>
 
       <VerificationHero
-        eyebrow="Submission complete"
-        title="Verification sent for review"
-        description="Your current evidence set is locked for reviewer handling. Track the queue state from the workspace and only re-enter the wizard when WEAZ asks for updates."
+        eyebrow="Submission complete 🎉"
+        title="Verification Sent for Review"
+        description="Your evidence package is now cryptographically locked for compliance reviewer evaluation. Track review progress from your status workspace."
         statusLabel={verificationStatusLabel(status?.verificationStatus)}
         statusTone={verificationStatusTone(status?.verificationStatus)}
         actions={
@@ -104,60 +115,60 @@ export default function VerificationSubmittedPage() {
         }
       />
 
-      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-            What happens next
+      <section className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">
+            What Happens Next
           </p>
-          <div className="mt-5 space-y-4 text-sm leading-7 text-gray-600">
-            <p>WEAZ reviewers pick up submissions from the queue in order.</p>
+          <div className="space-y-3 text-xs leading-relaxed text-on-surface-variant">
+            <p>• WIEZ compliance team reviews submissions sequentially in order of receipt.</p>
             <p>
-              If more evidence is needed, the request will appear in your
-              verification workspace with field-specific instructions.
+              • If additional information or document correction is needed, field-specific notifications will appear on your workspace.
             </p>
             <p>
-              When approved, the badge only shows while the store and account
-              remain in the eligible state.
+              • Upon approval, your verified brand badge becomes active across all storefront items.
             </p>
           </div>
         </div>
 
-        <section className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-            Current record
+        <section className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-widest text-tertiary mb-3">
+            Current Submission Record
           </p>
-          <div className="mt-4 space-y-3 text-sm text-gray-600">
-            <p>
-              Status:{' '}
-              <span className="font-semibold text-gray-900">
+          <div className="space-y-3 text-xs text-on-surface">
+            <p className="flex justify-between border-b border-outline-variant/20 pb-2">
+              <span className="text-on-surface-variant">Status:</span>
+              <span className="font-bold text-primary">
                 {verificationStatusLabel(status?.verificationStatus)}
               </span>
             </p>
-            <p>
-              Attempt:{' '}
-              <span className="font-semibold text-gray-900">
-                {status?.verificationAttemptNumber ?? 0}
+            <p className="flex justify-between border-b border-outline-variant/20 pb-2">
+              <span className="text-on-surface-variant">Attempt:</span>
+              <span className="font-bold">
+                #{status?.verificationAttemptNumber ?? 1}
               </span>
             </p>
-            <p>
-              Submitted:{' '}
-              <span className="font-semibold text-gray-900">
+            <p className="flex justify-between">
+              <span className="text-on-surface-variant">Submitted at:</span>
+              <span className="font-semibold">
                 {status?.verificationSubmittedAt
                   ? new Date(status.verificationSubmittedAt).toLocaleString()
-                  : 'Not available'}
+                  : 'Just now'}
               </span>
             </p>
           </div>
           <Link
             to="/studio/verification"
-            className="mt-5 inline-flex text-sm font-semibold text-sky-700 transition hover:text-sky-800"
+            className="mt-5 inline-flex text-xs font-bold text-primary hover:underline"
           >
-            View the full verification timeline
+            View full verification timeline →
           </Link>
         </section>
       </section>
 
-      <VerificationHistoryPanel attempts={status?.attemptHistory ?? []} />
+      <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm">
+        <VerificationHistoryPanel attempts={status?.attemptHistory ?? []} />
+      </div>
     </div>
   );
 }

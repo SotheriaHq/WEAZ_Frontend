@@ -5,8 +5,10 @@ import { toast } from 'sonner';
 
 import ReviewComposerModal from '@/components/reviews/ReviewComposerModal';
 import { useReviewRuntimeFlags } from '@/hooks/useReviewRuntimeFlags';
+import useCachedResource from '@/hooks/useCachedResource';
 import ImageWithFallback from '@/components/ImageWithFallback';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
+import { queryClient } from '@/query/queryClient';
 
 const formatCurrency = (amount: number, currency: string) =>
   new Intl.NumberFormat('en-NG', {
@@ -111,8 +113,24 @@ const OrderDetail: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { flags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
+  const orderQueryKey = ['orders', 'detail', orderId] as const;
+  const {
+    data: order = null,
+    loading,
+    error: orderError,
+  } = useCachedResource<Order | null>({
+    queryKey: orderQueryKey,
+    queryFn: async () => {
+      if (!orderId) return null;
+      const access = await resolveOrderAccess(orderId);
+      if (access.destination !== `/orders/${orderId}`) {
+        navigate(access.destination, { replace: true });
+        return null;
+      }
+      return (await getMyOrder(orderId)) as Order;
+    },
+    enabled: Boolean(orderId),
+  });
   const [activeReviewItem, setActiveReviewItem] = useState<any | null>(null);
   const [confirmingDelivery, setConfirmingDelivery] = useState(false);
 
@@ -129,36 +147,13 @@ const OrderDetail: React.FC = () => {
   }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
-    let active = true;
-
-    const fetchOrder = async () => {
-      if (!orderId) return;
-      setLoading(true);
-      try {
-        const access = await resolveOrderAccess(orderId);
-        if (!active) return;
-        if (access.destination !== `/orders/${orderId}`) {
-          navigate(access.destination, { replace: true });
-          return;
-        }
-
-        const data = await getMyOrder(orderId);
-        if (!active) return;
-        setOrder(data as any);
-      } catch (error: any) {
-        toast.error(error?.response?.data?.message || 'Order not found');
-        navigate('/profile?tab=orders');
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
-    void fetchOrder();
-
-    return () => {
-      active = false;
-    };
-  }, [navigate, orderId]);
+    if (!orderError) return;
+    const message =
+      (orderError as { response?: { data?: { message?: string } } }).response?.data?.message ||
+      'Order not found';
+    toast.error(message);
+    navigate('/profile?tab=orders');
+  }, [navigate, orderError]);
 
   // Buyer can confirm delivery once the brand has shipped (new flow) or marked delivered (legacy)
   const canConfirmDelivery =
@@ -239,7 +234,7 @@ const OrderDetail: React.FC = () => {
     setConfirmingDelivery(true);
     try {
       const updated = await confirmMyOrderDelivery(orderId);
-      setOrder(updated as any);
+      queryClient.setQueryData(orderQueryKey, updated);
       toast.success('Delivery confirmed');
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to confirm delivery');
@@ -251,7 +246,7 @@ const OrderDetail: React.FC = () => {
   if (loading) {
     return (
       <div className="mx-auto flex max-w-4xl justify-center px-4 py-10">
-        <VLoader size={56} phase="loading" />
+        <MuseLoader size={56} />
       </div>
     );
   }
@@ -677,12 +672,12 @@ const OrderDetail: React.FC = () => {
         onSaved={async () => {
           if (!orderId) return;
           const data = await getMyOrder(orderId);
-          setOrder(data as any);
+          queryClient.setQueryData(orderQueryKey, data);
         }}
         onDeleted={async () => {
           if (!orderId) return;
           const data = await getMyOrder(orderId);
-          setOrder(data as any);
+          queryClient.setQueryData(orderQueryKey, data);
         }}
       />
     </div>

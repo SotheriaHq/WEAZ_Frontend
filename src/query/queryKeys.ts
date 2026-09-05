@@ -1,15 +1,9 @@
+import { normalizeUuidV4List } from '@/utils/uuid';
+
 export type CollectionScopeKey = 'design' | 'store' | 'all' | null | undefined;
 export type CollectionVisibilityKey = 'public' | 'private' | 'all' | null | undefined;
 
 const normalizeId = (value?: string | null) => String(value ?? '').trim();
-const normalizeIdList = (values?: Array<string | null | undefined> | null) =>
-  Array.from(
-    new Set(
-      (values ?? [])
-        .map((value) => normalizeId(value))
-        .filter(Boolean),
-    ),
-  ).sort();
 
 const normalizeRecord = (value?: object | null) => {
   if (!value) return {};
@@ -77,6 +71,12 @@ export const queryKeys = {
       ] as const,
     collectionDetail: (collectionId?: string | null, scope?: CollectionScopeKey) =>
       ['brand', 'collectionDetail', normalizeId(collectionId), scope ?? 'design'] as const,
+    myDrafts: (ownerId?: string | null) =>
+      ['brand', 'drafts', 'mine', normalizeId(ownerId)] as const,
+    finance: (userId?: string | null) =>
+      ['brand', 'finance', normalizeId(userId)] as const,
+    reviewsDashboard: (params?: object | null) =>
+      ['brand', 'reviewsDashboard', normalizeRecord(params)] as const,
   },
   brandPrivateAccess: {
     myStates: (brandId?: string | null, viewerId?: string | null) =>
@@ -93,6 +93,8 @@ export const queryKeys = {
     status: () => ['store', 'status'] as const,
     cart: (userId?: string | null) => ['store', 'cart', normalizeId(userId)] as const,
     wishlistRoot: (userId?: string | null) => ['store', 'wishlist', normalizeId(userId)] as const,
+    product: (productId?: string | null, params?: object | null) =>
+      ['store', 'product', normalizeId(productId), normalizeRecord(params)] as const,
     wishlist: (userIdOrParams?: string | null | WishlistParams, params?: WishlistParams) => {
       const resolved = resolveWishlistArgs(userIdOrParams, params);
       return ['store', 'wishlist', resolved.userId, normalizeRecord(resolved.params)] as const;
@@ -110,7 +112,7 @@ export const queryKeys = {
     status: (targetType?: string | null, targetId?: string | null) =>
       ['saved', 'status', normalizeId(targetType), normalizeId(targetId)] as const,
     batch: (targetType?: string | null, targetIds?: Array<string | null | undefined> | null) =>
-      ['saved', 'batch', normalizeId(targetType), normalizeIdList(targetIds)] as const,
+      ['saved', 'batch', normalizeId(targetType), normalizeUuidV4List(targetIds)] as const,
   },
   threaded: {
     collection: (collectionId?: string | null) => ['threaded', 'collection', normalizeId(collectionId)] as const,
@@ -122,6 +124,7 @@ export const queryKeys = {
   },
   messaging: {
     unreadCount: () => ['messaging', 'unreadCount'] as const,
+    inbox: (userId?: string | null) => ['messaging', 'inbox', normalizeId(userId)] as const,
   },
   comments: {
     listRoot: (targetType?: string | null, targetId?: string | null) =>
@@ -172,6 +175,8 @@ export const queryKeys = {
   },
   sizeFit: {
     myProfile: (userId?: string | null) => ['sizeFit', 'myProfile', normalizeId(userId)] as const,
+    computed: (userId?: string | null, region?: string | null) =>
+      ['sizeFit', 'computed', normalizeId(userId), normalizeId(region)] as const,
     shares: (userId?: string | null) => ['sizeFit', 'shares', normalizeId(userId)] as const,
   },
   customOrders: {
@@ -183,13 +188,27 @@ export const queryKeys = {
       ['customOrders', 'brandQueue', normalizeRecord(params)] as const,
   },
   reviews: {
+    brand: (brandId?: string | null) => ['reviews', 'brand', normalizeId(brandId)] as const,
     mine: () => ['reviews', 'mine'] as const,
   },
-  market: {
+  /**
+   * Runway = design feed UI (backend Design domain).
+   * Keys use `runway` so they are not confused with commerce `market.*`.
+   */
+  runway: {
     feedCategories: () =>
-      ['market', 'feedCategories'] as const,
+      ['runway', 'feedCategories'] as const,
     feed: (params?: object | null) =>
-      ['market', 'feed', normalizeRecord(params)] as const,
+      ['runway', 'feed', normalizeRecord(params)] as const,
+  },
+  /** Commerce Market (products, sections, suggestions) — not Runway/design feed. */
+  market: {
+    /** @deprecated Prefer queryKeys.runway.feedCategories */
+    feedCategories: () =>
+      ['runway', 'feedCategories'] as const,
+    /** @deprecated Prefer queryKeys.runway.feed */
+    feed: (params?: object | null) =>
+      ['runway', 'feed', normalizeRecord(params)] as const,
     sections: (params?: object | null) =>
       ['market', 'sections', normalizeRecord(params)] as const,
     sectionDetail: (sectionKey?: string | null, params?: object | null) =>
@@ -215,18 +234,65 @@ export const PRIVATE_QUERY_ROOTS = new Set<string>([
   'sizeFit',
   'customOrders',
   'reviews',
+  // Inline-keyed screen caches (MyOrders, OrderDetail, profile OrdersPanel,
+  // studio OrderManagement) — user-private, must not survive logout.
+  'orders',
+  'profile',
+  'studio',
+  // PatchesTab keys inline as ['patches', profileId, scope]. It was missing
+  // here, so the previous account's patched brands survived logout in memory —
+  // and would have survived to disk the moment `patches` became persistable.
+  'patches',
 ]);
 
-export const isPersistableThreadlyQueryKey = (queryKey: readonly unknown[]) => {
+/**
+ * Which cached queries are written to storage and rehydrated on the next load.
+ *
+ * Reload/tab-discard behaviour, NOT freshness: rehydrated data still obeys
+ * staleTime and revalidates silently, so the only thing persistence changes is
+ * whether a returning user sees their content immediately or a cold skeleton.
+ * Mobile browsers discard backgrounded tabs aggressively, which makes every
+ * non-persisted screen a full cold load with a skeleton and a layout jump.
+ *
+ * Two things keep this safe rather than "persist everything":
+ *  - every root listed here is also in PRIVATE_QUERY_ROOTS above, so logout
+ *    purges it from disk;
+ *  - payloads with real PII stay OUT. Orders (addresses, payment references),
+ *    brand finance and the reviews dashboard are deliberately memory-only.
+ */
+export const isPersistableWiezQueryKey = (queryKey: readonly unknown[]) => {
   const [root, scope] = queryKey;
   if (root === 'brand') {
-    return scope === 'profile' || scope === 'collections' || scope === 'collectionDetail';
+    return (
+      scope === 'profile' ||
+      scope === 'collections' ||
+      scope === 'collectionDetail' ||
+      // The owner's Drafts tab. Left out originally, so it was the one catalog
+      // tab that always cold-loaded after a reload while Public/Private
+      // repainted instantly from `brand.collections`.
+      scope === 'drafts' ||
+      scope === 'draft-collections'
+    );
+    // `brand.finance` and `brand.reviewsDashboard` intentionally fall through.
   }
   if (root === 'design' || root === 'designs' || root === 'config') {
     return true;
   }
   if (root === 'media') {
     return scope === 'publicUrl';
+  }
+  // Profile tabs the user actually round-trips between. These are read-only
+  // display data with no PII, and they are exactly the tabs that came back
+  // empty-then-flickering after a reload.
+  if (root === 'reviews' || root === 'patches') {
+    return true;
+  }
+  if (root === 'saved') {
+    // The Saved TAB list only. `saved.status` / `saved.batch` are per-target
+    // booleans probed for every card the user scrolls past — hundreds of tiny
+    // entries that would crowd real content out of the 4MB storage budget for
+    // no visible benefit (they re-resolve in one batched request).
+    return scope === 'me';
   }
   if (root === 'market') {
     return (

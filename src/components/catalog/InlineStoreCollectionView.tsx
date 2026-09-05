@@ -2,14 +2,13 @@
  * InlineStoreCollectionView
  *
  * End-user view of a store collection, rendered inline within CatalogShopTab.
- * Shows collection header, product grid, gallery, and "Add All to Cart".
+ * Shows collection header, product grid, gallery, and "Add All to Bag".
  *
  * Supports product drill-down via the `onViewProduct` callback which
  * lets CatalogShopTab render InlineProductDetail for a specific product.
  */
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { ArrowLeft, ShoppingCart, Grid3X3, Images, Package, ChevronRight } from 'lucide-react';
-import { brandApi } from '@/api/BrandApi';
 import { toast } from 'sonner';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
@@ -23,6 +22,7 @@ import ImageLightbox from './ImageLightbox';
 import { useNavigate } from 'react-router-dom';
 import { normalizeSizingMode, type SizingMode } from '@/types/sizing';
 import MarketSuggestionBlocks from '@/components/market/MarketSuggestionBlocks';
+import { useCollectionDetailQuery } from '@/query/queries';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -130,9 +130,14 @@ const InlineStoreCollectionView: React.FC<InlineStoreCollectionViewProps> = ({
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const detailQuery = useCollectionDetailQuery(collectionId, 'store', {
+    enabled: Boolean(collectionId),
+  });
 
-  const [loading, setLoading] = useState(true);
-  const [detail, setDetail] = useState<any>(null);
+  const [loading, setLoading] = useState(
+    () => Boolean(collectionId) && !detailQuery.data,
+  );
+  const [detail, setDetail] = useState<any>(() => detailQuery.data ?? null);
   const [notFound, setNotFound] = useState(false);
 
   // Gallery state
@@ -149,37 +154,42 @@ const InlineStoreCollectionView: React.FC<InlineStoreCollectionViewProps> = ({
   // Fetch collection detail
   // -----------------------------------------------------------------------
   useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      if (!collectionId) return;
-      setLoading(true);
-      setNotFound(false);
-      setDetail(null);
-      try {
-        const d = await brandApi.getCollectionDetail(collectionId, { scope: 'store' });
-        if (!mounted) return;
-        if (d) {
-          setDetail(d);
-        } else {
-          setNotFound(true);
-        }
-      } catch (e: any) {
-        if (mounted) {
-          const status = e?.response?.status;
-          if (status === 404 || status === 410) {
-            setNotFound(true);
-          } else {
-            toast.error('Failed to load collection');
-            onBack();
-          }
-        }
-      } finally {
-        if (mounted) setLoading(false);
+    if (!collectionId) return;
+    const hasCurrentDetail = detail?.id === collectionId;
+
+    if (detailQuery.error) {
+      const status = (detailQuery.error as any)?.response?.status;
+      if (status === 404 || status === 410) {
+        setNotFound(true);
+        setDetail(null);
+      } else {
+        toast.error('Failed to load collection');
+        onBack();
       }
-    };
-    void run();
-    return () => { mounted = false; };
-  }, [collectionId, onBack]);
+      setLoading(false);
+      return;
+    }
+
+    if (!detailQuery.data) {
+      if (!hasCurrentDetail) {
+        setDetail(null);
+      }
+      setLoading(detailQuery.isLoading && !hasCurrentDetail);
+      setNotFound(false);
+      return;
+    }
+
+    setDetail(detailQuery.data);
+    setNotFound(false);
+    setLoading(false);
+  }, [
+    collectionId,
+    detail?.id,
+    detailQuery.data,
+    detailQuery.error,
+    detailQuery.isLoading,
+    onBack,
+  ]);
 
   // -----------------------------------------------------------------------
   // Parse products from collection detail

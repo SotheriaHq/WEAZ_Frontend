@@ -12,10 +12,10 @@ import MediaRenderer from '@/components/media/MediaRenderer';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
-import VLoader from '@/components/loaders/VLoader';
+
 import { getCatalogEntityCardCopy, resolveCatalogEntityCardBranch } from './catalogEntityCardModel';
 import { mapCatalogTargetForLegacyApi } from '@/utils/catalogTarget';
-import { getCompactPublishTaskStatusLabel } from '@/utils/publishTracker';
+import { getCompactPublishTaskStatusLabel, isLocalPublishTaskId } from '@/utils/publishTracker';
 import { getContentStatusLabel, getContentStatusTone } from '@/utils/contentIntegrity';
 import ContentReviewDecisionModal from '@/components/content-integrity/ContentReviewDecisionModal';
 
@@ -35,6 +35,18 @@ export interface CollectionCardProps {
   isSaved?: boolean;
   onToggleSave?: (id: string) => void;
   saveBusy?: boolean;
+  compact?: boolean;
+  /**
+   * The review status the surrounding list is already filtered to. Cards whose
+   * status matches it suppress their status chip — the tab heading has said it
+   * once already.
+   */
+  impliedStatus?: string | null;
+  /**
+   * The entity kind the surrounding list is already known to be ("Design" on
+   * the design tab). Cards matching it drop their entity chip.
+   */
+  impliedEntityLabel?: string | null;
 }
 
 const CollectionCardComponent: React.FC<CollectionCardProps> = ({
@@ -53,6 +65,9 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
   isSaved: isSavedProp,
   onToggleSave,
   saveBusy: saveBusyProp,
+  compact = false,
+  impliedStatus = null,
+  impliedEntityLabel = null,
 }) => {
   const {
     title,
@@ -105,18 +120,33 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
     progress: publishProgress,
   });
   const backendStatus = String(collection.publicationStatus ?? collection.status ?? '').toUpperCase();
+  /**
+   * A status badge earns its place only when the status is NOT already implied.
+   *
+   * Every card in the In Review tab wore an "In Review" chip, every card in
+   * Changes Requested wore "Changes" — restating the heading the user just
+   * tapped, on every tile, in the one corner the artwork needed. `impliedStatus`
+   * is the bucket the surrounding list is already filtered to, so the chip now
+   * appears only when a card's status differs from its surroundings, which is
+   * the only time it carries information.
+   */
+  const statusIsImplied =
+    Boolean(impliedStatus) &&
+    String(impliedStatus).toUpperCase() === backendStatus;
   const reviewStatusLabel =
-    backendStatus === 'IN_REVIEW' ||
-    backendStatus === 'CHANGES_REQUESTED' ||
-    backendStatus === 'REJECTED' ||
-    backendStatus === 'FAILED'
+    !statusIsImplied &&
+    (backendStatus === 'IN_REVIEW' ||
+      backendStatus === 'CHANGES_REQUESTED' ||
+      backendStatus === 'REJECTED' ||
+      backendStatus === 'FAILED')
       ? getContentStatusLabel(backendStatus)
       : null;
   const reviewStatusClassName = reviewStatusLabel
     ? getContentStatusTone(backendStatus)
     : 'bg-sky-500/90 text-white';
   const clientPreviewUrl = collection.clientStatusMeta?.previewUrl;
-  const hasPersistedCollectionId = !collection.id.startsWith('publish_');
+  const isLocalPublishTask = isLocalPublishTaskId(collection.id);
+  const hasPersistedCollectionId = !isLocalPublishTask;
 
   const displayItemCount = itemCount || postsCount;
   const [resolvedCover, setResolvedCover] = useState<string | undefined>(coverImage && coverImage.length > 0 ? coverImage : undefined);
@@ -323,36 +353,44 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
     }
   };
 
+  const canOpenCard = !isPublishing && !publishFailed && !isDeleted && hasPersistedCollectionId && Boolean(onClick);
+
   return (
     <>
     <div 
       data-entity-type={entityType}
       data-card-branch={cardBranch}
       className={`relative group w-full overflow-hidden shadow-md transition-transform duration-200 rounded-xl ${
-        isDeleted ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'
+        canOpenCard ? 'cursor-pointer md:hover:scale-[1.02]' : 'cursor-default'
       }`}
-      onClick={isPublishing || isDeleted || !onClick ? undefined : () => onClick(collection.id)}
+      onClick={canOpenCard ? () => onClick?.(collection.id) : undefined}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Background Media */}
-      <div className="relative aspect-[4/5] w-full overflow-hidden bg-transparent">
+      {/* Background Media.
+          4:5 → 4:5.5 is exactly +10% height. At two cards per row the width is
+          fixed by the grid, so height is the only dimension that can give the
+          artwork more room. */}
+      <div className="relative aspect-[4/5.5] w-full overflow-hidden bg-transparent">
         {(isPublishing || publishFailed) && (
           <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/70 px-4 text-center text-white backdrop-blur-sm">
             {isPublishing ? (
-              <>
-                <VLoader size={24} progress={publishProgress ?? undefined} phase="loading" showLabel={false} />
-                {publishProgress !== null && publishProgress < 99 ? (
-                  <div className="text-sm font-semibold">{compactStatusLabel}</div>
-                ) : (
-                  <div className="flex flex-col items-center gap-1.5">
-                    <div className="text-xs font-medium text-white/80">Uploading...</div>
-                    <div className="w-28 h-1 rounded-full bg-white/20 overflow-hidden">
-                      <div className="h-full w-1/2 rounded-full bg-white/70 animate-pulse" />
-                    </div>
-                  </div>
-                )}
-              </>
+              <div className="w-36 space-y-2">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
+                  <div
+                    className="h-full rounded-full bg-[color:var(--brand-primary,#a855f7)] transition-[width] duration-300 ease-out"
+                    style={{
+                      width:
+                        publishProgress !== null
+                          ? `${Math.max(4, Math.min(100, publishProgress))}%`
+                          : '28%',
+                    }}
+                  />
+                </div>
+                <div className="text-center text-sm font-semibold tracking-wide text-white">
+                  {compactStatusLabel}
+                </div>
+              </div>
             ) : (() => {
               const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
               return (
@@ -475,18 +513,42 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
             </div>
           )}
         
-        {/* Always-visible gradient overlay for text readability - lighter for more image visibility */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 via-black/35 to-transparent" />
+        {/* Readability scrim. Was from-black/70 via-black/35 over the bottom
+            40% — deep enough to read as a separate dark panel laid on top of
+            the photo. It only has to carry the title and price, so it is now
+            shallower and lighter, and stops well short of the midpoint. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/55 via-black/20 to-transparent" />
         
-        {/* Entity badge (top left) */}
-        <div className="absolute top-3 left-3 z-20">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-500/80 backdrop-blur-sm text-white text-xs font-medium rounded-full">
-            <span>{copy.badgeLabel}</span>
+        {/* Entity badge (top left).
+            Same rule as the review chip: a label that only restates where the
+            user already is earns nothing. In a brand's own catalogue, on a tab
+            of designs, every tile wore a purple "Design" chip over the artwork.
+            `impliedEntityLabel` is what the surrounding list is, so the badge
+            survives only where a list genuinely mixes kinds. */}
+        {copy.badgeLabel.toLowerCase() !== String(impliedEntityLabel ?? '').toLowerCase() ? (
+          <div className="hidden md:block absolute top-3 left-3 z-20">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-500/80 backdrop-blur-sm text-white text-xs font-medium rounded-full">
+              <span>{copy.badgeLabel}</span>
+            </div>
           </div>
+        ) : null}
+
+        {/* Mobile status badges (top left) */}
+        <div className="md:hidden absolute top-2 left-2 z-20 flex flex-col gap-1">
+          {reviewStatusLabel && (
+            <div className={`px-2 py-0.5 rounded-full text-[12px] font-bold border backdrop-blur-sm shadow-sm ${reviewStatusClassName}`}>
+              {reviewStatusLabel === 'In Review' ? 'Review' : reviewStatusLabel}
+            </div>
+          )}
+          {isDraft && (
+            <div className="px-2 py-0.5 rounded-full text-[12px] font-bold bg-amber-500/80 text-white border border-amber-400/30 backdrop-blur-sm shadow-sm">
+              Draft
+            </div>
+          )}
         </div>
         
         {/* Three-dot menu for owners (top right) */}
-        {showActions && (onEdit || onDelete || onRestore || onPermanentDelete) && (
+        {showActions && hasPersistedCollectionId && (onEdit || onDelete || onRestore || onPermanentDelete) && (
           <div className="absolute top-3 right-3 z-50" onClick={(e) => e.stopPropagation()}>
             <Dropdown>
               <DropdownTrigger className="btn-tight-xs">
@@ -522,8 +584,8 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
         )}
 
         {/* Vertical Action Bar (like in Reels) - Right side */}
-        {!isDraft && !isDeleted && (
-        <div className="absolute bottom-28 right-2 z-10 flex flex-col items-center gap-3">
+        {!isDraft && !isDeleted && hasPersistedCollectionId && (
+        <div className="hidden md:flex absolute bottom-28 right-2 z-10 flex-col items-center gap-3">
           {/* Legacy thread targets are still collection-backed for design rows. */}
           <ThreadButton
             contentType="COLLECTION"
@@ -551,8 +613,8 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
         </div>
         )}
 
-        {/* Bottom Info */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 text-white z-10">
+        {/* Desktop Bottom Info */}
+        <div className={`hidden md:block absolute bottom-0 left-0 right-0 text-white z-10 ${compact ? 'p-2' : 'p-3'}`}>
           {/* Brand Info with Avatar */}
           <div className="flex items-center gap-2 mb-2">
             <div className="w-7 h-7 flex-shrink-0 ring-1 ring-white/30 rounded-sm overflow-hidden">
@@ -577,7 +639,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
           </div>
 
           {/* Collection Title */}
-          <h3 className="text-base font-bold mb-1 line-clamp-2 leading-tight">{displayTitle}</h3>
+          <h3 className={`font-bold mb-1 line-clamp-2 leading-tight ${compact ? 'text-sm' : 'text-base'}`}>{displayTitle}</h3>
           
           {/* Collection Stats */}
           <div className="flex items-center gap-1.5 text-[11px] text-white/90 mb-2">
@@ -689,6 +751,29 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
                   {copy.viewLabel}
                 </button>
               </>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile bottom info.
+            This was `bg-black/45 backdrop-blur-md` with its own top border —
+            a frosted slab sitting ON the photo, reading as a separate object
+            stuck to the card rather than part of it. The scrim above already
+            does the readability work, so the bar now contributes no surface of
+            its own: no fill, no blur, no border. Title and price simply sit in
+            the card's bottom margin, over its own artwork. */}
+        <div className="md:hidden absolute bottom-0 left-0 right-0 px-2.5 pb-2 pt-1 z-10 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <h3
+              className="font-bold text-white truncate leading-tight uppercase tracking-wide drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)]"
+              style={{ fontSize: '12px' }}
+            >
+              {displayTitle}
+            </h3>
+            {(baseBand || saleBand) && (
+              <span className="text-white font-semibold leading-tight mt-0.5 drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)]" style={{ fontSize: '12px' }}>
+                {singleBand}
+              </span>
             )}
           </div>
         </div>

@@ -15,7 +15,9 @@ const createConfiguration = vi.fn();
 const updateConfiguration = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
+const toastInfo = vi.fn();
 const useMeasurementPoints = vi.fn();
+const submitFreeform = vi.fn();
 
 const measurementRegistryPoints = [
   'WOMEN_BUST',
@@ -63,6 +65,12 @@ vi.mock('@/hooks/useMeasurementPoints', () => ({
   useMeasurementPoints: (...args: unknown[]) => useMeasurementPoints(...args),
 }));
 
+vi.mock('@/api/MeasurementPointsApi', () => ({
+  MeasurementPointsApi: {
+    submitFreeform: (...args: unknown[]) => submitFreeform(...args),
+  },
+}));
+
 vi.mock('@/api/CustomOrderApi', () => ({
   customOrderConfigurationsApi: {
     listFabricRuleBases: (...args: unknown[]) => listFabricRuleBases(...args),
@@ -78,6 +86,7 @@ vi.mock('sonner', () => ({
   toast: {
     error: (...args: unknown[]) => toastError(...args),
     success: (...args: unknown[]) => toastSuccess(...args),
+    info: (...args: unknown[]) => toastInfo(...args),
   },
 }));
 
@@ -124,6 +133,30 @@ describe('CustomOrderConfigurationEditor', () => {
       points: [],
       isLoading: false,
     });
+    // A manually added key now registers as a freeform point for admin review
+    // and adopts the server-assigned key. Mirror that: echo an uppercased key.
+    submitFreeform.mockImplementation((payload: any) =>
+      Promise.resolve({
+        point: {
+          id: 'freeform-created-1',
+          key: String(payload?.label ?? '')
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, '_'),
+          label: String(payload?.label ?? ''),
+          description: null,
+          category: payload?.category ?? 'GENERAL',
+          gender: payload?.gender ?? null,
+          source: 'BRAND_FREEFORM',
+          status: 'BRAND_ONLY',
+          brandId: 'brand-1',
+          minValueCm: null,
+          maxValueCm: null,
+          isActive: true,
+        },
+        fuzzyMatches: [],
+      }),
+    );
     createConfiguration.mockResolvedValue({
       id: 'configuration-1',
       brandId: 'brand-1',
@@ -169,7 +202,13 @@ describe('CustomOrderConfigurationEditor', () => {
   it('shows the save-first state when the source has not been persisted yet', () => {
     render(<CustomOrderConfigurationEditor sourceType="PRODUCT" measurementKeys={['bust', 'waist']} />);
 
-    expect(screen.getByText('Save this item first so the custom-order settings can attach to it.')).toBeInTheDocument();
+    // The copy no longer promises the settings save with the item regardless:
+    // a part-filled configuration cannot be stored at all, so it says so.
+    expect(
+      screen.getByText(
+        /Custom-order settings are stored as one complete configuration/i,
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Select a fabric-rule basis')).not.toBeInTheDocument();
     expect(getStoreStatus).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Create configuration' })).not.toBeInTheDocument();

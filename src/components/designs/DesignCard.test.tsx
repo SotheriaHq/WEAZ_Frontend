@@ -122,11 +122,11 @@ const brandOwner: AuthUserDto = {
   type: 'BRAND',
   storeId: 'brand-1',
   activeBrandId: 'brand-1',
-  brandFullName: 'Threadly Atelier',
+  brandFullName: 'WIEZ Atelier',
   brandMemberships: [
     {
       brandId: 'brand-1',
-      brandName: 'Threadly Atelier',
+      brandName: 'WIEZ Atelier',
       role: 'OWNER',
       status: 'ACTIVE',
       isOwner: true,
@@ -143,8 +143,8 @@ const baseItem: MarketItem = {
   collectionTitle: 'Adire wrap dress',
   collectionDescription: 'A direct message test design.',
   brandId: 'brand-1',
-  brandName: 'Threadly Atelier',
-  username: 'threadlyatelier',
+  brandName: 'WIEZ Atelier',
+  username: 'wiezatelier',
   brandLogo: null,
   brandLogoFileId: null,
   threadsCount: 0,
@@ -210,7 +210,7 @@ describe('DesignCard direct message flow', () => {
     expect(mockedMessagingApi.sendBrandMessage).not.toHaveBeenCalled();
   });
 
-  it('sends direct messages, clears the input, and routes to the thread', async () => {
+  it('sends direct messages and clears the input WITHOUT leaving the runway', async () => {
     mockedMessagingApi.sendBrandMessage.mockResolvedValueOnce({
       thread: { id: 'thread-1' },
     });
@@ -229,9 +229,12 @@ describe('DesignCard direct message flow', () => {
       );
     });
 
-    expect(navigateMock).toHaveBeenCalledWith('/messages?thread=thread-1');
+    // The whole point of the change: the feed position survives the send.
+    expect(navigateMock).not.toHaveBeenCalled();
     expect(screen.getByPlaceholderText('Message brand...')).toHaveValue('');
-    expect(mockedToast.success).toHaveBeenCalledWith('Message sent');
+    expect(mockedToast.success).toHaveBeenCalledWith(
+      'Message sent — the reply lands in your inbox.',
+    );
   });
 
   it('does not expose direct messaging to the brand owner viewing their own design', () => {

@@ -10,6 +10,7 @@ import type { AuthProfileResponse, AuthUserDto } from '@/types/auth';
 import { setUser } from '@/features/userSlice';
 import type { RootState } from '@/store';
 import { FrostedButton } from '@/components/ui/FrostedButton';
+import { BRAND_STAFF_COMING_SOON } from '@/config/featureFlags';
 
 const BrandStaffInvitePage: React.FC = () => {
   const [params] = useSearchParams();
@@ -83,15 +84,36 @@ const BrandStaffInvitePage: React.FC = () => {
     }
   }, [token]);
 
+  if (BRAND_STAFF_COMING_SOON) {
+    return (
+      <main className="min-h-screen wiez-shell-bg px-4 py-16 text-theme">
+        <section className="mx-auto max-w-lg rounded-2xl border border-gray-200 bg-white/80 p-8 text-center shadow-sm dark:border-white/10 dark:bg-white/5">
+          <div className="text-4xl" aria-hidden="true">👥</div>
+          <h1 className="mt-3 text-lg font-bold">Brand staff is coming soon</h1>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-theme-secondary">
+            Team invites are paused while we finish the staff workspace. Keep
+            this link — you can accept it once the feature unlocks.
+          </p>
+          <Link
+            to="/"
+            className="mt-5 inline-flex min-h-10 items-center justify-center rounded-full bg-purple-600 px-5 text-sm font-semibold text-white transition hover:bg-purple-500"
+          >
+            Back to Runway
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
   return (
-    <main className="min-h-screen threadly-shell-bg px-4 py-16 text-theme">
+    <main className="min-h-screen wiez-shell-bg px-4 py-16 text-theme">
       <section className="mx-auto max-w-lg space-y-6">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-theme-secondary">
             Brand invite
           </p>
           <h1 className="mt-2 text-3xl font-semibold">
-            Join a WEAZ brand workspace
+            Join a WIEZ brand workspace
           </h1>
           <p className="mt-3 text-sm text-theme-secondary">
             Accepting adds your account to the brand team. The brand owner controls your role and permissions.

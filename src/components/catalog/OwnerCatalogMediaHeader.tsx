@@ -46,6 +46,7 @@ type OwnerHeaderProfileBase = {
 
 interface OwnerCatalogMediaHeaderProps {
   profile: OwnerHeaderProfileBase;
+  isStoreOpen?: boolean;
   onEditProfile?: () => void;
   onShareProfile?: () => void;
   onShowQrCode?: () => void;
@@ -66,6 +67,7 @@ const mapUploadedMedia = (uploaded: any, fallbackFileName: string) => ({
 
 const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> = ({
   profile,
+  isStoreOpen = false,
   onEditProfile,
   onShareProfile,
   onShowQrCode,
@@ -472,6 +474,7 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
 
       <ProfileHeader
         profile={headerProfile}
+        isStoreOpen={isStoreOpen}
         canEdit
         onEditProfile={onEditProfile}
         onShareProfile={onShareProfile}

@@ -230,9 +230,14 @@ export const notificationsSlice = createSlice({
     },
     clearLocalNotifications: (state) => { state.local = []; },
     resetState: () => ({ ...initialState }),
-    removeNotification: (state, action: PayloadAction<{ id: string }>) => {
+    removeNotification: (state, action: PayloadAction<{ id: string; unreadDelta?: number }>) => {
+      const existing = state.items.find((n) => n.id === action.payload.id);
       state.items = state.items.filter((n) => n.id !== action.payload.id);
-      state.unreadCount = state.items.filter((n) => !n.isRead).length;
+      if (typeof action.payload.unreadDelta === 'number') {
+        state.unreadCount = Math.max(0, state.unreadCount + action.payload.unreadDelta);
+      } else if (existing && !existing.isRead) {
+        state.unreadCount = Math.max(0, state.unreadCount - 1);
+      }
     },
     ingestRealtime: (
       state,
@@ -294,7 +299,9 @@ export const notificationsSlice = createSlice({
       }
 
       state.items.unshift(incoming);
-      state.unreadCount += 1;
+      if (!incoming.isRead) {
+        state.unreadCount += 1;
+      }
       // cap list length
       if (state.items.length > 200) state.items.pop();
     },

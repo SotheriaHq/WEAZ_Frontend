@@ -4,11 +4,31 @@ import type { AuthUserDto } from '../../types/auth';
 import OrderManagement from '../../pages/dashboard/OrderManagement';
 import { brandApi } from '../../api/BrandApi';
 import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import userReducer, { type UserState } from '../../features/userSlice';
-import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// Mock BrandApi
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+// Mock MessagingApi
+vi.mock('../../api/MessagingApi', () => ({
+  messagingApi: {
+    getBulkOrderSummariesForBrand: vi.fn().mockResolvedValue({ items: [] }),
+  },
+}));
+
+// Mock StoreApi
+vi.mock('../../api/StoreApi', () => ({
+  getStoreStatus: vi.fn().mockResolvedValue({ brandId: 'user-123', isConfigured: true }),
+}));
 vi.mock('../../api/BrandApi', () => ({
   brandApi: {
     getOrders: vi.fn(),
@@ -19,6 +39,13 @@ vi.mock('../../api/BrandApi', () => ({
 // Mock OrderDetailsModal
 vi.mock('../../components/dashboard/OrderDetailsModal', () => ({
   default: () => <div data-testid="order-details-modal">Order Details Modal</div>,
+}));
+
+// Mock RealtimeProvider
+vi.mock('@/realtime/RealtimeProvider', () => ({
+  useRealtime: () => ({
+    onNotification: vi.fn(),
+  }),
 }));
 
 const createTestStore = (initialState: { user: UserState }) => {
@@ -113,11 +140,13 @@ describe('OrderManagement', () => {
     });
 
     render(
-      <Provider store={store}>
-        <BrowserRouter>
-          <OrderManagement />
-        </BrowserRouter>
-      </Provider>
+      <QueryClientProvider client={createTestQueryClient()}>
+        <Provider store={store}>
+          <MemoryRouter>
+            <OrderManagement />
+          </MemoryRouter>
+        </Provider>
+      </QueryClientProvider>
     );
 
     // Initial loading state
@@ -125,8 +154,8 @@ describe('OrderManagement', () => {
 
     // Wait for orders to load
     await waitFor(() => {
-      expect(screen.getByText('Customer 1')).toBeInTheDocument();
-      expect(screen.getByText('Customer 2')).toBeInTheDocument();
+      expect(screen.getAllByText('Customer 1')[0]).toBeInTheDocument();
+      expect(screen.getAllByText('Customer 2')[0]).toBeInTheDocument();
     });
 
     expect(brandApi.getOrders).toHaveBeenCalledWith('user-123', expect.objectContaining({
@@ -146,20 +175,22 @@ describe('OrderManagement', () => {
     });
 
     render(
-      <Provider store={store}>
-        <BrowserRouter>
-          <OrderManagement />
-        </BrowserRouter>
-      </Provider>
+      <QueryClientProvider client={createTestQueryClient()}>
+        <Provider store={store}>
+          <MemoryRouter>
+            <OrderManagement />
+          </MemoryRouter>
+        </Provider>
+      </QueryClientProvider>
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Customer 1')).toBeInTheDocument();
+      expect(screen.getAllByText('Customer 1')[0]).toBeInTheDocument();
     });
 
-    // Filter by status
-    const statusSelect = screen.getByRole('combobox');
-    fireEvent.change(statusSelect, { target: { value: 'PENDING' } });
+    // Filter by status tab
+    const pendingTab = screen.getByRole('button', { name: /^PENDING$/i });
+    fireEvent.click(pendingTab);
 
     await waitFor(() => {
       expect(brandApi.getOrders).toHaveBeenCalledWith('user-123', expect.objectContaining({
@@ -168,7 +199,7 @@ describe('OrderManagement', () => {
     });
 
     // Search
-    const searchInput = screen.getByPlaceholderText(/Search by order ID/i);
+    const searchInput = screen.getByPlaceholderText(/Search order ID/i);
     fireEvent.change(searchInput, { target: { value: 'Cust' } });
 
     // Wait for debounce

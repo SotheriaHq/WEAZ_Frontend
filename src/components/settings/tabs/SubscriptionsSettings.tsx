@@ -22,7 +22,7 @@ const SubscriptionsSettings: React.FC = () => {
             <input
               type="text"
               placeholder="Search patches..."
-              className="threadly-search-input pl-10"
+              className="wiez-search-input pl-10"
             />
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"

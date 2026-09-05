@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import type React from 'react';
 import type { AuthUserDto } from '@/types/auth';
@@ -43,6 +44,15 @@ vi.mock('../../services/LocationService', () => ({
     getStates: vi.fn(async () => []),
     getCities: vi.fn(async () => []),
   },
+  // The factory replaces the WHOLE module, so every named export the component
+  // imports has to be listed here. This one was missing, and the component has
+  // imported it all along — the suite failed on module init before reaching a
+  // single assertion.
+  LOCATION_FIELD_LABELS: {
+    country: 'Country',
+    state: 'State / Province',
+    city: 'City / LGA',
+  },
 }));
 
 vi.mock('@/components/media/MediaRenderer', () => ({
@@ -66,7 +76,7 @@ vi.mock('react-redux', () => ({
 
 const makeBrandUser = (overrides: Partial<AuthUserDto> = {}): AuthUserDto => ({
   id: 'user-1',
-  username: 'weazbrand',
+  username: 'wiezbrand',
   email: 'brand@example.com',
   firstName: 'Ada',
   lastName: 'Okafor',
@@ -75,7 +85,7 @@ const makeBrandUser = (overrides: Partial<AuthUserDto> = {}): AuthUserDto => ({
   themePreference: 'system',
   phoneNumber: null,
   address: null,
-  brandFullName: 'WEAZ Atelier',
+  brandFullName: 'WIEZ Atelier',
   brandDescription: 'A focused fashion brand story for setup testing.',
   brandCountry: null,
   brandState: null,
@@ -103,7 +113,7 @@ const makeBrandUser = (overrides: Partial<AuthUserDto> = {}): AuthUserDto => ({
   brandMemberships: [
     {
       brandId: 'brand-1',
-      brandName: 'WEAZ Atelier',
+      brandName: 'WIEZ Atelier',
       role: 'OWNER',
       status: 'ACTIVE',
       isOwner: true,
@@ -134,19 +144,43 @@ const renderModal = (props: Partial<React.ComponentProps<typeof EditProfileModal
 };
 
 describe('EditProfileModal brand setup blocker flow', () => {
-  it('renders from the brand setup route query', async () => {
+  it('renders from the brand setup route query (non-prompt deep link persists)', async () => {
+    userState.profile = makeBrandUser();
+    brandApiMock.getBrandProfile.mockResolvedValue(null);
+
+    // A user-opened / deep-linked modal (no modalOrigin=prompt) survives a load;
+    // only the ephemeral auto-prompt is stripped on refresh.
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/profile?modal=brand-setup']}>
+          <Routes>
+            <Route path="/profile" element={<GlobalModalRouter />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole('dialog', { name: 'Brand setup' })).toBeInTheDocument();
+  });
+
+  it('strips an auto-prompt modal carried in from a hard refresh (no reopen)', async () => {
     userState.profile = makeBrandUser();
     brandApiMock.getBrandProfile.mockResolvedValue(null);
 
     render(
-      <MemoryRouter initialEntries={['/profile?modal=brand-setup&modalOrigin=prompt']}>
-        <Routes>
-          <Route path="/profile" element={<GlobalModalRouter />} />
-        </Routes>
-      </MemoryRouter>,
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/profile?modal=brand-setup&modalOrigin=prompt']}>
+          <Routes>
+            <Route path="/profile" element={<GlobalModalRouter />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
-    expect(await screen.findByRole('dialog', { name: 'Brand setup' })).toBeInTheDocument();
+    // The auto-prompt modal must not reopen after a reload.
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Brand setup' })).not.toBeInTheDocument(),
+    );
   });
 
   it('allows seven selected tags and blocks the eighth tag', async () => {

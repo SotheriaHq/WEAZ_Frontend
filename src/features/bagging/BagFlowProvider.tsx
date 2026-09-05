@@ -15,6 +15,7 @@ import type { AppDispatch, RootState } from '@/store';
 import { addToCart, fetchCart, fetchCustomBagCount, openCartDrawer } from '@/features/cartSlice';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { showNotice } from '@/components/ui/NoticeModal';
 import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import { BagApi, type BagSourceType } from '@/api/BagApi';
 import type { BagDefaultAction, BagStatus } from '@/api/StoreApi';
@@ -53,7 +54,7 @@ type PendingBagAction = {
   returnPath: string;
 };
 
-const PENDING_BAG_ACTION_KEY = 'threadly.pendingBagAction.v1';
+const PENDING_BAG_ACTION_KEY = 'wiez.pendingBagAction.v1';
 
 const canUseSessionStorage = () =>
   typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined';
@@ -161,7 +162,13 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
         : status.ui.defaultAction;
 
       if (!status.canBag || action === 'DISABLED') {
-        toast.error(status.ui.disabledReason || 'This product cannot be bagged.');
+        // Must-read refusal (unverified store, closed store, own content...):
+        // a toast auto-dismissed before slower readers finished the sentence,
+        // leaving only a dead button. This one waits to be dismissed.
+        showNotice({
+          title: 'Not available',
+          message: status.ui.disabledReason || 'This product cannot be bagged.',
+        });
         return;
       }
 
@@ -192,7 +199,10 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
 
       if (action === 'OPEN_CUSTOM_FLOW') {
         if (!status.custom.available || !status.custom.configurationId) {
-          toast.error(status.ui.disabledReason || 'This product is not configured for custom bagging yet.');
+          showNotice({
+            title: 'Custom orders unavailable',
+            message: status.ui.disabledReason || 'This product is not configured for custom bagging yet.',
+          });
           return;
         }
         if (status.custom.fittingState === 'MISSING' || status.custom.fittingState === 'PARTIAL') {
@@ -262,7 +272,10 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
 
   const openCustomFlow = useCallback((product: BagProductInput, status: BagStatus) => {
     if (!status.custom.available || !status.custom.configurationId) {
-      toast.error(status.ui.disabledReason || 'This product is not configured for custom bagging yet.');
+      showNotice({
+        title: 'Custom orders unavailable',
+        message: status.ui.disabledReason || 'This product is not configured for custom bagging yet.',
+      });
       return;
     }
     if (status.custom.fittingState === 'MISSING' || status.custom.fittingState === 'PARTIAL') {

@@ -14,6 +14,7 @@ import { getCheckoutStatusCopy } from '@/pages/checkout/checkoutStatusCopy';
 import { setRuntimeCardholderNameMatchMode } from '@/pages/checkout/paymentFlow';
 import { canOfferCustomOrderCardRetry } from '@/pages/checkout/paymentRetryFlow';
 import { fetchCart, openCartDrawer } from '@/features/cartSlice';
+import { queryClient } from '@/query/queryClient';
 import type { AppDispatch } from '@/store';
 
 type ViewState = 'verifying' | 'resolved' | 'missing';
@@ -168,6 +169,14 @@ const PaymentReturnPage: React.FC = () => {
   ) => {
     if (status === 'PAID') {
       await dispatch(fetchCart({ force: true }));
+      // A new order now exists. The Orders tab uses a cache-first resource with
+      // refetchOnMount:false, so without this it paints the pre-order cache and
+      // the buyer had to hard-refresh to see the order they just placed. Force a
+      // fresh fetch (active + inactive) so the tab is populated on arrival.
+      void queryClient.invalidateQueries({
+        queryKey: ['profile', 'orders', 'me'],
+        refetchType: 'all',
+      });
       toast.success('Your order is placed successfully, Thank you for shopping.');
       navigate(`/bag/confirmation?reference=${encodeURIComponent(reference)}`, {
         replace: options?.replace,
@@ -346,7 +355,7 @@ const PaymentReturnPage: React.FC = () => {
         <div className="mb-6 text-6xl">🧾</div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Payment return data is missing</h1>
         <p className="mb-8 text-gray-500 dark:text-zinc-400">
-          WEAZ could not find the reference needed to resume this payment flow.
+          WIEZ could not find the reference needed to resume this payment flow.
         </p>
         <div className="flex flex-col justify-center gap-3 sm:flex-row">
           <Button onClick={() => navigate('/profile?tab=orders')}>Open my orders</Button>
@@ -363,7 +372,7 @@ const PaymentReturnPage: React.FC = () => {
         <div className="mb-6 text-6xl">🌀</div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Verifying payment</h1>
         <p className="text-gray-500 dark:text-zinc-400">
-          Stage 1/2 - WEAZ is checking the latest payment status for reference {reference || 'unknown'}.
+          Stage 1/2 - WIEZ is checking the latest payment status for reference {reference || 'unknown'}.
         </p>
       </div>
     );
@@ -419,7 +428,7 @@ const PaymentReturnPage: React.FC = () => {
       {shouldAutoVerify && autoVerifyAttempts < AUTO_VERIFY_MAX_ATTEMPTS && (
         <div className="mb-8 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-left text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
           <p>
-            WEAZ is checking automatically every 10 seconds (attempt {Math.min(autoVerifyAttempts + 1, AUTO_VERIFY_MAX_ATTEMPTS)} of {AUTO_VERIFY_MAX_ATTEMPTS}).
+            WIEZ is checking automatically every 10 seconds (attempt {Math.min(autoVerifyAttempts + 1, AUTO_VERIFY_MAX_ATTEMPTS)} of {AUTO_VERIFY_MAX_ATTEMPTS}).
           </p>
           <p className="mt-1">
             You can safely leave this page — your payment is being confirmed in the background.
@@ -450,7 +459,7 @@ const PaymentReturnPage: React.FC = () => {
               Retry this payment from your bag checkout
             </h2>
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              WEAZ now uses one payment initialization path. Prepare this custom order in your bag, then complete payment in checkout.
+              WIEZ now uses one payment initialization path. Prepare this custom order in your bag, then complete payment in checkout.
             </p>
           </div>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">

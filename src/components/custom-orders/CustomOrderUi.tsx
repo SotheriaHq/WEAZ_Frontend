@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { CustomOrderProgressStage } from '@/api/CustomOrderApi';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { humanizeCustomOrderToken } from './customOrderFormatting';
@@ -179,7 +179,7 @@ export const CustomOrderBadge: React.FC<{ value?: string | null; type?: 'status'
   type = 'status',
 }) => {
   if (!value) {
-    return <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">—</span>;
+    return <span className="inline-flex max-w-full whitespace-normal break-words rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">—</span>;
   }
 
   const text =
@@ -187,19 +187,176 @@ export const CustomOrderBadge: React.FC<{ value?: string | null; type?: 'status'
       ? stageLabelMap[value as CustomOrderProgressStage] ?? humanizeCustomOrderToken(value)
       : humanizeCustomOrderToken(value);
   const tone = statusToneMap[value] ?? 'bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-200';
-  return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>{text}</span>;
+  return (
+    <span
+      className={`inline-flex max-w-full whitespace-normal break-words rounded-full px-3 py-1 text-left text-xs font-semibold leading-snug ${tone}`}
+    >
+      {text}
+    </span>
+  );
 };
+
+/**
+ * Additive buyer payment lines that MUST sum to grandTotal.
+ *
+ * Pricing engine contract (custom-order-pricing.service):
+ *   outfitTotal (stored as subtotal) = productionBase + fabric + rush
+ *   grandTotal = outfitTotal + delivery
+ *
+ * So production base must exclude fabric AND rush:
+ *   productionBase = subtotal - fabric - rush
+ */
+export const CustomOrderBuyerPaymentBreakdown: React.FC<{
+  summary?: {
+    fabricCharge?: number | null;
+    subtotal?: number | null;
+    shippingFee?: number | null;
+    rushFee?: number | null;
+    grandTotal?: number | null;
+    currency?: string | null;
+    /** Optional explicit labor charge when present on locked summary. */
+    productionCharge?: number | null;
+  } | null;
+  formatCurrency: (value: number, currency?: string) => string;
+  title?: string;
+}> = ({ summary, formatCurrency, title = 'Buyer payment breakdown' }) => {
+  const currency = summary?.currency || 'NGN';
+  const fabric = Math.max(0, Number(summary?.fabricCharge ?? 0));
+  const subtotal = Math.max(0, Number(summary?.subtotal ?? 0));
+  const shipping = Math.max(0, Number(summary?.shippingFee ?? 0));
+  const rush = Math.max(0, Number(summary?.rushFee ?? 0));
+  const grandTotal = Math.max(0, Number(summary?.grandTotal ?? 0));
+  const explicitProduction = Number(summary?.productionCharge);
+  // outfitTotal (subtotal) already includes rush + fabric; strip both for labor only.
+  // Never do (subtotal - fabric) alone — that double-counts rush when rush is listed separately.
+  const productionBase =
+    Number.isFinite(explicitProduction) && explicitProduction > 0
+      ? Math.round((explicitProduction + Number.EPSILON) * 100) / 100
+      : subtotal > 0
+        ? Math.max(0, Math.round((subtotal - fabric - rush + Number.EPSILON) * 100) / 100)
+        : Math.max(
+            0,
+            Math.round((grandTotal - fabric - shipping - rush + Number.EPSILON) * 100) / 100,
+          );
+
+  const lineSum = Math.round((productionBase + fabric + shipping + rush + Number.EPSILON) * 100) / 100;
+  const linesMatchTotal =
+    grandTotal <= 0 || Math.abs(lineSum - grandTotal) < 0.02;
+
+  const rows: Array<{ label: string; value: string; emphasized?: boolean; hint?: string }> = [];
+  if (productionBase > 0) {
+    rows.push({
+      label: 'Production base',
+      value: formatCurrency(productionBase, currency),
+      hint: 'Labor and production charge only. Excludes fabric, rush, and delivery.',
+    });
+  }
+  if (fabric > 0) {
+    rows.push({
+      label: 'Fabric',
+      value: formatCurrency(fabric, currency),
+      hint: 'Fabric yardage cost charged to the buyer.',
+    });
+  }
+  if (rush > 0) {
+    rows.push({
+      label: 'Rush fee',
+      value: formatCurrency(rush, currency),
+      hint: 'Expedited production surcharge selected by the buyer.',
+    });
+  }
+  if (shipping > 0 || grandTotal > 0) {
+    rows.push({
+      label: 'Delivery fee',
+      value: formatCurrency(shipping, currency),
+      hint: 'Shipping / delivery fee paid by the buyer.',
+    });
+  }
+  rows.push({
+    label: 'Buyer paid total',
+    value: formatCurrency(grandTotal, currency),
+    emphasized: true,
+    hint: 'Exact amount the buyer paid (production + fabric + rush + delivery).',
+  });
+
+  return (
+    <div className="min-w-0">
+      <div className="text-sm font-semibold text-slate-900 dark:text-white">{title}</div>
+      <dl className="mt-2 divide-y divide-black/5 dark:divide-white/10">
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            className={`grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-0.5 py-2 ${
+              row.emphasized ? 'bg-emerald-50/70 px-2 dark:bg-emerald-500/10' : 'px-0.5'
+            }`}
+          >
+            <dt
+              className="min-w-0 text-[13px] font-medium text-slate-600 dark:text-slate-300"
+              title={row.hint}
+            >
+              <span className="break-words">{row.label}</span>
+              {row.hint ? (
+                <span
+                  className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 text-[10px] font-bold text-slate-500 dark:border-slate-600 dark:text-slate-400"
+                  aria-label={row.hint}
+                  title={row.hint}
+                >
+                  i
+                </span>
+              ) : null}
+            </dt>
+            <dd
+              className={`tabular-nums text-right text-[13px] font-semibold tracking-tight ${
+                row.emphasized ? 'text-emerald-800 dark:text-emerald-200' : 'text-slate-900 dark:text-white'
+              }`}
+            >
+              {row.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {!linesMatchTotal ? (
+        <p className="mt-2 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+          Line items ({formatCurrency(lineSum, currency)}) do not match buyer paid total. Showing locked paid total as source of truth.
+        </p>
+      ) : null}
+    </div>
+  );
+};
+
+/** Section/field title with native hover description (title attribute + visible tip on hover). */
+export const CustomOrderFieldTitle: React.FC<{
+  title: string;
+  description: string;
+  className?: string;
+}> = ({ title, description, className }) => (
+  <div className={`group relative inline-flex max-w-full items-center gap-1.5 ${className ?? ''}`}>
+    <span className="text-sm font-semibold text-slate-900 dark:text-white">{title}</span>
+    <span
+      className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full border border-slate-300 text-[10px] font-bold leading-none text-slate-500 dark:border-slate-600 dark:text-slate-400"
+      title={description}
+      aria-label={description}
+    >
+      i
+    </span>
+    <span
+      role="tooltip"
+      className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-[min(18rem,70vw)] rounded-lg border border-black/10 bg-slate-900 px-2.5 py-2 text-[11px] font-medium leading-snug text-white shadow-lg group-hover:block dark:border-white/15 dark:bg-slate-800"
+    >
+      {description}
+    </span>
+  </div>
+);
 
 export const CustomOrderMetricCard: React.FC<{ label: string; value: React.ReactNode; helper?: React.ReactNode }> = ({
   label,
   value,
   helper,
 }) => (
-  <div className="group relative flex h-full min-h-[104px] min-w-0 flex-col justify-center overflow-hidden rounded-[1.4rem] border border-black/5 bg-gradient-to-br from-white to-slate-50/50 p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md dark:border-white/[0.05] dark:from-white/[0.03] dark:to-transparent">
-    <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:animate-shimmer group-hover:opacity-100 dark:via-white/5" />
-    <div className="relative text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-[11px] sm:tracking-[0.18em] dark:text-slate-400">{label}</div>
-    <div className="relative mt-1.5 min-w-0 break-words text-lg font-bold leading-tight text-slate-900 dark:text-white">{value}</div>
-    {helper ? <div className="relative mt-1 min-w-0 break-words text-[11px] font-medium text-slate-500 dark:text-slate-400">{helper}</div> : null}
+  <div className="group relative flex h-full min-h-0 min-w-0 flex-col justify-center overflow-hidden rounded-xl border border-black/5 bg-gradient-to-br from-white to-slate-50/50 px-3.5 py-3 shadow-sm dark:border-white/[0.05] dark:from-white/[0.03] dark:to-transparent">
+    <div className="relative text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{label}</div>
+    <div className="relative mt-1 min-w-0 break-words text-base font-bold leading-snug text-slate-900 dark:text-white">{value}</div>
+    {helper ? <div className="relative mt-0.5 min-w-0 break-words text-[11px] font-medium text-slate-500 dark:text-slate-400">{helper}</div> : null}
   </div>
 );
 
@@ -357,31 +514,80 @@ export const CustomOrderWorkspaceTabs: React.FC<{
   </div>
 );
 
-export const CustomOrderMediaPreview: React.FC<{ src?: string | null; title: string; emoji?: string; className?: string }> = ({
-  src,
-  title,
-  emoji = '🧵',
-  className,
-}) => (
-  <div className={`group relative overflow-hidden rounded-[2rem] border border-white/40 bg-gradient-to-b from-black/[0.02] to-black/[0.05] shadow-sm dark:border-white/10 dark:from-white/[0.02] dark:to-white/[0.05] ${className ?? ''}`}>
-    {src ? (
-      <>
-        <ImageWithFallback
-          src={src}
-          alt={title}
-          fallbackName={title}
-          fit="contain"
-          rounded="none"
-          containerClassName="flex min-h-[240px] w-full items-center justify-center overflow-hidden lg:min-h-[320px]"
-          className="h-auto w-full max-h-[85vh] transition-transform duration-700 group-hover:scale-[1.02]"
-          maxHeightClassName="max-h-[85vh]"
-        />
-        <div className="pointer-events-none absolute inset-0 rounded-[2rem] ring-1 ring-inset ring-black/10 dark:ring-white/10" />
-      </>
-    ) : (
-      <div className="flex min-h-[260px] items-center justify-center bg-slate-900 text-7xl text-white transition-colors duration-500 group-hover:bg-slate-800 dark:bg-slate-950">
-        <span aria-hidden="true" className="transition-transform duration-500 group-hover:scale-110">{emoji}</span>
-      </div>
-    )}
-  </div>
-);
+export const CustomOrderMediaPreview: React.FC<{
+  src?: string | null;
+  /** All angles the designer posted. When >1, a thumbnail gallery is shown. */
+  sources?: Array<string | null | undefined> | null;
+  title: string;
+  emoji?: string;
+  className?: string;
+}> = ({ src, sources, title, emoji = '🧵', className }) => {
+  // Prefer the explicit multi-angle list; fall back to the single cover so all
+  // existing single-image callers keep working unchanged (Rule 31 additive).
+  const images = useMemo(() => {
+    const list = (sources && sources.length > 0 ? sources : [src])
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .filter((value): value is string => value.length > 0);
+    return Array.from(new Set(list));
+  }, [sources, src]);
+
+  const [activeIndex, setActiveIndex] = useState(0);
+  useEffect(() => {
+    // Reset when the underlying set of images changes (e.g. switching orders).
+    setActiveIndex(0);
+  }, [images.join('|')]);
+
+  const activeSrc = images[Math.min(activeIndex, images.length - 1)] ?? null;
+
+  return (
+    <div className={`group relative overflow-hidden rounded-[2rem] border border-white/40 bg-gradient-to-b from-black/[0.02] to-black/[0.05] shadow-sm dark:border-white/10 dark:from-white/[0.02] dark:to-white/[0.05] ${className ?? ''}`}>
+      {activeSrc ? (
+        <>
+          <ImageWithFallback
+            src={activeSrc}
+            alt={images.length > 1 ? `${title} — angle ${activeIndex + 1}` : title}
+            fallbackName={title}
+            fit="contain"
+            rounded="none"
+            containerClassName="flex min-h-[240px] w-full items-center justify-center overflow-hidden lg:min-h-[320px]"
+            className="h-auto w-full max-h-[85vh] transition-transform duration-700 group-hover:scale-[1.02]"
+            maxHeightClassName="max-h-[85vh]"
+          />
+          <div className="pointer-events-none absolute inset-0 rounded-[2rem] ring-1 ring-inset ring-black/10 dark:ring-white/10" />
+          {images.length > 1 ? (
+            <div className="absolute inset-x-0 bottom-0 flex gap-2 overflow-x-auto no-scrollbar bg-gradient-to-t from-black/40 to-transparent p-3">
+              {images.map((image, index) => (
+                <button
+                  key={image}
+                  type="button"
+                  onClick={() => setActiveIndex(index)}
+                  aria-label={`View ${title} angle ${index + 1}`}
+                  aria-current={index === activeIndex}
+                  className={`h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border transition ${
+                    index === activeIndex
+                      ? 'border-white ring-2 ring-white dark:ring-white/10'
+                      : 'border-white/40 opacity-80 hover:opacity-100'
+                  }`}
+                >
+                  <ImageWithFallback
+                    src={image}
+                    alt={`${title} angle ${index + 1}`}
+                    fallbackName={title}
+                    fit="contain"
+                    rounded="none"
+                    containerClassName="flex h-full w-full items-center justify-center bg-black/[0.04] dark:bg-white/[0.06]"
+                    className="h-full w-full"
+                  />
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <div className="flex min-h-[260px] items-center justify-center bg-slate-900 text-7xl text-white transition-colors duration-500 group-hover:bg-slate-800 dark:bg-slate-950">
+          <span aria-hidden="true" className="transition-transform duration-500 group-hover:scale-110">{emoji}</span>
+        </div>
+      )}
+    </div>
+  );
+};

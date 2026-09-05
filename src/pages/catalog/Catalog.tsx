@@ -1,19 +1,20 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
-import { useDispatch } from 'react-redux';
-import { useQueryClient } from '@tanstack/react-query';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectIsMobile } from '@/features/uiSlice';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { toast } from 'sonner';
 import ProfileHeader from '../../components/catalog/ProfileHeader';
 import OwnerCatalogMediaHeader from '../../components/catalog/OwnerCatalogMediaHeader';
 import Tabs from '../../components/Tabs';
-import AddCollectionModal from '../../components/profile/AddCollectionModal';
 import CollectionsGrid from '../../components/profile/CollectionsGrid';
 import CollectionsSkeleton from '../../components/profile/CollectionsSkeleton';
 import EmptyState from '../../components/EmptyState';
 import AddCollectionDropdown from '../../components/profile/AddCollectionDropdown';
 import ProfileHeaderSkeleton from '../../components/profile/ProfileHeaderSkeleton';
+import ScrollAssist from '../../components/ui/ScrollAssist';
 import ProfileImageModal from '../../components/profile/ProfileImageModal';
 import ReviewsTab from '../../components/profile/tabs/ReviewsTab';
 import AboutTab from '../../components/profile/tabs/AboutTab';
@@ -24,25 +25,39 @@ import { setUser } from '../../features/userSlice';
 import { brandApi } from '../../api/BrandApi';
 import { ProfilePhotoViewApi } from '@/api/ProfilePhotoViewApi';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
-import { finalizeCollectionUploads } from '@/api/collectionUploads';
+import { finalizeDesignUploads } from '@/api/DesignApi';
+import {
+  isDesignPublishJobRunning,
+  runDesignPublishJob,
+} from '@/features/designs/designPublishJob';
+import { readDesignPublishRecovery } from '@/features/designs/designPublishRecovery';
 import ProfileHeaderQuickEditModal from '../../components/profile/ProfileHeaderQuickEditModal';
-import type { BrandProfileDto, CollectionDto } from '../../types/profile';
+import type { BrandProfileDto, CollectionDto, ReviewRatingDistributionItem } from '../../types/profile';
+import type { ProductReviewResponse } from '../../api/ReviewsApi';
 import { useSignedFileUrl as useSignedFileUrlHook } from '../../hooks/useSignedFileUrl';
 import type { StoreStatusResponse } from '../../api/StoreApi';
 import CatalogShopTab from '@/components/catalog/CatalogShopTab';
 import BrandQrModal from '@/components/qr/BrandQrModal';
 import { resolveBannerImageSource, resolveProfileImageSource } from '@/utils/profileImage';
 import { buildProfileUrl } from '@/utils/publicLinks';
+import { resolvePublicBrandIdentity } from '@/utils/brandPublicIdentity';
+import { patchToastMessage } from '@/lib/patchPresentation';
 import {
   type PublishTask,
   type PublishTaskKind,
   readPublishTasks,
   subscribePublishTasks,
   prunePublishTasks,
+  reconcilePublishTasksWithDraftIds,
   removePublishTask,
+  updatePublishTask,
   getPublishTaskDesignId,
   getPublishTaskLegacyCollectionId,
   getCompactPublishTaskStatusLabel,
+  getPublishTaskRuntimePreview,
+  isLocalPublishTaskId,
+  readPublishFailedDesignIds,
+  clearPublishFailedDesignId,
 } from '@/utils/publishTracker';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
 import {
@@ -52,11 +67,14 @@ import {
 import { canManageCatalog, getActiveBrandId } from '@/lib/brandAccess';
 import {
   fetchBrandCollectionsQuery,
-  fetchCollectionDetailQuery,
+  fetchDesignDetailQuery,
   useBrandPrivateAccessStatesQuery,
   useBrandCollectionsQuery,
   useBrandProfileQuery,
+  useMyDraftCollectionsQuery,
   useStoreStatusQuery,
+  removeFromMyDraftsQueryData,
+  refreshOwnerCatalogQueries,
 } from '@/query/queries';
 import { queryKeys } from '@/query/queryKeys';
 
@@ -64,6 +82,12 @@ import ComingSoon from '../placeholders/ComingSoon';
 
 type TabType = 'Content' | 'Store' | 'Reviews' | 'Us' | 'Drafts';
 type VisibilityFilter = CatalogVisibilityFilter;
+type BrandReviewsCache = {
+  reviews: ProductReviewResponse[];
+  averageRating: number;
+  totalReviews: number;
+  ratingDistribution: ReviewRatingDistributionItem[];
+};
 const VISIBILITY_FILTERS: VisibilityFilter[] = ['Public', 'Private'];
 const OWNER_VISIBILITY_FILTERS: VisibilityFilter[] = [
   'Public',
@@ -78,6 +102,48 @@ const REVIEW_VISIBILITY_STATUS: Partial<Record<VisibilityFilter, string>> = {
   'In Review': 'IN_REVIEW',
   'Changes Requested': 'CHANGES_REQUESTED',
   Rejected: 'REJECTED',
+};
+
+const VISIBILITY_SHORT_LABELS: Partial<Record<VisibilityFilter, string>> = {
+  'In Review': 'Review',
+  'Changes Requested': 'Changes',
+  Rejected: 'Rejected',
+  Deleted: 'Deleted',
+};
+
+const VISIBILITY_ICONS: Partial<Record<VisibilityFilter, React.ReactNode>> = {
+  Public: '🌍',
+  Private: '🔒',
+  Drafts: '📝',
+  'In Review': <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-amber-100 text-[10px] font-bold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">R</span>,
+  'Changes Requested': <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-orange-100 text-[10px] font-bold text-orange-800 dark:bg-orange-900/50 dark:text-orange-200">!</span>,
+  Rejected: <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-rose-100 text-[10px] font-bold text-rose-800 dark:bg-rose-900/50 dark:text-rose-200">✕</span>,
+  Deleted: '🗑️',
+};
+
+const MODERATION_RESOLVED_STATUSES = new Set([
+  'PUBLISHED',
+  'IN_REVIEW',
+  'CHANGES_REQUESTED',
+  'REJECTED',
+]);
+
+type DesignPublishStatusDetail = {
+  status?: string | null;
+};
+
+const resolveDesignPublishStatus = async (
+  queryClient: QueryClient,
+  task: PublishTask | null | undefined,
+  fallbackId?: string | null,
+  options?: { forceRefresh?: boolean },
+): Promise<DesignPublishStatusDetail | null> => {
+  const designLookupId = task
+    ? getPublishTaskDesignId(task)
+    : fallbackId;
+  if (!designLookupId) return null;
+  const detail = await fetchDesignDetailQuery(queryClient, designLookupId, options);
+  return (detail ?? null) as DesignPublishStatusDetail | null;
 };
 
 type PrivateAccessState = {
@@ -157,12 +223,20 @@ const ProfilePage: React.FC = () => {
   } = useBrandProfile();
   
   const [drafts, setDrafts] = useState<CollectionDto[]>([]);
-  const [draftsLoading, setDraftsLoading] = useState(false);
   const [draftsError, setDraftsError] = useState<string | null>(null);
   const [draftsInitialized, setDraftsInitialized] = useState(false);
   const [isBrandQrOpen, setIsBrandQrOpen] = useState(false);
-  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; title?: string; visibility?: 'PUBLIC' | 'PRIVATE'; kind?: PublishTaskKind; reviewStatus?: string | null }>>({});
+  // 'settling' = upload finished, server row not in the list yet. The card stays
+  // mounted and fully rendered through this phase so it resolves in place
+  // instead of vanishing and popping back.
+  const [publishingStates, setPublishingStates] = useState<Record<string, { status: 'publishing' | 'failed' | 'settling'; startedAt: number; attempts: number; progress?: number; message?: string; previewUrl?: string; taskId?: string; designId?: string; title?: string; visibility?: 'PUBLIC' | 'PRIVATE'; kind?: PublishTaskKind; reviewStatus?: string | null }>>({});
   const [publishTasks, setPublishTasks] = useState<PublishTask[]>([]);
+  // Persisted markers for drafts that are actually failed go-lives — survives
+  // the local-task reconcile so the surviving Drafts card renders the
+  // "Open editor / Retry / Remove" state instead of a plain draft.
+  const [failedPublishDesignIds, setFailedPublishDesignIds] = useState<Set<string>>(new Set());
+  // Transient card highlight (e.g. arriving from a publish-failed notification).
+  const [highlightDesignId, setHighlightDesignId] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -180,19 +254,15 @@ const ProfilePage: React.FC = () => {
   
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
+  const isMobile = useSelector(selectIsMobile);
 
   const [searchQuery, setSearchQuery] = useState('');
   
   // State for inline collection viewer
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
 
-  // Handle URL params for tab, collection, and visibility filter
-  useEffect(() => {
-    const urlCollectionId = searchParams.get('collectionId');
-    if (urlCollectionId) {
-      setSelectedCollectionId(urlCollectionId);
-    }
-    const tab = String(searchParams.get('tab') ?? '').trim().toLowerCase();
+  const resolveTabFromQuery = useCallback((params: URLSearchParams): TabType => {
+    const tab = String(params.get('tab') ?? '').trim().toLowerCase();
     const tabAlias: Record<string, TabType> = {
       collections: 'Content',
       content: 'Content',
@@ -201,20 +271,56 @@ const ProfilePage: React.FC = () => {
       reviews: 'Reviews',
       us: 'Us',
     };
-    if (tabAlias[tab]) {
-      const normalized = tabAlias[tab];
-      setActiveTab(normalized as TabType);
+    return tabAlias[tab] ?? 'Content';
+  }, []);
+
+  const [activeTab, setActiveTab] = useState<TabType>(() => resolveTabFromQuery(searchParams));
+  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>(() => {
+    const fromQuery = resolveVisibilityFilterFromQuery(searchParams);
+    return fromQuery && OWNER_VISIBILITY_FILTERS.includes(fromQuery) ? fromQuery : 'Public';
+  });
+
+  const handleVisibilityFilterChange = useCallback(
+    (next: VisibilityFilter) => {
+      setVisibilityFilter(next);
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev);
+          params.set('visibility', next);
+          if (!params.get('tab')) {
+            params.set('tab', 'Content');
+          }
+          return params;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const myDraftsQuery = useMyDraftCollectionsQuery(ownerBrandId, {
+    enabled: Boolean(isOwner && ownerBrandId),
+  });
+
+  const deletedDesignsQuery = useBrandCollectionsQuery(
+    { ownerId: ownerBrandId, scope: 'design', visibility: 'all', onlyDeleted: true },
+    { enabled: Boolean(isOwner && ownerBrandId) },
+  );
+
+  // Handle URL params for tab, collection, and visibility filter
+  useEffect(() => {
+    const urlCollectionId = searchParams.get('collectionId');
+    if (urlCollectionId) {
+      setSelectedCollectionId(urlCollectionId);
     }
-    // Handle visibility/status filter from URL (e.g., after draft save or review submit redirect)
+    const nextTab = resolveTabFromQuery(searchParams);
+    setActiveTab((current) => (current === nextTab ? current : nextTab));
     const visibility = resolveVisibilityFilterFromQuery(searchParams);
     if (visibility && OWNER_VISIBILITY_FILTERS.includes(visibility)) {
-      setVisibilityFilter(visibility);
+      setVisibilityFilter((current) => (current === visibility ? current : visibility));
     }
-  }, [searchParams]);
+  }, [resolveTabFromQuery, searchParams]);
 
-  const [activeTab, setActiveTab] = useState<TabType>('Content');
-  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>('Public');
-  const [isAddOpen, setIsAddOpen] = useState(false);
   const [pendingAccessConfirm, setPendingAccessConfirm] = useState<string | null>(null);
   const [collectionToDelete, setCollectionToDelete] = useState<string | null>(null);
   const [collectionToRestore, setCollectionToRestore] = useState<string | null>(null);
@@ -222,8 +328,61 @@ const ProfilePage: React.FC = () => {
   const [recentlyDeletedDesign, setRecentlyDeletedDesign] = useState<{ isDraft: boolean } | null>(null);
   const [locallyRemovedCollectionIds, setLocallyRemovedCollectionIds] = useState<Set<string>>(new Set());
   const [deletedDesigns, setDeletedDesigns] = useState<CollectionDto[]>([]);
-  const [deletedDesignsLoading, setDeletedDesignsLoading] = useState(false);
   const [deletedDesignsError, setDeletedDesignsError] = useState<string | null>(null);
+  const [deletedDesignsInitialized, setDeletedDesignsInitialized] = useState(false);
+
+  const collectionListChanged = useCallback(
+    (current: CollectionDto[], next: CollectionDto[]) => {
+      if (current.length !== next.length) return true;
+      return current.some((entry, index) => entry.id !== next[index]?.id);
+    },
+    [],
+  );
+
+  // Sync react-query draft/deleted caches during render so tab switches paint
+  // cached data on the first frame — never a blocking skeleton on revisits.
+  // Respect optimistic removals so a stale query cache cannot resurrect deleted rows.
+  if (isOwner && myDraftsQuery.data) {
+    const uniqueDrafts = myDraftsQuery.data.reduce((acc, draft) => {
+      if (!acc.some((entry) => entry.id === draft.id)) {
+        acc.push(draft);
+      }
+      return acc;
+    }, [] as CollectionDto[]).filter((draft) => !locallyRemovedCollectionIds.has(draft.id));
+    if (collectionListChanged(drafts, uniqueDrafts)) {
+      setDrafts(uniqueDrafts);
+    }
+    if (!draftsInitialized) {
+      setDraftsInitialized(true);
+    }
+    if (draftsError) {
+      setDraftsError(null);
+    }
+  }
+
+  if (isOwner && deletedDesignsQuery.data) {
+    const visibleDeleted = deletedDesignsQuery.data.filter(
+      (item) => !locallyRemovedCollectionIds.has(item.id),
+    );
+    if (collectionListChanged(deletedDesigns, visibleDeleted)) {
+      setDeletedDesigns(visibleDeleted);
+    }
+    if (!deletedDesignsInitialized) {
+      setDeletedDesignsInitialized(true);
+    }
+    if (deletedDesignsError) {
+      setDeletedDesignsError(null);
+    }
+  }
+
+  if (isOwner && myDraftsQuery.error && !draftsInitialized) {
+    setDraftsError('Unable to connect to server. Please check your connection.');
+  }
+
+  if (isOwner && deletedDesignsQuery.error && !deletedDesignsInitialized) {
+    setDeletedDesignsError('Unable to load deleted designs.');
+  }
+
   // collectionType state removed; modal is opened with the selected type via handler
   const [storeStatus, setStoreStatus] = useState<StoreStatusResponse | null>(null);
   const [storeStatusLoading, setStoreStatusLoading] = useState(false);
@@ -240,16 +399,45 @@ const ProfilePage: React.FC = () => {
 
   useEffect(() => {
     prunePublishTasks();
-    setPublishTasks(readPublishTasks(publishTaskScope));
-    return subscribePublishTasks(() => {
-      setPublishTasks(readPublishTasks(publishTaskScope));
-    });
+    const sync = () => {
+      setPublishTasks(readPublishTasks(publishTaskScope, 'design'));
+      setFailedPublishDesignIds((prev) => {
+        const next = readPublishFailedDesignIds(publishTaskScope);
+        if (prev.size === next.size && [...next].every((id) => prev.has(id))) {
+          return prev;
+        }
+        return next;
+      });
+    };
+    sync();
+    return subscribePublishTasks(sync);
   }, [publishTaskScope]);
 
-  const handleOpenAddModal = () => {
-    // collection type passed from dropdown; modal uses internal defaults for now
-    setIsAddOpen(true);
-  };
+  // Industry-standard stale-while-revalidate: refresh owner catalog when the
+  // path/search actually changes — not on every location.key (state-only nav
+  // clears used to re-key and spam refetch during go-live).
+  const catalogRouteKey = `${location.pathname}${location.search}`;
+  useEffect(() => {
+    if (!isOwner || !ownerBrandId) return;
+    refreshOwnerCatalogQueries(queryClient, ownerBrandId);
+  }, [isOwner, catalogRouteKey, ownerBrandId, queryClient]);
+
+  useEffect(() => {
+    if (!isOwner || !ownerBrandId) return;
+    const onFocus = () => refreshOwnerCatalogQueries(queryClient, ownerBrandId);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [isOwner, ownerBrandId, queryClient]);
+
+  useEffect(() => {
+    if (!isOwner || !user?.id) return;
+    const onContentReviewUpdated = () => {
+      void fetchCollections(user.id, { forceRefresh: true });
+    };
+    window.addEventListener('wiez:content-review-updated', onContentReviewUpdated);
+    return () => window.removeEventListener('wiez:content-review-updated', onContentReviewUpdated);
+  }, [fetchCollections, isOwner, user?.id]);
+
 
   // Capture navigation state from publish flow to show inline publishing badge on card
   useEffect(() => {
@@ -258,7 +446,8 @@ const ProfilePage: React.FC = () => {
     if (navState.publishingTaskId) {
       const taskId = String(navState.publishingTaskId);
       const task = publishTasks.find((entry) => entry.id === taskId);
-      const lookupId = (task ? getPublishTaskDesignId(task) : null) || taskId;
+      // Always key by local task id so progress updates don't spawn a second card.
+      const lookupId = taskId;
       const kind: PublishTaskKind = navState.publishingKind === 'draft' || task?.kind === 'draft' ? 'draft' : 'publish';
       const startedAt = typeof navState.publishingStartedAt === 'number' ? navState.publishingStartedAt : task?.startedAt ?? Date.now();
       setPublishingStates((prev) => ({
@@ -267,14 +456,22 @@ const ProfilePage: React.FC = () => {
           status: task?.status === 'failed' ? 'failed' : 'publishing',
           startedAt,
           attempts: 0,
-          progress: task?.progress,
-          previewUrl: task?.coverPreviewUrl,
+          progress: task?.progress ?? prev[lookupId]?.progress ?? 0,
+          previewUrl:
+            task?.coverPreviewUrl ||
+            getPublishTaskRuntimePreview(taskId) ||
+            prev[lookupId]?.previewUrl ||
+            undefined,
           taskId,
+          designId: task ? getPublishTaskDesignId(task) : prev[lookupId]?.designId,
           kind,
+          title: task?.title || (typeof navState.publishingTitle === 'string' ? navState.publishingTitle : undefined),
           reviewStatus:
             typeof navState.publishingReviewStatus === 'string'
               ? String(navState.publishingReviewStatus).toUpperCase()
-              : null,
+              : kind === 'publish'
+                ? 'IN_REVIEW'
+                : null,
           visibility:
             navState.publishingVisibility === 'PRIVATE'
               ? 'PRIVATE'
@@ -290,9 +487,9 @@ const ProfilePage: React.FC = () => {
       }));
       if (kind === 'draft') {
         setDraftsInitialized(true);
-        setDraftsLoading(false);
       }
-      navigate(`${location.pathname}${location.search}`, { replace: true });
+      // Clear nav state without changing the search string (avoids location.key thrash).
+      navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
       return;
     }
 
@@ -332,9 +529,32 @@ const ProfilePage: React.FC = () => {
   }, [fetchCollections, isOwner, location.pathname, location.search, location.state, navigate, publishTasks, user?.id]);
 
   const isEditModalOpen = searchParams.get('modal') === 'brand-setup';
+  const activeReviewsBrandId = isOwner
+    ? user?.id ?? null
+    : isVisitorView
+      ? routeBrandId ?? null
+      : null;
+  const cachedReviewsForActiveBrand = activeReviewsBrandId
+    ? queryClient.getQueryData<BrandReviewsCache>(queryKeys.reviews.brand(activeReviewsBrandId))
+    : undefined;
+  const hasLoadedActiveReviews =
+    Boolean(activeReviewsBrandId) && loadedReviewsBrandId === activeReviewsBrandId;
+  const reviewsDisplayData: BrandReviewsCache = hasLoadedActiveReviews
+    ? { reviews, averageRating, totalReviews, ratingDistribution }
+    : cachedReviewsForActiveBrand ?? {
+        reviews: [],
+        averageRating: 0,
+        totalReviews: 0,
+        ratingDistribution: [],
+      };
+  const reviewsTabLoading =
+    Boolean(activeReviewsBrandId) &&
+    !hasLoadedActiveReviews &&
+    !cachedReviewsForActiveBrand &&
+    reviewsLoading;
 
   const getHasDismissedBrandSetup = useCallback(() => {
-    const DISMISS_KEY = 'threadly.brandProfileSetup.dismissedUntil';
+    const DISMISS_KEY = 'wiez.brandProfileSetup.dismissedUntil';
     if (typeof window === 'undefined') return false;
     const dismissedUntilRaw = window.localStorage.getItem(DISMISS_KEY);
     const dismissedUntil = dismissedUntilRaw ? Number(dismissedUntilRaw) : 0;
@@ -346,99 +566,48 @@ const ProfilePage: React.FC = () => {
       return;
     }
 
-    if (isOwner && user?.id && loadedReviewsBrandId !== user.id && !reviewsLoading) {
-      void fetchReviews(user.id);
-    }
-
-    if (isVisitorView && routeBrandId && loadedReviewsBrandId !== routeBrandId && !reviewsLoading) {
-      void fetchReviews(routeBrandId);
+    if (activeReviewsBrandId && loadedReviewsBrandId !== activeReviewsBrandId && !reviewsLoading) {
+      void fetchReviews(activeReviewsBrandId);
     }
   }, [
     activeTab,
+    activeReviewsBrandId,
     fetchReviews,
-    isOwner,
-    isVisitorView,
     loadedReviewsBrandId,
     reviewFlags.readEnabled,
     reviewFlagsLoading,
     reviewsLoading,
-    routeBrandId,
-    user?.id,
   ]);
 
-  useEffect(() => {
-    if (visibilityFilter === 'Drafts' && isOwner) {
-      setDraftsLoading(true);
-      setDraftsError(null);
-      brandApi.getMyDraftCollections()
-        .then(items => {
-          // Deduplicate by ID to prevent showing duplicate draft cards
-          const uniqueDrafts = items.reduce((acc, draft) => {
-            if (!acc.some(d => d.id === draft.id)) {
-              acc.push(draft);
-            }
-            return acc;
-          }, [] as typeof items);
-          setDrafts(uniqueDrafts);
-          setDraftsInitialized(true);
-        })
-        .catch(err => {
-          console.error(err);
-          setDraftsError('Unable to connect to server. Please check your connection.');
-        })
-        .finally(() => setDraftsLoading(false));
-    }
-  }, [visibilityFilter, isOwner]);
 
-  useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      if (visibilityFilter !== 'Deleted' || !isOwner || !user?.id) return;
-      setDeletedDesignsLoading(true);
-      setDeletedDesignsError(null);
-      try {
-        const items = await brandApi.getCollections(user.id, {
-          scope: 'design',
-          visibility: 'all',
-          onlyDeleted: true,
-        });
-        if (!mounted) return;
-        setDeletedDesigns(items);
-      } catch (error) {
-        if (!mounted) return;
-        console.error(error);
-        setDeletedDesignsError('Unable to load deleted designs.');
-      } finally {
-        if (mounted) setDeletedDesignsLoading(false);
-      }
-    };
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [visibilityFilter, isOwner, user?.id]);
 
   const requiresProfileSetup = useMemo(() => {
     if (!isOwner || !user) {
       return false;
     }
-    const description = (brandProfile?.description ?? user.brandDescription ?? '').trim();
-    const tags =
-      brandProfile?.tags ??
-      brandProfile?.hashtags ??
-      user.brandTags ??
-      [];
+    // Treat empty profile fields as missing and fall through to the redux
+    // user, which is updated synchronously on save — a stale profile
+    // snapshot must never flag a completed setup as incomplete.
+    const description = (
+      brandProfile?.description?.trim() ||
+      user.brandDescription ||
+      ''
+    ).trim();
+    const profileTags = brandProfile?.tags?.length
+      ? brandProfile.tags
+      : brandProfile?.hashtags;
+    const tags = profileTags?.length ? profileTags : (user.brandTags ?? []);
     const hasLocation =
-      Boolean((brandProfile?.country ?? user.brandCountry ?? '').trim()) ||
-      Boolean((brandProfile?.state ?? user.brandState ?? '').trim());
+      Boolean((brandProfile?.country?.trim() || user.brandCountry || '').trim()) ||
+      Boolean((brandProfile?.state?.trim() || user.brandState || '').trim());
 
     const needsSetup = description.length < 20 || tags.length === 0 || !hasLocation;
-    
+
     return needsSetup;
   }, [isOwner, user, brandProfile]);
 
   useEffect(() => {
-    const DISMISS_KEY = 'threadly.storeSetup.dismissedUntil';
+    const DISMISS_KEY = 'wiez.storeSetup.dismissedUntil';
     if (!isOwner) {
       setStoreStatus(null);
       setStoreStatusLoading(false);
@@ -465,22 +634,22 @@ const ProfilePage: React.FC = () => {
   const showStoreSetupNudge = useMemo(() => {
     if (!isOwner) return false;
     if (hasDismissedStoreSetup) return false;
-    if (storeStatusLoading) return false;
-    // Encourage setup until the store is marked live/open.
-    if (!storeStatus) return false;
-    return storeStatus.isStoreOpen === false;
+    if (storeStatusLoading && !storeStatus) return true;
+    if (!storeStatus) return true;
+    // Flag shows only until the setup FLOW is complete (independent of open/paused).
+    return storeStatus.isSetupComplete === false;
   }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading]);
 
   const showStoreSetupChip = useMemo(() => {
     if (!isOwner) return false;
     if (!hasDismissedStoreSetup) return false;
-    if (storeStatusLoading) return false;
-    if (!storeStatus) return false;
-    return storeStatus.isStoreOpen === false;
+    if (storeStatusLoading && !storeStatus) return true;
+    if (!storeStatus) return true;
+    return storeStatus.isSetupComplete === false;
   }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading]);
 
   const dismissStoreSetupNudge = useCallback(() => {
-    const DISMISS_KEY = 'threadly.storeSetup.dismissedUntil';
+    const DISMISS_KEY = 'wiez.storeSetup.dismissedUntil';
     const until = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
     localStorage.setItem(DISMISS_KEY, String(until));
     setHasDismissedStoreSetup(true);
@@ -489,7 +658,7 @@ const ProfilePage: React.FC = () => {
   const handleOpenStoreSetup = useCallback(() => {
     if (isStoreSetupNavigating) return;
     setIsStoreSetupNavigating(true);
-    navigate('/studio/store');
+    navigate('/studio/store/essentials');
   }, [isStoreSetupNavigating, navigate]);
 
   useEffect(() => {
@@ -500,7 +669,24 @@ const ProfilePage: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [isStoreSetupNavigating]);
 
+  // Auto-prompt fires at most once per BROWSER SESSION (not once per mount).
+  // A mount-scoped ref re-fired on every catalog remount, so a hard refresh
+  // re-popped the profile modal. sessionStorage survives refresh but resets for
+  // a new session, so the nudge shows once and then leaves the user alone.
+  const AUTO_PROMPT_SESSION_KEY = 'wiez.brandProfileSetup.promptedSession';
+  const hasAutoPromptedSetupRef = useRef(false);
   useEffect(() => {
+    if (hasAutoPromptedSetupRef.current) return;
+    let promptedThisSession = false;
+    try {
+      promptedThisSession = sessionStorage.getItem(AUTO_PROMPT_SESSION_KEY) === '1';
+    } catch {
+      promptedThisSession = false;
+    }
+    if (promptedThisSession) {
+      hasAutoPromptedSetupRef.current = true;
+      return;
+    }
     const hasDismissedSetup = getHasDismissedBrandSetup();
     if (
       isOwner &&
@@ -509,10 +695,17 @@ const ProfilePage: React.FC = () => {
       !hasDismissedSetup &&
       !isEditModalOpen
     ) {
+      hasAutoPromptedSetupRef.current = true;
+      try {
+        sessionStorage.setItem(AUTO_PROMPT_SESSION_KEY, '1');
+      } catch {
+        // Non-fatal: without sessionStorage the ref still guards this mount.
+      }
       const next = new URLSearchParams(searchParams);
       next.set('modal', 'brand-setup');
       next.set('modalOrigin', 'prompt');
-      setSearchParams(next);
+      // replace: the prompt is not a user navigation — Back must not reopen it.
+      setSearchParams(next, { replace: true });
     }
   }, [
     isOwner,
@@ -582,16 +775,66 @@ const ProfilePage: React.FC = () => {
   // ---------------- Visitor data fetch ----------------
   const [visitorProfile, setVisitorProfile] = useState<BrandProfileDto | null>(null);
   const [visitorCollections, setVisitorCollections] = useState<CollectionDto[]>([]);
-  const [visitorLoading, setVisitorLoading] = useState<boolean>(() => Boolean(isVisitorView));
-  const [visitorError, setVisitorError] = useState<string | null>(null);
   const [isVisitorAvatarModalOpen, setIsVisitorAvatarModalOpen] = useState(false);
   const visitorProfileQuery = useBrandProfileQuery(normalizedRouteBrandId, {
     enabled: Boolean(isVisitorView && normalizedRouteBrandId),
   });
+  // Brand profile `id` is always the owner user id (getBrandOrThrow returns User).
+  // Collections are keyed by Collection.ownerId = User.id. Prefer resolved owner
+  // id; backend also accepts Brand.id, so do not block the list fetch on profile.
+  const visitorOwnerUserId =
+    (typeof visitorProfileQuery.data?.id === 'string' && visitorProfileQuery.data.id.trim()) ||
+    normalizedRouteBrandId;
   const visitorCollectionsQuery = useBrandCollectionsQuery(
-    { ownerId: normalizedRouteBrandId, visibility: 'all', scope: 'design' },
-    { enabled: Boolean(isVisitorView && normalizedRouteBrandId) },
+    { ownerId: visitorOwnerUserId, visibility: 'all', scope: 'design' },
+    {
+      enabled: Boolean(isVisitorView && visitorOwnerUserId),
+    },
   );
+
+  // Reset mirrors when routing to a DIFFERENT brand so brand A's data never
+  // flashes under brand B's URL (render-phase reset-on-key-change pattern).
+  const [visitorBrandKey, setVisitorBrandKey] = useState(normalizedRouteBrandId);
+  if (visitorBrandKey !== normalizedRouteBrandId) {
+    setVisitorBrandKey(normalizedRouteBrandId);
+    setVisitorProfile(null);
+    setVisitorCollections([]);
+  }
+
+  // Sync query results into the local mirrors DURING RENDER (not in an effect)
+  // so a warm react-query cache paints real content on the very first frame.
+  // The old effect-based mirror guaranteed at least one full skeleton frame on
+  // EVERY profile visit — even with cached data — because state only updated
+  // after paint. React re-renders synchronously (before commit) when state is
+  // set during render, so this path never paints a skeleton over cached data.
+  if (isVisitorView) {
+    const nextProfile = visitorProfileQuery.data ?? null;
+    if (visitorProfileQuery.data !== undefined && visitorProfile !== nextProfile) {
+      setVisitorProfile(nextProfile);
+    }
+    if (visitorCollectionsQuery.data && visitorCollections !== visitorCollectionsQuery.data) {
+      setVisitorCollections(visitorCollectionsQuery.data);
+    }
+  } else if (visitorProfile !== null || visitorCollections.length > 0) {
+    setVisitorProfile(null);
+    setVisitorCollections([]);
+  }
+
+  // Full-page skeleton only while the brand profile has never settled.
+  // Do NOT wait on collections (grid can skeleton in-place) and do NOT use
+  // isFetching (background refetch would re-trap the whole page for minutes).
+  const visitorLoading =
+    isVisitorView &&
+    Boolean(normalizedRouteBrandId) &&
+    !visitorProfile &&
+    visitorProfileQuery.isPending;
+  const visitorError =
+    isVisitorView &&
+    !visitorProfile &&
+    !visitorLoading &&
+    (visitorProfileQuery.isError || visitorProfileQuery.isFetched)
+      ? 'Failed to load profile data'
+      : null;
   const {
     getPatched,
     isLoading: isPatchLoading,
@@ -602,44 +845,6 @@ const ProfilePage: React.FC = () => {
   const showPatchAction = Boolean(isVisitorView && user?.type === 'REGULAR' && routeBrandId);
   const isPatched = showPatchAction ? getPatched(routeBrandId) : false;
   const patchLoading = showPatchAction ? isPatchLoading(routeBrandId) : false;
-
-  useEffect(() => {
-    if (!isVisitorView || !normalizedRouteBrandId) {
-      setVisitorProfile(null);
-      setVisitorCollections([]);
-      setVisitorLoading(false);
-      setVisitorError(null);
-      return;
-    }
-
-    if (visitorProfileQuery.data !== undefined) {
-      setVisitorProfile(visitorProfileQuery.data ?? null);
-    }
-    if (visitorCollectionsQuery.data) {
-      setVisitorCollections(visitorCollectionsQuery.data);
-    }
-    const hasCachedVisitorData = Boolean(visitorProfile || visitorCollections.length > 0);
-    setVisitorLoading(
-      !hasCachedVisitorData &&
-        (visitorProfileQuery.isLoading || visitorCollectionsQuery.isLoading),
-    );
-    if (visitorProfileQuery.error || visitorCollectionsQuery.error) {
-      setVisitorError('Failed to load profile data');
-    } else {
-      setVisitorError(null);
-    }
-  }, [
-    isVisitorView,
-    normalizedRouteBrandId,
-    visitorCollections.length,
-    visitorCollectionsQuery.data,
-    visitorCollectionsQuery.error,
-    visitorCollectionsQuery.isLoading,
-    visitorProfile,
-    visitorProfileQuery.data,
-    visitorProfileQuery.error,
-    visitorProfileQuery.isLoading,
-  ]);
 
   useEffect(() => {
     if (!showPatchAction || !routeBrandId) return;
@@ -654,11 +859,7 @@ const ProfilePage: React.FC = () => {
     }
     try {
       const nextPatchedState = await toggleStatus(routeBrandId);
-      toast.success(
-        nextPatchedState
-          ? 'Patched successfully. You will now receive brand updates.'
-          : 'Unpatched successfully. You will no longer receive patch-only updates.',
-      );
+      toast.success(patchToastMessage(nextPatchedState));
     } catch {
       toast.error('Failed to update patch status.');
     }
@@ -699,16 +900,74 @@ const ProfilePage: React.FC = () => {
     [isVisitorView, visitorCollections, collections]
   );
 
+  /**
+   * Every id the server has actually handed us, across every tab's list.
+   *
+   * This is the handoff signal between the local progress card and the real
+   * row. Without it the local card was dropped the instant the upload reported
+   * `published`/`saved`, while the refetched list had not rendered yet — so the
+   * card vanished for a beat and then reappeared fully formed. That gap is the
+   * blink owners see on every upload, on every tab.
+   */
+  const serverKnownIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const entry of activeCollections) if (entry?.id) ids.add(entry.id);
+    for (const entry of drafts) if (entry?.id) ids.add(entry.id);
+    return ids;
+  }, [activeCollections, drafts]);
+
+  // Single card key = local task.id for the whole in-flight lifetime. Never re-key
+  // to designId mid-upload (that was the double-card + remount flash).
   useEffect(() => {
     if (publishTasks.length === 0) return;
     setPublishingStates((prev) => {
       let changed = false;
       const next = { ...prev };
-      publishTasks.forEach((task) => {
-        const key = getPublishTaskDesignId(task) || task.id;
-        if (key !== task.id && next[task.id]) {
-          delete next[task.id];
+      const liveTaskIds = new Set(publishTasks.map((task) => task.id));
+
+      // Drop orphaned in-flight entries that no longer have a publish task.
+      for (const key of Object.keys(next)) {
+        const entry = next[key];
+        if (!entry) continue;
+        const taskId = entry.taskId ?? key;
+        if (
+          (entry.status === 'publishing' ||
+            entry.status === 'failed' ||
+            entry.status === 'settling') &&
+          !liveTaskIds.has(taskId) &&
+          isLocalPublishTaskId(taskId)
+        ) {
+          delete next[key];
           changed = true;
+        }
+      }
+
+      publishTasks.forEach((task) => {
+        // Always key by local task id while in-flight / failed.
+        const key = task.id;
+        const nextDesignId = getPublishTaskDesignId(task);
+        // Remove any accidental secondary entry keyed by design id.
+        if (nextDesignId && next[nextDesignId] && nextDesignId !== key) {
+          delete next[nextDesignId];
+          changed = true;
+        }
+        if (task.status === 'published' || task.status === 'saved') {
+          // Terminal local status: the server row owns display FROM THE MOMENT
+          // IT EXISTS — not from the moment the upload finished. Handing over
+          // early leaves a frame with neither card, which is the disappear /
+          // reappear flash. Hold the finished card in place (it already shows
+          // the real cover and title) until its row is in the list, then swap.
+          const serverRowReady = !nextDesignId || serverKnownIds.has(nextDesignId);
+          if (next[key] && serverRowReady) {
+            delete next[key];
+            changed = true;
+          } else if (next[key] && next[key].status !== 'settling') {
+            // Keep the card mounted, but stop it reading as in-progress: the
+            // work is done and only the list refresh is outstanding.
+            next[key] = { ...next[key], status: 'settling', progress: 100, message: '' };
+            changed = true;
+          }
+          return;
         }
         const current = next[key];
         const nextStatus = task.status === 'failed' ? 'failed' : 'publishing';
@@ -717,30 +976,45 @@ const ProfilePage: React.FC = () => {
           task.error ||
           task.message ||
           getCompactPublishTaskStatusLabel({
-            status: task.status === 'failed' ? 'failed' : task.status === 'finalizing' ? 'finalizing' : 'uploading',
+            status:
+              task.status === 'failed'
+                ? 'failed'
+                : task.status === 'finalizing'
+                  ? 'finalizing'
+                  : 'uploading',
             kind: isDraftTask ? 'draft' : 'publish',
             progress: task.progress,
           });
+        const nextPreviewUrl =
+          task.coverPreviewUrl ||
+          getPublishTaskRuntimePreview(task.id) ||
+          current?.previewUrl;
+        const nextReviewStatus =
+          current?.reviewStatus ?? (!isDraftTask ? 'IN_REVIEW' : null);
         if (
           !current ||
           current.status !== nextStatus ||
           current.progress !== task.progress ||
           current.message !== nextMessage ||
-          current.previewUrl !== task.coverPreviewUrl ||
+          current.previewUrl !== nextPreviewUrl ||
           current.taskId !== task.id ||
+          current.designId !== nextDesignId ||
           current.title !== task.title ||
-          current.kind !== task.kind
+          current.kind !== task.kind ||
+          current.reviewStatus !== nextReviewStatus
         ) {
           next[key] = {
             status: nextStatus,
             startedAt: task.startedAt,
             attempts: current?.attempts ?? 0,
             progress: task.progress,
-            previewUrl: task.coverPreviewUrl,
+            previewUrl: nextPreviewUrl,
             taskId: task.id,
+            designId: nextDesignId,
             title: task.title,
             visibility: task.visibility,
             kind: task.kind,
+            reviewStatus: nextReviewStatus,
             message: nextMessage,
           };
           changed = true;
@@ -748,41 +1022,52 @@ const ProfilePage: React.FC = () => {
       });
       return changed ? next : prev;
     });
-  }, [publishTasks]);
+    // serverKnownIds is a dependency on purpose: when the refetched list finally
+    // contains the new row, this effect re-runs and retires the local card. That
+    // is the swap, and it happens in the same commit as the row appearing.
+  }, [publishTasks, serverKnownIds]);
 
+  // When a local task reaches published/saved, drop it after a single background
+  // catalog refresh — do not loop on collections identity every render.
+  const cleanedCompletedTaskIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const completed = publishTasks.filter((task) => task.kind !== 'draft' && task.status === 'published' && getPublishTaskDesignId(task));
+    const completed = publishTasks.filter(
+      (task) =>
+        (task.status === 'published' || task.status === 'saved') &&
+        getPublishTaskDesignId(task) &&
+        !cleanedCompletedTaskIdsRef.current.has(task.id),
+    );
     if (completed.length === 0) return;
 
-    const checkAndCleanup = async () => {
+    let cancelled = false;
+    const cleanup = async () => {
       for (const task of completed) {
-        const designId = getPublishTaskDesignId(task);
-        const legacyCollectionId = getPublishTaskLegacyCollectionId(task);
-        if (!designId) continue;
+        cleanedCompletedTaskIdsRef.current.add(task.id);
         try {
           if (!isVisitorView && user?.id) {
             await fetchCollections(user.id, { forceRefresh: true });
           }
-          const latest = !isVisitorView ? collections : visitorCollections;
-          const isLive = latest.some((entry) => entry.id === designId || entry.id === legacyCollectionId);
-          if (isLive) {
-            removePublishTask(task.id, publishTaskScope);
-            setPublishingStates((prev) => {
-              const next = { ...prev };
-              delete next[task.id];
-              delete next[designId];
-              if (legacyCollectionId) delete next[legacyCollectionId];
-              return next;
-            });
-          }
         } catch {
-          // Ignore transient failures; polling and task updates will retry.
+          /* best-effort */
         }
+        if (cancelled) return;
+        removePublishTask(task.id, publishTaskScope);
+        setPublishingStates((prev) => {
+          const next = { ...prev };
+          delete next[task.id];
+          const designId = getPublishTaskDesignId(task);
+          const legacyCollectionId = getPublishTaskLegacyCollectionId(task);
+          if (designId) delete next[designId];
+          if (legacyCollectionId) delete next[legacyCollectionId];
+          return next;
+        });
       }
     };
-
-    void checkAndCleanup();
-  }, [collections, fetchCollections, isVisitorView, publishTaskScope, publishTasks, user?.id, visitorCollections]);
+    void cleanup();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchCollections, isVisitorView, publishTaskScope, publishTasks, user?.id]);
 
   useEffect(() => {
     if (!isOwner || visibilityFilter !== 'Drafts') return;
@@ -792,17 +1077,11 @@ const ProfilePage: React.FC = () => {
     let cancelled = false;
     const refreshDrafts = async () => {
       try {
-        const items = await brandApi.getMyDraftCollections();
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.brand.myDrafts(ownerBrandId),
+        });
         if (cancelled) return;
-        const uniqueDrafts = items.reduce((acc, draft) => {
-          if (!acc.some((entry) => entry.id === draft.id)) {
-            acc.push(draft);
-          }
-          return acc;
-        }, [] as typeof items);
-        setDrafts(uniqueDrafts);
         setDraftsInitialized(true);
-        setDraftsLoading(false);
         savedDraftTasks.forEach((task) => removePublishTask(task.id, publishTaskScope));
         setPublishingStates((prev) => {
           const next = { ...prev };
@@ -824,7 +1103,7 @@ const ProfilePage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isOwner, publishTaskScope, publishTasks, visibilityFilter]);
+  }, [isOwner, ownerBrandId, publishTaskScope, publishTasks, queryClient, visibilityFilter]);
 
   // Auto-clear stale failed publish states for collections that exist on the server
   useEffect(() => {
@@ -844,17 +1123,126 @@ const ProfilePage: React.FC = () => {
     });
   }, [activeCollections, publishTaskScope, publishingStates]);
 
+  // A failed local task whose design row DID reach the server is a ghost:
+  // publish tasks live in per-device localStorage, so reconcile on every draft
+  // fetch to keep one truth across Android / iPad / laptop browsers.
+  useEffect(() => {
+    if (drafts.length === 0) return;
+    const draftIds = drafts.map((entry) => entry.id);
+    const removed = reconcilePublishTasksWithDraftIds(draftIds, publishTaskScope);
+    if (removed === 0) return;
+    const draftIdSet = new Set(draftIds);
+    setPublishingStates((prev) => {
+      const next = { ...prev };
+      for (const [key, state] of Object.entries(prev)) {
+        const designId = state.designId ?? key;
+        if (
+          state.status === 'failed' &&
+          draftIdSet.has(designId)
+        ) {
+          delete next[key];
+          if (state.taskId) delete next[state.taskId];
+        }
+      }
+      return next;
+    });
+  }, [drafts, publishTaskScope]);
+
+  // A go-live that failed mid-upload left a media-less DRAFT on the server. Pull
+  // the draft list forward the moment we learn of the failure so the reconcile
+  // above can drop the local in-review ghost and the single Drafts card can take
+  // over — never leave the user stranded between an unopenable card and an empty
+  // draft. Refetch at most once per failed id (until it appears in drafts).
+  const refetchedFailedDesignIdsRef = useRef<Set<string>>(new Set());
+  const refetchMyDrafts = myDraftsQuery.refetch;
+  useEffect(() => {
+    if (!isOwner || failedPublishDesignIds.size === 0) return;
+    const draftIdSet = new Set(drafts.map((entry) => entry.id));
+    let shouldRefetch = false;
+    failedPublishDesignIds.forEach((id) => {
+      if (draftIdSet.has(id)) {
+        refetchedFailedDesignIdsRef.current.delete(id);
+        return;
+      }
+      if (!refetchedFailedDesignIdsRef.current.has(id)) {
+        refetchedFailedDesignIdsRef.current.add(id);
+        shouldRefetch = true;
+      }
+    });
+    if (shouldRefetch) {
+      void refetchMyDrafts();
+    }
+  }, [failedPublishDesignIds, drafts, isOwner, refetchMyDrafts]);
+
+  // Once a failed draft is successfully finished (leaves DRAFT — published or
+  // resubmitted for review), retire its failure marker so the card stops
+  // rendering the failed state on this and every other device.
+  useEffect(() => {
+    if (failedPublishDesignIds.size === 0) return;
+    const progressedPastDraft = new Set(
+      activeCollections
+        .filter((c) => {
+          const status = String(c.publicationStatus ?? c.status ?? '').toUpperCase();
+          return status.length > 0 && status !== 'DRAFT';
+        })
+        .map((c) => c.id),
+    );
+    failedPublishDesignIds.forEach((id) => {
+      if (progressedPastDraft.has(id)) {
+        clearPublishFailedDesignId(id);
+      }
+    });
+  }, [activeCollections, failedPublishDesignIds]);
+
+  // Deep-link from a notification: ?highlightDesign=<id> rings + scrolls to the
+  // exact card once, then the param is stripped so refresh/back never re-fires.
+  const appliedHighlightRef = useRef<string | null>(null);
+  useEffect(() => {
+    const hid = searchParams.get('highlightDesign');
+    if (!hid || appliedHighlightRef.current === hid) return;
+    appliedHighlightRef.current = hid;
+    setHighlightDesignId(hid);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('highlightDesign');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!highlightDesignId) return;
+    const timer = window.setTimeout(() => setHighlightDesignId(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [highlightDesignId]);
+
   const handleCollectionViewerBack = useCallback(() => {
     setSelectedCollectionId(null);
+    // Close must REPLACE — a push here makes browser-back reopen the viewer.
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete('collectionId');
       return next;
-    });
+    }, { replace: true });
   }, [setSearchParams]);
 
   const handleDismissFailedCard = useCallback((id: string) => {
     if (!id) return;
+    const state = publishingStates[id];
+    if (state?.taskId) {
+      removePublishTask(state.taskId, publishTaskScope);
+    }
+    if (isLocalPublishTaskId(id)) {
+      removePublishTask(id, publishTaskScope);
+    } else if (failedPublishDesignIds.has(id)) {
+      // "Remove" on a stranded failed-publish DRAFT means get rid of the draft
+      // itself (it never got its media). Drop the failure marker and route into
+      // the normal delete confirmation so nothing is destroyed silently.
+      clearPublishFailedDesignId(id);
+      setCollectionToDelete(id);
+    }
     setPublishingStates((prev) => {
       if (!prev[id]) return prev;
       const next = { ...prev };
@@ -865,11 +1253,12 @@ const ProfilePage: React.FC = () => {
       delete next[id];
       return next;
     });
-  }, []);
+  }, [publishTaskScope, publishingStates, failedPublishDesignIds]);
 
   const removeCollectionFromView = useCallback((collectionId: string) => {
     if (!collectionId) return;
 
+    clearPublishFailedDesignId(collectionId);
     setLocallyRemovedCollectionIds((prev) => {
       if (prev.has(collectionId)) return prev;
       const next = new Set(prev);
@@ -890,7 +1279,7 @@ const ProfilePage: React.FC = () => {
       const next = new URLSearchParams(prev);
       next.delete('collectionId');
       return next;
-    });
+    }, { replace: true });
   }, [setSearchParams]);
 
   const restoreCollectionInView = useCallback((
@@ -913,12 +1302,21 @@ const ProfilePage: React.FC = () => {
   }, []);
 
   const handleEditCollection = useCallback((id: string) => {
+    if (isLocalPublishTaskId(id)) {
+      toast.info('Upload session is still initializing. Use Retry status or remove the status card.');
+      return;
+    }
     navigate(buildDesignRoute({ designId: id, legacyCollectionId: id, mode: 'edit' }));
   }, [navigate]);
 
   const handleRequestCollectionDelete = useCallback((id: string) => {
+    if (isLocalPublishTaskId(id)) {
+      handleDismissFailedCard(id);
+      toast.success('Removed upload status card.');
+      return;
+    }
     setCollectionToDelete(id);
-  }, []);
+  }, [handleDismissFailedCard]);
 
   const handleRequestCollectionRestore = useCallback((id: string) => {
     setCollectionToRestore(id);
@@ -929,7 +1327,21 @@ const ProfilePage: React.FC = () => {
   }, []);
 
   const handleCollectionClick = useCallback((id: string) => {
+    if (isLocalPublishTaskId(id)) {
+      toast.info('Upload session is still initializing. Use Retry status to check it.');
+      return;
+    }
     if (visibilityFilter === 'Drafts') {
+      handleEditCollection(id);
+      return;
+    }
+    // In Review / Changes Requested / Rejected behave like Drafts: they are
+    // unfinished work the owner came here to ACT on, not published content to
+    // browse. They used to open the read-only viewer, which is a dead end —
+    // the owner had to find the edit route themselves after being told changes
+    // were needed. The edit screen already renders `ReviewFeedbackBanner`, so
+    // routing here is also what surfaces the reviewer's actual request.
+    if (REVIEW_VISIBILITY_STATUS[visibilityFilter]) {
       handleEditCollection(id);
       return;
     }
@@ -982,7 +1394,26 @@ const ProfilePage: React.FC = () => {
   const decoratedCollections = useMemo(() => {
     const decorated = searchAndVisibilityFiltered.map((c) => {
       const pub = publishingStates[c.id];
-      if (!pub) return c;
+      if (!pub) {
+        // No in-flight state, but this real draft is a marked failed go-live:
+        // paint the same "publish-failed" affordance (Open editor / Retry /
+        // Remove) directly on the surviving server-draft card.
+        const status = String(c.publicationStatus ?? c.status ?? '').toUpperCase();
+        if (failedPublishDesignIds.has(c.id) && status !== 'PUBLISHED') {
+          return {
+            ...c,
+            clientStatus: 'publish-failed',
+            clientStatusMessage: "Publish didn't finish",
+            clientStatusMeta: {
+              startedAt: Date.now(),
+              attempts: 0,
+              offline: !navigator.onLine,
+              kind: 'draft',
+            },
+          } as CollectionDto;
+        }
+        return c;
+      }
       // If the collection already exists on the server (has real data)
       // and the publish state is failed, the server-side publish actually
       // succeeded — skip the stale failed overlay.
@@ -1017,16 +1448,32 @@ const ProfilePage: React.FC = () => {
         .filter(([key, state]) => {
           if (decoratedIds.has(key)) return false;
           if (state.kind === 'draft') return false;
-          if (state.status !== 'publishing' && state.status !== 'failed') return false;
-          return String(state.reviewStatus ?? '').toUpperCase() === targetReviewStatus;
+          // 'settling' included: finished upload, server row still in flight.
+          // Dropping it here is what blinked the Review-tab card.
+          if (
+            state.status !== 'publishing' &&
+            state.status !== 'failed' &&
+            state.status !== 'settling'
+          ) {
+            return false;
+          }
+          // Default go-live tasks to IN_REVIEW so they land on the review tab
+          // even before finalize returns a status.
+          const reviewStatus = String(
+            state.reviewStatus ?? (state.kind === 'publish' ? 'IN_REVIEW' : ''),
+          ).toUpperCase();
+          return reviewStatus === targetReviewStatus;
         })
         .map(([key, state]) => {
           const nowIso = new Date(state.startedAt || Date.now()).toISOString();
-          const compactMessage = getCompactPublishTaskStatusLabel({
-            status: state.status === 'failed' ? 'failed' : 'uploading',
-            kind: state.kind,
-            progress: state.progress,
-          });
+          const isSettling = state.status === 'settling';
+          const compactMessage = isSettling
+            ? ''
+            : getCompactPublishTaskStatusLabel({
+                status: state.status === 'failed' ? 'failed' : 'uploading',
+                kind: state.kind,
+                progress: state.progress,
+              });
           return {
             id: key,
             status: targetReviewStatus,
@@ -1041,8 +1488,14 @@ const ProfilePage: React.FC = () => {
             coverImage: state.previewUrl,
             createdAt: nowIso,
             updatedAt: nowIso,
-            clientStatus: state.status === 'failed' ? 'publish-failed' : 'publishing',
-            clientStatusMessage: compactMessage,
+            // Settled: render as the finished review card, no progress chrome,
+            // so the handoff to the server row is invisible.
+            clientStatus: isSettling
+              ? undefined
+              : state.status === 'failed'
+                ? 'publish-failed'
+                : 'publishing',
+            clientStatusMessage: isSettling ? undefined : compactMessage,
             clientStatusMeta: {
               startedAt: state.startedAt,
               attempts: state.attempts,
@@ -1063,11 +1516,34 @@ const ProfilePage: React.FC = () => {
     const placeholders: CollectionDto[] = Object.entries(publishingStates)
       .filter(([key, state]) => {
         if (decoratedIds.has(key)) return false;
-        // Show both in-progress uploads AND failed tasks (so failed tasks surface as ghost cards)
-        if (state.status !== 'publishing' && state.status !== 'failed') return false;
+        // The real server draft (keyed by design id) already renders this card
+        // — don't also show the transient local placeholder (keyed by task id)
+        // for the same design, or a failed go-live briefly double-cards.
+        if (state.designId && decoratedIds.has(state.designId)) return false;
+        // In-progress uploads, failed tasks (surfaced as ghost cards), and
+        // 'settling' cards — the last of these are finished uploads whose server
+        // row has not landed yet. Excluding them is what emptied the slot for a
+        // beat and made the card blink.
+        if (
+          state.status !== 'publishing' &&
+          state.status !== 'failed' &&
+          state.status !== 'settling'
+        ) {
+          return false;
+        }
         if (isDraftView) {
           if (state.kind !== 'draft') return false;
         } else if (state.kind === 'draft') {
+          return false;
+        }
+        // Go-live tasks belong on In Review, not Public/Private.
+        const reviewStatus = String(state.reviewStatus ?? '').toUpperCase();
+        if (
+          !isDraftView &&
+          (reviewStatus === 'IN_REVIEW' ||
+            reviewStatus === 'CHANGES_REQUESTED' ||
+            reviewStatus === 'REJECTED')
+        ) {
           return false;
         }
         if ((state.visibility ?? 'PUBLIC') !== targetVisibility) return false;
@@ -1078,40 +1554,55 @@ const ProfilePage: React.FC = () => {
       .map(([key, state]) => {
         const nowIso = new Date(state.startedAt || Date.now()).toISOString();
         const isFailed = state.status === 'failed';
-        const compactMessage = getCompactPublishTaskStatusLabel({
-          status: isFailed ? 'failed' : 'uploading',
-          kind: state.kind,
-          progress: state.progress,
-        });
+        const isSettling = state.status === 'settling';
+        const compactMessage = isSettling
+          ? ''
+          : getCompactPublishTaskStatusLabel({
+              status: isFailed ? 'failed' : 'uploading',
+              kind: state.kind,
+              progress: state.progress,
+            });
+        const fallbackTitle = isFailed
+          ? isDraftView
+            ? 'Draft save failed'
+            : 'Publish failed'
+          : isDraftView
+            ? 'Saving draft'
+            : 'Publishing design';
         return {
           id: key,
           status: 'DRAFT',
-          name: state.title || (isFailed ? (isDraftView ? 'Draft save failed' : 'Publish failed') : (isDraftView ? 'Saving draft' : 'Publishing design')),
+          name: state.title || fallbackTitle,
           description: compactMessage,
           ownerId: user?.id || '',
-          title: state.title || (isFailed ? (isDraftView ? 'Draft save failed' : 'Publish failed') : (isDraftView ? 'Saving draft' : 'Publishing design')),
+          title: state.title || fallbackTitle,
           isPublic: targetVisibility !== 'PRIVATE',
           visibility: targetVisibility,
           type: 'EVERYBODY',
           coverImage: state.previewUrl,
           createdAt: nowIso,
           updatedAt: nowIso,
-          clientStatus: isFailed ? 'publish-failed' : 'publishing',
-          clientStatusMessage: compactMessage,
-          clientStatusMeta: {
-            startedAt: state.startedAt,
-            attempts: state.attempts,
-            offline: !navigator.onLine,
-            progress: state.progress,
-            previewUrl: state.previewUrl,
-            taskId: state.taskId,
-            kind: state.kind,
-          },
+          // A settling card carries NO client status: it renders as the finished
+          // card it is about to become, so the swap to the server row changes
+          // nothing the eye can catch.
+          clientStatus: isSettling ? undefined : isFailed ? 'publish-failed' : 'publishing',
+          clientStatusMessage: isSettling ? undefined : compactMessage,
+          clientStatusMeta: isSettling
+            ? undefined
+            : {
+                startedAt: state.startedAt,
+                attempts: state.attempts,
+                offline: !navigator.onLine,
+                progress: state.progress,
+                previewUrl: state.previewUrl,
+                taskId: state.taskId,
+                kind: state.kind,
+              },
         } as CollectionDto;
       });
 
     return [...placeholders, ...decorated];
-  }, [publishingStates, searchAndVisibilityFiltered, searchQuery, user?.id, visibilityFilter]);
+  }, [publishingStates, searchAndVisibilityFiltered, searchQuery, user?.id, visibilityFilter, failedPublishDesignIds]);
 
   const hasPendingDraftTask = useMemo(
     () => Object.values(publishingStates).some((state) => state.kind === 'draft' && (state.status === 'publishing' || state.status === 'failed')),
@@ -1130,9 +1621,9 @@ const ProfilePage: React.FC = () => {
         : collectionsError;
   const ownerContentLoading =
     visibilityFilter === 'Drafts'
-      ? draftsLoading || (!draftsInitialized && !hasPendingDraftTask)
+      ? myDraftsQuery.isLoading && !draftsInitialized && !hasPendingDraftTask
       : visibilityFilter === 'Deleted'
-        ? deletedDesignsLoading
+        ? deletedDesignsQuery.isLoading && !deletedDesignsInitialized
         : collectionsLoading && !hasPendingLiveTask;
   const isDraftVisibility = visibilityFilter === 'Drafts';
   const isDeletedVisibility = visibilityFilter === 'Deleted';
@@ -1192,8 +1683,69 @@ const ProfilePage: React.FC = () => {
     const targetCollectionId = linkedTask
       ? getPublishTaskLegacyCollectionId(linkedTask)
       : (state?.taskId && state.taskId === collectionId ? null : collectionId);
+    const recoveryTaskId = linkedTask?.id ?? state?.taskId ?? collectionId;
 
     if (!targetCollectionId) {
+      const recoveredJob = await readDesignPublishRecovery(recoveryTaskId).catch(() => null);
+      if (recoveredJob) {
+        if (isDesignPublishJobRunning(recoveredJob.taskId)) {
+          toast.info('Upload is already retrying.');
+          return;
+        }
+
+        updatePublishTask(
+          recoveredJob.taskId,
+          {
+            status: 'uploading',
+            progress: 1,
+            message: 'Retrying upload...',
+            error: undefined,
+          },
+          publishTaskScope,
+        );
+        setPublishingStates((prev) => ({
+          ...prev,
+          [collectionId]: {
+            status: 'publishing',
+            startedAt: prev[collectionId]?.startedAt ?? Date.now(),
+            attempts: (prev[collectionId]?.attempts ?? 0) + 1,
+            progress: 1,
+            previewUrl: prev[collectionId]?.previewUrl,
+            taskId: recoveredJob.taskId,
+            title: recoveredJob.title,
+            visibility: recoveredJob.designMetadata.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC',
+            kind: 'publish',
+            reviewStatus: 'IN_REVIEW',
+            message: 'Retrying upload...',
+          },
+        }));
+
+        void runDesignPublishJob({
+          ...recoveredJob,
+          publishTaskScope,
+          onComplete: () => {
+            toast.success('Design submitted for review.');
+            if (!isVisitorView && user?.id) {
+              void fetchCollections(user.id, { forceRefresh: true });
+            }
+          },
+          onError: (error) => {
+            toast.error(error.message || 'Upload retry failed.');
+          },
+        });
+        toast.info('Retrying upload from saved recovery data.');
+        return;
+      }
+
+      // A FAILED task with no server design id means initialize never
+      // succeeded and no recovery snapshot exists. Retrying can never work;
+      // be honest instead of showing a fake retry.
+      if (linkedTask?.status === 'failed' || state?.status === 'failed') {
+        toast.error(
+          'This save never reached the server and no recovery data is available. Dismiss this card and create the design again.',
+        );
+        return;
+      }
       setPublishingStates((prev) => ({
         ...prev,
         [collectionId]: {
@@ -1226,14 +1778,26 @@ const ProfilePage: React.FC = () => {
         },
       }));
 
-      const current = await fetchCollectionDetailQuery(queryClient, targetCollectionId);
-      const RETRY_RESOLVED = new Set(['PUBLISHED', 'IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED']);
-      if (!RETRY_RESOLVED.has(current?.status ?? '')) {
-        await finalizeCollectionUploads(targetCollectionId, [], true, { action: 'publish' });
+      const current = await resolveDesignPublishStatus(
+        queryClient,
+        linkedTask,
+        state?.designId ?? collectionId,
+      );
+      if (!MODERATION_RESOLVED_STATUSES.has(current?.status ?? '')) {
+        const designId =
+          (linkedTask ? getPublishTaskDesignId(linkedTask) : null) ??
+          state?.designId ??
+          collectionId;
+        await finalizeDesignUploads(designId, [], true, { action: 'publish' });
       }
 
-      const refreshedDetail = await fetchCollectionDetailQuery(queryClient, targetCollectionId, 'design', { forceRefresh: true });
-      if (!RETRY_RESOLVED.has(refreshedDetail?.status ?? '')) {
+      const refreshedDetail = await resolveDesignPublishStatus(
+        queryClient,
+        linkedTask,
+        state?.designId ?? collectionId,
+        { forceRefresh: true },
+      );
+      if (!MODERATION_RESOLVED_STATUSES.has(refreshedDetail?.status ?? '')) {
         setPublishingStates((prev) => ({
           ...prev,
           [collectionId]: {
@@ -1304,140 +1868,117 @@ const ProfilePage: React.FC = () => {
     }
   }, [fetchCollections, isVisitorView, publishTaskScope, publishTasks, publishingStates, queryClient, routeBrandId, user]);
 
-  // Poll publish status for any pending ids
-  useEffect(() => {
-    const pending = Object.entries(publishingStates)
+  // Poll only after a design id exists. Do NOT put publishingStates in deps —
+  // setState from poll would re-arm the effect and infinite-loop network calls
+  // (what produced 1000+ GETs and constant re-renders after go-live).
+  const publishingStatesRef = useRef(publishingStates);
+  publishingStatesRef.current = publishingStates;
+  const publishTasksRef = useRef(publishTasks);
+  publishTasksRef.current = publishTasks;
+  const pendingPublishPollKey = useMemo(() => {
+    return Object.entries(publishingStates)
       .filter(([, state]) => state.status === 'publishing' && state.kind !== 'draft')
-      .map(([id, state]) => {
-        const task = state.taskId
-          ? publishTasks.find((entry) => entry.id === state.taskId)
-          : publishTasks.find((entry) => entry.id === id);
-        const resolvedCollectionId = task
-          ? getPublishTaskLegacyCollectionId(task)
-          : (state.taskId && state.taskId === id ? null : id);
-        return { id, state, resolvedCollectionId };
-      });
+      .map(([id, state]) => `${id}:${state.designId ?? ''}`)
+      .sort()
+      .join('|');
+  }, [publishingStates]);
 
-    if (pending.length === 0) return;
+  useEffect(() => {
+    if (!pendingPublishPollKey) return;
 
+    let cancelled = false;
     const poll = async () => {
+      if (cancelled) return;
+      const snapshot = publishingStatesRef.current;
+      const tasks = publishTasksRef.current;
+      const pending = Object.entries(snapshot)
+        .filter(([, state]) => state.status === 'publishing' && state.kind !== 'draft')
+        .map(([id, state]) => {
+          const task = state.taskId
+            ? tasks.find((entry) => entry.id === state.taskId)
+            : tasks.find((entry) => entry.id === id);
+          const resolvedCollectionId =
+            state.designId ||
+            (task ? getPublishTaskLegacyCollectionId(task) : null) ||
+            (state.taskId && state.taskId === id ? null : id);
+          return { id, state, resolvedCollectionId, task };
+        })
+        // Wait for initialize to mint a real design id — no detail polling until then.
+        .filter((entry) => entry.resolvedCollectionId && !isLocalPublishTaskId(entry.resolvedCollectionId));
+
+      if (pending.length === 0) return;
+
       const offline = typeof navigator !== 'undefined' && !navigator.onLine;
-      if (offline) {
-        setPublishingStates((prev) => {
-          const next = { ...prev };
-          pending.forEach(({ id, state }) => {
-            next[id] = { ...state, message: 'Offline. We will resume when back online.' };
-          });
-          return next;
-        });
-        return;
-      }
+      if (offline) return;
 
-      await Promise.all(pending.map(async ({ id, state, resolvedCollectionId }) => {
-        if (!resolvedCollectionId) {
-          setPublishingStates((prev) => ({
-            ...prev,
-            [id]: {
-              ...state,
-              message: 'Upload session is still initializing. We will continue checking automatically.',
-            },
-          }));
-          return;
-        }
-
-        try {
-          const detail = await fetchCollectionDetailQuery(queryClient, resolvedCollectionId, 'design', { forceRefresh: true });
-          // Resolve on any moderation-terminal status, not just PUBLISHED.
-          // IN_REVIEW means brand review picked it up; CHANGES_REQUESTED/REJECTED means moderation acted.
-          const MODERATION_RESOLVED = new Set(['PUBLISHED', 'IN_REVIEW', 'CHANGES_REQUESTED', 'REJECTED']);
-          if (!MODERATION_RESOLVED.has(detail?.status ?? '')) {
-            const attempts = state.attempts + 1;
-            const tookTooLong = Date.now() - state.startedAt > 90_000;
-            setPublishingStates((prev) => ({
-              ...prev,
-              [id]: {
-                ...state,
-                attempts,
-                status: tookTooLong ? 'failed' : 'publishing',
-                message: tookTooLong
-                  ? 'Publishing is taking longer than usual. Retry to force another publish attempt.'
-                  : 'Still processing your design...',
-              },
-            }));
-            return;
-          }
-
-          if (!isVisitorView && user?.id) {
-            await fetchCollections(user.id, { forceRefresh: true });
-          } else if (isVisitorView && routeBrandId) {
-            const cols = await fetchBrandCollectionsQuery(
+      await Promise.all(
+        pending.map(async ({ id, state, resolvedCollectionId, task }) => {
+          try {
+            const detail = await resolveDesignPublishStatus(
               queryClient,
-              { ownerId: routeBrandId, visibility: 'all', scope: 'design' },
+              task,
+              state.designId ?? resolvedCollectionId,
               { forceRefresh: true },
             );
-            setVisitorCollections(cols ?? []);
-          }
-
-          setPublishingStates((prev) => {
-            const next = { ...prev };
-            delete next[id];
-            delete next[resolvedCollectionId];
-            if (state.taskId) {
-              delete next[state.taskId];
+            if (cancelled) return;
+            if (!MODERATION_RESOLVED_STATUSES.has(detail?.status ?? '')) {
+              const tookTooLong = Date.now() - state.startedAt > 90_000;
+              if (!tookTooLong) return;
+              setPublishingStates((prev) => {
+                const current = prev[id];
+                if (!current || current.status !== 'publishing') return prev;
+                return {
+                  ...prev,
+                  [id]: {
+                    ...current,
+                    status: 'failed',
+                    message:
+                      'Publishing is taking longer than usual. Retry to force another publish attempt.',
+                  },
+                };
+              });
+              return;
             }
-            return next;
-          });
 
-          if (state.taskId) {
-            removePublishTask(state.taskId, publishTaskScope);
+            if (!isVisitorView && user?.id) {
+              await fetchCollections(user.id, { forceRefresh: true });
+            }
+
+            if (cancelled) return;
+            setPublishingStates((prev) => {
+              const next = { ...prev };
+              delete next[id];
+              if (resolvedCollectionId) delete next[resolvedCollectionId];
+              if (state.taskId) delete next[state.taskId];
+              return next;
+            });
+            if (state.taskId) {
+              removePublishTask(state.taskId, publishTaskScope);
+            }
+          } catch {
+            // Transient errors: leave the progress card; next interval retries.
           }
-        } catch {
-          const attempts = state.attempts + 1;
-          const tookTooLong = Date.now() - state.startedAt > 90_000;
-          setPublishingStates((prev) => ({
-            ...prev,
-            [id]: {
-              ...state,
-              attempts,
-              status: tookTooLong ? 'failed' : 'publishing',
-              message: tookTooLong
-                ? 'Publishing is taking longer than usual. Retry to force another publish attempt.'
-                : 'Still processing your design...',
-            },
-          }));
-        }
-      }));
+        }),
+      );
     };
 
+    void poll();
     const interval = setInterval(() => {
       void poll();
-    }, 5000);
+    }, 8_000);
 
-    void poll();
-
-    return () => clearInterval(interval);
-  }, [fetchCollections, isVisitorView, publishTaskScope, publishTasks, publishingStates, queryClient, routeBrandId, user]);
-
-  // Debug: track filtering pipeline when tab or lists change
-  useEffect(() => {
-    try {
-      const totals = activeCollections.reduce((acc, c) => {
-        acc.all += 1;
-        if (c.visibility === 'PRIVATE' || c.isPublic === false) acc.private += 1; else acc.public += 1;
-        return acc;
-      }, { all: 0, public: 0, private: 0 } as any);
-      console.debug('[BrandProfile] view', {
-        isOwner,
-        isVisitorView,
-        activeTab,
-        visibilityFilter,
-        total: activeCollections.length,
-        ...totals,
-        filtered: displayCollections.length,
-        searched: searchAndVisibilityFiltered.length,
-      });
-    } catch {}
-  }, [isOwner, isVisitorView, activeTab, visibilityFilter, activeCollections, displayCollections.length, searchAndVisibilityFiltered.length]);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [
+    fetchCollections,
+    isVisitorView,
+    pendingPublishPollKey,
+    publishTaskScope,
+    queryClient,
+    user?.id,
+  ]);
 
   // Resolve signed URLs for visitor profile assets if necessary
   const visitorBannerAsset = useMemo(
@@ -1463,18 +2004,17 @@ const ProfilePage: React.FC = () => {
 
   const viewDisplayData = useMemo(() => {
     if (isVisitorView && visitorProfile) {
+      // Same public identity fields the owner sees — never blank when the
+      // brand profile (or /u/ share URL) has usable name/handle/location/tags.
+      const identity = resolvePublicBrandIdentity(visitorProfile);
       return {
-        brandName: visitorProfile.brandFullName,
-        location:
-          visitorProfile.location ??
-          [visitorProfile.city, visitorProfile.state, visitorProfile.country]
-            .filter(Boolean)
-            .join(', '),
-        username: '',
+        brandName: identity.brandName,
+        location: identity.location,
+        username: identity.username,
         logoImage: visitorLogoUrl ?? undefined,
         bannerImage: visitorBannerUrl ?? undefined,
-        hashtags: visitorProfile.hashtags ?? visitorProfile.tags ?? [],
-        description: visitorProfile.description ?? '',
+        hashtags: identity.tags,
+        description: identity.description || visitorProfile.description || '',
         socialLinks: visitorProfile.socialLinks,
         contactInfo: visitorProfile.contactInfo,
         country: visitorProfile.country,
@@ -1491,14 +2031,26 @@ const ProfilePage: React.FC = () => {
 
   const activeBrandProfile = isVisitorView ? visitorProfile : brandProfile;
   const fallbackProfileUrl = useMemo(() => {
-    const profileId = isVisitorView ? routeBrandId : user?.id;
+    const profileId = isVisitorView
+      ? visitorProfile?.id || routeBrandId
+      : user?.id;
     if (!profileId) return null;
 
     return buildProfileUrl({
       id: profileId,
-      username: viewDisplayData.username || undefined,
+      username:
+        viewDisplayData.username ||
+        activeBrandProfile?.username ||
+        undefined,
     });
-  }, [isVisitorView, routeBrandId, user?.id, viewDisplayData.username]);
+  }, [
+    activeBrandProfile?.username,
+    isVisitorView,
+    routeBrandId,
+    user?.id,
+    viewDisplayData.username,
+    visitorProfile?.id,
+  ]);
   const profileShareUrl =
     activeBrandProfile?.shareUrl ??
     activeBrandProfile?.publicProfileUrl ??
@@ -1554,13 +2106,13 @@ const ProfilePage: React.FC = () => {
   ]);
 
   const handleShareProfile = useCallback(async () => {
-    const shareBrandName = viewDisplayData.brandName || 'WEAZ';
+    const shareBrandName = viewDisplayData.brandName || 'WIEZ';
     const url = profileShareUrl;
     if (!url) {
       toast.error('Profile link is not available yet.');
       return;
     }
-    const message = `Check out ${shareBrandName} on WEAZ: ${url}`;
+    const message = `Check out ${shareBrandName} on WIEZ: ${url}`;
     try {
       if (navigator.share) {
         await navigator.share({
@@ -1655,11 +2207,11 @@ const ProfilePage: React.FC = () => {
 
   const brandData = {
     brandName: viewDisplayData.brandName,
-    title: 'About Catalog',
+    title: isOwner ? 'About My Content' : 'About',
     description:
       viewDisplayData.description || (isOwner
         ? `${viewDisplayData.brandName} is a Lagos-based fashion brand where indigenous Nigerian textiles meet modern fashion innovation.`
-        : 'Welcome to our catalog!'),
+        : 'Welcome!'),
     socialLinks: {
       instagram: viewDisplayData.socialLinks?.instagram || undefined,
       facebook: viewDisplayData.socialLinks?.facebook || undefined,
@@ -1698,7 +2250,27 @@ const ProfilePage: React.FC = () => {
   }
 
   if (!isOwner && isVisitorView && !visitorProfile) {
-    return <div className="max-w-screen-xl mx-auto p-6">Catalog not found.</div>;
+    return (
+      <div className="mx-auto max-w-lg p-8 text-center">
+        <p className="text-4xl" aria-hidden="true">🧭</p>
+        <h2 className="mt-4 text-xl font-bold text-gray-900 dark:text-white">
+          {visitorError || 'Page not found'}
+        </h2>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          This brand catalog could not be loaded. Check your connection and try again.
+        </p>
+        <button
+          type="button"
+          className="mt-6 rounded-full bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-purple-700"
+          onClick={() => {
+            void visitorProfileQuery.refetch();
+            void visitorCollectionsQuery.refetch();
+          }}
+        >
+          Try again
+        </button>
+      </div>
+    );
   }
 
   if (!user && !isVisitorView) {
@@ -1716,6 +2288,9 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div className="w-full">
+      {/* Long catalogs (hundreds of designs) need one-tap escape hatches back
+          to the profile metadata or down to the end of the feed. */}
+      <ScrollAssist />
       {isOwner && user && (
         <ProfileHeaderQuickEditModal
           open={isHeaderQuickEditOpen}
@@ -1738,7 +2313,7 @@ const ProfilePage: React.FC = () => {
       <BrandQrModal
         open={isBrandQrOpen}
         onClose={() => setIsBrandQrOpen(false)}
-        brandName={viewDisplayData.brandName || 'WEAZ Brand'}
+        brandName={viewDisplayData.brandName || 'WIEZ Brand'}
         qrTargetUrl={profileQrTargetUrl}
         shareUrl={profileShareUrl}
         logoUrl={viewDisplayData.logoImage ?? null}
@@ -1752,7 +2327,7 @@ const ProfilePage: React.FC = () => {
         onClose={() => setIsVisitorAvatarModalOpen(false)}
       />
       {showStoreSetupNudge ? (
-        <div className="fixed bottom-24 right-4 sm:right-6 z-[60] w-[min(88vw,270px)]">
+        <div className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] right-4 sm:right-6 z-[60] w-[min(88vw,270px)]">
           <div className="glass-menu-soft px-3 py-2">
             <div className="min-w-0">
               <p className="truncate text-xs font-semibold text-gray-900 dark:text-gray-100">
@@ -1783,7 +2358,7 @@ const ProfilePage: React.FC = () => {
           </div>
         </div>
       ) : showStoreSetupChip ? (
-        <div className="fixed bottom-24 right-4 sm:right-6 z-[60]">
+        <div className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] right-4 sm:right-6 z-[60]">
           <button
             type="button"
             onClick={handleOpenStoreSetup}
@@ -1802,6 +2377,7 @@ const ProfilePage: React.FC = () => {
       {isOwner ? (
         <OwnerCatalogMediaHeader
           profile={ownerHeaderProfile}
+          isStoreOpen={viewIsStoreOpen}
           onEditProfile={handleOpenHeaderQuickEdit}
           onShareProfile={handleShareProfile}
           onShowQrCode={() => setIsBrandQrOpen(true)}
@@ -1813,6 +2389,7 @@ const ProfilePage: React.FC = () => {
       ) : (
         <ProfileHeader
           profile={visitorHeaderProfile}
+          isStoreOpen={viewIsStoreOpen}
           onViewAvatar={handleViewVisitorAvatar}
           onShareProfile={handleShareProfile}
           onShowQrCode={() => setIsBrandQrOpen(true)}
@@ -1827,7 +2404,12 @@ const ProfilePage: React.FC = () => {
         <div className="mt-6">
           <Tabs
             tabs={['Content', 'Store', 'Reviews', 'Us']}
+            labels={{
+              // UI only: internal key stays Content (URL/backend). Owner sees My Content.
+              Content: isOwner ? 'My Content' : 'Content',
+            }}
             activeTab={activeTab}
+            compact={isMobile}
             onTabChange={(tab) => {
                 setActiveTab(tab as TabType);
                 setSearchParams((prev) => {
@@ -1873,8 +2455,8 @@ const ProfilePage: React.FC = () => {
                 ) : (
                   // Show collections grid
                   <>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-                      <div className="flex-1 w-full sm:w-auto">
+                    <div className="flex flex-row items-center justify-between gap-3 mb-4">
+                      <div className="min-w-0 flex-1">
                         <div className="relative w-full">
                           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">🔎</span>
                           <input
@@ -1897,51 +2479,24 @@ const ProfilePage: React.FC = () => {
                       </div>
                       {/* Show create controls only for owner */}
                       {isOwner && (
-                        <div className="flex gap-2">
-                          <AddCollectionDropdown openModal={() => handleOpenAddModal()} />
+                        <div className="flex flex-shrink-0 gap-2">
+                          <AddCollectionDropdown />
                         </div>
                       )}
                     </div>
 
-                    {/* Visibility filter chips */}
+                    {/* Visibility filter tabs with sliding active indicator */}
                     <div className="mb-6">
-                      <div className="flex gap-5 overflow-x-auto border-b border-gray-200/80 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10">
-                        {(isOwner ? OWNER_VISIBILITY_FILTERS : VISIBILITY_FILTERS).map((opt) => (
-                          <button
-                            key={opt}
-                            onClick={() => setVisibilityFilter(opt as any)}
-                            aria-pressed={visibilityFilter === opt}
-                            className={`relative flex shrink-0 items-center gap-2 pb-3 pt-2 text-sm font-semibold transition-colors ${
-                              visibilityFilter === opt
-                                ? 'text-purple-700 dark:text-purple-300'
-                                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
-                            }`}
-                          >
-                            <span>
-                              {opt === 'Public'
-                                  ? '🌍'
-                                  : opt === 'Private'
-                                    ? '🔒'
-                                    : opt === 'Drafts'
-                                      ? '📝'
-                                      : opt === 'In Review'
-                                        ? 'R'
-                                        : opt === 'Changes Requested'
-                                          ? '!'
-                                          : opt === 'Rejected'
-                                            ? 'X'
-                                            : '🗑️'}
-                            </span>
-                            {opt}
-                            <span
-                              aria-hidden="true"
-                              className={`absolute inset-x-0 bottom-0 mx-auto h-0.5 w-7 rounded-full transition-all ${
-                                visibilityFilter === opt ? 'bg-purple-600 dark:bg-purple-300' : 'bg-transparent'
-                              }`}
-                            />
-                          </button>
-                        ))}
-                      </div>
+                      <Tabs
+                        tabs={isOwner ? OWNER_VISIBILITY_FILTERS : VISIBILITY_FILTERS}
+                        activeTab={visibilityFilter}
+                        compact={isMobile}
+                        size="sm"
+                        icons={VISIBILITY_ICONS}
+                        labels={isMobile ? VISIBILITY_SHORT_LABELS : undefined}
+                        onTabChange={(tab) => handleVisibilityFilterChange(tab as VisibilityFilter)}
+                        ariaLabel="Visibility filter tabs"
+                      />
                     </div>
 
                     {/* Collections Grid (Owner or Visitor/Public) */}
@@ -2108,6 +2663,7 @@ const ProfilePage: React.FC = () => {
                       ) : decoratedCollections.length > 0 ? (
                         <CollectionsGrid
                           collections={decoratedCollections}
+                          compactCards={!isMobile}
                           isDraft={isDraftVisibility}
                           isDeleted={isDeletedVisibility}
                           onEdit={isOwner ? handleEditCollection : undefined}
@@ -2117,6 +2673,13 @@ const ProfilePage: React.FC = () => {
                           onCollectionClick={handleCollectionClick}
                           onRetryPublish={handleRetryPublishCheck}
                           onDismiss={isOwner ? handleDismissFailedCard : undefined}
+                          highlightId={highlightDesignId}
+                          // The visibility tab already names the status, so its
+                          // cards do not repeat it.
+                          impliedStatus={REVIEW_VISIBILITY_STATUS[visibilityFilter] ?? null}
+                          // The Content tab is designs; the chip would only ever
+                          // say "Design" over a grid of designs.
+                          impliedEntityLabel="Design"
                         />
                       ) : (
                         isOwner ? (
@@ -2162,11 +2725,11 @@ const ProfilePage: React.FC = () => {
                 <ReviewsTab
                   brandId={shopBrandId || routeBrandId || user?.id || null}
                   currentUserId={user?.id || null}
-                  reviews={reviews}
-                  averageRating={averageRating}
-                  totalReviews={totalReviews}
-                  ratingDistribution={ratingDistribution}
-                  isLoading={reviewsLoading}
+                  reviews={reviewsDisplayData.reviews}
+                  averageRating={reviewsDisplayData.averageRating}
+                  totalReviews={reviewsDisplayData.totalReviews}
+                  ratingDistribution={reviewsDisplayData.ratingDistribution}
+                  isLoading={reviewsTabLoading}
                   isOwner={isOwner}
                   brandRepliesEnabled={reviewFlags.brandRepliesEnabled}
                 />
@@ -2194,17 +2757,6 @@ const ProfilePage: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {isOwner && (
-        <AddCollectionModal
-          isOpen={isAddOpen}
-          onClose={() => setIsAddOpen(false)}
-          onCreate={async () => {
-            setIsAddOpen(false);
-            if (user) await fetchCollections(user.id, { forceRefresh: true });
-          }}
-        />
-      )}
 
       {/* Confirm access request dialog for visitor */}
       <ConfirmDialog
@@ -2264,11 +2816,20 @@ const ProfilePage: React.FC = () => {
         onConfirm={async () => {
           if (!collectionToDelete || !user) return;
           const id = collectionToDelete;
+          if (isLocalPublishTaskId(id)) {
+            setCollectionToDelete(null);
+            handleDismissFailedCard(id);
+            toast.success('Removed upload status card.');
+            return;
+          }
           const isDraft = drafts.some(d => d.id === id);
           const removedSnapshot = drafts.find((item) => item.id === id)
             ?? activeCollections.find((item) => item.id === id);
           setCollectionToDelete(null);
           removeCollectionFromView(id);
+          if (isDraft) {
+            removeFromMyDraftsQueryData(queryClient, ownerBrandId, id);
+          }
           try {
             const success = isDraft
               ? await brandApi.deleteCollection(id)
@@ -2276,6 +2837,7 @@ const ProfilePage: React.FC = () => {
             if (success) {
               toast.success(isDraft ? 'Draft discarded' : 'Design deleted');
               setRecentlyDeletedDesign({ isDraft });
+              refreshOwnerCatalogQueries(queryClient, ownerBrandId);
               if (!isDraft) {
                 // Refresh only the off-screen Deleted source. The visible source remains
                 // the optimistic local removal, so one delete never replaces or blanks
@@ -2291,10 +2853,32 @@ const ProfilePage: React.FC = () => {
               }
             } else {
               restoreCollectionInView(id, removedSnapshot, isDraft);
+              if (isDraft && removedSnapshot) {
+                queryClient.setQueryData<CollectionDto[]>(
+                  queryKeys.brand.myDrafts(ownerBrandId),
+                  (current) => {
+                    const list = current ?? [];
+                    return list.some((item) => item.id === removedSnapshot.id)
+                      ? list
+                      : [removedSnapshot, ...list];
+                  },
+                );
+              }
               toast.error(isDraft ? 'Failed to discard draft' : 'Failed to delete design');
             }
           } catch (error) {
             restoreCollectionInView(id, removedSnapshot, isDraft);
+            if (isDraft && removedSnapshot) {
+              queryClient.setQueryData<CollectionDto[]>(
+                queryKeys.brand.myDrafts(ownerBrandId),
+                (current) => {
+                  const list = current ?? [];
+                  return list.some((item) => item.id === removedSnapshot.id)
+                    ? list
+                    : [removedSnapshot, ...list];
+                },
+              );
+            }
             console.error('Error deleting collection:', error);
             toast.error('An error occurred');
           }
@@ -2353,7 +2937,7 @@ const ProfilePage: React.FC = () => {
         title={recentlyDeletedDesign?.isDraft ? 'Draft Deleted' : 'Design Deleted'}
         message="Where do you want to go next?"
         confirmText="Create New Design"
-        cancelText="Go To Content"
+        cancelText="Go To My Content"
         onCancel={() => {
           const nextVisibility = recentlyDeletedDesign?.isDraft ? 'Drafts' : 'Public';
           setRecentlyDeletedDesign(null);

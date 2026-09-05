@@ -21,13 +21,13 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { getActorDisplayName, normalizeNotification } from '@/utils/notificationAdapter';
 import type { NormalizedNotification } from '@/utils/notificationAdapter';
-import { determineActorRoute, determineNotificationRoute } from '@/utils/notificationRouting';
+import { determineActorRoute, resolveNotificationClickRoute } from '@/utils/notificationRouting';
 import { trackDropdownOpen, trackDropdownClose, trackMarkAllRead } from '@/utils/notificationTelemetry';
 import { NotificationTypes, getActionText } from '@/types/notificationTypes';
 import { NotificationIcon } from '@/components/notifications/NotificationIcon';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
-import { COMPANY_NAME } from '@/lib/brand';
+import { PRODUCT_NAME } from '@/brand/identity';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 
 interface Props { 
@@ -155,37 +155,13 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
   }, [open, onClose]);
 
   const handleBodyClick = useCallback((notification: NormalizedNotification) => {
-    const payload = (notification.payload as Record<string, unknown> | undefined) ?? {};
-    const payloadTargetUrl = typeof payload.targetUrl === 'string' ? payload.targetUrl : null;
-    const explicitTargetUrl = typeof notification.targetUrl === 'string' ? notification.targetUrl : null;
-    const exactTargetUrl = payloadTargetUrl || explicitTargetUrl;
-    const payloadOrderId = typeof payload.orderId === 'string' ? payload.orderId : null;
-    const payloadCustomOrderId = typeof payload.customOrderId === 'string' ? payload.customOrderId : null;
-    const isBrand = hasActiveBrandMembership(currentUser);
-    const isOrderNotification =
-      notification.type === NotificationTypes.ORDER_PLACED ||
-      notification.type === NotificationTypes.ORDER_STATUS_UPDATED;
-    const isMessageNotification =
-      notification.type === NotificationTypes.MESSAGE_RECEIVED ||
-      notification.type === NotificationTypes.MESSAGE_UNREAD_REMINDER ||
-      notification.type === NotificationTypes.MESSAGE_THREAD_REOPENED ||
-      notification.type === NotificationTypes.MESSAGE_MODERATED;
-
-    let route: string;
-    if (exactTargetUrl) {
-      route = exactTargetUrl;
-    } else if (isBrand && isOrderNotification && payloadOrderId) {
-      route = `/studio?tab=orders&orderId=${encodeURIComponent(payloadOrderId)}`;
-    } else if (isBrand && isMessageNotification && payloadCustomOrderId) {
-      route = `/studio/messages?customOrderId=${encodeURIComponent(payloadCustomOrderId)}`;
-    } else if (isBrand && isMessageNotification && payloadOrderId) {
-      route = `/studio/messages?orderId=${encodeURIComponent(payloadOrderId)}`;
-    } else {
-      route = determineNotificationRoute(notification);
-    }
-
-    const resolvedRoute = isAdminConsoleUser && route.startsWith('/profile') ? '/admin' : route;
-    navigate(resolvedRoute);
+    // Shared with the /notifications page — see resolveNotificationClickRoute.
+    navigate(
+      resolveNotificationClickRoute(notification, {
+        isBrand: hasActiveBrandMembership(currentUser),
+        isAdminConsoleUser,
+      }),
+    );
     onClose();
   }, [currentUser, isAdminConsoleUser, navigate, onClose]);
 
@@ -225,8 +201,8 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     dispatch(fetchNotifications({ limit: 30 }));
   }, [dispatch]);
 
-  const handleSettings = useCallback(() => {
-    navigate('/settings?tab=notifications');
+  const handleViewAll = useCallback(() => {
+    navigate('/notifications');
     onClose();
   }, [navigate, onClose]);
 
@@ -253,11 +229,38 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
+  const renderStyledActionText = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/("(?:[^"\\]|\\.)*"|\/[^\s]+|#[A-Za-z0-9_-]+)/g);
+    return parts.map((part, idx) => {
+      if (!part) return null;
+      const isTargetOrLink =
+        (part.startsWith('"') && part.endsWith('"')) ||
+        part.startsWith('/') ||
+        part.startsWith('#');
+      if (isTargetOrLink) {
+        return (
+          <span
+            key={idx}
+            className="font-bold italic text-[color:var(--brand-primary)] dark:text-purple-400 mx-0.5"
+          >
+            {part}
+          </span>
+        );
+      }
+      return <span key={idx}>{part}</span>;
+    });
+  };
+
 
   const contentTitleFor = (n: NormalizedNotification): string => {
     const payload = (n.payload as Record<string, unknown> | undefined) ?? {};
     const fromTarget = typeof n.target?.preview === 'string' ? n.target.preview.trim() : '';
-    if (fromTarget) return fromTarget;
+    // `target.preview` is a human content title for content notifications, but
+    // system notifications reuse it to carry a route path (e.g.
+    // "/admin/custom-orders/:id"). Never surface that raw path as a title.
+    const isRouteyPreview = fromTarget.startsWith('/') || /^https?:\/\//i.test(fromTarget);
+    if (fromTarget && !isRouteyPreview) return fromTarget;
 
     const fromPayload =
       (typeof payload.contentTitle === 'string' && payload.contentTitle) ||
@@ -417,13 +420,17 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
               <span aria-hidden="true">✅</span>
               Read
             </button>
+            {/* The dropdown is a preview — it fetches the first 30 and paginates
+                inside a panel capped to the viewport. "View all" is the way out
+                to the full list; settings has its own home under /settings and
+                was never what someone reaches for from a notification preview. */}
             <button
-              onClick={handleSettings}
-              className="surface-interactive-hover p-2 rounded-full transition-colors"
-              aria-label="Notification settings"
-              title="Notification settings"
+              type="button"
+              onClick={handleViewAll}
+              className="text-[11px] font-semibold text-[color:var(--brand-primary)] hover:opacity-80 transition-opacity"
+              aria-label="View all notifications"
             >
-              <span aria-hidden="true">⚙️</span>
+              View all
             </button>
           </div>
         </div>
@@ -485,7 +492,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
               const hasActorLink = Boolean(n.actor?.id);
               const hasActorLabel =
                 Boolean(actorDisplayName) &&
-                actorDisplayName.toLowerCase() !== COMPANY_NAME.toLowerCase();
+                actorDisplayName.toLowerCase() !== PRODUCT_NAME.toLowerCase();
               const hasMeaningfulMessage =
                 typeof n.message === 'string' &&
                 n.message.trim().length > 0 &&
@@ -512,8 +519,8 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                     className={
                       'group rounded-xl border backdrop-blur p-2 cursor-pointer transition ' +
                       (isUnread
-                        ? 'border-purple-300/50 dark:border-purple-500/20 bg-purple-50/40 dark:bg-purple-500/5'
-                        : 'border-theme surface-card surface-interactive-hover')
+                        ? 'border-purple-400/70 border-l-4 border-l-purple-500 bg-purple-100/80 shadow-sm dark:border-purple-400/40 dark:border-l-purple-400 dark:bg-purple-500/15'
+                        : 'border-theme surface-card surface-interactive-hover opacity-75 hover:opacity-100')
                     }
                     onClick={() => {
                       handleMarkRead(n.id);
@@ -538,12 +545,12 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="text-xs text-theme-secondary line-clamp-2 leading-5">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-2 leading-5">
                               {hasActorLabel ? (
                                 hasActorLink ? (
                                   <button
                                     type="button"
-                                    className="font-semibold text-purple-600 dark:text-purple-400 hover:underline underline-offset-2 transition-colors"
+                                    className="font-bold italic text-[color:var(--brand-primary)] dark:text-purple-400 hover:underline underline-offset-2 transition-colors"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       void handleActorClick(n);
@@ -553,14 +560,16 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                                     @{actorDisplayName}
                                   </button>
                                 ) : (
-                                  <span className="font-semibold text-[color:var(--text-primary)]">@{actorDisplayName}</span>
+                                  <span className="font-bold italic text-[color:var(--brand-primary)] dark:text-purple-400">@{actorDisplayName}</span>
                                 )
                               ) : (
-                                showCompanyPrefix ? <span className="font-semibold text-[color:var(--text-primary)]">{COMPANY_NAME}</span> : null
+                                showCompanyPrefix ? <span className="font-bold italic text-[color:var(--brand-primary)] dark:text-purple-400">{PRODUCT_NAME}</span> : null
                               )}
-                              <span className={hasActorLabel || showCompanyPrefix ? 'ml-1' : undefined}>{actionTextWithoutTitle}</span>
+                              <span className={hasActorLabel || showCompanyPrefix ? 'ml-1' : undefined}>
+                                {renderStyledActionText(actionTextWithoutTitle)}
+                              </span>
                               {contentTitle ? (
-                                <span className="ml-1 inline-flex max-w-[180px] items-center truncate rounded-md border border-purple-300/50 bg-purple-100/70 px-1.5 py-0.5 font-semibold text-purple-700 dark:border-purple-400/30 dark:bg-purple-500/15 dark:text-purple-300">
+                                <span className="ml-1 inline-flex max-w-[200px] items-center truncate rounded-md border border-purple-300/50 bg-purple-100/70 px-1.5 py-0.5 font-bold italic text-[color:var(--brand-primary)] dark:border-purple-400/30 dark:bg-purple-500/15 dark:text-purple-300">
                                   "{contentTitle}"
                                 </span>
                               ) : null}
@@ -582,7 +591,10 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                               <span className="text-xs" aria-hidden="true">🗑️</span>
                             </button>
                             {isUnread && (
-                              <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1" aria-hidden="true" />
+                              <div
+                                className="mt-1 h-2 w-2 rounded-full bg-purple-500 ring-2 ring-purple-500/25"
+                                aria-hidden="true"
+                              />
                             )}
                           </div>
                         </div>

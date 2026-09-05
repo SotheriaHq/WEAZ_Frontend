@@ -686,7 +686,7 @@ const AdminSettingsPage: React.FC = () => {
                   className={`rounded-xl border p-3.5 transition-colors ${
                     changed
                       ? 'border-purple-300 bg-purple-50/50 dark:border-purple-500/30 dark:bg-purple-500/5'
-                      : 'border-gray-200/60 bg-white/60 dark:border-white/8 dark:bg-white/[0.02]'
+                      : 'border-gray-200/60 bg-white/60 dark:border-white/[0.08] dark:bg-white/[0.02]'
                   }`}
                 >
                   <div className="mb-2 flex items-start justify-between gap-2">

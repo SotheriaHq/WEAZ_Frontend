@@ -12,12 +12,21 @@ import { Link, Tag } from 'lucide-react';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
+import { patchMenuRowColorClasses, patchToastMessage } from '@/lib/patchPresentation';
 import { useNavigate } from 'react-router-dom';
-import { isBrandOwner } from '@/lib/brandAccess';
-import { BagApi } from '@/api/BagApi';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagFlow } from '@/features/bagging/BagFlowProvider';
+import {
+  ownsDesignBrand as checkOwnsDesignBrand,
+  runDesignBagFlow,
+} from '@/features/bagging/designBagActions';
+import {
+  BRAND_BAG_BLOCKED_MESSAGE,
+  isBrandAccountBlockedFromBagging,
+} from '@/lib/baggingAccess';
 import { BAG_IT_LABEL } from '@/constants/bagging';
+import { formatPrice } from '@/utils/helpers';
+import { CustomOrderIndicator } from '@/components/custom-orders/CustomOrderIndicator';
 
 interface DesignCardProps {
   item: MarketItem;
@@ -31,7 +40,19 @@ interface DesignCardProps {
   isPatched?: boolean;
   onTogglePatch?: (brandId: string) => void;
   patchBusy?: boolean;
+  /** First-row / LCP cards: eager + high fetch priority. Default lazy. */
+  priority?: boolean;
 }
+
+const MIN_CARD_ASPECT_RATIO = 0.45;
+const MAX_CARD_ASPECT_RATIO = 2.2;
+
+const resolveCardAspectRatio = (value?: number | null): number | null => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return Math.min(MAX_CARD_ASPECT_RATIO, Math.max(MIN_CARD_ASPECT_RATIO, value));
+};
 
 export const DesignCard: React.FC<DesignCardProps> = ({
   item,
@@ -45,6 +66,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   isPatched: isPatchedProp,
   onTogglePatch,
   patchBusy: patchBusyProp,
+  priority = false,
 }) => {
   const navigate = useNavigate();
   const isVideo = Boolean(item.media.type?.toUpperCase().includes('VIDEO'));
@@ -57,7 +79,6 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   const [isHidden, setIsHidden] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showTags, setShowTags] = useState(false);
-  const [showCustomLabel, setShowCustomLabel] = useState(false);
   const [isSavedLocal, setIsSavedLocal] = useState(false);
   const [saveBusyLocal, setSaveBusyLocal] = useState(false);
   const isRegular = user?.type === 'REGULAR';
@@ -176,7 +197,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
     if (!isPatchCapable || !item.brandId) return;
     try {
       const nextPatched = await toggleStatus(item.brandId);
-      toast.success(nextPatched ? 'Brand patched.' : 'Brand unpatched.');
+      toast.success(patchToastMessage(nextPatched, item.brandName));
     } catch {
       toast.error('Unable to update patch.');
     }
@@ -187,84 +208,28 @@ export const DesignCard: React.FC<DesignCardProps> = ({
 
   const isCustomAvailable = item.customAvailable === true;
   const brandId = typeof item.brandId === 'string' ? item.brandId.trim() : '';
-  const ownsDesignBrand = Boolean(brandId && (user?.id === brandId || isBrandOwner(user, brandId)));
+  const ownsDesignBrand = checkOwnsDesignBrand(user, brandId);
+  const brandBagBlocked = isBrandAccountBlockedFromBagging(user);
+  const bagDisabled = bagBusy || ownsDesignBrand || brandBagBlocked;
   const canMessageBrand = Boolean(brandId) && !ownsDesignBrand;
-  const designBagTarget = {
-    id: item.collectionId,
-    name: item.collectionTitle || 'this design',
-    sourceType: 'DESIGN' as const,
-    sourceId: item.collectionId,
-  };
 
   const handleBagDesign = async (event: React.MouseEvent) => {
     event.stopPropagation();
     if (!isCustomAvailable) return;
-    if (ownsDesignBrand) {
-      toast.info('Brands cannot place custom orders on their own designs.');
-      return;
-    }
-    if (!item.collectionId) {
-      toast.error('Design reference is unavailable for bagging.');
-      return;
-    }
-    if (!bagFlow) {
-      toast.error('Bag is unavailable right now.');
-      return;
-    }
-    if (!isAuth) {
-      bagFlow.openAuthPrompt(designBagTarget, 'OPEN_CUSTOM_FLOW');
-      return;
-    }
     if (bagBusy) return;
+    if (brandBagBlocked) {
+      toast.info(BRAND_BAG_BLOCKED_MESSAGE);
+      return;
+    }
 
     setBagBusy(true);
     try {
-      const status = await BagApi.getSourceBagStatus('DESIGN', item.collectionId);
-      const duplicateClasses = status.duplicateState?.classifications ?? [];
-
-      if (status.custom.alreadyBagged || duplicateClasses.includes('IN_BAG')) {
-        bagFlow.openExistingBag(designBagTarget, status);
-        toast.info('This custom request is already in your bag.');
-        return;
-      }
-      if (duplicateClasses.includes('SUBMITTED_UNPAID')) {
-        bagFlow.openExistingBag(designBagTarget, status);
-        toast.info('Resume this custom request from My Bag.');
-        return;
-      }
-      if (duplicateClasses.includes('PAID_ACTIVE')) {
-        toast.error('You already have an active paid custom order for this design.');
-        return;
-      }
-      if (duplicateClasses.includes('COMPLETED_BLOCKED')) {
-        toast.error(status.duplicateState?.reason || 'This completed custom order cannot be repeated.');
-        return;
-      }
-
-      if (!status.canBag || status.ui.defaultAction === 'DISABLED') {
-        toast.error(status.ui.disabledReason || 'This design cannot be bagged right now.');
-        return;
-      }
-      if (status.ui.defaultAction === 'OPEN_FITTINGS') {
-        bagFlow.openFittings(designBagTarget, status);
-        return;
-      }
-      if (
-        status.ui.defaultAction === 'CONFIRM_STALE_FITTINGS' ||
-        status.custom.requiresStaleConfirmation ||
-        status.custom.freshnessState === 'STALE' ||
-        status.custom.freshnessState === 'VERY_STALE'
-      ) {
-        bagFlow.openStaleConfirmation(designBagTarget, status);
-        return;
-      }
-      if (status.ui.defaultAction === 'OPEN_CUSTOM_FLOW') {
-        bagFlow.openCustomFlow(designBagTarget, status);
-        return;
-      }
-      toast.error(status.ui.disabledReason || 'This design cannot be bagged right now.');
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Unable to bag this design.');
+      await runDesignBagFlow({
+        item,
+        user,
+        isAuthenticated: isAuth,
+        bagFlow,
+      });
     } finally {
       setBagBusy(false);
     }
@@ -275,6 +240,8 @@ export const DesignCard: React.FC<DesignCardProps> = ({
     brandLogoFileId: item.brandLogoFileId,
   });
   const brandAvatarFallback = getAvatarFallback(item.brandName ?? null, item.username ?? null);
+  const cardAspectRatio = resolveCardAspectRatio(item.media.aspectRatio);
+  const cardAspectStyle = cardAspectRatio ? { aspectRatio: cardAspectRatio } : undefined;
 
   return (
     <article
@@ -289,34 +256,45 @@ export const DesignCard: React.FC<DesignCardProps> = ({
       onMouseLeave={() => {
         setShowMenu(false);
         setShowTags(false);
-        setShowCustomLabel(false);
       }}
     >
-      {/* Full Image Background */}
-      <div className="relative w-full h-full">
+      {/* Full Image Background — aspect box reserves layout (CLS) before paint */}
+      <div
+        className={`relative w-full bg-transparent ${cardAspectRatio ? '' : 'aspect-[3/4] min-h-[200px]'}`}
+        style={cardAspectStyle}
+      >
         {isVideo ? (
           <MediaRenderer
             kind="video"
             src={item.media.url ?? ''}
             poster={item.media.previewUrl ?? undefined}
             controls={false}
-            fit="contain"
+            fit="cover"
             maxHeightClassName="max-h-none"
             maxWidthClassName="max-w-full"
-            className="w-full h-full"
-            mediaClassName="w-full h-full object-contain"
+            className="absolute inset-0 h-full w-full"
+            mediaClassName="h-full w-full object-cover"
+            preload={priority ? 'metadata' : 'none'}
           />
         ) : (
           <ImageWithFallback
-              src={item.media.url ?? ''}
+              /* Grid cards must use the small 640px CARD variant (previewUrl),
+                 NOT the 1440–2048px full-screen `url` — loading the high-res
+                 image into a ~300px card is what made the runway render one
+                 card at a time. The modal still opens the full-res `url`. */
+              src={item.media.previewUrl ?? item.media.url ?? ''}
               fileId={item.media.fileId || null}
               alt={item.collectionTitle}
-              fit="contain"
+              fit="cover"
               rounded="none"
-              containerClassName="h-full w-full"
+              containerClassName="absolute inset-0 h-full w-full"
               maxHeightClassName="max-h-none"
-              className="h-full w-full object-contain"
+              className="h-full w-full object-cover"
               fallbackName={item.collectionTitle}
+              /* Document-scrolled feed: first-row LCP cards use eager+high;
+                 the rest lazy so they don't contend for the connection pool. */
+              loading={priority ? 'eager' : 'lazy'}
+              fetchPriority={priority ? 'high' : 'low'}
             />
         )}
         
@@ -324,7 +302,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
         {/* Tag Button */}
-        <div className="absolute top-3 left-3 z-20">
+        <div className="hidden md:block absolute top-2 left-2 z-20 scale-[0.72] origin-top-left sm:top-3 sm:left-3 sm:scale-100">
            <button
             onClick={(e) => {
               e.stopPropagation();
@@ -333,7 +311,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
             className="hover:scale-110 transition-transform drop-shadow-md"
             title="View Tags"
           >
-            <Tag className="h-5 w-5 text-white" aria-hidden="true" />
+            <Tag className="h-4 w-4 text-white sm:h-5 sm:w-5" aria-hidden="true" />
           </button>
           {showTags && item.tags && item.tags.length > 0 && (
             <div className="absolute top-8 left-0 flex flex-wrap gap-1 w-48 animate-in fade-in zoom-in-95 duration-100">
@@ -345,42 +323,25 @@ export const DesignCard: React.FC<DesignCardProps> = ({
             </div>
           )}
           {isCustomAvailable && (
-            <div className="relative mt-2 inline-flex">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowCustomLabel((prev) => !prev);
-                }}
-                onMouseEnter={() => setShowCustomLabel(true)}
-                onMouseLeave={() => setShowCustomLabel(false)}
-                onFocus={() => setShowCustomLabel(true)}
-                onBlur={() => setShowCustomLabel(false)}
-                className="inline-flex items-center justify-center rounded-full border border-purple-300/50 bg-purple-500/25 px-2 py-1 text-sm leading-none text-white shadow-md"
-                aria-label="Custom available"
-                title="Custom available"
-              >
-                <span role="img" aria-hidden="true">{String.fromCodePoint(0x2702, 0xfe0f)}</span>
-              </button>
-              {showCustomLabel && (
-                <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded-full bg-black/80 px-2 py-1 text-[10px] font-semibold text-white shadow-lg backdrop-blur whitespace-nowrap">
-                  Custom Available
-                </span>
-              )}
+            <div className="relative mt-2 inline-flex items-center">
+              <CustomOrderIndicator
+                pointsCount={(item as any)?.customMeasurementKeys?.length ?? (item as any)?.requiredMeasurementKeys?.length}
+                size="sm"
+              />
             </div>
           )}
         </div>
 
         {/* Context Menu (Three Dots) */}
-        <div className="absolute top-3 right-3 z-30">
+        <div className="hidden md:block absolute top-2 right-2 z-30 scale-[0.72] origin-top-right sm:top-3 sm:right-3 sm:scale-100">
           <button
             onClick={(e) => {
               e.stopPropagation();
               setShowMenu(!showMenu);
             }}
-            className="p-1 rounded-full text-white/90 hover:text-white transition-colors drop-shadow-md"
+            className="p-0.5 rounded-full text-white/90 hover:text-white transition-colors drop-shadow-md sm:p-1"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="sm:h-6 sm:w-6">
               <circle cx="12" cy="12" r="1" />
               <circle cx="12" cy="5" r="1" />
               <circle cx="12" cy="19" r="1" />
@@ -414,9 +375,11 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                   <button
                     onClick={handleTogglePatch}
                     disabled={resolvedPatchBusy}
-                    className="w-full text-left px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 flex items-center gap-2 transition-colors disabled:opacity-60"
+                    className={`w-full text-left px-3 py-2 text-xs font-medium flex items-center gap-2 transition-colors disabled:opacity-60 ${patchMenuRowColorClasses(
+                      resolvedPatched,
+                    )}`}
                   >
-                    <Tag className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span aria-hidden="true">{resolvedPatched ? '✓' : '🧵'}</span>
                     {resolvedPatched ? 'Unpatch brand' : 'Patch brand'}
                   </button>
                 </>
@@ -438,52 +401,59 @@ export const DesignCard: React.FC<DesignCardProps> = ({
         </div>
 
         {/* Vertical Action Bar (Right Side - Instagram/TikTok Style) */}
-        <div className="absolute bottom-24 right-3 z-10 flex flex-col items-center gap-4">
+        <div className="hidden md:flex absolute bottom-10 right-1 z-10 flex flex-col items-center gap-1 sm:bottom-20 sm:right-3 sm:gap-2.5">
           {isCustomAvailable ? (
             <button
               type="button"
-              className="flex flex-col items-center text-white transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex origin-bottom-right scale-[0.95] flex-col items-center text-white transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60 sm:scale-100"
               onClick={handleBagDesign}
-              disabled={bagBusy || ownsDesignBrand}
+              disabled={bagDisabled}
               aria-label={BAG_IT_LABEL}
-              title={ownsDesignBrand ? 'Brands cannot bag their own designs' : BAG_IT_LABEL}
+              title={
+                brandBagBlocked
+                  ? BRAND_BAG_BLOCKED_MESSAGE
+                  : ownsDesignBrand
+                    ? 'Brands cannot bag their own designs'
+                    : BAG_IT_LABEL
+              }
             >
               <BagPulseIcon
-                status={bagBusy ? 'bagging' : ownsDesignBrand ? 'disabled' : 'not_bagged'}
+                status={bagBusy ? 'bagging' : bagDisabled ? 'disabled' : 'not_bagged'}
                 context="rail"
                 size={34}
-                disabled={bagBusy || ownsDesignBrand}
+                disabled={bagDisabled}
               />
-              <span className="text-xs font-bold mt-1 drop-shadow">{BAG_IT_LABEL}</span>
+              <span className="text-[9px] font-bold mt-0.5 drop-shadow sm:text-xs sm:mt-1">{BAG_IT_LABEL}</span>
             </button>
           ) : null}
 
-          <ThreadButton
-            contentType="COLLECTION_MEDIA"
-            contentId={item.id}
-            initialCount={item.threadsCount ?? 0}
-            initialThreaded={item.isThreaded}
-            ownerId={item.brandId}
-            parentCollectionId={item.collectionId}
-          />
-          
-          <button 
-            className="flex flex-col items-center text-white hover:scale-110 transition-transform"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Handle share action
-            }}
-            aria-label="Share"
-            title="Share collection"
-          >
-            <Link className="h-5 w-5" aria-hidden="true" />
-            <span className="text-xs font-bold mt-1 drop-shadow">{item.collectionCollabCount ?? 0}</span>
-          </button>
+          <div className="flex origin-bottom-right scale-[0.62] flex-col items-center gap-1 sm:scale-[0.88] sm:gap-2 lg:scale-100 lg:gap-3">
+            <ThreadButton
+              contentType="COLLECTION_MEDIA"
+              contentId={item.id}
+              initialCount={item.threadsCount ?? 0}
+              initialThreaded={item.isThreaded}
+              ownerId={item.brandId}
+              parentCollectionId={item.collectionId}
+            />
+
+            <button
+              className="flex flex-col items-center text-white hover:scale-110 transition-transform"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Handle share action
+              }}
+              aria-label="Share"
+              title="Share collection"
+            >
+              <Link className="h-3.5 w-3.5 sm:h-5 sm:w-5" aria-hidden="true" />
+              <span className="text-[8px] font-bold mt-0.5 drop-shadow sm:text-xs sm:mt-1">{item.collectionCollabCount ?? 0}</span>
+            </button>
+          </div>
         </div>
 
-        {/* Bottom Content Overlay */}
-        {/* FIX #6: Responsive padding for different screen sizes */}
-        <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-3 md:p-4 text-white z-10">
+        {/* Desktop Bottom Content Overlay */}
+        <div className="hidden md:block absolute bottom-0 left-0 right-0 p-1.5 sm:p-3 md:p-4 text-white z-10">
           {/* Brand Info with Glassmorphism */}
           {/* FIX #6: Responsive padding and spacing */}
           <button
@@ -492,9 +462,9 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               e.stopPropagation();
               onViewBrand?.(item.brandId, item);
             }}
-            className="flex items-center gap-2 mb-1 w-fit rounded-lg py-1 transition-all"
+            className="flex items-center gap-1.5 mb-0.5 w-fit rounded-lg py-0.5 transition-all sm:gap-2 sm:mb-1 sm:py-1"
           >
-            <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-xl border border-white/40 shadow-md">
+            <div className="relative h-6 w-6 flex-shrink-0 overflow-hidden rounded-lg border border-white/40 shadow-md sm:h-8 sm:w-8 sm:rounded-xl">
               <ImageWithFallback
                 src={brandAvatar.src}
                 fileId={brandAvatar.fileId}
@@ -502,22 +472,22 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                 fit="cover"
                 rounded="xl"
                 fallbackName={brandAvatarFallback}
-                containerClassName="h-8 w-8 rounded-xl"
-                className="h-8 w-8 object-cover"
+                containerClassName="h-6 w-6 rounded-lg sm:h-8 sm:w-8 sm:rounded-xl"
+                className="h-6 w-6 object-cover sm:h-8 sm:w-8"
               />
             </div>
             <div className="min-w-0 text-left">
               {/* FIX #5: Responsive font sizing, removed truncate, allow wrapping with line-clamp */}
               <p 
                 className="font-bold leading-tight text-white drop-shadow line-clamp-2"
-                style={{ fontSize: 'clamp(0.75rem, 2.5vw, 0.875rem)' }}
+                style={{ fontSize: 'clamp(0.5625rem, 2vw, 0.875rem)' }}
               >
                 {item.brandName ?? item.username ?? 'Brand'}
               </p>
               {item.username && item.brandName !== item.username && (
                 <p 
                   className="leading-tight text-white/80 line-clamp-1"
-                  style={{ fontSize: 'clamp(0.625rem, 2vw, 0.75rem)' }}
+                  style={{ fontSize: 'clamp(0.5rem, 1.6vw, 0.75rem)' }}
                 >
                   @{item.username}
                 </p>
@@ -534,7 +504,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               fontWeight: 700, 
               letterSpacing: '0.03em', 
               textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-              fontSize: 'clamp(0.875rem, 2.5vw, 1rem)'
+              fontSize: 'clamp(0.625rem, 2vw, 1rem)'
             }}
           >
             {item.collectionTitle}
@@ -569,12 +539,23 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                       contextDesignCoverFileId: item.coverMediaId ?? item.media.fileId ?? undefined,
                       contextDesignCoverUrl: item.media.url ?? item.media.previewUrl ?? undefined,
                     });
+                    /*
+                      Send and stay. The runway is a feed, not a funnel.
+
+                      This used to `navigate()` to the thread the moment the
+                      message landed, which tore the shopper out of a scroll
+                      position they cannot get back and made a one-line question
+                      cost them their whole browsing session. The message is
+                      already delivered by this point and the reply arrives in
+                      the inbox either way, so the navigation bought nothing and
+                      charged everything.
+
+                      `result` is still awaited — the toast must only fire on a
+                      real send — the thread id simply is not needed here.
+                    */
+                    void result;
                     setDirectMessageText('');
-                    toast.success('Message sent');
-                    const threadId = result?.thread?.id;
-                    if (threadId) {
-                      navigate(`/messages?thread=${encodeURIComponent(threadId)}`);
-                    }
+                    toast.success('Message sent — the reply lands in your inbox.');
                   } catch (err: any) {
                     toast.error(err?.response?.data?.message ?? 'Failed to send message');
                   } finally { setDirectMessageBusy(false); }
@@ -585,10 +566,58 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                 busy={directMessageBusy}
                 className="w-full"
                 variant="overlay"
+                size="compact"
                 submitAriaLabel="Send direct message"
               />
             </div>
           </div>
+        </div>
+
+        {/* Mobile View Bottom Overlay */}
+        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-black/45 backdrop-blur-md z-10 flex items-center justify-between min-h-[32px] max-h-[38px] border-t border-white/10" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-1 min-w-0 flex flex-col justify-center pl-1">
+            <h3 
+              className="font-bold text-white truncate leading-none uppercase"
+              style={{ fontSize: '12px' }}
+            >
+              {item.collectionTitle}
+            </h3>
+            {(() => {
+              const min = typeof item.minPrice === 'number' ? formatPrice(item.minPrice) : undefined;
+              const max = typeof item.maxPrice === 'number' ? formatPrice(item.maxPrice) : undefined;
+              const displayPrice = min && max ? `${min} - ${max}` : min ? `${min}+` : max ? `Up to ${max}` : null;
+              return displayPrice ? (
+                <span className="text-white/85 leading-none mt-0.5" style={{ fontSize: '12px' }}>
+                  {displayPrice}
+                </span>
+              ) : null;
+            })()}
+          </div>
+          
+          {/* Mobile Bag It Feature inline in the bottom bar */}
+          {isCustomAvailable && (
+            <button
+              type="button"
+              className="flex items-center justify-center p-0.5 text-white hover:scale-110 transition-transform mr-1 shrink-0"
+              onClick={handleBagDesign}
+              disabled={bagDisabled}
+              aria-label={BAG_IT_LABEL}
+              title={
+                brandBagBlocked
+                  ? BRAND_BAG_BLOCKED_MESSAGE
+                  : ownsDesignBrand
+                    ? 'Brands cannot bag their own designs'
+                    : BAG_IT_LABEL
+              }
+            >
+              <BagPulseIcon
+                status={bagBusy ? 'bagging' : bagDisabled ? 'disabled' : 'not_bagged'}
+                context="rail"
+                size={24}
+                disabled={bagDisabled}
+              />
+            </button>
+          )}
         </div>
       </div>
     </article>
@@ -596,4 +625,3 @@ export const DesignCard: React.FC<DesignCardProps> = ({
 };
 
 export default DesignCard;
-

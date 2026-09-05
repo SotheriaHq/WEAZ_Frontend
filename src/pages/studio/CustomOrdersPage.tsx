@@ -100,31 +100,55 @@ const StudioCustomOrderCard: React.FC<{
 }> = ({ order, summary, onOpenOrder, onOpenMessages }) => {
   const unreadCount = Number(summary?.unreadCount ?? 0);
 
+  // Read-only admin notice (reminder/dispute) the brand hasn't opened yet.
+  const hasAdminNotice = Boolean(order.hasUnreadAdminNotice);
+
   return (
-    <article className={`overflow-hidden rounded-2xl border transition hover:shadow-[0_8px_30px_rgba(15,23,42,0.08)] ${cardTone(order.status)}`}>
+    <article
+      className={`overflow-hidden rounded-2xl border transition hover:shadow-[0_8px_30px_rgba(15,23,42,0.08)] ${cardTone(order.status)} ${
+        hasAdminNotice ? 'ring-2 ring-rose-400/70 ring-offset-1 ring-offset-transparent' : ''
+      }`}
+    >
       <div className="grid items-center gap-0 lg:grid-cols-[64px_minmax(0,1fr)_170px_140px_130px]">
-        {/* Thumbnail */}
-        <div className="hidden overflow-hidden lg:block">
-          {order.sourcePrimaryMediaUrl ? (
-            <ImageWithFallback
-              src={order.sourcePrimaryMediaUrl}
-              alt={order.sourceTitle}
-              fallbackName={order.sourceTitle}
-              fit="cover"
-              rounded="none"
-              containerClassName="h-[64px] w-[64px] overflow-hidden"
-              className="h-[64px] w-[64px]"
-              maxHeightClassName="max-h-[64px]"
-            />
-          ) : (
-            <div className="flex h-[64px] w-[64px] items-center justify-center bg-slate-950 text-2xl text-white">
-              <span aria-hidden="true">🧵</span>
+        {/* Mobile + Desktop Thumbnail */}
+        <div className="flex items-center gap-3 p-3 lg:p-0 overflow-hidden border-b border-black/[0.04] dark:border-white/[0.04] lg:border-b-0">
+          <div className="overflow-hidden rounded-xl shrink-0">
+            {order.sourcePrimaryMediaUrl ? (
+              <ImageWithFallback
+                src={order.sourcePrimaryMediaUrl}
+                alt={order.sourceTitle}
+                fallbackName={order.sourceTitle}
+                fit="cover"
+                rounded="xl"
+                containerClassName="h-[48px] w-[48px] lg:h-[64px] lg:w-[64px] overflow-hidden"
+                className="h-[48px] w-[48px] lg:h-[64px] lg:w-[64px]"
+                maxHeightClassName="max-h-[64px]"
+              />
+            ) : (
+              <div className="flex h-[48px] w-[48px] lg:h-[64px] lg:w-[64px] items-center justify-center bg-slate-950 text-xl lg:text-2xl text-white">
+                <span aria-hidden="true">🧵</span>
+              </div>
+            )}
+          </div>
+          {/* Mobile Identity Info */}
+          <div className="min-w-0 flex-1 lg:hidden">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
+                {formatCustomOrderCode(order.id)}
+              </span>
+              <span className="text-xs font-bold text-slate-900 dark:text-white">
+                {formatCurrency(order.buyerPriceSummary.grandTotal, order.buyerPriceSummary.currency)}
+              </span>
             </div>
-          )}
+            <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{order.sourceTitle}</div>
+            <div className="text-[11px] text-slate-500 truncate">
+              {order.buyer?.name || 'Buyer'} • {[order.delivery?.city, order.delivery?.state].filter(Boolean).join(', ') || 'No address'}
+            </div>
+          </div>
         </div>
 
-        {/* Order identity + badges */}
-        <div className="min-w-0 px-4 py-3">
+        {/* Desktop Order Identity */}
+        <div className="hidden lg:block min-w-0 px-4 py-3">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
               {formatCustomOrderCode(order.id)}
@@ -134,8 +158,16 @@ const StudioCustomOrderCard: React.FC<{
                 💬 {unreadCount > 0 ? `${unreadCount}` : '●'}
               </span>
             ) : null}
+            {hasAdminNotice ? (
+              <span
+                className="inline-flex animate-pulse items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-300"
+                title="An admin left a reminder or dispute notice — open the order to read it"
+              >
+                📣 Admin notice
+              </span>
+            ) : null}
           </div>
-          <div className="mt-1 line-clamp-1 text-sm font-bold text-slate-900 dark:text-white">{order.sourceTitle}</div>
+          <div className="mt-1 break-words text-sm font-bold text-slate-900 dark:text-white">{order.sourceTitle}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <CustomOrderBadge value={order.status} />
             <CustomOrderBadge value={order.paymentStatus} type="payment" />
@@ -143,7 +175,7 @@ const StudioCustomOrderCard: React.FC<{
           </div>
         </div>
 
-        {/* Buyer + delivery */}
+        {/* Desktop Buyer + delivery */}
         <div className="hidden border-l border-black/[0.06] px-4 py-3 dark:border-white/[0.06] lg:block">
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Buyer</div>
           <div className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">{order.buyer?.name || '—'}</div>
@@ -152,7 +184,7 @@ const StudioCustomOrderCard: React.FC<{
           </div>
         </div>
 
-        {/* Total + placed */}
+        {/* Desktop Total + placed */}
         <div className="hidden border-l border-black/[0.06] px-4 py-3 dark:border-white/[0.06] lg:block">
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Total</div>
           <div className="mt-0.5 text-sm font-bold text-slate-900 dark:text-white">
@@ -161,20 +193,33 @@ const StudioCustomOrderCard: React.FC<{
           <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{formatDateTime(order.createdAt)}</div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2 border-l border-black/[0.06] px-4 py-3 dark:border-white/[0.06]">
+        {/* Status badges row on Mobile */}
+        <div className="flex flex-wrap items-center justify-between gap-1.5 px-3 py-2 lg:hidden">
+          <div className="flex flex-wrap items-center gap-1">
+            <CustomOrderBadge value={order.status} />
+            <CustomOrderBadge value={order.paymentStatus} type="payment" />
+          </div>
+          {summary?.hasUnread ? (
+            <span className="inline-flex rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+              💬 {unreadCount > 0 ? `${unreadCount}` : '●'}
+            </span>
+          ) : null}
+        </div>
+
+        {/* Actions Bar */}
+        <div className="flex items-center gap-2 border-t lg:border-t-0 border-l-0 lg:border-l border-black/[0.06] p-2.5 lg:px-4 lg:py-3 dark:border-white/[0.06]">
           <button
             type="button"
             onClick={onOpenOrder}
-            className="flex-1 rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white dark:bg-white dark:text-slate-950"
+            className="flex-1 rounded-full bg-slate-950 px-3 py-1.5 lg:py-2 text-xs font-semibold text-white dark:bg-white dark:text-slate-950 hover:bg-slate-800"
           >
-            Open
+            Open Order
           </button>
           <button
             type="button"
             onClick={onOpenMessages}
             aria-label="Open messages"
-            className="rounded-full border border-black/10 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200"
+            className="rounded-full border border-black/10 bg-white/80 px-3 py-1.5 lg:py-2 text-xs font-semibold text-slate-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 hover:bg-slate-100"
           >
             💬
           </button>
@@ -241,7 +286,11 @@ const CustomOrdersPage: React.FC = () => {
       active: orders.filter((entry) =>
         ['PENDING_BRAND_ACCEPTANCE', 'ACCEPTED', 'IN_PRODUCTION', 'READY_FOR_DISPATCH', 'IN_TRANSIT'].includes(entry.status),
       ).length,
-      issues: orders.filter((entry) => ['DISPUTED', 'DELIVERY_ISSUE_REPORTED'].includes(entry.status)).length,
+      issues: orders.filter(
+        (entry) =>
+          ['DISPUTED', 'DELIVERY_ISSUE_REPORTED'].includes(entry.status) ||
+          entry.hasUnreadAdminNotice,
+      ).length,
     }),
     [orders],
   );
@@ -260,7 +309,7 @@ const CustomOrdersPage: React.FC = () => {
         <span className="font-medium">Custom orders</span>
       </div>
 
-      <section className="rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-5 py-4 text-white shadow-sm">
+      <section className="rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-3 py-4 text-white shadow-sm sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">Studio</div>
@@ -277,34 +326,46 @@ const CustomOrdersPage: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('/studio?tab=orders')}
-              className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-950"
+              className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-950 dark:bg-white/5"
             >
               Standard orders
             </button>
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <div className="flex items-center gap-1.5 rounded-xl bg-white/10 px-3.5 py-2">
-            <span className="text-lg font-bold">{metrics.total}</span>
-            <span className="text-xs text-slate-300">in view</span>
+        {/*
+          Four counters, four columns - the same shape the standard-orders tab
+          uses, because they are the same kind of thing.
+
+          `flex-wrap` gave these a different ragged layout at every width: three
+          on one line and a lonely fourth below it, or two and two, depending on
+          how long the numbers happened to be. A grid makes the row stable and
+          makes the two tabs agree with each other.
+
+          Number over label rather than beside it, so the label has the full
+          column width and does not have to compete with the figure for it.
+        */}
+        <div className="mt-4 grid grid-cols-4 gap-2">
+          <div className="min-w-0 rounded-xl bg-white/10 px-2 py-2 sm:px-3.5">
+            <div className="text-base font-bold leading-tight sm:text-lg">{metrics.total}</div>
+            <div className="text-[10px] leading-tight text-slate-300 sm:text-xs">in view</div>
           </div>
-          <div className="flex items-center gap-1.5 rounded-xl bg-amber-500/20 px-3.5 py-2">
-            <span className="text-lg font-bold text-amber-200">{metrics.awaitingMoney}</span>
-            <span className="text-xs text-amber-300/80">awaiting payment</span>
+          <div className="min-w-0 rounded-xl bg-amber-500/20 px-2 py-2 sm:px-3.5">
+            <div className="text-base font-bold leading-tight text-amber-200 sm:text-lg">{metrics.awaitingMoney}</div>
+            <div className="text-[10px] leading-tight text-amber-300/80 sm:text-xs">awaiting payment</div>
           </div>
-          <div className="flex items-center gap-1.5 rounded-xl bg-emerald-500/20 px-3.5 py-2">
-            <span className="text-lg font-bold text-emerald-200">{metrics.active}</span>
-            <span className="text-xs text-emerald-300/80">active pipeline</span>
+          <div className="min-w-0 rounded-xl bg-emerald-500/20 px-2 py-2 sm:px-3.5">
+            <div className="text-base font-bold leading-tight text-emerald-200 sm:text-lg">{metrics.active}</div>
+            <div className="text-[10px] leading-tight text-emerald-300/80 sm:text-xs">active pipeline</div>
           </div>
-          <div className="flex items-center gap-1.5 rounded-xl bg-rose-500/20 px-3.5 py-2">
-            <span className="text-lg font-bold text-rose-200">{metrics.issues}</span>
-            <span className="text-xs text-rose-300/80">needs attention</span>
+          <div className="min-w-0 rounded-xl bg-rose-500/20 px-2 py-2 sm:px-3.5">
+            <div className="text-base font-bold leading-tight text-rose-200 sm:text-lg">{metrics.issues}</div>
+            <div className="text-[10px] leading-tight text-rose-300/80 sm:text-xs">needs attention</div>
           </div>
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-black/10 bg-white/85 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.04]">
+      <section className="rounded-2xl border border-black/10 bg-white/85 p-3 shadow-[0_24px_80px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.04] sm:rounded-[2rem] sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Studio queue</div>

@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminContentReviewPage from './AdminContentReviewPage';
@@ -163,6 +164,23 @@ const submission = {
   reports: [],
 };
 
+/**
+ * The page calls `useQueryClient()` to invalidate catalog caches after a review
+ * action, so it cannot render outside a provider. A fresh client per test keeps
+ * cached submissions from one case leaking into the next, and retries are off so
+ * a rejected mock surfaces immediately instead of after three backoffs.
+ */
+const renderPage = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <AdminContentReviewPage />
+    </QueryClientProvider>,
+  );
+};
+
 describe('AdminContentReviewPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -192,7 +210,7 @@ describe('AdminContentReviewPage', () => {
       },
     });
 
-    render(<AdminContentReviewPage />);
+    renderPage();
 
     expect(await screen.findByText('No content waiting for review.')).toBeTruthy();
     expect(screen.getByText('Submissions that need approval will appear here.')).toBeTruthy();
@@ -209,7 +227,7 @@ describe('AdminContentReviewPage', () => {
     });
     getSubmission.mockResolvedValue({ data: { data: submission } });
 
-    render(<AdminContentReviewPage />);
+    renderPage();
 
     expect(await screen.findByText('Adire Jacket')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Review/i }));
@@ -239,7 +257,7 @@ describe('AdminContentReviewPage', () => {
     });
     getSubmission.mockResolvedValue({ data: { data: submission } });
 
-    render(<AdminContentReviewPage />);
+    renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: /Review/i }));
     fireEvent.click(await screen.findByRole('button', { name: /Reject/i }));

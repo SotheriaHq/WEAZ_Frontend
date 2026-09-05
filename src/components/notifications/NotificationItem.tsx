@@ -19,6 +19,14 @@ import type { NormalizedNotification } from '@/utils/notificationAdapter';
 import { trackOnce, createTelemetryEvent } from '@/utils/notificationTelemetry';
 import './NotificationItem.css';
 
+// A `target.preview` is meant to be a short human snippet (e.g. a comment
+// excerpt). Some system notifications reuse it to carry a route path — never
+// show that raw path/URL to the user; it's used only for routing.
+function isRouteyPreview(preview?: string | null): boolean {
+  if (!preview) return false;
+  return preview.startsWith('/') || /^https?:\/\//i.test(preview);
+}
+
 // Utility function for relative time
 function timeAgo(dateString: string): string {
   const date = new Date(dateString);
@@ -39,10 +47,16 @@ export interface NotificationItemProps {
   onUsernameClick: (actorId: string) => void;
   onBodyClick: (notification: NormalizedNotification) => void;
   onMarkRead: (id: string) => void;
+  /**
+   * Renders the dismiss control. It lives inside the row rather than in the
+   * caller's markup because the row IS the `<li>` — an outer wrapper would
+   * nest one list item inside another.
+   */
+  onDelete?: (id: string) => void;
 }
 
 export const NotificationItem = React.memo<NotificationItemProps>(
-  ({ notification, onAvatarClick, onUsernameClick, onBodyClick, onMarkRead }) => {
+  ({ notification, onAvatarClick, onUsernameClick, onBodyClick, onMarkRead, onDelete }) => {
     const { id, type, isRead, actor, target, message } = notification;
     const displayName = getActorDisplayName(notification);
     const actionText = getActionText(type);
@@ -90,6 +104,11 @@ export const NotificationItem = React.memo<NotificationItemProps>(
       onBodyClick(notification);
     }, [id, handleMarkRead, onBodyClick, notification]);
 
+    const handleDelete = useCallback((e: React.MouseEvent) => {
+      e.stopPropagation();
+      onDelete?.(id);
+    }, [id, onDelete]);
+
     // Keyboard handler for accessibility
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -122,7 +141,7 @@ export const NotificationItem = React.memo<NotificationItemProps>(
           className={`avatar-section ${hasActor ? 'clickable' : 'non-clickable'}`}
           onClick={hasActor ? handleAvatarClick : undefined}
           role={hasActor ? 'button' : 'img'}
-          aria-label={hasActor ? `View profile of ${displayName}` : 'WEAZ notification'}
+          aria-label={hasActor ? `View profile of ${displayName}` : 'WIEZ notification'}
           tabIndex={hasActor ? 0 : -1}
           data-testid="notification-avatar"
         >
@@ -153,7 +172,7 @@ export const NotificationItem = React.memo<NotificationItemProps>(
             {actionText && (
               <span className="action-text"> {actionText}</span>
             )}
-            {target?.preview && (
+            {target?.preview && !isRouteyPreview(target.preview) && (
               <span className="target-preview"> {target.preview}</span>
             )}
           </div>
@@ -178,6 +197,18 @@ export const NotificationItem = React.memo<NotificationItemProps>(
         <div className="icon-section">
           <NotificationIcon type={type} size="sm" />
         </div>
+
+        {onDelete ? (
+          <button
+            type="button"
+            className="notification-dismiss"
+            onClick={handleDelete}
+            aria-label="Delete notification"
+            data-testid="notification-delete"
+          >
+            <span aria-hidden="true">✕</span>
+          </button>
+        ) : null}
       </li>
     );
   },
@@ -185,7 +216,8 @@ export const NotificationItem = React.memo<NotificationItemProps>(
     // Custom comparison - only re-render if these change
     return (
       prevProps.notification.id === nextProps.notification.id &&
-      prevProps.notification.isRead === nextProps.notification.isRead
+      prevProps.notification.isRead === nextProps.notification.isRead &&
+      Boolean(prevProps.onDelete) === Boolean(nextProps.onDelete)
     );
   }
 );

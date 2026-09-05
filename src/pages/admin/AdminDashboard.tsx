@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminDashboardApi } from '../../api/AdminApi';
 import { unwrapApiResponse } from '@/types/auth';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import useCachedResource from '@/hooks/useCachedResource';
+import { WIEZ_COUNT_STALE_TIME_MS } from '@/query/queryClient';
 
 type RecentLog = {
   id: string;
@@ -28,7 +30,20 @@ type DashboardStats = {
   pendingVerifications: number;
   pendingPayouts: number;
   openDisputes: number;
+  ordersNeedingAttention?: number;
+  customOrdersNeedingAttention?: number;
+  totalDesigns?: number;
+  totalProducts?: number;
+  totalCollections?: number;
   recentLogs: RecentLog[];
+};
+
+type LiveBadges = {
+  customOrdersNeedingAttention: number;
+  openDisputes: number;
+  pendingPayouts: number;
+  pendingVerifications: number;
+  ordersNeedingAttention: number;
 };
 
 const humanAction = (action: string): { label: string; verb: string } => {
@@ -102,35 +117,56 @@ const statusBadge = (status: string | null | undefined) => {
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    adminDashboardApi
-      .getStats()
-      .then((res) => {
-        const payload = unwrapApiResponse<DashboardStats>(res.data as any);
-        setStats(payload);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  // Heavy platform totals — slower poll. Not re-run every 20s.
+  const { data: stats, loading } = useCachedResource<DashboardStats>({
+    queryKey: ['admin', 'dashboard', 'stats'],
+    queryFn: async () => {
+      const res = await adminDashboardApi.getStats();
+      return unwrapApiResponse<DashboardStats>(res.data as any);
+    },
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
 
+  // Live action badges — cheap counts only, 20s poll.
+  const { data: badges } = useCachedResource<LiveBadges>({
+    queryKey: ['admin', 'dashboard', 'badges'],
+    queryFn: async () => {
+      const res = await adminDashboardApi.getLiveBadges();
+      return unwrapApiResponse<LiveBadges>(res.data as any);
+    },
+    staleTime: WIEZ_COUNT_STALE_TIME_MS,
+    refetchInterval: 20_000,
+  });
+
+  const pendingVerifications =
+    badges?.pendingVerifications ?? stats?.pendingVerifications;
+  const openDisputes = badges?.openDisputes ?? stats?.openDisputes;
+  const pendingPayouts = badges?.pendingPayouts ?? stats?.pendingPayouts;
+  const ordersNeedingAttention =
+    badges?.ordersNeedingAttention ?? stats?.ordersNeedingAttention;
+  const customAttentionCount =
+    badges?.customOrdersNeedingAttention ?? stats?.customOrdersNeedingAttention ?? 0;
+
+  // Deltas are derived from real stats only — no fabricated growth numbers.
   const primaryCards = [
-    { label: 'Total Users', value: stats?.totalUsers, change: '+12.4% vs last month', changeType: 'up' as const, color: 'indigo', route: '/admin/users' },
-    { label: 'Active Brands', value: stats?.totalBrands, change: `+${stats?.totalBrands ? Math.round(stats.totalBrands * 0.013) : 0} new this week`, changeType: 'up' as const, color: 'fuchsia', route: '/admin/brands' },
-    { label: 'Pending Reviews', value: stats?.pendingVerifications, change: 'Action Required', changeType: 'warning' as const, color: 'amber', route: '/admin/moderation' },
-    { label: 'Open Disputes', value: stats?.openDisputes, change: 'Needs attention', changeType: 'warning' as const, color: 'red', route: '/admin/disputes' },
+    { label: 'Total Users', value: stats?.totalUsers, change: stats?.activeUsers30d != null ? `${stats.activeUsers30d.toLocaleString()} active in 30d` : 'Registered users', changeType: 'up' as const, color: 'indigo', route: '/admin/users' },
+    { label: 'Active Brands', value: stats?.totalBrands, change: 'Active on platform', changeType: 'neutral' as const, color: 'fuchsia', route: '/admin/brands' },
+    { label: 'Pending Reviews', value: pendingVerifications, change: 'Action Required', changeType: 'warning' as const, color: 'amber', route: '/admin/moderation' },
+    { label: 'Open Disputes', value: openDisputes, change: 'Needs attention', changeType: 'warning' as const, color: 'red', route: '/admin/disputes' },
   ];
 
   const secondaryMetrics = useMemo(() => {
     const base = [
       { label: 'Active (30d)', value: stats?.activeUsers30d?.toLocaleString() ?? '—', route: '/admin/users' },
-      { label: 'Pending Payouts', value: stats?.pendingPayouts?.toLocaleString() ?? '—', route: '/admin/payouts' },
-      { label: 'Verifications', value: stats?.pendingVerifications?.toLocaleString() ?? '—', route: '/admin/brands' },
+      { label: 'Pending Payouts', value: pendingPayouts?.toLocaleString() ?? '—', route: '/admin/payouts' },
+      { label: 'Orders to Ship', value: ordersNeedingAttention?.toLocaleString() ?? '—', route: '/admin/orders' },
+      { label: 'Verifications', value: pendingVerifications?.toLocaleString() ?? '—', route: '/admin/brands' },
       { label: 'Audit Events', value: stats?.recentLogs?.length?.toString() ?? '—', route: '/admin/audit' },
-      { label: 'Content', value: '—', route: '/admin/content' },
-      { label: 'Designs', value: '—', route: '/admin/content?tab=designs' },
+      { label: 'Products', value: stats?.totalProducts?.toLocaleString() ?? '—', route: '/admin/content?tab=products' },
+      { label: 'Designs', value: stats?.totalDesigns?.toLocaleString() ?? '—', route: '/admin/content?tab=designs' },
+      { label: 'Collections', value: stats?.totalCollections?.toLocaleString() ?? '—', route: '/admin/content?tab=collections' },
     ];
     if (!stats?.showDailySignupCount) return base;
     return [
@@ -138,7 +174,7 @@ const AdminDashboard: React.FC = () => {
       { label: 'Signups Today', value: stats?.dailySignupCount?.toLocaleString() ?? '—', route: '/admin/users' },
       ...base.slice(1),
     ];
-  }, [stats]);
+  }, [stats, pendingPayouts, ordersNeedingAttention, pendingVerifications]);
 
   const colorMap: Record<string, { glow: string; text: string }> = {
     indigo: { glow: 'bg-indigo-500/10', text: 'text-indigo-400' },
@@ -174,6 +210,31 @@ const AdminDashboard: React.FC = () => {
           <span className="text-[10px] font-medium uppercase tracking-widest text-gray-500 dark:text-gray-400">Live System Status: Optimal</span>
         </div>
       </div>
+
+      {/* Always-visible danger flag: custom orders escalated for admin review.
+          Beats/pulses so the admin can't miss it even without opening notifications. */}
+      {!loading && customAttentionCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => navigate('/admin/orders?tab=custom&attention=1')}
+          className="group flex w-full items-center gap-4 rounded-2xl border border-rose-300/70 bg-gradient-to-r from-rose-50 to-rose-100/60 px-5 py-4 text-left shadow-sm shadow-rose-500/10 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-rose-500/20 dark:border-rose-500/30 dark:from-rose-500/10 dark:to-rose-500/5"
+          aria-label={`${customAttentionCount} custom orders need admin review`}
+        >
+          <span className="relative flex h-11 w-11 shrink-0 items-center justify-center">
+            <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-rose-400/40" />
+            <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-full bg-rose-500 text-xl text-white">🚨</span>
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-rose-700 dark:text-rose-200">
+              {customAttentionCount} custom {customAttentionCount === 1 ? 'order needs' : 'orders need'} your review
+            </p>
+            <p className="mt-0.5 text-xs font-medium text-rose-600/90 dark:text-rose-200/80">
+              These orders were escalated and are waiting on an admin action. Tap to open the queue.
+            </p>
+          </div>
+          <span aria-hidden className="shrink-0 rounded-full bg-rose-500 px-3 py-1 text-xs font-bold text-white">Review now →</span>
+        </button>
+      ) : null}
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {primaryCards.map((card) => {

@@ -144,7 +144,7 @@ const SearchField: React.FC<SearchFieldProps> = ({
             onChange?.(next);
           }}
           placeholder={placeholder}
-          className={`threadly-search-input pl-10 ${hasFilterItems || isLoading || inputValue ? 'pr-24' : 'pr-10'}`}
+          className={`wiez-search-input pl-10 ${hasFilterItems || isLoading || inputValue ? 'pr-24' : 'pr-10'}`}
         />
         {inputValue ? (
           <button

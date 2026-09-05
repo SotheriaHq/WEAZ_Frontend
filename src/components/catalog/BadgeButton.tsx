@@ -24,13 +24,13 @@ export const Badge: React.FC<BadgeProps> = ({
       ? 'bg-[#000000] text-white border-[#000000] shadow-sm' 
       : 'bg-[#000000] text-white border-[#000000] hover:bg-[#000000] shadow-sm',
     secondary: active
-      ? 'bg-purple-100 text-purple-900 border-purple-200'
-      : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100',
+      ? 'bg-purple-100 text-purple-900 border-purple-200 dark:bg-purple-500/20 dark:text-purple-300 dark:border-purple-500/30'
+      : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/30',
     outline: active
-      ? 'bg-purple-50 text-purple-700 border-purple-300'
-      : 'bg-transparent text-purple-600 border-purple-300 hover:bg-purple-50',
+      ? 'bg-purple-50 text-purple-700 border-purple-300 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/40'
+      : 'bg-transparent text-purple-600 border-purple-300 hover:bg-purple-50 dark:border-purple-500/40',
     ghost: active
-      ? 'bg-purple-100 text-purple-800 border-transparent'
+      ? 'bg-purple-100 text-purple-800 border-transparent dark:bg-purple-500/20 dark:text-purple-300'
       : 'bg-transparent text-purple-600 border-transparent hover:bg-purple-50'
   };
   

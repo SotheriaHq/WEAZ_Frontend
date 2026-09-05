@@ -142,16 +142,25 @@ const normalizeInitializeDesignResponse = (payload: unknown): InitializeDesignRe
   };
 };
 
+// Initialize/finalize do real server work (draft rows, media finalization)
+// and run over mobile links; the global 15 s axios timeout produced FALSE
+// task failures whose drafts actually existed — the cross-device ghost cards.
+const DESIGN_MUTATION_TIMEOUT_MS = 60_000;
+
 export async function initializeDesignUploads(
   dto: InitializeDesignUploadsDto,
 ): Promise<InitializeDesignResponse> {
-  const response = await apiClient.post('/designs/initialize', {
-    ...dto,
-    files: dto.files.map((file, index) => ({
-      ...file,
-      viewSlot: toBackendMediaViewSlot(file.viewSlot, index),
-    })),
-  });
+  const response = await apiClient.post(
+    '/designs/initialize',
+    {
+      ...dto,
+      files: dto.files.map((file, index) => ({
+        ...file,
+        viewSlot: toBackendMediaViewSlot(file.viewSlot, index),
+      })),
+    },
+    { timeout: DESIGN_MUTATION_TIMEOUT_MS },
+  );
   return normalizeInitializeDesignResponse(response.data);
 }
 
@@ -186,7 +195,10 @@ export async function finalizeDesignUploads(
       draftSessionToken: options?.draftSessionToken,
       draftVersion: options?.draftVersion,
     },
-    { headers: { 'Idempotency-Key': createIdempotencyKey() } },
+    {
+      headers: { 'Idempotency-Key': createIdempotencyKey() },
+      timeout: DESIGN_MUTATION_TIMEOUT_MS,
+    },
   );
   clearDesignDetailCache(designId);
   return unwrapData<unknown>(response.data);
@@ -235,7 +247,17 @@ export async function getDesignDetail(
 }
 
 export async function updateDesign(designId: string, designMetadata: DesignMetadata) {
-  const response = await apiClient.patch(`/designs/${designId}`, designMetadata);
+  // Drafts legitimately have unset fields the editor holds as ''. The backend
+  // DTO validates optional fields only when present, and @IsUUID/@IsEnum
+  // reject empty strings outright — so strip them instead of sending them.
+  const sanitized = Object.fromEntries(
+    Object.entries(designMetadata).filter(
+      ([, value]) => !(typeof value === 'string' && value.trim() === ''),
+    ),
+  ) as DesignMetadata;
+  const response = await apiClient.patch(`/designs/${designId}`, sanitized, {
+    timeout: DESIGN_MUTATION_TIMEOUT_MS,
+  });
   clearDesignDetailCache(designId);
   return unwrapData<unknown>(response.data);
 }
@@ -257,6 +279,38 @@ export async function submitDesignForReview(designId: string) {
   const response = await apiClient.post(`/designs/${designId}/submit`);
   clearDesignDetailCache(designId);
   return unwrapData<unknown>(response.data);
+}
+
+export async function withdrawDesignFromReview(designId: string) {
+  const response = await apiClient.post(`/designs/${designId}/withdraw-review`);
+  clearDesignDetailCache(designId);
+  return unwrapData<unknown>(response.data);
+}
+
+/**
+ * Report a client-side go-live failure (media upload/finalize died after the
+ * draft was created) so the backend emits a durable, cross-device notification
+ * routing the owner back to the draft. Best-effort — callers run this in a
+ * failure path and must not let it throw.
+ */
+export async function reportDesignPublishFailure(
+  designId: string,
+  info?: {
+    title?: string;
+    reason?: string;
+    stage?: 'initialize' | 'upload' | 'finalize';
+  },
+): Promise<void> {
+  await apiClient.post(
+    `/designs/${designId}/report-publish-failure`,
+    {
+      title: info?.title,
+      reason: info?.reason,
+      stage: info?.stage,
+    },
+    // Failure path: keep it short so a bad connection doesn't hang the report.
+    { timeout: 8000 },
+  );
 }
 
 export async function acknowledgeContentPolicy() {
@@ -305,6 +359,8 @@ export const DesignApi = {
   updateDesign,
   initializeDesignMediaUploads,
   submitDesignForReview,
+  withdrawDesignFromReview,
+  reportDesignPublishFailure,
   acknowledgeContentPolicy,
   reorderDesignMedia,
   deleteDesignMedia,

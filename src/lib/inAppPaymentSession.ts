@@ -8,7 +8,7 @@ export type ResolvedInAppPaymentSession = {
 };
 
 export const IN_APP_PAYMENT_SESSION_ERROR =
-  'WEAZ only supports secure in-app checkout sessions. Retry the payment from inside WEAZ.';
+  'WIEZ only supports secure in-app checkout sessions. Retry the payment from inside WIEZ.';
 
 export const resolvePaymentGateway = (
   session: Pick<InAppPaymentSession, 'gateway'>,

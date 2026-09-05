@@ -44,7 +44,7 @@ export interface UnifiedCheckoutQueueState {
   summary?: UnifiedCheckoutSummary;
 }
 
-const STORAGE_KEY = 'threadly.unifiedCheckout.queue.v1';
+const STORAGE_KEY = 'wiez.unifiedCheckout.queue.v1';
 
 const hasSessionStorage = () => {
   try {

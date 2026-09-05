@@ -4,7 +4,8 @@ import { toast } from 'sonner';
 import { adminOrdersApi } from '@/api/AdminApi';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import ImageWithFallback from '@/components/ImageWithFallback';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
+import { useReturnTo } from '@/hooks/useReturnTo';
 import { unwrapApiResponse } from '@/types/auth';
 import type { AdminStandardOrderDetail } from '@/types/admin';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
@@ -125,12 +126,15 @@ const DetailRow: React.FC<{
 
 const LoaderBlock = () => (
   <div className="py-16">
-    <VLoader size={40} phase="loading" showLabel={false} />
+    <MuseLoader size={40} />
   </div>
 );
 
 const AdminOrderDetailPage: React.FC = () => {
   const navigate = useNavigate();
+  // Reachable from finance, from the brand manage modal, and from deep links —
+  // send the admin back where they actually came from.
+  const backTarget = useReturnTo('/admin/finance', 'Back to finance');
   const { orderId } = useParams<{ orderId: string }>();
   const [order, setOrder] = useState<AdminStandardOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -228,10 +232,10 @@ const AdminOrderDetailPage: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => navigate('/admin/finance')}
+              onClick={() => navigate(backTarget.to)}
               className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]"
             >
-              Back to finance
+              ← {backTarget.label}
             </button>
             <button
               type="button"
@@ -466,7 +470,7 @@ const AdminOrderDetailPage: React.FC = () => {
                 Finance breakdown
               </h2>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                WEAZ ledger and escrow state for this standard order.
+                WIEZ ledger and escrow state for this standard order.
               </p>
             </div>
 

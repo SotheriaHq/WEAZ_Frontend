@@ -3,9 +3,21 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
-import { messagingApi, type InboxItem, type ThreadMessage, type ThreadOrderItem } from '@/api/MessagingApi';
+import { messagingApi, type InboxItem, type ThreadMessage, type ThreadOrderItem, type ResolvedThreadRoute } from '@/api/MessagingApi';
 import { customOrdersBuyerApi, customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
 import { getStoreStatus } from '@/api/StoreApi';
+import { isRateLimited, shouldAnnounceRateLimit } from '@/api/httpClient';
+import {
+  ISLAND_BOTTOM_NAV_BREAKPOINT_PX,
+  ISLAND_BOTTOM_NAV_RESERVED_PX,
+  useLockShellViewport,
+  useSuppressIslandBottomNav,
+} from '@/components/navigation/IslandBottomNav';
+import DesignViewModal from '@/components/designs/DesignViewModal';
+import { getDesignDetail } from '@/api/DesignApi';
+import { toMarketItem } from '@/api/MarketApi';
+import { selectIsMobile } from '@/features/uiSlice';
+import type { MarketItem } from '@/types/market';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import MessageBubble, { formatDate } from '@/components/messaging/MessageBubble';
@@ -14,6 +26,10 @@ import ChatContactSidebar from '@/components/messaging/ChatContactSidebar';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
+import { useCachedResource } from '@/hooks/useCachedResource';
+import { notifyMessagingRead } from '@/hooks/useMessagingUnreadCount';
+import { queryKeys } from '@/query/queryKeys';
+import { resolveParticipantDisplayName } from '@/utils/participantDisplayName';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -51,6 +67,15 @@ type ConversationItem = {
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
+
+/**
+ * How long the "jumped to this message" wash stays on screen.
+ *
+ * Must be >= the `wiez-message-jump` keyframe duration in `index.css`, or the
+ * class is pulled mid-animation and the band disappears in a step instead of a
+ * fade.
+ */
+const MESSAGE_JUMP_HIGHLIGHT_MS = 2400;
 
 const FILTERS = [
   { label: 'All', value: 'all' },
@@ -106,7 +131,7 @@ const mapInboxItem = (item: InboxItem): ConversationItem => ({
   title: item.title,
   subtitle: item.subtitle,
   participantName:
-    item.participant?.firstName || item.participant?.username || item.participant?.lastName || 'Participant',
+    resolveParticipantDisplayName(item.participant),
   participantId: item.participant?.id || null,
   participantImage: item.participant?.profileImage || null,
   participantUsername: item.participant?.username || null,
@@ -117,6 +142,86 @@ const mapInboxItem = (item: InboxItem): ConversationItem => ({
   mutedUntil: item.mutedUntil ?? null,
   archivedAt: item.archivedAt ?? null,
 });
+
+/**
+ * Build a minimal ConversationItem from a resolved thread route so a thread that
+ * isn't in the inbox list can still be opened. Message + attached-order loading
+ * both key off `threadId` (thread transport), so the conversation renders fully;
+ * the inbox refetch later replaces this with the enriched item (participant, etc.).
+ */
+const synthesizeConversationFromRoute = (route: ResolvedThreadRoute): ConversationItem => ({
+  id: route.threadId,
+  threadId: route.threadId,
+  contextType: route.contextType,
+  contextId:
+    route.contextType === 'STANDARD_ORDER'
+      ? route.orderId || route.threadId
+      : route.contextType === 'CUSTOM_ORDER'
+        ? route.customOrderId || route.threadId
+        : route.threadId,
+  orderId: route.orderId ?? null,
+  customOrderId: route.customOrderId ?? null,
+  targetUrl: route.targetUrl ?? null,
+  orderDetailUrl: route.orderDetailUrl ?? null,
+  title: 'Conversation',
+  subtitle: '',
+  participantName: 'Conversation',
+  participantId: null,
+  participantImage: null,
+  participantUsername: null,
+  createdAt: new Date().toISOString(),
+  lastMessageAt: null,
+  unreadCount: 0,
+  hasUnread: false,
+  mutedUntil: null,
+  archivedAt: null,
+});
+
+/**
+ * A send, held whole so it can be repeated exactly.
+ *
+ * The `clientMessageId` is part of the draft rather than regenerated per
+ * attempt: the backend dedupes on (thread, sender, clientMessageId), so
+ * retrying with the SAME id is what makes "the message went through but the
+ * response was lost" resolve to one message instead of two.
+ */
+type OutgoingDraft = {
+  conversation: ConversationItem;
+  payload: {
+    bodyText?: string;
+    clientMessageId: string;
+    attachmentFileIds: string[];
+    replyToMessageId?: string;
+  };
+};
+
+const getSendErrorMessage = (error: unknown): string => {
+  const message = (error as any)?.response?.data?.message;
+  return typeof message === 'string' && message.trim()
+    ? message
+    : 'Message not sent. Tap retry to try again.';
+};
+
+/**
+ * Server messages, with this device's in-flight ones kept.
+ *
+ * Sending triggers a refresh, and a refresh replaces the whole list — so
+ * sending a second message while the first was still settling used to erase
+ * the second one's bubble mid-flight, and it reappeared seconds later out of
+ * nowhere. A message that is still sending, or has failed and is waiting to be
+ * retried, exists only here: nothing the server returns can contain it, so it
+ * survives every replacement until it resolves.
+ *
+ * Appended after the server's rows because the list runs oldest-first and these
+ * are, by definition, the newest thing in the thread.
+ */
+const withPendingLocalMessages = (
+  incoming: ThreadMessage[],
+  current: ThreadMessage[],
+): ThreadMessage[] => {
+  const pending = current.filter((message) => message._optimistic);
+  return pending.length > 0 ? [...incoming, ...pending] : incoming;
+};
 
 const nextClientMessageId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -361,19 +466,74 @@ const MessagingManagementPage: React.FC = () => {
   const surface: Surface = hasActiveBrandMembership(profile) ? 'BRAND' : 'BUYER';
   const [brandId, setBrandId] = useState<string | null>(null);
   const actorId = profile?.id;
-  const { onNotification, onMessageEvent } = useRealtime();
+  const { onNotification, onMessageEvent, socketConnected } = useRealtime();
+
+  /**
+   * Which side of the conversation a message belongs to.
+   *
+   * `senderUserId === actorId` alone is not enough on the BRAND surface: the
+   * backend nulls `senderUserId` on moderated messages, and a brand thread can
+   * legitimately be answered by a staff member whose user id is not the viewing
+   * owner's — both cases collapsed every bubble to "received", which is why the
+   * sender/receiver colours never appeared for brands. Falling back to
+   * `senderRole` keeps the two sides distinct in those cases: on the brand
+   * surface BRAND_OWNER is "us", on the buyer surface BUYER is "us".
+   */
+  const isOwnMessage = useCallback(
+    (msg: { senderUserId?: string | null; senderRole?: string }) => {
+      if (actorId && msg.senderUserId) return msg.senderUserId === actorId;
+      if (msg.senderRole === 'SYSTEM' || msg.senderRole === 'ADMIN') return false;
+      return surface === 'BRAND'
+        ? msg.senderRole === 'BRAND_OWNER'
+        : msg.senderRole === 'BUYER';
+    },
+    [actorId, surface],
+  );
 
   /* ---- Conversation state ---- */
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'unread' | 'orders' | 'custom' | 'inquiry' | 'archived'>('all');
   const [query, setQuery] = useState('');
+  // Hybrid cache-first inbox: the cached resource paints instantly on revisits,
+  // while local state stays the working copy for optimistic updates
+  // (thread prefs, sent-message previews). Cache updates re-seed local state.
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [activeId, setActiveId] = useState<string>('');
+  // Safety net: a thread resolved from an order/custom-order/thread reference that
+  // is NOT present in the inbox list (e.g. archived, beyond the inbox window, or a
+  // freshly-linked buyer<->brand thread). Without this, "Open conversation" would
+  // land on the empty home screen because activeConversation is derived solely from
+  // the inbox. We synthesize a conversation item from the resolved route so the
+  // exact thread (and its attached order) opens regardless.
+  const [resolvedThreadFallback, setResolvedThreadFallback] = useState<ResolvedThreadRoute | null>(null);
   const highlightedMessageId = params.get('messageId');
+
+  const inboxResource = useCachedResource<ConversationItem[]>({
+    queryKey: queryKeys.messaging.inbox(actorId),
+    queryFn: async () => {
+      const inbox = await messagingApi.getInbox({ limit: 100, contextType: 'all', filter: 'all' });
+      return (inbox.items || []).map(mapInboxItem);
+    },
+    enabled: Boolean(actorId),
+  });
+  const loading = inboxResource.loading;
+  const inboxData = inboxResource.data;
+  const inboxError = inboxResource.error;
+  const refetchInboxResource = inboxResource.refetch;
+
+  useEffect(() => {
+    if (inboxData) setConversations(inboxData);
+  }, [inboxData]);
+
+  useEffect(() => {
+    if (!inboxError) return;
+    toast.error((inboxError as any)?.response?.data?.message || 'Unable to load conversations');
+  }, [inboxError]);
 
   /* ---- Message state ---- */
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  /** Payloads for messages that failed to send, keyed by `clientMessageId`. */
+  const failedDraftsRef = useRef<Map<string, OutgoingDraft>>(new Map());
   const sending = false;
   const [customOrderDetail, setCustomOrderDetail] = useState<CustomOrderDetail | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -417,7 +577,26 @@ const MessagingManagementPage: React.FC = () => {
   const messageNodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   /* ---- Derived ---- */
-  const activeConversation = conversations.find((item) => item.id === activeId) || null;
+  /**
+   * Memoized, because its IDENTITY is a dependency of five effects.
+   *
+   * This was recomputed inline every render, and the fallback branch built a
+   * brand-new object each time. Every re-render therefore produced a new
+   * `activeConversation`, which produced new `fetchMessages` /
+   * `fetchThreadOrders` / `fetchCustomOrderDetail` / `refresh` callbacks, which
+   * tore down and re-established both socket subscriptions and the 25s poll
+   * timer. Since `refresh()` sets state, it re-entered that cycle every time it
+   * ran — the churn behind 87 message fetches and 85 order fetches in one
+   * window, against a 120/min budget shared by the whole app.
+   */
+  const activeConversation = useMemo(
+    () =>
+      conversations.find((item) => item.id === activeId) ||
+      (resolvedThreadFallback && resolvedThreadFallback.threadId === activeId
+        ? synthesizeConversationFromRoute(resolvedThreadFallback)
+        : null),
+    [activeId, conversations, resolvedThreadFallback],
+  );
   const activeAvatarSource = resolveAvatarMediaSource(activeConversation?.participantImage);
   const contactSidebarProps = activeConversation
     ? {
@@ -513,39 +692,38 @@ const MessagingManagementPage: React.FC = () => {
   /* ---- Load conversations ---- */
   const refreshInbox = useCallback(async () => {
     try {
-      const inbox = await messagingApi.getInbox({ limit: 100, contextType: 'all', filter: 'all' });
-      setConversations((inbox.items || []).map(mapInboxItem));
+      await refetchInboxResource();
     } catch {
       /* silently ignore background inbox refresh errors */
     }
-  }, []);
+  }, [refetchInboxResource]);
 
+  /* ---- Auto-select from URL params ----
+     When a specific order/custom order/thread is requested we must open THAT
+     conversation. Custom-order chats are buyer<->brand (DIRECT) threads linked
+     to the order, so they never match by contextType==='CUSTOM_ORDER'; we
+     resolve the reference to its real thread server-side (actor-scoped) instead
+     of silently selecting conversations[0] — which was opening the wrong
+     brand's chat. Only default to the first conversation when NO specific
+     context was requested. */
+  const contextResolveKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const inbox = await messagingApi.getInbox({ limit: 100, contextType: 'all', filter: 'all' });
-        if (!cancelled) setConversations((inbox.items || []).map(mapInboxItem));
-      } catch (error: any) {
-        if (!cancelled) {
-          toast.error(error?.response?.data?.message || 'Unable to load conversations');
-          setConversations([]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void load();
-    return () => { cancelled = true; };
-  }, [brandId, surface]);
-
-  /* ---- Auto-select from URL params ---- */
-  useEffect(() => {
-    if (conversations.length === 0) { setActiveId(''); return; }
-
     const queryOrderId = params.get('orderId');
     const queryCustomOrderId = params.get('customOrderId');
+    const queryThreadId = params.get('threadId') || params.get('thread');
+    const hasExplicitContext = Boolean(queryOrderId || queryCustomOrderId || queryThreadId);
+
+    // An empty inbox must NOT short-circuit context resolution. This guard used
+    // to sit at the top of the effect, so a shopper arriving from an order
+    // notification's "Open conversation" — who had never messaged anyone, and
+    // therefore had an empty inbox — bailed out before any resolution ran and
+    // landed on the blank general messages screen. That is the worst case for
+    // this deep link: the person who most needs to be dropped into the right
+    // thread is the one least able to find the brand by hand.
+    if (conversations.length === 0 && !hasExplicitContext) {
+      setActiveId('');
+      return;
+    }
 
     if (queryOrderId) {
       const t = conversations.find((i) => i.contextType === 'STANDARD_ORDER' && i.orderId === queryOrderId);
@@ -556,22 +734,87 @@ const MessagingManagementPage: React.FC = () => {
       if (t) { setActiveId(t.id); return; }
     }
 
-    const queryThreadId = params.get('threadId') || params.get('thread');
     if (queryThreadId) {
       if (conversations.some((i) => i.id === queryThreadId)) { setActiveId(queryThreadId); return; }
-      void messagingApi.resolveThreadRoute(queryThreadId).then((resolved) => {
-        const next = new URLSearchParams(params);
-        next.set('threadId', resolved.threadId);
-        if (resolved.orderId) next.set('orderId', resolved.orderId);
-        if (resolved.customOrderId) next.set('customOrderId', resolved.customOrderId);
-        setParams(next, { replace: true });
-      }).catch(() => {});
+      const resolveKey = `t:${queryThreadId}`;
+      if (contextResolveKeyRef.current !== resolveKey) {
+        contextResolveKeyRef.current = resolveKey;
+        void messagingApi.resolveThreadRoute(queryThreadId).then((resolved) => {
+          // Open the thread directly (synthesizing it if it's outside the inbox
+          // window) rather than only rewriting the URL, which could loop without
+          // ever selecting anything.
+          setResolvedThreadFallback(resolved);
+          setActiveId(resolved.threadId);
+        }).catch(() => {});
+      }
+      return;
     }
 
-    if (!activeId || !conversations.some((i) => i.id === activeId)) {
+    // Explicit order/custom-order that didn't directly match an inbox item:
+    // resolve it to its actual (often DIRECT/BUYER_BRAND) thread. Never fall
+    // through to conversations[0] here — that opened an unrelated brand's chat.
+    if (queryOrderId || queryCustomOrderId) {
+      const resolveKey = `co:${queryCustomOrderId ?? ''}|o:${queryOrderId ?? ''}`;
+      if (contextResolveKeyRef.current !== resolveKey) {
+        contextResolveKeyRef.current = resolveKey;
+        void messagingApi.resolveConversation({
+          orderId: queryOrderId ?? undefined,
+          customOrderId: queryCustomOrderId ?? undefined,
+        }).then((resolved) => {
+          if (!resolved?.threadId) return;
+          // Carry the requested order reference into the resolved route so the
+          // conversation opens with that specific order attached (the thread's own
+          // customOrderId column is null for buyer<->brand DIRECT threads).
+          const enriched: ResolvedThreadRoute = {
+            ...resolved,
+            orderId: resolved.orderId ?? queryOrderId ?? null,
+            customOrderId: resolved.customOrderId ?? queryCustomOrderId ?? null,
+          };
+          setResolvedThreadFallback(enriched);
+          setActiveId(resolved.threadId);
+        }).catch(() => {
+          // Leave nothing selected rather than opening the wrong conversation.
+        });
+      }
+      return;
+    }
+
+    if (!hasExplicitContext && (!activeId || !conversations.some((i) => i.id === activeId))) {
       setActiveId(conversations[0].id);
     }
   }, [activeId, conversations, params, setParams]);
+
+  /**
+   * Reflect a completed mark-read locally.
+   *
+   * The server-side read landed, but nothing told the list row or the nav badge,
+   * so the "new message" dot survived opening the thread until a full inbox
+   * refetch happened to run. Clearing the row optimistically and firing
+   * `messaging:read` keeps the dot, the row and the badge in agreement
+   * immediately; the socket `message.read` echo then confirms it.
+   */
+  const clearLocalUnread = useCallback((conversationId: string) => {
+    setConversations((prev) =>
+      prev.map((item) =>
+        item.id === conversationId && (item.hasUnread || item.unreadCount > 0)
+          ? { ...item, unreadCount: 0, hasUnread: false }
+          : item,
+      ),
+    );
+    notifyMessagingRead();
+  }, []);
+
+  /**
+   * Messages already fetched, per conversation.
+   *
+   * Switching threads used to show a spinner every single time, because the
+   * pane had nothing to draw until the network came back. Every messaging app
+   * people compare this to paints the last known conversation instantly and
+   * reconciles behind it — the request still happens, it just stops being the
+   * thing the reader waits on. A ref, not state: writing it must never itself
+   * cause a render.
+   */
+  const messagesCacheRef = useRef<Map<string, ThreadMessage[]>>(new Map());
 
   /* ---- Load messages when active conversation changes ---- */
   const fetchMessages = useCallback(async () => {
@@ -591,9 +834,20 @@ const MessagingManagementPage: React.FC = () => {
     if (useThreadTransport && threadId) {
       const response = await messagingApi.listThreadMessages(threadId, { limit: 50 });
       const sorted = [...response.items].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      setMessages(sorted);
+      messagesCacheRef.current.set(activeConversation.id, sorted);
+      setMessages((current) => withPendingLocalMessages(sorted, current));
       const lastId = sorted.at(-1)?.id;
-      if (lastId) await messagingApi.markThreadReadById(threadId, lastId);
+      if (lastId) {
+        /*
+          Fire-and-forget. Marking read is a WRITE the reader is not waiting on:
+          awaiting it kept `messagesLoading` true for an extra round trip after
+          the messages were already on screen, so the spinner outlived the data
+          it was covering. `clearLocalUnread` updates the row immediately and the
+          socket echo confirms it.
+        */
+        void messagingApi.markThreadReadById(threadId, lastId).catch(() => undefined);
+        clearLocalUnread(activeConversation.id);
+      }
       return;
     }
 
@@ -610,21 +864,26 @@ const MessagingManagementPage: React.FC = () => {
             : await messagingApi.listOrderMessages(contextId, { limit: 50 });
 
     const sorted = [...response.items].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    setMessages(sorted);
+    messagesCacheRef.current.set(activeConversation.id, sorted);
+    setMessages((current) => withPendingLocalMessages(sorted, current));
 
     const lastId = sorted.at(-1)?.id;
     if (lastId) {
-      if (ct === 'INQUIRY') {
-        await messagingApi.markThreadReadById(contextId, lastId);
-      } else if (ct === 'CUSTOM_ORDER') {
-        if (surface === 'BRAND' && brandId) await messagingApi.markCustomOrderReadForBrand(brandId, contextId, lastId);
-        else await messagingApi.markCustomOrderRead(contextId, lastId);
-      } else {
-        if (surface === 'BRAND' && brandId) await messagingApi.markOrderReadForBrand(brandId, contextId, lastId);
-        else await messagingApi.markOrderRead(contextId, lastId);
-      }
+      // Fire-and-forget, same reasoning as the thread-transport branch above.
+      const markRead =
+        ct === 'INQUIRY'
+          ? messagingApi.markThreadReadById(contextId, lastId)
+          : ct === 'CUSTOM_ORDER'
+            ? surface === 'BRAND' && brandId
+              ? messagingApi.markCustomOrderReadForBrand(brandId, contextId, lastId)
+              : messagingApi.markCustomOrderRead(contextId, lastId)
+            : surface === 'BRAND' && brandId
+              ? messagingApi.markOrderReadForBrand(brandId, contextId, lastId)
+              : messagingApi.markOrderRead(contextId, lastId);
+      void Promise.resolve(markRead).catch(() => undefined);
+      clearLocalUnread(activeConversation.id);
     }
-  }, [activeConversation, brandId, getContextId, surface, useThreadTransport]);
+  }, [activeConversation, brandId, clearLocalUnread, getContextId, surface, useThreadTransport]);
 
   const fetchCustomOrderDetail = useCallback(async () => {
     if (!activeConversation || activeConversation.contextType !== 'CUSTOM_ORDER') {
@@ -657,7 +916,20 @@ const MessagingManagementPage: React.FC = () => {
       const response = await messagingApi.listThreadOrders(activeConversation.threadId, { filter: orderFilter });
       const nextOrders = response.items || [];
       setThreadOrders(nextOrders);
+      // When the conversation was opened from a specific order/custom-order (the
+      // deep-link case), attach THAT order by default so messages carry its
+      // reference — even if the thread has several linked orders.
+      const requestedOrderId = params.get('orderId');
+      const requestedCustomOrderId = params.get('customOrderId');
+      const requestedKey = requestedCustomOrderId
+        ? `CUSTOM_ORDER:${requestedCustomOrderId}`
+        : requestedOrderId
+          ? `STANDARD_ORDER:${requestedOrderId}`
+          : '';
       setSelectedOrderKey((current) => {
+        if (requestedKey && nextOrders.some((order) => `${order.type}:${order.id}` === requestedKey)) {
+          return requestedKey;
+        }
         if (current && nextOrders.some((order) => `${order.type}:${order.id}` === current)) {
           return current;
         }
@@ -667,11 +939,12 @@ const MessagingManagementPage: React.FC = () => {
       setThreadOrders([]);
       setSelectedOrderKey('');
     }
-  }, [activeConversation?.threadId, orderFilter]);
+  }, [activeConversation?.threadId, orderFilter, params]);
 
   const refresh = useCallback(async () => {
+    // Nothing selected: nothing to fetch, and nothing below can be keyed.
+    if (!activeConversation) return;
     if (
-      activeConversation &&
       surface === 'BRAND' &&
       activeConversation.contextType !== 'INQUIRY' &&
       !useThreadTransport &&
@@ -679,11 +952,43 @@ const MessagingManagementPage: React.FC = () => {
     ) {
       return;
     }
-    setMessagesLoading(true);
+    /*
+      Only the MESSAGES gate the message pane.
+
+      This awaited all three fetches together, so the pane stayed on a spinner
+      until the slowest of them finished — a conversation's messages could be in
+      hand for a second while the reader watched a loader, because the custom
+      order detail or the thread's order list had not answered yet. Those two
+      feed side panels; they now resolve on their own schedule and update their
+      own regions.
+
+      The spinner is also skipped entirely when there is something cached to
+      draw: replacing readable content with a loader is a downgrade, not
+      feedback.
+    */
+    const hasCachedMessages = (messagesCacheRef.current.get(activeConversation.id)?.length ?? 0) > 0;
+    if (!hasCachedMessages) setMessagesLoading(true);
+
+    void fetchCustomOrderDetail().catch(() => undefined);
+    void fetchThreadOrders().catch(() => undefined);
+
     try {
-      await Promise.all([fetchMessages(), fetchCustomOrderDetail(), fetchThreadOrders()]);
+      await fetchMessages();
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Unable to load messages');
+      /*
+        A 429 here is the app rate-limiting ITSELF, and it arrives once per
+        in-flight request — which is how one screen produced a stack of
+        identical toasts. Say it at most once per window, and never in the
+        server's words: "ThrottlerException: Too Many Requests" means nothing
+        to a shopper.
+      */
+      if (isRateLimited(error)) {
+        if (shouldAnnounceRateLimit()) {
+          toast.error('Refreshing too quickly — pausing for a moment.');
+        }
+      } else {
+        toast.error(error?.response?.data?.message || 'Unable to load messages');
+      }
     } finally {
       setMessagesLoading(false);
       scrollToBottom();
@@ -705,6 +1010,18 @@ const MessagingManagementPage: React.FC = () => {
     setOrderFilter('all');
     setSelectedOrderKey('');
     setReplyToMessage(null);
+
+    /*
+      Paint on the same tick as the click.
+
+      Whatever is known about this conversation goes up immediately — the cached
+      transcript if we have one, an empty pane if we do not — and the refresh
+      reconciles underneath. Crucially this ALSO clears the previous thread's
+      messages synchronously: leaving them up while the next fetch ran meant a
+      switch showed one person's conversation under another person's name, which
+      is far worse than a brief empty pane.
+    */
+    setMessages(messagesCacheRef.current.get(activeConversation.id) ?? []);
     void refresh();
   }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -713,54 +1030,314 @@ const MessagingManagementPage: React.FC = () => {
     void fetchThreadOrders();
   }, [orderFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ---- Polling ---- */
+  /**
+   * Always-current handles for the effects below.
+   *
+   * `refresh` and `refreshInbox` are rebuilt whenever their inputs change, which
+   * is often. Listing them as effect dependencies meant the poll timer and both
+   * socket subscriptions were torn down and rebuilt constantly — and a timer
+   * re-armed on every render never survives long enough to reach its interval,
+   * while a subscription replaced mid-flight can deliver the same event twice.
+   * Reading them through a ref keeps every call on the latest closure while the
+   * effects depend only on the conversation actually changing.
+   */
+  /*
+    An open thread owns the bottom of the screen — composer, attachments and
+    quick replies all live there — so the floating island must stand down while
+    it is open. The thread LIST keeps the island, matching the native app.
+  */
+  useSuppressIslandBottomNav(Boolean(activeId));
+
+  /**
+   * The referenced design, shown in place on a desktop.
+   *
+   * On a wide screen the conversation stays useful while you look at what it is
+   * about, so the reference opens over the thread and closes back onto it. On a
+   * phone there is no room for both, so the same tap routes to the design view
+   * and `state.returnTo` brings the reader back — see `handleOpenDesignContext`.
+   */
+  const isMobileViewport = useSelector(selectIsMobile);
+  const [designContextItem, setDesignContextItem] = useState<MarketItem | null>(null);
+  const [designContextLoading, setDesignContextLoading] = useState(false);
+
+  /**
+   * The shell's height, measured against where it actually starts.
+   *
+   * It was `calc(viewport - 4rem)` — a hard-coded guess at the navbar. Whenever
+   * the real chrome is taller than 4rem (it is, on a laptop, once the header and
+   * page padding are counted) the shell is too tall, the DOCUMENT gains a
+   * scrollbar, and scrolling slides the whole conversation — header and all —
+   * up underneath the fixed navbar. Then it springs back, because the panes
+   * inside have nowhere to go. That is the "pushes itself under the navbar and
+   * won't stay down" report.
+   *
+   * Measuring the distance from the top of the viewport to the top of this
+   * element makes the shell exactly fill what is left, whatever the chrome
+   * happens to be, on any device.
+   */
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const [shellHeight, setShellHeight] = useState<number | null>(null);
+
+  /*
+    This page sizes itself to the viewport, so the app shell must stop adding
+    `min-h-screen` and island clearance underneath it. Without the lock the
+    document is permanently ~96px taller than the screen and every drag scrolls
+    that overflow — the conversation header disappears under the fixed navbar
+    and a dead band opens at the bottom. See `useShellViewportLocked`.
+  */
+  useLockShellViewport(true);
+
   useEffect(() => {
-    if (!activeConversation) return;
+    const measure = () => {
+      const node = shellRef.current;
+      if (!node) return;
+      const top = node.getBoundingClientRect().top;
+
+      /*
+        Room for the island is reserved only when the island is actually there.
+
+        It renders below `lg` and hides itself while a thread is open, so the
+        cases are: phone + conversation list, leave room; phone + open thread,
+        none needed because the island has stood down and the composer owns the
+        bottom; tablet or desktop, none needed because the island never renders
+        at that width. Reserving unconditionally is what left an empty strip
+        under the conversation on an iPad, and reserving nothing would put the
+        island on top of the last row of the list on a phone.
+      */
+      const islandVisible =
+        !activeId && window.innerWidth < ISLAND_BOTTOM_NAV_BREAKPOINT_PX;
+      const bottomInset = islandVisible ? ISLAND_BOTTOM_NAV_RESERVED_PX : 12;
+      const next = Math.max(320, window.innerHeight - top - bottomInset);
+      setShellHeight((current) => (current === next ? current : next));
+    };
+
+    measure();
+    window.addEventListener('resize', measure);
+    window.addEventListener('orientationchange', measure);
+    const observer =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    if (observer && shellRef.current?.parentElement) {
+      observer.observe(shellRef.current.parentElement);
+    }
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
+      observer?.disconnect();
+    };
+    // Opening or leaving a thread changes whether the island is on screen, and
+    // therefore how much room to leave for it.
+  }, [activeId]);
+
+  const refreshRef = useRef(refresh);
+  const refreshInboxRef = useRef(refreshInbox);
+  const activeConversationRef = useRef(activeConversation);
+  useEffect(() => {
+    refreshRef.current = refresh;
+    refreshInboxRef.current = refreshInbox;
+    activeConversationRef.current = activeConversation;
+  });
+
+  /* ---- Polling ---- */
+  /*
+    The poll is a FALLBACK, not the delivery mechanism.
+
+    It ran unconditionally at 25s alongside a working socket that already
+    delivers `message.created` and `thread.updated` instantly — so every open
+    conversation spent a request every 25 seconds re-fetching what it had
+    already been pushed, on a 120/min budget shared with the entire app. That is
+    what kept the throttler tripping and putting "refreshing too quickly" in
+    front of people who were doing nothing wrong.
+
+    While the socket is connected there is nothing for a poll to add, so it does
+    not run. When the socket is down it is the only thing keeping the thread
+    current, so it does — at a calmer interval, since it is now a safety net
+    rather than a heartbeat.
+  */
+  const POLL_WITHOUT_SOCKET_MS = 20000;
+  const POLL_WITH_SOCKET_MS = 120000;
+
+  useEffect(() => {
+    if (!activeId) return;
     let intervalId: number | null = null;
     const setup = () => {
       if (intervalId) window.clearInterval(intervalId);
       if (document.visibilityState === 'visible') {
-        intervalId = window.setInterval(() => void refresh(), 25000);
+        intervalId = window.setInterval(
+          () => void refreshRef.current(),
+          socketConnected ? POLL_WITH_SOCKET_MS : POLL_WITHOUT_SOCKET_MS,
+        );
       }
     };
     setup();
-    const onVis = () => { setup(); if (document.visibilityState === 'visible') void refresh(); };
+    const onVis = () => {
+      setup();
+      if (document.visibilityState === 'visible') void refreshRef.current();
+    };
     document.addEventListener('visibilitychange', onVis);
     return () => { document.removeEventListener('visibilitychange', onVis); if (intervalId) window.clearInterval(intervalId); };
-  }, [activeConversation, refresh]);
+  }, [activeId, socketConnected]);
 
   /* ---- Real-time ---- */
   // Direct socket events — immediate, no worker dependency
   useEffect(() => {
     const handleMessageEvent = (payload: any) => {
       const pThreadId = String(payload?.threadId ?? '');
-      void refreshInbox();
-      if (!activeConversation) return;
-      const contextId = getContextId(activeConversation);
-      const threadId = activeConversation.threadId;
+      void refreshInboxRef.current();
+      const current = activeConversationRef.current;
+      if (!current) return;
+      const contextId = getContextId(current);
+      const threadId = current.threadId;
       if (pThreadId && (pThreadId === contextId || pThreadId === threadId)) {
-        void refresh();
+        void refreshRef.current();
       }
     };
     const unsub1 = onMessageEvent('message.created', handleMessageEvent);
     const unsub2 = onMessageEvent('thread.updated', handleMessageEvent);
     return () => { unsub1(); unsub2(); };
-  }, [activeConversation, getContextId, onMessageEvent, refresh, refreshInbox]);
+    // Subscribe ONCE per socket. Everything variable is read from a ref inside
+    // the handler, so this must not re-run when those values change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onMessageEvent]);
+
+  /*
+    Receipts move the ticks IN PLACE — they never trigger a fetch.
+
+    A tick change is one field on messages already on screen, so re-downloading
+    the conversation to discover it is both the slow way and the expensive way
+    to find out. That refetch is what the delay was: the recipient opened the
+    thread, the server recorded delivery and read within milliseconds of each
+    other, and the sender's client learned about each one on a separate round
+    trip — one tick, pause, two ticks, pause, read.
+
+    Applied to the cache as well as to state, so the ticks survive switching
+    away from the thread and back.
+  */
+  /*
+    Receipts that arrived before the message they describe.
+
+    The delivered event can beat the send response back: the server pushes it
+    the instant presence resolves, while the sender is still waiting on its own
+    POST to return the message it applies to. Holding the ids means an early
+    receipt is applied the moment the bubble exists instead of being dropped and
+    left to a later refetch — which is precisely the stuck first tick.
+  */
+  const pendingDeliveredIdsRef = useRef<Set<string>>(new Set());
+  const pendingReadRef = useRef<{ conversationId: string; lastReadMessageId: string } | null>(null);
+
+  const applyReceiptsToActiveThread = useCallback(() => {
+    const current = activeConversationRef.current;
+    if (!current) return;
+    const deliveredIds = pendingDeliveredIdsRef.current;
+    const pendingRead = pendingReadRef.current;
+    if (deliveredIds.size === 0 && !pendingRead) return;
+
+    setMessages((items) => {
+      if (items.length === 0) return items;
+
+      // Read implies delivered, so it is applied second and wins outright.
+      const readLimit =
+        pendingRead && pendingRead.conversationId === current.id
+          ? (() => {
+              // The reader acknowledges up to the newest message they hold.
+              // When that id is not in view it is newer than anything loaded
+              // here, so every own message on screen has been read.
+              const index = pendingRead.lastReadMessageId
+                ? items.findIndex((message) => message.id === pendingRead.lastReadMessageId)
+                : -1;
+              return index === -1 ? items.length - 1 : index;
+            })()
+          : -1;
+
+      let changed = false;
+      const next = items.map((message, index) => {
+        const own = isOwnMessage(message);
+        if (own && index <= readLimit && message.deliveryStatus !== 'READ') {
+          changed = true;
+          return { ...message, deliveryStatus: 'READ' as const };
+        }
+        // A late delivery event must never walk a read tick backwards.
+        if (
+          deliveredIds.has(message.id) &&
+          message.deliveryStatus !== 'READ' &&
+          message.deliveryStatus !== 'DELIVERED'
+        ) {
+          changed = true;
+          return { ...message, deliveryStatus: 'DELIVERED' as const };
+        }
+        return message;
+      });
+
+      if (!changed) return items;
+      messagesCacheRef.current.set(current.id, next);
+      return next;
+    });
+  }, [isOwnMessage]);
+
+  useEffect(() => {
+    const conversationMatches = (payload: any) => {
+      const current = activeConversationRef.current;
+      if (!current) return false;
+      const pThreadId = String(payload?.threadId ?? '');
+      if (!pThreadId) return false;
+      return pThreadId === getContextId(current) || pThreadId === current.threadId;
+    };
+
+    const handleDelivered = (payload: any) => {
+      if (!conversationMatches(payload)) return;
+      const ids = Array.isArray(payload?.messageIds) ? payload.messageIds : [];
+      if (ids.length === 0) return;
+      ids.forEach((id: unknown) => pendingDeliveredIdsRef.current.add(String(id)));
+      applyReceiptsToActiveThread();
+    };
+
+    const handleRead = (payload: any) => {
+      if (!conversationMatches(payload)) return;
+      // Our own read of somebody else's messages says nothing about our ticks.
+      if (actorId && String(payload?.readByUserId ?? '') === actorId) return;
+      const current = activeConversationRef.current;
+      if (!current) return;
+      pendingReadRef.current = {
+        conversationId: current.id,
+        lastReadMessageId: String(payload?.lastReadMessageId ?? ''),
+      };
+      applyReceiptsToActiveThread();
+    };
+
+    const unsubDelivered = onMessageEvent('message.delivered', handleDelivered);
+    const unsubRead = onMessageEvent('message.read', handleRead);
+    return () => { unsubDelivered(); unsubRead(); };
+  }, [onMessageEvent, actorId, applyReceiptsToActiveThread, getContextId]);
+
+  // Re-apply held receipts whenever the transcript changes, so one that landed
+  // before its message still reaches it.
+  useEffect(() => {
+    applyReceiptsToActiveThread();
+  }, [messages, applyReceiptsToActiveThread]);
+
+  // Receipts are per-conversation; carrying them across a switch would stamp
+  // another thread's bubbles.
+  useEffect(() => {
+    pendingDeliveredIdsRef.current = new Set();
+    pendingReadRef.current = null;
+  }, [activeId]);
 
   // notification.created — backup path via notification worker
   useEffect(() => {
     const unsubscribe = onNotification((payload: any) => {
       const type = String(payload?.type ?? '');
       if (type !== 'MESSAGE_RECEIVED' && type !== 'MESSAGE_MODERATED' && type !== 'MESSAGE_UNREAD_REMINDER' && type !== 'MESSAGE_THREAD_REOPENED') return;
-      void refreshInbox();
-      if (!activeConversation) return;
-      const contextId = getContextId(activeConversation);
-      const threadId = activeConversation.threadId;
+      void refreshInboxRef.current();
+      const current = activeConversationRef.current;
+      if (!current) return;
+      const contextId = getContextId(current);
+      const threadId = current.threadId;
       const pId = String(payload?.payload?.threadId ?? payload?.payload?.customOrderId ?? payload?.payload?.orderId ?? '');
-      if (pId === contextId || pId === threadId) void refresh();
+      if (pId === contextId || pId === threadId) void refreshRef.current();
     });
     return unsubscribe;
-  }, [activeConversation, getContextId, onNotification, refresh, refreshInbox]);
+    // Same as above: one subscription, latest values read through refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onNotification]);
 
   /* ---- Highlight message ---- */
   useEffect(() => {
@@ -768,9 +1345,31 @@ const MessagingManagementPage: React.FC = () => {
     const node = messageNodeRefs.current[highlightedMessageId];
     if (!node) return;
     node.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    node.classList.add('ring-2', 'ring-orange-400');
-    const t = window.setTimeout(() => node.classList.remove('ring-2', 'ring-orange-400'), 1800);
-    return () => window.clearTimeout(t);
+
+    /*
+      A wash, not an outline.
+
+      This used to add `ring-2 ring-orange-400`, and because the node it lands on
+      is the full-width message ROW rather than the bubble, it drew a hard orange
+      rectangle across the entire conversation pane. Orange is this app's warning
+      colour, so arriving from "you have a new message" looked like arriving at an
+      error — and a static 1.8s box gives no sense of "here, this one".
+
+      Messenger, WhatsApp and Slack all do the same thing instead: a soft band in
+      the product's own accent that blooms and fades. It reads as attention rather
+      than alarm, and because it decays it does not leave the transcript looking
+      permanently marked up. The animation is opacity-only on a pseudo-element, so
+      it stays on the compositor, and `prefers-reduced-motion` gets a plain hold.
+    */
+    node.classList.add('wiez-message-jump');
+    const t = window.setTimeout(
+      () => node.classList.remove('wiez-message-jump'),
+      MESSAGE_JUMP_HIGHLIGHT_MS,
+    );
+    return () => {
+      window.clearTimeout(t);
+      node.classList.remove('wiez-message-jump');
+    };
   }, [highlightedMessageId, messages]);
 
   /* ---- Scroll on new messages ---- */
@@ -836,41 +1435,220 @@ const MessagingManagementPage: React.FC = () => {
         hasUnread: payload.markRead ? false : entry.hasUnread,
       };
     }));
+
+    if (payload.markRead) notifyMessagingRead();
   };
 
-  const handleSend = useCallback(async (bodyText: string, attachmentFileIds: string[], replyToMessageId?: string) => {
-    if (!activeConversation) return;
-    const contextId = getContextId(activeConversation);
-    const threadId = activeConversation.threadId;
-    const ct = activeConversation.contextType;
-    const payload = { bodyText: bodyText || undefined, clientMessageId: nextClientMessageId(), attachmentFileIds, replyToMessageId };
+  /**
+   * Send one prepared draft, reporting its progress in the thread.
+   *
+   * Split out from `handleSend` because a retry has to run the exact same
+   * request again — same `clientMessageId`, so the backend's idempotency check
+   * recognises a replay rather than posting the message twice if the first
+   * attempt actually landed and only the response was lost.
+   */
+  const dispatchSend = useCallback(async (draft: OutgoingDraft) => {
+    const { conversation, payload } = draft;
+    const contextId = getContextId(conversation);
+    const threadId = conversation.threadId;
+    const ct = conversation.contextType;
 
-    if ((ct === 'INQUIRY' || useThreadTransport) && threadId) {
-      await messagingApi.sendThreadMessage(threadId, payload);
-    } else if (ct === 'INQUIRY') {
-      await messagingApi.sendThreadMessage(contextId, payload);
-    } else if (ct === 'CUSTOM_ORDER') {
-      if (surface === 'BRAND' && brandId) await messagingApi.sendCustomOrderMessageForBrand(brandId, contextId, payload);
-      else await messagingApi.sendCustomOrderMessage(contextId, payload);
-    } else {
-      if (surface === 'BRAND' && brandId) await messagingApi.sendOrderMessageForBrand(brandId, contextId, payload);
-      else await messagingApi.sendOrderMessage(contextId, payload);
+    setMessages((items) =>
+      items.map((message) =>
+        message.id === payload.clientMessageId
+          ? { ...message, _optimistic: 'sending' as const }
+          : message,
+      ),
+    );
+
+    try {
+      if ((ct === 'INQUIRY' || useThreadTransport) && threadId) {
+        await messagingApi.sendThreadMessage(threadId, payload);
+      } else if (ct === 'INQUIRY') {
+        await messagingApi.sendThreadMessage(contextId, payload);
+      } else if (ct === 'CUSTOM_ORDER') {
+        if (surface === 'BRAND' && brandId) await messagingApi.sendCustomOrderMessageForBrand(brandId, contextId, payload);
+        else await messagingApi.sendCustomOrderMessage(contextId, payload);
+      } else {
+        if (surface === 'BRAND' && brandId) await messagingApi.sendOrderMessageForBrand(brandId, contextId, payload);
+        else await messagingApi.sendOrderMessage(contextId, payload);
+      }
+    } catch (error) {
+      /*
+        The bubble stays, marked failed, and the draft is kept for the retry.
+        Removing it would take the writing with it — the one outcome a person
+        who just typed a paragraph cannot recover from.
+      */
+      failedDraftsRef.current.set(payload.clientMessageId, draft);
+      setMessages((items) =>
+        items.map((message) =>
+          message.id === payload.clientMessageId
+            ? { ...message, _optimistic: 'failed' as const }
+            : message,
+        ),
+      );
+      toast.error(getSendErrorMessage(error));
+      return;
     }
 
-    setReplyToMessage(null);
-    await refresh();
+    /*
+      The send already succeeded. A refresh that trips the rate limit must not
+      surface as a send failure — the message IS delivered, and the socket will
+      deliver it back anyway.
+    */
+    try {
+      await refresh();
+    } catch (refreshError) {
+      if (!isRateLimited(refreshError)) throw refreshError;
+    }
+
+    /*
+      Drop the placeholder only AFTER the refresh has brought the real message
+      in. Clearing it first would empty the space it occupies for the length of
+      a round trip, so the thread would visibly lose a line and get it back.
+    */
+    setMessages((items) =>
+      items.filter((message) => message.id !== payload.clientMessageId),
+    );
 
     // Update conversation list card with latest message preview
     setConversations((prev) => prev.map((c) =>
-      c.id !== activeId ? c : {
+      c.id !== conversation.id ? c : {
         ...c,
-        subtitle: bodyText || (attachmentFileIds.length > 0 ? '📎 Attachment' : c.subtitle),
+        subtitle: payload.bodyText || ((payload.attachmentFileIds?.length ?? 0) > 0 ? '📎 Attachment' : c.subtitle),
         lastMessageAt: new Date().toISOString(),
         unreadCount: 0,
         hasUnread: false,
       }
     ));
-  }, [activeConversation, activeId, brandId, getContextId, refresh, surface, useThreadTransport]);
+  }, [brandId, getContextId, refresh, surface, useThreadTransport]);
+
+  /**
+   * Put the message in the thread, then send it.
+   *
+   * `ComposeArea` used to await this whole function before clearing, so between
+   * pressing Enter and the server answering there was no evidence anything had
+   * happened: the text sat in the box, the thread was unchanged, and on a slow
+   * connection people press Enter again. The bubble now appears on the
+   * keystroke and reports its own state from the thread — sending, sent,
+   * delivered, read, or failed with a way to try again.
+   */
+  const handleSend = useCallback(async (bodyText: string, attachmentFileIds: string[], replyToMessageId?: string) => {
+    if (!activeConversation) return;
+    const conversation = activeConversation;
+    const payload = {
+      bodyText: bodyText || undefined,
+      clientMessageId: nextClientMessageId(),
+      attachmentFileIds,
+      replyToMessageId,
+    };
+
+    setMessages((items) => [
+      ...items,
+      {
+        id: payload.clientMessageId,
+        threadId: conversation.threadId ?? '',
+        senderUserId: actorId ?? null,
+        senderRole: surface === 'BRAND' ? 'BRAND_OWNER' : 'BUYER',
+        kind: 'USER',
+        visibilityState: 'VISIBLE',
+        bodyText: bodyText || null,
+        createdAt: new Date().toISOString(),
+        attachments: [],
+        quotedMessage: replyToMessage
+          ? {
+              id: replyToMessage.id,
+              bodyText: replyToMessage.bodyText,
+              senderRole: '',
+              senderName: replyToMessage.senderName,
+            }
+          : null,
+        _optimistic: 'sending',
+      } as ThreadMessage,
+    ]);
+
+    setReplyToMessage(null);
+    await dispatchSend({ conversation, payload });
+  }, [actorId, activeConversation, dispatchSend, replyToMessage, surface]);
+
+  /** Re-send a message that failed, from the bubble it failed in. */
+  const handleRetryMessage = useCallback((messageId: string) => {
+    const draft = failedDraftsRef.current.get(messageId);
+    if (!draft) return;
+    failedDraftsRef.current.delete(messageId);
+    void dispatchSend(draft);
+  }, [dispatchSend]);
+
+  /** Discard a message that never sent. Unreachable on a delivered message. */
+  const handleDiscardMessage = useCallback((messageId: string) => {
+    failedDraftsRef.current.delete(messageId);
+    setMessages((items) => items.filter((message) => message.id !== messageId));
+  }, []);
+
+  /**
+   * Open the design a message refers to, and be able to come back.
+   *
+   * `state.returnTo` carries the exact thread URL, so the design view's back
+   * affordance — the on-screen arrow, the Android hardware button, or a browser
+   * Back — lands the reader back in the conversation they were reading rather
+   * than at the top of a feed. Without it, following a reference costs you your
+   * place in the thread, which is why the reference was worth avoiding.
+   */
+  /**
+   * Open the product a message refers to, and be able to come back.
+   *
+   * Same contract as `handleOpenDesignContext` — `state.returnTo` carries the
+   * thread URL so following the reference does not cost the reader their place
+   * in the conversation. Products go straight to the product page; there is no
+   * in-place modal for them the way there is for designs.
+   */
+  const handleOpenProductContext = useCallback(
+    (productId: string) => {
+      if (!productId) return;
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      navigate(`/products/${encodeURIComponent(productId)}`, {
+        state: { returnTo, fromMessages: true },
+      });
+    },
+    [navigate],
+  );
+
+  const handleOpenDesignContext = useCallback(
+    async (designId: string) => {
+      if (!designId) return;
+
+      const routeToDesign = () => {
+        const returnTo = `${window.location.pathname}${window.location.search}`;
+        navigate(`/designs/${encodeURIComponent(designId)}`, {
+          state: { returnTo, fromMessages: true },
+        });
+      };
+
+      if (isMobileViewport) {
+        routeToDesign();
+        return;
+      }
+
+      setDesignContextLoading(true);
+      try {
+        const raw = await getDesignDetail(designId);
+        const item = toMarketItem((raw ?? {}) as Record<string, unknown>);
+        // A design that cannot be mapped to something the viewer can render is
+        // not worth opening an empty modal for — fall back to the full page,
+        // which has its own loading and error states.
+        if (!item?.id) {
+          routeToDesign();
+          return;
+        }
+        setDesignContextItem(item);
+      } catch {
+        routeToDesign();
+      } finally {
+        setDesignContextLoading(false);
+      }
+    },
+    [isMobileViewport, navigate],
+  );
 
   const handleRequestExtension = useCallback(async (days: number, reason: string) => {
     if (!activeConversation || !selectedOrder || surface !== 'BRAND' || !brandId) return;
@@ -968,12 +1746,71 @@ const MessagingManagementPage: React.FC = () => {
   /* ================================================================ */
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-2xl border border-gray-200/60 dark:border-transparent bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
+    /*
+      `dvh`, not `vh`.
+
+      On a mobile browser `100vh` is the viewport with the URL bar RETRACTED, so
+      while it is showing, the container is taller than what you can actually
+      see. The top slid under the header, the composer sat below the fold, and
+      because the page itself did not overflow there was nothing to scroll back
+      — exactly the "screen pushes itself up and won't come back" report. `dvh`
+      tracks the live viewport, and the fallback keeps older browsers on the old
+      behaviour rather than on nothing.
+    */
+    <>
+    <div
+      /*
+        Height comes from a CSS custom property with a `vh` fallback, not from
+        two competing Tailwind `h-` classes. Emitting both let the STYLESHEET's
+        order decide which won rather than the source's, so which unit applied
+        was an implementation detail of the build.
+
+        `dvh` matters because `100vh` on a mobile browser is the viewport with
+        the URL bar retracted — while it is showing, the container is taller than
+        what you can see, which pushed the header up and left the composer below
+        an unscrollable fold.
+      */
+      ref={shellRef}
+      style={{
+        height: shellHeight
+          ? `${shellHeight}px`
+          : 'calc(var(--messages-viewport, 100vh) - 4rem)',
+      }}
+      className="flex overflow-hidden rounded-2xl border border-gray-200/60 dark:border-transparent bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
 
       {/* ============================================================ */}
       {/*  LEFT PANEL — Conversation List                               */}
       {/* ============================================================ */}
-      <div className={`w-80 shrink-0 flex-col border-r border-gray-200/60 dark:border-white/[0.04] bg-white/70 dark:bg-white/[0.02] ${activeId ? 'hidden lg:flex' : 'flex'}`}>
+      {/*
+        Full width on a phone, a 320px rail from `lg`.
+
+        `w-80 shrink-0` is a desktop rail measurement, and it was applied at
+        every width. On a 390px phone showing the conversation list, that is a
+        320px column with dead space beside it — the layout reads as a desktop
+        page shrunk to fit, which is exactly what it is. It only stopped looking
+        that way once a thread was opened and the rail switched to `hidden`,
+        which is the "adjusts after a couple of seconds" part: not a timer, but
+        the thread resolving from the URL and flipping this branch.
+
+        `min-w-0` because a `shrink-0` column with long conversation titles can
+        push its own container wider than the viewport, and a page that overflows
+        horizontally is one a mobile browser will scale down to fit.
+      */}
+      {/*
+        `min-h-0` is what makes the inner `overflow-y-auto` actually scroll.
+
+        A flex child defaults to `min-height: auto`, which refuses to shrink
+        below its content. So a long conversation list grew this column past the
+        shell instead of scrolling inside it, the shell overflowed, and the PAGE
+        scrolled — which is why scrolling one region moved everything and no
+        section had independent scrolling. The same omission applies to the two
+        panes beside it.
+
+        Width: the rail is narrower at `lg` (iPad) than at `xl`, because at
+        1024–1279px a 320px rail plus the detail panel leaves the conversation
+        itself squeezed into whatever is left.
+      */}
+      <div className={`w-full min-w-0 min-h-0 flex-col bg-gray-50/80 dark:bg-white/[0.03] lg:w-[17rem] lg:shrink-0 xl:w-80 ${activeId ? 'hidden lg:flex' : 'flex'}`}>
         {/* Header */}
         <div className="shrink-0 px-4 pt-4 pb-3">
           <h1 className="text-base font-semibold text-theme">Messages</h1>
@@ -990,7 +1827,7 @@ const MessagingManagementPage: React.FC = () => {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search conversations..."
-              className="w-full rounded-xl border border-gray-200/60 dark:border-transparent bg-gray-50 dark:bg-white/5 pl-8 pr-3 py-2 text-xs outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/20 transition-all"
+              className="w-full rounded-xl bg-white dark:bg-white/[0.06] pl-8 pr-3 py-2 text-xs text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-1 focus:ring-purple-400/30 transition-all"
             />
           </div>
         </div>
@@ -1014,7 +1851,10 @@ const MessagingManagementPage: React.FC = () => {
         </div>
 
         {/* Conversation list */}
-        <div className="flex-1 overflow-y-auto px-2 pb-2">
+        {/* `overscroll-contain` stops a flick that reaches the end of this list
+            from continuing into the page behind it — the "scrolling one section
+            shakes the whole screen" effect. */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 pb-2">
           {loading ? (
             <div className="space-y-1.5 py-3">
               {Array.from({ length: 6 }).map((_, index) => (
@@ -1038,10 +1878,29 @@ const MessagingManagementPage: React.FC = () => {
                   key={item.id}
                   type="button"
                   onClick={() => selectConversation(item)}
-                  className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all mb-0.5 ${
+                  /*
+                    Unread has to LOOK unread.
+
+                    A read row and an unread row used to differ by
+                    `border-transparent` vs `border-transparent` — that is, by
+                    nothing at all except the weight of the name — so scanning
+                    the list for what needed answering meant reading every line.
+                    Messenger, Instagram DMs and WhatsApp all separate the two
+                    states with a filled surface plus a solid dot, and they carry
+                    the signal on THREE channels at once (surface, weight, dot)
+                    so it survives colour-blindness and a dimmed screen.
+
+                    Order matters: active beats unread beats read. A conversation
+                    you are looking at is by definition read, so the two never
+                    actually collide, but the ordering keeps it that way if the
+                    read receipt is slow.
+                  */
+                  className={`group w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors mb-0.5 border-l-[3px] ${
                     isActive
-                      ? 'bg-purple-50 dark:bg-purple-500/10 border-l-2 border-purple-500'
-                      : 'hover:bg-gray-50 dark:hover:bg-white/[0.03] border-l-2 border-transparent'
+                      ? 'border-purple-500 bg-purple-100/70 dark:bg-purple-500/15'
+                      : item.hasUnread
+                        ? 'border-purple-500 bg-gradient-to-r from-purple-50 to-fuchsia-50/40 hover:from-purple-100 hover:to-fuchsia-100/50 dark:from-purple-500/[0.14] dark:to-fuchsia-500/[0.06] dark:hover:from-purple-500/20'
+                        : 'border-transparent hover:bg-gray-50 dark:hover:bg-white/[0.03]'
                   }`}
                 >
                   {/* Avatar */}
@@ -1070,20 +1929,55 @@ const MessagingManagementPage: React.FC = () => {
                   {/* Content */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1">
-                      <span className={`truncate text-[13px] ${isActive ? 'font-semibold text-purple-900 dark:text-purple-200' : item.hasUnread ? 'font-semibold text-theme' : 'font-medium text-theme-secondary'}`}>
+                      <span className={`truncate text-[13px] ${isActive ? 'font-semibold text-purple-900 dark:text-purple-200' : item.hasUnread ? 'font-bold text-theme' : 'font-medium text-theme-secondary'}`}>
                         {item.participantName}
                       </span>
-                      <span className="shrink-0 text-[10px] text-theme-secondary">
+                      {/*
+                        The timestamp joins the unread signal instead of staying
+                        grey. On an unread row the recency IS the urgency, and
+                        tabular figures stop the column jittering as it ticks.
+                      */}
+                      <span
+                        className={`shrink-0 text-[10px] tabular-nums ${
+                          item.hasUnread && !isActive
+                            ? 'font-bold text-purple-600 dark:text-purple-300'
+                            : 'text-theme-secondary'
+                        }`}
+                      >
                         {formatRelative(item.lastMessageAt || item.createdAt)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-1 mt-0.5">
-                      <p className="truncate text-[11px] text-theme-secondary">{item.subtitle || item.title}</p>
-                      {item.unreadCount > 0 && (
-                        <span className="shrink-0 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1 text-[9px] font-bold text-white">
+                      {/*
+                        An unread preview must not be muted — it is the one line
+                        that tells you whether this needs answering now, and
+                        `text-theme-secondary` on both states was throwing that
+                        away on exactly the rows that needed it.
+                      */}
+                      <p
+                        className={`truncate text-[11px] ${
+                          item.hasUnread && !isActive
+                            ? 'font-semibold text-theme'
+                            : 'text-theme-secondary'
+                        }`}
+                      >
+                        {item.subtitle || item.title}
+                      </p>
+                      {item.unreadCount > 0 ? (
+                        <span
+                          className="shrink-0 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1 text-[9px] font-bold tabular-nums text-white"
+                          aria-label={`${item.unreadCount} unread`}
+                        >
                           {item.unreadCount > 99 ? '99+' : item.unreadCount}
                         </span>
-                      )}
+                      ) : item.hasUnread ? (
+                        /* Unread, but the server did not send a count — the dot
+                           is the honest form of "there is something here". */
+                        <span
+                          className="shrink-0 h-2 w-2 rounded-full bg-purple-600"
+                          aria-label="Unread"
+                        />
+                      ) : null}
                     </div>
                   </div>
                 </button>
@@ -1096,7 +1990,7 @@ const MessagingManagementPage: React.FC = () => {
       {/* ============================================================ */}
       {/*  CENTER PANEL — Active Chat                                   */}
       {/* ============================================================ */}
-      <div className={`flex flex-1 flex-col min-w-0 ${!activeId ? 'hidden lg:flex' : 'flex'}`}>
+      <div className={`flex flex-1 flex-col min-w-0 min-h-0 ${!activeId ? 'hidden lg:flex' : 'flex'}`}>
         {!activeConversation ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
@@ -1107,15 +2001,30 @@ const MessagingManagementPage: React.FC = () => {
         ) : (
           <>
             {/* Chat header */}
-            <div className="shrink-0 flex items-center justify-between gap-3 border-b border-gray-200/60 dark:border-white/[0.04] bg-white/60 dark:bg-white/[0.02] backdrop-blur-sm px-4 py-3">
+            <div className="shrink-0 flex items-center justify-between gap-3 bg-white/70 dark:bg-white/[0.04] backdrop-blur-sm px-4 py-3">
               <div className="flex items-center gap-3 min-w-0">
-                {/* Mobile back button */}
+                {/*
+                  The way back to the message list — and on a phone, the ONLY way.
+
+                  An open thread suppresses the island bottom nav (a conversation
+                  is a drill-down, not a tab), so this control is the entire exit.
+                  It was a 32px box holding a 16px grey `←`: below the 44px
+                  minimum tap target, and reading as decoration rather than as
+                  the one thing to press. Reported as there being no back control
+                  at all, which is a fair description of a control nobody sees.
+
+                  👈 and 44px match `AppBackButton` on native, so the same
+                  gesture looks the same in both apps. `aria-label` because an
+                  emoji alone announces as its unicode name.
+                */}
                 <button
                   type="button"
                   onClick={() => setActiveId('')}
-                  className="lg:hidden shrink-0 h-8 w-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/5"
+                  aria-label="Back to messages"
+                  title="Back to messages"
+                  className="lg:hidden -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl transition-colors hover:bg-gray-100 active:bg-gray-200 dark:hover:bg-white/10 dark:active:bg-white/[0.15]"
                 >
-                  <span aria-hidden="true" className="text-base">←</span>
+                  <span aria-hidden="true">👈</span>
                 </button>
 
                 <div className="h-9 w-9 rounded-2xl overflow-hidden shrink-0">
@@ -1149,7 +2058,7 @@ const MessagingManagementPage: React.FC = () => {
                     <select
                       value={orderFilter}
                       onChange={(event) => setOrderFilter(event.target.value as typeof orderFilter)}
-                      className="hidden sm:block rounded-lg border border-gray-200/70 bg-white px-2 py-1.5 text-[11px] font-medium text-gray-700 outline-none dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
+                      className="hidden sm:block rounded-lg bg-gray-100 px-2 py-1.5 text-[11px] font-medium text-gray-700 outline-none dark:bg-white/[0.08] dark:text-gray-200"
                       aria-label="Filter orders"
                     >
                       <option value="all">All</option>
@@ -1161,7 +2070,7 @@ const MessagingManagementPage: React.FC = () => {
                     <select
                       value={selectedOrderKey}
                       onChange={(event) => setSelectedOrderKey(event.target.value)}
-                      className="max-w-[180px] rounded-lg border border-gray-200/70 bg-white px-2 py-1.5 text-[11px] font-medium text-gray-700 outline-none dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
+                      className="max-w-[180px] rounded-lg bg-gray-100 px-2 py-1.5 text-[11px] font-medium text-gray-700 outline-none dark:bg-white/[0.08] dark:text-gray-200"
                       aria-label="Select order"
                     >
                       <option value="">Select order</option>
@@ -1239,7 +2148,7 @@ const MessagingManagementPage: React.FC = () => {
             </div>
 
             {/* Messages area */}
-            <div className="flex-1 overflow-y-auto px-4 py-3">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3">
               {messagesLoading && messages.length === 0 ? (
                 <div className="space-y-3 py-3">
                   {Array.from({ length: 5 }).map((_, index) => (
@@ -1262,19 +2171,23 @@ const MessagingManagementPage: React.FC = () => {
                   <div key={group.date}>
                     {/* Date separator */}
                     <div className="flex items-center gap-3 my-3">
-                      <div className="flex-1 h-px bg-gray-200/60 dark:bg-white/8" />
+                      <div className="flex-1 h-px bg-gray-200/60 dark:bg-white/[0.08]" />
                       <span className="text-[10px] font-medium text-theme-secondary uppercase tracking-wider">{group.date}</span>
-                      <div className="flex-1 h-px bg-gray-200/60 dark:bg-white/8" />
+                      <div className="flex-1 h-px bg-gray-200/60 dark:bg-white/[0.08]" />
                     </div>
                     {group.msgs.map((msg) => (
                       <div key={msg.id} ref={(node) => { messageNodeRefs.current[msg.id] = node; }}>
                         <MessageBubble
                           message={msg}
-                          isOwn={!!actorId && msg.senderUserId === actorId}
+                          isOwn={isOwnMessage(msg)}
+                          onOpenDesignContext={handleOpenDesignContext}
+                          onOpenProductContext={handleOpenProductContext}
+                          onRetry={() => handleRetryMessage(msg.id)}
+                          onDiscard={() => handleDiscardMessage(msg.id)}
                           onReply={(m) => setReplyToMessage({
                             id: m.id,
                             bodyText: m.bodyText,
-                            senderName: m.sender?.firstName || m.sender?.username || (m.senderUserId === actorId ? 'You' : m.senderRole),
+                            senderName: resolveParticipantDisplayName(m.sender, isOwnMessage(m) ? 'You' : m.senderRole),
                           })}
                         />
                       </div>
@@ -1326,13 +2239,24 @@ const MessagingManagementPage: React.FC = () => {
       {/* ============================================================ */}
       {/*  RIGHT PANEL — Contact Sidebar                                */}
       {/* ============================================================ */}
+      {/*
+        Detail panel appears only where there is room for three columns.
+
+        At `xl` (1280px) a 320px rail and a 288px detail panel leave the
+        conversation — the actual point of the screen — with the remainder,
+        which on a landscape tablet reads as a thin strip between two wide
+        panels. It now waits for `2xl`, and scrolls independently like the
+        others.
+      */}
       {activeConversation && (
-        <div className="hidden xl:flex w-72 shrink-0 flex-col border-l border-gray-200/60 dark:border-white/[0.04] bg-white/70 dark:bg-white/[0.02]">
+        <div className="hidden 2xl:flex w-72 shrink-0 min-h-0 flex-col overflow-y-auto overscroll-contain bg-gray-50/80 dark:bg-white/[0.03]">
           {contactSidebarProps ? <ChatContactSidebar {...contactSidebarProps} /> : null}
         </div>
       )}
+    </div>
+
       {activeConversation && showContactDetails && contactSidebarProps ? (
-        <div className="fixed inset-0 z-layer-modal xl:hidden">
+        <div className="fixed inset-0 z-layer-modal 2xl:hidden">
           <button
             type="button"
             className="absolute inset-0 bg-black/45"
@@ -1340,7 +2264,7 @@ const MessagingManagementPage: React.FC = () => {
             aria-label="Close conversation details"
           />
           <div className="absolute inset-y-0 right-0 w-[min(88vw,360px)] border-l border-gray-200/60 bg-white shadow-2xl dark:border-white/[0.04] dark:bg-[#111017]">
-            <div className="flex items-center justify-between border-b border-gray-200/60 px-4 py-3 dark:border-white/[0.04]">
+            <div className="flex items-center justify-between px-4 py-3">
               <div className="text-sm font-semibold text-theme">Conversation details</div>
               <button
                 type="button"
@@ -1356,7 +2280,31 @@ const MessagingManagementPage: React.FC = () => {
           </div>
         </div>
       ) : null}
-    </div>
+
+      {/*
+        The referenced design, over the conversation rather than instead of it.
+
+        Only reached on a desktop-width viewport — `handleOpenDesignContext`
+        routes on a phone, where a modal over a thread would leave neither
+        usable. Closing returns the reader to exactly the scroll position they
+        left, which is the whole reason for opening in place.
+      */}
+      <DesignViewModal
+        open={Boolean(designContextItem)}
+        item={designContextItem}
+        onClose={() => setDesignContextItem(null)}
+      />
+
+      {designContextLoading ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 left-1/2 z-layer-modal -translate-x-1/2 rounded-full bg-black/80 px-4 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-sm"
+        >
+          Opening design…
+        </div>
+      ) : null}
+    </>
   );
 };
 

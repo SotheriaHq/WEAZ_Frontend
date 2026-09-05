@@ -61,7 +61,7 @@ const hasPersistedSessionEvidence = () => {
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const dispatch = useDispatch();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => hasPersistedSessionEvidence());
   const authExpiredToastShownRef = useRef(false);
   const bootstrapCompleteRef = useRef(false);
 
@@ -200,6 +200,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     const initialize = async () => {
+      const bootstrapTimeout = window.setTimeout(() => {
+        bootstrapCompleteRef.current = true;
+        if (isMounted) {
+          setLoading(false);
+        }
+      }, 8_000);
+
       try {
         if (!hasPersistedSessionEvidence()) {
           return;
@@ -213,6 +220,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         handleProfileError(error);
         await clearPrivateSession();
       } finally {
+        window.clearTimeout(bootstrapTimeout);
         bootstrapCompleteRef.current = true;
         if (isMounted) {
           setLoading(false);

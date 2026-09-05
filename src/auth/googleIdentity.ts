@@ -25,6 +25,9 @@ type GoogleAccountsId = {
     cancel_on_tap_outside?: boolean;
     context?: 'signin' | 'signup' | 'use';
     login_hint?: string;
+    // Opt into FedCM so supporting browsers render Google's account selector as a
+    // native in-page modal instead of opening a separate popup window/tab.
+    use_fedcm_for_prompt?: boolean;
   }) => void;
   prompt: (callback?: (notification: GooglePromptMomentNotification) => void) => void;
   renderButton: (parent: HTMLElement, options: GoogleRenderButtonOptions) => void;
@@ -129,6 +132,7 @@ export const mountGoogleSignInButton = async (
     context,
     auto_select: false,
     cancel_on_tap_outside: true,
+    use_fedcm_for_prompt: true,
     callback: (response) => {
       const credential = response.credential?.trim();
       if (credential) {
@@ -207,6 +211,7 @@ export const requestGoogleIdToken = async ({
       context,
       auto_select: false,
       cancel_on_tap_outside: true,
+      use_fedcm_for_prompt: true,
       ...(loginHint ? { login_hint: loginHint.trim() } : {}),
       callback: (response) => {
         const credential = response.credential?.trim();

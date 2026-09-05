@@ -188,15 +188,24 @@ export interface CustomOrderListItem {
   sourceType: CustomOrderSourceType;
   sourceId: string;
   sourceTitle: string;
+  sourceBrandName?: string | null;
   sourcePrimaryMediaUrl?: string | null;
+  currency?: string;
   brand: {
     name: string;
+    id?: string;
+    ownerId?: string;
   };
   buyer?: {
     name?: string | null;
     email?: string | null;
     phone?: string | null;
   };
+  /** Sticky "needs admin attention" signal (set by ops cron, cleared by any admin action). */
+  adminAttentionRequiredAt?: string | null;
+  adminAttentionReason?: string | null;
+  /** Read-only brand signal: an admin reminder/dispute notice is unacknowledged (📣 badge). */
+  hasUnreadAdminNotice?: boolean;
   delivery?: {
     city?: string | null;
     state?: string | null;
@@ -254,6 +263,13 @@ export interface CustomOrderIssue {
 export interface CustomOrderDispute {
   id: string;
   status: CustomOrderDisputeStatus | string;
+  reasonType?: CustomOrderIssueType | string;
+  /** Buyer's opening statement (read-only to the brand). */
+  buyerStatement?: string | null;
+  /** The brand's single response, once submitted (read-only afterward). */
+  brandResponse?: string | null;
+  /** Deadline by which the brand may still submit its response, if set. */
+  brandRespondByAt?: string | null;
   resolution?: CustomOrderDisputeResolution | string | null;
   adminNotes?: string | null;
   assignedAdminId?: string | null;
@@ -376,6 +392,8 @@ export interface CustomOrderDetail {
     title: string;
     slug?: string | null;
     primaryMediaUrl?: string | null;
+    /** All renderable angles the designer posted (falls back to the cover). */
+    mediaUrls?: string[] | null;
     brandName?: string | null;
   };
   configurationVersionId: string;
@@ -386,6 +404,8 @@ export interface CustomOrderDetail {
     shippingFee?: number;
     rushFee?: number;
     fabricCharge?: number;
+    /** Labor/production only (excludes fabric + rush). */
+    productionCharge?: number;
   };
   internalPriceBreakdown?: Record<string, unknown>;
   quoteStatus?: CustomOrderQuoteStatus;
@@ -419,6 +439,15 @@ export interface CustomOrderDetail {
   retentionHoldUntil?: string | null;
   retentionHoldSetById?: string | null;
   retentionHoldSetAt?: string | null;
+  /** Sticky "needs admin attention" signal — drives the detail-page danger banner. */
+  adminAttentionRequiredAt?: string | null;
+  adminAttentionReason?: string | null;
+  /** Read-only admin-notice state for the brand's studio detail (reminder/dispute). */
+  brandAdminNoticeAt?: string | null;
+  brandAdminNoticeAckAt?: string | null;
+  hasUnreadAdminNotice?: boolean;
+  brandId?: string;
+  buyerId?: string;
   progressEvents: CustomOrderProgressEvent[];
   extensionRequests: CustomOrderExtensionRequest[];
   issues: CustomOrderIssue[];
@@ -587,9 +616,13 @@ export interface CustomOrderPaymentAttempt {
 
 export interface PaginatedCustomOrders<T> {
   items: T[];
-  page: number;
+  page?: number;
   limit: number;
   total: number;
+  /** Server count of orders needing admin attention under the same filters. */
+  attentionTotal?: number;
+  /** Keyset cursor for the next page (prefer over deep OFFSET). */
+  nextCursor?: string | null;
 }
 
 export interface CustomOrderRiskDashboard {
@@ -854,6 +887,10 @@ export const customOrderConfigurationsApi = {
     page?: number;
     limit?: number;
     isActive?: boolean;
+    /** Required for non-owner callers; brand owners may omit to list own brand. */
+    brandId?: string;
+    sourceType?: 'PRODUCT' | 'DESIGN';
+    sourceId?: string;
   }) {
     const response = await apiClient.get('/custom-order-configurations', withParams(params));
     return hydrateConfigurationPage(
@@ -1093,6 +1130,34 @@ export const customOrdersBrandApi = {
     );
     return unwrapApiResponse<CustomOrderDetail>(response.data);
   },
+
+  /** Mark all admin notices (reminders/dispute alerts) on this order as seen. Read-only ack. */
+  async ackAdminNotices(brandId: string, orderId: string) {
+    const response = await apiClient.post(
+      `/brands/${brandId}/custom-orders/${orderId}/admin-notices/ack`,
+    );
+    return unwrapApiResponse<{ customOrderId: string; acknowledged: boolean }>(
+      response.data,
+    );
+  },
+
+  /** Submit the brand's single, one-time response to an admin-adjudicated dispute. */
+  async respondToDispute(
+    brandId: string,
+    orderId: string,
+    disputeId: string,
+    payload: { response: string },
+  ) {
+    const response = await apiClient.post(
+      `/brands/${brandId}/custom-orders/${orderId}/disputes/${disputeId}/respond`,
+      payload,
+    );
+    return unwrapApiResponse<{
+      disputeId: string;
+      status: CustomOrderDisputeStatus | string;
+      brandResponse: string | null;
+    }>(response.data);
+  },
 };
 
 export const customOrdersAdminApi = {
@@ -1106,7 +1171,20 @@ export const customOrdersAdminApi = {
     return unwrapApiResponse<CustomOrderRiskDashboard>(response.data);
   },
 
-  async list(params?: { page?: number; limit?: number; status?: CustomOrderStatus; stage?: CustomOrderProgressStage; brandId?: string; q?: string }) {
+  async list(params?: {
+    page?: number;
+    limit?: number;
+    status?: CustomOrderStatus;
+    stage?: CustomOrderProgressStage;
+    brandId?: string;
+    q?: string;
+    /** Server-side needs-review filter (dashboard deep-link). */
+    attention?: boolean | 1 | 0;
+    /** Server-side sort: attention | newest | oldest | amount. */
+    sort?: 'attention' | 'newest' | 'oldest' | 'amount';
+    /** Keyset cursor from a prior response's nextCursor. */
+    cursor?: string;
+  }) {
     const response = await apiClient.get('/admin/custom-orders', withParams(params));
     return unwrapApiResponse<PaginatedCustomOrders<CustomOrderListItem>>(response.data);
   },

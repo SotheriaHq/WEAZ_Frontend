@@ -1,19 +1,18 @@
 import { Link } from 'react-router-dom';
-import { APP_NAME } from '@/config/productIdentity';
+import { PRODUCT_NAME } from '@/brand/identity';
 import { LEGAL_PAGES } from './legalDocuments';
 
 export default function LegalIndexPage() {
   return (
-    <main className="threadly-shell-bg min-h-screen px-4 py-12 text-slate-950 dark:text-white sm:px-6 lg:px-8">
+    <main className="wiez-shell-bg min-h-screen px-4 py-12 text-slate-950 dark:text-white sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-8">
           <p className="text-xs font-black uppercase tracking-[0.24em] text-fuchsia-500 dark:text-fuchsia-300">
             Legal center
           </p>
-          <h1 className="mt-2 text-3xl font-black sm:text-4xl">{APP_NAME} Legal</h1>
+          <h1 className="mt-2 text-3xl font-black sm:text-4xl">{PRODUCT_NAME} Legal</h1>
           <p className="mt-3 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-            These documents are versioned for product enforcement and acceptance tracking.
-            Current draft copy is marked for counsel review before public launch.
+            Official operating terms, consumer protections, merchant standards, and privacy directives governing the {PRODUCT_NAME} platform.
           </p>
         </div>
 

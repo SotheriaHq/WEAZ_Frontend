@@ -24,9 +24,14 @@ import {
   LEGAL_STORE_PUBLISH_DOCUMENT_KEYS,
 } from '@/api/LegalApi';
 import { primeStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
+import { sanitizeResponseTimeSla } from '@/utils/storePolicyConstraints';
 
 const MAX_SPECIALIZATIONS = 4;
-const RESPONSE_TIME_OPTIONS = ['12h', '24h', '48h'];
+const RESPONSE_TIME_OPTIONS = ['2h', 'same-day', '24h'] as const;
+type ResponseTimeOption = (typeof RESPONSE_TIME_OPTIONS)[number];
+
+const resolveResponseTime = (value: string | undefined | null): ResponseTimeOption =>
+  sanitizeResponseTimeSla(value, '24h');
 
 const BRAND_SPECIALIZATION_OPTIONS = [
   { value: 'womenswear', label: 'Womenswear' },
@@ -67,6 +72,14 @@ const StoreGeneralSettings: React.FC = () => {
   const [tagline, setTagline] = useState('');
   const [description, setDescription] = useState('');
   const [contactEmail, setContactEmail] = useState('');
+  /**
+   * Whether the address above appears on the public brand profile.
+   *
+   * Off by default and off for every existing brand: an address given to WIEZ
+   * for operational contact is not consent to publish it to every visitor. Only
+   * the brand can change this — there is no admin path that sets it.
+   */
+  const [contactEmailPublic, setContactEmailPublic] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [responseTime, setResponseTime] = useState('24h');
   const [brandColor, setBrandColor] = useState('#8B5CF6');
@@ -98,11 +111,9 @@ const StoreGeneralSettings: React.FC = () => {
         setTagline(settings.tagline || '');
         setDescription(settings.description || '');
         setContactEmail(settings.contactEmail || '');
+        setContactEmailPublic(Boolean(settings.contactEmailPublic));
         setSelectedCategories(normalizeSpecializationSelection(settings.tags || []));
-        const resolvedResponseTime = RESPONSE_TIME_OPTIONS.includes(settings.responseTimeSla || '')
-          ? (settings.responseTimeSla as string)
-          : '24h';
-        setResponseTime(resolvedResponseTime);
+        setResponseTime(resolveResponseTime(settings.responseTimeSla));
         setIsLive(Boolean(settings.isStoreOpen));
         setInitialSettings(settings);
       } catch (error) {
@@ -133,9 +144,7 @@ const StoreGeneralSettings: React.FC = () => {
       description.trim() !== (initialSettings.description || '') ||
       contactEmail.trim() !== (initialSettings.contactEmail || '') ||
       normalizedTagSnapshot !== normalizedInitialTags ||
-      responseTime !== (RESPONSE_TIME_OPTIONS.includes(initialSettings.responseTimeSla || '')
-        ? (initialSettings.responseTimeSla as string)
-        : '24h')
+      responseTime !== resolveResponseTime(initialSettings.responseTimeSla)
     )
   );
 
@@ -155,6 +164,7 @@ const StoreGeneralSettings: React.FC = () => {
           description: description.trim(),
           tags: selectedCategories,
           contactEmail: contactEmail.trim(),
+          contactEmailPublic,
         }),
         updateStorePolicies({
           responseTimeSla: responseTime,
@@ -167,6 +177,7 @@ const StoreGeneralSettings: React.FC = () => {
         description: description.trim(),
         tags: selectedCategories,
         contactEmail: contactEmail.trim(),
+        contactEmailPublic,
         responseTimeSla: responseTime,
       });
 
@@ -217,7 +228,12 @@ const StoreGeneralSettings: React.FC = () => {
       } else {
         await closeStore();
       }
-      primeStoreSetupStatusCache(nextLiveState);
+      // Opening a store requires completed setup, so opening confirms it.
+      // Closing/pausing must NOT flip "setup complete" to false — a paused
+      // store is still fully set up.
+      if (nextLiveState) {
+        primeStoreSetupStatusCache(true);
+      }
       setIsLive(nextLiveState);
       toast.success(nextLiveState ? 'Store is now live.' : 'Store is now paused.');
     } catch (error: any) {
@@ -322,8 +338,8 @@ const StoreGeneralSettings: React.FC = () => {
                         (isSelected
                           ? 'bg-purple-600 text-white border-purple-600'
                           : isDisabled
-                            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                            : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-purple-300 hover:text-purple-600')
+                            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed dark:bg-white/10'
+                            : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-purple-300 hover:text-purple-600 dark:bg-white/5 dark:text-gray-300')
                       }
                     >
                       {cat.label}
@@ -339,7 +355,7 @@ const StoreGeneralSettings: React.FC = () => {
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Store URL Slug</label>
             <div className="flex items-center gap-2">
-              <span className="text-gray-500 dark:text-gray-400 text-sm">threadly.store/</span>
+              <span className="text-gray-500 dark:text-gray-400 text-sm">wiez.store/</span>
               <input
                 type="text"
                 value={slug}
@@ -390,6 +406,26 @@ const StoreGeneralSettings: React.FC = () => {
               disabled={isLoading}
               className="w-full bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all disabled:opacity-60"
             />
+
+            <label className="flex items-start gap-3 pt-1 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={contactEmailPublic}
+                onChange={(e) => setContactEmailPublic(e.target.checked)}
+                disabled={isLoading || !contactEmail.trim()}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 dark:border-white/20 text-purple-600 focus:ring-purple-500 disabled:opacity-50"
+              />
+              <span className="text-sm">
+                <span className="font-medium text-gray-900 dark:text-white">
+                  Show this email on my public profile
+                </span>
+                <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {contactEmail.trim()
+                    ? 'Shoppers browsing your catalog will be able to email you directly. Your account sign-in email is never shown.'
+                    : 'Add a contact email above to make it public.'}
+                </span>
+              </span>
+            </label>
           </div>
         </div>
       </section>
@@ -529,9 +565,9 @@ const StoreGeneralSettings: React.FC = () => {
                   onChange={(e) => setResponseTime(e.target.value)}
                   disabled={isLoading}
                 >
-                  <option value="12h">Within 12 hours</option>
+                  <option value="2h">Within 2 hours</option>
+                  <option value="same-day">Same business day</option>
                   <option value="24h">Within 24 hours</option>
-                  <option value="48h">Within 48 hours</option>
                 </Select>
             </div>
 
@@ -559,11 +595,9 @@ const StoreGeneralSettings: React.FC = () => {
             setTagline(initialSettings.tagline || '');
             setDescription(initialSettings.description || '');
             setContactEmail(initialSettings.contactEmail || '');
+            setContactEmailPublic(Boolean(initialSettings.contactEmailPublic));
             setSelectedCategories(normalizeSpecializationSelection(initialSettings.tags || []));
-            const resolvedResponseTime = RESPONSE_TIME_OPTIONS.includes(initialSettings.responseTimeSla || '')
-              ? (initialSettings.responseTimeSla as string)
-              : '24h';
-            setResponseTime(resolvedResponseTime);
+            setResponseTime(resolveResponseTime(initialSettings.responseTimeSla));
           }}
           className="px-6 py-2.5 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium text-sm transition-colors"
         >

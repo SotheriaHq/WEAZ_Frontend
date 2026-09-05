@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { productApi } from '@/api/ProductApi';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 
 interface BulkDeleteCandidate {
   id: string;
@@ -212,7 +212,7 @@ const BulkDeleteProductsModal: React.FC<BulkDeleteProductsModalProps> = ({
             <div className="px-6 pb-5">
               {loadingImpact ? (
                 <div className="flex flex-col items-center gap-3 py-10">
-                  <VLoader size={36} phase="loading" showLabel={false} />
+                  <MuseLoader size={36} />
                   <span className="text-sm text-gray-500 dark:text-zinc-400">Checking impact...</span>
                 </div>
               ) : (
@@ -236,7 +236,7 @@ const BulkDeleteProductsModal: React.FC<BulkDeleteProductsModalProps> = ({
                   {!isPermanentDeleteMode && (
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { emoji: '🛒', label: 'In Carts', value: impactSummary.inCarts },
+                      { emoji: '🛒', label: 'In Bags', value: impactSummary.inCarts },
                       { emoji: '❤️', label: 'Wishlisted', value: impactSummary.inWishlists },
                       { emoji: '👁️', label: 'Total Views', value: impactSummary.totalViews },
                       { emoji: '🧵', label: 'Threads', value: impactSummary.totalThreads },
@@ -410,7 +410,7 @@ const BulkDeleteProductsModal: React.FC<BulkDeleteProductsModalProps> = ({
               >
                 {isProcessing ? (
                   <span className="flex items-center justify-center gap-2">
-                    <VLoader size={16} phase="loading" showLabel={false} />
+                    <MuseLoader size={16} />
                     Deleting...
                   </span>
                 ) : (

@@ -4,8 +4,8 @@ export const isKnownUnavailableSeedMediaUrl = (value?: string | null): boolean =
 
   try {
     const parsed = new URL(raw);
-    return parsed.hostname.toLowerCase() === 'threadly.local';
+    return parsed.hostname.toLowerCase() === 'wiez.local';
   } catch {
-    return raw.toLowerCase().includes('threadly.local/uploads/seed/');
+    return raw.toLowerCase().includes('wiez.local/uploads/seed/');
   }
 };

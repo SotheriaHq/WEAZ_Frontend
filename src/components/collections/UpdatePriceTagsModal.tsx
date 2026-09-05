@@ -4,6 +4,7 @@ import { brandApi } from '@/api/BrandApi';
 import { toast } from 'sonner';
 import TagPicker from '@/components/forms/TagPicker';
 import TagsApi from '@/api/TagsApi';
+import { getRangeError } from '@/utils/rangeValidation';
 
 interface Props {
   open: boolean;
@@ -39,7 +40,17 @@ const UpdatePriceTagsModal: React.FC<Props> = ({ open, onClose, collectionId, cu
     return () => { mounted = false; };
   }, []);
 
-  const canSave = useMemo(() => !saving, [saving]);
+  // The server refuses an inverted range with PRICE_RANGE_INVALID, which used
+  // to arrive here as a bare "Failed to update collection" toast with no clue
+  // which field was wrong. Same rule, same wording as the mobile editor.
+  const priceRangeError = useMemo(
+    () => getRangeError(minPrice, maxPrice, { label: 'price' }),
+    [maxPrice, minPrice],
+  );
+  const canSave = useMemo(
+    () => !saving && priceRangeError.summary === null,
+    [priceRangeError.summary, saving],
+  );
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -79,23 +90,45 @@ const UpdatePriceTagsModal: React.FC<Props> = ({ open, onClose, collectionId, cu
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">Min Price</label>
-            <input 
-              type="number" 
-              value={minPrice} 
-              onChange={(e) => setMinPrice(e.target.value === '' ? '' : Number(e.target.value))} 
-              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" 
-              placeholder="₦0" 
+            <input
+              type="number"
+              value={minPrice}
+              onChange={(e) => setMinPrice(e.target.value === '' ? '' : Number(e.target.value))}
+              className={`w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border focus:ring-2 focus:border-transparent transition-all ${
+                priceRangeError.min
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300 dark:border-gray-700 focus:ring-purple-500'
+              }`}
+              placeholder="₦0"
+              aria-invalid={priceRangeError.min ? true : undefined}
+              aria-describedby={priceRangeError.min ? 'min-price-error' : undefined}
             />
+            {priceRangeError.min ? (
+              <p id="min-price-error" className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {priceRangeError.min}
+              </p>
+            ) : null}
           </div>
           <div>
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">Max Price</label>
-            <input 
-              type="number" 
-              value={maxPrice} 
-              onChange={(e) => setMaxPrice(e.target.value === '' ? '' : Number(e.target.value))} 
-              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" 
-              placeholder="₦0" 
+            <input
+              type="number"
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(e.target.value === '' ? '' : Number(e.target.value))}
+              className={`w-full px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border focus:ring-2 focus:border-transparent transition-all ${
+                priceRangeError.max
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300 dark:border-gray-700 focus:ring-purple-500'
+              }`}
+              placeholder="₦0"
+              aria-invalid={priceRangeError.max ? true : undefined}
+              aria-describedby={priceRangeError.max ? 'max-price-error' : undefined}
             />
+            {priceRangeError.max ? (
+              <p id="max-price-error" className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {priceRangeError.max}
+              </p>
+            ) : null}
           </div>
         </div>
         

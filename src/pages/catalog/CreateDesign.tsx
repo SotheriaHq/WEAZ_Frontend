@@ -8,12 +8,12 @@ import React, {
 import { motion, AnimatePresence } from "framer-motion";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import VLoader from "@/components/loaders/VLoader";
+import { MuseLoader } from '@/components/loaders/MuseLoader';
+import { getRangeError } from "@/utils/rangeValidation";
 import {
   FiArrowLeft,
   FiTrash2,
   FiStar,
-  FiMove,
   FiMaximize2,
   FiChevronDown,
   FiChevronUp,
@@ -37,28 +37,41 @@ import { getStorePolicies } from '@/api/StoreApi';
 // Context & Hooks
 import TextField from "../../components/forms/TextField";
 import UniversalSelect from "@/components/forms/UniversalSelect";
-import MediaUploadZone from "../../components/upload/MediaUploadZone";
-import ThumbnailStrip from "../../components/upload/ThumbnailStrip";
-import MediaRenderer from "../../components/media/MediaRenderer";
+import MediaSlotGrid, {
+  buildMediaSlotMap,
+  renderableMediaSlots,
+} from "@/components/media/MediaSlotGrid";
+import SizingConfigurator from "@/components/sizing/SizingConfigurator";
+import LocalMediaPreview from "../../components/media/LocalMediaPreview";
 import useFilePicker from "../../components/upload/useFilePicker";
 import { PrePublishConfirmModal } from "@/components/modals";
 import TagsApi from "@/api/TagsApi";
+import HashtagPickerModal from "@/components/tags/HashtagPickerModal";
+import ReviewFeedbackBanner from "@/components/content-review/ReviewFeedbackBanner";
 import { brandApi } from "@/api/BrandApi";
 import FilterSelector, {
   type FilterSelection,
 } from "@/components/categories/FilterSelector";
+import { DEFAULT_HASHTAG_SUGGESTIONS } from "@/components/categories/filterTagSuggestions";
 import InfoTooltip from "@/components/ui/InfoTooltip";
 import type { MediaItem } from "@/types/media";
 import { MediaProvider, useMediaStore } from "../../hooks/useMediaStore";
 import useDesignUpload from "../../hooks/useDesignUpload";
+import useCachedResource from "@/hooks/useCachedResource";
 import { useBrandProfile } from "../../hooks/UseBrandHook";
-import { DesignApi, finalizeDesignUploads, resolveDesignId } from "@/api/DesignApi";
+import { useQueryClient } from "@tanstack/react-query";
+import { refreshOwnerCatalogQueries } from "@/query/queries";
+import { getActiveBrandId } from "@/lib/brandAccess";
+import { DesignApi, resolveDesignId } from "@/api/DesignApi";
+import {
+  runDesignPublishJob,
+  unlockDocumentScroll,
+} from "@/features/designs/designPublishJob";
+import { saveDesignPublishRecovery } from "@/features/designs/designPublishRecovery";
 import type { SizingMode } from '@/types/sizing';
 import {
   DESIGN_FIT_PREFERENCE_OPTIONS,
   DESIGN_MAX_MEDIA_COUNT,
-  DESIGN_MEDIA_SLOTS,
-  DESIGN_REQUIRED_MEDIA_COUNT,
   DESIGN_TARGET_AGE_OPTIONS,
   type DesignFitPreference,
   type DesignTargetAgeGroup,
@@ -87,8 +100,19 @@ import {
   getMediaViewSlotLabel,
   getMissingRequiredMediaSlots,
   normalizeMediaViewSlot,
+  type MediaViewSlot,
 } from '@/utils/contentIntegrity';
+import {
+  canSaveDraft,
+  canWithdrawFromReview,
+  normalizeContentReviewStatus,
+  primaryActionLabel,
+  primaryActionPendingLabel,
+  reviewStateHint,
+} from '@/utils/contentReviewActions';
+import { addClientDiagnostic } from '@/utils/clientDiagnostics';
 import { TourOverlay, type TourStep } from '@/components/ui/TourOverlay';
+import { useOneTimeTour } from '@/hooks/useOneTimeTour';
 // ============================================================================
 
 type CategoryTypeOption = { id: string; slug?: string; name: string; categoryId?: string };
@@ -266,12 +290,26 @@ const CreateDesignInner: React.FC = () => {
   const [description, setDescription] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+  /**
+   * Inverted price range, caught at the field.
+   *
+   * The backend has always refused this (`PRICE_RANGE_INVALID`), but only at
+   * submit — after the whole design had been filled in and the upload started.
+   * Same rule and wording as the mobile composer, from the shared helper.
+   */
+  const priceRangeError = useMemo(
+    () => getRangeError(minPrice, maxPrice, { label: "price" }),
+    [maxPrice, minPrice],
+  );
   const [isMadeToOrder, setIsMadeToOrder] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>(
+    () => [...DEFAULT_HASHTAG_SUGGESTIONS],
+  );
   const [tagSearch, setTagSearch] = useState("");
-  const [loadingCategories, setLoadingCategories] = useState(true);
-  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [tagSearchResults, setTagSearchResults] = useState<string[]>([]);
+  const [showTagPicker, setShowTagPicker] = useState(false);
+
   const [categoryId, setCategoryId] = useState<string>("");
   const [categoryTypeId, setCategoryTypeId] = useState<string>("");
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({});
@@ -283,6 +321,9 @@ const CreateDesignInner: React.FC = () => {
   const [fitPreference, setFitPreference] = useState<DesignFitPreference>('REGULAR');
   const [targetAgeGroup, setTargetAgeGroup] = useState<DesignTargetAgeGroup>('ADULT');
   const [metadataEditedAt, setMetadataEditedAt] = useState<Date | null>(null);
+  const [publicationStatus, setPublicationStatus] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState(false);
+  const [withdrawingFromReview, setWithdrawingFromReview] = useState(false);
   const [storeProcessingTime, setStoreProcessingTime] = useState('');
   const [storeCustomOrderLeadTime, setStoreCustomOrderLeadTime] = useState('');
   const [customMeasurementKeys, setCustomMeasurementKeys] = useState<string[]>(
@@ -290,23 +331,13 @@ const CreateDesignInner: React.FC = () => {
   );
 
   // UI state
-  const [isTourActive, setIsTourActive] = useState(false);
-
   // Auto-start the tour the first time a user opens the create-design page.
-  // Persisted in localStorage so it never shows again after the first visit.
-  useEffect(() => {
-    if (isEditMode) return;
-    if (localStorage.getItem('threadly_tour_design_create')) return;
-    const timer = window.setTimeout(() => setIsTourActive(true), 800);
-    return () => clearTimeout(timer);
-    // isEditMode is stable for the lifetime of this page instance
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleTourClose = useCallback(() => {
-    setIsTourActive(false);
-    localStorage.setItem('threadly_tour_design_create', '1');
-  }, []);
+  // The seen-flag is persisted the moment it is shown (not only on close), so
+  // ignoring it or navigating away is as permanent as pressing "Skip tour".
+  const { isActive: isTourActive, close: handleTourClose } = useOneTimeTour(
+    'wiez_tour_design_create',
+    { enabled: !isEditMode },
+  );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -350,7 +381,6 @@ const CreateDesignInner: React.FC = () => {
 
   // Track original items for deletion in edit mode
   const originalItemIds = useRef<Set<string>>(new Set());
-  const transientObjectUrlsRef = useRef<Map<string, string>>(new Map());
 
   const {
     uploadDesign,
@@ -360,6 +390,11 @@ const CreateDesignInner: React.FC = () => {
     cancelUploads,
   } = useDesignUpload();
   const { user } = useBrandProfile();
+  const queryClient = useQueryClient();
+  const ownerBrandId = getActiveBrandId(user);
+  const refreshCatalogAfterMutation = useCallback(() => {
+    refreshOwnerCatalogQueries(queryClient, ownerBrandId);
+  }, [ownerBrandId, queryClient]);
   const publishTaskScope = useMemo(
     () => ({ ownerId: user?.id ?? undefined }),
     [user?.id],
@@ -370,17 +405,91 @@ const CreateDesignInner: React.FC = () => {
   }, [location.pathname, location.search]);
   const requiresEmailVerification = !isEditMode && user?.isEmailVerified === false;
 
+  const { data: categories = [], loading: loadingCategories } =
+    useCachedResource<CategoryOption[]>({
+      queryKey: ['design-create', 'categories-with-subcategories'],
+      queryFn: async () => {
+        const cats = await brandApi.getCategoriesWithSubCategories(false);
+        if (!Array.isArray(cats)) return [];
+        return cats.map((c) => ({
+          id: c.id,
+          slug: c.slug,
+          name: c.name,
+          types: Array.isArray(c.types)
+            ? c.types.map((t) => ({
+                id: t.id,
+                slug: t.slug,
+                name: t.name,
+                categoryId: t.categoryId,
+              }))
+            : [],
+        }));
+      },
+      staleTime: 30 * 60 * 1000,
+      gcTime: 60 * 60 * 1000,
+    });
+
+  const { data: cachedTagSuggestions } = useCachedResource<string[]>({
+    queryKey: ['design-create', 'tag-suggestions', 80],
+    queryFn: async () => {
+      const suggestions = await TagsApi.getSuggestions(80);
+      return Array.isArray(suggestions) && suggestions.length > 0
+        ? suggestions
+        : DEFAULT_HASHTAG_SUGGESTIONS;
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+  });
+
+  const { data: storePolicyDefaults } = useCachedResource<{
+    processingTime: string;
+    customOrderLeadTime: string;
+  }>({
+    queryKey: ['design-create', 'store-policy-defaults', user?.id ?? 'anon'],
+    enabled: Boolean(user?.id),
+    queryFn: async () => {
+      const policies = await getStorePolicies();
+      return {
+        processingTime: policies.processingTime || '',
+        customOrderLeadTime: policies.shippingRules?.customOrderSettings?.leadTime || '',
+      };
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  useEffect(() => {
+    if (!cachedTagSuggestions) return;
+    setTagSuggestions((current) =>
+      Array.from(new Set([...cachedTagSuggestions, ...current])),
+    );
+  }, [cachedTagSuggestions]);
+
+  useEffect(() => {
+    if (!storePolicyDefaults) return;
+    setStoreProcessingTime(storePolicyDefaults.processingTime);
+    setStoreCustomOrderLeadTime(storePolicyDefaults.customOrderLeadTime);
+  }, [storePolicyDefaults]);
+
   const disabled = false;
+  const isInReview = publicationStatus === 'IN_REVIEW';
+  const reviewStatus = useMemo(
+    () => normalizeContentReviewStatus(publicationStatus),
+    [publicationStatus],
+  );
+  const reviewHint = useMemo(() => reviewStateHint(reviewStatus), [reviewStatus]);
   const titleDescriptionLocked = useMemo(() => {
-    if (!isEditMode || !metadataEditedAt) return false;
+    if (!isEditMode || editingDraft || publicationStatus !== 'PUBLISHED' || !metadataEditedAt) {
+      return false;
+    }
     const cooldownMs = 30 * 24 * 60 * 60 * 1000;
     return Date.now() < metadataEditedAt.getTime() + cooldownMs;
-  }, [metadataEditedAt, isEditMode]);
+  }, [editingDraft, metadataEditedAt, isEditMode, publicationStatus]);
   const nextTitleEditDate = useMemo(() => {
-    if (!metadataEditedAt) return null;
+    if (!metadataEditedAt || editingDraft || publicationStatus !== 'PUBLISHED') return null;
     const cooldownMs = 30 * 24 * 60 * 60 * 1000;
     return new Date(metadataEditedAt.getTime() + cooldownMs);
-  }, [metadataEditedAt]);
+  }, [editingDraft, metadataEditedAt, publicationStatus]);
   const picker = useFilePicker({
     accept: ["image/*", "video/*"],
     maxFiles: Math.max(0, DESIGN_MAX_MEDIA_COUNT - files.length),
@@ -404,57 +513,6 @@ const CreateDesignInner: React.FC = () => {
   // this effect and spamming APIs; run only on mount or when edit id changes.
   useEffect(() => {
     let mounted = true;
-
-    const loadTagSuggestions = async () => {
-      try {
-        const s = await TagsApi.getSuggestions(80);
-        if (mounted) setTagSuggestions(Array.isArray(s) ? s : []);
-      } catch (error) {
-        console.warn("Failed to load tag suggestions", error);
-        if (mounted) setTagSuggestions([]);
-      }
-    };
-
-    const loadCategories = async () => {
-      try {
-        const cats = await brandApi.getCategoriesWithSubCategories(true);
-        if (!mounted || !Array.isArray(cats)) return;
-        const mapped = cats.map((c) => ({
-          id: c.id,
-          slug: c.slug,
-          name: c.name,
-          types: Array.isArray(c.types)
-            ? c.types.map((t) => ({
-                id: t.id,
-                slug: t.slug,
-                name: t.name,
-                categoryId: t.categoryId,
-              }))
-            : [],
-        }));
-        setCategories(mapped);
-      } catch (error) {
-        console.warn("Failed to load categories", error);
-        if (mounted) setCategories([]);
-      } finally {
-        if (mounted) setLoadingCategories(false);
-      }
-    };
-
-    const loadStoreProcessingDefaults = async () => {
-      try {
-        const policies = await getStorePolicies();
-        if (!mounted) return;
-        setStoreProcessingTime(policies.processingTime || '');
-        setStoreCustomOrderLeadTime(
-          policies.shippingRules?.customOrderSettings?.leadTime || '',
-        );
-      } catch {
-        if (!mounted) return;
-        setStoreProcessingTime('');
-        setStoreCustomOrderLeadTime('');
-      }
-    };
 
     const loadDesignDetail = async () => {
       if (!isEditMode || !id) return;
@@ -487,6 +545,9 @@ const CreateDesignInner: React.FC = () => {
         setMetadataEditedAt(
           d.metadataEditedAt ? new Date(d.metadataEditedAt) : null,
         );
+        const loadedStatus = normalizePublicationStatusValue(d.status) ?? 'DRAFT';
+        setPublicationStatus(loadedStatus);
+        setEditingDraft(loadedStatus === 'DRAFT');
 
         const draftFilters = Array.isArray((d as any).filters)
           ? ((d as any).filters as Array<{ dimensionId?: string; valueId?: string }>).reduce(
@@ -514,11 +575,17 @@ const CreateDesignInner: React.FC = () => {
                 ? await brandApi.getSignedFileUrl(m.fileId).catch(() => null)
                 : null;
               const previewUrl = signedUrl || m.previewUrl;
-              if (!previewUrl) return null;
+              // Do NOT drop media whose signed URL failed to mint. Dropping it
+              // silently removed the item from `files`, which made the required
+              // view slots read as missing, which made the primary action fail
+              // validation and appear dead — and had the owner saved anyway,
+              // the media would have been deleted from the design. An item that
+              // exists on the server must survive a transient signing failure.
+              if (!previewUrl && !m.remoteId) return null;
               return {
                 id: m.id,
                 file: undefined,
-                previewUrl,
+                previewUrl: previewUrl || '',
                 kind: m.kind,
                 remoteId: m.remoteId,
                 viewSlot: normalizeMediaViewSlot(m.viewSlot, index),
@@ -538,10 +605,7 @@ const CreateDesignInner: React.FC = () => {
     };
 
     void Promise.all([
-      loadTagSuggestions(),
-      loadCategories(),
       loadDesignDetail(),
-      loadStoreProcessingDefaults(),
     ]);
 
     return () => {
@@ -610,66 +674,49 @@ const CreateDesignInner: React.FC = () => {
     categoryId.trim().length > 0 &&
     categoryTypeId.trim().length > 0 &&
     type.trim().length > 0;
-  const hasDraftContent = Boolean(
-    title.trim().length > 0 ||
-    description.trim().length > 0 ||
-    minPrice.trim().length > 0 ||
-    maxPrice.trim().length > 0 ||
-    selectedTags.length > 0 ||
-    categoryId.trim().length > 0 ||
-    categoryTypeId.trim().length > 0 ||
-    files.length > 0 ||
-    isMadeToOrder ||
-    sizingMode !== 'NONE' ||
-    fitPreference !== 'REGULAR' ||
-    targetAgeGroup !== 'ADULT' ||
-    normalizedCustomMeasurementKeys.length > 0 ||
-    type !== 'EVERYBODY' ||
-    visibility !== 'PUBLIC' ||
-    Object.values(filterSelection).some((values) => values.length > 0),
+
+  /**
+   * Design media in the shape `MediaSlotGrid` renders. The local `file` is
+   * carried through because these are pre-upload picks — HEIC-from-camera and
+   * oversized phone JPEGs need the local preview pipeline, not a plain <img>.
+   */
+  const designSlotMedia = useMemo(
+    () =>
+      buildMediaSlotMap(
+        files.map((item, index) => ({
+          id: item.id,
+          url: item.previewUrl || '',
+          kind: item.kind === 'video' ? ('video' as const) : ('image' as const),
+          file: item.file,
+          isCover: index === coverIndex,
+          viewSlot: item.viewSlot,
+          progress: perFileProgress[item.id],
+        })),
+        DESIGN_MAX_MEDIA_COUNT,
+      ),
+    [files, coverIndex, perFileProgress],
   );
+
+  /**
+   * Design slots are strictly positional — `useMediaStore` re-derives slot from
+   * index on every structural edit, which is what lets an owner reclaim Front
+   * after deleting the image that held it. So only the slot immediately after
+   * the last filled one can be picked; offering "Right" while "Left" is empty
+   * would promise a placement the store would quietly override.
+   */
+  const nextFillableDesignSlots = useMemo(() => {
+    const slots = renderableMediaSlots(DESIGN_MAX_MEDIA_COUNT);
+    const next = slots[files.length];
+    return next ? [next] : [];
+  }, [files.length]);
+
+  const openPickerForSlot = useCallback(() => {
+    picker.open();
+  }, [picker]);
 
   const resolveMediaWithUrl = useCallback((item?: MediaItem | null) => {
     if (!item) return null;
-    if (item.previewUrl) {
-      // Prefer stable preview URL from store (already lifecycle-managed).
-      const transient = transientObjectUrlsRef.current.get(item.id);
-      if (transient) {
-        URL.revokeObjectURL(transient);
-        transientObjectUrlsRef.current.delete(item.id);
-      }
-      return { ...item, url: item.previewUrl };
-    }
-
-    let url = transientObjectUrlsRef.current.get(item.id);
-    if (!url && item.file) {
-      url = URL.createObjectURL(item.file);
-      transientObjectUrlsRef.current.set(item.id, url);
-    }
-    return url ? { ...item, url } : null;
-  }, []);
-
-  useEffect(() => {
-    const keepIds = new Set(files.map((item) => item.id));
-    for (const [id, url] of Array.from(
-      transientObjectUrlsRef.current.entries(),
-    )) {
-      const item = files.find((it) => it.id === id);
-      if (!keepIds.has(id) || item?.previewUrl) {
-        URL.revokeObjectURL(url);
-        transientObjectUrlsRef.current.delete(id);
-      }
-    }
-  }, [files]);
-
-  useEffect(() => {
-    const transientObjectUrls = transientObjectUrlsRef.current;
-    return () => {
-      for (const url of transientObjectUrls.values()) {
-        URL.revokeObjectURL(url);
-      }
-      transientObjectUrls.clear();
-    };
+    return { ...item, url: item.previewUrl || '' };
   }, []);
 
   // Get current selected file for main preview
@@ -687,44 +734,59 @@ const CreateDesignInner: React.FC = () => {
     return withUrl?.url;
   }, [files, coverIndex, resolveMediaWithUrl]);
 
-  const buildCoverPreviewDataUrl = useCallback(
-    async (sourceFiles: MediaItem[] = files, sourceCoverIndex = coverIndex): Promise<string | undefined> => {
-      const coverItem = sourceFiles[sourceCoverIndex];
-      if (!coverItem || coverItem.kind !== 'image' || !coverItem.file) {
-        return undefined;
-      }
-      const file = coverItem.file;
-      if (file.size > 6 * 1024 * 1024) {
-        return undefined;
-      }
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : undefined);
-        reader.onerror = () => resolve(undefined);
-        reader.readAsDataURL(file);
-      });
-    },
-    [coverIndex, files],
-  );
-
   const fullscreenFile = useMemo(() => {
     if (fullscreenIndex === null) return null;
     return resolveMediaWithUrl(files[fullscreenIndex]);
   }, [files, fullscreenIndex, resolveMediaWithUrl]);
 
-  // Filter tag suggestions based on search
-  const filteredSuggestions = useMemo(() => {
+  const isSearchingTags = tagSearch.trim().length > 0;
+
+  // Server-side tag search (debounced): typing queries the FULL approved catalog
+  // via /tags/search, so any tag is findable regardless of how large the tag table
+  // is — not just the loaded popular set. Empty box => show the popular default list.
+  useEffect(() => {
+    const q = tagSearch.trim();
+    if (q.length < 2) {
+      setTagSearchResults([]);
+      return;
+    }
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const results = await TagsApi.search(q, 30);
+        if (active) setTagSearchResults(results.map((r) => r.name));
+      } catch {
+        if (active) setTagSearchResults([]);
+      }
+    }, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [tagSearch]);
+
+
+
+  const availableTagSuggestions = useMemo(() => {
     const search = tagSearch.toLowerCase().trim();
-    if (!search)
-      return tagSuggestions
-        .filter((t) => !selectedTags.includes(t))
-        .slice(0, 12);
-    return tagSuggestions
-      .filter(
-        (t) => t.toLowerCase().includes(search) && !selectedTags.includes(t),
-      )
-      .slice(0, 12);
-  }, [tagSearch, tagSuggestions, selectedTags]);
+    if (search) {
+      const localMatches = tagSuggestions.filter((t) =>
+        t.toLowerCase().includes(search),
+      );
+      // Server results first (whole catalog), then any local popular matches.
+      return Array.from(new Set([...tagSearchResults, ...localMatches])).filter(
+        (t) => !selectedTags.includes(t),
+      );
+    }
+    return tagSuggestions.filter((t) => !selectedTags.includes(t));
+  }, [tagSearch, tagSuggestions, selectedTags, tagSearchResults]);
+
+  const filteredSuggestions = useMemo(() => {
+    const limit = isSearchingTags ? 60 : 24;
+    return availableTagSuggestions.slice(0, limit);
+  }, [availableTagSuggestions, isSearchingTags]);
+
+
 
   const handleFilterTagSuggestions = useCallback((suggestions: string[]) => {
     if (!Array.isArray(suggestions) || suggestions.length === 0) {
@@ -782,6 +844,80 @@ const CreateDesignInner: React.FC = () => {
     setCoverIndex(index);
     toast.success("Cover image updated");
   };
+
+  /**
+   * Reordering IS slot assignment — the media store derives view slots from
+   * position, so dropping an image at position 1 makes it the Front. This is
+   * how an owner reclaims a required slot after deleting the image that held
+   * it; before reorder existed there was no way to do that at all.
+   *
+   * Cover and selection follow the items they pointed at rather than staying
+   * pinned to a position, so a drag never silently re-points either of them.
+   */
+  const handleReorderMedia = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      const current = mediaStore.items;
+      if (fromIndex < 0 || fromIndex >= current.length) return;
+      const bounded = Math.min(Math.max(toIndex, 0), current.length - 1);
+      if (bounded === fromIndex) return;
+
+      const next = [...current];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(bounded, 0, moved);
+      mediaStore.reorder(next);
+
+      const followIndex = (index: number) => {
+        if (index === fromIndex) return bounded;
+        if (fromIndex < bounded && index > fromIndex && index <= bounded) return index - 1;
+        if (fromIndex > bounded && index >= bounded && index < fromIndex) return index + 1;
+        return index;
+      };
+      setSelectedIndex(followIndex);
+      setCoverIndex(followIndex);
+    },
+    [mediaStore],
+  );
+
+  /**
+   * Dragging one tile onto another moves it there and lets everything below
+   * shift up — a move, not a swap, because slots follow position here.
+   *
+   * Resolution goes through the SAME map the grid rendered, by item id.
+   * It used to translate a slot into an array index with
+   * `renderableMediaSlots().indexOf(slot)` — the slot's ordinal in the canonical
+   * slot list. That is only equal to the array index while slots are strictly
+   * positional, which is true for a fresh create but NOT in edit mode: the store
+   * hydrates server media with `set`, which deliberately preserves whatever
+   * slots the server stored. A design whose media sat in FRONT / LEFT /
+   * DETAIL_1 therefore had ordinals 0 / 2 / 4 against array indices 0 / 1 / 2,
+   * so dragging the second tile moved the third item — and `handleReorderMedia`
+   * clamped any ordinal past the end instead of rejecting it. The visible result
+   * was an image appearing to land in the new slot while still occupying the old
+   * one, and whatever had been in the target vanishing.
+   */
+  const handleSlotDrop = useCallback(
+    (fromSlot: string, toSlot: string) => {
+      if (fromSlot === toSlot) return;
+      const sourceItem = designSlotMedia.get(fromSlot as MediaViewSlot);
+      if (!sourceItem) return;
+
+      const current = mediaStore.items;
+      const fromIndex = current.findIndex((item) => item.id === sourceItem.id);
+      if (fromIndex < 0) return;
+
+      const targetItem = designSlotMedia.get(toSlot as MediaViewSlot);
+      // Dropping onto an occupied tile lands on that item's position. Dropping
+      // onto an empty tile means "send it to the end", because an empty slot has
+      // no position of its own in a positional list.
+      const toIndex = targetItem
+        ? current.findIndex((item) => item.id === targetItem.id)
+        : current.length - 1;
+      if (toIndex < 0) return;
+
+      handleReorderMedia(fromIndex, toIndex);
+    },
+    [designSlotMedia, handleReorderMedia, mediaStore.items],
+  );
 
   const goToMediaIndex = useCallback(
     (nextIndex: number) => {
@@ -863,6 +999,35 @@ const CreateDesignInner: React.FC = () => {
     setSelectedTags(selectedTags.filter((t) => t !== tag));
   };
 
+  const handleToggleTagFromPicker = (tag: string) => {
+    const cleaned = tag.replace(/#/g, "").trim();
+    if (!cleaned) return;
+    const existing = selectedTags.find(
+      (t) => t.toLowerCase() === cleaned.toLowerCase(),
+    );
+    if (existing) {
+      removeTag(existing);
+      return;
+    }
+    addTag(cleaned);
+  };
+
+  // Warn before tab close/refresh when a NEW design has unsaved content —
+  // protects long forms (incl. custom-order settings that attach on save).
+  // Edit mode is excluded: the design already exists and re-prompting on
+  // every close would be noise.
+  useEffect(() => {
+    const hasUnsavedNewContent =
+      !isEditMode && !lastSaved && (title.trim().length > 0 || files.length > 0);
+    if (!hasUnsavedNewContent) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [files.length, isEditMode, lastSaved, title]);
+
   const handleCategoryChange = (value: string) => {
     setCategoryId(value);
     const nextCategory = filteredCategories.find((category) => category.id === value);
@@ -891,11 +1056,43 @@ const CreateDesignInner: React.FC = () => {
   };
 
   const handleSaveDraft = async () => {
-    if (!hasDraftContent) {
-      toast.error('Add at least one detail to save a draft');
+    addClientDiagnostic('info', 'create-design', 'Save draft clicked', {
+      isEditMode,
+      fileCount: files.length,
+      titleLength: title.trim().length,
+      userId: user?.id,
+    });
+    // Draft rule: a title is the ONLY requirement. Custom-order / measurement
+    // details are never enforced for drafts — they are completed later, before
+    // publishing. So a draft saves even with Custom Order toggled and no points.
+    if (title.trim().length === 0) {
+      toast.error('Add a title to save your draft');
+      addClientDiagnostic('warn', 'create-design', 'Save draft blocked by missing title', {
+        fileCount: files.length,
+      });
       return;
     }
     await executeSaveDraft();
+  };
+
+  const handleWithdrawFromReview = async () => {
+    if (!isEditMode || !id || !isInReview || withdrawingFromReview) return;
+    setWithdrawingFromReview(true);
+    try {
+      await DesignApi.withdrawDesignFromReview(id);
+      setPublicationStatus('DRAFT');
+      setEditingDraft(true);
+      toast.success('Design moved back to drafts.');
+      refreshCatalogAfterMutation();
+      navigate('/profile?tab=Content&visibility=Drafts', { replace: true });
+    } catch (error) {
+      const message =
+        (error as { response?: { data?: { message?: string | string[] } } })?.response?.data
+          ?.message ?? 'Could not call design back from review.';
+      toast.error(Array.isArray(message) ? message[0] : String(message));
+    } finally {
+      setWithdrawingFromReview(false);
+    }
   };
 
   const executeSaveDraft = async () => {
@@ -906,14 +1103,13 @@ const CreateDesignInner: React.FC = () => {
     setIsSubmitting(true);
     try {
       if (isEditMode && id && isMadeToOrder) {
-        const saved = await customOrderEditorRef.current?.saveConfiguration({
+        // Best-effort: persist the custom-order config if it is complete, but
+        // never block a draft when it is not (e.g. measurement points
+        // unavailable). Publish still enforces a valid config.
+        await customOrderEditorRef.current?.saveConfiguration({
           silentSuccess: true,
+          silent: true,
         });
-        if (!saved) {
-          setIsSubmitting(false);
-          setSubmitIntent(null);
-          return;
-        }
       }
 
       const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
@@ -946,13 +1142,14 @@ const CreateDesignInner: React.FC = () => {
         } as any);
         setLastSaved(new Date());
         toast.success("Draft saved");
+        refreshCatalogAfterMutation();
         navigate("/profile?tab=Content&visibility=Drafts", { replace: true });
         return;
       }
 
       const pendingCustomOrderDraft =
         isMadeToOrder
-          ? customOrderEditorRef.current?.buildConfigurationDraft() ?? null
+          ? customOrderEditorRef.current?.buildConfigurationDraft({ silent: true }) ?? null
           : null;
       const filesSnapshot = [...files];
       const coverIndexSnapshot = coverIndex;
@@ -964,24 +1161,17 @@ const CreateDesignInner: React.FC = () => {
         message: 'Saving draft...',
       });
 
-      await (async () => {
+      const runDraftSaveTask = async () => {
         let savedDesignId: string | undefined;
         try {
-          const previewDataUrl = await buildCoverPreviewDataUrl(
-            filesSnapshot,
-            coverIndexSnapshot,
+          updatePublishTask(
+            draftTask.id,
+            {
+              progress: 5,
+              message: 'Preparing draft media...',
+            },
+            publishTaskScope,
           );
-          if (previewDataUrl) {
-            updatePublishTask(
-              draftTask.id,
-              {
-                coverPreviewUrl: previewDataUrl,
-                progress: 5,
-                message: 'Preparing draft media...',
-              },
-              publishTaskScope,
-            );
-          }
 
           const response = await uploadDesign(
             filesSnapshot,
@@ -1022,17 +1212,23 @@ const CreateDesignInner: React.FC = () => {
 
           savedDesignId = extractDesignId(response);
           if (pendingCustomOrderDraft && savedDesignId) {
-            await customOrderConfigurationsApi.create({
-              ...pendingCustomOrderDraft,
-              fabricRuleBasisId: String(pendingCustomOrderDraft.fabricRuleBasisId ?? '').trim() || (
-                await customOrderConfigurationsApi.createFabricRuleBasis({
-                  label: `${draftTitle} fabric rules`,
-                  measurementKeys: pendingCustomOrderDraft.requiredMeasurementKeys,
-                  gender: measurementGender,
-                })
-              ).id,
-              sourceId: savedDesignId,
-            });
+            // Non-fatal for drafts: if the custom-order config can't be saved yet,
+            // the draft still succeeds and the config is completed before publish.
+            try {
+              await customOrderConfigurationsApi.create({
+                ...pendingCustomOrderDraft,
+                fabricRuleBasisId: String(pendingCustomOrderDraft.fabricRuleBasisId ?? '').trim() || (
+                  await customOrderConfigurationsApi.createFabricRuleBasis({
+                    label: `${draftTitle} fabric rules`,
+                    measurementKeys: pendingCustomOrderDraft.requiredMeasurementKeys,
+                    gender: measurementGender,
+                  })
+                ).id,
+                sourceId: savedDesignId,
+              });
+            } catch {
+              /* Draft saved; custom-order config can be completed before publishing. */
+            }
           }
 
           updatePublishTask(
@@ -1049,40 +1245,107 @@ const CreateDesignInner: React.FC = () => {
           );
 
           toast.success("Draft saved");
-          navigate("/profile?tab=Content&visibility=Drafts", {
-            replace: true,
-            state: {
-              publishingTaskId: draftTask.id,
-              publishingTitle: draftTitle,
-              publishingStartedAt: draftTask.startedAt,
-              publishingVisibility: 'PRIVATE',
-              publishingKind: 'draft',
-            },
-          });
           window.setTimeout(() => removePublishTask(draftTask.id, publishTaskScope), 60_000);
         } catch (error) {
           const errMsg =
             (error as any)?.response?.data?.message ||
             (error instanceof Error ? error.message : 'Failed to save draft');
+          const failedDesignId =
+            savedDesignId ||
+            (typeof (error as any)?.designId === 'string'
+              ? ((error as any).designId as string)
+              : undefined);
+          const failedStage =
+            typeof (error as any)?.stage === 'string'
+              ? ((error as any).stage as string)
+              : undefined;
+
+          // Media uploaded 100% and only the finalize response was lost
+          // (mobile timeout): if the draft exists server-side, it IS saved —
+          // reporting failure here is what created failed+saved ghost pairs.
+          if (failedDesignId && failedStage === 'finalize') {
+            try {
+              await DesignApi.getDesignDetail(failedDesignId, { forceRefresh: true });
+              updatePublishTask(
+                draftTask.id,
+                {
+                  status: 'saved',
+                  progress: 100,
+                  designId: failedDesignId,
+                  legacyCollectionId: failedDesignId,
+                  collectionId: failedDesignId,
+                  message: 'Draft saved',
+                },
+                publishTaskScope,
+              );
+              addClientDiagnostic('warn', 'create-design', 'Draft finalize response lost but draft exists; marked saved', {
+                taskId: draftTask.id,
+                designId: failedDesignId,
+                error: String(errMsg),
+              });
+              toast.success('Draft saved');
+              window.setTimeout(() => removePublishTask(draftTask.id, publishTaskScope), 60_000);
+              return;
+            } catch {
+              /* Design not reachable — fall through to genuine failure. */
+            }
+          }
+
           updatePublishTask(
             draftTask.id,
             {
               status: 'failed',
               progress: 100,
-              designId: savedDesignId,
-              legacyCollectionId: savedDesignId,
-              collectionId: savedDesignId,
+              designId: failedDesignId,
+              legacyCollectionId: failedDesignId,
+              collectionId: failedDesignId,
               message: 'Draft save failed',
               error: String(errMsg),
             },
             publishTaskScope,
           );
-          toast.error("Failed to save draft");
+          addClientDiagnostic('error', 'create-design', 'Save draft failed', {
+            taskId: draftTask.id,
+            savedDesignId: failedDesignId,
+            stage: failedStage,
+            error: String(errMsg),
+          });
+          toast.error(`Failed to save draft: ${String(errMsg)}`);
         }
-      })();
+      };
+
+      updatePublishTask(
+        draftTask.id,
+        {
+          progress: 1,
+          message: 'Draft queued...',
+        },
+        publishTaskScope,
+      );
+      toast.info('Draft is saving in the background');
+      navigate("/profile?tab=Content&visibility=Drafts", {
+        replace: true,
+        state: {
+          publishingTaskId: draftTask.id,
+          publishingTitle: draftTitle,
+          publishingStartedAt: draftTask.startedAt,
+          publishingVisibility: 'PRIVATE',
+          publishingKind: 'draft',
+        },
+      });
+      window.setTimeout(() => {
+        void runDraftSaveTask();
+      }, 0);
+      return;
     } catch (error) {
       console.error(error);
-      toast.error("Failed to save draft");
+      const errMsg =
+        (error as any)?.response?.data?.message ||
+        (error instanceof Error ? error.message : 'Failed to save draft');
+      addClientDiagnostic('error', 'create-design', 'Save draft failed before upload task', {
+        error: String(errMsg),
+      });
+      toast.error(`Failed to save draft: ${String(errMsg)}`);
       setIsSubmitting(false);
       setSubmitIntent(null);
     } finally {
@@ -1109,7 +1372,16 @@ const CreateDesignInner: React.FC = () => {
       if (getSelectedFilterValueIds().length === 0)
         reasons.push("Add at least one style detail.");
       if (selectedTags.length === 0) reasons.push("Add at least one hashtag.");
-      toast.error(reasons[0] ?? "Complete the required details before going live.");
+      toast.error(
+        reasons.length > 1
+          ? `${reasons[0]} (${reasons.length - 1} more to fix)`
+          : reasons[0] ?? "Complete the required details before going live.",
+      );
+      addClientDiagnostic('warn', 'create-design', 'Publish blocked by validation', {
+        isEditMode,
+        publicationStatus,
+        reasons,
+      });
       return;
     }
 
@@ -1117,6 +1389,17 @@ const CreateDesignInner: React.FC = () => {
       const pendingCustomOrderDraft =
         customOrderEditorRef.current?.buildConfigurationDraft() ?? null;
       if (!pendingCustomOrderDraft) {
+        // This used to `return` in silence, which is how the primary action
+        // came to look broken: an owner answering a change request pressed it
+        // and nothing happened at all — no toast, no modal, no error.
+        // A blocked submit must always say what is blocking it.
+        toast.error(
+          'Finish the custom-order setup (measurements and pricing) before submitting.',
+        );
+        addClientDiagnostic('warn', 'create-design', 'Publish blocked by incomplete custom order', {
+          isEditMode,
+          publicationStatus,
+        });
         return;
       }
     }
@@ -1128,6 +1411,7 @@ const CreateDesignInner: React.FC = () => {
     if (isSubmitting) return;
     setSubmitIntent("publish");
     setIsSubmitting(true);
+
     try {
       const pendingCustomOrderDraft =
         !isEditMode && isMadeToOrder
@@ -1135,10 +1419,58 @@ const CreateDesignInner: React.FC = () => {
           : null;
 
       if (!isEditMode && isMadeToOrder && !pendingCustomOrderDraft) {
+        setIsSubmitting(false);
+        setSubmitIntent(null);
         return;
       }
 
-      if (isEditMode && id && isMadeToOrder) {
+      // Snapshot File blobs BEFORE unmount. Module-level job owns them so the
+      // upload survives CreateDesign teardown (mobile SPA navigate).
+      const jobFiles = files
+        .map((item) => {
+          const file = item.file instanceof File ? item.file : null;
+          if (!file) return null;
+          return { file, viewSlot: item.viewSlot ?? null };
+        })
+        .filter((entry): entry is { file: File; viewSlot: string | null } => Boolean(entry));
+
+      if (!isEditMode && jobFiles.length === 0) {
+        toast.error('Add media before going live.');
+        setIsSubmitting(false);
+        setSubmitIntent(null);
+        return;
+      }
+
+      const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
+      const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
+      const finalTags = selectedTags.slice(0, 10);
+      const filterValueIdsSnapshot = getSelectedFilterValueIds();
+      const coverIndexSnapshot = coverIndex;
+      const titleSnapshot = title;
+      const descriptionSnapshot = description;
+      const visibilitySnapshot = visibility;
+      const typeSnapshot = type;
+      const categoryIdSnapshot = categoryId;
+      const categoryTypeIdSnapshot = categoryTypeId;
+      const sizingModeSnapshot = sizingMode;
+      const customMeasurementKeysSnapshot = normalizedCustomMeasurementKeys;
+      const isMadeToOrderSnapshot = isMadeToOrder;
+      const fitPreferenceSnapshot = fitPreference;
+      const targetAgeGroupSnapshot = targetAgeGroup;
+      const measurementGenderSnapshot = measurementGender;
+      const designIdSnapshot = id;
+      const coverPreviewUrl: string | undefined = (() => {
+        const coverItem = files[coverIndexSnapshot];
+        if (coverItem?.previewUrl) return coverItem.previewUrl;
+        return undefined;
+      })();
+
+      // Go-live always lands on In Review — content integrity review is the
+      // server outcome for new publishes. Never send users to Public mid-upload.
+      const inReviewCatalogUrl = '/profile?tab=content&contentStatus=in-review';
+
+      // Edit + made-to-order: persist config before leave (needs editor mounted).
+      if (isEditMode && designIdSnapshot && isMadeToOrderSnapshot) {
         const saved = await customOrderEditorRef.current?.saveConfiguration({
           silentSuccess: true,
         });
@@ -1149,333 +1481,172 @@ const CreateDesignInner: React.FC = () => {
         }
       }
 
-      const parsedMinPrice = minPrice ? parseFloat(minPrice) : undefined;
-      const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : undefined;
-      const finalTags = selectedTags.slice(0, 10);
-      await DesignApi.acknowledgeContentPolicy();
+      const designMetadata = {
+        title: titleSnapshot,
+        description: descriptionSnapshot,
+        visibility: visibilitySnapshot,
+        type: typeSnapshot,
+        categoryId: categoryIdSnapshot,
+        subCategoryId: categoryTypeIdSnapshot,
+        categoryTypeId: categoryTypeIdSnapshot,
+        tags: finalTags,
+        filterValueIds: filterValueIdsSnapshot,
+        sizingMode: sizingModeSnapshot,
+        rtwSizeSystem: undefined as string | undefined,
+        customMeasurementKeys: customMeasurementKeysSnapshot,
+        customOrderEnabled: isMadeToOrderSnapshot,
+        fitPreference: fitPreferenceSnapshot,
+        targetAgeGroup: targetAgeGroupSnapshot,
+      };
 
-      if (isEditMode && id) {
-        // Build a preview URL from the existing cover
-        const editPreviewUrl: string | undefined = (() => {
-          const coverItem = files[coverIndex];
-          if (coverItem?.previewUrl) return coverItem.previewUrl;
-          return undefined;
-        })();
+      const task = createPublishTask({
+        ownerId: user?.id,
+        title: titleSnapshot,
+        visibility: visibilitySnapshot,
+        coverPreviewUrl,
+        designId: isEditMode ? designIdSnapshot : undefined,
+        legacyCollectionId: isEditMode ? designIdSnapshot : undefined,
+        collectionId: isEditMode ? designIdSnapshot : undefined,
+        message: 'Uploading…',
+      });
 
-        const task = createPublishTask({
+      updatePublishTask(
+        task.id,
+        {
+          progress: 3,
+          message: 'Uploading…',
+        },
+        publishTaskScope,
+      );
+
+      try {
+        await saveDesignPublishRecovery({
+          taskId: task.id,
           ownerId: user?.id,
-          title,
-          visibility,
-          coverPreviewUrl: editPreviewUrl,
-          designId: id,
-          legacyCollectionId: id,
-          collectionId: id,
-          message: 'Updating design...',
+          title: titleSnapshot,
+          description: descriptionSnapshot,
+          minPrice: parsedMinPrice,
+          maxPrice: parsedMaxPrice,
+          tags: finalTags,
+          files: jobFiles,
+          coverIndex: coverIndexSnapshot,
+          designMetadata,
+          existingDesignId: isEditMode ? designIdSnapshot : undefined,
+          pendingCustomOrderDraft: pendingCustomOrderDraft as Record<string, unknown> | null,
+          measurementGender: measurementGenderSnapshot,
+          kind: 'publish',
         });
-
-        setShowPublishModal(false);
-
-        await (async () => {
-          try {
-            updatePublishTask(task.id, { progress: 10, message: 'Updating metadata...' }, publishTaskScope);
-
-            await DesignApi.updateDesign(id, {
-              title,
-              description,
-              minPrice: parsedMinPrice,
-              maxPrice: parsedMaxPrice,
-              tags: finalTags,
-              categoryId,
-              subCategoryId: categoryTypeId,
-              categoryTypeId,
-              type,
-              visibility,
-              coverMediaId: files[coverIndex]?.remoteId || undefined,
-              filterValueIds: getSelectedFilterValueIds(),
-              sizingMode,
-              rtwSizeSystem: null,
-              customMeasurementKeys: normalizedCustomMeasurementKeys,
-              customOrderEnabled: isMadeToOrder,
-              fitPreference,
-              targetAgeGroup,
-            } as any);
-
-            updatePublishTask(task.id, { progress: 40, message: 'Cleaning up items...' }, publishTaskScope);
-
-            const currentIds = new Set(files.map((f) => f.id));
-            const toDelete = Array.from(originalItemIds.current).filter(
-              (oid) => !currentIds.has(oid),
-            );
-            if (toDelete.length > 0) {
-              await Promise.all(
-                toDelete.map((itemId) => DesignApi.deleteDesignMedia(id, itemId)),
-              );
-            }
-
-            updatePublishTask(task.id, { status: 'finalizing', progress: 70, message: 'Finalizing...' }, publishTaskScope);
-
-            const finalizeResult = await finalizeDesignUploads(
-              id,
-              [],
-              true,
-              {
-                action: "publish",
-                coverIndex,
-                designMetadata: {
-                  title,
-                  description,
-                  visibility,
-                  type,
-                  categoryId,
-                  subCategoryId: categoryTypeId,
-                  categoryTypeId,
-                  tags: finalTags,
-                  filterValueIds: getSelectedFilterValueIds(),
-                  sizingMode,
-                  rtwSizeSystem: undefined,
-                  customMeasurementKeys: normalizedCustomMeasurementKeys,
-                  customOrderEnabled: isMadeToOrder,
-                  fitPreference,
-                  targetAgeGroup,
-                },
-              },
-            );
-
-            updatePublishTask(task.id, {
-              status: 'published',
-              progress: 100,
-              designId: id,
-              legacyCollectionId: id,
-              collectionId: id,
-              coverPreviewUrl: undefined,
-              message: getProfileRouteForPublication(finalizeResult, visibility).taskMessage,
-            }, publishTaskScope);
-            const profileRoute = getProfileRouteForPublication(finalizeResult, visibility);
-            toast.success(profileRoute.toastMessage);
-            navigate(profileRoute.url, {
-              replace: true,
-              state: {
-                publishingTaskId: task.id,
-                publishingTitle: title,
-                publishingStartedAt: task.startedAt,
-                publishingVisibility: visibility,
-                publishingReviewStatus: profileRoute.reviewStatus,
-              },
-            });
-            window.setTimeout(() => removePublishTask(task.id, publishTaskScope), 30_000);
-          } catch (backgroundError) {
-            const rawErrMsg =
-              (backgroundError as any)?.response?.data?.message ||
-              (backgroundError instanceof Error ? backgroundError.message : 'Failed to go live with design');
-            const errMsg = mapCreatorMetadataError(rawErrMsg, 'Failed to go live with design');
-            updatePublishTask(task.id, {
-              status: 'failed',
-              progress: 100,
-              message: 'Go live failed',
-              error: errMsg,
-            }, publishTaskScope);
-            toast.error(errMsg);
-          }
-        })();
-        return;
-      } else {
-        const buildCoverPreviewDataUrl = async (): Promise<string | undefined> => {
-          const coverItem = files[coverIndex];
-          if (!coverItem || coverItem.kind !== 'image' || !coverItem.file) {
-            return undefined;
-          }
-          const file = coverItem.file;
-          if (file.size > 4 * 1024 * 1024) {
-            return undefined;
-          }
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : undefined);
-            reader.onerror = () => resolve(undefined);
-            reader.readAsDataURL(file);
-          });
-        };
-
-        const previewDataUrl = await buildCoverPreviewDataUrl();
-        const task = createPublishTask({
-          ownerId: user?.id,
-          title,
-          visibility,
-          coverPreviewUrl: previewDataUrl,
-          message: 'Preparing draft upload...',
+      } catch (recoveryError) {
+        addClientDiagnostic('warn', 'create-design', 'Publish recovery snapshot could not be saved', {
+          taskId: task.id,
+          error: recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
         });
-
-        setShowPublishModal(false);
-
-        await (async () => {
-          let uploadedDesignId: string | undefined;
-          try {
-            const response = await uploadDesign(
-              files,
-              title,
-              description,
-              parsedMinPrice,
-              parsedMaxPrice,
-              false,
-              finalTags,
-              {
-                categoryId,
-                subCategoryId: categoryTypeId,
-                categoryTypeId,
-                type,
-                visibility,
-                filterValueIds: getSelectedFilterValueIds(),
-                coverIndex,
-                sizingMode,
-                rtwSizeSystem: undefined,
-                customMeasurementKeys: normalizedCustomMeasurementKeys,
-                customOrderEnabled: isMadeToOrder,
-                fitPreference,
-                targetAgeGroup,
-              },
-              (value: number) => {
-                const mappedProgress = Math.max(5, Math.min(90, Math.round(value * 0.9)));
-                updatePublishTask(task.id, {
-                  status: value >= 100 ? 'finalizing' : 'uploading',
-                  progress: mappedProgress,
-                  message: value >= 100 ? 'Draft uploaded. Preparing go-live...' : 'Uploading media...',
-                }, publishTaskScope);
-              },
-              false,
-            );
-
-            uploadedDesignId = extractDesignId(response);
-            if (!uploadedDesignId) {
-              throw new Error('Upload completed but no design id was returned. Please retry go-live.');
-            }
-
-            if (pendingCustomOrderDraft) {
-              updatePublishTask(task.id, {
-                status: 'finalizing',
-                progress: 94,
-                designId: uploadedDesignId,
-                legacyCollectionId: uploadedDesignId,
-                collectionId: uploadedDesignId,
-                message: 'Saving custom-order setup...',
-              }, publishTaskScope);
-              await customOrderConfigurationsApi.create({
-                ...pendingCustomOrderDraft,
-                fabricRuleBasisId: String(pendingCustomOrderDraft.fabricRuleBasisId ?? '').trim() || (
-                  await customOrderConfigurationsApi.createFabricRuleBasis({
-                    label: `${title.trim() || 'Custom order'} fabric rules`,
-                    measurementKeys: pendingCustomOrderDraft.requiredMeasurementKeys,
-                    gender: measurementGender,
-                  })
-                ).id,
-                sourceId: uploadedDesignId,
-              });
-            }
-
-            updatePublishTask(task.id, {
-              status: 'finalizing',
-              progress: 97,
-              designId: uploadedDesignId,
-              legacyCollectionId: uploadedDesignId,
-              collectionId: uploadedDesignId,
-              message: 'Taking design live...',
-            }, publishTaskScope);
-
-            const finalizeResult = await finalizeDesignUploads(
-              uploadedDesignId,
-              [],
-              true,
-              {
-                action: 'publish',
-                coverIndex,
-                designMetadata: {
-                  title,
-                  description,
-                  visibility,
-                  type,
-                  categoryId,
-                  subCategoryId: categoryTypeId,
-                  categoryTypeId,
-                  tags: finalTags,
-                  filterValueIds: getSelectedFilterValueIds(),
-                  sizingMode,
-                  rtwSizeSystem: undefined,
-                  customMeasurementKeys: normalizedCustomMeasurementKeys,
-                  customOrderEnabled: isMadeToOrder,
-                  fitPreference,
-                  targetAgeGroup,
-                },
-              },
-            );
-
-            updatePublishTask(task.id, {
-              status: 'published',
-              progress: 100,
-              designId: uploadedDesignId,
-              legacyCollectionId: uploadedDesignId,
-              collectionId: uploadedDesignId,
-              coverPreviewUrl: undefined,
-              message: getProfileRouteForPublication(finalizeResult, visibility).taskMessage,
-            }, publishTaskScope);
-
-            const profileRoute = getProfileRouteForPublication(finalizeResult, visibility);
-            toast.success(profileRoute.toastMessage);
-            navigate(profileRoute.url, {
-              replace: true,
-              state: {
-                publishingTaskId: task.id,
-                publishingTitle: title,
-                publishingStartedAt: task.startedAt,
-                publishingVisibility: visibility,
-                publishingReviewStatus: profileRoute.reviewStatus,
-              },
-            });
-            window.setTimeout(() => removePublishTask(task.id, publishTaskScope), 30_000);
-          } catch (backgroundError) {
-            const rawErrMsg =
-              (backgroundError as any)?.response?.data?.message ||
-              (backgroundError instanceof Error ? backgroundError.message : 'Failed to go live with design');
-            const errMsg = mapCreatorMetadataError(rawErrMsg, 'Failed to go live with design');
-            updatePublishTask(task.id, {
-              status: 'failed',
-              progress: 100,
-              designId: uploadedDesignId,
-              legacyCollectionId: uploadedDesignId,
-              collectionId: uploadedDesignId,
-              message: uploadedDesignId
-                ? 'Uploaded with setup issue. Open editor to complete and go live again.'
-                : 'Go live failed',
-              error: errMsg,
-            }, publishTaskScope);
-            toast.error(
-              uploadedDesignId
-                ? `${errMsg}. Your media was uploaded; open the design editor to finish setup.`
-                : errMsg,
-            );
-          }
-        })();
-
-        return;
       }
+
+      setShowPublishModal(false);
+      // Modal scroll-lock / focus traps can freeze the island nav if left behind
+      // after SPA navigation — hard unlock immediately.
+      unlockDocumentScroll();
+      toast.info('Submitting for review…');
+      navigate(inReviewCatalogUrl, {
+        replace: true,
+        state: {
+          publishingTaskId: task.id,
+          publishingTitle: titleSnapshot,
+          publishingStartedAt: task.startedAt,
+          publishingVisibility: visibilitySnapshot,
+          publishingKind: 'publish',
+          publishingReviewStatus: 'IN_REVIEW',
+        },
+      });
+      // Second unlock after paint in case modal exit animation re-locks.
+      window.setTimeout(() => unlockDocumentScroll(), 0);
+      window.setTimeout(() => unlockDocumentScroll(), 320);
+
+      // Fire-and-forget module job — does not depend on CreateDesign mount.
+      void runDesignPublishJob({
+        taskId: task.id,
+        ownerId: user?.id,
+        title: titleSnapshot,
+        description: descriptionSnapshot,
+        minPrice: parsedMinPrice,
+        maxPrice: parsedMaxPrice,
+        tags: finalTags,
+        files: jobFiles,
+        coverIndex: coverIndexSnapshot,
+        designMetadata,
+        existingDesignId: isEditMode ? designIdSnapshot : undefined,
+        pendingCustomOrderDraft: pendingCustomOrderDraft as Record<string, unknown> | null,
+        measurementGender: measurementGenderSnapshot,
+        publishTaskScope,
+        onComplete: ({ payload }) => {
+          const profileRoute = getProfileRouteForPublication(
+            payload,
+            visibilitySnapshot,
+          );
+          toast.success(profileRoute.toastMessage || 'Design submitted for review.');
+          // Stay on In Review; only re-route if status is a different review bucket.
+          if (
+            profileRoute.reviewStatus &&
+            profileRoute.reviewStatus !== 'IN_REVIEW' &&
+            profileRoute.url !== inReviewCatalogUrl
+          ) {
+            navigate(profileRoute.url, {
+              replace: true,
+              state: {
+                publishingTaskId: task.id,
+                publishingTitle: titleSnapshot,
+                publishingStartedAt: task.startedAt,
+                publishingVisibility: visibilitySnapshot,
+                publishingReviewStatus: profileRoute.reviewStatus,
+              },
+            });
+          }
+          refreshCatalogAfterMutation();
+        },
+        onError: (error, failedDesignId) => {
+          // A fresh go-live that reached the server (a draft was created) now
+          // surfaces as a durable, clickable notification that routes to the
+          // draft — no fast, unreadable error toast. Only when nothing reached
+          // the server (no draft, so no notification is possible) do we fall
+          // back to an inline error the user can actually act on.
+          if (failedDesignId && !isEditMode) {
+            return;
+          }
+          const errMsg = mapCreatorMetadataError(
+            error.message,
+            'Failed to go live with design',
+          );
+          toast.error(
+            failedDesignId
+              ? `${errMsg}. Open the design editor to finish.`
+              : errMsg,
+          );
+        },
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.toLowerCase().includes("cancelled")) {
-        toast.info("Go-live cancelled");
+      if (message.toLowerCase().includes('cancelled')) {
+        toast.info('Go-live cancelled');
         setShowPublishModal(false);
+        unlockDocumentScroll();
         return;
       }
       console.error(error);
       const errMsg = (error as any)?.response?.data?.message;
       toast.error(
-        typeof errMsg === "string" || Array.isArray(errMsg)
-          ? mapCreatorMetadataError(errMsg, "Failed to go live with design")
+        typeof errMsg === 'string' || Array.isArray(errMsg)
+          ? mapCreatorMetadataError(errMsg, 'Failed to go live with design')
           : isEditMode
-            ? "Failed to update design"
-            : "Failed to go live with design",
+            ? 'Failed to update design'
+            : 'Failed to go live with design',
       );
-      throw error; // Re-throw so modal can handle state
+      unlockDocumentScroll();
+      throw error;
     } finally {
       setIsSubmitting(false);
       setSubmitIntent(null);
+      unlockDocumentScroll();
     }
   };
 
@@ -1560,9 +1731,9 @@ const CreateDesignInner: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-transparent text-[var(--text-primary)] transition-colors duration-300">
+    <div className="min-h-screen overflow-x-clip bg-transparent text-[var(--text-primary)] transition-colors duration-300">
       {/* Main Content */}
-      <main className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-24 sm:pb-32">
+      <main className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-24 sm:pb-32">
         <div className="mb-4 flex items-center justify-between sm:mb-6">
           <button
             type="button"
@@ -1592,7 +1763,7 @@ const CreateDesignInner: React.FC = () => {
               className="mb-6 p-4 rounded-2xl glass-panel-dark border border-purple-500/30"
             >
               <div className="flex items-center gap-3 mb-2">
-                <VLoader size={32} phase="loading" showLabel={false} />
+                <MuseLoader size={32} />
                 <span className="text-theme font-medium">
                   Uploading files... {progress}%
                 </span>
@@ -1617,35 +1788,46 @@ const CreateDesignInner: React.FC = () => {
           )}
         </AnimatePresence>
 
+        {isEditMode && id ? <ReviewFeedbackBanner designId={id} /> : null}
+
         <div className="mb-8 grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(360px,0.82fr)]">
           {/* Media Section */}
           <section id="design-media-section" className="min-w-0">
+            {/*
+              One hidden input for BOTH states. It used to live inside the
+              "has media" branch, because the empty state was a drop zone that
+              carried its own; with the grid on both sides, keeping it there
+              would leave the first slot tap with nothing to click.
+            */}
+            <input
+              ref={picker.inputRef}
+              type="file"
+              multiple
+              onChange={picker.handlers.onInputChange}
+              className="hidden"
+              accept="image/*,video/*"
+              disabled={disabled}
+            />
             {files.length === 0 ? (
-              <div className="space-y-3">
-                <MediaUploadZone
-                  onFilesUpload={mediaStore.addFiles}
-                  picker={picker}
-                  disabled={disabled}
-                  maxFiles={DESIGN_MAX_MEDIA_COUNT}
-                />
-                <div className="flex flex-wrap justify-center gap-1.5 px-2">
-                  {DESIGN_MEDIA_SLOTS.map((label, index) => (
-                    <span
-                      key={label}
-                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
-                        index < DESIGN_REQUIRED_MEDIA_COUNT
-                          ? 'bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400'
-                          : 'surface-control-muted'
-                      }`}
-                    >
-                      <span className="font-bold">{index + 1}.</span> {label}{index < DESIGN_REQUIRED_MEDIA_COUNT && ' *'}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-center text-[10px] text-theme-secondary mt-1">
-                  * Required to go live - fill Front, Back, Left, and Right
-                </p>
-              </div>
+              /*
+               * The slot grid IS the empty state now. It used to be a drop zone
+               * with a paragraph of instructions, a legend of numbered slot
+               * names, and a footnote about what is required — three pieces of
+               * copy describing a shape the grid simply shows. Product creation
+               * has always done it this way; there was no reason for design
+               * creation to teach a second mental model.
+               */
+              <MediaSlotGrid
+                mediaBySlot={designSlotMedia}
+                maxSlots={DESIGN_MAX_MEDIA_COUNT}
+                missingRequiredSlots={missingRequiredMediaSlots}
+                disabled={disabled}
+                onPickForSlot={openPickerForSlot}
+                enabledEmptySlots={nextFillableDesignSlots}
+                onDropFiles={(_slot, dropped) =>
+                  mediaStore.addFiles(dropped, DESIGN_MAX_MEDIA_COUNT)
+                }
+              />
             ) : (
               <div className="space-y-4 h-full min-w-0">
                 {/* Main Preview - NO background; media defines layout */}
@@ -1671,18 +1853,27 @@ const CreateDesignInner: React.FC = () => {
                           exit={{ opacity: 0 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <MediaRenderer
-                            kind={
-                              selectedFile.kind === "video" ? "video" : "image"
-                            }
-                            src={selectedFile.url}
-                            alt={selectedFile.file?.name || "Preview"}
-                            className="w-full h-full flex items-center justify-center"
-                            mediaClassName="h-full w-full object-contain"
-                            maxHeightClassName="max-h-[85vh]"
-                            maxWidthClassName="max-w-full"
-                            allowScroll
-                          />
+                          {selectedFile.url ? (
+                            <LocalMediaPreview
+                              kind={
+                                selectedFile.kind === "video" ? "video" : "image"
+                              }
+                              src={selectedFile.url}
+                              file={selectedFile.file}
+                              alt={selectedFile.file?.name || "Preview"}
+                              className="w-full h-full flex items-center justify-center"
+                              mediaClassName="h-full w-full object-contain"
+                              maxHeightClassName="max-h-[85vh]"
+                              maxWidthClassName="max-w-full"
+                              allowScroll
+                              diagnosticScope="create-design-main-preview"
+                            />
+                          ) : (
+                            <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-sm font-medium text-theme-secondary">
+                              <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+                              Optimizing photo for preview...
+                            </div>
+                          )}
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -1709,12 +1900,9 @@ const CreateDesignInner: React.FC = () => {
                           disabled={disabled}
                           active={coverIndex === selectedIndex}
                         />
-                        <ActionButton
-                          icon={<FiMove className="w-4 h-4" />}
-                          label="Reorder"
-                          onClick={() => {}}
-                          disabled
-                        />
+                        {/* The "Reorder" button here was permanently disabled
+                            and did nothing; reordering is a long press on a
+                            tile in the grid below. */}
                         <ActionButton
                           icon={<FiMaximize2 className="w-4 h-4" />}
                           label="Fullscreen"
@@ -1725,30 +1913,33 @@ const CreateDesignInner: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Thumbnail Strip */}
-                <ThumbnailStrip
-                  items={files}
-                  selectedIndex={selectedIndex}
-                  coverIndex={coverIndex}
-                  onSelect={setSelectedIndex}
-                  onDelete={handleDelete}
-                  onSetCover={handleSetCover}
-                  onAddMore={picker.open}
+                {/*
+                  Same grid as the empty state and as product creation. It
+                  replaces the thumbnail strip, where the slot was implied by
+                  position and only discoverable by dragging a grip.
+                */}
+                <MediaSlotGrid
+                  mediaBySlot={designSlotMedia}
+                  maxSlots={DESIGN_MAX_MEDIA_COUNT}
+                  missingRequiredSlots={missingRequiredMediaSlots}
+                  selectedId={files[selectedIndex]?.id ?? null}
+                  disabled={disabled}
                   canAddMore={files.length < DESIGN_MAX_MEDIA_COUNT}
-                  disabled={disabled}
-                  progressById={perFileProgress}
-                  showSlotLabels
-                />
-
-                {/* Hidden file input */}
-                <input
-                  ref={picker.inputRef}
-                  type="file"
-                  multiple
-                  onChange={picker.handlers.onInputChange}
-                  className="hidden"
-                  accept="image/*,video/*"
-                  disabled={disabled}
+                  onPickForSlot={openPickerForSlot}
+                  enabledEmptySlots={nextFillableDesignSlots}
+                  onSelect={(item) => {
+                    const index = files.findIndex((file) => file.id === item.id);
+                    if (index !== -1) setSelectedIndex(index);
+                  }}
+                  onDelete={(item) => handleDelete(item.id)}
+                  onSetCover={(item) => {
+                    const index = files.findIndex((file) => file.id === item.id);
+                    if (index !== -1) handleSetCover(index);
+                  }}
+                  onSlotDrop={handleSlotDrop}
+                  onDropFiles={(_slot, dropped) =>
+                    mediaStore.addFiles(dropped, DESIGN_MAX_MEDIA_COUNT)
+                  }
                 />
 
                 {/* Image info */}
@@ -1811,6 +2002,11 @@ const CreateDesignInner: React.FC = () => {
                           {description.length} / 500 characters
                         </p>
                       </div>
+                      {editingDraft && (
+                        <p className="rounded-lg border border-sky-300/60 bg-sky-50/80 px-3 py-2 text-xs font-medium text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
+                          Drafts can be updated up to 2 times every 24 hours.
+                        </p>
+                      )}
                       {titleDescriptionLocked && (
                         <p className="rounded-lg border border-amber-300/60 bg-amber-50/80 px-3 py-2 text-xs font-medium text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
                           Title and description can only be updated once every
@@ -1821,7 +2017,7 @@ const CreateDesignInner: React.FC = () => {
                         </p>
                       )}
 
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
                           <label className="mb-2 flex items-center text-sm font-medium text-theme">
                             Who is it for?
@@ -1842,6 +2038,7 @@ const CreateDesignInner: React.FC = () => {
 
                         <UniversalSelect
                           label="Age group"
+                          required
                           value={targetAgeGroup}
                           onChange={handleAgeGroupChange}
                           options={DESIGN_TARGET_AGE_OPTIONS.map((option) => ({
@@ -1853,9 +2050,10 @@ const CreateDesignInner: React.FC = () => {
                         />
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-3">
                         <UniversalSelect
                           label="What is it?"
+                          required
                           value={categoryId}
                           onChange={handleCategoryChange}
                           options={filteredCategories.map((c) => ({
@@ -1876,6 +2074,7 @@ const CreateDesignInner: React.FC = () => {
 
                         <UniversalSelect
                           label="Garment type"
+                          required
                           value={categoryTypeId}
                           onChange={setCategoryTypeId}
                           options={categoryTypeOptions.map((categoryType) => ({
@@ -1908,6 +2107,17 @@ const CreateDesignInner: React.FC = () => {
                         disabled={disabled}
                         onTagSuggestions={handleFilterTagSuggestions}
                       />
+                      {(() => {
+                        const styleDetailCount = Object.values(filterSelection).flatMap(
+                          (values) => (Array.isArray(values) ? values : values ? [values] : []),
+                        ).length;
+                        return styleDetailCount > 8 ? (
+                          <p className="text-[11px] font-medium text-amber-600 dark:text-amber-300">
+                            ⚠️ {styleDetailCount} style details selected — fewer, precise
+                            details improve discovery and buyer trust.
+                          </p>
+                        ) : null;
+                      })()}
 
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-theme flex items-center">
@@ -1948,7 +2158,7 @@ const CreateDesignInner: React.FC = () => {
                               onKeyDown={handleTagInputKeyDown}
                               placeholder="Search or create a hashtag..."
                               disabled={disabled || selectedTags.length >= 10}
-                              className="threadly-search-input pl-10 pr-12"
+                              className="wiez-search-input pl-10 pr-[5.5rem]"
                             />
                             <button
                               type="button"
@@ -1974,10 +2184,10 @@ const CreateDesignInner: React.FC = () => {
                             </button>
                           </div>
 
-                          {filteredSuggestions.length > 0 && (
+                          {filteredSuggestions.length > 0 ? (
                             <div className="mt-3">
                               <p className="text-xs text-theme-secondary mb-2">
-                                Popular hashtags:
+                                {isSearchingTags ? 'Matching hashtags:' : 'Popular hashtags:'}
                               </p>
                               <div className="flex flex-wrap gap-1.5">
                                 {filteredSuggestions.map((tag) => {
@@ -2001,8 +2211,31 @@ const CreateDesignInner: React.FC = () => {
                                   );
                                 })}
                               </div>
+
                             </div>
-                          )}
+                          ) : isSearchingTags ? (
+                            <p className="mt-3 text-xs text-theme-secondary">
+                              No existing tag matches "{tagSearch.trim()}". Press{' '}
+                              <span className="font-semibold">Add</span> to create it (sent for admin approval).
+                            </p>
+                          ) : null}
+
+                          <button
+                            type="button"
+                            onClick={() => setShowTagPicker(true)}
+                            disabled={disabled}
+                            className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1.5 text-[12px] font-semibold text-purple-700 transition hover:bg-purple-100 disabled:opacity-50 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+                          >
+                            🔎 See more hashtags ({selectedTags.length}/10)
+                          </button>
+                          <HashtagPickerModal
+                            open={showTagPicker}
+                            onClose={() => setShowTagPicker(false)}
+                            selected={selectedTags}
+                            onToggle={handleToggleTagFromPicker}
+                            maxTags={10}
+                            extraSuggestions={tagSuggestions}
+                          />
                         </div>
                       </div>
                     </div>
@@ -2030,7 +2263,7 @@ const CreateDesignInner: React.FC = () => {
                   Price Range
                   <InfoTooltip text="An indicative price range for this design. This is NOT a checkout price — it helps buyers understand the expected cost." />
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-secondary)]">
                       ₦
@@ -2041,7 +2274,13 @@ const CreateDesignInner: React.FC = () => {
                       onChange={(e) => setMinPrice(e.target.value)}
                       placeholder="15,000"
                       disabled={disabled}
-                      className="surface-control placeholder-theme w-full pl-8 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      aria-invalid={priceRangeError.min ? true : undefined}
+                      aria-describedby={priceRangeError.summary ? "design-price-range-error" : undefined}
+                      className={`surface-control placeholder-theme w-full pl-8 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2 ${
+                        priceRangeError.min
+                          ? "border-red-500 focus:ring-red-500/50"
+                          : "focus:ring-purple-500/50"
+                      }`}
                     />
                     <span className="absolute -bottom-5 left-0 text-xs text-theme-secondary">
                       Minimum Price
@@ -2057,13 +2296,28 @@ const CreateDesignInner: React.FC = () => {
                       onChange={(e) => setMaxPrice(e.target.value)}
                       placeholder="45,000"
                       disabled={disabled}
-                      className="surface-control placeholder-theme w-full pl-8 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      aria-invalid={priceRangeError.max ? true : undefined}
+                      aria-describedby={priceRangeError.summary ? "design-price-range-error" : undefined}
+                      className={`surface-control placeholder-theme w-full pl-8 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2 ${
+                        priceRangeError.max
+                          ? "border-red-500 focus:ring-red-500/50"
+                          : "focus:ring-purple-500/50"
+                      }`}
                     />
                     <span className="absolute -bottom-5 left-0 text-xs text-theme-secondary">
                       Maximum Price
                     </span>
                   </div>
                 </div>
+                {priceRangeError.summary ? (
+                  <p
+                    id="design-price-range-error"
+                    role="alert"
+                    className="mt-7 text-xs text-red-600 dark:text-red-400"
+                  >
+                    {priceRangeError.summary}
+                  </p>
+                ) : null}
               </div>
 
               {/* Info box */}
@@ -2101,7 +2355,7 @@ const CreateDesignInner: React.FC = () => {
               </div>
 
               {isMadeToOrder && (
-                <div className="max-h-[38vh] min-h-[260px] overflow-y-auto rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-secondary)]/60 p-2 pr-1 shadow-inner scrollbar-hide">
+                <div className="max-h-none overflow-y-visible rounded-none border-0 bg-transparent p-0 sm:max-h-[38vh] sm:min-h-[260px] sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-[color:var(--border-default)] sm:bg-[color:var(--surface-secondary)]/60 sm:p-2 sm:pr-1 sm:shadow-inner scrollbar-hide">
                   <CustomOrderConfigurationEditor
                     ref={customOrderEditorRef}
                     sourceType="DESIGN"
@@ -2130,24 +2384,28 @@ const CreateDesignInner: React.FC = () => {
             className="self-start"
           >
             <div className="space-y-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <UniversalSelect
-                  label="Sizing Mode"
-                  value={sizingMode}
-                  onChange={handleDesignSizingModeChange}
-                  options={DESIGN_SIZING_MODE_OPTIONS.map((option) => ({
-                    value: option.value,
-                    label: option.label,
-                  }))}
-                  disabled={disabled}
-                  searchable
-                  optionAllowWrap
-                  optionCompact
-                  selectedAllowWrap
-                />
+              {/*
+                Same sizing component the product form uses, so designs and
+                products expose an identical measurement-point picker (and the
+                same freeform submission path) instead of designs quietly
+                offering less. The RTW size-system select is hidden here only
+                because the design save payload has no field to persist it.
+              */}
+              <SizingConfigurator
+                sizingMode={sizingMode}
+                onSizingModeChange={handleDesignSizingModeChange}
+                onRtwSizeSystemChange={() => undefined}
+                showRtwSizeSystem={false}
+                customMeasurementKeys={customMeasurementKeys}
+                onCustomMeasurementKeysChange={setCustomMeasurementKeys}
+                measurementGender={measurementGender}
+                disabled={disabled}
+              />
 
+              <div className="grid grid-cols-2 gap-3">
                 <UniversalSelect
                   label="Fit Preference"
+                          required
                   value={fitPreference}
                   onChange={(value) => setFitPreference(value as DesignFitPreference)}
                   options={DESIGN_FIT_PREFERENCE_OPTIONS.map((option) => ({
@@ -2164,7 +2422,7 @@ const CreateDesignInner: React.FC = () => {
                   Who can see this?
                   <InfoTooltip text={CREATOR_METADATA_HELP.visibility} />
                 </label>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-2">
                   {(
                     [
                       {
@@ -2221,14 +2479,18 @@ const CreateDesignInner: React.FC = () => {
       </main>
 
       {/* Actions Footer - Integrated into flow */}
-      <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 pb-12">
+      <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 pb-12">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-sm text-theme-secondary">
-            {lastSaved
-              ? `${isEditMode ? "Design" : "Draft"} saved locally - Last edit: ${formatTimeAgo(lastSaved)}`
-              : isEditMode
-                ? "Unsaved changes"
-                : "Create a draft or go live when ready."}
+            {reviewHint ? (
+              <span className="block">{reviewHint}</span>
+            ) : lastSaved ? (
+              `${isEditMode ? "Design" : "Draft"} saved locally - Last edit: ${formatTimeAgo(lastSaved)}`
+            ) : isEditMode ? (
+              "Unsaved changes"
+            ) : (
+              "Create a draft or go live when ready."
+            )}
           </div>
           <div className="flex gap-3 w-full sm:w-auto">
             <button
@@ -2239,43 +2501,54 @@ const CreateDesignInner: React.FC = () => {
             >
               Cancel
             </button>
-            <button
-              type="button"
-              onClick={handleSaveDraft}
-              disabled={disabled || isSubmitting}
-              className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-6 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isSubmitting && submitIntent === "draft" ? (
-                <VLoader size={16} phase="loading" showLabel={false} />
-              ) : (
-                <FiFile className="w-4 h-4" />
-              )}
-              {isSubmitting && submitIntent === "draft" ? "Saving..." : "Save Draft"}
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveDraft}
-              disabled={disabled}
-              className="hidden"
-            >
-              Hidden duplicate
-            </button>
+            {/*
+              Withdrawing is an ADDITIONAL action while a submission is pending,
+              never a replacement for Save Draft. Swapping the two is what left
+              owners in a change-request cycle with no way to park their work.
+            */}
+            {canWithdrawFromReview(reviewStatus) && (
+              <button
+                type="button"
+                onClick={handleWithdrawFromReview}
+                disabled={withdrawingFromReview}
+                className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-5 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {withdrawingFromReview ? 'Calling back…' : '↩️ Call back'}
+              </button>
+            )}
+            {canSaveDraft(reviewStatus) && (
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                disabled={isSubmitting}
+                className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-6 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isSubmitting && submitIntent === "draft" ? (
+                  <MuseLoader size={16} />
+                ) : (
+                  <FiFile className="w-4 h-4" />
+                )}
+                {isSubmitting && submitIntent === "draft" ? "Saving…" : "Save Draft"}
+              </button>
+            )}
             <button
               type="button"
               onClick={handlePublishClick}
-              disabled={disabled || isSubmitting}
+              disabled={isSubmitting}
               className="flex-1 sm:flex-none py-3 px-6 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-purple-500/25 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isSubmitting && submitIntent === "publish" ? (
-                <VLoader size={16} phase="loading" showLabel={false} />
+                <MuseLoader size={16} />
               ) : (
                 <HiOutlineSparkles className="w-5 h-5" />
               )}
               {isSubmitting && submitIntent === "publish"
-                ? "Going live..."
-                : isEditMode
-                  ? "Update Design"
-                  : "Go live"}
+                ? primaryActionPendingLabel(reviewStatus)
+                : primaryActionLabel({
+                    status: reviewStatus,
+                    isEditMode,
+                    entity: 'design',
+                  })}
             </button>
           </div>
         </div>
@@ -2436,12 +2709,14 @@ const CreateDesignInner: React.FC = () => {
                     transition: "transform 0.2s ease",
                   }}
                 >
-                  <MediaRenderer
+                  <LocalMediaPreview
                     kind={fullscreenFile.kind === "video" ? "video" : "image"}
                     src={fullscreenFile.url}
+                    file={fullscreenFile.file}
                     alt="Fullscreen preview"
                     maxHeightClassName="max-h-[80vh]"
                     className="rounded-none"
+                    diagnosticScope="create-design-fullscreen-preview"
                   />
                 </div>
 
@@ -2501,7 +2776,7 @@ const FormSection: React.FC<{
 }> = ({ title, icon, isOpen, onToggle, children, className, id }) => (
   <div
     id={id}
-    className={`surface-card relative rounded-2xl border border-[color:var(--border-strong)] ring-1 ring-[color:var(--border-default)]/60 backdrop-blur transition-shadow ${
+    className={`surface-card relative rounded-xl sm:rounded-2xl border border-[color:var(--border-default)] backdrop-blur transition-shadow ${
       isOpen ? "shadow-[0_14px_34px_rgba(15,23,42,0.08)]" : "shadow-sm"
     } ${className ?? ""}`}
   >

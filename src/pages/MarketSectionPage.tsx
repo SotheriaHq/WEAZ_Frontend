@@ -23,6 +23,7 @@ import {
   mapSectionProductToMarketplaceProduct,
 } from '@/utils/marketSectionMapper';
 import { useScrollRestore } from '@/components/ScrollRestoreProvider';
+import { useScrollLock } from '@/hooks/useScrollLock';
 
 const SECTION_DETAIL_LIMIT = 24;
 
@@ -116,6 +117,7 @@ const MarketSectionPage: React.FC = () => {
   const { anonymousSessionId, flushMarketSignals, trackMarketSignal } =
     useMarketSignals('MARKET_SECTION_DETAIL');
   const [selectedProduct, setSelectedProduct] = useState<MarketplaceProduct | null>(null);
+  useScrollLock(Boolean(selectedProduct));
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const observedItemKeysRef = useRef<Set<string>>(new Set());
   const viewedSectionKeyRef = useRef<string | null>(null);
@@ -304,7 +306,7 @@ const MarketSectionPage: React.FC = () => {
               type="button"
               onClick={() => {
                 saveScrollPosition(scrollRestoreKey, window.scrollY);
-                navigate('/market-place');
+                navigate('/market');
               }}
               className="mb-3 rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/10"
             >
@@ -414,13 +416,13 @@ const MarketSectionPage: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-layer-modal bg-black/60 p-3 backdrop-blur-sm sm:p-6"
+              className="fixed inset-0 z-layer-modal bg-black/60 p-3 backdrop-blur-sm sm:p-6 flex items-center justify-center"
             >
               <motion.div
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 18 }}
-                className="mx-auto h-full w-full max-w-6xl overflow-y-auto rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-[#120d18] sm:p-6"
+                className="mx-auto max-h-[92vh] w-full max-w-6xl overflow-y-auto overscroll-contain rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-[#120d18] sm:p-6 glass-scrollbar flex flex-col"
               >
                 <div className="mb-3 flex justify-end">
                   <button

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { resolveOrderAccess } from '@/api/StoreApi';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 
 const OrderAccessResolverPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -50,7 +50,7 @@ const OrderAccessResolverPage: React.FC = () => {
             {error || 'Checking which order workspace you can access.'}
           </p>
         </div>
-        {!error ? <VLoader size={52} phase="loading" /> : null}
+        {!error ? <MuseLoader size={52} /> : null}
         {error ? (
           <button
             type="button"

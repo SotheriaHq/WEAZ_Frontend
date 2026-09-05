@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { X, RotateCcw } from 'lucide-react';
 import FrostedButton from '../ui/FrostedButton';
+import { getRangeError } from '@/utils/rangeValidation';
 
 interface FilterPanelProps {
   isOpen: boolean;
@@ -17,6 +18,12 @@ export interface FilterState {
 
 const FilterPanel: React.FC<FilterPanelProps> = ({ isOpen, onClose, onApply, initialFilters }) => {
   const [filters, setFilters] = useState<FilterState>(initialFilters);
+  // An inverted range matched nothing and rendered an empty result set, which
+  // reads as "there is nothing here" rather than "your max is below your min".
+  const priceRangeError = useMemo(
+    () => getRangeError(filters.minPrice, filters.maxPrice, { label: 'price' }),
+    [filters.maxPrice, filters.minPrice],
+  );
 
   if (!isOpen) return null;
 
@@ -91,7 +98,10 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ isOpen, onClose, onApply, ini
                     placeholder="0"
                     value={filters.minPrice ?? ''}
                     onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value ? Number(e.target.value) : undefined }))}
-                    className="w-full pl-7 pr-4 py-2.5 bg-gray-50 dark:bg-gray-800 border-transparent rounded-xl focus:bg-white dark:focus:bg-black focus:border-primary focus:ring-0 transition-all text-sm"
+                    aria-invalid={priceRangeError.min ? true : undefined}
+                    className={`w-full pl-7 pr-4 py-2.5 bg-gray-50 dark:bg-gray-800 rounded-xl focus:bg-white dark:focus:bg-black focus:ring-0 transition-all text-sm ${
+                      priceRangeError.min ? 'border border-red-500' : 'border-transparent focus:border-primary'
+                    }`}
                   />
                 </div>
               </div>
@@ -105,11 +115,19 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ isOpen, onClose, onApply, ini
                     placeholder="Any"
                     value={filters.maxPrice ?? ''}
                     onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value ? Number(e.target.value) : undefined }))}
-                    className="w-full pl-7 pr-4 py-2.5 bg-gray-50 dark:bg-gray-800 border-transparent rounded-xl focus:bg-white dark:focus:bg-black focus:border-primary focus:ring-0 transition-all text-sm"
+                    aria-invalid={priceRangeError.max ? true : undefined}
+                    className={`w-full pl-7 pr-4 py-2.5 bg-gray-50 dark:bg-gray-800 rounded-xl focus:bg-white dark:focus:bg-black focus:ring-0 transition-all text-sm ${
+                      priceRangeError.max ? 'border border-red-500' : 'border-transparent focus:border-primary'
+                    }`}
                   />
                 </div>
               </div>
             </div>
+            {priceRangeError.summary ? (
+              <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">
+                {priceRangeError.summary}
+              </p>
+            ) : null}
           </section>
         </div>
 
@@ -124,6 +142,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ isOpen, onClose, onApply, ini
           </button>
           <FrostedButton
             className="flex-1 justify-center"
+            disabled={priceRangeError.summary !== null}
             onClick={() => {
               onApply(filters);
               onClose();

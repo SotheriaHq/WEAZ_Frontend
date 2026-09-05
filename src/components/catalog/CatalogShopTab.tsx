@@ -26,6 +26,7 @@ import useDebounce from '@/hooks/useDebounce';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSavedBatchStatusQuery } from '@/query/queries';
 import { queryKeys } from '@/query/queryKeys';
+import useCachedResource from '@/hooks/useCachedResource';
 
 interface ProductsResponse {
   items: StoreProduct[];
@@ -36,6 +37,13 @@ interface ProductsResponse {
   hasNextPage: boolean;
   nextCursor?: string | null;
 }
+
+type CatalogProductsPage = {
+  items: StoreProduct[];
+  total: number;
+  hasNextPage: boolean;
+  nextCursor: string | null;
+};
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
@@ -141,13 +149,43 @@ export default function CatalogShopTab({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [products, setProducts] = useState<StoreProduct[]>([]);
-  const [total, setTotal] = useState(0);
+  const initialProductsPage = useMemo(() => {
+    const cachedPages = queryClient.getQueriesData<CatalogProductsPage>({
+      queryKey: ['catalog-shop', 'products', brandId],
+    });
+    return cachedPages.find(([queryKey, data]) => {
+      if (!data) return false;
+      const params = (queryKey as readonly unknown[])[3] as Record<string, unknown> | undefined;
+      return (
+        params?.page === 1 &&
+        params?.limit === 20 &&
+        params?.sortBy === 'newest' &&
+        params?.status === 'PUBLISHED' &&
+        !params?.cursor &&
+        !params?.q &&
+        !params?.minPrice &&
+        !params?.maxPrice &&
+        !params?.onSale &&
+        !params?.category
+      );
+    })?.[1];
+  }, [brandId, queryClient]);
+  const [products, setProducts] = useState<StoreProduct[]>(
+    () => initialProductsPage?.items ?? [],
+  );
+  const [total, setTotal] = useState(() => initialProductsPage?.total ?? 0);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(
+    () => initialProductsPage?.hasNextPage ?? false,
+  );
+  const [loading, setLoading] = useState(
+    () => Boolean(brandId && isStoreOpen !== false && !initialProductsPage),
+  );
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(
+    () => initialProductsPage?.nextCursor ?? null,
+  );
 
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search.trim(), 250);
@@ -165,10 +203,40 @@ export default function CatalogShopTab({
   const [chipsCollapsed, setChipsCollapsed] = useState(false);
   const [searchCollapsed, setSearchCollapsed] = useState(true); // Collapsed by default
   const searchContainerRef = useRef<HTMLDivElement>(null);
-  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const { data: categories = [] } = useCachedResource<ProductCategory[]>({
+    queryKey: ['catalog-shop', 'product-categories'],
+    queryFn: async ({ signal }) => {
+      try {
+        const response = await apiClient.get<ProductCategory[]>('/products/categories', { signal });
+        return unwrapApiResponse(response.data) || [];
+      } catch (err) {
+        console.error('Failed to fetch categories', err);
+        return [];
+      }
+    },
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+  });
   const [, startTransition] = useTransition();
-  const [collections, setCollections] = useState<CollectionDto[]>([]);
-  const [collectionsLoading, setCollectionsLoading] = useState(false);
+  const { data: collections = [], loading: collectionsLoading } =
+    useCachedResource<CollectionDto[]>({
+      queryKey: ['catalog-shop', 'collections', brandId, 'public', 'store'],
+      enabled: Boolean(brandId),
+      queryFn: async () => {
+        try {
+          const result = await brandApi.getCollections(brandId, {
+            visibility: 'public',
+            scope: 'store',
+          });
+          return Array.isArray(result) ? result : [];
+        } catch (err) {
+          console.error('Failed to fetch collections for store tab', err);
+          return [];
+        }
+      },
+      staleTime: 3 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+    });
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
@@ -226,45 +294,6 @@ export default function CatalogShopTab({
     setSearchParams(next, { replace: true });
   }, [requestedCollectionId, searchParams, selectedCollectionId, setSearchParams]);
 
-
-
-  // Fetch available categories
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await apiClient.get<ProductCategory[]>('/products/categories');
-        const cats = unwrapApiResponse(response.data) || [];
-        setCategories(cats);
-      } catch (err) {
-        console.error('Failed to fetch categories', err);
-      }
-    };
-    fetchCategories();
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-    const fetchCollections = async () => {
-      if (!brandId) return;
-      setCollectionsLoading(true);
-      try {
-        const result = await brandApi.getCollections(brandId, { visibility: 'public', scope: 'store' });
-        if (mounted) {
-          setCollections(Array.isArray(result) ? result : []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch collections for store tab', err);
-        if (mounted) setCollections([]);
-      } finally {
-        if (mounted) setCollectionsLoading(false);
-      }
-    };
-    void fetchCollections();
-    return () => {
-      mounted = false;
-    };
-  }, [brandId]);
-
   const savedStatusQuery = useSavedBatchStatusQuery('COLLECTION', collectionTargetIds, {
     enabled: isAuth && collectionTargetIds.length > 0,
   });
@@ -306,6 +335,22 @@ export default function CatalogShopTab({
     return Number.isFinite(maxPrice) ? maxPrice : undefined;
   }, [maxPrice]);
 
+  const applyProductsPage = useCallback(
+    (payload: CatalogProductsPage, opts: { resetPage: boolean; currentPage: number }) => {
+      setProducts((prev) =>
+        opts.resetPage || opts.currentPage === 1 ? payload.items : [...prev, ...payload.items],
+      );
+      setTotal(payload.total);
+      setHasMore(payload.hasNextPage);
+      setNextCursor(payload.nextCursor);
+      setError(null);
+      if (opts.resetPage) {
+        setPage(1);
+      }
+    },
+    [],
+  );
+
   const fetchProducts = useCallback(
     async (opts?: { resetPage?: boolean; page?: number }) => {
       if (!brandId) return;
@@ -313,49 +358,92 @@ export default function CatalogShopTab({
       const resetPage = Boolean(opts?.resetPage);
       const currentPage = resetPage ? 1 : opts?.page ?? page;
       const cursor = resetPage ? undefined : nextCursor ?? undefined;
+      const queryParams = {
+        page: currentPage,
+        limit: 20,
+        sortBy,
+        status: 'PUBLISHED',
+        cursor: cursor ?? null,
+        q: debouncedSearch || null,
+        minPrice: normalizedMinPrice ?? null,
+        maxPrice: normalizedMaxPrice ?? null,
+        onSale: onSale ? 'true' : null,
+        category: selectedCategory && selectedCategory !== 'ALL' ? selectedCategory : null,
+      };
+      const productPageQueryKey = [
+        'catalog-shop',
+        'products',
+        brandId,
+        queryParams,
+      ] as const;
+      const cachedPage = queryClient.getQueryData<CatalogProductsPage>(productPageQueryKey);
+      const append = !resetPage && currentPage > 1;
 
-      setLoading(true);
+      if (cachedPage) {
+        applyProductsPage(cachedPage, { resetPage, currentPage });
+        setLoading(false);
+        setLoadingMore(false);
+      } else if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(products.length === 0);
+      }
+
       try {
-        const params: any = {
-          page: currentPage,
-          limit: 20,
-          sortBy,
-          status: 'PUBLISHED', // Only show live products in Store tab
-        };
-        if (cursor) params.cursor = cursor;
-        if (debouncedSearch) params.q = debouncedSearch;
-        if (normalizedMinPrice !== undefined) params.minPrice = normalizedMinPrice;
-        if (normalizedMaxPrice !== undefined) params.maxPrice = normalizedMaxPrice;
-        if (onSale) params.onSale = 'true';
-        if (selectedCategory && selectedCategory !== 'ALL') params.category = selectedCategory;
+        const pageData = await queryClient.fetchQuery({
+          queryKey: productPageQueryKey,
+          queryFn: async ({ signal }) => {
+            const params: any = {
+              page: currentPage,
+              limit: 20,
+              sortBy,
+              status: 'PUBLISHED',
+            };
+            if (cursor) params.cursor = cursor;
+            if (debouncedSearch) params.q = debouncedSearch;
+            if (normalizedMinPrice !== undefined) params.minPrice = normalizedMinPrice;
+            if (normalizedMaxPrice !== undefined) params.maxPrice = normalizedMaxPrice;
+            if (onSale) params.onSale = 'true';
+            if (selectedCategory && selectedCategory !== 'ALL') params.category = selectedCategory;
 
-        const response = await apiClient.get<Partial<ProductsResponse>>(`/brands/${brandId}/products`, { params });
-        const payload = unwrapApiResponse<Partial<ProductsResponse>>(response.data);
-        const items = Array.isArray(payload?.items) ? payload.items : [];
-        const totalCount = typeof payload?.total === 'number' ? payload.total : items.length;
-        const hasNextPage = Boolean(payload?.hasNextPage);
-        const responseNextCursor = payload?.nextCursor;
-        setProducts((prev) => (resetPage || currentPage === 1 ? items : [...prev, ...items]));
-        setTotal(totalCount);
-        setHasMore(hasNextPage);
-        setNextCursor(typeof responseNextCursor === 'string' && responseNextCursor.length > 0 ? responseNextCursor : null);
-        setError(null);
-        if (resetPage) {
-          setPage(1);
-        }
+            const response = await apiClient.get<Partial<ProductsResponse>>(
+              `/brands/${brandId}/products`,
+              { params, signal },
+            );
+            const payload = unwrapApiResponse<Partial<ProductsResponse>>(response.data);
+            const items = Array.isArray(payload?.items) ? payload.items : [];
+            const responseNextCursor = payload?.nextCursor;
+            return {
+              items,
+              total: typeof payload?.total === 'number' ? payload.total : items.length,
+              hasNextPage: Boolean(payload?.hasNextPage),
+              nextCursor:
+                typeof responseNextCursor === 'string' && responseNextCursor.length > 0
+                  ? responseNextCursor
+                  : null,
+            };
+          },
+          staleTime: 3 * 60 * 1000,
+          gcTime: 30 * 60 * 1000,
+        });
+        applyProductsPage(pageData, { resetPage, currentPage });
       } catch (e) {
-        const message = (e as any)?.response?.data?.message ?? 'Failed to load products';
-        setProducts([]);
-        setTotal(0);
-        setHasMore(false);
-        setError(typeof message === 'string' ? message : 'Failed to load products');
-        toast.error(typeof message === 'string' ? message : 'Failed to load products');
-        setNextCursor(null);
+        if (!cachedPage) {
+          const message = (e as any)?.response?.data?.message ?? 'Failed to load products';
+          setProducts([]);
+          setTotal(0);
+          setHasMore(false);
+          setError(typeof message === 'string' ? message : 'Failed to load products');
+          toast.error(typeof message === 'string' ? message : 'Failed to load products');
+          setNextCursor(null);
+        }
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     },
     [
+      applyProductsPage,
       brandId,
       debouncedSearch,
       isStoreOpen,
@@ -364,9 +452,11 @@ export default function CatalogShopTab({
       normalizedMinPrice,
       onSale,
       page,
+      products.length,
+      queryClient,
       selectedCategory,
       sortBy,
-    ]
+    ],
   );
 
   useEffect(() => {
@@ -481,7 +571,8 @@ export default function CatalogShopTab({
     } else {
       next.delete('storeView');
     }
-    setSearchParams(next, { replace: false });
+    // View toggle is UI state — replace so mobile back doesn't replay it.
+    setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
   const storeClosedPlaceholder = useMemo(() => {
@@ -865,7 +956,7 @@ export default function CatalogShopTab({
                       value={minPrice ?? ''}
                       onChange={(e) => setMinPrice(e.target.value ? Number(e.target.value) : undefined)}
                       placeholder="Min"
-                      className="threadly-search-input px-3 py-2 text-sm"
+                      className="wiez-search-input px-3 py-2 text-sm"
                     />
                     <input
                       type="number"
@@ -873,7 +964,7 @@ export default function CatalogShopTab({
                       value={maxPrice ?? ''}
                       onChange={(e) => setMaxPrice(e.target.value ? Number(e.target.value) : undefined)}
                       placeholder="Max"
-                      className="threadly-search-input px-3 py-2 text-sm"
+                      className="wiez-search-input px-3 py-2 text-sm"
                     />
                   </div>
                 </div>
@@ -1016,7 +1107,7 @@ export default function CatalogShopTab({
                 </div>
               ) : null}
 
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(242px,1fr))] gap-4 sm:gap-5">
+              <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(242px,1fr))] gap-4 sm:gap-5">
                 {showProductsEmpty ? (
                   <div className="col-span-full">
                     <StoreEmptyState type="no-products" isOwner={isOwner} />
@@ -1043,9 +1134,10 @@ export default function CatalogShopTab({
                   <button
                     type="button"
                     onClick={handleLoadMore}
+                    disabled={loadingMore}
                     className="px-6 py-3 rounded-full text-sm font-medium bg-purple-600 hover:bg-purple-700 text-white transition-colors"
                   >
-                    Load more
+                    {loadingMore ? 'Loading...' : 'Load more'}
                   </button>
                 </div>
               ) : null}

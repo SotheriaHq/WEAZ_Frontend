@@ -94,6 +94,25 @@ export async function getRequiredLegalAcceptances(
   });
 }
 
+/**
+ * True when a request failed specifically because the current legal terms were
+ * not accepted (backend `assertRequiredCurrentAcceptances` throws a 400 whose
+ * message starts with "Accept the current legal terms before continuing:").
+ * Used to trigger a consent step and retry — e.g. a new user signing in with
+ * Google from the Login page, where consent isn't collected up front.
+ */
+export function isLegalAcceptanceRequiredError(error: unknown): boolean {
+  const response = (error as { response?: { status?: number; data?: unknown } } | null)?.response;
+  if (response?.status !== undefined && response.status !== 400) return false;
+  const data = response?.data as { message?: unknown } | undefined;
+  const message =
+    (typeof data?.message === 'string' && data.message) ||
+    (typeof (error as { message?: unknown })?.message === 'string'
+      ? (error as { message: string }).message
+      : '');
+  return message.toLowerCase().includes('legal terms before continuing');
+}
+
 export async function acceptLegalDocuments(payload: {
   acceptances: LegalAcceptancePayload[];
   source?: string;

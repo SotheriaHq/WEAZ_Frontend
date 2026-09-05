@@ -9,6 +9,7 @@ import type { CatalogEntityType } from '@/constants/catalogDomain';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagging } from '@/hooks/useBagging';
 import { BAG_IT_LABEL } from '@/constants/bagging';
+import { CustomOrderIndicator } from '@/components/custom-orders/CustomOrderIndicator';
 import {
   getProductStockState,
   isCustomOrderOnlyProduct,
@@ -36,7 +37,16 @@ export interface StoreProduct {
   discountPercent?: number | null;
   thumbnail?: string;
   images: string[];
-  media?: Array<{ id: string; url: string; type: string; isPrimary?: boolean }>;
+  media?: Array<{
+    id: string;
+    fileUploadId?: string | null;
+    url: string;
+    type: string;
+    isPrimary?: boolean;
+    width?: number | null;
+    height?: number | null;
+    aspectRatio?: number | null;
+  }>;
   mediaIds?: string[];
   sizes: string[];
   sizingMode?: SizingMode;
@@ -86,20 +96,58 @@ interface StoreProductCardProps {
   onPreviewNavigationActiveChange?: (active: boolean) => void;
   isOwnerView?: boolean;
   onEdit?: (product: StoreProduct) => void;
+  /** First-row / LCP cards: eager + high fetch priority. Default lazy. */
+  priority?: boolean;
 }
 
 type GallerySource = {
   key: string;
   fileId?: string;
   url?: string | null;
+  aspectRatio?: number | null;
 };
 
 type ResolvedGalleryImage = {
   key: string;
   url: string;
+  aspectRatio?: number | null;
 };
 
 const MAX_GALLERY_ITEMS = 6;
+const MIN_CARD_ASPECT_RATIO = 0.45;
+const MAX_CARD_ASPECT_RATIO = 2.2;
+
+const resolveCardAspectRatio = (value?: number | null): number | null => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return Math.min(MAX_CARD_ASPECT_RATIO, Math.max(MIN_CARD_ASPECT_RATIO, value));
+};
+
+/**
+ * The single frame ratio every market card renders into, portrait because that
+ * is what most fashion media is shot in and it gives the tallest usable image
+ * for a given row height.
+ *
+ * Fixed on purpose: cards previously inherited each image's own ratio, which is
+ * what made rails ragged and grids gappy. Media is letterboxed into this frame
+ * with `object-contain` so nothing is ever cropped or stretched.
+ */
+const CARD_FRAME_ASPECT_RATIO = 4 / 5;
+
+const aspectRatioFromDimensions = (
+  width?: number | null,
+  height?: number | null,
+): number | null =>
+  typeof width === 'number' &&
+  Number.isFinite(width) &&
+  width > 0 &&
+  typeof height === 'number' &&
+  Number.isFinite(height) &&
+  height > 0
+    ? width / height
+    : null;
+
 const normalizeGalleryUrl = (value?: string | null) => {
   const raw = String(value ?? '').trim();
   if (!raw) return null;
@@ -120,6 +168,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   onPreviewNavigationActiveChange,
   isOwnerView = false,
   onEdit,
+  priority = false,
 }) => {
   const dispatch = useDispatch<AppDispatch>();
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
@@ -129,7 +178,6 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 
   const [imgError, setImgError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [showCustomLabel, setShowCustomLabel] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [failedGalleryKeys, setFailedGalleryKeys] = useState<string[]>([]);
@@ -261,7 +309,24 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     const seen = new Set<string>();
     const sources: GallerySource[] = [];
 
-    const appendSource = (source: { fileId?: string; url?: string | null }) => {
+    const resolveMediaFileId = (item?: {
+      id?: string;
+      fileUploadId?: string | null;
+      url?: string | null;
+    } | null) => {
+      // Prefer FileUpload id — ProductMedia.id is a different table UUID and
+      // causes the signed media endpoint to fail.
+      const fromUpload =
+        typeof item?.fileUploadId === 'string' ? item.fileUploadId.trim() : '';
+      if (fromUpload) return fromUpload;
+      return undefined;
+    };
+
+    const appendSource = (source: {
+      fileId?: string;
+      url?: string | null;
+      aspectRatio?: number | null;
+    }) => {
       const fileId = typeof source.fileId === 'string' && source.fileId.trim().length > 0
         ? source.fileId.trim()
         : undefined;
@@ -276,6 +341,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         key,
         fileId,
         url: source.url ?? normalizedUrl,
+        aspectRatio: resolveCardAspectRatio(source.aspectRatio),
       });
     };
 
@@ -285,36 +351,33 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       : undefined;
 
     appendSource({
-      fileId:
-        typeof primaryMedia?.id === 'string' && !primaryMedia.id.startsWith('http')
-          ? primaryMedia.id
-          : undefined,
+      fileId: resolveMediaFileId(primaryMedia),
       url: primaryMedia?.url || product.thumbnail || product.images[0] || null,
+      aspectRatio:
+        resolveCardAspectRatio(primaryMedia?.aspectRatio) ??
+        aspectRatioFromDimensions(primaryMedia?.width, primaryMedia?.height),
     });
 
     appendSource({
-      fileId:
-        typeof secondaryMedia?.id === 'string' && !secondaryMedia.id.startsWith('http')
-          ? secondaryMedia.id
-          : undefined,
+      fileId: resolveMediaFileId(secondaryMedia),
       url: secondaryMedia?.url || (product.images.length > 1 ? product.images[1] : null),
+      aspectRatio:
+        resolveCardAspectRatio(secondaryMedia?.aspectRatio) ??
+        aspectRatioFromDimensions(secondaryMedia?.width, secondaryMedia?.height),
     });
 
     product.media?.forEach((item) => {
       appendSource({
-        fileId:
-          typeof item.id === 'string' && !item.id.startsWith('http')
-            ? item.id
-            : undefined,
+        fileId: resolveMediaFileId(item),
         url: item.url,
+        aspectRatio:
+          resolveCardAspectRatio(item.aspectRatio) ??
+          aspectRatioFromDimensions(item.width, item.height),
       });
     });
 
-    product.mediaIds?.forEach((mediaId) => {
-      if (typeof mediaId === 'string' && mediaId.trim().length > 0) {
-        appendSource({ fileId: mediaId });
-      }
-    });
+    // mediaIds are ProductMedia row ids, NOT FileUpload ids — do not pass them
+    // to the signed media endpoint. Prefer URLs / fileUploadId from media slots above.
 
     product.images.forEach((imageUrl) => {
       appendSource({ url: imageUrl });
@@ -334,23 +397,36 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 
       const resolved = await Promise.all(
         gallerySources.map(async (source) => {
-          if (source.fileId) {
+          // Prefer signing raw S3 URLs by key first — this is the market/admin
+          // hot path and does not require ownership of the FileUpload row.
+          const rawUrl = source.url ?? '';
+          const isUnsignedS3 =
+            rawUrl.includes('.s3.') ||
+            rawUrl.includes('amazonaws.com');
+          const alreadySigned =
+            rawUrl.includes('X-Amz-Signature') ||
+            rawUrl.includes('X-Amz-Credential') ||
+            rawUrl.includes('Signature=');
+
+          if (rawUrl && isUnsignedS3 && !alreadySigned) {
             try {
-              const signed = await brandApi.getSignedFileUrl(source.fileId);
-              if (signed) {
-                return signed;
-              }
+              const signed = await brandApi.getSignedS3Url(rawUrl);
+              if (signed) return signed;
             } catch {
+              /* fall through */
             }
           }
 
-          if (source.url && source.url.includes('.s3.') && !source.url.includes('?')) {
+          if (alreadySigned && rawUrl) {
+            return rawUrl;
+          }
+
+          if (source.fileId) {
             try {
-              const signed = await brandApi.getSignedS3Url(source.url);
-              if (signed) {
-                return signed;
-              }
+              const signed = await brandApi.getSignedFileUrl(source.fileId);
+              if (signed) return signed;
             } catch {
+              /* fall through */
             }
           }
 
@@ -367,7 +443,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           if (!source || acc.some((entry) => entry.key === source.key)) {
             return acc;
           }
-          acc.push({ key: source.key, url: candidate });
+          acc.push({ key: source.key, url: candidate, aspectRatio: source.aspectRatio });
           return acc;
         }, []),
       );
@@ -396,6 +472,30 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       ? galleryImages[1]
       : galleryImages[0] ?? null;
   const hasDisplayImage = Boolean(activeImage?.url || desiredImage?.url);
+  // The media's own ratio is still read, but it NO LONGER drives the frame.
+  //
+  // It used to: `aspectRatio: cardAspectRatio` made every card as tall as its
+  // own image, so a rail of mixed portrait/square/landscape products rendered as
+  // a ragged row of different-height cards, and the Explore grid opened gaps
+  // wherever a short card sat next to a tall one. Worse, the frame then rendered
+  // `object-cover` on top, so the card was inconsistent AND cropping at the same
+  // time — the two failure modes we least wanted together.
+  //
+  // Now the frame is a fixed portrait ratio and the media is `object-contain`
+  // inside it. Content keeps its true shape (nothing is cropped or stretched),
+  // and the leftover space becomes a deliberate dark matte rather than a gap in
+  // the layout. That is the "dark shade support" the native app already uses.
+  const mediaAspectRatio =
+    activeImage?.aspectRatio ??
+    desiredImage?.aspectRatio ??
+    galleryImages[0]?.aspectRatio ??
+    null;
+  // Only used to decide whether bars will actually appear, so the matte can stay
+  // fully transparent for media that fills the frame edge to edge.
+  const fillsFrameExactly =
+    mediaAspectRatio != null &&
+    Math.abs(mediaAspectRatio - CARD_FRAME_ASPECT_RATIO) < 0.02;
+  const mediaFrameStyle = activeImage?.url ? undefined : { minHeight: 240 };
 
   useEffect(() => {
     if (!isHovered || !hoverGalleryEnabled) {
@@ -488,9 +588,15 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         onPreviewNavigationActiveChange?.(false);
       }}
     >
+      {/* Fixed portrait frame + dark matte. The matte is what turns leftover
+          space from "a gap in the layout" into deliberate depth behind the
+          content, and it is skipped entirely when the media already fills the
+          frame so those cards stay pixel-identical to before. */}
       <div
-        className="relative overflow-hidden bg-transparent"
-        style={activeImage?.url ? undefined : { minHeight: 240 }}
+        className={`relative aspect-[4/5] w-full overflow-hidden ${
+          fillsFrameExactly ? 'bg-transparent' : 'bg-neutral-950'
+        }`}
+        style={mediaFrameStyle}
       >
         {hasDisplayImage && !activeImage?.url && !imgError ? (
           <div className="absolute inset-0 animate-pulse">
@@ -503,10 +609,12 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             kind="image"
             src={activeImage.url}
             alt={product.name}
-            className="block w-full max-w-full"
-            mediaClassName={`block h-auto w-full transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
-            maxHeightClassName="max-h-[440px]"
-            loading="eager"
+            fit="contain"
+            className="absolute inset-0 block h-full w-full max-w-full"
+            mediaClassName={`block h-full w-full object-contain transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
+            maxHeightClassName="max-h-none"
+            loading={priority ? 'eager' : 'lazy'}
+            fetchPriority={priority ? 'high' : 'low'}
             onError={() => {
               setFailedGalleryKeys((prev) => (
                 activeImage?.key && !prev.includes(activeImage.key)
@@ -646,12 +754,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         ) : null}
 
         {isOwnerView && onEdit ? (
-          <div
-            className={`
-              absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-all duration-300
-              ${isHovered ? 'opacity-100' : 'opacity-0'}
-            `}
-          >
+          <div className="hidden md:flex absolute inset-0 z-20 items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               type="button"
               onClick={(event) => {
@@ -659,7 +762,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                 event.stopPropagation();
                 onEdit?.(product);
               }}
-              className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 shadow-xl transition-all hover:bg-gray-100 active:scale-95"
+              className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 shadow-xl transition-all hover:bg-gray-100 active:scale-95 dark:bg-white/5 dark:text-white"
             >
               Edit Product
             </button>
@@ -675,25 +778,43 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         ) : null}
 
         {isCustomOrderOnly ? (
-          <div className="absolute inset-x-0 top-4 z-20 flex justify-center px-4">
-            <span className="rounded-full bg-violet-600/90 px-3 py-1 text-xs font-semibold text-white shadow-xl backdrop-blur-sm">
-              ✂️ Custom order only
-            </span>
+          <div className="absolute inset-x-0 top-3 z-20 flex justify-center px-4">
+            <CustomOrderIndicator
+              pointsCount={product.customMeasurementKeys?.length}
+              size="sm"
+            />
           </div>
         ) : null}
 
-        <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/82 via-black/42 to-transparent px-4 pb-4 pt-16">
-          <h3 className="line-clamp-1 text-sm font-semibold leading-snug text-white drop-shadow-sm">
+        {/*
+          Calm frosted bar, not a tall gradient. The old treatment was a
+          `pt-16` `from-black/[0.82]` scrim: it covered ~40% of the card (so media
+          never read "in full") and its perceived weight swung with the image —
+          invisible over dark media, a heavy black band over light media.
+          A constant blurred tint is legible against ANY content because it does
+          not depend on what is underneath.
+
+          The tint was black/55, chosen as the opacity that alone holds white
+          text above 4.5:1 over pure-white media. Carrying the entire contrast
+          budget in opacity is what made the bar read as a dark slab bolted to
+          the photograph. The same floor is now met by three cooperating layers
+          instead of one: a lighter /40 tint, a heavier blur that collapses the
+          luminance range of whatever is behind it, and a real text shadow on
+          every glyph. The shadow is the part that does the work over bright
+          media — it travels with the text rather than with the panel.
+        */}
+        <div className="hidden md:block absolute inset-x-0 bottom-0 z-10 border-t border-white/10 bg-black/40 px-4 pb-3 pt-2.5 backdrop-blur-xl backdrop-saturate-150">
+          <h3 className="line-clamp-1 text-sm font-semibold leading-snug text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
             {product.name}
           </h3>
 
-          <p className="mt-0.5 line-clamp-1 text-[11px] text-white/70">
+          <p className="mt-0.5 line-clamp-1 text-[11px] text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">
             {product.brand.name}
           </p>
 
           <div className="mt-1.5 flex items-center justify-between">
             <div className="flex items-baseline gap-1.5">
-              <span className={`text-sm font-bold drop-shadow-sm ${product.isOnSale ? 'text-rose-300' : 'text-white'}`}>
+              <span className={`text-sm font-bold [text-shadow:0_1px_3px_rgba(0,0,0,0.85)] ${product.isOnSale ? 'text-rose-300' : 'text-white'}`}>
                 {formatPrice(product.effectivePrice, product.brand.currency)}
               </span>
               {product.isOnSale && product.salePrice ? (
@@ -703,25 +824,12 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               ) : null}
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               {isCustomAvailable ? (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setShowCustomLabel((prev) => !prev);
-                  }}
-                  onMouseEnter={() => setShowCustomLabel(true)}
-                  onMouseLeave={() => setShowCustomLabel(false)}
-                  onFocus={() => setShowCustomLabel(true)}
-                  onBlur={() => setShowCustomLabel(false)}
-                  className="inline-flex items-center gap-1 rounded-full bg-purple-500/80 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm"
-                  aria-label="Custom available"
-                  title="Custom available"
-                >
-                  <span role="img" aria-hidden="true">{String.fromCodePoint(0x2702, 0xfe0f)}</span>
-                  {showCustomLabel ? <span>Custom</span> : null}
-                </button>
+                <CustomOrderIndicator
+                  pointsCount={product.customMeasurementKeys?.length}
+                  size="sm"
+                />
               ) : null}
 
               {!isOwnerView ? (
@@ -763,6 +871,41 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Mobile View Bottom Overlay */}
+        {/* Same frosted treatment as desktop, same reasoning: lighter tint,
+            heavier blur, contrast carried by the text shadow. */}
+        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-black/40 backdrop-blur-xl backdrop-saturate-150 z-10 flex items-center justify-between min-h-[32px] max-h-[38px] border-t border-white/10" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-1 min-w-0 flex flex-col justify-center pl-1">
+            <h3
+              className="font-bold text-white truncate leading-none uppercase [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]"
+              style={{ fontSize: '12px' }}
+            >
+              {product.name}
+            </h3>
+            <span className="text-white/90 leading-none mt-0.5 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]" style={{ fontSize: '12px' }}>
+              {formatPrice(product.effectivePrice, product.brand.currency)}
+            </span>
+          </div>
+          
+          {/* Mobile Bag It feature inline in the bottom bar */}
+          {!isOwnerView && (
+            <button
+              type="button"
+              className="flex items-center justify-center p-0.5 text-white hover:scale-110 transition-transform mr-1 shrink-0"
+              onClick={handleQuickAddToCart}
+              disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
+              aria-label={BAG_IT_LABEL}
+            >
+              <BagPulseIcon
+                status={pulseStatus}
+                context="multi_card"
+                size={24}
+                disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
+              />
+            </button>
+          )}
+        </div>
       </div>
     </article>
     <ContentReviewDecisionModal
@@ -778,3 +921,4 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 };
 
 export default StoreProductCard;
+

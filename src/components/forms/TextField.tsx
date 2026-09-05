@@ -45,6 +45,11 @@ const TextField = forwardRef<HTMLInputElement, Props>(
         {label && (
           <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
             {label}
+            {/* The required mark, matching `UniversalSelect` and `Input`.
+                `required` was already accepted here and passed to the input,
+                so the field enforced the rule while its label said nothing —
+                "Design Title" was mandatory and looked optional. */}
+            {rest.required ? <span className="ml-1 text-purple-500">*</span> : null}
           </label>
         )}
         <div className="flex items-center">

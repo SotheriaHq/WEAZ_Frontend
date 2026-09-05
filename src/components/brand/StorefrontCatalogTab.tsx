@@ -48,9 +48,9 @@ export const StorefrontCatalogTab: React.FC<StorefrontCatalogTabProps> = ({
       <div className="flex min-h-[40vh] items-center justify-center rounded-[2rem] bg-gray-50/50 dark:bg-white/[0.03]">
         <div className="text-center">
           <p className="text-4xl">🛍️</p>
-          <h3 className="mt-4 text-lg font-bold text-gray-900 dark:text-white">Catalog empty</h3>
+          <h3 className="mt-4 text-lg font-bold text-gray-900 dark:text-white">Shop empty</h3>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            This designer hasn't added any products to their catalog yet.
+            This designer hasn&apos;t added any products to their shop yet.
           </p>
         </div>
       </div>

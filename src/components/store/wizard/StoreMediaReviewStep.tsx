@@ -16,7 +16,7 @@ import {
 import { toast } from 'sonner';
 import type { StoreWizardData, MediaItem } from '@/types/storeWizard';
 import MediaRenderer from '@/components/media/MediaRenderer';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 
 interface StoreMediaReviewStepProps {
   data: StoreWizardData;
@@ -210,7 +210,7 @@ const StoreMediaReviewStep: React.FC<StoreMediaReviewStepProps> = ({
             >
               {isAutoFixing ? (
                 <>
-                  <VLoader size={16} phase="loading" showLabel={false} />
+                  <MuseLoader size={16} />
                   Processing...
                 </>
               ) : (

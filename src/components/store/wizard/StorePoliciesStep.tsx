@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -15,6 +15,16 @@ import {
 import type { StoreWizardData } from '@/types/storeWizard';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
+import {
+  getStorePoliciesStepValidation,
+  STORE_CUSTOM_ORDER_LEAD_TIME_OPTIONS,
+  STORE_PROCESSING_TIME_OPTIONS,
+  STORE_REFUND_METHOD_OPTIONS,
+  STORE_RESPONSE_SLA_OPTIONS,
+  STORE_RETURN_WINDOW_OPTIONS,
+  STORE_SHIPPING_COUNTRIES,
+} from '@/utils/storePolicyConstraints';
 
 interface StorePoliciesStepProps {
   data: StoreWizardData;
@@ -26,26 +36,12 @@ interface StorePoliciesStepProps {
   primaryActionLabel?: string;
 }
 
-// Shipping regions with flags (Africa-first)
-const SHIPPING_COUNTRIES = [
-  { value: 'nigeria', label: 'Nigeria', flag: '🇳🇬', accent: 'from-emerald-500/20 to-emerald-600/20' },
-  { value: 'ghana', label: 'Ghana', flag: '🇬🇭', accent: 'from-amber-500/20 to-red-500/20' },
-  { value: 'kenya', label: 'Kenya', flag: '🇰🇪', accent: 'from-green-500/20 to-red-500/20' },
-  { value: 'south-africa', label: 'South Africa', flag: '🇿🇦', accent: 'from-cyan-500/20 to-emerald-500/20' },
-  { value: 'rwanda', label: 'Rwanda', flag: '🇷🇼', accent: 'from-yellow-500/20 to-blue-500/20' },
-  { value: 'egypt', label: 'Egypt', flag: '🇪🇬', accent: 'from-red-500/20 to-gray-500/20' },
-  { value: 'uk', label: 'United Kingdom', flag: '🇬🇧', accent: 'from-blue-500/20 to-red-500/20' },
-  { value: 'us', label: 'United States', flag: '🇺🇸', accent: 'from-blue-500/20 to-indigo-500/20' },
-  { value: 'international', label: 'International', flag: '🌍', accent: 'from-purple-500/20 to-blue-500/20' },
-];
+const SHIPPING_COUNTRIES = STORE_SHIPPING_COUNTRIES;
 
-// Processing times
-const PROCESSING_TIMES = [
-  { value: '1-2', label: '1-2 business days' },
-  { value: '3-5', label: '3-5 business days' },
-  { value: '5-7', label: '5-7 business days' },
-  { value: '7-14', label: '7-14 business days' },
-];
+// Processing times. Capped at 7 days and shared from storePolicyConstraints —
+// this list used to be defined here and still offered "7-14 business days",
+// above the ceiling every other production promise already respected.
+const PROCESSING_TIMES = STORE_PROCESSING_TIME_OPTIONS;
 
 // Shipping methods
 const SHIPPING_METHODS = [
@@ -61,25 +57,15 @@ const ORDER_CANCELLATION_WINDOWS = [
   { value: '24h', label: 'Within 24 hours' },
 ];
 
-const CUSTOM_ORDER_LEAD_TIMES = [
-  { value: '7-14', label: '7-14 days' },
-  { value: '14-21', label: '14-21 days' },
-  { value: '21-30', label: '21-30 days' },
-  { value: '30-plus', label: '30+ days' },
-];
+const CUSTOM_ORDER_LEAD_TIMES = STORE_CUSTOM_ORDER_LEAD_TIME_OPTIONS;
 
-const CUSTOM_ORDER_CONSULTATION_MODES = [
-  { value: 'required', label: 'Consultation required before quote' },
-  { value: 'optional', label: 'Consultation optional' },
-];
+const SELECT_WRAP_PROPS = {
+  selectedAllowWrap: true,
+  optionAllowWrap: true,
+  optionCompact: true,
+} as const;
 
-// Return windows
-const RETURN_WINDOWS = [
-  { value: '7', label: '7 days' },
-  { value: '14', label: '14 days' },
-  { value: '30', label: '30 days' },
-  { value: 'none', label: 'No returns' },
-];
+const RETURN_WINDOWS = STORE_RETURN_WINDOW_OPTIONS;
 
 // Return conditions
 const RETURN_CONDITIONS = [
@@ -128,20 +114,8 @@ const SIZE_CHARTS = [
   },
 ];
 
-// Refund methods
-const REFUND_METHODS = [
-  { value: 'original', label: 'Original payment method' },
-  { value: 'store-credit', label: 'Store credit' },
-  { value: 'exchange', label: 'Exchange only' },
-];
-
-// Response time SLAs
-const RESPONSE_SLAS = [
-  { value: '2h', label: 'Within 2 hours' },
-  { value: 'same-day', label: 'Same business day' },
-  { value: '24h', label: 'Within 24 hours' },
-  { value: '48h', label: 'Within 48 hours' },
-];
+const REFUND_METHODS = STORE_REFUND_METHOD_OPTIONS;
+const RESPONSE_SLAS = STORE_RESPONSE_SLA_OPTIONS;
 
 // Recommended defaults
 const RECOMMENDED_DEFAULTS: Partial<StoreWizardData> = {
@@ -158,8 +132,7 @@ const RECOMMENDED_DEFAULTS: Partial<StoreWizardData> = {
   refundMethod: 'original',
   responseTimeSla: '24h',
   customOrdersEnabled: true,
-  customOrderConsultationMode: 'required',
-  customOrderLeadTime: '14-21',
+  customOrderLeadTime: '2-4',
   customOrderRushSupported: false,
 };
 
@@ -269,75 +242,77 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
     }
   }, [data.orderProcessingMode, onChange]);
 
+  const stepValidation = useMemo(() => getStorePoliciesStepValidation(data), [data]);
+  const canContinue = stepValidation.valid && !isSaving;
+
   return (
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
       {/* Main Content - Centered Card */}
-      <div className="flex-1 flex items-start justify-center p-6 lg:p-12 overflow-y-auto">
+      <div className="flex-1 flex items-start justify-center p-3 sm:p-6 lg:p-12 overflow-y-auto">
         <div className="w-full max-w-[900px]">
           {/* Glass Card Container */}
-          <div className="rounded-2xl overflow-hidden bg-white/80 dark:bg-white/[0.03] backdrop-blur-xl border border-gray-200/50 dark:border-purple-500/10 shadow-xl">
+          <div className="rounded-2xl overflow-hidden bg-white/80 dark:bg-white/[0.03] backdrop-blur-xl border border-[color:var(--border-default)]/50 dark:border-purple-500/10 shadow-xl">
             {!isSettingsMode && (
-              <div className="px-8 pt-8 pb-4 border-b border-gray-200/50 dark:border-white/5">
+              <div className="px-8 pt-8 pb-4 border-b border-[color:var(--border-default)]/50 dark:border-white/5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-purple-600/20 flex items-center justify-center text-purple-600 dark:text-purple-400 text-sm font-bold border border-purple-500/30">
                       3
                     </div>
-                    <span className="text-gray-900 dark:text-white font-medium">
+                    <span className="text-[color:var(--text-primary)] dark:text-white font-medium">
                       Store Policies
                     </span>
                   </div>
-                  <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">
-                    Step 2 of 3
+                  <span className="text-xs text-[color:var(--text-secondary)] font-medium uppercase tracking-wider">
+                    Step 2 of 4
                   </span>
                 </div>
                 <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-                  <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 transition-all duration-500" />
+                  <div className="h-full w-1/2 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 transition-all duration-500" />
                 </div>
               </div>
             )}
 
             {/* Content Area */}
-            <div className="p-8 space-y-8">
+            <div className="origin-top scale-[0.92] p-4 space-y-5 sm:scale-100 sm:p-8 sm:space-y-8">
               {/* Header */}
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+              <div className="flex flex-row items-start justify-between gap-2 sm:gap-4">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <h1 className="text-xl font-bold tracking-tight text-[color:var(--text-primary)] dark:text-white sm:text-3xl">
                     Set Your Policies
                   </h1>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm md:text-base">
-                    Define how you handle shipping, returns, and customer
-                    inquiries.
+                  <p className="text-xs text-[color:var(--text-secondary)] dark:text-gray-400 sm:text-base">
+                    Define how you handle shipping, returns, and customer inquiries.
                   </p>
                 </div>
                 <button
                   onClick={applyDefaults}
-                  className="px-4 py-2 rounded-lg bg-purple-600/10 hover:bg-purple-600/20 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-sm font-medium transition-colors inline-flex items-center gap-2"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-purple-500/20 bg-purple-600/10 px-2 py-1.5 text-[10px] font-medium text-purple-600 transition-colors hover:bg-purple-600/20 dark:text-purple-400 sm:gap-2 sm:px-4 sm:py-2 sm:text-sm"
                 >
-                  <Sparkles className="w-4 h-4" />
-                  Apply Recommended
+                  <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="whitespace-nowrap">Apply Recommended</span>
                 </button>
               </div>
 
               {/* Policy Cards Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
                 {/* Shipping Policy Card */}
-                <div className="rounded-xl bg-gray-50/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 p-6 space-y-5">
+                <div className="space-y-4 rounded-xl border border-[color:var(--border-default)]/50 bg-[color:var(--surface-secondary)]/50 p-4 dark:border-white/5 dark:bg-white/[0.02] sm:space-y-5 sm:p-6">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400">
                       <Package className="w-5 h-5" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <h3 className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
                       Shipping Policy
                     </h3>
                   </div>
 
                   {/* Shipping Regions */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="text-sm font-medium text-[color:var(--text-primary)] dark:text-gray-300">
                       Shipping Regions
                     </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
                       {SHIPPING_COUNTRIES.map((region) => {
                         const isSelected = data.shippingRegions.includes(region.value);
                         const isAfrican = ['nigeria', 'ghana', 'kenya', 'south-africa', 'rwanda', 'egypt'].includes(region.value);
@@ -345,28 +320,28 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                           <button
                             key={region.value}
                             onClick={() => toggleRegion(region.value)}
-                            className={`flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-all duration-200 bg-gradient-to-r ${region.accent} ${
+                            className={`flex items-center justify-between rounded-xl border bg-gradient-to-r px-2 py-2 text-left transition-all duration-200 sm:px-4 sm:py-3 ${region.accent} ${
                               isSelected
                                 ? 'border-purple-500/50 shadow-lg shadow-purple-500/10'
-                                : 'border-gray-200 dark:border-white/10 hover:border-purple-400/60'
+                                : 'border-[color:var(--border-default)] dark:border-white/10 hover:border-purple-400/60'
                             }`}
                           >
-                            <div className="flex items-center gap-3">
-                              <span className="text-xl" aria-hidden="true">{region.flag}</span>
-                              <div className="flex flex-col">
-                                <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                            <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
+                              <span className="text-base sm:text-xl" aria-hidden="true">{region.flag}</span>
+                              <div className="flex min-w-0 flex-col">
+                                <span className="text-[11px] font-semibold leading-tight text-[color:var(--text-primary)] dark:text-white sm:text-sm">
                                   {region.label}
                                 </span>
-                                <span className="text-[11px] text-gray-600 dark:text-gray-400">
+                                <span className="hidden text-[10px] text-[color:var(--text-secondary)] dark:text-gray-400 sm:block">
                                   {isAfrican ? 'Africa-first lane' : 'Secondary lane'}
                                 </span>
                               </div>
                             </div>
                             <div
-                              className={`w-6 h-6 rounded-full border flex items-center justify-center ${
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border sm:h-6 sm:w-6 ${
                                 isSelected
                                   ? 'bg-purple-600 text-white border-purple-600'
-                                  : 'bg-white/70 dark:bg-gray-800 text-gray-400 border-gray-300 dark:border-gray-700'
+                                  : 'bg-white/70 dark:bg-gray-800 text-[color:var(--text-muted)] border-[color:var(--field-border)] dark:border-gray-700'
                               }`}
                             >
                               {isSelected && <Check className="w-3 h-3" />}
@@ -383,17 +358,18 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       label="Processing Time"
                       value={data.processingTime}
                       onChange={(value) => onChange({ processingTime: value })}
-                      options={PROCESSING_TIMES}
+                      options={[...PROCESSING_TIMES]}
                       placeholder="Select processing time"
+                      {...SELECT_WRAP_PROPS}
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-[color:var(--text-secondary)] dark:text-gray-400">
                       This becomes the default processing time for new products and custom-order setup.
                     </p>
                   </div>
 
                   {/* Shipping Methods */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="text-sm font-medium text-[color:var(--text-primary)] dark:text-gray-300">
                       Shipping Methods
                     </label>
                     <div className="space-y-2">
@@ -404,15 +380,15 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                         return (
                           <label
                             key={method.value}
-                            className="flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-black/20 border border-gray-200 dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                            className="flex items-center gap-3 p-3 rounded-lg bg-[color:var(--surface-secondary)] dark:bg-black/20 border border-[color:var(--border-default)] dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                           >
                             <input
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleShippingMethod(method.value)}
-                              className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                              className="w-4 h-4 rounded border-[color:var(--field-border)] text-purple-600 focus:ring-purple-500"
                             />
-                            <span className="text-sm text-gray-700 dark:text-gray-300">
+                            <span className="text-sm text-[color:var(--text-primary)] dark:text-gray-300">
                               {method.label}
                             </span>
                           </label>
@@ -424,7 +400,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                   {/* Free Shipping Threshold */}
                   {data.shippingMethods.includes('free-threshold') && (
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <label className="text-sm font-medium text-[color:var(--text-primary)] dark:text-gray-300">
                         Free Shipping Threshold (₦)
                       </label>
                       <input
@@ -438,20 +414,20 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                           })
                         }
                         placeholder="e.g. 50000"
-                        className="w-full bg-white dark:bg-black/30 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-purple-500"
+                        className="w-full bg-[color:var(--surface-secondary)] dark:bg-black/30 border border-[color:var(--field-border)] dark:border-white/10 rounded-lg px-4 py-2.5 text-sm text-[color:var(--text-primary)] dark:text-white focus:outline-none focus:border-purple-500"
                       />
                     </div>
                   )}
                 </div>
 
                 {/* Returns Policy Card */}
-                <div className="rounded-xl bg-gray-50/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 p-6 space-y-5">
+                <div className="space-y-4 rounded-xl border border-[color:var(--border-default)]/50 bg-[color:var(--surface-secondary)]/50 p-4 dark:border-white/5 dark:bg-white/[0.02] sm:space-y-5 sm:p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-600 dark:text-orange-400">
                         <RotateCcw className="w-5 h-5" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      <h3 className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
                         Returns & Exchanges
                       </h3>
                     </div>
@@ -467,7 +443,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       }`}
                     >
                       <span
-                        className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${
+                        className={`absolute top-1 w-4 h-4 rounded-full bg-[color:var(--surface-secondary)] shadow transition-all ${
                           data.returnsAccepted ? 'left-7' : 'left-1'
                         }`}
                       />
@@ -482,14 +458,15 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                           label="Return Window"
                           value={data.returnWindow}
                           onChange={(value) => onChange({ returnWindow: value })}
-                          options={RETURN_WINDOWS.filter((window) => window.value !== 'none')}
+                          options={[...RETURN_WINDOWS]}
                           placeholder="Select return window"
+                          {...SELECT_WRAP_PROPS}
                         />
                       </div>
 
                       {/* Return Conditions */}
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label className="text-sm font-medium text-[color:var(--text-primary)] dark:text-gray-300">
                           Conditions
                         </label>
                         <div className="space-y-2">
@@ -500,7 +477,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                             return (
                               <label
                                 key={condition.value}
-                                className="flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-black/20 border border-gray-200 dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                                className="flex items-center gap-3 p-3 rounded-lg bg-[color:var(--surface-secondary)] dark:bg-black/20 border border-[color:var(--border-default)] dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                               >
                                 <input
                                   type="checkbox"
@@ -508,9 +485,9 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                                   onChange={() =>
                                     toggleReturnCondition(condition.value)
                                   }
-                                  className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                  className="w-4 h-4 rounded border-[color:var(--field-border)] text-purple-600 focus:ring-purple-500"
                                 />
-                                <span className="text-sm text-gray-700 dark:text-gray-300">
+                                <span className="text-sm text-[color:var(--text-primary)] dark:text-gray-300">
                                   {condition.label}
                                 </span>
                               </label>
@@ -525,13 +502,14 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                           label="Refund Method"
                           value={data.refundMethod}
                           onChange={(value) => onChange({ refundMethod: value })}
-                          options={REFUND_METHODS}
+                          options={[...REFUND_METHODS]}
                           placeholder="Select refund method"
+                          {...SELECT_WRAP_PROPS}
                         />
                       </div>
                     </>
                   ) : (
-                    <div className="text-center py-6 text-gray-500">
+                    <div className="text-center py-6 text-[color:var(--text-secondary)]">
                       <p className="text-sm">
                         Returns are disabled. Toggle above to enable.
                       </p>
@@ -540,18 +518,18 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 </div>
 
                 {/* Orders & Custom Orders Card */}
-                <div className="rounded-xl bg-gray-50/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 p-6 space-y-5">
+                <div className="space-y-4 rounded-xl border border-[color:var(--border-default)]/50 bg-[color:var(--surface-secondary)]/50 p-4 dark:border-white/5 dark:bg-white/[0.02] sm:space-y-5 sm:p-6">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-lg">
                       🧾
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <h3 className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
                       Orders & Custom Orders
                     </h3>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="text-sm font-medium text-[color:var(--text-primary)] dark:text-gray-300">
                       Standard Order Processing
                     </label>
                     <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-100">
@@ -572,27 +550,28 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                             value as StoreWizardData['orderCancellationWindow'],
                         })
                       }
-                      options={ORDER_CANCELLATION_WINDOWS}
+                      options={[...ORDER_CANCELLATION_WINDOWS]}
                       placeholder="Select cancellation window"
+                      {...SELECT_WRAP_PROPS}
                     />
                   </div>
 
-                  <label className="flex items-start gap-3 p-3 rounded-lg bg-white dark:bg-black/20 border border-gray-200 dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                  <label className="flex items-start gap-3 p-3 rounded-lg bg-[color:var(--surface-secondary)] dark:bg-black/20 border border-[color:var(--border-default)] dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                     <input
                       type="checkbox"
                       checked={data.allowOrderNotes}
                       onChange={(e) => onChange({ allowOrderNotes: e.target.checked })}
-                      className="w-4 h-4 mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      className="w-4 h-4 mt-0.5 rounded border-[color:var(--field-border)] text-purple-600 focus:ring-purple-500"
                     />
                     <div>
-                      <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">Allow buyer order notes</div>
-                      <div className="text-xs text-gray-500">Buyers can include fit/delivery notes at checkout.</div>
+                      <div className="text-sm text-[color:var(--text-primary)] dark:text-gray-300 font-medium">Allow buyer order notes</div>
+                      <div className="text-xs text-[color:var(--text-secondary)]">Buyers can include fit/delivery notes at checkout.</div>
                     </div>
                   </label>
 
-                  <div className="pt-1 border-t border-gray-200/70 dark:border-white/10 space-y-2">
+                  <div className="pt-1 border-t border-[color:var(--border-default)]/70 dark:border-white/10 space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <label className="text-sm font-medium text-[color:var(--text-primary)] dark:text-gray-300">
                         Accept custom orders
                       </label>
                       <button
@@ -602,34 +581,19 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                         }`}
                       >
                         <span
-                          className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${
+                          className={`absolute top-1 w-4 h-4 rounded-full bg-[color:var(--surface-secondary)] shadow transition-all ${
                             data.customOrdersEnabled ? 'left-7' : 'left-1'
                           }`}
                         />
                       </button>
                     </div>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-[color:var(--text-secondary)]">
                       Enables custom-order entry points on eligible products and designs.
                     </p>
                   </div>
 
                   {data.customOrdersEnabled ? (
                     <>
-                      <div className="space-y-2">
-                        <UniversalSelect
-                          label="Consultation Mode"
-                          value={data.customOrderConsultationMode}
-                          onChange={(value) =>
-                            onChange({
-                              customOrderConsultationMode:
-                                value as StoreWizardData['customOrderConsultationMode'],
-                            })
-                          }
-                          options={CUSTOM_ORDER_CONSULTATION_MODES}
-                          placeholder="Select consultation mode"
-                        />
-                      </div>
-
                       <div className="space-y-2">
                         <UniversalSelect
                           label="Typical Custom-Order Lead Time"
@@ -640,21 +604,22 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                                 value as StoreWizardData['customOrderLeadTime'],
                             })
                           }
-                          options={CUSTOM_ORDER_LEAD_TIMES}
+                          options={[...CUSTOM_ORDER_LEAD_TIMES]}
                           placeholder="Select lead time"
+                          {...SELECT_WRAP_PROPS}
                         />
                       </div>
 
-                      <label className="flex items-start gap-3 p-3 rounded-lg bg-white dark:bg-black/20 border border-gray-200 dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                      <label className="flex items-start gap-3 p-3 rounded-lg bg-[color:var(--surface-secondary)] dark:bg-black/20 border border-[color:var(--border-default)] dark:border-white/5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                         <input
                           type="checkbox"
                           checked={data.customOrderRushSupported}
                           onChange={(e) => onChange({ customOrderRushSupported: e.target.checked })}
-                          className="w-4 h-4 mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                          className="w-4 h-4 mt-0.5 rounded border-[color:var(--field-border)] text-purple-600 focus:ring-purple-500"
                         />
                         <div>
-                          <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">Enable rush custom orders</div>
-                          <div className="text-xs text-gray-500">Use this only if your team can handle expedited timelines.</div>
+                          <div className="text-sm text-[color:var(--text-primary)] dark:text-gray-300 font-medium">Enable rush custom orders</div>
+                          <div className="text-xs text-[color:var(--text-secondary)]">Use this only if your team can handle expedited timelines.</div>
                         </div>
                       </label>
                     </>
@@ -673,15 +638,15 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                         <Ruler className="w-5 h-5" />
                       </div>
                       <div className="text-left">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        <h3 className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
                           Size Chart
                         </h3>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-[color:var(--text-secondary)]">
                           {data.sizeChartPresetKey ? `Using ${data.sizeChartPresetKey}` : 'Tap to configure'}
                         </p>
                       </div>
                     </div>
-                    <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${expandedSections.sizeChart ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-5 h-5 text-[color:var(--text-muted)] transition-transform ${expandedSections.sizeChart ? 'rotate-180' : ''}`} />
                   </button>
 
                   {expandedSections.sizeChart && (
@@ -702,16 +667,16 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                                 sizeChartUrl: null,
                               })
                             }
-                            className={`w-full text-left rounded-xl border px-4 py-3 transition-all duration-200 bg-white dark:bg-black/20 hover:border-purple-400/60 hover:shadow-md ${
+                            className={`w-full text-left rounded-xl border px-4 py-3 transition-all duration-200 bg-[color:var(--surface-secondary)] dark:bg-black/20 hover:border-purple-400/60 hover:shadow-md ${
                               isActive
                                 ? 'border-purple-500/60 shadow-purple-500/15 shadow-lg'
-                                : 'border-gray-200 dark:border-white/10'
+                                : 'border-[color:var(--border-default)] dark:border-white/10'
                             } ${isAfrica ? 'ring-1 ring-emerald-400/40' : ''}`}
                           >
                             <div className="flex items-center justify-between gap-2">
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                  <span className="text-sm font-semibold text-[color:var(--text-primary)] dark:text-white">
                                     {chart.title}
                                   </span>
                                   {isAfrica && (
@@ -720,7 +685,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-xs text-gray-500 mt-0.5">
+                                <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
                                   {chart.description}
                                 </p>
                               </div>
@@ -728,20 +693,20 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                                 className={`w-7 h-7 rounded-full flex items-center justify-center border ${
                                   isActive
                                     ? 'bg-purple-600 text-white border-purple-600'
-                                    : 'border-gray-300 dark:border-gray-600 text-gray-400'
+                                    : 'border-[color:var(--field-border)] dark:border-gray-600 text-[color:var(--text-muted)]'
                                 }`}
                               >
                                 <Check className="w-3.5 h-3.5" />
                               </div>
                             </div>
-                            <div className="mt-2 flex items-center gap-2 text-[11px] text-gray-500">
+                            <div className="mt-2 flex items-center gap-2 text-[11px] text-[color:var(--text-secondary)]">
                               <Sparkles className="w-3.5 h-3.5 text-purple-500" />
                               <span>{index === 0 ? 'Africa-first sizing lane' : 'Mapped for cross-border shoppers'}</span>
                             </div>
                           </button>
                         );
                       })}
-                      <div className="text-xs text-gray-500 flex items-center gap-2">
+                      <div className="text-xs text-[color:var(--text-secondary)] flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
@@ -760,12 +725,14 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       </div>
                     </div>
 
-                    {/* Preview */}
-                    <div className="rounded-xl border border-dashed border-gray-300 dark:border-white/10 bg-white dark:bg-black/10 p-5 h-full min-h-[280px]">
+                    {/* Preview — min-w-0 is LOAD-BEARING: without it the grid
+                        column stretches to the table's min width on phones and
+                        the whole page overflows instead of the table scrolling. */}
+                    <div className="min-w-0 rounded-xl border border-dashed border-[color:var(--field-border)] dark:border-white/10 bg-[color:var(--surface-secondary)] dark:bg-black/10 p-3 sm:p-5 h-full min-h-[280px]">
                       {data.sizeChartUrl ? (
                         <div className="relative">
-                          <div className="text-xs text-gray-500 mb-2 flex items-center gap-2">
-                            <span className="px-2 py-0.5 rounded-full bg-gray-200/60 dark:bg-white/10 text-gray-700 dark:text-gray-200 border border-gray-300/60 dark:border-white/10">Custom upload</span>
+                          <div className="text-xs text-[color:var(--text-secondary)] mb-2 flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-full bg-gray-200/60 dark:bg-white/10 text-[color:var(--text-primary)] dark:text-gray-200 border border-[color:var(--field-border)]/60 dark:border-white/10">Custom upload</span>
                             <span>Preview</span>
                           </div>
                           <MediaRenderer
@@ -773,7 +740,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                             src={data.sizeChartUrl}
                             alt="Size chart preview"
                             maxHeightClassName="max-h-40"
-                            className="rounded-lg border border-gray-200 dark:border-white/10"
+                            className="rounded-lg border border-[color:var(--border-default)] dark:border-white/10"
                             mediaClassName="rounded-lg"
                           />
                           <button
@@ -788,30 +755,30 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       ) : selectedPreset ? (
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <div className="flex items-center gap-2 text-xs text-[color:var(--text-secondary)]">
                               <span className="px-2 py-0.5 rounded-full bg-purple-600/10 text-purple-700 dark:text-purple-200 border border-purple-500/20">
                                 {selectedPreset.title}
                               </span>
-                              <span className="text-gray-600 dark:text-gray-400">Preview</span>
+                              <span className="text-[color:var(--text-secondary)] dark:text-gray-400">Preview</span>
                             </div>
                           </div>
-                          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/10">
-                            <table className="min-w-[560px] w-full text-xs text-left text-gray-700 dark:text-gray-200">
-                              <thead className="bg-gray-100 dark:bg-white/5 text-[11px] uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                          <div className="overflow-x-auto rounded-lg border border-[color:var(--border-default)] dark:border-white/10">
+                            <table className="min-w-[420px] w-full text-[11px] sm:text-xs text-left text-[color:var(--text-primary)] dark:text-gray-200">
+                              <thead className="bg-[color:var(--surface-muted)] dark:bg-white/5 text-[10px] sm:text-[11px] uppercase tracking-wide text-[color:var(--text-secondary)] dark:text-gray-400">
                                 <tr>
-                                  <th className="px-4 py-3">Size</th>
-                                  <th className="px-4 py-3">Bust</th>
-                                  <th className="px-4 py-3">Waist</th>
-                                  <th className="px-4 py-3">Hip</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Size</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Bust</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Waist</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Hip</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {selectedPreset.rows.map((row) => (
                                   <tr key={row.size} className="odd:bg-white even:bg-gray-50 dark:odd:bg-black/30 dark:even:bg-black/20">
-                                    <td className="px-4 py-3 font-medium">{row.size}</td>
-                                    <td className="px-4 py-3">{row.bust}</td>
-                                    <td className="px-4 py-3">{row.waist}</td>
-                                    <td className="px-4 py-3">{row.hip}</td>
+                                    <td className="px-2.5 py-2 font-medium sm:px-4 sm:py-3">{row.size}</td>
+                                    <td className="px-2.5 py-2 sm:px-4 sm:py-3">{row.bust}</td>
+                                    <td className="px-2.5 py-2 sm:px-4 sm:py-3">{row.waist}</td>
+                                    <td className="px-2.5 py-2 sm:px-4 sm:py-3">{row.hip}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -819,7 +786,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                           </div>
                         </div>
                       ) : (
-                        <div className="h-full min-h-[180px] flex flex-col items-center justify-center text-center text-sm text-gray-500 gap-2">
+                        <div className="h-full min-h-[180px] flex flex-col items-center justify-center text-center text-sm text-[color:var(--text-secondary)] gap-2">
                           <Sparkles className="w-6 h-6 text-purple-500" />
                           <p>Select a preset to preview or upload a custom chart.</p>
                         </div>
@@ -832,7 +799,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 
 
 {/* Size Chart Card - Collapsible - lg:col-span-2 for wide modern layout */}
-                <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-gray-50/80 to-white/50 dark:from-white/[0.02] dark:to-white/[0.01] border border-gray-200/80 dark:border-white/10 p-6 space-y-6 shadow-sm overflow-hidden relative">
+                <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-gray-50/80 to-white/50 dark:from-white/[0.02] dark:to-white/[0.01] border border-[color:var(--border-default)]/80 dark:border-white/10 p-3 sm:p-6 space-y-4 sm:space-y-6 shadow-sm overflow-hidden relative">
                   {/* Decorative modern background element */}
                   <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-emerald-400/5 dark:bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
                   
@@ -846,7 +813,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                         <Ruler className="w-6 h-6" />
                       </div>
                       <div className="text-left">
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
+                        <h3 className="text-xl font-bold text-[color:var(--text-primary)] dark:text-white tracking-tight flex items-center gap-2">
                           Size Chart Configurator
                           {(data.sizeChartPresetKey || data.sizeChartUrl) ? (
                             <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
@@ -854,26 +821,26 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                             </span>
                           ) : null}
                         </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        <p className="text-sm text-[color:var(--text-secondary)] dark:text-gray-400 mt-1">
                           {data.sizeChartPresetKey ? `Active: ${SIZE_CHARTS.find(c => c.id === data.sizeChartPresetKey)?.title || data.sizeChartPresetKey}` : 'Choose a predefined sizing lane or upload your custom reference.'}
                         </p>
                       </div>
                     </div>
-                    <div className={`p-2 rounded-full transition-all duration-300 ${expandedSections.sizeChart ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rotate-180' : 'bg-gray-100 dark:bg-white/5 text-gray-500 group-hover:bg-gray-200 dark:group-hover:bg-white/10'}`}>
+                    <div className={`p-2 rounded-full transition-all duration-300 ${expandedSections.sizeChart ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rotate-180' : 'bg-[color:var(--surface-muted)] dark:bg-white/5 text-[color:var(--text-secondary)] group-hover:bg-gray-200 dark:group-hover:bg-white/10'}`}>
                       <ChevronDown className="w-5 h-5" />
                     </div>
                   </button>
 
                   {expandedSections.sizeChart && (
-                  <div className="flex flex-col gap-8 pt-6 border-t border-gray-100 dark:border-white/5 relative z-10 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="flex flex-col gap-8 pt-6 border-t border-[color:var(--border-default)] dark:border-white/5 relative z-10 animate-in fade-in slide-in-from-top-4 duration-500">
                     
                     {/* Top Section: Presets Grid */}
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <h4 className="text-sm font-semibold text-[color:var(--text-primary)] dark:text-white flex items-center gap-2">
                           Select Sizing System
                         </h4>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-[color:var(--text-secondary)]">
                           {data.sizeChartSystem === 'custom' ? 'Custom Image Active' : `${SIZE_CHARTS.length} lanes available`}
                         </div>
                       </div>
@@ -896,7 +863,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                               className={`p-5 rounded-2xl border text-left transition-all duration-300 group relative overflow-hidden flex flex-col h-full ${
                                 isActive
                                   ? 'bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-500/10 dark:to-emerald-500/5 border-emerald-400/50 shadow-[0_8px_24px_-8px_rgba(16,185,129,0.25)] ring-1 ring-emerald-500/20 md:-translate-y-1'
-                                  : 'bg-white dark:bg-black/20 border-gray-200 dark:border-white/10 hover:border-emerald-300 dark:hover:border-emerald-500/40 hover:bg-emerald-50/30 hover:shadow-md'
+                                  : 'bg-[color:var(--surface-secondary)] dark:bg-black/20 border-[color:var(--border-default)] dark:border-white/10 hover:border-emerald-300 dark:hover:border-emerald-500/40 hover:bg-emerald-50/30 hover:shadow-md'
                               }`}
                             >
                               {isAfrica && (
@@ -905,24 +872,24 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                                 </div>
                               )}
                               <div className="flex justify-between items-start mb-3">
-                                <div className={`p-2 rounded-lg ${isActive ? 'bg-emerald-500 text-white shadow-inner' : 'bg-gray-100 dark:bg-white/5 text-gray-500 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/30 group-hover:text-emerald-600 transition-colors'}`}>
+                                <div className={`p-2 rounded-lg ${isActive ? 'bg-emerald-500 text-white shadow-inner' : 'bg-[color:var(--surface-muted)] dark:bg-white/5 text-[color:var(--text-secondary)] group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/30 group-hover:text-emerald-600 transition-colors'}`}>
                                   {index === 0 ? <Sparkles className="w-4 h-4" /> : <Ruler className="w-4 h-4" />}
                                 </div>
                                 <div
                                   className={`w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all ${
                                     isActive
                                       ? 'bg-emerald-500 border-emerald-500 text-white scale-110 shadow-md shadow-emerald-500/20'
-                                      : 'bg-white dark:bg-black border-gray-200 dark:border-gray-700 text-transparent group-hover:border-emerald-400'
+                                      : 'bg-[color:var(--surface-secondary)] dark:bg-black border-[color:var(--border-default)] dark:border-gray-700 text-transparent group-hover:border-emerald-400'
                                   }`}
                                 >
                                   <Check className="w-3.5 h-3.5" />
                                 </div>
                               </div>
                               <div className="mt-auto">
-                                <h5 className={`text-base font-bold mb-1.5 transition-colors ${isActive ? 'text-emerald-900 dark:text-emerald-100' : 'text-gray-900 dark:text-white'}`}>
+                                <h5 className={`text-base font-bold mb-1.5 transition-colors ${isActive ? 'text-emerald-900 dark:text-emerald-100' : 'text-[color:var(--text-primary)] dark:text-white'}`}>
                                   {chart.title}
                                 </h5>
-                                <p className={`text-xs leading-relaxed ${isActive ? 'text-emerald-700/80 dark:text-emerald-300/80' : 'text-gray-500 dark:text-gray-400'}`}>
+                                <p className={`text-xs leading-relaxed ${isActive ? 'text-emerald-700/80 dark:text-emerald-300/80' : 'text-[color:var(--text-secondary)] dark:text-gray-400'}`}>
                                   {chart.description}
                                 </p>
                               </div>
@@ -931,18 +898,18 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                         })}
                       </div>
 
-                      <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/5">
+                      <div className="mt-4 pt-4 border-t border-[color:var(--border-default)] dark:border-white/5">
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="w-full flex items-center justify-center gap-3 p-4 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-xl bg-gray-50/50 dark:bg-white/[0.01] hover:border-purple-400 hover:bg-purple-50/50 dark:hover:bg-purple-900/20 transition-all duration-300 group"
+                          className="w-full flex items-center justify-center gap-3 p-4 border-2 border-dashed border-[color:var(--border-default)] dark:border-white/10 rounded-xl bg-[color:var(--surface-secondary)]/50 dark:bg-white/[0.01] hover:border-purple-400 hover:bg-purple-50/50 dark:hover:bg-purple-900/20 transition-all duration-300 group"
                         >
-                          <div className="w-10 h-10 rounded-full bg-white dark:bg-black shadow-sm border border-gray-100 dark:border-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Upload className="w-4 h-4 text-gray-500 group-hover:text-purple-600" />
+                          <div className="w-10 h-10 rounded-full bg-[color:var(--surface-secondary)] dark:bg-black shadow-sm border border-[color:var(--border-default)] dark:border-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Upload className="w-4 h-4 text-[color:var(--text-secondary)] group-hover:text-purple-600" />
                           </div>
                           <div className="text-left">
-                            <span className="block text-sm font-semibold text-gray-900 dark:text-white group-hover:text-purple-700 transition-colors">Upload Custom Chart</span>
-                            <span className="block text-xs text-gray-500">Supports PNG, JPG (Max 5MB)</span>
+                            <span className="block text-sm font-semibold text-[color:var(--text-primary)] dark:text-white group-hover:text-purple-700 transition-colors">Upload Custom Chart</span>
+                            <span className="block text-xs text-[color:var(--text-secondary)]">Supports PNG, JPG (Max 5MB)</span>
                           </div>
                         </button>
                         <input
@@ -956,9 +923,9 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                     </div>
 
                     {/* Bottom Section: Preview Area */}
-                    <div className="flex flex-col space-y-3 bg-white dark:bg-[#111] rounded-2xl border border-gray-200/80 dark:border-white/10 overflow-hidden shadow-sm">
-                      <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02] flex items-center justify-between">
-                         <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <div className="flex flex-col space-y-3 bg-[color:var(--surface-secondary)] dark:bg-[#111] rounded-2xl border border-[color:var(--border-default)]/80 dark:border-white/10 overflow-hidden shadow-sm">
+                      <div className="p-4 border-b border-[color:var(--border-default)] dark:border-white/5 bg-[color:var(--surface-secondary)]/50 dark:bg-white/[0.02] flex items-center justify-between">
+                         <h4 className="text-sm font-bold text-[color:var(--text-primary)] dark:text-white flex items-center gap-2">
                            Live Preview
                            {selectedPreset && !data.sizeChartUrl && (
                              <span className="relative flex h-2 w-2 ml-1">
@@ -974,18 +941,18 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       
                       <div className="p-1">
                         {data.sizeChartUrl ? (
-                          <div className="relative group w-full flex items-center justify-center bg-gray-50/80 dark:bg-black/40 rounded-xl p-6 min-h-[300px]">
+                          <div className="relative group w-full flex items-center justify-center bg-[color:var(--surface-secondary)]/80 dark:bg-black/40 rounded-xl p-6 min-h-[300px]">
                             <MediaRenderer
                               kind="image"
                               src={data.sizeChartUrl}
                               alt="Custom Size Chart"
-                              className="max-w-full lg:max-w-2xl max-h-[500px] object-contain rounded-lg shadow-md border border-gray-200/50 dark:border-white/10"
+                              className="max-w-full lg:max-w-2xl max-h-[500px] object-contain rounded-lg shadow-md border border-[color:var(--border-default)]/50 dark:border-white/10"
                             />
                             <button
                               onClick={() =>
                                 onChange({ sizeChartFile: null, sizeChartUrl: null })
                               }
-                              className="absolute top-4 right-4 p-2.5 rounded-full bg-white/90 dark:bg-black/60 shadow-lg backdrop-blur border border-gray-200 dark:border-white/10 text-red-500 hover:bg-red-500 hover:text-white transition-all transform opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100"
+                              className="absolute top-4 right-4 p-2.5 rounded-full bg-white/90 dark:bg-black/60 shadow-lg backdrop-blur border border-[color:var(--border-default)] dark:border-white/10 text-red-500 hover:bg-red-500 hover:text-white transition-all transform opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100"
                               title="Remove custom chart"
                             >
                               <X className="w-5 h-5" />
@@ -993,27 +960,27 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                           </div>
                         ) : selectedPreset ? (
                           <div className="flex flex-col w-full h-full bg-transparent overflow-hidden">
-                            <div className="overflow-x-auto p-4">
-                              <table className="w-full text-sm text-left">
+                            <div className="min-w-0 overflow-x-auto p-2 sm:p-4">
+                              <table className="w-full text-xs sm:text-sm text-left">
                                 <thead>
-                                  <tr className="border-b border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400">
-                                    <th className="px-6 py-4 font-semibold text-gray-900 dark:text-white bg-gray-50/50 dark:bg-white/5 rounded-tl-xl w-1/4">Size Standard</th>
-                                    <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Bust</th>
-                                    <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Waist</th>
-                                    <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider bg-gray-50/50 dark:bg-white/5 rounded-tr-xl">Hip</th>
+                                  <tr className="border-b border-[color:var(--border-default)] dark:border-white/10 text-[color:var(--text-secondary)] dark:text-gray-400">
+                                    <th className="px-3 py-2.5 sm:px-6 sm:py-4 font-semibold text-[color:var(--text-primary)] dark:text-white bg-[color:var(--surface-secondary)]/50 dark:bg-white/5 rounded-tl-xl w-1/4">Size Standard</th>
+                                    <th className="px-3 py-2.5 sm:px-6 sm:py-4 font-medium text-[10px] sm:text-xs uppercase tracking-wider">Bust</th>
+                                    <th className="px-3 py-2.5 sm:px-6 sm:py-4 font-medium text-[10px] sm:text-xs uppercase tracking-wider">Waist</th>
+                                    <th className="px-3 py-2.5 sm:px-6 sm:py-4 font-medium text-[10px] sm:text-xs uppercase tracking-wider bg-[color:var(--surface-secondary)]/50 dark:bg-white/5 rounded-tr-xl">Hip</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                                   {selectedPreset.rows.map((row) => (
                                     <tr key={row.size} className="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors group">
-                                      <td className="px-6 py-4">
-                                        <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-bold text-sm border border-gray-200/50 dark:border-white/5 shadow-sm group-hover:border-emerald-500/30 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-500/10 transition-colors">
+                                      <td className="px-3 py-2.5 sm:px-6 sm:py-4">
+                                        <span className="inline-flex items-center justify-center px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-[color:var(--surface-muted)] dark:bg-white/10 text-[color:var(--text-primary)] dark:text-white font-bold text-xs sm:text-sm border border-[color:var(--border-default)]/50 dark:border-white/5 shadow-sm group-hover:border-emerald-500/30 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-500/10 transition-colors">
                                           {row.size}
                                         </span>
                                       </td>
-                                      <td className="px-6 py-4 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">{row.bust}</td>
-                                      <td className="px-6 py-4 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap">{row.waist}</td>
-                                      <td className="px-6 py-4 text-gray-600 dark:text-gray-300 font-medium whitespace-nowrap bg-gray-50/30 dark:bg-white/[0.01]">{row.hip}</td>
+                                      <td className="px-3 py-2.5 sm:px-6 sm:py-4 text-[color:var(--text-secondary)] dark:text-gray-300 font-medium whitespace-nowrap">{row.bust}</td>
+                                      <td className="px-3 py-2.5 sm:px-6 sm:py-4 text-[color:var(--text-secondary)] dark:text-gray-300 font-medium whitespace-nowrap">{row.waist}</td>
+                                      <td className="px-3 py-2.5 sm:px-6 sm:py-4 text-[color:var(--text-secondary)] dark:text-gray-300 font-medium whitespace-nowrap bg-[color:var(--surface-secondary)]/30 dark:bg-white/[0.01]">{row.hip}</td>
                                     </tr>
                                   ))}
                                 </tbody>
@@ -1021,13 +988,13 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                             </div>
                           </div>
                         ) : (
-                          <div className="flex flex-col items-center justify-center text-center p-12 bg-gray-50/30 dark:bg-black/10 rounded-xl m-2 border border-dashed border-gray-200 dark:border-white/10">
+                          <div className="flex flex-col items-center justify-center text-center p-12 bg-[color:var(--surface-secondary)]/30 dark:bg-black/10 rounded-xl m-2 border border-dashed border-[color:var(--border-default)] dark:border-white/10">
                             <div className="w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center mb-4 relative">
                               <Sparkles className="w-8 h-8 text-emerald-400 dark:text-emerald-500" />
                               <div className="absolute inset-0 bg-emerald-400 blur-xl opacity-20 rounded-full animate-pulse" />
                             </div>
-                            <h5 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No Size Chart Selected</h5>
-                            <p className="text-sm text-gray-500 max-w-sm mx-auto">
+                            <h5 className="text-lg font-bold text-[color:var(--text-primary)] dark:text-white mb-2">No Size Chart Selected</h5>
+                            <p className="text-sm text-[color:var(--text-secondary)] max-w-sm mx-auto">
                               Choose a standardized sizing lane from above or upload your own guide to activate the preview area.
                             </p>
                           </div>
@@ -1048,15 +1015,15 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                         <Ruler className="w-5 h-5" />
                       </div>
                       <div className="text-left">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        <h3 className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
                           Size Chart
                         </h3>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-[color:var(--text-secondary)]">
                           {data.sizeChartPresetKey ? `Using ${data.sizeChartPresetKey}` : 'Tap to configure'}
                         </p>
                       </div>
                     </div>
-                    <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${expandedSections.sizeChart ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-5 h-5 text-[color:var(--text-muted)] transition-transform ${expandedSections.sizeChart ? 'rotate-180' : ''}`} />
                   </button>
 
                   {expandedSections.sizeChart && (
@@ -1077,16 +1044,16 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                                 sizeChartUrl: null,
                               })
                             }
-                            className={`w-full text-left rounded-xl border px-4 py-3 transition-all duration-200 bg-white dark:bg-black/20 hover:border-purple-400/60 hover:shadow-md ${
+                            className={`w-full text-left rounded-xl border px-4 py-3 transition-all duration-200 bg-[color:var(--surface-secondary)] dark:bg-black/20 hover:border-purple-400/60 hover:shadow-md ${
                               isActive
                                 ? 'border-purple-500/60 shadow-purple-500/15 shadow-lg'
-                                : 'border-gray-200 dark:border-white/10'
+                                : 'border-[color:var(--border-default)] dark:border-white/10'
                             } ${isAfrica ? 'ring-1 ring-emerald-400/40' : ''}`}
                           >
                             <div className="flex items-center justify-between gap-2">
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                  <span className="text-sm font-semibold text-[color:var(--text-primary)] dark:text-white">
                                     {chart.title}
                                   </span>
                                   {isAfrica && (
@@ -1095,7 +1062,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-xs text-gray-500 mt-0.5">
+                                <p className="text-xs text-[color:var(--text-secondary)] mt-0.5">
                                   {chart.description}
                                 </p>
                               </div>
@@ -1103,20 +1070,20 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                                 className={`w-7 h-7 rounded-full flex items-center justify-center border ${
                                   isActive
                                     ? 'bg-purple-600 text-white border-purple-600'
-                                    : 'border-gray-300 dark:border-gray-600 text-gray-400'
+                                    : 'border-[color:var(--field-border)] dark:border-gray-600 text-[color:var(--text-muted)]'
                                 }`}
                               >
                                 <Check className="w-3.5 h-3.5" />
                               </div>
                             </div>
-                            <div className="mt-2 flex items-center gap-2 text-[11px] text-gray-500">
+                            <div className="mt-2 flex items-center gap-2 text-[11px] text-[color:var(--text-secondary)]">
                               <Sparkles className="w-3.5 h-3.5 text-purple-500" />
                               <span>{index === 0 ? 'Africa-first sizing lane' : 'Mapped for cross-border shoppers'}</span>
                             </div>
                           </button>
                         );
                       })}
-                      <div className="text-xs text-gray-500 flex items-center gap-2">
+                      <div className="text-xs text-[color:var(--text-secondary)] flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
@@ -1135,12 +1102,14 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       </div>
                     </div>
 
-                    {/* Preview */}
-                    <div className="rounded-xl border border-dashed border-gray-300 dark:border-white/10 bg-white dark:bg-black/10 p-5 h-full min-h-[280px]">
+                    {/* Preview — min-w-0 is LOAD-BEARING: without it the grid
+                        column stretches to the table's min width on phones and
+                        the whole page overflows instead of the table scrolling. */}
+                    <div className="min-w-0 rounded-xl border border-dashed border-[color:var(--field-border)] dark:border-white/10 bg-[color:var(--surface-secondary)] dark:bg-black/10 p-3 sm:p-5 h-full min-h-[280px]">
                       {data.sizeChartUrl ? (
                         <div className="relative">
-                          <div className="text-xs text-gray-500 mb-2 flex items-center gap-2">
-                            <span className="px-2 py-0.5 rounded-full bg-gray-200/60 dark:bg-white/10 text-gray-700 dark:text-gray-200 border border-gray-300/60 dark:border-white/10">Custom upload</span>
+                          <div className="text-xs text-[color:var(--text-secondary)] mb-2 flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-full bg-gray-200/60 dark:bg-white/10 text-[color:var(--text-primary)] dark:text-gray-200 border border-[color:var(--field-border)]/60 dark:border-white/10">Custom upload</span>
                             <span>Preview</span>
                           </div>
                           <MediaRenderer
@@ -1148,7 +1117,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                             src={data.sizeChartUrl}
                             alt="Size chart preview"
                             maxHeightClassName="max-h-40"
-                            className="rounded-lg border border-gray-200 dark:border-white/10"
+                            className="rounded-lg border border-[color:var(--border-default)] dark:border-white/10"
                             mediaClassName="rounded-lg"
                           />
                           <button
@@ -1163,30 +1132,30 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       ) : selectedPreset ? (
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <div className="flex items-center gap-2 text-xs text-[color:var(--text-secondary)]">
                               <span className="px-2 py-0.5 rounded-full bg-purple-600/10 text-purple-700 dark:text-purple-200 border border-purple-500/20">
                                 {selectedPreset.title}
                               </span>
-                              <span className="text-gray-600 dark:text-gray-400">Preview</span>
+                              <span className="text-[color:var(--text-secondary)] dark:text-gray-400">Preview</span>
                             </div>
                           </div>
-                          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/10">
-                            <table className="min-w-[560px] w-full text-xs text-left text-gray-700 dark:text-gray-200">
-                              <thead className="bg-gray-100 dark:bg-white/5 text-[11px] uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                          <div className="overflow-x-auto rounded-lg border border-[color:var(--border-default)] dark:border-white/10">
+                            <table className="min-w-[420px] w-full text-[11px] sm:text-xs text-left text-[color:var(--text-primary)] dark:text-gray-200">
+                              <thead className="bg-[color:var(--surface-muted)] dark:bg-white/5 text-[10px] sm:text-[11px] uppercase tracking-wide text-[color:var(--text-secondary)] dark:text-gray-400">
                                 <tr>
-                                  <th className="px-4 py-3">Size</th>
-                                  <th className="px-4 py-3">Bust</th>
-                                  <th className="px-4 py-3">Waist</th>
-                                  <th className="px-4 py-3">Hip</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Size</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Bust</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Waist</th>
+                                  <th className="px-2.5 py-2 sm:px-4 sm:py-3">Hip</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {selectedPreset.rows.map((row) => (
                                   <tr key={row.size} className="odd:bg-white even:bg-gray-50 dark:odd:bg-black/30 dark:even:bg-black/20">
-                                    <td className="px-4 py-3 font-medium">{row.size}</td>
-                                    <td className="px-4 py-3">{row.bust}</td>
-                                    <td className="px-4 py-3">{row.waist}</td>
-                                    <td className="px-4 py-3">{row.hip}</td>
+                                    <td className="px-2.5 py-2 font-medium sm:px-4 sm:py-3">{row.size}</td>
+                                    <td className="px-2.5 py-2 sm:px-4 sm:py-3">{row.bust}</td>
+                                    <td className="px-2.5 py-2 sm:px-4 sm:py-3">{row.waist}</td>
+                                    <td className="px-2.5 py-2 sm:px-4 sm:py-3">{row.hip}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -1194,7 +1163,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                           </div>
                         </div>
                       ) : (
-                        <div className="h-full min-h-[180px] flex flex-col items-center justify-center text-center text-sm text-gray-500 gap-2">
+                        <div className="h-full min-h-[180px] flex flex-col items-center justify-center text-center text-sm text-[color:var(--text-secondary)] gap-2">
                           <Sparkles className="w-6 h-6 text-purple-500" />
                           <p>Select a preset to preview or upload a custom chart.</p>
                         </div>
@@ -1205,12 +1174,12 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 </div>
 
                 {/* Customer Contact Card */}
-                <div className="rounded-xl bg-gray-50/50 dark:bg-white/[0.02] border border-gray-200/50 dark:border-white/5 p-6 space-y-4">
+                <div className="rounded-xl bg-[color:var(--surface-secondary)]/50 dark:bg-white/[0.02] border border-[color:var(--border-default)]/50 dark:border-white/5 p-6 space-y-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-600 dark:text-purple-400">
                       <Clock className="w-5 h-5" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <h3 className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
                       Customer Contact
                     </h3>
                   </div>
@@ -1221,14 +1190,15 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       label="Response Time Commitment"
                       value={data.responseTimeSla}
                       onChange={(value) => onChange({ responseTimeSla: value })}
-                      options={RESPONSE_SLAS}
+                      options={[...RESPONSE_SLAS]}
                       placeholder="Select response commitment"
+                      {...SELECT_WRAP_PROPS}
                     />
                     {/* Preview badge */}
                     <div className="p-3 rounded-lg bg-purple-600/5 border border-purple-500/20">
                       <div className="flex items-center gap-2 text-sm">
                         <Clock className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                        <span className="text-gray-700 dark:text-gray-300">
+                        <span className="text-[color:var(--text-primary)] dark:text-gray-300">
                           Badge: "Usually responds{' '}
                           {
                             RESPONSE_SLAS.find(
@@ -1244,11 +1214,11 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                   {/* Contact Email */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <label className="text-sm font-medium text-[color:var(--text-primary)] dark:text-gray-300">
                         Contact Email
                       </label>
                       {isSettingsMode ? (
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--text-muted)]">
                           Editable in settings
                         </span>
                       ) : (
@@ -1266,11 +1236,11 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                       placeholder={isSettingsMode ? 'support@yourbrand.com' : 'Pulled from your verified profile email'}
                       className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none ${
                         isSettingsMode
-                          ? 'border-gray-300 bg-white text-gray-900 focus:border-purple-500 dark:border-white/10 dark:bg-black/30 dark:text-white'
-                          : 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-500 dark:border-white/10 dark:bg-black/20 dark:text-gray-400'
+                          ? 'border-[color:var(--field-border)] bg-[color:var(--surface-secondary)] text-[color:var(--text-primary)] focus:border-purple-500 dark:border-white/10 dark:bg-black/30 dark:text-white'
+                          : 'cursor-not-allowed border-[color:var(--border-default)] bg-[color:var(--surface-muted)] text-[color:var(--text-secondary)] dark:border-white/10 dark:bg-black/20 dark:text-gray-400'
                       }`}
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-[color:var(--text-secondary)] dark:text-gray-400">
                       {isSettingsMode
                         ? 'Used for customer support replies and store contact details.'
                         : 'This email is pulled from your profile and locked during setup. Update it from Settings if it changes.'}
@@ -1280,39 +1250,51 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-black/20">
+            <div className="border-t border-[color:var(--border-default)]/50 bg-[color:var(--surface-secondary)]/50 p-4 dark:border-white/5 dark:bg-black/20 sm:p-6">
               {!isSettingsMode && (
-                <div className="mb-6">
+                <div className="mb-4 sm:mb-6">
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-500">Progress</span>
-                    <span className="text-purple-600 font-medium">Step 2 of 3</span>
+                    <span className="text-[color:var(--text-secondary)]">Progress</span>
+                    <span className="text-purple-600 font-medium">Step 2 of 4</span>
                   </div>
                   <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
                     <div
                       className="bg-gradient-to-r from-purple-600 to-purple-700 h-full rounded-full transition-all duration-300"
-                      style={{ width: '66%' }}
+                      style={{ width: '50%' }}
                     />
                   </div>
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                {!isSettingsMode && (
+              {!isSettingsMode && !stepValidation.valid ? (
+                <p className="mb-3 text-xs text-amber-700 dark:text-amber-300">
+                  Complete required fields: {stepValidation.missing.join(', ')}
+                </p>
+              ) : null}
+
+              <div className="flex flex-row items-center justify-between gap-2 sm:gap-4">
+                {!isSettingsMode ? (
                   <button
+                    type="button"
                     onClick={onBack}
-                    className="text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors text-sm inline-flex items-center gap-2"
+                    disabled={isSaving}
+                    className="inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-xs text-[color:var(--text-secondary)] transition-colors hover:text-gray-900 disabled:opacity-50 dark:hover:text-white sm:gap-2 sm:px-0 sm:py-0 sm:text-sm"
                   >
-                    <ArrowLeft className="w-4 h-4" />
+                    <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     Back
                   </button>
+                ) : (
+                  <span />
                 )}
                 <button
+                  type="button"
                   onClick={onContinue}
-                  disabled={isSaving}
-                  className="px-8 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 shadow-lg shadow-purple-500/20"
+                  disabled={!canContinue}
+                  className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-purple-500/20 transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none sm:px-8 sm:py-3"
                 >
-                  {actionLabel}
-                  <ArrowRight className="w-4 h-4" />
+                  {isSaving ? <MuseLoader size={16} /> : null}
+                  {isSaving ? 'Saving...' : actionLabel}
+                  {!isSaving ? <ArrowRight className="h-4 w-4" /> : null}
                 </button>
               </div>
             </div>

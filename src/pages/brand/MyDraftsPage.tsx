@@ -2,15 +2,17 @@
  * PHASE 6: My Drafts Page
  * Shows collections pending category approval
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { brandApi } from '@/api/BrandApi';
 import { useNavigate } from 'react-router-dom';
 import { Trash2, Eye } from 'lucide-react';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
+import useCachedResource from '@/hooks/useCachedResource';
+import { queryClient } from '@/query/queryClient';
 
 interface DraftCollection {
   id: string;
@@ -23,30 +25,35 @@ interface DraftCollection {
   coverImage?: string;
 }
 
+const DRAFTS_QUERY_KEY = ['brand', 'draft-collections'] as const;
+
 const MyDraftsPage: React.FC = () => {
-  const [drafts, setDrafts] = useState<DraftCollection[]>([]);
-  const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
   const navigate = useNavigate();
 
-  const fetchDrafts = async () => {
-    setLoading(true);
-    try {
+  // Cached fetch: drafts paint instantly on revisit and revalidate silently.
+  const {
+    data: drafts = [],
+    loading,
+    error: fetchError,
+  } = useCachedResource<DraftCollection[]>({
+    queryKey: DRAFTS_QUERY_KEY,
+    queryFn: async () => {
       const response = await brandApi.getMyDraftCollections();
-      const cleaned = (response || []).filter((d) => d && d.id && ((d.title && d.title.trim().length) || d.coverImage || (d.itemCount ?? 0) > 0));
-      setDrafts(cleaned);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message ?? 'Failed to load draft designs');
-    } finally {
-      setLoading(false);
-    }
-  };
+      return (response || []).filter(
+        (d) =>
+          d &&
+          d.id &&
+          ((d.title && d.title.trim().length) || d.coverImage || (d.itemCount ?? 0) > 0),
+      );
+    },
+  });
 
-  useEffect(() => {
-    fetchDrafts();
-  }, []);
+  React.useEffect(() => {
+    if (fetchError) toast.error('Failed to load draft designs');
+  }, [fetchError]);
 
   const handleDelete = (id: string, title: string) => {
     setPendingDelete({ id, title });
@@ -57,14 +64,18 @@ const MyDraftsPage: React.FC = () => {
     if (!pendingDelete) return;
     const { id } = pendingDelete;
     setDeleting(id);
+    const removeFromCache = () =>
+      queryClient.setQueryData<DraftCollection[]>(DRAFTS_QUERY_KEY, (prev) =>
+        (prev ?? []).filter((d) => d.id !== id),
+      );
     try {
       await brandApi.deleteCollection(id);
       toast.success('Draft deleted successfully');
-      setDrafts((prev) => prev.filter((d) => d.id !== id));
+      removeFromCache();
     } catch (error: any) {
       // If backend cannot delete (already missing records), remove locally to avoid broken cards
       toast.error(error?.response?.data?.message ?? 'Failed to delete draft');
-      setDrafts((prev) => prev.filter((d) => d.id !== id));
+      removeFromCache();
     } finally {
       setDeleting(null);
       setConfirmOpen(false);
@@ -88,7 +99,7 @@ const MyDraftsPage: React.FC = () => {
         {/* Content */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <VLoader size={32} phase="loading" showLabel={false} />
+            <MuseLoader size={32} />
             <p className="ml-3 text-gray-600 dark:text-gray-400">Loading drafts...</p>
           </div>
         ) : drafts.length === 0 ? (
@@ -186,7 +197,7 @@ const MyDraftsPage: React.FC = () => {
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {deleting === draft.id ? (
-                        <VLoader size={16} phase="loading" showLabel={false} />
+                        <MuseLoader size={16} />
                       ) : (
                         <Trash2 className="h-4 w-4" />
                       )}

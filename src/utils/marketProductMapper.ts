@@ -20,6 +20,28 @@ const parseTimestamp = (value?: string | null): number => {
   return Number.isFinite(ts) ? ts : 0;
 };
 
+const optionalNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const aspectRatioFromDimensions = (
+  width?: number | null,
+  height?: number | null,
+): number | null =>
+  typeof width === 'number' &&
+  Number.isFinite(width) &&
+  width > 0 &&
+  typeof height === 'number' &&
+  Number.isFinite(height) &&
+  height > 0
+    ? width / height
+    : null;
+
 export const getProductRecencyTimestamp = (product: MarketplaceProduct): number => {
   const createdTs = parseTimestamp(product.createdAt);
   const updatedTs = parseTimestamp(product.updatedAt);
@@ -47,16 +69,23 @@ export const normalizeMarketProduct = (raw: any): MarketplaceProduct | null => {
     ? raw.media
       .map((m: any) => {
         const mediaId = m?.id ? String(m.id) : null;
-        const mediaUrl = m?.url ? String(m.url) : null;
-        if (!mediaId || !mediaUrl) return null;
+        const fileUploadId = m?.fileUploadId ? String(m.fileUploadId) : null;
+        const mediaUrl = m?.url ? String(m.url) : '';
+        if (!mediaId && !fileUploadId) return null;
+        const width = optionalNumber(m?.width);
+        const height = optionalNumber(m?.height);
         return {
-          id: mediaId,
+          id: mediaId ?? fileUploadId ?? '',
+          fileUploadId,
           url: mediaUrl,
           type: String(m?.type ?? 'image'),
           isPrimary: Boolean(m?.isPrimary),
+          width,
+          height,
+          aspectRatio: optionalNumber(m?.aspectRatio) ?? aspectRatioFromDimensions(width, height),
         };
       })
-      .filter(Boolean) as Array<{ id: string; url: string; type: string; isPrimary?: boolean }>
+      .filter(Boolean) as NonNullable<StoreProduct['media']>
     : [];
 
   const sizeAvailability = Array.isArray(raw?.sizes)

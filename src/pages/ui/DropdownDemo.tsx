@@ -59,7 +59,7 @@ const DropdownDemo: React.FC = () => {
               <DropdownTrigger className="btn-frost-primary btn-tight-sm">Shop Now</DropdownTrigger>
               <DropdownMenu>
                 <DropdownItem>Buy Now</DropdownItem>
-                <DropdownItem>Add to Cart</DropdownItem>
+                <DropdownItem>Bag It</DropdownItem>
                 <DropdownItem>Wishlist</DropdownItem>
               </DropdownMenu>
             </Dropdown>

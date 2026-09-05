@@ -6,13 +6,16 @@ import { resolveCatalogEntityCardBranch } from './catalogEntityCardModel';
 
 export type CatalogEntityCardProps = Omit<CollectionCardProps, 'cardKind'> & {
   fallbackEntityType?: CatalogEntityType | null;
+  compact?: boolean;
 };
 
 const CatalogEntityCard: React.FC<CatalogEntityCardProps> = ({
   collection,
   fallbackEntityType,
+  compact,
   ...props
 }) => {
+  // `impliedStatus` rides along in ...props to whichever branch renders.
   const fallback = fallbackEntityType ?? (collection.isAvailableInStore ? 'COLLECTION' : 'DESIGN');
   const branch = resolveCatalogEntityCardBranch(collection, fallback);
 
@@ -21,6 +24,7 @@ const CatalogEntityCard: React.FC<CatalogEntityCardProps> = ({
       <CollectionCard
         {...props}
         collection={collection}
+        compact={compact}
         cardKind="collection"
       />
     );
@@ -34,6 +38,7 @@ const CatalogEntityCard: React.FC<CatalogEntityCardProps> = ({
       <CollectionCard
         {...props}
         collection={collection}
+        compact={compact}
         cardKind="collection"
       />
     );
@@ -43,6 +48,7 @@ const CatalogEntityCard: React.FC<CatalogEntityCardProps> = ({
     <DesignCard
       {...props}
       collection={collection}
+      compact={compact}
     />
   );
 };

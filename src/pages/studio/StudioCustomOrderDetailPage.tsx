@@ -12,6 +12,7 @@ import OrderChatDrawer from '@/components/messaging/OrderChatDrawer';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
   CustomOrderBadge,
+  CustomOrderBuyerPaymentBreakdown,
   CustomOrderDataTable,
   CustomOrderJsonBreakdown,
   CustomOrderKeyValueList,
@@ -27,9 +28,19 @@ import {
 } from '@/components/custom-orders/customOrderFormatting';
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 
-type StudioDetailTab = 'overview' | 'measurements' | 'operations' | 'timeline';
+type StudioDetailTab =
+  | 'overview'
+  | 'notices'
+  | 'measurements'
+  | 'operations'
+  | 'timeline';
 
-const TABS: Array<{ id: StudioDetailTab; label: string; emoji: string; helper: string }> = [
+const BASE_TABS: Array<{
+  id: StudioDetailTab;
+  label: string;
+  emoji: string;
+  helper: string;
+}> = [
   { id: 'overview', label: 'Overview', emoji: '🧾', helper: 'Status, summary and audit' },
   { id: 'measurements', label: 'Measurements', emoji: '📏', helper: 'Approved body points' },
   { id: 'operations', label: 'Operations', emoji: '🛠️', helper: 'Acceptance and lifecycle' },
@@ -114,12 +125,30 @@ const textValue = (value: unknown, fallback = '—') =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
+// Human title for a read-only admin notice (reminder / risk flag / escalation)
+// derived from the ADMIN-authored timeline event's payload.
+const describeAdminNoticeTitle = (
+  payload: Record<string, unknown> | null | undefined,
+): string => {
+  const reason = typeof payload?.reason === 'string' ? payload.reason : '';
+  const action = typeof payload?.action === 'string' ? payload.action : '';
+  if (reason === 'MANUAL_BRAND_REMINDER') return '📣 Reminder from admin';
+  if (action === 'FLAG_RISK') return '🚩 Risk flag from admin';
+  if (reason) return `📣 ${humanizeCustomOrderToken(reason)}`;
+  return '📣 Admin notice';
+};
+
+const disputeIsClosed = (status: string) =>
+  ['RESOLVED', 'CLOSED'].includes(status.toUpperCase());
+
 const hashToTab = (hash: string): StudioDetailTab | null => {
   const key = hash.replace('#', '').trim().toLowerCase();
   if (key === 'measurements') return 'measurements';
   if (key === 'operations') return 'operations';
   if (key === 'timeline') return 'timeline';
   if (key === 'overview') return 'overview';
+  // Admin reminder emails/notifications can deep-link straight to the notice.
+  if (key === 'notices') return 'notices';
   return null;
 };
 
@@ -223,6 +252,8 @@ const StudioCustomOrderDetailPage: React.FC = () => {
   const [extensionReason, setExtensionReason] = useState('');
   const [exceptionReason, setExceptionReason] = useState('');
   const [exceptionQuote, setExceptionQuote] = useState('');
+  const [ackingNotices, setAckingNotices] = useState(false);
+  const [disputeResponses, setDisputeResponses] = useState<Record<string, string>>({});
   const highlightMessageId = searchParams.get('messageId');
 
   const loadOrder = useCallback(async (resolvedBrandId?: string | null) => {
@@ -349,6 +380,60 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     () => Object.entries(order?.measurementSnapshot ?? {}),
     [order?.measurementSnapshot],
   );
+
+  // Read-only admin notices: reminders / risk flags / escalations authored by
+  // the admin team (actorType ADMIN), newest first. Brands never reply here.
+  const adminNotices = useMemo(
+    () =>
+      (order?.timelineEvents ?? [])
+        .filter((event) => String(event.actorType).toUpperCase() === 'ADMIN')
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        ),
+    [order?.timelineEvents],
+  );
+  const disputes = useMemo(() => order?.disputes ?? [], [order?.disputes]);
+  const hasAdminNoticeContent = adminNotices.length > 0 || disputes.length > 0;
+
+  /**
+   * Notices live in their own tab so they survive being acknowledged.
+   *
+   * The panel used to sit inline above the tabs and, once "Mark as seen" was
+   * pressed, there was nowhere to go back and re-read what admin had actually
+   * said — which matters when the notice is "act on this order or it will be
+   * cancelled". An open dispute or an unread notice raises the urgency marker
+   * on the tab label so it still demands attention without shouting forever.
+   */
+  const openDisputeCount = useMemo(
+    () => disputes.filter((dispute) => !disputeIsClosed(String(dispute.status))).length,
+    [disputes],
+  );
+  const noticeUrgency: 'urgent' | 'new' | 'calm' =
+    openDisputeCount > 0 ? 'urgent' : order?.hasUnreadAdminNotice ? 'new' : 'calm';
+
+  const tabs = useMemo(() => {
+    if (!hasAdminNoticeContent) return BASE_TABS;
+    const noticeEmoji =
+      noticeUrgency === 'urgent' ? '🚨' : noticeUrgency === 'new' ? '🔴' : '📣';
+    const noticeHelper =
+      noticeUrgency === 'urgent'
+        ? `${openDisputeCount} open dispute${openDisputeCount === 1 ? '' : 's'}`
+        : noticeUrgency === 'new'
+          ? 'Unread admin notice'
+          : 'Admin reminders and disputes';
+    return [
+      BASE_TABS[0],
+      {
+        id: 'notices' as StudioDetailTab,
+        label: 'Notices',
+        emoji: noticeEmoji,
+        helper: noticeHelper,
+      },
+      ...BASE_TABS.slice(1),
+    ];
+  }, [hasAdminNoticeContent, noticeUrgency, openDisputeCount]);
 
   const currentStage = order?.currentProgressStage ?? 'ORDER_RECEIVED';
   const currentStageLabel = humanizeCustomOrderToken(currentStage);
@@ -506,6 +591,75 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     }
   };
 
+  // Read-only acknowledgement — clears the 📣 badge; brands never reply here.
+  const handleAckAdminNotices = async () => {
+    if (!brandId || !order) return;
+    setAckingNotices(true);
+    try {
+      await customOrdersBrandApi.ackAdminNotices(brandId, order.id);
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              hasUnreadAdminNotice: false,
+              brandAdminNoticeAckAt: new Date().toISOString(),
+            }
+          : prev,
+      );
+      toast.success('Admin notices marked as seen.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to update admin notices.');
+    } finally {
+      setAckingNotices(false);
+    }
+  };
+
+  // One-time brand response to an admin-adjudicated dispute (locked afterward).
+  const handleRespondToDispute = async (disputeId: string) => {
+    if (!brandId || !order) return;
+    const text = (disputeResponses[disputeId] ?? '').trim();
+    if (text.length < 5) {
+      toast.error('Please write at least a sentence before submitting.');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const result = await customOrdersBrandApi.respondToDispute(
+        brandId,
+        order.id,
+        disputeId,
+        { response: text },
+      );
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              disputes: prev.disputes.map((dispute) =>
+                dispute.id === disputeId
+                  ? {
+                      ...dispute,
+                      brandResponse: result.brandResponse ?? text,
+                      status: result.status,
+                    }
+                  : dispute,
+              ),
+            }
+          : prev,
+      );
+      setDisputeResponses((prev) => {
+        const next = { ...prev };
+        delete next[disputeId];
+        return next;
+      });
+      toast.success('Your response was submitted to the admin team.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to submit your response.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // Filter out non-human-readable fields from timeline payloads
   const filterTimelinePayload = (payload: Record<string, unknown>): Record<string, unknown> => {
     const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -534,8 +688,183 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     return 'border-black/10 bg-white/80 dark:border-white/10 dark:bg-white/[0.04]';
   };
 
+  /**
+   * Notices tab.
+   *
+   * Previously an inline panel above the tabs: once the brand pressed
+   * "Mark as seen" the block lost its unread styling and there was no durable
+   * place to re-read what admin had said - which matters when the notice is
+   * "act on this order or it will be cancelled". Living in a tab, the history
+   * stays available and the urgency marker rides on the tab label instead.
+   */
+  const renderNotices = () => {
+    if (!order) return null;
+    if (!hasAdminNoticeContent) {
+      return (
+        <section className={shell}>
+          <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+            No admin notices or disputes have been raised on this order.
+          </div>
+        </section>
+      );
+    }
+    return (
+      <section className={shell}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
+                <span aria-hidden="true">📣</span>
+                <span>Admin notices</span>
+                {order.hasUnreadAdminNotice ? (
+                  <span className="inline-flex animate-pulse rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-rose-700 dark:text-rose-300">
+                    New
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Reminders and dispute notices from the WIEZ admin team. These are read-only — you can submit a single response on a dispute, but there's no back-and-forth here.
+              </p>
+            </div>
+            {order.hasUnreadAdminNotice ? (
+              <button
+                type="button"
+                onClick={() => void handleAckAdminNotices()}
+                disabled={ackingNotices}
+                className="shrink-0 rounded-full bg-slate-950 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-slate-950"
+              >
+                {ackingNotices ? 'Marking…' : 'Mark as seen'}
+              </button>
+            ) : null}
+          </div>
+
+          {adminNotices.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              {adminNotices.map((event) => {
+                const payload = isRecord(event.payloadJson) ? event.payloadJson : null;
+                const note = typeof payload?.note === 'string' ? payload.note : '';
+                return (
+                  <div
+                    key={event.id}
+                    className="rounded-2xl border border-black/10 bg-white/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {describeAdminNoticeTitle(payload)}
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {formatDateTime(event.createdAt)}
+                      </div>
+                    </div>
+                    {note ? (
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
+                        {note}
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-sm italic text-slate-400 dark:text-slate-500">
+                        No additional note was left.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {disputes.length > 0 ? (
+            <div className="mt-4 space-y-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                Disputes
+              </div>
+              {disputes.map((dispute) => {
+                const status = String(dispute.status);
+                const alreadyResponded = Boolean(dispute.brandResponse);
+                const canRespond = !alreadyResponded && !disputeIsClosed(status);
+                const draft = disputeResponses[dispute.id] ?? '';
+                return (
+                  <div
+                    key={dispute.id}
+                    className="rounded-2xl border border-rose-200/70 bg-white/70 px-4 py-4 dark:border-rose-500/20 dark:bg-white/[0.03]"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {dispute.reasonType
+                          ? humanizeCustomOrderToken(String(dispute.reasonType))
+                          : 'Dispute'}
+                      </div>
+                      <CustomOrderBadge value={status} />
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      Opened {formatDateTime(dispute.openedAt)}
+                    </div>
+
+                    {dispute.buyerStatement ? (
+                      <div className="mt-3 rounded-xl border border-black/10 bg-black/[0.02] px-3 py-2 text-sm text-slate-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">
+                          Buyer statement
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap">{dispute.buyerStatement}</p>
+                      </div>
+                    ) : null}
+
+                    {alreadyResponded ? (
+                      <div className="mt-3 rounded-xl border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-300">
+                          Your response (submitted)
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap">{dispute.brandResponse}</p>
+                      </div>
+                    ) : canRespond ? (
+                      <div className="mt-3">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                          Submit your response — you can only do this once
+                        </div>
+                        <textarea
+                          value={draft}
+                          onChange={(event) =>
+                            setDisputeResponses((prev) => ({
+                              ...prev,
+                              [dispute.id]: event.target.value,
+                            }))
+                          }
+                          rows={3}
+                          maxLength={2000}
+                          placeholder="Explain your side of this dispute for the admin team…"
+                          className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                        />
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <span className="text-xs text-slate-400 dark:text-slate-500">
+                            {draft.trim().length}/2000
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => void handleRespondToDispute(dispute.id)}
+                            disabled={busy || draft.trim().length < 5}
+                            className="rounded-full bg-rose-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                          >
+                            Submit response
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-3 text-sm italic text-slate-400 dark:text-slate-500">
+                        This dispute is closed — no response can be submitted.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+      </section>
+    );
+  };
+
   const renderTab = () => {
     if (!order) return null;
+
+    if (activeTab === 'notices') {
+      return renderNotices();
+    }
 
     if (activeTab === 'overview') {
       return (
@@ -574,25 +903,34 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                 <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
                   Current display
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex min-w-0 flex-wrap gap-2">
                   <CustomOrderBadge value={currentStage} type="stage" />
                 </div>
-                <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                <p className="mt-3 break-words text-sm text-slate-600 dark:text-slate-300">
                   Order placed and order received are system-managed. Brand production updates begin from fabric and piece gathering after payment is confirmed.
                 </p>
               </div>
             </section>
           </div>
 
+          <section className={shell}>
+            <CustomOrderBuyerPaymentBreakdown
+              summary={order.buyerPriceSummary}
+              formatCurrency={(value, currency) =>
+                formatCurrency(value, currency ?? order.buyerPriceSummary.currency ?? 'NGN')
+              }
+            />
+          </section>
+
           {/* Technical breakdown merged into Overview */}
           <div className="grid items-start gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_360px]">
             <section className={shell}>
-              <div className="text-lg font-semibold text-slate-900 dark:text-white">Price breakdown</div>
+              <div className="text-lg font-semibold text-slate-900 dark:text-white">Internal price details</div>
               <div className="mt-4 space-y-4">
                 {technicalBreakdown && Object.keys(technicalBreakdown).length > 0 ? (
                   <CustomOrderJsonBreakdown data={technicalBreakdown} />
                 ) : (
-                  <div className="text-sm text-slate-500 dark:text-slate-400">No breakdown available.</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">No internal technical breakdown available.</div>
                 )}
                 {chartLock ? (
                   <CustomOrderDataTable
@@ -995,9 +1333,30 @@ const StudioCustomOrderDetailPage: React.FC = () => {
         </section>
       ) : null}
 
+      {/* Notices moved into their own tab (rendered by renderNotices) so they
+          remain readable after "Mark as seen". What stays here is a one-line
+          pointer, shown only while something is genuinely outstanding. */}
+      {hasAdminNoticeContent && noticeUrgency !== 'calm' && activeTab !== 'notices' ? (
+        <button
+          type="button"
+          onClick={() => setActiveTab('notices')}
+          className="flex w-full flex-wrap items-center justify-between gap-3 rounded-[1.75rem] border border-rose-300/70 bg-rose-50/90 p-4 text-left dark:border-rose-500/25 dark:bg-rose-500/10"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold text-rose-900 dark:text-rose-100">
+            <span aria-hidden="true">{noticeUrgency === 'urgent' ? '🚨' : '🔴'}</span>
+            {noticeUrgency === 'urgent'
+              ? `${openDisputeCount} open dispute${openDisputeCount === 1 ? '' : 's'} need your attention`
+              : 'You have an unread notice from the WIEZ admin team'}
+          </span>
+          <span className="shrink-0 text-xs font-bold uppercase tracking-[0.16em] text-rose-700 dark:text-rose-300">
+            Open notices →
+          </span>
+        </button>
+      ) : null}
+
       <div className="max-w-full overflow-hidden">
         <CustomOrderWorkspaceTabs
-          tabs={TABS}
+          tabs={tabs}
           activeTab={activeTab}
           onChange={(nextTab) => setActiveTab(nextTab as StudioDetailTab)}
         />
@@ -1020,3 +1379,4 @@ const StudioCustomOrderDetailPage: React.FC = () => {
 };
 
 export default StudioCustomOrderDetailPage;
+

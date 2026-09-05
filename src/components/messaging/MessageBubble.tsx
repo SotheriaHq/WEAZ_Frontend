@@ -2,14 +2,27 @@ import React, { memo, useRef, useState } from 'react';
 import type { ThreadMessage } from '@/api/MessagingApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import { resolveParticipantDisplayName } from '@/utils/participantDisplayName';
 
 interface MessageBubbleProps {
+  /**
+   * Open the design this message refers to. Omitted where there is nowhere
+   * sensible to go, in which case the reference stays a static card.
+   */
+  onOpenDesignContext?: (designId: string) => void;
+  /**
+   * Open the product this message refers to. Same contract as
+   * `onOpenDesignContext`; omitted where there is nowhere sensible to go.
+   */
+  onOpenProductContext?: (productId: string) => void;
   message: ThreadMessage & { _optimistic?: 'sending' | 'failed' };
   isOwn: boolean;
   /** When true, hidden/redacted messages are shown with a visual indicator (admin view). */
   showModerated?: boolean;
   /** Called when user clicks retry on a failed optimistic message */
   onRetry?: () => void;
+  /** Discard a message that never sent. Only offered on a failed bubble. */
+  onDiscard?: () => void;
   /** Called when the user swipes to initiate a reply to this message */
   onReply?: (message: ThreadMessage) => void;
 }
@@ -31,17 +44,18 @@ const formatDate = (iso: string) => {
   }
 };
 
-const senderName = (msg: ThreadMessage) => {
-  if (msg.sender?.firstName) return msg.sender.firstName;
-  if (msg.sender?.username) return msg.sender.username;
-  switch (msg.senderRole) {
+const roleLabel = (role: ThreadMessage['senderRole']) => {
+  switch (role) {
     case 'BUYER': return 'Buyer';
     case 'BRAND_OWNER': return 'Brand';
     case 'ADMIN': return 'Admin';
     case 'SYSTEM': return 'System';
-    default: return msg.senderRole;
+    default: return role;
   }
 };
+
+const senderName = (msg: ThreadMessage) =>
+  resolveParticipantDisplayName(msg.sender, roleLabel(msg.senderRole));
 
 /** True when value looks like a UUID file ID rather than a URL */
 const isFileId = (value?: string | null) =>
@@ -63,7 +77,7 @@ const DoubleTick: React.FC<{ className?: string }> = ({ className }) => (
 
 const SWIPE_THRESHOLD = 52; // px required to trigger reply
 
-const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, showModerated = false, onRetry, onReply }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, showModerated = false, onRetry, onDiscard, onReply, onOpenDesignContext, onOpenProductContext }) => {
   const isSystem = message.kind === 'SYSTEM' || message.kind === 'MODERATION_NOTICE';
   const isHidden = message.visibilityState === 'HIDDEN';
   const isRedacted = message.visibilityState === 'REDACTED';
@@ -103,7 +117,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
   if (isSystem) {
     return (
       <div className="flex justify-center my-2">
-        <div className="max-w-[85%] rounded-xl bg-gray-100/80 dark:bg-white/5 border border-gray-200/50 dark:border-transparent px-4 py-2 text-center">
+        <div className="max-w-[85%] rounded-xl bg-gray-100/80 dark:bg-white/5 px-4 py-2 text-center">
           <p className="text-xs text-gray-500 dark:text-gray-400 italic">
             {message.bodyText || 'System message'}
           </p>
@@ -117,14 +131,46 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
   const optimistic = (message as any)._optimistic as 'sending' | 'failed' | undefined;
   const deliveryStatus = message.deliveryStatus ?? 'SENT';
 
-  // Design context card fields
-  const designTitle = message.metadataJson?.contextDesignTitle;
-  const designCoverUrl = message.metadataJson?.contextDesignCoverUrl as string | undefined;
-  const designCoverFileId = message.metadataJson?.contextDesignCoverFileId as string | undefined;
+  /*
+    The content this message is about — a Runway design OR a Market product.
+
+    Only the design half was read here, so a message sent from a product (which
+    the native app now does) arrived on the web with its reference invisible:
+    the brand saw a question about "this" with nothing attached, which is the
+    exact failure the reference exists to prevent. Product wins when both are
+    present, because a message is composed from one screen.
+  */
+  const productContextId = message.metadataJson?.contextProductId as string | undefined;
+  const isProductContext = Boolean(
+    productContextId || message.metadataJson?.contextProductTitle,
+  );
+  const contextTitle = (isProductContext
+    ? message.metadataJson?.contextProductTitle
+    : message.metadataJson?.contextDesignTitle) as string | undefined;
+  const contextCoverUrl = (isProductContext
+    ? message.metadataJson?.contextProductCoverUrl
+    : message.metadataJson?.contextDesignCoverUrl) as string | undefined;
+  const contextCoverFileId = (isProductContext
+    ? message.metadataJson?.contextProductCoverFileId
+    : message.metadataJson?.contextDesignCoverFileId) as string | undefined;
   // Prefer direct URL; fall back to fileId resolution
-  const coverSrc = designCoverUrl || (!isFileId(designCoverFileId) ? designCoverFileId : undefined);
-  const coverFileId = !coverSrc && isFileId(designCoverFileId) ? designCoverFileId : undefined;
-  const hasDesignCard = Boolean(designTitle);
+  const coverSrc = contextCoverUrl || (!isFileId(contextCoverFileId) ? contextCoverFileId : undefined);
+  const coverFileId = !coverSrc && isFileId(contextCoverFileId) ? contextCoverFileId : undefined;
+  const designContextId = isProductContext
+    ? productContextId
+    : (message.metadataJson?.contextDesignId as string | undefined);
+  const hasDesignCard = Boolean(contextTitle);
+  // Only an addressable reference is actionable. Older messages carry a title
+  // and cover but no id; those stay as they are rather than becoming a button
+  // that goes nowhere.
+  const canOpenDesignContext = Boolean(
+    designContextId && (isProductContext ? onOpenProductContext : onOpenDesignContext),
+  );
+  const openContext = () => {
+    if (!designContextId) return;
+    if (isProductContext) onOpenProductContext?.(String(designContextId));
+    else onOpenDesignContext?.(String(designContextId));
+  };
 
   const renderTicks = () => {
     if (!isOwn) return null;
@@ -138,20 +184,40 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
       );
     }
     if (optimistic === 'failed') {
+      /*
+        Both ways out, offered together.
+
+        A failed message previously had only Retry, which is the wrong single
+        option: a send can fail for a reason retrying will never fix, and the
+        bubble then sits in the thread permanently with no way to clear it
+        short of reloading. "Resend" and "Delete message" are the two things
+        anyone actually wants, so both are here.
+      */
       return (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onRetry?.(); }}
-          className="inline-flex items-center gap-0.5 text-red-300 hover:text-red-100 font-semibold"
-          title="Failed to send. Tap to retry."
-        >
-          <svg viewBox="0 0 16 16" fill="none" width="12" height="12">
-            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M8 4.5V9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            <circle cx="8" cy="11.5" r="0.75" fill="currentColor" />
-          </svg>
-          <span className="text-[10px]">Retry</span>
-        </button>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-0.5 text-red-300" title="Not sent">
+            <svg viewBox="0 0 16 16" fill="none" width="12" height="12" aria-hidden="true">
+              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M8 4.5V9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="8" cy="11.5" r="0.75" fill="currentColor" />
+            </svg>
+            <span className="text-[10px]">Not sent</span>
+          </span>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRetry?.(); }}
+            className="text-[10px] font-semibold text-white/80 underline underline-offset-2 hover:text-white"
+          >
+            Resend
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDiscard?.(); }}
+            className="text-[10px] font-semibold text-red-300 underline underline-offset-2 hover:text-red-100"
+          >
+            Delete
+          </button>
+        </span>
       );
     }
     if (deliveryStatus === 'READ') {
@@ -195,15 +261,43 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
           </span>
         )}
 
-        {/* Design context card — sits ABOVE the bubble, no background fill */}
+        {/*
+          Design context card — sits ABOVE the bubble, no background fill.
+
+          The reference is what the message is ABOUT, so it has to be a way to
+          get to the thing. Rendering it as inert decoration left the recipient
+          reading "did you make this in red?" next to a picture they could not
+          open, with no way to answer without hunting the catalogue by hand.
+        */}
         {hasDesignCard && !isRedacted && (
-          <div className={`mb-1 rounded-xl overflow-hidden border border-gray-200/70 dark:border-white/12 bg-transparent`}>
+          <div
+            {...(canOpenDesignContext
+              ? {
+                  role: 'button' as const,
+                  tabIndex: 0,
+                  onClick: openContext,
+                  onKeyDown: (event: React.KeyboardEvent) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    openContext();
+                  },
+                  'aria-label': `Open ${String(contextTitle)}`,
+                }
+              : {})}
+            /* No outline: the cover image is its own edge, and the frosted
+               caption below already reads as attached to it. */
+            className={`mb-1 overflow-hidden rounded-xl bg-transparent ${
+              canOpenDesignContext
+                ? 'cursor-pointer transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400'
+                : ''
+            }`}
+          >
             {(coverSrc || coverFileId) && (
               <div className="w-full h-[120px] bg-gray-100 dark:bg-white/5">
                 <ImageWithFallback
                   src={coverSrc}
                   fileId={coverFileId}
-                  alt={String(designTitle)}
+                  alt={String(contextTitle)}
                   fit="cover"
                   rounded="none"
                   containerClassName="w-full h-[120px]"
@@ -213,7 +307,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
             )}
             <div className="px-2.5 py-1.5 bg-white/80 dark:bg-black/30 backdrop-blur-sm">
               <p className="text-[11px] font-semibold text-gray-800 dark:text-gray-100 truncate leading-snug">
-                🎨 {String(designTitle)}
+                {isProductContext ? '🛍️' : '🎨'} {String(contextTitle)}
+                {canOpenDesignContext ? (
+                  <span className="ml-1 font-normal text-purple-600 dark:text-purple-300">
+                    · View
+                  </span>
+                ) : null}
               </p>
             </div>
           </div>
@@ -231,14 +330,32 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
           </div>
         )}
 
-        {/* Main bubble — text + ticks only */}
+        {/*
+          Main bubble — text + ticks only.
+
+          The received bubble is an OPAQUE surface in each theme, not a
+          translucent white. `dark:bg-white/8` never compiled (Tailwind's bare
+          opacity modifier only accepts its 5-step scale, so `/8` produced no
+          rule at all), which left the light-mode `bg-white/80` in force on dark
+          — a near-white bubble carrying `dark:text-gray-100` text. That is the
+          "impossible to read" report, and it could only ever have looked right
+          in one theme.
+
+          Solid colours rather than a tint over the shell: a translucent bubble
+          takes its contrast from whatever happens to be behind it, which on a
+          message list is the previous bubble as often as the background.
+
+          No border either. The fill already separates the bubble from the
+          surface, so an outline on top of it is a second separator doing the
+          same job.
+        */}
         <div
           className={`rounded-2xl px-3.5 py-2 ${
             isModerated && showModerated
-              ? 'bg-red-50/80 dark:bg-red-900/20 border border-red-200/60 dark:border-red-800/40 text-gray-900 dark:text-gray-100 rounded-bl-md'
+              ? 'bg-red-50/80 dark:bg-red-950/40 text-gray-900 dark:text-red-100 rounded-bl-md'
               : isOwn
                 ? 'bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white rounded-br-md'
-                : 'bg-white/80 dark:bg-white/8 border border-gray-200/60 dark:border-transparent text-gray-900 dark:text-gray-100 rounded-bl-md'
+                : 'bg-gray-100 text-gray-900 dark:bg-[#252732] dark:text-gray-50 rounded-bl-md'
           }`}
         >
           {isRedacted && !showModerated ? (

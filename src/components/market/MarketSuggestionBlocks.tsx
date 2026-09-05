@@ -57,7 +57,7 @@ const resolveSuggestionRoute = (item: MarketSectionItem) => {
     const slug = item.category?.slug ?? item.target?.key ?? targetId;
     return `/market-place?category=${encodeURIComponent(slug)}`;
   }
-  return item.target?.route || '/market-place';
+  return item.target?.route || '/market';
 };
 
 const formatPrice = (item: MarketSectionItem) => {

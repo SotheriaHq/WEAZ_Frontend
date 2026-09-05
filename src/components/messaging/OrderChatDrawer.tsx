@@ -7,7 +7,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import MessageBubble, { formatDate } from './MessageBubble';
 import ComposeArea from './ComposeArea';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 
 type ContextType = 'CUSTOM_ORDER' | 'STANDARD_ORDER';
 
@@ -399,8 +399,11 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
         aria-hidden
       />
 
-      {/* Drawer */}
-      <div className="fixed right-0 top-0 z-layer-drawer flex h-dvh max-h-dvh w-full max-w-md min-h-0 flex-col overflow-hidden border-l border-gray-200/50 bg-white/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out dark:border-white/10 dark:bg-zinc-900/95">
+      {/* Drawer — pinned top+bottom (inset-y-0) so it always has a definite
+          full-viewport height. Relying on h-dvh alone left the flex column
+          without a resolved height on some engines, letting the composer +
+          quick-reply chips overflow below the fold. */}
+      <div className="fixed inset-y-0 right-0 z-layer-drawer flex w-full max-w-md min-h-0 flex-col overflow-hidden border-l border-gray-200/50 bg-white/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-out dark:border-white/10 dark:bg-zinc-900/95">
         {/* Header */}
         <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200/50 dark:border-white/10">
           <div className="min-w-0">
@@ -483,7 +486,7 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-                <VLoader size={24} phase="loading" showLabel={false} />
+                <MuseLoader size={24} />
                 <span>Loading thread…</span>
               </div>
             </div>

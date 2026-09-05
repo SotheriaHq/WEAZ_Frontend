@@ -7,7 +7,15 @@ import {
   type PasswordStrength,
 } from '@/lib/passwordPolicy';
 
-type FeedbackTone = 'dark' | 'light';
+/**
+ * `dark` and `light` pin the feedback to one palette. They exist for surfaces
+ * whose colour does NOT follow the theme (a coloured banner, a fixed-dark
+ * hero). Anything sitting on a normal themed surface wants `auto`, which is
+ * why `auto` is the default: a hardcoded `dark` on a panel that turns light
+ * renders grey-on-white at ~2.8:1 and reads as missing text, which is exactly
+ * how the auth cards lost their helper copy.
+ */
+type FeedbackTone = 'dark' | 'light' | 'auto';
 
 type PasswordPolicyFeedbackProps = {
   password: string;
@@ -43,9 +51,16 @@ const toneClasses: Record<
   light: {
     muted: 'text-gray-600',
     danger: 'text-red-600',
-    success: 'text-emerald-700',
+    success: 'text-emerald-700 dark:text-emerald-300',
     track: 'bg-gray-200',
     fill: 'bg-amber-500',
+  },
+  auto: {
+    muted: 'text-gray-600 dark:text-gray-300',
+    danger: 'text-red-700 dark:text-red-300',
+    success: 'text-emerald-700 dark:text-emerald-300',
+    track: 'bg-gray-200 dark:bg-white/10',
+    fill: 'bg-amber-500 dark:bg-amber-400',
   },
 };
 
@@ -83,7 +98,7 @@ export const PasswordPolicyFeedback: React.FC<PasswordPolicyFeedbackProps> = ({
   password,
   id,
   className = '',
-  tone = 'dark',
+  tone = 'auto',
 }) => {
   const length = getPasswordLength(password);
   const meetsLength = isPasswordLengthValid(password);
@@ -126,7 +141,7 @@ export const PasswordMatchFeedback: React.FC<PasswordMatchFeedbackProps> = ({
   password,
   confirmPassword,
   className = '',
-  tone = 'dark',
+  tone = 'auto',
 }) => {
   const styles = toneClasses[tone];
 

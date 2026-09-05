@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -6,6 +7,7 @@ import {
   confirmMyOrderDelivery,
   getMyOrder,
   getMyOrders,
+  getMyOrdersVersion,
   type Order,
   type PaystackPaymentData,
   type ShippingAddress,
@@ -49,6 +51,10 @@ import {
   type PaymentFormState,
 } from '@/pages/checkout/paymentFlow';
 import { useConfirm } from '@/components/ui/useConfirm';
+import BackLink from '@/components/ui/BackLink';
+import { useCachedResource } from '@/hooks/useCachedResource';
+import { queryClient } from '@/query/queryClient';
+import { useRealtime } from '@/realtime/RealtimeProvider';
 
 const STANDARD_STATUS_OPTIONS = ['ALL', 'PENDING', 'PROCESSING', 'SHIPPED'] as const;
 const CUSTOM_STATUS_OPTIONS = ['ALL', 'PENDING', 'ACTIVE', 'COMPLETED', 'ISSUES'] as const;
@@ -435,40 +441,23 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
   orderId,
   onBack,
 }) => {
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
   const [confirmingDelivery, setConfirmingDelivery] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-
-    const run = async () => {
-      setLoading(true);
-      try {
-        const data = await getMyOrder(orderId);
-        if (!mounted) return;
-        setOrder(data as Order);
-      } catch {
-        if (!mounted) return;
-        setOrder(null);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    void run();
-
-    return () => {
-      mounted = false;
-    };
-  }, [orderId]);
+  // Shares the cache entry with the standalone /orders/:orderId page, so a
+  // revisit from either surface paints instantly with silent revalidation.
+  const orderQueryKey = useMemo(() => ['orders', 'detail', orderId] as const, [orderId]);
+  const { data: order = null, loading } = useCachedResource<Order | null>({
+    queryKey: orderQueryKey,
+    queryFn: async () => (await getMyOrder(orderId)) as Order,
+    enabled: Boolean(orderId),
+  });
 
   const handleConfirmDelivery = async () => {
     if (!order) return;
     setConfirmingDelivery(true);
     try {
       const updated = await confirmMyOrderDelivery(order.id);
-      setOrder(updated as Order);
+      queryClient.setQueryData(orderQueryKey, updated as Order);
       toast.success('Delivery confirmed.');
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to confirm delivery.');
@@ -490,6 +479,11 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
   }
 
   const firstItem = order.items?.[0] ?? null;
+  const standardMediaUrls = (firstItem?.images && firstItem.images.length > 0)
+    ? firstItem.images
+    : firstItem?.thumbnail
+      ? [firstItem.thumbnail]
+      : [];
   const canConfirmDelivery =
     (order.status === 'SHIPPED' || order.status === 'DELIVERED') &&
     order.paymentStatus === 'PAID' &&
@@ -511,37 +505,21 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-full border border-gray-200/80 bg-white/80 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-fuchsia-300 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:text-white"
-        >
-          Back to orders
-        </button>
+        <BackLink label="Back to orders" onClick={onBack} variant="pill" />
         <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
           Standard order
         </div>
       </div>
 
       <section className="overflow-hidden rounded-[28px] border border-gray-200/80 bg-white/70 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
-        <div className="grid gap-6 p-6 lg:grid-cols-[180px_minmax(0,1fr)]">
-          <div className="aspect-square overflow-hidden rounded-3xl border border-gray-200 dark:border-white/10">
-            {firstItem?.thumbnail ? (
-              <ImageWithFallback
-                src={firstItem.thumbnail}
-                alt={firstItem.name}
-                fit="contain"
-                rounded="none"
-                className="h-full w-full"
-                containerClassName="h-full w-full overflow-hidden"
-                maxHeightClassName="max-h-[85vh]"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-gray-400 dark:text-gray-500">
-                No image
-              </div>
-            )}
-          </div>
+        <div className="grid gap-6 p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <CustomOrderMediaPreview
+            src={firstItem?.thumbnail ?? null}
+            sources={standardMediaUrls}
+            title={firstItem?.name || 'Order item'}
+            emoji="🛍️"
+            className="min-h-[240px] lg:min-h-[320px]"
+          />
 
           <div className="space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -710,8 +688,6 @@ export const BuyerCustomOrderDetailView: React.FC<{
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
   const profile = useSelector((state: RootState) => state.user.profile);
-  const [order, setOrder] = useState<CustomOrderDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [paymentVerification, setPaymentVerification] =
     useState<CustomOrderPaymentVerificationResult | null>(null);
@@ -790,33 +766,40 @@ export const BuyerCustomOrderDetailView: React.FC<{
     }
   }, [location.state]);
 
+  // Cache-first custom-order detail: cached revisits paint instantly while a
+  // silent revalidation runs; mutations write refreshed data into the cache.
+  const customOrderQueryKey = useMemo(
+    () => ['orders', 'customDetail', orderId] as const,
+    [orderId],
+  );
+  const {
+    data: order = null,
+    loading,
+    error: orderLoadError,
+  } = useCachedResource<CustomOrderDetail | null>({
+    queryKey: customOrderQueryKey,
+    queryFn: () => customOrdersBuyerApi.getById(orderId),
+    enabled: Boolean(orderId),
+  });
+  const setOrder = useCallback(
+    (next: CustomOrderDetail) => {
+      queryClient.setQueryData(customOrderQueryKey, next);
+    },
+    [customOrderQueryKey],
+  );
+
   useEffect(() => {
-    let mounted = true;
+    if (order?.paymentStatus === 'PAID') {
+      setPaymentVerification(null);
+    }
+  }, [order?.paymentStatus]);
 
-    const run = async () => {
-      setLoading(true);
-      try {
-        const data = await customOrdersBuyerApi.getById(orderId);
-        if (!mounted) return;
-        setOrder(data);
-        if (data.paymentStatus === 'PAID') {
-          setPaymentVerification(null);
-        }
-      } catch (error: any) {
-        if (!mounted) return;
-        setOrder(null);
-        toast.error(error?.response?.data?.message || 'Unable to load custom order');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    void run();
-
-    return () => {
-      mounted = false;
-    };
-  }, [orderId]);
+  useEffect(() => {
+    if (!orderLoadError) return;
+    toast.error(
+      (orderLoadError as any)?.response?.data?.message || 'Unable to load custom order',
+    );
+  }, [orderLoadError]);
 
   const latestOpenExtension = useMemo(
     () =>
@@ -1078,6 +1061,11 @@ export const BuyerCustomOrderDetailView: React.FC<{
   }, [order]);
   const hasTimelineEntries = timelineReceiptEntries.length > 0;
   const mediaUrl = order?.source.primaryMediaUrl ?? previewOrder?.sourcePrimaryMediaUrl ?? null;
+  const sourceMediaUrls = (order?.source.mediaUrls && order.source.mediaUrls.length > 0)
+    ? order.source.mediaUrls
+    : mediaUrl
+      ? [mediaUrl]
+      : [];
   const title = order?.source.title ?? previewOrder?.sourceTitle ?? 'Custom order';
   const brandName = order?.source.brandName ?? previewOrder?.brand?.name ?? 'Brand';
   const paymentStatusValue = order?.paymentStatus ?? previewOrder?.paymentStatus ?? null;
@@ -1181,13 +1169,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
     <div className="space-y-6">
       {ConfirmDialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-full border border-gray-200/80 bg-white/80 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-fuchsia-300 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:text-white"
-        >
-          Back to orders
-        </button>
+        <BackLink label="Back to orders" onClick={onBack} variant="pill" />
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -1204,6 +1186,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
         <div className="grid gap-6 p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           <CustomOrderMediaPreview
             src={mediaUrl}
+            sources={sourceMediaUrls}
             title={title}
             className="min-h-[240px] lg:min-h-[320px]"
           />
@@ -1659,10 +1642,121 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
 }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [standardOrders, setStandardOrders] = useState<Order[]>([]);
-  const [customOrders, setCustomOrders] = useState<CustomOrderListItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { onNotification, onMessageEvent, socketConnected } = useRealtime();
+
+  const invalidateOrders = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['profile', 'orders', 'me'] });
+    void queryClient.invalidateQueries({ queryKey: ['orders', 'detail'] });
+    void queryClient.invalidateQueries({ queryKey: ['orders', 'customDetail'] });
+  }, []);
+
+  // Realtime sync (primary, ~free): the backend now emits dedicated
+  // `order.updated` / `custom-order.updated` events on every status/progress
+  // change; also refetch on any order-related notification as a backstop. We
+  // re-subscribe when the socket (re)connects so a new socket instance keeps
+  // the handlers. See ORDER_LIFECYCLE_SLA_AND_SYNC plan §Phase 0.
+  useEffect(() => {
+    const offOrder = onMessageEvent('order.updated', invalidateOrders);
+    const offCustom = onMessageEvent('custom-order.updated', invalidateOrders);
+    const offNotif = onNotification((payload) => {
+      if (String(payload?.type ?? '').toUpperCase().includes('ORDER')) {
+        invalidateOrders();
+      }
+    });
+    return () => {
+      offOrder();
+      offCustom();
+      offNotif();
+    };
+  }, [onMessageEvent, onNotification, invalidateOrders, socketConnected]);
+
+  // Cheap self-heal fallback: ONLY while the realtime socket is down, poll the
+  // lightweight orders-version signature (~1 aggregate) every 60s and refetch
+  // the heavy list only when it changes. No polling when the socket is healthy.
+  const lastOrdersVersionRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (socketConnected) return;
+    let active = true;
+    const check = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const { version } = await getMyOrdersVersion();
+        if (!active) return;
+        if (
+          lastOrdersVersionRef.current !== null &&
+          lastOrdersVersionRef.current !== version
+        ) {
+          invalidateOrders();
+        }
+        lastOrdersVersionRef.current = version;
+      } catch {
+        /* transient; try again next tick */
+      }
+    };
+    void check();
+    const interval = window.setInterval(() => void check(), 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [socketConnected, invalidateOrders]);
+
+  // Cached through the shared query client so returning to the Orders tab paints
+  // instantly from cache instead of flashing the skeleton + refetching every time.
+  const {
+    data: ordersData,
+    loading,
+    error: ordersError,
+  } = useCachedResource({
+    queryKey: ['profile', 'orders', 'me'],
+    queryFn: async () => {
+      const [standardResponse, customResponse] = await Promise.all([
+        getMyOrders(1, 50),
+        customOrdersBuyerApi.list({ page: 1, limit: 50 }),
+      ]);
+
+      const nextStandardOrders = Array.isArray(standardResponse?.items)
+        ? standardResponse.items
+        : [];
+      const nextCustomOrders = Array.isArray(customResponse?.items)
+        ? customResponse.items
+        : [];
+
+      const standardIds = nextStandardOrders.map((item) => item.id).filter(Boolean);
+      const customIds = nextCustomOrders.map((item) => item.id).filter(Boolean);
+
+      const [standardSummaries, customSummaries] = await Promise.all([
+        standardIds.length > 0
+          ? messagingApi.getBulkOrderSummaries(standardIds, true)
+          : Promise.resolve({ items: [] }),
+        customIds.length > 0
+          ? messagingApi.getBulkCustomOrderSummaries(customIds, true)
+          : Promise.resolve({ items: [] }),
+      ]);
+
+      return {
+        standardOrders: nextStandardOrders,
+        customOrders: nextCustomOrders,
+        standardSummaryByOrderId: standardSummaries.items.reduce<
+          Record<string, ThreadSummaryResponse | null>
+        >((acc, item) => {
+          acc[item.contextId] = item.summary;
+          return acc;
+        }, {}),
+        customSummaryByOrderId: customSummaries.items.reduce<
+          Record<string, ThreadSummaryResponse | null>
+        >((acc, item) => {
+          acc[item.contextId] = item.summary;
+          return acc;
+        }, {}),
+      };
+    },
+  });
+  const standardOrders = ordersData?.standardOrders ?? [];
+  const customOrders = ordersData?.customOrders ?? [];
+  const standardSummaryByOrderId = ordersData?.standardSummaryByOrderId ?? {};
+  const customSummaryByOrderId = ordersData?.customSummaryByOrderId ?? {};
+  const error = ordersError ? 'Unable to load your orders right now.' : null;
   const [query, setQuery] = useState('');
   const [standardStatus, setStandardStatus] = useState<StandardStatusFilter>('ALL');
   const [customStatus, setCustomStatus] = useState<CustomStatusFilter>('ALL');
@@ -1678,72 +1772,6 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
     urlOrderId && urlKind ? { kind: urlKind, id: urlOrderId } : null;
   const [localSelection, setLocalSelection] = useState<OrdersPanelSelection | null>(null);
   const selection = mode === 'full' ? urlSelection : localSelection;
-  const [standardSummaryByOrderId, setStandardSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
-  const [customSummaryByOrderId, setCustomSummaryByOrderId] = useState<Record<string, ThreadSummaryResponse | null>>({});
-
-  useEffect(() => {
-    let mounted = true;
-
-    const run = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [standardResponse, customResponse] = await Promise.all([
-          getMyOrders(1, 50),
-          customOrdersBuyerApi.list({ page: 1, limit: 50 }),
-        ]);
-
-        if (!mounted) return;
-
-        const nextStandardOrders = Array.isArray(standardResponse?.items) ? standardResponse.items : [];
-        const nextCustomOrders = Array.isArray(customResponse?.items) ? customResponse.items : [];
-
-        setStandardOrders(nextStandardOrders);
-        setCustomOrders(nextCustomOrders);
-
-        const standardIds = nextStandardOrders.map((item) => item.id).filter(Boolean);
-        const customIds = nextCustomOrders.map((item) => item.id).filter(Boolean);
-
-        const [standardSummaries, customSummaries] = await Promise.all([
-          standardIds.length > 0
-            ? messagingApi.getBulkOrderSummaries(standardIds, true)
-            : Promise.resolve({ items: [] }),
-          customIds.length > 0
-            ? messagingApi.getBulkCustomOrderSummaries(customIds, true)
-            : Promise.resolve({ items: [] }),
-        ]);
-
-        if (!mounted) return;
-
-        setStandardSummaryByOrderId(
-          standardSummaries.items.reduce<Record<string, ThreadSummaryResponse | null>>((acc, item) => {
-            acc[item.contextId] = item.summary;
-            return acc;
-          }, {}),
-        );
-        setCustomSummaryByOrderId(
-          customSummaries.items.reduce<Record<string, ThreadSummaryResponse | null>>((acc, item) => {
-            acc[item.contextId] = item.summary;
-            return acc;
-          }, {}),
-        );
-      } catch (err) {
-        if (!mounted) return;
-        setStandardOrders([]);
-        setCustomOrders([]);
-        setError('Unable to load your orders right now.');
-        console.error('Orders panel failed to fetch orders:', err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    void run();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (!initialSelection || mode !== 'full') return;
@@ -1827,12 +1855,13 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
   const clearDetailSelection = useCallback(() => {
     setLocalSelection(null);
     setSelectedCustomPreview(null);
+    // Close must REPLACE — a push here makes browser-back reopen the detail.
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete('orderId');
       next.delete('kind');
       return next;
-    });
+    }, { replace: true });
   }, [setSearchParams]);
 
   const handleViewChange = useCallback(
@@ -1842,12 +1871,13 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
 
       setLocalSelection(null);
       setSelectedCustomPreview(null);
+      // View toggle is UI state — replace so mobile back doesn't replay it.
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set('kind', view);
         next.delete('orderId');
         return next;
-      });
+      }, { replace: true });
     },
     [mode, setSearchParams],
   );
@@ -1892,40 +1922,38 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
           )}
         </div>
 
-        <div className="mb-4 inline-flex rounded-2xl border border-gray-200/80 bg-white/80 p-1 dark:border-white/10 dark:bg-white/5">
-          {(['standard', 'custom'] as const).map((view) => {
-            const active = activeView === view;
-            return (
-              <button
-                key={view}
-                type="button"
-                onClick={() => handleViewChange(view)}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                  active
-                    ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                    : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-                }`}
-              >
-                {view === 'standard' ? 'Standard Orders' : 'Custom Orders'}
-              </button>
-            );
-          })}
+        <div className="mb-4 flex flex-row items-center gap-2.5">
+          <div className="inline-flex shrink-0 rounded-2xl border border-gray-200/80 bg-white/80 p-0.5 dark:border-white/10 dark:bg-white/5">
+            {(['standard', 'custom'] as const).map((view) => {
+              const active = activeView === view;
+              return (
+                <button
+                  key={view}
+                  type="button"
+                  onClick={() => handleViewChange(view)}
+                  className={`rounded-xl px-2.5 py-1.5 text-[10px] sm:text-xs font-semibold transition ${
+                    active
+                      ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                      : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                  }`}
+                >
+                  {view === 'standard' ? 'Standard' : 'Custom'}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="relative flex-1 min-w-0">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search orders..."
+              className="w-full rounded-2xl border border-gray-200/80 bg-white/70 py-1.5 pl-3 pr-3 text-[10px] sm:text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-400/40 dark:border-white/10 dark:bg-white/5 dark:text-white"
+            />
+          </div>
         </div>
 
-        <div className="relative mb-3">
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={
-              activeView === 'standard'
-                ? 'Search standard orders...'
-                : 'Search custom orders...'
-            }
-            className="w-full rounded-2xl border border-gray-200/80 bg-white/70 py-2.5 pl-4 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-400/40 dark:border-white/10 dark:bg-white/5 dark:text-white"
-          />
-        </div>
-
-        <div className="mb-4 flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+        <div className="mb-4 flex items-center border-b border-gray-100 dark:border-white/10 overflow-x-auto scrollbar-hide relative">
           {(activeView === 'standard' ? STANDARD_STATUS_OPTIONS : CUSTOM_STATUS_OPTIONS).map((opt) => {
             const active = activeView === 'standard' ? standardStatus === opt : customStatus === opt;
             return (
@@ -1939,26 +1967,39 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                   }
                   setCustomStatus(opt as CustomStatusFilter);
                 }}
-                className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+                className={`relative shrink-0 px-3 pb-2 text-[10px] sm:text-xs font-bold transition-colors focus:outline-none ${
                   active
-                    ? 'bg-fuchsia-500 text-white'
-                    : 'border border-gray-200/80 bg-white/60 text-gray-600 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
+                    ? 'text-fuchsia-600 dark:text-fuchsia-400'
+                    : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
                 }`}
               >
-                {opt === 'ALL'
-                  ? 'All'
-                  : opt === 'PROCESSING'
-                    ? 'Proc.'
-                    : opt.charAt(0) + opt.slice(1).toLowerCase()}
+                <span className="relative z-10">
+                  {opt === 'ALL'
+                    ? 'All'
+                    : opt === 'PROCESSING'
+                      ? 'Processing'
+                      : opt.charAt(0) + opt.slice(1).toLowerCase()}
+                </span>
+                {active ? (
+                  <motion.div
+                    layoutId="activeOrderTabIndicator"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-fuchsia-500"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                ) : null}
               </button>
             );
           })}
         </div>
 
-        <div className="space-y-3">
+        {/* Inline scroller: the list used to grow the page without bound, so a
+            shopper with twenty orders had to scroll past all of them to reach
+            anything below. Rows scroll within a fixed viewport instead, keeping
+            the tab a stable height regardless of order count. */}
+        <div className="max-h-[min(62vh,560px)] space-y-2 overflow-y-auto overscroll-contain scrollbar-wiez pr-1">
           {loading ? (
             Array.from({ length: 3 }).map((_, idx) => (
-              <div key={idx} className="h-24 rounded-2xl bg-gray-100 dark:bg-white/5 animate-pulse" />
+              <div key={idx} className="h-20 rounded-2xl bg-gray-100 dark:bg-white/5 animate-pulse" />
             ))
           ) : error ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-xs text-amber-700 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-300">
@@ -1969,7 +2010,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
               <EmptyOrdersState
                 query={query}
                 filtered={standardStatus !== 'ALL'}
-                onBrowse={() => navigate('/market')}
+                onBrowse={() => navigate('/runway')}
                 label="standard"
               />
             ) : (
@@ -1985,18 +2026,9 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                     key={order.id}
                     type="button"
                     onClick={() => handleSelect({ kind: 'standard', id: order.id })}
-                    className="w-full rounded-2xl bg-white/65 p-3 text-left shadow-[0_14px_40px_rgba(15,23,42,0.05)] transition hover:bg-white dark:bg-white/[0.03] dark:hover:bg-white/10"
+                    className="w-full rounded-2xl bg-white/65 p-2.5 text-left shadow-[0_14px_40px_rgba(15,23,42,0.05)] transition hover:bg-white dark:bg-white/[0.03] dark:hover:bg-white/10"
                   >
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
-                        #ORD-{order.id.slice(0, 4).toUpperCase()}
-                      </span>
-                      <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${statusBadgeClass(normalizedStatus)}`}>
-                        {normalizedStatus}
-                      </span>
-                    </div>
-
-                    <div className="mb-3 flex items-start gap-3">
+                    <div className="flex items-start gap-2.5">
                       <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-white/10">
                         {firstItem?.thumbnail ? (
                           <ImageWithFallback
@@ -2016,33 +2048,47 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <p className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
-                          {firstItem?.name || 'Order'}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(order.createdAt)}</p>
-                        {summary?.hasUnread ? (
-                          <p className="mt-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
-                            {unreadCount > 0 ? `${unreadCount} unread messages` : 'New messages'}
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
+                            {firstItem?.name || 'Order'}
                           </p>
-                        ) : null}
+                          <p className="shrink-0 text-sm font-bold text-gray-900 dark:text-white">
+                            {formatCurrency(order.totalAmount, order.currency)}
+                          </p>
+                        </div>
+
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-gray-500 dark:text-gray-400">
+                          <span className="font-mono">
+                            #ORD-{order.id.slice(0, 4).toUpperCase()}
+                          </span>
+                          <span>{formatDate(order.createdAt)}</span>
+                          <span className={`rounded-md px-1.5 py-0.5 font-bold ${statusBadgeClass(normalizedStatus)}`}>
+                            {normalizedStatus}
+                          </span>
+                          {summary?.hasUnread ? (
+                            <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                              {unreadCount > 0 ? `${unreadCount} unread` : 'New messages'}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {/* The four stage captions below the bar doubled the row
+                            height for information the status chip already gives.
+                            The bar keeps the at-a-glance progress; the detail
+                            view keeps the labels. */}
+                        <div className="mt-2 flex items-center gap-1">
+                          {Array.from({ length: 4 }).map((_, idx) => (
+                            <span
+                              key={idx}
+                              className={`h-1 w-full rounded-full ${
+                                idx < completedSegments
+                                  ? 'bg-fuchsia-500 dark:bg-fuchsia-400'
+                                  : 'bg-gray-200 dark:bg-white/10'
+                              }`}
+                            />
+                          ))}
+                        </div>
                       </div>
-
-                      <p className="shrink-0 text-sm font-bold text-gray-900 dark:text-white">
-                        {formatCurrency(order.totalAmount, order.currency)}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: 4 }).map((_, idx) => (
-                        <span
-                          key={idx}
-                          className={`h-1.5 w-full rounded-full ${
-                            idx < completedSegments
-                              ? 'bg-fuchsia-500 dark:bg-fuchsia-400'
-                              : 'bg-gray-200 dark:bg-white/10'
-                          }`}
-                        />
-                      ))}
                     </div>
                   </button>
                 );
@@ -2052,7 +2098,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
             <EmptyOrdersState
               query={query}
               filtered={customStatus !== 'ALL'}
-              onBrowse={() => navigate('/market')}
+              onBrowse={() => navigate('/runway')}
               label="custom"
             />
           ) : (
@@ -2065,21 +2111,10 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                   key={order.id}
                   type="button"
                   onClick={() => handleSelect({ kind: 'custom', id: order.id })}
-                    className="w-full rounded-[1.7rem] bg-white/65 p-3.5 text-left shadow-[0_14px_40px_rgba(15,23,42,0.05)] transition hover:bg-white dark:bg-white/[0.03] dark:hover:bg-white/10"
+                    className="w-full rounded-2xl bg-white/65 p-2.5 text-left shadow-[0_14px_40px_rgba(15,23,42,0.05)] transition hover:bg-white dark:bg-white/[0.03] dark:hover:bg-white/10"
                 >
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
-                      {formatCustomOrderCode(order.id)}
-                    </span>
-                    {shouldShowBuyerStatusBadge(order.status) ? <CustomOrderBadge value={order.status} /> : null}
-                    <CustomOrderBadge
-                      value={getBuyerFacingProgressStage(order.currentProgressStage)}
-                      type="stage"
-                    />
-                  </div>
-
-                  <div className="grid gap-3 lg:grid-cols-[92px_minmax(0,1fr)_auto] lg:items-start">
-                    <div className="h-[92px] overflow-hidden rounded-[1.25rem] bg-gray-100 dark:bg-white/10">
+                  <div className="flex items-start gap-2.5">
+                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-white/10">
                       {order.sourcePrimaryMediaUrl ? (
                         <ImageWithFallback
                           src={order.sourcePrimaryMediaUrl}
@@ -2097,31 +2132,36 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                       )}
                     </div>
 
-                    <div className="min-w-0">
-                      <div className="line-clamp-1 text-lg font-bold text-gray-900 dark:text-white">
-                        {order.sourceTitle}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
+                          {order.sourceTitle}
+                        </div>
+                        <div className="shrink-0 text-sm font-bold text-gray-900 dark:text-white">
+                          {formatCurrency(order.buyerPriceSummary.grandTotal, order.buyerPriceSummary.currency)}
+                        </div>
                       </div>
-                      <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+
+                      <div className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
                         {order.brand?.name || 'Brand'} · {formatDate(order.createdAt)}
                       </div>
-                      {summary?.hasUnread ? (
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span className="font-mono text-[10px] text-gray-500 dark:text-gray-400">
+                          {formatCustomOrderCode(order.id)}
+                        </span>
+                        {shouldShowBuyerStatusBadge(order.status) ? (
+                          <CustomOrderBadge value={order.status} />
+                        ) : null}
+                        <CustomOrderBadge
+                          value={getBuyerFacingProgressStage(order.currentProgressStage)}
+                          type="stage"
+                        />
+                        {summary?.hasUnread ? (
+                          <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
                             {unreadCount > 0 ? `${unreadCount} unread` : 'New messages'}
                           </span>
-                        </div>
-                      ) : null}
-                      <div className="mt-3 grid gap-1 text-sm text-gray-600 dark:text-gray-300 sm:grid-cols-2">
-                        <span>Delivery: {order.delivery?.city || order.delivery?.state || 'Not scheduled'}</span>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <div className="text-base font-bold text-gray-900 dark:text-white">
-                        {formatCurrency(order.buyerPriceSummary.grandTotal, order.buyerPriceSummary.currency)}
-                      </div>
-                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        {order.measurementCount ?? 0} measurements
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -2134,7 +2174,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
 
       {mode === 'summary' && activeView === 'standard' && standardOrders.length > 0 ? (
         <section className="glass-panel rounded-3xl border border-gray-200/70 bg-white/70 p-5 text-center backdrop-blur-md dark:border-white/10 dark:bg-white/5">
-          <h4 className="text-base font-bold text-gray-900 dark:text-white">WEAZ Pro</h4>
+          <h4 className="text-base font-bold text-gray-900 dark:text-white">WIEZ Pro</h4>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Unlock exclusive drops and lower fees.</p>
           <button
             type="button"
@@ -2147,7 +2187,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
         <section className="glass-panel rounded-3xl border border-gray-200/70 bg-white/70 p-5 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
           <h4 className="text-base font-bold text-gray-900 dark:text-white">Buyer Protection</h4>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Every purchase on WEAZ is covered by our authenticity and fulfillment protections.
+            Every purchase on WIEZ is covered by our authenticity and fulfillment protections.
           </p>
         </section>
       ) : null}

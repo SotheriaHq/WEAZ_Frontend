@@ -22,8 +22,10 @@ import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildStorefrontUrl } from '@/utils/publicLinks';
 import type { VerificationStatusResponse } from '@/types/verification';
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
+import { useCachedResource } from '@/hooks/useCachedResource';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
+import VerifiedBrandBadge from '@/components/brand/VerifiedBrandBadge';
 
 export default function StoreManagement() {
   const navigate = useNavigate();
@@ -33,18 +35,107 @@ export default function StoreManagement() {
   const isEmbeddedMobile = embeddedSurface === 'mobile-app';
   const showStudioFloatingControls = location.pathname.startsWith('/studio');
 
-  const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<StoreStatusResponse | null>(null);
-  const [verification, setVerification] = useState<VerificationStatusResponse | null>(null);
-  const [overview, setOverview] = useState<any>(null);
-  const [overviewLoading, setOverviewLoading] = useState(false);
-  const [analytics, setAnalytics] = useState<any>(null);
   const [analyticsOpen] = useState(true);
   const [analyticsCollapsed, setAnalyticsCollapsed] = useState(true);
   const [layoutMode, setLayoutMode] = useState(false);
-  const [draftCollections, setDraftCollections] = useState<any[]>([]);
-  const [draftCollectionsLoading, setDraftCollectionsLoading] = useState(false);
   const [showStoreQr, setShowStoreQr] = useState(false);
+
+  // Cached screen data: revisits paint instantly from the shared query cache
+  // (skeleton ONLY on the true first load); stale data revalidates silently.
+  // This replaces the legacy useState+useEffect fetches that re-skeletoned the
+  // Store tab on every navigation (client-reported).
+  const {
+    data: statusBundle,
+    loading,
+    error: statusError,
+  } = useCachedResource<{
+    status: StoreStatusResponse;
+    verification: VerificationStatusResponse | null;
+  }>({
+    queryKey: ['store', 'management', 'status', user?.id ?? 'anon'],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const verificationRequest = user?.id
+        ? brandApi.getVerificationStatus(user.id, { force: true }).catch(() => null)
+        : Promise.resolve<VerificationStatusResponse | null>(null);
+      let s = await getStoreStatus();
+
+      if (!s?.isStoreOpen && isStoreOpenPending(user?.id)) {
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          await sleep(500);
+          try {
+            const retryStatus = await getStoreStatus();
+            s = retryStatus;
+            if (retryStatus?.isStoreOpen) {
+              break;
+            }
+          } catch {
+            // Keep trying while in pending-open grace period.
+          }
+        }
+      }
+
+      const verificationData = await verificationRequest;
+      return { status: s, verification: verificationData };
+    },
+  });
+  const status = statusBundle?.status ?? null;
+  const verification = statusBundle?.verification ?? null;
+
+  const { data: overviewBundle } = useCachedResource<{
+    overview: any;
+    analytics: any;
+  }>({
+    queryKey: ['store', 'management', 'overview', user?.id ?? 'anon'],
+    enabled: Boolean(user?.id),
+    queryFn: async () => {
+      try {
+        const [overviewData, analyticsData] = await Promise.all([
+          brandApi.getDashboardOverview(user!.id),
+          brandApi.getDashboardAnalytics(user!.id, '7d'),
+        ]);
+        return { overview: overviewData, analytics: analyticsData };
+      } catch {
+        return {
+          overview: {
+            kpis: {
+              totalRevenue: 0,
+              totalOrders: 0,
+              conversionRate: 0,
+              storeViews: 0,
+              reviewScore: 0,
+              reviewCount: 0,
+            },
+            recentOrders: [],
+            store: {
+              name: user?.brandFullName || user?.username || 'Your Store',
+              slug: user?.username || 'your-store',
+              isLive: false,
+            },
+          },
+          analytics: { salesChart: [] },
+        };
+      }
+    },
+  });
+  const overview = overviewBundle?.overview ?? null;
+  const analytics = overviewBundle?.analytics ?? null;
+
+  const { data: draftCollections = [], loading: draftCollectionsLoading } =
+    useCachedResource<any[]>({
+      queryKey: ['store', 'management', 'draft-collections', user?.id ?? 'anon'],
+      enabled: Boolean(user?.id),
+      queryFn: async () => {
+        const collections = await brandApi.getCollections(user!.id, {
+          visibility: 'all',
+          scope: 'store',
+        });
+        return (collections || []).filter((collection: any) => {
+          const collectionStatus = String(collection?.status || '').toUpperCase();
+          return collectionStatus === 'DRAFT' && collection?.isSystemGenerated !== true;
+        });
+      },
+    });
 
   const resolvedAvatar = useMemo(
     () =>
@@ -182,153 +273,35 @@ export default function StoreManagement() {
     return String(val);
   };
 
+  // Redirects derive from the cached status — they run on both fresh fetches
+  // and instant cache paints, so draft stores still bounce to setup.
   useEffect(() => {
-    let mounted = true;
+    if (statusBundle) {
+      const s = statusBundle.status;
+      if (s?.isStoreOpen) {
+        clearStoreOpenPending(user?.id);
+        return;
+      }
+      if (isStoreOpenPending(user?.id)) return;
+      if (s?.profile == null) {
+        navigate('/studio/store/setup', { replace: true });
+        return;
+      }
+      navigate(resolveStoreSetupDestination(user?.id), { replace: true });
+      return;
+    }
 
-    const run = async () => {
-      try {
-        setLoading(true);
-        const verificationRequest = user?.id
-          ? brandApi.getVerificationStatus(user.id, { force: true }).catch(() => null)
-          : Promise.resolve<VerificationStatusResponse | null>(null);
-        let s = await getStoreStatus();
-
-        if (!s?.isStoreOpen && isStoreOpenPending(user?.id)) {
-          for (let attempt = 0; attempt < 5; attempt += 1) {
-            await sleep(500);
-            try {
-              const retryStatus = await getStoreStatus();
-              s = retryStatus;
-              if (retryStatus?.isStoreOpen) {
-                break;
-              }
-            } catch {
-              // Keep trying while in pending-open grace period.
-            }
-          }
-        }
-
-        if (!mounted) return;
-        setStatus(s);
-
-        if (s?.isStoreOpen) {
-          clearStoreOpenPending(user?.id);
-        }
-
-        if (s?.profile == null) {
-          if (isStoreOpenPending(user?.id)) {
-            return;
-          }
+    if (statusError) {
+      const code = (statusError as any)?.response?.status;
+      if (code === 404) {
+        if (!isStoreOpenPending(user?.id)) {
           navigate('/studio/store/setup', { replace: true });
-          return;
         }
-
-        if (!s?.isStoreOpen) {
-          if (isStoreOpenPending(user?.id)) {
-            return;
-          }
-
-          navigate(resolveStoreSetupDestination(user?.id), { replace: true });
-        }
-
-        const verificationData = await verificationRequest;
-        if (!mounted) return;
-
-        setVerification(verificationData);
-      } catch (e) {
-        const code = (e as any)?.response?.status;
-        if (code === 404) {
-          if (isStoreOpenPending(user?.id)) {
-            return;
-          }
-          navigate('/studio/store/setup', { replace: true });
-          return;
-        }
-        toast.error('Failed to load store status');
-      } finally {
-        if (mounted) setLoading(false);
+        return;
       }
-    };
-
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [navigate, user?.id]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const run = async () => {
-      if (!user?.id) return;
-      setOverviewLoading(true);
-      try {
-        const [overviewData, analyticsData] = await Promise.all([
-          brandApi.getDashboardOverview(user.id),
-          brandApi.getDashboardAnalytics(user.id, '7d'),
-        ]);
-        if (!mounted) return;
-        setOverview(overviewData);
-        setAnalytics(analyticsData);
-      } catch {
-        if (!mounted) return;
-        setOverview({
-          kpis: {
-            totalRevenue: 0,
-            totalOrders: 0,
-            conversionRate: 0,
-            storeViews: 0,
-            reviewScore: 0,
-            reviewCount: 0,
-          },
-          recentOrders: [],
-          store: {
-            name: brandName,
-            slug: user?.username || 'your-store',
-            isLive: status?.isStoreOpen ?? false,
-          },
-        });
-        setAnalytics({ salesChart: [] });
-      } finally {
-        if (mounted) setOverviewLoading(false);
-      }
-    };
-
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [brandName, status?.isStoreOpen, user?.id, user?.username]);
-
-  useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      if (!user?.id) return;
-      setDraftCollectionsLoading(true);
-      try {
-        const collections = await brandApi.getCollections(user.id, {
-          visibility: 'all',
-          scope: 'store',
-        });
-        const drafts = (collections || []).filter((collection: any) => {
-          const status = String(collection?.status || '').toUpperCase();
-          return status === 'DRAFT' && collection?.isSystemGenerated !== true;
-        });
-        if (!mounted) return;
-        setDraftCollections(drafts || []);
-      } catch {
-        if (!mounted) return;
-        setDraftCollections([]);
-      } finally {
-        if (mounted) setDraftCollectionsLoading(false);
-      }
-    };
-
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [user?.id]);
+      toast.error('Failed to load store status');
+    }
+  }, [statusBundle, statusError, navigate, user?.id]);
 
   if (loading) {
     return <StudioPageSkeleton variant="dashboard" />;
@@ -362,7 +335,7 @@ export default function StoreManagement() {
   }
 
   return (
-    <div className="animate-in fade-in space-y-8 duration-500">
+    <div className="animate-in fade-in space-y-4 duration-500 sm:space-y-8">
       {returnTo ? (
         <div className="flex items-center gap-3">
           <button
@@ -435,16 +408,42 @@ export default function StoreManagement() {
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={() => navigate('/studio/verification')}
-                className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-300"
-                aria-label="Open verification workspace"
-                title={verificationLabel}
-              >
-                <span>{verificationMarker}</span>
-                <span className="max-w-[140px] truncate">{verificationLabel}</span>
-              </button>
+              {/*
+                Once the badge is live, show THE BADGE — the same scalloped seal
+                buyers see on the storefront and catalog cards. A sky-blue pill
+                reading "✅ Seller verified" is a label ABOUT the badge, so the
+                owner's own Studio was the one surface that never showed them
+                what they had actually earned.
+
+                Before that point the pill still earns its place: it is a status
+                + call to action ("Verification in progress", "needs attention")
+                that has to be tappable to reach the workspace.
+              */}
+              {verificationBadgeVisible ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/studio/verification')}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 transition hover:bg-gray-100 dark:hover:bg-white/10"
+                  aria-label="Verified brand — open verification workspace"
+                  title="Verified brand"
+                >
+                  <VerifiedBrandBadge size={20} linkTo={null} />
+                  <span className="text-[11px] font-semibold text-on-surface">
+                    Verified
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate('/studio/verification')}
+                  className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-300"
+                  aria-label="Open verification workspace"
+                  title={verificationLabel}
+                >
+                  <span>{verificationMarker}</span>
+                  <span className="max-w-[140px] truncate">{verificationLabel}</span>
+                </button>
+              )}
 
               <div className="group relative">
                 <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
@@ -503,25 +502,25 @@ export default function StoreManagement() {
       </div>
 
       {showVerificationPrompt ? (
-        <section className="rounded-3xl border border-sky-200/80 bg-gradient-to-r from-sky-50 via-white to-indigo-50 p-5 shadow-sm dark:border-sky-500/20 dark:from-sky-500/10 dark:via-white/5 dark:to-indigo-500/10">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className={isEmbeddedMobile ? 'max-w-none' : 'max-w-3xl'}>
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700 dark:text-sky-200">
+        <section className="rounded-2xl border border-sky-200/80 bg-gradient-to-r from-sky-50 via-white to-indigo-50 p-3 shadow-sm dark:border-sky-500/20 dark:from-sky-500/10 dark:via-white/5 dark:to-indigo-500/10 sm:rounded-3xl sm:p-5">
+          <div className="flex flex-row items-center justify-between gap-3 sm:flex-col sm:items-start sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className={`min-w-0 ${isEmbeddedMobile ? 'max-w-none' : 'sm:max-w-3xl'}`}>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-700 dark:text-sky-200 sm:text-xs">
                 {verificationPrompt.eyebrow}
               </div>
-              <h2 className="mt-2 text-xl font-semibold text-theme">
+              <h2 className="mt-1 line-clamp-2 text-sm font-semibold text-theme sm:mt-2 sm:text-xl">
                 {verificationPrompt.title}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-theme-secondary">
+              <p className="mt-2 hidden text-sm leading-6 text-theme-secondary sm:block">
                 {verificationPrompt.description}
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex shrink-0 flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => navigate('/studio/verification')}
-                className="inline-flex items-center rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+                className="inline-flex min-h-10 items-center justify-center rounded-full bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700 sm:px-4 sm:py-2.5 sm:text-sm"
               >
                 {verificationPrompt.primaryLabel}
               </button>
@@ -529,7 +528,7 @@ export default function StoreManagement() {
                 <button
                   type="button"
                   onClick={() => navigate('/settings?tab=notifications')}
-                  className="inline-flex items-center rounded-full border border-sky-200 bg-white/80 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-white dark:border-sky-500/20 dark:bg-white/5 dark:text-sky-200"
+                  className="hidden min-h-10 items-center justify-center rounded-full border border-sky-200 bg-white/80 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-white dark:border-sky-500/20 dark:bg-white/5 dark:text-sky-200 sm:inline-flex"
                 >
                   Manage reminders
                 </button>
@@ -559,6 +558,7 @@ export default function StoreManagement() {
         downloadFileName="storefront-qr.png"
         logoUrl={avatarUrl || resolvedAvatar.src}
         logoFileId={resolvedAvatar.fileId}
+        username={overview?.store?.slug || user?.username}
       />
 
       {showStudioFloatingControls && analyticsOpen && analyticsCollapsed ? (
@@ -631,7 +631,7 @@ export default function StoreManagement() {
                             mediaClassName="h-full w-full object-cover"
                           />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-gray-100 text-xs text-gray-500">
+                          <div className="flex h-full w-full items-center justify-center bg-gray-100 text-xs text-gray-500 dark:bg-white/10">
                             No Image
                           </div>
                         )}
@@ -668,7 +668,7 @@ export default function StoreManagement() {
                           {order.items?.length || 0} items
                         </p>
                       </div>
-                      <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-semibold text-green-600">
+                      <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-semibold text-green-600 dark:bg-green-500/10">
                         {order.status || 'Paid'}
                       </span>
                     </div>
@@ -704,7 +704,7 @@ export default function StoreManagement() {
             <button
               type="button"
               onClick={() => setAnalyticsCollapsed(true)}
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:bg-white/5 dark:text-gray-300"
             >
               Close Analytics
             </button>
@@ -712,11 +712,10 @@ export default function StoreManagement() {
         </aside>
       ) : null}
 
-      {overviewLoading ? (
-        <div className="rounded-2xl border border-gray-200 bg-white/70 p-4 text-sm text-gray-500 dark:border-white/10 dark:bg-white/5">
-          Loading store stats...
-        </div>
-      ) : null}
+      {/* Store stats revalidate in the background and feed a panel that is
+          collapsed by default — a captioned "Loading store stats..." slab under
+          the product grid was one more thing announcing itself on a screen the
+          client already called over-loaded. It resolves silently now. */}
     </div>
   );
 }

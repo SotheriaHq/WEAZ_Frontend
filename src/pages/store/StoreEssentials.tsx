@@ -6,6 +6,7 @@ import type { RootState } from '@/store';
 import { getStoreWizardPrefill, updateStoreProfile } from '@/api/StoreApi';
 import Input from '@/components/ui/Input';
 import { readStoreProgressLocally, saveStoreProgressLocally } from '@/utils/storeSetup';
+import StoreSetupProgress from '@/components/store/StoreSetupProgress';
 
 const MAX_SPECIALIZATIONS = 4;
 const MAX_DESCRIPTION = 500;
@@ -25,6 +26,37 @@ const BRAND_SPECIALIZATION_OPTIONS = [
 ];
 
 const normalizeToken = (value: string): string => value.trim().replace(/^#/, '').toLowerCase();
+
+const MAX_TAGLINE = 60;
+
+const firstSentence = (text: string): string => {
+  const trimmed = text.trim();
+  if (!trimmed) return '';
+  return (trimmed.split(/(?<=[.!?])\s+/)[0] ?? trimmed).trim();
+};
+
+const resolveSuggestedTagline = (options: {
+  savedTagline?: string;
+  apiTagline?: string;
+  description?: string;
+  userBrandDescription?: string | null;
+  tags?: string[];
+}): string => {
+  const saved = options.savedTagline?.trim();
+  if (saved) return saved.slice(0, MAX_TAGLINE);
+
+  const api = options.apiTagline?.trim();
+  if (api) return api.slice(0, MAX_TAGLINE);
+
+  const fromDescription = firstSentence(options.description || '');
+  if (fromDescription) return fromDescription.slice(0, MAX_TAGLINE);
+
+  const fromUserDescription = firstSentence(options.userBrandDescription || '');
+  if (fromUserDescription) return fromUserDescription.slice(0, MAX_TAGLINE);
+
+  const fromTags = (options.tags || []).slice(0, 3).join(' • ');
+  return fromTags.slice(0, MAX_TAGLINE);
+};
 
 const normalizeSpecializationSelection = (
   values: string[],
@@ -67,6 +99,7 @@ const StoreEssentials: React.FC = () => {
   const user = useSelector((state: RootState) => state.user.profile);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [selected, setSelected] = useState<string[]>([]);
   const [tagline, setTagline] = useState('');
@@ -93,6 +126,29 @@ const StoreEssentials: React.FC = () => {
           return;
         }
 
+        /**
+         * Store setup STARTS at the start. This page never skips itself.
+         *
+         * It used to auto-forward to the wizard whenever it judged essentials
+         * "already done", and every version of that judgement was wrong for
+         * somebody:
+         *
+         *  - Reading the localStorage flag meant the mobile WebView, whose
+         *    storage is not the brand's, jumped straight to the Social step for
+         *    brands who had never filled essentials at all.
+         *  - Reading the server was accurate but no kinder. A brand whose
+         *    description and tags happen to be populated still expects the
+         *    first screen of setup to be the first screen of setup.
+         *  - Worst of all, the wizard's Back button lands here, so ANY forward
+         *    bounced the user straight back to Social. The start of setup was
+         *    unreachable and Back looked broken.
+         *
+         * The cost of not forwarding is one extra tap on Continue for a brand
+         * who has already filled this in — and the fields below are prefilled
+         * from the server, so there is nothing to redo. That is a far better
+         * trade than a flow that can trap someone.
+         */
+
         // Best-effort prefill for quick-start
         const localProgress = readStoreProgressLocally<StoreEssentialsProgress>(
           user?.id,
@@ -106,24 +162,54 @@ const StoreEssentials: React.FC = () => {
             )
           : [];
 
-        if (typeof localProgress?.tagline === 'string') {
-          setTagline(localProgress.tagline);
-        } else if (prefill.brand?.tagline) {
-          setTagline(prefill.brand.tagline);
+        /**
+         * Chips come pre-selected only from choices made in THIS flow.
+         *
+         * The original rule was "localStorage only", because brand-profile
+         * hashtags had once been mapped onto these chips and users had to
+         * unselect choices they never made. That concern stands — but
+         * `brand.tags` is not those hashtags: `persistAndContinue` below writes
+         * `tags: selected` from this very screen, so the server copy IS the
+         * saved essentials selection.
+         *
+         * It has to be read, too. Now that this page no longer skips itself, a
+         * returning brand lands here with their selection intact instead of
+         * empty chips they must re-pick to get past `canContinue`. localStorage
+         * still wins when present — it is the more recent of the two.
+         */
+        const serverCategories = normalizeSpecializationSelection(
+          Array.isArray(prefill.brand?.tags) ? prefill.brand.tags : [],
+          BRAND_SPECIALIZATION_OPTIONS,
+        );
+        const resolvedCategories = localCategories.length > 0 ? localCategories : serverCategories;
+
+        if (resolvedCategories.length > 0) {
+          setSelected(resolvedCategories);
         }
 
-        if (typeof localProgress?.description === 'string') {
+        const resolvedDescription =
+          typeof localProgress?.description === 'string' && localProgress.description.trim()
+            ? localProgress.description
+            : (prefill.brand?.description || user?.brandDescription || '');
+
+        if (typeof localProgress?.description === 'string' && localProgress.description.trim()) {
           setDescription(localProgress.description);
         } else if (prefill.brand?.description) {
           setDescription(prefill.brand.description);
+        } else if (user?.brandDescription) {
+          setDescription(user.brandDescription);
         }
 
-        if (
-          localProgress?.essentialsComplete === true &&
-          localProgress.setupWizardVersion === 2
-        ) {
-          setSelected(localCategories);
-        }
+        setTagline(
+          resolveSuggestedTagline({
+            savedTagline:
+              typeof localProgress?.tagline === 'string' ? localProgress.tagline : undefined,
+            apiTagline: prefill.brand?.tagline,
+            description: resolvedDescription,
+            userBrandDescription: user?.brandDescription,
+            tags: resolvedCategories,
+          }),
+        );
       } catch (error) {
         // If this fails, still render the static brand-positioning options.
         console.error('Failed to load store essentials prefill', error);
@@ -137,10 +223,32 @@ const StoreEssentials: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [navigate, user?.id]);
+  }, [navigate, user?.brandDescription, user?.id]);
 
   useEffect(() => {
-    // Confetti once on mount (best-effort)
+    /**
+     * Confetti marks STARTING store setup, once.
+     *
+     * It fired on every mount of this page, and this page is where the wizard's
+     * Back button lands — so walking back from Social threw confetti again, and
+     * again on every lap. A celebration that repeats on backward navigation
+     * stops reading as a celebration and starts reading as a bug.
+     *
+     * Keyed per brand in sessionStorage: it re-arms for a genuinely new visit
+     * (new tab, or after the browser session ends) but never for movement
+     * inside the flow. Session rather than local storage so a brand who comes
+     * back another day is still greeted.
+     */
+    if (!user?.id) return;
+    const seenKey = `wiez.storeSetup.welcomed:${user.id}`;
+    try {
+      if (window.sessionStorage.getItem(seenKey)) return;
+      window.sessionStorage.setItem(seenKey, '1');
+    } catch {
+      // Storage unavailable (private mode, restricted WebView). Fall through and
+      // celebrate — a duplicate confetti is a smaller failure than none at all.
+    }
+
     const fire = async () => {
       try {
         const confetti = (await import('canvas-confetti')).default;
@@ -180,12 +288,15 @@ const StoreEssentials: React.FC = () => {
     []
   );
 
+  const taglineValid = tagline.trim().length > 0;
   const descriptionValid = description.trim().length > 0;
   const canContinue = selected.length > 0 && descriptionValid;
   const canSkip = descriptionValid;
 
   const persistAndContinue = useCallback(
     async (skipSpecializations: boolean) => {
+      if (isSubmitting) return;
+      setIsSubmitting(true);
       const payload = {
         tags: skipSpecializations ? [] : selected,
         tagline: tagline.trim(),
@@ -201,21 +312,25 @@ const StoreEssentials: React.FC = () => {
       };
 
       try {
-        saveStoreProgressLocally(localProgress, user?.id);
-      } catch {
-        // ignore storage errors; onboarding can still continue
-      }
+        try {
+          saveStoreProgressLocally(localProgress, user?.id);
+        } catch {
+          // ignore storage errors; onboarding can still continue
+        }
 
-      try {
-        await updateStoreProfile(payload);
-      } catch (error) {
-        console.error('Failed to save store essentials', error);
-        // Don’t block onboarding on transient failures.
-      }
+        try {
+          await updateStoreProfile(payload);
+        } catch (error) {
+          console.error('Failed to save store essentials', error);
+          // Don’t block onboarding on transient failures.
+        }
 
-      navigate('/studio/store/setup', { replace: true });
+        navigate('/studio/store/setup', { replace: true });
+      } finally {
+        setIsSubmitting(false);
+      }
     },
-    [description, navigate, selected, tagline, user?.id]
+    [description, isSubmitting, navigate, selected, tagline, user?.id]
   );
 
   const selectedLabels = useMemo(() => {
@@ -232,35 +347,38 @@ const StoreEssentials: React.FC = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full mb-4 shadow-lg">
               <Store className="w-7 h-7 text-white" />
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl sm:text-4xl font-bold text-[color:var(--text-primary)] mb-2">
               Welcome,{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">
                 {brandName}
               </span>
               !
             </h1>
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-2">
+            <h2 className="text-xl sm:text-2xl font-semibold text-[color:var(--text-primary)] mb-2">
               Let&apos;s Get Your Store Ready
             </h2>
-            <p className="text-gray-600">Just a few quick details to jumpstart your store</p>
+            <p className="text-[color:var(--text-secondary)]">Just a few quick details to jumpstart your store</p>
           </div>
+
+          {/* Same rail the wizard shows — setup is one flow across two pages. */}
+          <StoreSetupProgress current="essentials" className="mb-6" />
 
           {/* Main card */}
           <div className="glass-panel rounded-3xl p-6 sm:p-8">
-            <div className="flex items-center gap-2 mb-6 pb-4 border-b border-gray-200 dark:border-white/10">
+            <div className="flex items-center gap-2 mb-6 pb-4 border-b border-[color:var(--border-default)]">
               <Sparkles className="w-4 h-4 text-purple-600" />
-              <span className="text-lg font-semibold text-gray-800 dark:text-white">Store Essentials</span>
+              <span className="text-lg font-semibold text-[color:var(--text-primary)]">Store Essentials</span>
             </div>
 
             {/* Form */}
             <div className="space-y-6">
               {/* Brand specialization */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-[color:var(--text-primary)] mb-2">
                   What best describes your brand?{' '}
-                  <span className="text-gray-500 font-normal">(Select up to {MAX_SPECIALIZATIONS})</span>
+                  <span className="text-[color:var(--text-secondary)] font-normal">(Select up to {MAX_SPECIALIZATIONS})</span>
                 </label>
-                <p className="mb-3 text-xs text-gray-500">
+                <p className="mb-3 text-xs text-[color:var(--text-secondary)]">
                   Choose up to {MAX_SPECIALIZATIONS}. This helps customers understand your store focus.
                 </p>
 
@@ -269,7 +387,7 @@ const StoreEssentials: React.FC = () => {
                     Array.from({ length: 4 }).map((_, index) => (
                       <div
                         key={`cat-skeleton-${index}`}
-                        className="h-[68px] rounded-xl bg-white/60 border border-gray-200 animate-pulse"
+                        className="h-[68px] rounded-xl bg-[color:var(--surface-muted)] border border-[color:var(--border-default)] animate-pulse"
                       />
                     ))
                   ) : (
@@ -288,8 +406,8 @@ const StoreEssentials: React.FC = () => {
                             (isSelected
                               ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white border-purple-600 shadow-lg'
                               : isDisabled
-                                ? 'bg-white/60 text-gray-400 border-gray-200 cursor-not-allowed'
-                                : 'bg-white/60 backdrop-blur-sm border-gray-200 text-gray-700 hover:border-purple-300 hover:bg-purple-50/50')
+                                ? 'bg-[color:var(--surface-secondary)] text-[color:var(--text-muted)] border-[color:var(--border-default)] cursor-not-allowed opacity-70'
+                                : 'bg-[color:var(--surface-secondary)] backdrop-blur-sm border-[color:var(--border-default)] text-[color:var(--text-primary)] hover:border-purple-400 hover:bg-purple-500/10')
                           }
                         >
                           <div className="flex flex-col items-center gap-1">
@@ -301,7 +419,7 @@ const StoreEssentials: React.FC = () => {
                   )}
                 </div>
 
-                <p className="text-sm text-gray-500">{selected.length} of {MAX_SPECIALIZATIONS} selected</p>
+                <p className="text-sm text-[color:var(--text-secondary)]">{selected.length} of {MAX_SPECIALIZATIONS} selected</p>
               </div>
 
               {/* Tagline */}
@@ -323,7 +441,7 @@ const StoreEssentials: React.FC = () => {
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-[color:var(--text-primary)] mb-2">
                   Store Description <span className="text-purple-500">*</span>
                 </label>
                 <textarea
@@ -333,9 +451,9 @@ const StoreEssentials: React.FC = () => {
                   disabled={isLoading}
                   rows={4}
                   placeholder="Tell shoppers what your brand is about..."
-                  className="w-full rounded-xl border border-gray-300/80 bg-white/80 px-4 py-3 text-sm font-medium text-gray-900 shadow-sm transition-all duration-200 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/30 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:opacity-60"
+                  className="w-full rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-secondary)] px-4 py-3 text-sm font-medium text-[color:var(--text-primary)] shadow-sm transition-all duration-200 placeholder:text-[color:var(--text-muted)] focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/30 disabled:cursor-not-allowed disabled:opacity-60"
                 />
-                <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
+                <div className="mt-1 flex items-center justify-between text-xs text-[color:var(--text-secondary)]">
                   <span>Required to publish your store.</span>
                   <span>{description.length}/{MAX_DESCRIPTION}</span>
                 </div>
@@ -344,22 +462,22 @@ const StoreEssentials: React.FC = () => {
             </div>
 
             {/* Live Preview */}
-            <div className="mt-8 p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl border-2 border-purple-200">
-              <p className="text-xs text-gray-600 mb-3 text-center">This is how your store will appear</p>
-              <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div className="mt-8 p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl border-2 border-purple-200 dark:border-purple-500/30">
+              <p className="text-xs text-[color:var(--text-secondary)] mb-3 text-center">This is how your store will appear</p>
+              <div className="bg-[color:var(--surface-secondary)] border border-[color:var(--border-default)] rounded-xl shadow-lg overflow-hidden">
                 <div className="h-24 bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400" />
                 <div className="p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-gray-900">{brandName}</h3>
-                      <p className="text-sm text-gray-600 mt-1 min-h-[20px]">{tagline.trim() || ''}</p>
+                      <h3 className="text-lg font-bold text-[color:var(--text-primary)]">{brandName}</h3>
+                      <p className="text-sm text-[color:var(--text-secondary)] mt-1 min-h-[20px]">{tagline.trim() || ''}</p>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-3">
                     {selectedLabels.map((label) => (
                       <span
                         key={label}
-                        className="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full"
+                        className="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full dark:bg-purple-500/20 dark:text-purple-300"
                       >
                         {label}
                       </span>
@@ -370,61 +488,67 @@ const StoreEssentials: React.FC = () => {
             </div>
 
             {/* Readiness */}
-            <div className="mt-6 p-4 bg-transparent rounded-xl border border-gray-200/70 dark:border-white/10">
+            <div className="mt-6 p-4 bg-transparent rounded-xl border border-[color:var(--border-default)]">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  <span className="text-sm text-gray-700">Brand Name</span>
+                  <span className="text-sm text-[color:var(--text-primary)]">Brand Name</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {canContinue ? (
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
                   ) : (
-                    <Circle className="w-4 h-4 text-gray-300" />
+                    <Circle className="w-4 h-4 text-[color:var(--text-muted)]" />
                   )}
-                  <span className={"text-sm " + (canContinue ? 'text-gray-700' : 'text-gray-500')}>
+                  <span className={"text-sm " + (canContinue ? 'text-[color:var(--text-primary)]' : 'text-[color:var(--text-secondary)]')}>
                     Brand focus (at least 1 required)
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Circle className="w-4 h-4 text-gray-300" />
-                  <span className="text-sm text-gray-400">Tagline (optional)</span>
+                  {taglineValid ? (
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <Circle className="w-4 h-4 text-[color:var(--text-muted)]" />
+                  )}
+                  <span className={`text-sm ${taglineValid ? 'text-[color:var(--text-primary)]' : 'text-[color:var(--text-secondary)]'}`}>
+                    Tagline {taglineValid ? '' : '(optional)'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   {descriptionValid ? (
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
                   ) : (
-                    <Circle className="w-4 h-4 text-gray-300" />
+                    <Circle className="w-4 h-4 text-[color:var(--text-muted)]" />
                   )}
-                  <span className={"text-sm " + (descriptionValid ? 'text-gray-700' : 'text-gray-500')}>
+                  <span className={"text-sm " + (descriptionValid ? 'text-[color:var(--text-primary)]' : 'text-[color:var(--text-secondary)]')}>
                     Description
                   </span>
                 </div>
               </div>
 
-              <p className={"text-sm font-semibold mt-3 " + (canContinue ? 'text-green-600' : 'text-gray-400')}>
+              <p className={"text-sm font-semibold mt-3 " + (canContinue ? 'text-green-600 dark:text-green-400' : 'text-[color:var(--text-secondary)]')}>
                 {canContinue ? 'Ready to continue!' : 'Add a description and select at least 1 brand focus'}
               </p>
             </div>
 
             {/* Actions */}
-            <div className="mt-8 flex flex-col sm:flex-row gap-4">
+            <div className="mt-8 flex flex-row items-center gap-2 sm:gap-4">
               <button
                 type="button"
-                disabled={!canContinue || isLoading}
+                disabled={!canContinue || isLoading || isSubmitting}
                 onClick={() => void persistAndContinue(false)}
-                className="flex-1 px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:py-4 sm:text-base"
               >
-                Continue to Store Setup
-                <ArrowRight className="inline-block w-5 h-5 ml-2" />
+                {isSubmitting ? 'Saving...' : 'Continue to Store Setup'}
+                {!isSubmitting ? <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" /> : null}
               </button>
               <button
                 type="button"
-                disabled={isLoading || !canSkip}
+                disabled={isLoading || !canSkip || isSubmitting}
                 onClick={() => void persistAndContinue(true)}
-                className="px-6 py-4 text-gray-600 font-medium hover:text-gray-800 transition-colors duration-200"
+                className="shrink-0 px-3 py-3 text-xs font-medium text-[color:var(--text-secondary)] transition-colors duration-200 hover:text-[color:var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:py-4 sm:text-base"
               >
-                Skip for now
+                Skip
               </button>
             </div>
           </div>

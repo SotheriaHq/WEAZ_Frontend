@@ -2,12 +2,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { brandApi } from '@/api/BrandApi';
 import { messagingApi, type ThreadSummaryByContextItem } from '@/api/MessagingApi';
-import { getStoreStatus } from '@/api/StoreApi';
+import { getStoreStatus, getCachedStoreStatus } from '@/api/StoreApi';
 import OrderDetailsModal from '@/components/dashboard/OrderDetailsModal';
 import OrderChatDrawer from '@/components/messaging/OrderChatDrawer';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { useRealtime } from '@/realtime/RealtimeProvider';
+import useDebounce from '@/hooks/useDebounce';
+import { useCachedResource } from '@/hooks/useCachedResource';
 
 type OrderLineItem = {
   id?: string;
@@ -59,13 +61,19 @@ const EMPTY_SUMMARY: OrdersSummary = {
   returnedCount: 0,
 };
 
+/**
+ * `shortLabel` is what a phone shows, so six tabs fit one row without scrolling.
+ *
+ * Only the labels that cannot be shrunk by type size alone are abbreviated -
+ * the rest are already short enough at the phone type scale.
+ */
 const STATUS_TABS = [
-  { label: 'All Orders', value: '' },
-  { label: 'Pending', value: 'PENDING' },
-  { label: 'Processing', value: 'PROCESSING' },
-  { label: 'Shipped', value: 'SHIPPED' },
-  { label: 'Delivered', value: 'DELIVERED' },
-  { label: 'Returns', value: 'RETURNED' },
+  { label: 'All Orders', shortLabel: 'All', value: '' },
+  { label: 'Pending', shortLabel: 'Pending', value: 'PENDING' },
+  { label: 'Processing', shortLabel: 'Active', value: 'PROCESSING' },
+  { label: 'Shipped', shortLabel: 'Shipped', value: 'SHIPPED' },
+  { label: 'Delivered', shortLabel: 'Sent', value: 'DELIVERED' },
+  { label: 'Returns', shortLabel: 'Returns', value: 'RETURNED' },
 ] as const;
 
 const SORT_OPTIONS = [
@@ -138,17 +146,17 @@ const getInitials = (name?: string | null) => {
 const getStatusClasses = (status?: string | null) => {
   switch (String(status || '').toUpperCase()) {
     case 'DELIVERED':
-      return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
+      return 'bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300';
     case 'PENDING':
-      return 'bg-amber-500/12 text-amber-700 dark:text-amber-300';
+      return 'bg-amber-500/[0.12] text-amber-700 dark:text-amber-300';
     case 'PROCESSING':
-      return 'bg-blue-500/12 text-blue-700 dark:text-blue-300';
+      return 'bg-blue-500/[0.12] text-blue-700 dark:text-blue-300';
     case 'SHIPPED':
-      return 'bg-indigo-500/12 text-indigo-700 dark:text-indigo-300';
+      return 'bg-indigo-500/[0.12] text-indigo-700 dark:text-indigo-300';
     case 'CANCELLED':
-      return 'bg-rose-500/12 text-rose-700 dark:text-rose-300';
+      return 'bg-rose-500/[0.12] text-rose-700 dark:text-rose-300';
     case 'RETURNED':
-      return 'bg-orange-500/12 text-orange-700 dark:text-orange-300';
+      return 'bg-orange-500/[0.12] text-orange-700 dark:text-orange-300';
     default:
       return 'bg-slate-500/10 text-slate-700 dark:text-slate-300';
   }
@@ -157,9 +165,9 @@ const getStatusClasses = (status?: string | null) => {
 const getPaymentClasses = (status?: string | null) => {
   switch (String(status || '').toUpperCase()) {
     case 'PAID':
-      return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
+      return 'bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300';
     case 'FAILED':
-      return 'bg-rose-500/12 text-rose-700 dark:text-rose-300';
+      return 'bg-rose-500/[0.12] text-rose-700 dark:text-rose-300';
     default:
       return 'bg-slate-500/10 text-slate-700 dark:text-slate-300';
   }
@@ -231,7 +239,7 @@ const downloadCsv = (orders: OrderRecord[]) => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = `threadly-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+  anchor.download = `wiez-orders-${new Date().toISOString().slice(0, 10)}.csv`;
   anchor.click();
   URL.revokeObjectURL(url);
 };
@@ -242,18 +250,114 @@ const OrderManagement: React.FC = () => {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [summaryByOrderId, setSummaryByOrderId] = useState<Record<string, ThreadSummaryByContextItem['summary']>>({});
   const [summary, setSummary] = useState<OrdersSummary>(EMPTY_SUMMARY);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(() => {
+  /**
+   * Status and page are DERIVED from the URL. They are not state.
+   *
+   * They used to be `useState` mirrored to `searchParams` by two effects — one
+   * copying URL→state, the other state→URL — with both listing `searchParams`
+   * AND the state in their dependencies. Each effect's write re-ran the other,
+   * and because each read the other's value from its own render closure, they
+   * could settle into a stable two-cycle instead of converging: state says
+   * SHIPPED, effect B writes SHIPPED to the URL; effect A then reads RETURNED
+   * (the value it had just been asked to apply) and writes it back to state;
+   * round and round.
+   *
+   * That is the loop in the device logs — an endless alternation of
+   * `status=RETURNED` / `status=SHIPPED` ROUTE_CHANGED messages. Inside the
+   * native WebView each of those is a `replace()`, so it also flooded the
+   * bridge, forced repeated reloads (the duplicated READY messages), defeated
+   * the warm-session shortcut in `webview.tsx` — which is why EVERY Studio
+   * screen went back to a cold handoff and a full page load — and eventually
+   * got the handoff endpoint to answer 401, which is what bounced the brand
+   * back to Orders on its own.
+   *
+   * With one owner there is nothing to synchronise and no cycle to enter.
+   */
+  const statusFilter = searchParams.get('status') || '';
+  const page = (() => {
     const parsed = Number(searchParams.get('page') || 1);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
-  });
+  })();
+
+  /**
+   * Writes the URL, and is the only way status/page change.
+   *
+   * `replace` so filtering does not build a back-stack of every tab the brand
+   * tried, and the equality check means a no-op selection writes nothing —
+   * which matters most in the WebView, where every write is a bridge message.
+   */
+  const updateOrderParams = useCallback(
+    (changes: { status?: string; page?: number; q?: string }) => {
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+
+          if (changes.status !== undefined) {
+            if (changes.status) next.set('status', changes.status);
+            else next.delete('status');
+          }
+          if (changes.q !== undefined) {
+            if (changes.q.trim()) next.set('q', changes.q.trim());
+            else next.delete('q');
+          }
+          if (changes.page !== undefined) {
+            if (changes.page > 1) next.set('page', String(changes.page));
+            else next.delete('page');
+          }
+
+          return next.toString() === current.toString() ? current : next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  /*
+   * Kept callable with an updater fn, because the pagination buttons use that
+   * form. The current page is read from the URL inside the setter rather than
+   * captured, so a stale render cannot send the pager backwards.
+   */
+  const setPage = useCallback(
+    (value: number | ((current: number) => number)) => {
+      setSearchParams(
+        (current) => {
+          const currentPage = (() => {
+            const parsed = Number(current.get('page') || 1);
+            return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+          })();
+          const nextPage =
+            typeof value === 'function'
+              ? (value as (page: number) => number)(currentPage)
+              : value;
+          if (nextPage === currentPage) return current;
+
+          const next = new URLSearchParams(current);
+          if (nextPage > 1) next.set('page', String(nextPage));
+          else next.delete('page');
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
   const [totalPages, setTotalPages] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<string>(() => searchParams.get('status') || '');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
   const [selectedOrder, setSelectedOrder] = useState<{ id: string } | null>(null);
   const [chatOrder, setChatOrder] = useState<{ id: string; customerName?: string } | null>(null);
-  const [brandId, setBrandId] = useState<string | null>(null);
+  /*
+     * Seeded from the warm cache so a revisit paints immediately.
+     *
+     * Starting at `null` and filling it in from an effect meant the data query
+     * below was disabled for the first render of EVERY visit, so the screen
+     * showed a skeleton before it was allowed to read the cache it already had.
+     */
+  const [brandId, setBrandId] = useState<string | null>(
+    () => getCachedStoreStatus()?.brandId ?? null,
+  );
 
   const preselectedOrderId = searchParams.get('orderId');
   const preselectedMessageId = searchParams.get('messageId');
@@ -282,65 +386,70 @@ const OrderManagement: React.FC = () => {
     };
   }, []);
 
-  const fetchOrders = useCallback(async () => {
-    if (!brandId) return;
-
-    setLoading(true);
-    try {
-      const data = await brandApi.getOrders(brandId, {
+  // Cache-first orders list: revisiting the Orders tab paints instantly from
+  // the shared query cache (skeleton only on true first load / new filters).
+  // Search stays debounced by keying the query on the debounced value.
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+  const ordersQueryEnabled = Boolean(brandId);
+  const {
+    data: ordersPage,
+    loading: ordersQueryLoading,
+    refetch: refetchOrders,
+  } = useCachedResource<{
+    orders: OrderRecord[];
+    summary: OrdersSummary;
+    totalPages: number;
+    summaryByOrderId: Record<string, ThreadSummaryByContextItem['summary']>;
+  }>({
+    queryKey: ['studio', 'orders', brandId ?? 'none', page, statusFilter, debouncedSearchQuery],
+    enabled: ordersQueryEnabled,
+    queryFn: async () => {
+      const data = await brandApi.getOrders(brandId!, {
         page,
         limit: 10,
         status: statusFilter,
-        q: searchQuery,
+        q: debouncedSearchQuery,
       });
-
-      if (data) {
-        const nextOrders = Array.isArray(data.items) ? data.items : [];
-        setOrders(nextOrders);
-        setSummary(data.summary || EMPTY_SUMMARY);
-        setTotalPages(Number(data.totalPages || data.meta?.totalPages || 1));
-
-        const orderIds = nextOrders.map((order: OrderRecord) => order.id).filter(Boolean);
-        if (orderIds.length > 0) {
-          try {
-            const summaries = await messagingApi.getBulkOrderSummariesForBrand(brandId, orderIds, true);
-            setSummaryByOrderId(
-              (summaries.items || []).reduce<Record<string, ThreadSummaryByContextItem['summary']>>((acc, item) => {
-                acc[item.contextId] = item.summary;
-                return acc;
-              }, {}),
-            );
-          } catch (summaryError) {
-            console.warn('Failed to fetch order message summaries', summaryError);
-            setSummaryByOrderId({});
-          }
-        } else {
-          setSummaryByOrderId({});
-        }
-      } else {
-        setOrders([]);
-        setSummary(EMPTY_SUMMARY);
-        setTotalPages(1);
-        setSummaryByOrderId({});
+      if (!data) {
+        return { orders: [], summary: EMPTY_SUMMARY, totalPages: 1, summaryByOrderId: {} };
       }
-    } catch (error) {
-      console.error('Failed to fetch orders', error);
-      setOrders([]);
-      setSummary(EMPTY_SUMMARY);
-      setTotalPages(1);
-      setSummaryByOrderId({});
-    } finally {
-      setLoading(false);
-    }
-  }, [brandId, page, searchQuery, statusFilter]);
+      const nextOrders = Array.isArray(data.items) ? data.items : [];
+      let nextSummaryByOrderId: Record<string, ThreadSummaryByContextItem['summary']> = {};
+      const orderIds = nextOrders.map((order: OrderRecord) => order.id).filter(Boolean);
+      if (orderIds.length > 0) {
+        try {
+          const summaries = await messagingApi.getBulkOrderSummariesForBrand(brandId!, orderIds, true);
+          nextSummaryByOrderId = (summaries.items || []).reduce<
+            Record<string, ThreadSummaryByContextItem['summary']>
+          >((acc, item) => {
+            acc[item.contextId] = item.summary;
+            return acc;
+          }, {});
+        } catch (summaryError) {
+          console.warn('Failed to fetch order message summaries', summaryError);
+        }
+      }
+      return {
+        orders: nextOrders,
+        summary: data.summary || EMPTY_SUMMARY,
+        totalPages: Number(data.totalPages || data.meta?.totalPages || 1),
+        summaryByOrderId: nextSummaryByOrderId,
+      };
+    },
+  });
+  const loading = ordersQueryEnabled && ordersQueryLoading;
 
   useEffect(() => {
-    const debounce = window.setTimeout(() => {
-      void fetchOrders();
-    }, 300);
+    if (!ordersPage) return;
+    setOrders(ordersPage.orders);
+    setSummary(ordersPage.summary);
+    setTotalPages(ordersPage.totalPages);
+    setSummaryByOrderId(ordersPage.summaryByOrderId);
+  }, [ordersPage]);
 
-    return () => window.clearTimeout(debounce);
-  }, [fetchOrders]);
+  const fetchOrders = useCallback(async () => {
+    refetchOrders();
+  }, [refetchOrders]);
 
   useEffect(() => {
     if (!preselectedOrderId) return;
@@ -352,40 +461,28 @@ const OrderManagement: React.FC = () => {
     setChatOrder({ id: preselectedOrderId });
   }, [preselectedOrderId, shouldOpenChat]);
 
+  /*
+   * The two effects that used to live here — URL→state and state→URL — are
+   * gone. Status and page read straight from `searchParams` (see above), and
+   * the search box syncs ONE WAY below.
+   */
+
+  /**
+   * The search box keeps local state so typing stays responsive, and pushes to
+   * the URL only after the debounce settles.
+   *
+   * One direction only. Reading the URL back into the box is what turned the
+   * search field into a third participant in the same loop, and it buys
+   * nothing: the box is already showing what the user typed.
+   */
   useEffect(() => {
-    const nextStatus = searchParams.get('status') || '';
-    const nextQuery = searchParams.get('q') || '';
-    const nextPage = Number(searchParams.get('page') || 1);
-
-    if (nextStatus !== statusFilter) {
-      setStatusFilter(nextStatus);
-    }
-    if (nextQuery !== searchQuery) {
-      setSearchQuery(nextQuery);
-    }
-    if (Number.isFinite(nextPage) && nextPage > 0 && nextPage !== page) {
-      setPage(nextPage);
-    }
-  }, [page, searchParams, searchQuery, statusFilter]);
-
-  useEffect(() => {
-    const next = new URLSearchParams(searchParams);
-
-    if (statusFilter) next.set('status', statusFilter);
-    else next.delete('status');
-
-    if (searchQuery.trim()) next.set('q', searchQuery.trim());
-    else next.delete('q');
-
-    if (page > 1) next.set('page', String(page));
-    else next.delete('page');
-
-    const current = searchParams.toString();
-    const target = next.toString();
-    if (current !== target) {
-      setSearchParams(next, { replace: true });
-    }
-  }, [page, searchParams, searchQuery, setSearchParams, statusFilter]);
+    if ((searchParams.get('q') || '') === debouncedSearchQuery.trim()) return;
+    updateOrderParams({ q: debouncedSearchQuery, page: 1 });
+    // `searchParams` is deliberately not a dependency: this effect reacts to
+    // the DEBOUNCED INPUT, and re-running it when the URL changes is exactly
+    // the round trip being removed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearchQuery, updateOrderParams]);
 
   useEffect(() => {
     const unsubscribe = onNotification((payload: any) => {
@@ -475,8 +572,9 @@ const OrderManagement: React.FC = () => {
   };
 
   const handleStatusChipClick = (value: string) => {
-    setStatusFilter(value);
-    setPage(1);
+    // Selecting the tab you are already on must not write anything.
+    if (value === statusFilter && page === 1) return;
+    updateOrderParams({ status: value, page: 1 });
   };
 
   const cycleSort = () => {
@@ -510,42 +608,62 @@ const OrderManagement: React.FC = () => {
           >
             ⭳ Export CSV
           </button>
-          <button
-            type="button"
-            disabled
-            className="rounded-2xl bg-[linear-gradient(135deg,#f97316,#c2410c)] px-5 py-2 text-sm font-semibold text-white opacity-75 shadow-[0_18px_40px_rgba(249,115,22,0.22)]"
-            title="Manual order creation is not implemented yet"
-          >
-            ＋ Create Manual Order
-          </button>
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {/*
+        Four metrics, four columns, at every width.
+
+        This was a `min-w-[150px]` flex rail below `sm`, so on a phone - which is
+        what the native app embeds - 600px of cards sat in a 390px viewport and
+        the summary of the whole screen could only be read by swiping. A metric
+        you have to go looking for is not a summary. There are exactly four of
+        these, so four columns divide any screen evenly and the number (the part
+        that matters) is always on screen.
+
+        Two columns on a phone, four once there is room. Four across a 390px
+        viewport gave each card ~90px, which is enough for the number and
+        nothing else; 2x2 gives every card real width, so the progress bar and
+        helper line survive and the whole summary is still on one screen.
+      */}
+      <section className="grid grid-cols-2 gap-2 py-1 sm:gap-3 lg:grid-cols-4">
         {metrics.map((metric) => (
           <article
             key={metric.label}
-            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
+            className="min-w-0 rounded-xl border border-slate-200 bg-white p-2 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03] sm:rounded-2xl sm:p-4"
           >
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{metric.label}</p>
-              <span className="text-lg">{metric.marker}</span>
+            <div className="flex items-start justify-between gap-1">
+              <p className="min-w-0 text-[10px] font-semibold uppercase leading-tight tracking-tight text-slate-500 dark:text-slate-400 sm:text-xs sm:tracking-[0.14em]">
+                {metric.label}
+              </p>
+              <span className="shrink-0 text-sm leading-none sm:text-lg">{metric.marker}</span>
             </div>
-            <p className="mt-3 text-2xl font-black tracking-tight">{metric.value}</p>
-            <div className="mt-3 flex items-center gap-3">
+            <p className="mt-1.5 truncate text-lg font-black tracking-tight sm:mt-3 sm:text-2xl">{metric.value}</p>
+            <div className="mt-2 flex items-center gap-2 sm:mt-3">
               <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/5">
                 <div className="h-full rounded-full bg-orange-500" style={{ width: `${metric.progress}%` }} />
               </div>
-              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">{metric.helper}</p>
+              <p className="shrink-0 text-[11px] font-medium text-slate-400 dark:text-slate-500">{metric.helper}</p>
             </div>
           </article>
         ))}
       </section>
 
       {/* Tabs + Filters */}
-      <section className="space-y-4">
+      <section className="space-y-3">
         {/* Underline tabs */}
-        <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-white/10">
+        {/*
+          The six status tabs divide the row rather than run off the end of it.
+
+          `flex-1` below `sm` gives each tab an equal share of whatever width
+          there is, so the set always ends where the screen ends and the tab you
+          want is never off-screen. Type size and letter-spacing come down to
+          match - uppercase at `tracking-wider` is what made these labels wide in
+          the first place - and the abbreviated `shortLabel` covers the two that
+          are still too long at that size. `sm:flex-none` hands the row back to
+          natural widths as soon as there is room for them.
+        */}
+        <nav className="flex gap-0.5 border-b border-slate-200 dark:border-white/10 sm:gap-1">
           {STATUS_TABS.map((tab) => {
             const active = statusFilter === tab.value;
             return (
@@ -553,46 +671,49 @@ const OrderManagement: React.FC = () => {
                 key={tab.label}
                 type="button"
                 onClick={() => handleStatusChipClick(tab.value)}
-                className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition ${
+                title={tab.label}
+                className={`min-w-0 flex-1 truncate border-b-2 px-1 py-2 text-[10px] font-bold uppercase tracking-tight transition sm:flex-none sm:px-3 sm:text-xs sm:tracking-wider ${
                   active
                     ? 'border-orange-500 text-orange-600 dark:text-orange-400'
                     : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-white'
                 }`}
               >
-                {tab.label}
+                <span className="sm:hidden">{tab.shortLabel}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
               </button>
             );
           })}
         </nav>
 
         {/* Search + filter row */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
           <input
             type="text"
-            placeholder="Search by order ID or customer name..."
-            className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
+            placeholder="Search order ID or customer name..."
+            className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
             value={searchQuery}
             onChange={(event) => {
+              // Page reset rides with the debounced URL write above, so a
+              // keystroke does not touch the URL (or the WebView bridge).
               setSearchQuery(event.target.value);
-              setPage(1);
             }}
           />
-          <div className="flex gap-3">
-            <div className="min-w-[180px]">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-[130px] sm:min-w-[180px]">
               <UniversalSelect
                 value={statusFilter}
                 onChange={(value) => {
-                  setStatusFilter(value);
-                  setPage(1);
+                  updateOrderParams({ status: value, page: 1 });
                 }}
                 options={STATUS_SELECT_OPTIONS}
                 placeholder="All statuses"
+                compact
               />
             </div>
             <button
               type="button"
               onClick={cycleSort}
-              className="whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:text-white"
+              className="shrink-0 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-600 transition hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:text-white"
               aria-label="Cycle order sort"
             >
               {SORT_OPTIONS.find((option) => option.value === sortBy)?.label || 'Newest'}
@@ -601,26 +722,127 @@ const OrderManagement: React.FC = () => {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
-        <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full min-w-[900px] border-collapse text-left sm:min-w-[980px] lg:min-w-[1080px]">
+      {/* Orders List / Table Container */}
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.03] p-2.5 sm:p-0">
+        {/* Mobile View: Compact grouped cards (<640px) */}
+        {/*
+          Cards up to `lg`, table above it.
+
+          The switch used to be `sm` (640px) while the table declares
+          `min-w-[900px]`, so every width from 640 to 900 got a table that could
+          only be read by dragging it sideways - tablets and the native app's
+          landscape webview included. The card list is a complete view of the
+          same order, not a fallback, so it is the better answer right up to the
+          point where a nine-column table genuinely fits.
+        */}
+        <div className="block lg:hidden space-y-2.5">
+          {loading ? (
+            <div className="space-y-2 p-2">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div key={idx} className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />
+              ))}
+            </div>
+          ) : sortedOrders.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500">
+              No orders found matching your criteria.
+            </div>
+          ) : (
+            sortedOrders.map((order) => {
+              const fit = summarizeOrderFit(order);
+              const summaryItem = summaryByOrderId[order.id] ?? null;
+              const unreadCount = Number(summaryItem?.unreadCount ?? 0);
+              const hasUnread = unreadCount > 0 || Boolean(summaryItem?.hasUnread);
+
+              return (
+                <div
+                  key={order.id}
+                  onClick={() => setSelectedOrder({ id: order.id })}
+                  className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03] space-y-2 transition cursor-pointer hover:border-orange-300 active:scale-[0.99]"
+                >
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="font-mono font-bold text-orange-600 dark:text-orange-400">
+                      #{order.id.slice(0, 8).toUpperCase()}
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${getStatusClasses(order.status)}`}>
+                        {order.status}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {getRelativeTime(order.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/15 text-xs font-black text-orange-600 shrink-0">
+                      {getInitials(order.customerName)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                        {order.customerName}
+                      </p>
+                      <p className="text-[11px] text-slate-500 truncate">
+                        {fit.primaryName} • {fit.sizingLabel}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-black text-slate-900 dark:text-white">
+                        {formatCurrency(normalizeAmount(order.totalAmount), order.currency)}
+                      </p>
+                      <span className={`inline-flex items-center rounded-full px-1.5 py-0.2 text-[9px] font-bold uppercase ${getPaymentClasses(order.paymentStatus)}`}>
+                        {order.paymentStatus || 'PENDING'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setChatOrder({ id: order.id, customerName: order.customerName });
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 text-xs font-semibold text-slate-700 dark:bg-white/5 dark:text-slate-300 flex items-center gap-1 hover:bg-slate-200"
+                    >
+                      💬 Message {hasUnread ? <span className="text-orange-500 text-[10px]">●</span> : null}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedOrder({ id: order.id });
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-orange-500 text-xs font-semibold text-white hover:bg-orange-600"
+                    >
+                      Details
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop View: Full Table (>=1024px, where nine columns fit) */}
+        <div className="hidden lg:block overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-0 border-collapse text-left xl:min-w-[1080px]">
             <thead>
-              <tr className="border-b border-slate-200/80 bg-slate-100/80 dark:border-white/10 dark:bg-white/[0.03]">
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Order ID</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Customer</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Items</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Details</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Status</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Message</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Payment</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Amount</th>
-                <th className="sticky right-0 bg-slate-100/95 px-6 py-4 dark:bg-zinc-900" />
+              <tr className="bg-slate-50 dark:bg-white/[0.02]">
+                <th className="w-[10%] min-w-[95px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Order ID</th>
+                <th className="w-[20%] min-w-[160px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Customer</th>
+                <th className="w-[8%] min-w-[65px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Items</th>
+                <th className="w-[22%] min-w-[180px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Details</th>
+                <th className="w-[11%] min-w-[95px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Status</th>
+                <th className="w-[7%] min-w-[60px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Message</th>
+                <th className="w-[11%] min-w-[95px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Payment</th>
+                <th className="w-[8%] min-w-[70px] whitespace-nowrap px-3 py-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-500">Amount</th>
+                <th className="w-[3%] min-w-[30px] px-3 py-3" />
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-16 text-center">
+                  <td colSpan={9} className="px-3 py-16 text-center">
                     <div className="space-y-3">
                       {Array.from({ length: 5 }).map((_, index) => (
                         <div
@@ -633,7 +855,7 @@ const OrderManagement: React.FC = () => {
                 </tr>
               ) : sortedOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-16 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <td colSpan={9} className="px-3 py-16 text-center text-sm text-slate-500 dark:text-slate-400">
                     No orders found matching your criteria.
                   </td>
                 </tr>
@@ -649,28 +871,28 @@ const OrderManagement: React.FC = () => {
                     <tr
                       key={order.id}
                       onClick={() => setSelectedOrder({ id: order.id })}
-                      className="cursor-pointer border-b border-slate-200/70 transition hover:bg-slate-100/70 dark:border-white/6 dark:hover:bg-white/[0.025]"
+                      className="cursor-pointer transition hover:bg-slate-50 dark:hover:bg-white/[0.015]"
                     >
-                      <td className="px-6 py-4 align-top">
+                      <td className="px-3 py-4 align-middle">
                         <p className="font-mono text-sm font-semibold tracking-tight text-orange-600 dark:text-orange-400">
                           #{order.id.slice(0, 8).toUpperCase()}
                         </p>
                         <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-500">{getRelativeTime(order.createdAt)}</p>
                       </td>
 
-                      <td className="px-6 py-4 align-top">
+                      <td className="px-3 py-4 align-middle">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500/15 text-xs font-black text-orange-600 dark:text-orange-300">
                             {getInitials(order.customerName)}
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">{order.customerName}</p>
-                            <p className="truncate text-xs text-slate-500 dark:text-slate-500">{order.customerEmail || 'No email captured'}</p>
+                            <p className="break-words text-sm font-semibold">{order.customerName}</p>
+                            <p className="break-words text-xs text-slate-500 dark:text-slate-500">{order.customerEmail || 'No email captured'}</p>
                           </div>
                         </div>
                       </td>
 
-                      <td className="px-6 py-4 align-top">
+                      <td className="px-3 py-4 align-middle">
                         <div className="flex items-center gap-2">
                           {previews.length > 0 ? (
                             previews.map((item, index) => (
@@ -682,7 +904,7 @@ const OrderManagement: React.FC = () => {
                                 return (
                                   <div
                                     key={item.orderItemId || item.id || `${order.id}-${index}`}
-                                    className={`h-10 w-10 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/5 ${index > 0 ? '-ml-4' : ''}`}
+                                    className={`h-10 w-10 overflow-hidden rounded-xl bg-white shadow-sm dark:bg-white/5 ${index > 0 ? '-ml-4' : ''}`}
                                   >
                                     <ImageWithFallback
                                       src={src}
@@ -698,7 +920,7 @@ const OrderManagement: React.FC = () => {
                               })()
                             ))
                           ) : (
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm dark:border-white/10 dark:bg-white/5">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-sm dark:bg-white/5">
                               🧵
                             </div>
                           )}
@@ -711,37 +933,37 @@ const OrderManagement: React.FC = () => {
                         </div>
                       </td>
 
-                      <td className="px-6 py-4 align-top">
-                        <p className="max-w-[240px] truncate text-sm text-slate-700 dark:text-slate-200">{fit.primaryName}</p>
+                      <td className="px-3 py-4 align-middle">
+                        <p className="max-w-[240px] break-words text-sm text-slate-700 dark:text-slate-200">{fit.primaryName}</p>
                         {fit.detailLine ? (
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">{fit.detailLine}</p>
                         ) : null}
                         <div className="mt-2 flex flex-wrap gap-2">
-                          <span className={`inline-flex rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${fit.usesCustomSizing ? 'border-indigo-500/20 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300' : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'}`}>
+                          <span className={`inline-flex rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${fit.usesCustomSizing ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300' : 'bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-300'}`}>
                             {fit.sizingLabel}
                           </span>
                           {fit.measurementCount > 0 ? (
-                            <span className="inline-flex rounded-md border border-orange-500/20 bg-orange-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-orange-700 dark:text-orange-300">
+                            <span className="inline-flex rounded-md bg-orange-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-orange-700 dark:text-orange-300">
                               {fit.measurementCount} points
                             </span>
                           ) : null}
                         </div>
                       </td>
 
-                      <td className="px-6 py-4 align-top">
-                        <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getStatusClasses(order.status)}`}>
+                      <td className="px-3 py-4 align-middle">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${getStatusClasses(order.status)}`}>
                           {order.status}
                         </span>
                       </td>
 
-                      <td className="px-6 py-4 align-top">
+                      <td className="px-3 py-4 align-middle">
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             setChatOrder({ id: order.id, customerName: order.customerName });
                           }}
-                          className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-lg transition hover:border-orange-300 hover:bg-orange-50 dark:border-white/10 dark:bg-white/5"
+                          className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-lg transition hover:bg-orange-500/10 dark:bg-white/[0.04]"
                           aria-label={`Open message thread for order ${order.id}`}
                           title="Open order chat"
                         >
@@ -754,24 +976,24 @@ const OrderManagement: React.FC = () => {
                         </button>
                       </td>
 
-                      <td className="px-6 py-4 align-top">
-                        <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold ${getPaymentClasses(order.paymentStatus)}`}>
+                      <td className="px-3 py-4 align-middle">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${getPaymentClasses(order.paymentStatus)}`}>
                           {order.paymentStatus || 'PENDING'}
                         </span>
                       </td>
 
-                      <td className="px-6 py-4 align-top">
+                      <td className="px-3 py-4 align-middle">
                         <p className="text-sm font-black">{formatCurrency(normalizeAmount(order.totalAmount), order.currency)}</p>
                       </td>
 
-                      <td className="sticky right-0 bg-white/95 px-6 py-4 text-right align-top dark:bg-zinc-900">
+                      <td className="px-3 py-4 text-right align-middle">
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             setSelectedOrder({ id: order.id });
                           }}
-                          className="rounded-xl border border-transparent px-3 py-2 text-lg leading-none text-slate-500 transition hover:border-slate-200 hover:bg-slate-100 hover:text-slate-900 dark:hover:border-white/10 dark:hover:bg-white/5 dark:hover:text-white"
+                          className="rounded-xl px-3 py-2 text-lg leading-none text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/5 dark:hover:text-white"
                           aria-label={`View order ${order.id}`}
                         >
                           ...
@@ -796,7 +1018,7 @@ const OrderManagement: React.FC = () => {
               type="button"
               onClick={() => setPage((current) => Math.max(1, current - 1))}
               disabled={page === 1}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-sm font-bold text-slate-500 transition hover:border-orange-300 hover:text-orange-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-sm font-bold text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/[0.08]"
             >
               {'<'}
             </button>
@@ -812,7 +1034,7 @@ const OrderManagement: React.FC = () => {
                     className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold transition ${
                       active
                         ? 'bg-orange-500 text-white'
-                        : 'border border-slate-200 bg-white/80 text-slate-500 hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'
+                        : 'bg-slate-50 text-slate-500 hover:bg-slate-100 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/[0.08]'
                     }`}
                   >
                     {targetPage}
@@ -824,7 +1046,7 @@ const OrderManagement: React.FC = () => {
               type="button"
               onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
               disabled={page === totalPages}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-sm font-bold text-slate-500 transition hover:border-orange-300 hover:text-orange-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-sm font-bold text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/[0.08]"
             >
               {'>'}
             </button>

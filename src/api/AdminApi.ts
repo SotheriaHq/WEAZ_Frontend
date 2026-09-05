@@ -3,6 +3,7 @@ import type {
   AdminUser,
   AdminReactivationRequest,
   AdminBrand,
+  AdminBrandOverview,
   AdminProduct,
   AdminCollection,
   AdminDesign,
@@ -65,6 +66,7 @@ import type {
 } from '../types/admin';
 import type {
   AdminVerificationDetails,
+  VerificationHistoryResponse,
   VerificationNote,
   VerificationQueueResponse,
   VerificationReason,
@@ -186,6 +188,11 @@ export const adminDashboardApi = {
       pendingVerifications: number;
       pendingPayouts: number;
       openDisputes: number;
+      ordersNeedingAttention?: number;
+      customOrdersNeedingAttention?: number;
+      totalDesigns?: number;
+      totalProducts?: number;
+      totalCollections?: number;
       recentLogs: {
         id: string;
         action: string;
@@ -201,6 +208,16 @@ export const adminDashboardApi = {
         targetRoute?: string | null;
       }[];
     }>('/admin/dashboard/stats'),
+
+  /** Cheap live badges for 20s polling (not the full stats fan-out). */
+  getLiveBadges: () =>
+    apiClient.get<{
+      customOrdersNeedingAttention: number;
+      openDisputes: number;
+      pendingPayouts: number;
+      pendingVerifications: number;
+      ordersNeedingAttention: number;
+    }>('/admin/dashboard/badges'),
 };
 
 // ── Users ──
@@ -249,6 +266,8 @@ export const adminBrandsApi = {
     apiClient.get<Paginated<AdminBrand>>('/admin/brands', { params }),
   getById: (id: string) =>
     apiClient.get<AdminBrand>(`/admin/brands/${id}`),
+  getOverview: (id: string) =>
+    apiClient.get<AdminBrandOverview>(`/admin/brands/${id}/overview`),
   overrideStoreOpen: (id: string, isOpen: boolean) =>
     apiClient.patch(`/admin/brands/${id}/open-close`, { isStoreOpen: isOpen }),
   suspend: (id: string, reason: string) =>
@@ -278,6 +297,17 @@ export const adminBrandsApi = {
     apiClient.get<{ notes: VerificationNote[] }>(`/admin/brands/${id}/verification/notes`),
   addVerificationNote: (id: string, text: string) =>
     apiClient.post<VerificationNote>(`/admin/brands/${id}/verification/notes`, { text }),
+  /**
+   * Audit trail of every information request sent on this verification and
+   * every submission the brand filed in response. The live `infoRequested*`
+   * columns only ever hold the most recent OPEN request — they are overwritten
+   * by the next request and cleared when the brand replies — so this is the
+   * only place the full back-and-forth can be read.
+   */
+  getVerificationHistory: (id: string) =>
+    apiClient.get<VerificationHistoryResponse>(
+      `/admin/brands/${id}/verification/history`,
+    ),
 };
 
 // ── Products ──
@@ -436,6 +466,39 @@ export const adminTaxonomyApi = {
     apiClient.patch(`/admin/categories/${id}/deactivate`),
   deleteCategory: (id: string) =>
     apiClient.delete(`/admin/categories/${id}`),
+  /**
+   * Brand-proposed garment categories awaiting a decision.
+   *
+   * `CategorySuggestionsApi` was stubbed to `[]` at some point ("legacy client
+   * removed"), but the backend never went away — `CategorySuggestionsAdminController`
+   * still serves these under TAXONOMY_READ. The result was a moderation queue
+   * that accrued submissions with no surface anywhere in the admin app.
+   */
+  listCategorySuggestions: (status: AdminCategorySuggestionStatus = 'PENDING') =>
+    apiClient.get<AdminCategorySuggestion[]>('/admin/categories/suggestions', {
+      params: { status },
+    }),
+  moderateCategorySuggestion: (
+    id: string,
+    data: { status: 'APPROVED' | 'REJECTED'; rejectionReason?: string },
+  ) => apiClient.patch<AdminCategorySuggestion>(`/admin/categories/suggestions/${id}`, data),
+};
+
+export type AdminCategorySuggestionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export type AdminCategorySuggestion = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  status: AdminCategorySuggestionStatus;
+  proposedByUserId: string;
+  proposedByUser?: { id: string; username?: string | null; email?: string | null } | null;
+  rejectionReason?: string | null;
+  approvedCategoryId?: string | null;
+  decidedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 // ── Tags ──
@@ -776,6 +839,13 @@ export const adminBreakGlassApi = {
 export const adminFinanceApi = {
   getOverview: () =>
     apiClient.get<AdminFinanceOverview>('/admin/finance/overview'),
+  repairCustomOrderSettlements: (data?: { limit?: number }) =>
+    apiClient.post<{
+      scanned: number;
+      repaired: number;
+      limit: number;
+      message: string;
+    }>('/admin/finance/settlement-repair/custom-orders', data ?? {}),
   listCommissionRules: () =>
     apiClient.get<AdminCommissionRule[]>('/admin/finance/commission-rules'),
   createCommissionRule: (data: {

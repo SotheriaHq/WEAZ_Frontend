@@ -5,7 +5,7 @@ export type AdminPermissionCode =
   | 'BRANDS_READ' | 'BRANDS_WRITE' | 'BRANDS_SUSPEND' | 'BRANDS_VERIFY' | 'BRANDS_STORE_OVERRIDE'
   | 'PRODUCTS_READ' | 'PRODUCTS_WRITE' | 'PRODUCTS_DELETE'
   | 'COLLECTIONS_READ' | 'COLLECTIONS_WRITE' | 'COLLECTIONS_DELETE'
-  | 'TAXONOMY_READ' | 'TAXONOMY_WRITE'
+  | 'TAXONOMY_READ' | 'TAXONOMY_WRITE' | 'TAXONOMY_SUGGESTIONS_MODERATE'
   | 'TAGS_READ' | 'TAGS_WRITE'
   | 'MODERATION_READ' | 'MODERATION_REVIEW' | 'MODERATION_QUARANTINE'
   | 'MEASUREMENTS_READ' | 'MEASUREMENTS_REVIEW'
@@ -128,6 +128,24 @@ export interface AdminBrand {
   name: string | null;
   ownerId?: string;
   isStoreOpen?: boolean;
+  /**
+   * Null until the brand completes setup and publishes its storefront. An admin
+   * store override is only meaningful once this is set — before that there is no
+   * storefront to open.
+   */
+  storePublishedAt?: string | null;
+  /**
+   * Raw verification outcome. Note this is NOT the same as "shows a verified
+   * badge" — the badge additionally requires an open store and an active owner.
+   */
+  verificationStatus?:
+    | 'NOT_SUBMITTED'
+    | 'PENDING'
+    | 'IN_REVIEW'
+    | 'ADDITIONAL_INFO_REQUESTED'
+    | 'APPROVED'
+    | 'REJECTED'
+    | 'CANCELLED';
   description?: string | null;
   logo?: string | null;
   createdAt?: string;
@@ -137,9 +155,98 @@ export interface AdminBrand {
     email: string;
     firstName: string;
     lastName: string;
+    username?: string;
     status?: string;
     profileImage?: string | null;
   };
+}
+
+/** `GET /admin/brands/:id/overview` — everything the brand manage modal renders. */
+export interface AdminBrandOverview {
+  brand: {
+    id: string;
+    name: string | null;
+    ownerId: string;
+    currency: string;
+    isStoreOpen: boolean;
+    storePublishedAt: string | null;
+    createdAt: string;
+    /** Public storefront slug, or null when the store is not publicly reachable. */
+    storefrontSlug: string | null;
+  };
+  verification: {
+    status:
+      | 'NOT_SUBMITTED'
+      | 'PENDING'
+      | 'IN_REVIEW'
+      | 'ADDITIONAL_INFO_REQUESTED'
+      | 'APPROVED'
+      | 'REJECTED'
+      | 'CANCELLED';
+    /** A submission is awaiting an admin decision right now. */
+    isReviewOpen: boolean;
+    /** Any verification record exists (i.e. not NOT_SUBMITTED). */
+    hasSubmission: boolean;
+    submittedAt: string | null;
+    reviewedAt: string | null;
+    attemptNumber: number;
+  };
+  content: {
+    designs: number;
+    designsPublished: number;
+    storeCollections: number;
+    products: number;
+    productsLive: number;
+    productsInReview: number;
+    productsDraft: number;
+    posts: number;
+  };
+  transactions: {
+    currency: string;
+    grossInflow: number;
+    paidOut: number;
+    items: AdminBrandTransaction[];
+  };
+  reminders: AdminBrandReminder[];
+  disputes: AdminBrandDispute[];
+}
+
+export interface AdminBrandTransaction {
+  id: string;
+  kind: 'ORDER' | 'CUSTOM_ORDER' | 'PAYOUT';
+  direction: 'IN' | 'OUT';
+  title: string;
+  reference: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  occurredAt: string;
+  orderId: string | null;
+  customOrderId: string | null;
+  payoutId: string | null;
+}
+
+export interface AdminBrandReminder {
+  id: string;
+  type: string;
+  isRead: boolean;
+  createdAt: string;
+  orderId: string | null;
+  customOrderId: string | null;
+  detail: string | null;
+}
+
+export interface AdminBrandDispute {
+  id: string;
+  type: string;
+  status: string;
+  description: string;
+  targetType: string;
+  targetId: string;
+  resolution: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  isOpen: boolean;
 }
 
 export interface AdminPayout {
@@ -396,6 +503,8 @@ export interface AdminProduct {
   images?: string[];
   primaryMediaUrl?: string | null;
   orderCount?: number;
+  /** Deduped views. Named to match the admin designs list. */
+  viewCount?: number;
   createdAt: string;
   updatedAt: string;
   brand?: { id: string; name: string | null };
@@ -479,7 +588,10 @@ export type ContentSubmissionStatus =
   | 'APPROVED'
   | 'REJECTED'
   | 'CHANGES_REQUESTED'
-  | 'CANCELLED';
+  /** The brand withdrew the item from review. */
+  | 'CANCELLED'
+  /** A newer submission for the same item replaced this row. */
+  | 'SUPERSEDED';
 export type ContentMediaViewSlot =
   | 'FRONT'
   | 'BACK'
@@ -578,6 +690,12 @@ export interface AdminContentSubmission {
   reasonCode?: ContentReviewReasonCode | null;
   reasonLabel?: string | null;
   reasonNote?: string | null;
+  /**
+   * What the brand changed since the previous submission, e.g.
+   * ["1 image(s) replaced", "Description edited"]. Empty for a first
+   * submission, and for rows that predate change detection.
+   */
+  changeSummary?: string[];
   submittedAt: string;
   reviewedAt?: string | null;
   target: {
@@ -591,6 +709,12 @@ export interface AdminContentSubmission {
     isActive?: boolean;
     createdAt?: string | null;
     updatedAt?: string | null;
+    /** Commercial terms. Products only — null on designs, which are not sold. */
+    price?: number | null;
+    salePrice?: number | null;
+    currency?: string | null;
+    customOrderEnabled?: boolean | null;
+    standardCheckoutEnabled?: boolean | null;
   };
   brand?: {
     id: string;
@@ -599,6 +723,10 @@ export interface AdminContentSubmission {
     reviewMode?: string | null;
     latestTrustEvent?: string | null;
     latestTrustEventAt?: string | null;
+    /** Identity signals a reviewer needs before approving a first listing. */
+    verificationStatus?: string | null;
+    isVerified?: boolean | null;
+    emailVerified?: boolean | null;
   } | null;
   submittedBy?: { id: string; username: string } | null;
   reviewedBy?: { id: string; username: string } | null;
@@ -618,6 +746,8 @@ export interface AdminContentSubmission {
     submittedAt: string;
     reviewedAt?: string | null;
     reviewedById?: string | null;
+    /** Resolved reviewer — the raw id alone is unusable in an audit trail. */
+    reviewedBy?: { id: string; username: string | null } | null;
   }>;
   reports: AdminContentReport[];
 }

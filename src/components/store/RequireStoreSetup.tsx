@@ -36,6 +36,18 @@ let storeStatusCacheUserId: string | null = null;
 let inFlightStoreStatusCheck: Promise<StoreStatusCache> | null = null;
 let inFlightStoreStatusCheckUserId: string | null = null;
 
+/**
+ * Reset this guard's module-level status cache so the next render refetches.
+ * Call after mutating anything the gate depends on (e.g. saving working hours),
+ * otherwise a published brand — whose fresh cache short-circuits the refetch —
+ * could keep being redirected by a stale `businessHoursConfigured` for up to the
+ * cache TTL.
+ */
+export function invalidateRequireStoreSetupCache(): void {
+  storeStatusCache = { status: null, hadError: false, checkedAt: 0 };
+  storeStatusCacheUserId = null;
+}
+
 const normalizeCacheUserId = (userId?: string | null): string | null => {
   const candidate = String(userId ?? '').trim();
   return candidate.length > 0 ? candidate : null;
@@ -49,7 +61,7 @@ const isCacheFresh = (userId?: string | null) =>
 const canServeFromCache = (userId?: string | null) =>
   isCacheFresh(userId) &&
   !storeStatusCache.hadError &&
-  Boolean(storeStatusCache.status?.isStoreOpen);
+  Boolean(storeStatusCache.status?.isSetupComplete);
 
 const fetchStoreStatusWithRetry = async (
   userId?: string | null,
@@ -169,7 +181,7 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
 
     const shouldBlockWithLoader =
       !isCacheFresh(user?.id) ||
-      !storeStatusCache.status?.isStoreOpen ||
+      !storeStatusCache.status?.isSetupComplete ||
       storeStatusCache.hadError;
     if (shouldBlockWithLoader) {
       setLoading(true);
@@ -234,8 +246,34 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     return <>{children}</>;
   }
 
-  if (status?.isStoreOpen) {
-    clearStoreOpenPending(user?.id);
+  // Business Hours hard gate, for ALREADY-PUBLISHED stores only.
+  //
+  // Hours are part of `isSetupComplete` now, so an unpublished brand missing
+  // them is handled below by the normal setup redirect — the wizard collects
+  // hours as a step. A brand that published BEFORE hours were required has no
+  // such path: sending it to the wizard would bounce off `ShopSetupWizardPage`,
+  // which redirects any open store back to `/studio/store`, and this guard would
+  // send it to the wizard again — an infinite loop. Route those brands straight
+  // at the hours settings instead, which lives outside this guard.
+  //
+  // Gated on `isPublished` for the other direction too: a brand that has not
+  // started setup must land in the wizard, not in a working-hours form for a
+  // store that does not exist yet. Only acts on a cleanly loaded status so a
+  // failed request never gates anyone.
+  if (
+    !hadError &&
+    status &&
+    status.isPublished === true &&
+    status.workingHoursRequired === true &&
+    status.businessHoursConfigured === false
+  ) {
+    return <Navigate to="/settings?tab=store-hours" replace />;
+  }
+
+  // Setup complete → allow Studio regardless of open/paused, so a paused store is
+  // never redirected back into the setup flow. Clear pending only once truly open.
+  if (status?.isSetupComplete) {
+    if (status.isStoreOpen) clearStoreOpenPending(user?.id);
     return <>{children}</>;
   }
 
@@ -248,7 +286,7 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     return <>{children}</>;
   }
 
-  if (status.isStoreOpen) {
+  if (status.isSetupComplete) {
     return <>{children}</>;
   }
 

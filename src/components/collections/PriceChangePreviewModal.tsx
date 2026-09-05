@@ -10,7 +10,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 /**
@@ -377,7 +377,7 @@ export const PriceChangePreviewModal: React.FC<PriceChangePreviewModalProps> = (
               >
                 {isConfirming ? (
                   <>
-                    <VLoader size={16} phase="loading" showLabel={false} />
+                    <MuseLoader size={16} />
                     Updating...
                   </>
                 ) : (

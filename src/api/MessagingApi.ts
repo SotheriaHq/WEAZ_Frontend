@@ -39,9 +39,24 @@ export interface ThreadMessage {
   createdAt: string;
   /** Delivery status: SENT (single tick), DELIVERED (double tick), READ (colored double tick) */
   deliveryStatus?: 'SENT' | 'DELIVERED' | 'READ';
+  /**
+   * CLIENT-ONLY, never sent by the server.
+   *
+   * A message appears in the thread the moment it is written, so the thread has
+   * to be able to say "on its way" and "did not go" — states that do not exist
+   * for a message the server has already accepted. Present on a bubble only
+   * until the real row arrives to replace it.
+   */
+  _optimistic?: 'sending' | 'failed';
   sender?: {
     id: string;
     username?: string | null;
+    /**
+     * Canonical, server-resolved name — brand name for a brand account, full
+     * name for a person. Prefer this over joining the parts below; read it
+     * through `resolveParticipantDisplayName`.
+     */
+    displayName?: string | null;
     firstName?: string | null;
     lastName?: string | null;
     profileImage?: string | null;
@@ -52,6 +67,11 @@ export interface ThreadMessage {
     contextDesignTitle?: string;
     contextDesignCoverFileId?: string;
     contextDesignCoverUrl?: string;
+    /* A message composed from a Market product references it the same way. */
+    contextProductId?: string;
+    contextProductTitle?: string;
+    contextProductCoverFileId?: string;
+    contextProductCoverUrl?: string;
     [key: string]: unknown;
   } | null;
   /** Quoted message for replies (set when replyToMessageId was provided on send) */
@@ -106,6 +126,12 @@ export interface InboxItem {
   participant?: {
     id: string;
     username?: string | null;
+    /**
+     * Canonical, server-resolved name — brand name for a brand account, full
+     * name for a person. Prefer this over joining the parts below; read it
+     * through `resolveParticipantDisplayName`.
+     */
+    displayName?: string | null;
     firstName?: string | null;
     lastName?: string | null;
     profileImage?: string | null;
@@ -536,6 +562,21 @@ export const messagingApi = {
     return unwrapApiResponse<ResolvedThreadRoute>(response.data);
   },
 
+  // Resolve a conversation from a context reference (order/custom order/brand)
+  // to its actual thread. Actor-scoped server-side (JWT), so it only ever
+  // returns a thread the caller participates in — no cross-account resolution.
+  async resolveConversation(params: {
+    orderId?: string;
+    customOrderId?: string;
+    brandId?: string;
+    threadId?: string;
+  }) {
+    const response = await apiClient.get('/messaging/conversations/resolve', {
+      params,
+    });
+    return unwrapApiResponse<ResolvedThreadRoute>(response.data);
+  },
+
   async listThreadMessages(threadId: string, params?: { cursorCreatedAt?: string; cursorId?: string; limit?: number }) {
     const response = await apiClient.get(`/messaging/threads/${threadId}/messages`, { params });
     return parseMessageList(response.data);
@@ -551,7 +592,14 @@ export const messagingApi = {
     return unwrapApiResponse<{ unreadCount: number }>(response.data);
   },
 
-  async sendBrandMessage(brandId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; contextDesignId?: string; contextDesignTitle?: string; contextDesignCoverFileId?: string; contextDesignCoverUrl?: string; replyToMessageId?: string }) {
+  /**
+   * Start or continue a thread with a brand.
+   *
+   * The `context*` fields carry the content the message is ABOUT — a Runway
+   * design or a Market product. Sending a remark composed from a piece of
+   * content without them leaves the brand reading a sentence with no subject.
+   */
+  async sendBrandMessage(brandId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; contextDesignId?: string; contextDesignTitle?: string; contextDesignCoverFileId?: string; contextDesignCoverUrl?: string; contextProductId?: string; contextProductTitle?: string; contextProductCoverFileId?: string; contextProductCoverUrl?: string; replyToMessageId?: string }) {
     const response = await apiClient.post(
       `/messaging/brands/${brandId}/messages`,
       payload,
