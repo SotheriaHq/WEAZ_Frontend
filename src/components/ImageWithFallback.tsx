@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import DefaultAvatar from './DefaultAvatar';
 import { brandApi } from '@/api/BrandApi';
 import MediaRenderer from './media/MediaRenderer';
@@ -282,6 +282,13 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const [lastGoodUrl, setLastGoodUrl] = useState<string | null>(() =>
     cachedLastGoodUrl ?? (loaded ? resolved : null),
   );
+  /**
+   * True when the image was already decoded at mount, so it needs no fade.
+   *
+   * A cache hit and a cold network fetch look identical to `loaded` — both end
+   * up true. Only one of them should animate.
+   */
+  const [instant, setInstant] = useState(false);
   const retryCountRef = React.useRef(0);
   const imgRef = React.useRef<HTMLImageElement | null>(null);
 
@@ -294,6 +301,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       // is allowed to show the shimmer again).
       setHadError(false);
       setEverErrored(false);
+      setInstant(false);
       if (sourceCacheKey) {
         const cachedLastGood = lastGoodUrlCache.get(sourceCacheKey);
         if (cachedLastGood) {
@@ -495,11 +503,29 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     (isResolving || (hasSource && !hadError && !loaded));
   const wrapperClassName = cn('overflow-hidden', roundClass(rounded), containerClassName);
 
-  useEffect(() => {
+  /*
+   * Cached images must paint instantly — no shimmer, no fade.
+   *
+   * This was a `useEffect`, which runs AFTER the browser paints. So an image
+   * already in the browser cache went: paint one frame at `opacity-0` with the
+   * shimmer over it, THEN flip `loaded`, THEN fade in over 300ms. Every card
+   * that remounted while scrolling replayed that, which is the "it settles and
+   * then flickers and re-settles" report — and why the feed never feels as
+   * still as a native app's, where a cached image simply appears.
+   *
+   * `useLayoutEffect` runs after the DOM is attached but BEFORE paint, so
+   * `image.complete` is already true for a cache hit and the state flip is
+   * flushed synchronously. The opacity-0 frame is never painted.
+   *
+   * `instant` then suppresses the transition. Without it the class flip still
+   * animates from 0 to 1 even though nothing was ever waiting on the network.
+   */
+  useLayoutEffect(() => {
     if (loaded || showFallback || isResolving) return;
     const image = imgRef.current;
     if (!image) return;
     if (image.complete && image.naturalWidth > 0) {
+      setInstant(true);
       setLoaded(true);
       onLoaded?.();
       if (resolved) {
@@ -564,7 +590,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           loading={loading}
           fetchPriority={fetchPriority}
           className="w-full h-full"
-          mediaClassName={`transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${className ?? ''}`}
+          mediaClassName={`${instant ? '' : 'transition-opacity duration-300'} ${loaded ? 'opacity-100' : 'opacity-0'} ${className ?? ''}`}
           maxHeightClassName={maxHeightClassName ?? 'max-h-[70vh]'}
           maxWidthClassName="max-w-full"
         />
