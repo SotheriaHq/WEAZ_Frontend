@@ -1,23 +1,33 @@
 import React from 'react';
 
 import { PRODUCT_NAME } from '@/brand/identity';
-import WiezOrb from '@/brand/WiezOrb';
+import WiezMark from '@/brand/WiezMark';
+import WiezWordmark from '@/brand/WiezWordmark';
 
 /**
- * The brand lockup: the orb beside the name.
+ * The brand lockup.
  *
- * The orb, not the full mark. Every caller renders this between 22px and 36px —
- * navbar, sidebar, auth headers, the Runway pill — and the muse's face stops
- * reading below roughly 96px. Screens with room for the figure use `WiezMark`
- * directly.
+ * Two shapes, and which one you get is the whole point:
+ *
+ * - **With the name** — the drawn wordmark, alone. The muse IS the "I", so the
+ *   logo is already inside the name; setting a mark beside it draws the muse
+ *   twice.
+ * - **Without the name** — the mark alone, for chrome too tight for lettering.
+ *
+ * Before this it rendered a small logo image plus `PRODUCT_NAME` as bold text,
+ * so the brand's own lettering appeared nowhere in the product while the muse
+ * appeared twice wherever the two sat together.
+ *
+ * `textClassName` is gone with the text it styled; the wordmark is artwork, and
+ * its weight and tracking are drawn rather than set.
  */
 
 type BrandWordmarkProps = {
   className?: string;
+  /** Rendered height in px, for whichever artwork is shown. */
   logoSize?: number;
   logoClassName?: string;
-  textClassName?: string;
-  /** Drop the name when the lockup sits next to other text that already says it. */
+  /** False renders the mark alone; the caller must then name the brand itself. */
   showName?: boolean;
 };
 
@@ -25,18 +35,14 @@ const BrandWordmark: React.FC<BrandWordmarkProps> = ({
   className = '',
   logoSize = 28,
   logoClassName = '',
-  textClassName = '',
   showName = true,
 }) => (
-  <span className={`inline-flex items-center gap-2 ${className}`.trim()}>
-    <WiezOrb
-      size={logoSize}
-      className={logoClassName}
-      // Without the name beside it the orb is the only thing identifying the
-      // brand, so it has to carry the label itself.
-      title={showName ? undefined : PRODUCT_NAME}
-    />
-    {showName ? <span className={textClassName}>{PRODUCT_NAME}</span> : null}
+  <span className={`inline-flex items-center ${className}`.trim()}>
+    {showName ? (
+      <WiezWordmark height={logoSize} className={logoClassName} />
+    ) : (
+      <WiezMark height={logoSize} className={logoClassName} title={PRODUCT_NAME} />
+    )}
   </span>
 );
 

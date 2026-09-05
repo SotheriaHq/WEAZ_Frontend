@@ -1,4 +1,4 @@
-import { useQuery, type QueryKey } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, type QueryKey } from '@tanstack/react-query';
 
 /**
  * useCachedResource — the standard way to fetch read-only screen/tab data.
@@ -64,6 +64,14 @@ export interface CachedResource<T> {
   loading: boolean;
   /** True whenever a fetch (initial OR silent background revalidation) is in flight. */
   fetching: boolean;
+  /**
+   * True while `data` still belongs to the PREVIOUS query key.
+   *
+   * Switching a filter chip keeps the old results on screen until the new ones
+   * land. They are real results, just answering the previous question — so a
+   * surface that wants to say so can dim them. Nothing is obliged to.
+   */
+  stale: boolean;
   error: Error | null;
   /** Force an immediate revalidation (e.g. a manual "Retry"/"Refresh" button). */
   refetch: () => Promise<void>;
@@ -78,6 +86,20 @@ export function useCachedResource<T>(
     queryKey,
     queryFn: ({ signal }) => queryFn({ signal }),
     enabled,
+    /*
+     * Keep the previous key's data on screen while the next one loads.
+     *
+     * Without this, changing a filter chip is an entirely NEW query as far as
+     * React Query is concerned: `data` drops to undefined and `isLoading` flips
+     * back to true, so the screen unmounts its content, mounts a skeleton, then
+     * mounts content again — three layouts for one tap. That is the flicker,
+     * and it is also why the SKELETONS flickered: they were being mounted fresh
+     * on every chip press rather than persisting across the change.
+     *
+     * With it, the old results stay put, `isLoading` stays false, and the only
+     * thing that changes is `isPlaceholderData`. One layout, no flash.
+     */
+    placeholderData: keepPreviousData,
     ...(initialData !== undefined ? { initialData } : {}),
     ...(staleTime !== undefined ? { staleTime } : {}),
     ...(gcTime !== undefined ? { gcTime } : {}),
@@ -90,6 +112,7 @@ export function useCachedResource<T>(
     data: query.data,
     loading: query.isLoading,
     fetching: query.isFetching,
+    stale: query.isPlaceholderData,
     error: (query.error as Error | null) ?? null,
     refetch: async () => {
       await query.refetch();

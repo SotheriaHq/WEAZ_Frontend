@@ -55,8 +55,24 @@ export const BRAND_COLORS = {
  * there is no filter that adapts it. Pick with the resolved theme.
  */
 export const BRAND_ASSETS = {
+  /**
+   * The drawn name, with the muse as the "I" — so this ALREADY contains the
+   * mark. Anywhere the name is shown, this is the whole lockup.
+   */
+  wordmarkLight: '/brand/wiez-wordmark-light.svg',
+  wordmarkDark: '/brand/wiez-wordmark-dark.svg',
+  /** The symbol alone, for chrome with no room for lettering. */
   markLight: '/brand/wiez-mark-light.svg',
   markDark: '/brand/wiez-mark-dark.svg',
+  /**
+   * The same mark as a 192px raster, for the loader.
+   *
+   * A dozen spinners can be on one form at 12-16px. The vector would be a fresh
+   * fetch on any screen with buttons but no logo, and rasterising 2853 paths
+   * per size buys nothing at that scale.
+   */
+  loaderMarkLight: '/brand/wiez-loader-mark-light.png',
+  loaderMarkDark: '/brand/wiez-loader-mark-dark.png',
   /** For grounds that are not known ahead of time — over imagery, over video. */
   markNeutral: '/brand/wiez-mark.svg',
   favicon: '/brand/wiez-favicon.svg',
@@ -64,12 +80,21 @@ export const BRAND_ASSETS = {
   openGraph: '/brand/wiez-og.png',
 } as const;
 
-export const PUBLIC_WEB_URL =
-  import.meta.env.VITE_APP_URL || '[PRODUCT CONFIRMATION NEEDED]';
-export const SUPPORT_EMAIL =
-  import.meta.env.VITE_SUPPORT_EMAIL || '[PRODUCT CONFIRMATION NEEDED]';
-export const LEGAL_EMAIL =
-  import.meta.env.VITE_LEGAL_EMAIL || '[PRODUCT CONFIRMATION NEEDED]';
+/**
+ * The site's own origin, for canonical and og:url.
+ *
+ * The fallback is empty rather than a placeholder string. Its one consumer,
+ * `SeoHead`'s `resolveOrigin`, already tests `startsWith('http')` and falls
+ * back to `window.location.origin` — so a non-URL here was never going to
+ * reach a meta tag, and writing "[PRODUCT CONFIRMATION NEEDED]" into a constant
+ * that can never render it only looked like an outstanding task.
+ *
+ * SUPPORT_EMAIL and LEGAL_EMAIL used to sit here beside it with the same
+ * placeholder and ZERO consumers — nothing in the app has ever shown a support
+ * or legal address. They are deleted rather than left looking pending; when a
+ * screen actually needs one, it needs a real address, not a constant.
+ */
+export const PUBLIC_WEB_URL = import.meta.env.VITE_APP_URL || '';
 
 export const LEGAL_ROUTE_LABELS = {
   legalIndex: 'Legal',

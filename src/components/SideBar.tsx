@@ -352,7 +352,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
           <div className="flex items-center cursor-pointer" onClick={() => handleLinkClick('/')}>
             <BrandWordmark
               logoSize={32}
-              textClassName="text-lg font-bold text-gray-900 dark:text-white tracking-tight"
+              
             />
           </div>
         </div>

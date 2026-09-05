@@ -230,8 +230,13 @@ export default {
         },
         // The loading system. Constant angular velocity on purpose: an easing
         // curve stutters where the loop seams, and a spinner loops forever.
-        'wiez-spin': {
-          to: { transform: 'rotate(360deg)' },
+        // Light rising through the mark and clearing, on a loop. Linear on
+        // purpose: an eased loop stutters where it seams, and a loader repeats
+        // forever.
+        'wiez-rise': {
+          '0%': { clipPath: 'inset(100% 0 0 0)' },
+          '55%': { clipPath: 'inset(0 0 0 0)' },
+          '100%': { clipPath: 'inset(0 0 100% 0)' },
         },
         'wiez-breathe': {
           '0%, 100%': { opacity: '0.78', transform: 'scale(0.97)' },
@@ -249,7 +254,7 @@ export default {
         'slide-up-fade': 'slide-up-fade 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
         float: 'float 6s ease-in-out infinite',
         pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'wiez-spin': 'wiez-spin 1.25s linear infinite',
+        'wiez-rise': 'wiez-rise 1.9s linear infinite',
         'wiez-breathe': 'wiez-breathe 2.4s ease-in-out infinite',
       },
       boxShadow: {

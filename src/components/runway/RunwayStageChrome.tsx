@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { toggleSidebar } from '@/features/uiSlice';
 import BrandWordmark from '@/components/brand/BrandWordmark';
+import CountBadge from '@/components/navigation/CountBadge';
 import { RUNWAY_CHIPS_HEIGHT_PX } from '@/components/navigation/navbarChrome';
 
 /**
@@ -92,8 +93,6 @@ const RunwayStageChrome: React.FC = () => {
     (state: RootState) => state.notifications.unreadCount,
   );
 
-  const badgeLabel = unreadCount > 99 ? '99+' : String(unreadCount);
-
   return (
     <>
       {/*
@@ -134,37 +133,36 @@ const RunwayStageChrome: React.FC = () => {
               : 'Open menu'
           }
         >
-          <span aria-hidden="true" className="text-base leading-none">
-            ☰
+          {/* The same marker the navbar and the sidebar use. This drew ☰
+              (U+2630) before — a CJK trigram whose weight and baseline are
+              whatever the system font decides, so it sat differently on every
+              device and matched nothing else in the product. */}
+          <span aria-hidden="true" className="text-lg leading-none">
+            🍔
           </span>
           {/*
-            `showName` with the logo suppressed: the lettermark and the word
-            together are too wide for a control that has to leave the centre of
-            the frame empty, and the word is the half that identifies.
+            The mark AND the word. It rendered the word alone on width grounds,
+            which made this the one surface in the product where the brand had
+            no mark at all — on the route whose whole job is showing pictures.
+            22px of lockup is affordable; the centre of the frame is still clear.
           */}
           <BrandWordmark
-            logoSize={0}
+            logoSize={22}
             showName
-            className="gap-0"
-            logoClassName="hidden"
-            textClassName="text-[13px] font-semibold tracking-[0.18em] text-white"
+            className="gap-1.5"
+            
           />
         </button>
 
-        {unreadCount > 0 ? (
-          /*
-            Outer corner, clear of the wordmark. `border-black/60` rather than a
-            theme colour: this sits on an arbitrary photograph, so the ring has
-            to separate the badge from whatever is behind it, not from a known
-            surface.
-          */
-          <span
-            className="pointer-events-none absolute -right-1 -top-1 flex min-w-[18px] items-center justify-center rounded-full border-2 border-black/60 bg-rose-500 px-1 text-[10px] font-bold leading-[14px] text-white"
-            aria-hidden="true"
-          >
-            {badgeLabel}
-          </span>
-        ) : null}
+        {/*
+          The shared badge: a numeral in the brand colour, no plate.
+
+          This drew a filled rose disc, which on a full-bleed photograph was the
+          highest-contrast object on the screen — louder than the image the page
+          exists to show. `CountBadge` carries its contrast in a text shadow
+          instead, which is the same technique the rest of this chrome uses.
+        */}
+        <CountBadge count={unreadCount} />
       </div>
 
       {/*

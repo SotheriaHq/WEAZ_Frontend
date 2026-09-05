@@ -98,6 +98,9 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const location = useLocation();
+  /* The search control hides on the search screen; `/search` is the route and
+     the results page keeps the same path with a query string. */
+  const isSearchRoute = location.pathname === '/search';
   // Phones only (<768px). Tablets and up keep the dropdown — it fits there.
   const isMobileViewport = useSelector(selectIsMobile);
 
@@ -503,7 +506,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
             >
               <BrandWordmark
                 logoSize={32}
-                textClassName="max-w-[200px] truncate text-lg font-bold tracking-tight text-theme"
+                
               />
               <span className="sr-only">{PRODUCT_NAME}</span>
             </div>
@@ -522,7 +525,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
         ) : null}
 
         <div className="flex min-w-[100px] shrink-0 items-center justify-end space-x-2 sm:space-x-3">
-          {!minimal ? (
+          {/* Not on the search screen itself: a control whose only job is to
+              take you where you already are is a dead tap target, and it sat
+              directly above the page's own search field. */}
+          {!minimal && !isSearchRoute ? (
             <button
               type="button"
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)] sm:hidden"
@@ -557,7 +563,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
             >
               <span aria-hidden="true" className="text-xl">{MY_BAG_EMOJI}</span>
               {cartQuantity > 0 ? (
-                <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1 text-xs font-bold text-white">
+                <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-xs font-bold text-[color:var(--brand-primary)]">
                   {cartQuantity > 99 ? '99+' : cartQuantity}
                 </span>
               ) : null}

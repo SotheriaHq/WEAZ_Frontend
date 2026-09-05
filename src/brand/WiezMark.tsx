@@ -20,15 +20,21 @@ import { useTheme } from '@/context/ThemeContext';
  */
 
 type WiezMarkProps = {
-  /** Rendered height in px. Below ~96 the figure stops reading; use `WiezOrb`. */
+  /** Rendered height in px. */
   height?: number;
   className?: string;
   /** Omit to render decoratively when adjacent text already names the brand. */
   title?: string;
 };
 
-/** Measured from the artwork's own viewBox (212 x 430). */
-const MARK_ASPECT_RATIO = 212 / 430;
+/**
+ * Measured from the artwork's own viewBox (461 x 430).
+ *
+ * The mark is the full lockup — the W, the muse and the orb. It was briefly the
+ * figure alone, which is what the LOADER wanted; the brand's mark is the whole
+ * thing, and rendering only part of it read as a cropped logo.
+ */
+const MARK_ASPECT_RATIO = 461 / 430;
 
 const WiezMark: React.FC<WiezMarkProps> = ({ height = 132, className = '', title }) => {
   const { resolvedTheme } = useTheme();

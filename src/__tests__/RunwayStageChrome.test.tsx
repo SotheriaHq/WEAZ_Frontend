@@ -55,12 +55,19 @@ describe('RunwayStageChrome', () => {
     expect(screen.getByText('99+')).toBeInTheDocument();
   });
 
-  it('carries the wordmark as text, not as a link', () => {
+  it('carries the drawn wordmark, and only once', () => {
     render(<RunwayStageChrome />);
     // On this route the wordmark's usual destination IS this screen, so a link
     // would be a dead tap target sitting on the photograph.
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
-    expect(screen.getByText('WIEZ')).toBeInTheDocument();
+
+    // The name is artwork, not bold text — and because the muse stands in for
+    // the "I", the wordmark already contains the mark. A second mark beside it
+    // would draw the figure twice.
+    const marks = screen.getAllByRole('img');
+    expect(marks).toHaveLength(1);
+    expect(marks[0]).toHaveAccessibleName('WIEZ');
+    expect(marks[0].getAttribute('src')).toMatch(/wiez-wordmark/);
   });
 
   it('does not repeat the active destination', () => {

@@ -1,42 +1,54 @@
 import React from 'react';
 
-import WiezOrb from '@/brand/WiezOrb';
+import { BRAND_ASSETS } from '@/brand/identity';
+import { useTheme } from '@/context/ThemeContext';
 
 /**
  * The app's loading vocabulary. Every wait on the web renders one of these two.
  *
- * It replaced `VLoader`, which drew a purple ring around a **thread emoji**
- * (🧵, swapping to ✅ on completion) — the brand mark appeared in no loading
- * state anywhere in the product. The orb here is the same artwork as the chrome
- * logo, inlined once and shared.
+ * **The logo is the loader.** A dim copy of the mark is the track, and a lit
+ * copy is revealed from the bottom up — so the thing that fills IS the brand,
+ * not a ring around a fragment of it.
  *
- * ## Why two components and not one with flags
+ * Two shapes it is deliberately NOT:
+ * - a ring orbiting the orb. That drew a spinner around one PIECE of the logo,
+ *   which reads as a loading widget that happens to have a ball in it.
+ * - a thread emoji in a purple ring, which is what `VLoader` drew at all 63
+ *   call sites — the brand mark appeared in no loading state in the product.
  *
- * `VLoader` took `phase` and `showLabel`, and 60-odd of its 73 call sites
- * passed `showLabel={false}`. The dozen that did not were rendering "Winding
- * thread — 47% complete" over an **invented** number: with no `progress` prop
- * the old component ran a timer that crawled toward 92% and stopped. Deleting
- * that is a correctness fix, not a visual one.
+ * ## Why two components instead of one with flags
+ *
+ * `VLoader` took `phase` and `showLabel`, and 60-odd of its call sites passed
+ * `showLabel={false}`. The dozen that did not rendered "Winding thread — 47%
+ * complete" over an **invented** number: with no `progress` prop the old
+ * component ran a timer that crawled toward 92% and stopped. Deleting that is a
+ * correctness fix, not a visual one.
  *
  * So: `MuseLoader` is indeterminate and never claims a number.
  * `MuseProgress` requires a real one.
  */
 
-const SPIN_CLASS =
-  'absolute inset-0 motion-safe:animate-wiez-spin motion-reduce:animate-wiez-breathe';
+/** From the mark's own viewBox (461 x 430). */
+const MARK_ASPECT_RATIO = 461 / 430;
 
 /**
- * Ring weight has to grow as the loader shrinks or it disappears; the arc has
- * to shorten too, or at 16px it reads as a closed circle rather than a spinner.
+ * A 192px raster, not the 381 KB vector.
+ *
+ * These appear a dozen at a time on a form, at 12-16px. The vector would be a
+ * fresh fetch on any screen that has buttons but no logo, and rasterising 2853
+ * paths per size buys nothing at that scale.
  */
-function ringGeometry(size: number) {
-  if (size <= 24) return { width: 11, dash: '148 142' };
-  if (size <= 40) return { width: 9, dash: '158 132' };
-  return { width: 7, dash: '168 122' };
+function useMarkSource() {
+  const { resolvedTheme } = useTheme();
+  return resolvedTheme === 'dark'
+    ? BRAND_ASSETS.loaderMarkDark
+    : BRAND_ASSETS.loaderMarkLight;
 }
 
+const LAYER_CLASS = 'absolute inset-0 h-full w-full object-contain';
+
 type MuseLoaderProps = {
-  /** Rendered edge length in px. Reads down to 16. */
+  /** Rendered height in px. Width follows the mark's aspect. */
   size?: number;
   className?: string;
   /** Announced to screen readers. Defaults to a plain "Loading". */
@@ -44,16 +56,15 @@ type MuseLoaderProps = {
 };
 
 /**
- * Indeterminate. The orb holds still and one arc turns around it at constant
- * speed — no easing curve, so there is no stutter at the loop seam, and the
- * only animated properties are transform and opacity.
+ * Indeterminate. Light rises through the mark and clears, on a loop — no
+ * easing at the seam, so there is no stutter where it repeats.
  */
 export const MuseLoader: React.FC<MuseLoaderProps> = ({
   size = 32,
   className = '',
   label = 'Loading',
 }) => {
-  const ring = ringGeometry(size);
+  const src = useMarkSource();
 
   return (
     <span
@@ -61,27 +72,15 @@ export const MuseLoader: React.FC<MuseLoaderProps> = ({
       aria-live="polite"
       aria-label={label}
       className={`relative inline-block shrink-0 align-middle ${className}`.trim()}
-      style={{ width: size, height: size }}
+      style={{ width: Math.round(size * MARK_ASPECT_RATIO), height: size }}
     >
-      {/* The wrapper spins, not the <svg>: animating an SVG element forces
-          layout work per frame that a transformed div does not. */}
-      <span className={SPIN_CLASS}>
-        <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true" focusable="false">
-          <circle
-            cx="50"
-            cy="50"
-            r="45"
-            fill="none"
-            stroke="var(--wiez-ring)"
-            strokeLinecap="round"
-            strokeWidth={ring.width}
-            strokeDasharray={ring.dash}
-          />
-        </svg>
-      </span>
-      <span className="absolute inset-[21%] motion-safe:animate-wiez-breathe">
-        <WiezOrb size={Math.round(size * 0.58)} />
-      </span>
+      <img src={src} alt="" aria-hidden="true" className={`${LAYER_CLASS} opacity-20`} />
+      <img
+        src={src}
+        alt=""
+        aria-hidden="true"
+        className={`${LAYER_CLASS} motion-safe:animate-wiez-rise motion-reduce:animate-wiez-breathe`}
+      />
     </span>
   );
 };
@@ -95,7 +94,7 @@ type MuseProgressProps = {
 };
 
 /**
- * Determinate. The ring fills to the value given, and the percentage is shown
+ * Determinate. The mark fills to the value given, and the percentage is shown
  * because here it means something.
  */
 export const MuseProgress: React.FC<MuseProgressProps> = ({
@@ -104,11 +103,8 @@ export const MuseProgress: React.FC<MuseProgressProps> = ({
   className = '',
   label = 'Uploading',
 }) => {
+  const src = useMarkSource();
   const clamped = Number.isFinite(progress) ? Math.min(100, Math.max(0, progress)) : 0;
-  const ring = ringGeometry(size);
-  // Circumference of r=45 in the 100-unit viewBox.
-  const circumference = 2 * Math.PI * 45;
-  const filled = (clamped / 100) * circumference;
 
   return (
     <span
@@ -119,38 +115,19 @@ export const MuseProgress: React.FC<MuseProgressProps> = ({
       aria-label={label}
       className={`inline-flex flex-col items-center justify-center ${className}`.trim()}
     >
-      <span className="relative inline-block shrink-0" style={{ width: size, height: size }}>
-        <svg
-          viewBox="0 0 100 100"
-          width={size}
-          height={size}
-          className="absolute inset-0 -rotate-90"
+      <span
+        className="relative inline-block shrink-0"
+        style={{ width: Math.round(size * MARK_ASPECT_RATIO), height: size }}
+      >
+        <img src={src} alt="" aria-hidden="true" className={`${LAYER_CLASS} opacity-20`} />
+        <img
+          src={src}
+          alt=""
           aria-hidden="true"
-          focusable="false"
-        >
-          <circle
-            cx="50"
-            cy="50"
-            r="45"
-            fill="none"
-            stroke="var(--wiez-ring-track)"
-            strokeWidth={ring.width}
-          />
-          <circle
-            cx="50"
-            cy="50"
-            r="45"
-            fill="none"
-            stroke="var(--wiez-ring)"
-            strokeLinecap="round"
-            strokeWidth={ring.width}
-            strokeDasharray={`${filled} ${circumference}`}
-            className="transition-[stroke-dasharray] duration-300 ease-out"
-          />
-        </svg>
-        <span className="absolute inset-[21%]">
-          <WiezOrb size={Math.round(size * 0.58)} />
-        </span>
+          className={`${LAYER_CLASS} transition-[clip-path] duration-300 ease-out`}
+          // Revealed from the bottom, so the fill rises as the number climbs.
+          style={{ clipPath: `inset(${100 - clamped}% 0 0 0)` }}
+        />
       </span>
       <span className="mt-2 text-sm font-semibold tabular-nums text-[color:var(--wiez-ring)]">
         {Math.round(clamped)}%

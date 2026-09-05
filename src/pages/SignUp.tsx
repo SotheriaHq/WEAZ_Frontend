@@ -143,7 +143,7 @@ const LoadingScreen = () => (
         <BrandWordmark
           logoSize={48}
           logoClassName="drop-shadow-[0_0_20px_rgba(212,175,55,0.45)]"
-          textClassName="text-3xl font-bold tracking-tight text-[var(--text-primary)] dark:text-white"
+          
         />
       </div>
       <div className="flex space-x-2 justify-center mb-4">
@@ -390,7 +390,7 @@ const SignUpPage = () => {
               <BrandWordmark
                 logoSize={40}
                 logoClassName="drop-shadow-[0_0_14px_rgba(212,175,55,0.35)]"
-                textClassName="text-2xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors"
+                
               />
             </Link>
           </div>
@@ -454,7 +454,7 @@ const SignUpPage = () => {
             <BrandWordmark
               logoSize={32}
               logoClassName="drop-shadow-[0_0_12px_rgba(212,175,55,0.45)] group-hover:drop-shadow-[0_0_18px_rgba(212,175,55,0.6)] transition-[filter]"
-              textClassName="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors"
+              
             />
           </Link>
 

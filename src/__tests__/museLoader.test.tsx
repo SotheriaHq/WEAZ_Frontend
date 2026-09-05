@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { MuseLoader, MuseProgress } from '@/components/loaders/MuseLoader';
 import WiezOrb from '@/brand/WiezOrb';
 import { BRAND_ASSETS, PRODUCT_NAME } from '@/brand/identity';
-import { WIEZ_ORB_PATHS, WIEZ_ORB_TONES } from '@/brand/wiezOrbArtwork';
+import { WIEZ_ORB_TONES } from '@/brand/wiezOrbArtwork';
 
 /**
  * The rules here are the ones the consolidation exists to hold.
@@ -42,22 +42,38 @@ describe('the loading system', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
   });
 
-  it('thickens the ring as it shrinks, or a 16px spinner has no ring', () => {
-    const { container: small } = render(<MuseLoader size={16} />);
-    const { container: large } = render(<MuseLoader size={96} />);
-
-    const width = (c: HTMLElement) =>
-      Number(c.querySelector('circle')?.getAttribute('stroke-width'));
-
-    expect(width(small)).toBeGreaterThan(width(large));
+  it("keeps the mark's own proportions at every size", () => {
+    const { container } = render(<MuseLoader size={48} />);
+    const box = container.firstElementChild as HTMLElement;
+    // A square box would squash a 461x430 lockup.
+    expect(box.style.height).toBe('48px');
+    expect(box.style.width).toBe(`${Math.round(48 * (461 / 430))}px`);
   });
 
-  it('carries the brand mark, not an emoji', () => {
+  it('is the whole logo filling, not a ring around one piece of it', () => {
     const { container } = render(<MuseLoader size={48} />);
-    // The orb is inlined, so its paths are in the DOM. The previous loader's
-    // entire brand content was the character U+1F9F5.
-    expect(container.querySelectorAll('path').length).toBe(WIEZ_ORB_PATHS.length);
+
+    // No ring. The previous shape orbited an arc around the orb, which read as
+    // a loading widget that happened to contain part of the brand.
+    expect(container.querySelector('circle')).toBeNull();
+
+    // Two stacked copies of the mark: a dim track and a lit fill.
+    const layers = [...container.querySelectorAll('img')];
+    expect(layers).toHaveLength(2);
+    for (const layer of layers) {
+      expect(layer.getAttribute('src')).toMatch(/wiez-loader-mark-/);
+    }
+    expect(layers[1].className).toMatch(/animate-wiez-rise/);
+
+    // The previous loader's entire brand content was the character U+1F9F5.
     expect(container.textContent).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u);
+  });
+
+  it('fills the mark from the bottom in proportion to real progress', () => {
+    const { container } = render(<MuseProgress progress={30} size={64} />);
+    const fill = [...container.querySelectorAll('img')][1] as HTMLElement;
+    // 30% full means 70% clipped off the top.
+    expect(fill.style.clipPath).toBe('inset(70% 0 0 0)');
   });
 });
 
