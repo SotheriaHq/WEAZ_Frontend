@@ -11,7 +11,7 @@ import {
   PasswordMatchFeedback,
   PasswordPolicyFeedback,
 } from '@/components/auth/PasswordPolicyFeedback';
-import { COMPANY_NAME } from '@/lib/brand';
+import { PRODUCT_NAME } from '@/brand/identity';
 import '../styles/auth.css';
 
 const ResetPasswordPage: React.FC = () => {
@@ -278,7 +278,7 @@ const ResetPasswordPage: React.FC = () => {
                   Password reset successfully!
                 </h2>
                 <p className="text-sm auth-muted leading-relaxed mb-8">
-                  Your password has been updated. You can now sign in to {COMPANY_NAME} with your new password.
+                  Your password has been updated. You can now sign in to {PRODUCT_NAME} with your new password.
                 </p>
                 <Link
                   to="/login"

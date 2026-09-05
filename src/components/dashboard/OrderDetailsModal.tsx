@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { brandApi } from '@/api/BrandApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getSizingModeLabel } from '@/types/sizing';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
@@ -211,7 +211,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         <div ref={dialogRef} tabIndex={-1} className="relative z-layer-modal flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white/95 shadow-2xl outline-none dark:border-white/10 dark:bg-[linear-gradient(160deg,rgba(16,16,16,0.98),rgba(10,10,10,0.96))]">
           {updatingStatus ? (
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-slate-950/35 backdrop-blur-sm">
-              <VLoader size={64} phase="loading" />
+              <MuseLoader size={64} />
               <p className="text-sm font-semibold text-white">Updating order to {updatingStatus.toLowerCase()}…</p>
             </div>
           ) : null}
@@ -246,7 +246,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           <div className="flex-1 overflow-y-auto p-6 scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden space-y-6 overscroll-contain md:p-7">
             {loading ? (
               <div className="flex justify-center py-16">
-                <VLoader size={64} phase="loading" />
+                <MuseLoader size={64} />
               </div>
             ) : order ? (
               <>

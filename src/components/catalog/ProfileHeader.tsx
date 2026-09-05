@@ -4,7 +4,7 @@ import Tag from '@/components/ui/Tag';
 import FitText from '@/components/ui/FitText';
 import { getTagColor } from '@/utils/tagColors';
 import AvatarCard from '../profile/AvatarCard';
-import VLoader from '../loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import ImageWithFallback from '../ImageWithFallback';
 import ThreadActivityIndicator from '../ui/ThreadActivityIndicator';
 import { patchButtonColorClasses } from '@/lib/patchPresentation';
@@ -126,7 +126,7 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
 
           {showBannerLoader && (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
-              <VLoader size={72} />
+              <MuseLoader size={72} />
             </div>
           )}
 

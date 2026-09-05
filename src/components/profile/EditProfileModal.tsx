@@ -26,7 +26,7 @@ import {
   useScrollFocusedFieldIntoView,
 } from '@/hooks/useKeyboardInset';
 import { BRAND_TAG_OPTIONS, BRAND_TAG_SELECTION_LIMIT } from '../../data/brandTags';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import {
   isEmptyPhone,
   isValidPhone,
@@ -886,7 +886,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             <div className="flex justify-end gap-4 pt-2">
               {isSubmitting && submitStatusMessage ? (
                 <div className="mr-auto flex min-h-11 items-center gap-2 rounded-full bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 dark:bg-purple-500/10 dark:text-fuchsia-200" role="status" aria-live="polite">
-                  <VLoader size={18} phase={submitStatus === 'almost' ? 'finishing' : 'loading'} showLabel={false} />
+                  <MuseLoader size={18} />
                   <span>{submitStatusMessage}</span>
                 </div>
               ) : null}

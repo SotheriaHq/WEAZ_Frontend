@@ -228,6 +228,15 @@ export default {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.5' },
         },
+        // The loading system. Constant angular velocity on purpose: an easing
+        // curve stutters where the loop seams, and a spinner loops forever.
+        'wiez-spin': {
+          to: { transform: 'rotate(360deg)' },
+        },
+        'wiez-breathe': {
+          '0%, 100%': { opacity: '0.78', transform: 'scale(0.97)' },
+          '50%': { opacity: '1', transform: 'scale(1)' },
+        },
       },
       animation: {
         shimmer: 'shimmer 1.5s infinite',
@@ -240,6 +249,8 @@ export default {
         'slide-up-fade': 'slide-up-fade 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
         float: 'float 6s ease-in-out infinite',
         pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'wiez-spin': 'wiez-spin 1.25s linear infinite',
+        'wiez-breathe': 'wiez-breathe 2.4s ease-in-out infinite',
       },
       boxShadow: {
         'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',

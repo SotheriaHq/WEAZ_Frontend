@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import WorkingHoursEditor, {
   DEFAULT_WORKING_HOURS,
   isWorkingHoursValid,
@@ -147,7 +147,7 @@ const StoreHoursStep: React.FC<StoreHoursStepProps> = ({
 
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <VLoader size={28} phase="loading" showLabel={false} />
+                  <MuseLoader size={28} />
                 </div>
               ) : (
                 <WorkingHoursEditor
@@ -185,7 +185,7 @@ const StoreHoursStep: React.FC<StoreHoursStepProps> = ({
                 disabled={busy || isLoading || !valid}
                 className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-purple-500/20 transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none sm:px-8 sm:py-2.5 sm:text-sm"
               >
-                {busy ? <VLoader size={16} phase="loading" showLabel={false} /> : null}
+                {busy ? <MuseLoader size={16} /> : null}
                 {busy ? 'Saving...' : 'Save & Continue'}
                 {!busy ? <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : null}
               </button>

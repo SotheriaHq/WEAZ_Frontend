@@ -15,7 +15,7 @@ import {
   Twitter,
   Briefcase,
 } from 'lucide-react';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { toast } from 'sonner';
 import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
@@ -213,7 +213,7 @@ const SettingsPage: React.FC = () => {
           className="flex items-center gap-2 rounded-xl bg-[color:var(--brand-primary)] px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition hover:bg-[color:var(--brand-primary-strong)] disabled:opacity-50"
         >
           {isSubmitting ? (
-            <VLoader size={16} phase="loading" showLabel={false} />
+            <MuseLoader size={16} />
           ) : (
             <Save className="w-4 h-4" />
           )}

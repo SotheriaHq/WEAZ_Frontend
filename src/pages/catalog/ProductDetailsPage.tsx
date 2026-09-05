@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToWishlist, checkWishlistStatus, removeFromWishlist } from '@/features/wishlistSlice';
@@ -693,7 +693,7 @@ export default function ProductDetailsPage({ resolvedProductId }: ProductDetails
                   >
                     {savingMeasurements ? (
                       <>
-                        <VLoader size={16} phase="loading" showLabel={false} /> Saving...
+                        <MuseLoader size={16} /> Saving...
                       </>
                     ) : (
                       <>

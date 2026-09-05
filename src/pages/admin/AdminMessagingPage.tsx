@@ -5,7 +5,7 @@ import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import MessageBubble, { formatDate } from '@/components/messaging/MessageBubble';
 import { messagingApi, type ThreadMessage } from '@/api/MessagingApi';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import ImageWithFallback from '@/components/ImageWithFallback';
 
 /* ------------------------------------------------------------------ */
@@ -333,7 +333,7 @@ const AdminMessagingPage: React.FC = () => {
           <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5">
             {inboxLoading && inbox.length === 0 ? (
               <div className="flex items-center justify-center h-32">
-                <VLoader size={24} phase="loading" />
+                <MuseLoader size={24} />
               </div>
             ) : inbox.length === 0 ? (
               <p className="text-center text-xs text-gray-400 dark:text-gray-500 py-8">No conversations found</p>
@@ -512,7 +512,7 @@ const AdminMessagingPage: React.FC = () => {
               <div className="flex-1 overflow-y-auto px-4 py-3">
                 {messagesLoading ? (
                   <div className="flex items-center justify-center h-32">
-                    <VLoader size={32} phase="loading" />
+                    <MuseLoader size={32} />
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-32 text-center">

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import UniversalSelect from '@/components/forms/UniversalSelect';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import Modal from '@/components/ui/Modal';
 import { adminFinanceApi, adminOrdersApi } from '@/api/AdminApi';
 import { customOrdersAdminApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
@@ -1862,7 +1862,7 @@ const TableWrap: React.FC<{ loading: boolean; empty: boolean; emptyMessage: stri
 
 const LoaderBlock = () => (
   <div className="flex items-center justify-center py-16">
-    <VLoader size={34} phase="loading" showLabel={false} />
+    <MuseLoader size={34} />
   </div>
 );
 

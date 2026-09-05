@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import DesignViewModal from '@/components/designs/DesignViewModal';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import DesignApi from '@/api/DesignApi';
 import useCachedResource from '@/hooks/useCachedResource';
 import { fetchCollectionDetailQuery } from '@/query/queries';
@@ -84,7 +84,7 @@ const DesignDetailsPage: React.FC = () => {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
-        <VLoader size={32} phase="loading" showLabel={false} />
+        <MuseLoader size={32} />
         <p className="text-sm font-medium text-theme-secondary">Loading design...</p>
       </div>
     );

@@ -2,16 +2,22 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { SeoApi } from '@/api/SeoApi';
 import {
-  APP_NAME,
-  PRODUCT_DESCRIPTION,
+  BRAND_ASSETS,
+  PRODUCT_CATEGORY,
+  PRODUCT_NAME,
   PUBLIC_WEB_URL,
-} from '@/config/productIdentity';
+} from '@/brand/identity';
 import { trackPageView } from '@/observability/analytics';
 import { isSeoNoindexClientPath } from '@/utils/seoPaths';
 
-const DEFAULT_TITLE = APP_NAME;
-const DEFAULT_DESCRIPTION = PRODUCT_DESCRIPTION;
-const DEFAULT_IMAGE = '/brand/wiez-logo-mark.svg';
+const DEFAULT_TITLE = PRODUCT_NAME;
+const DEFAULT_DESCRIPTION = PRODUCT_CATEGORY;
+/**
+ * A raster on the brand ground, not the SVG mark. Every major crawler renders
+ * og:image as a bitmap and several reject SVG outright, and a share card has no
+ * theme to adapt to — so the one place a fixed ground is correct is here.
+ */
+const DEFAULT_IMAGE = BRAND_ASSETS.openGraph;
 
 const upsertMeta = (
   attribute: 'name' | 'property',
@@ -91,7 +97,7 @@ const applyResolvedMeta = (meta: Awaited<ReturnType<typeof SeoApi.resolvePageMet
   upsertMeta('name', 'description', meta.description);
   upsertMeta('name', 'robots', meta.robots);
   upsertLink('canonical', meta.canonicalUrl);
-  upsertMeta('property', 'og:site_name', APP_NAME);
+  upsertMeta('property', 'og:site_name', PRODUCT_NAME);
   upsertMeta('property', 'og:locale', 'en_US');
   upsertMeta('property', 'og:title', meta.og.title);
   upsertMeta('property', 'og:description', meta.og.description);

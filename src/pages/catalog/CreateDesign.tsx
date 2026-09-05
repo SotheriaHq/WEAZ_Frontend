@@ -8,7 +8,7 @@ import React, {
 import { motion, AnimatePresence } from "framer-motion";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import VLoader from "@/components/loaders/VLoader";
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { getRangeError } from "@/utils/rangeValidation";
 import {
   FiArrowLeft,
@@ -1763,7 +1763,7 @@ const CreateDesignInner: React.FC = () => {
               className="mb-6 p-4 rounded-2xl glass-panel-dark border border-purple-500/30"
             >
               <div className="flex items-center gap-3 mb-2">
-                <VLoader size={32} phase="loading" showLabel={false} />
+                <MuseLoader size={32} />
                 <span className="text-theme font-medium">
                   Uploading files... {progress}%
                 </span>
@@ -2524,7 +2524,7 @@ const CreateDesignInner: React.FC = () => {
                 className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-6 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting && submitIntent === "draft" ? (
-                  <VLoader size={16} phase="loading" showLabel={false} />
+                  <MuseLoader size={16} />
                 ) : (
                   <FiFile className="w-4 h-4" />
                 )}
@@ -2538,7 +2538,7 @@ const CreateDesignInner: React.FC = () => {
               className="flex-1 sm:flex-none py-3 px-6 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-purple-500/25 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isSubmitting && submitIntent === "publish" ? (
-                <VLoader size={16} phase="loading" showLabel={false} />
+                <MuseLoader size={16} />
               ) : (
                 <HiOutlineSparkles className="w-5 h-5" />
               )}

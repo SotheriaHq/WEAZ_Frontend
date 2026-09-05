@@ -8,7 +8,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import {
   AUTHORITY_OPTIONS,
@@ -1188,7 +1188,7 @@ export default function VerificationWizardPage() {
                                       <span className="text-2xl">📄</span>
                                     )
                                   ) : (
-                                    <VLoader size={16} phase="loading" showLabel={false} />
+                                    <MuseLoader size={16} />
                                   )}
 
                                   {previewUrl ? (
@@ -1230,7 +1230,7 @@ export default function VerificationWizardPage() {
                               <span className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-primary to-tertiary text-on-primary text-xs font-semibold shadow-sm hover:shadow-md transition-all flex items-center gap-1.5">
                                 {isUploading ? (
                                   <>
-                                    <VLoader size={12} phase="loading" showLabel={false} />
+                                    <MuseLoader size={12} />
                                     Uploading...
                                   </>
                                 ) : value ? (
@@ -1382,7 +1382,7 @@ export default function VerificationWizardPage() {
                   >
                     {savingDraft ? (
                       <>
-                        <VLoader size={12} phase="loading" showLabel={false} />
+                        <MuseLoader size={12} />
                         Saving draft...
                       </>
                     ) : (

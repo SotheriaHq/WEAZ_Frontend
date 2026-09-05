@@ -1,5 +1,5 @@
 import React from 'react';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
@@ -34,7 +34,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || isLoading}
         {...props}
       >
-        {isLoading && <VLoader size={16} phase="loading" showLabel={false} className="mr-2" />}
+        {isLoading && <MuseLoader size={16} className="mr-2" />}
         {children}
       </button>
     );

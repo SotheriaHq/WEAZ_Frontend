@@ -7,7 +7,7 @@ import ReviewComposerModal from '@/components/reviews/ReviewComposerModal';
 import { useReviewRuntimeFlags } from '@/hooks/useReviewRuntimeFlags';
 import useCachedResource from '@/hooks/useCachedResource';
 import ImageWithFallback from '@/components/ImageWithFallback';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { queryClient } from '@/query/queryClient';
 
 const formatCurrency = (amount: number, currency: string) =>
@@ -246,7 +246,7 @@ const OrderDetail: React.FC = () => {
   if (loading) {
     return (
       <div className="mx-auto flex max-w-4xl justify-center px-4 py-10">
-        <VLoader size={56} phase="loading" />
+        <MuseLoader size={56} />
       </div>
     );
   }

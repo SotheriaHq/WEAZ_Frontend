@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import type { SizeFitShareDto, SizeFitSharePolicy, SizeFitSharesPayload } from '@/types/sizeFit';
 import SearchApi from '@/api/SearchApi';
@@ -257,7 +257,7 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
 
                       {suggestLoading ? (
                         <div className="absolute right-2 top-2.5">
-                          <VLoader size={14} phase="loading" showLabel={false} />
+                          <MuseLoader size={14} />
                         </div>
                       ) : null}
                     </div>
@@ -288,7 +288,7 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
                       disabled={saving || !shareTarget.trim()}
                       className="rounded-xl bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-sm font-semibold px-4.5 py-2 disabled:opacity-60 inline-flex items-center justify-center gap-2 transition"
                     >
-                      {saving ? <VLoader size={16} phase="loading" showLabel={false} /> : null}
+                      {saving ? <MuseLoader size={16} /> : null}
                       Share fittings
                     </button>
                   </div>

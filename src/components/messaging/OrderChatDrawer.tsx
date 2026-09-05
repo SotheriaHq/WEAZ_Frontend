@@ -7,7 +7,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import MessageBubble, { formatDate } from './MessageBubble';
 import ComposeArea from './ComposeArea';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 
 type ContextType = 'CUSTOM_ORDER' | 'STANDARD_ORDER';
 
@@ -486,7 +486,7 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-                <VLoader size={24} phase="loading" showLabel={false} />
+                <MuseLoader size={24} />
                 <span>Loading thread…</span>
               </div>
             </div>

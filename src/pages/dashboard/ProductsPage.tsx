@@ -12,7 +12,7 @@ import {
 import { toast } from 'sonner';
 import { Plus, Trash2, Package, Tag, Edit3 } from 'lucide-react';
 import Input from '@/components/ui/Input';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import Textarea from '@/components/ui/Textarea';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -213,7 +213,7 @@ const ProductsPage: React.FC = () => {
         <Card className="overflow-hidden border-0 shadow-lg bg-white dark:bg-[#111]">
           {loading ? (
             <div className="p-12 flex flex-col items-center justify-center text-gray-500 gap-4">
-              <VLoader size={32} phase="loading" showLabel={false} />
+              <MuseLoader size={32} />
               <p>Loading inventory...</p>
             </div>
           ) : filteredProducts.length === 0 ? (

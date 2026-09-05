@@ -1,6 +1,6 @@
 import React from 'react';
 import { MessageCircle, Send } from 'lucide-react';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 
 interface CommentInputProps {
   value: string;
@@ -80,7 +80,7 @@ export const CommentInput: React.FC<CommentInputProps> = ({
           isCompact ? 'p-1' : 'right-2 p-1.5'
         }`}
       >
-        {busy ? <VLoader size={isCompact ? 12 : 16} phase="loading" showLabel={false} /> : <Send size={isCompact ? 11 : 14} />}
+        {busy ? <MuseLoader size={isCompact ? 12 : 16} /> : <Send size={isCompact ? 11 : 14} />}
       </button>
     </div>
   );

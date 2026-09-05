@@ -26,7 +26,7 @@ import {
 } from './modals';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import ImageWithFallback from '@/components/ImageWithFallback';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { Select } from '@/components/ui/Select';
 import StoreEmptyState, { type EmptyStateType } from '@/components/designs/StoreEmptyState';
 import InlineProductDetail from '@/components/catalog/InlineProductDetail';
@@ -3867,7 +3867,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 )}
                 {collectionGalleryLoading ? (
                   <div className="flex h-[50vh] w-full items-center justify-center">
-                    <VLoader size={42} phase="loading" showLabel={false} />
+                    <MuseLoader size={42} />
                   </div>
                 ) : !selectedCollectionGalleryImage ? (
                   <div className="flex h-[40vh] w-full items-center justify-center">

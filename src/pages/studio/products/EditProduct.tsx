@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import VLoader from "@/components/loaders/VLoader";
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 
@@ -5331,7 +5331,7 @@ const EditProduct: React.FC = () => {
               >
                 {(saving || submitLocked) && saveAction === "draft" && (
                   <span className="absolute inset-0 flex items-center justify-center">
-                    <VLoader size={16} phase="loading" showLabel={false} />
+                    <MuseLoader size={16} />
                   </span>
                 )}
                 <span className={(saving || submitLocked) && saveAction === "draft" ? "opacity-0" : ""}>
@@ -5352,7 +5352,7 @@ const EditProduct: React.FC = () => {
               >
                 {(saving || submitLocked) && saveAction === "draft" && (
                   <span className="absolute inset-0 flex items-center justify-center">
-                    <VLoader size={16} phase="loading" showLabel={false} />
+                    <MuseLoader size={16} />
                   </span>
                 )}
                 <span className={(saving || submitLocked) && saveAction === "draft" ? "opacity-0" : ""}>
@@ -5431,7 +5431,7 @@ const EditProduct: React.FC = () => {
               >
                 {(saving || submitLocked) && saveAction === "publish" && (
                   <span className="absolute inset-0 flex items-center justify-center">
-                    <VLoader size={16} phase="loading" showLabel={false} />
+                    <MuseLoader size={16} />
                   </span>
                 )}
                 <span className={(saving || submitLocked) && saveAction === "publish" ? "opacity-0" : ""}>

@@ -54,18 +54,39 @@
     }
   } catch (_e) {}
 
+  /*
+   * The gauge violet, per ground.
+   *
+   * These are two different colours on purpose, not a light and dark shade of
+   * one. #6015e2 sits at 1.9:1 against the night ground — the same reason the
+   * old logo vanished on the dark theme — so the night gauge uses the
+   * dark-ground violet instead. Kept in step with --wiez-ring in index.css.
+   */
+  var RING_DAY = '96,21,226';
+  var RING_NIGHT = '175,135,244';
+
   function paintProgress() {
     var ring = document.getElementById('boot-splash-ring');
     if (!ring) return false;
     var degrees = progress * 3.6;
+    /* theme-init.js has already stamped this before first paint. Inline style
+       beats the stylesheet, so the theme has to be read here too. */
+    var isNight = document.documentElement.classList.contains('dark');
+    var rgb = isNight ? RING_NIGHT : RING_DAY;
     ring.style.background =
-      'conic-gradient(from -38deg, rgba(147,51,234,0.96) 0deg ' +
+      'conic-gradient(from -38deg, rgba(' +
+      rgb +
+      ',0.96) 0deg ' +
       degrees +
-      'deg, rgba(216,180,254,0.28) ' +
+      'deg, rgba(' +
+      rgb +
+      ',0.3) ' +
       degrees +
       'deg ' +
       Math.min(360, degrees + 18) +
-      'deg, rgba(147,51,234,0.08) 0deg)';
+      'deg, rgba(' +
+      rgb +
+      ',0.1) 0deg)';
     return true;
   }
 
@@ -130,7 +151,7 @@
       var retry = document.createElement('button');
       retry.type = 'button';
       retry.style.cssText =
-        'border:0;border-radius:9999px;padding:10px 18px;background:#7c3aed;color:#fff;font-weight:600;font-size:14px;';
+        'border:0;border-radius:9999px;padding:10px 18px;background:#6015e2;color:#fff;font-weight:600;font-size:14px;';
       retry.textContent = 'Tap to reload';
       retry.addEventListener('click', cacheBustReload);
 

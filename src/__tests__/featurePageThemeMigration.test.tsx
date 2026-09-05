@@ -92,8 +92,9 @@ vi.mock('@/components/designs/DesignViewModal', () => ({
   default: () => null,
 }));
 
-vi.mock('@/components/loaders/VLoader', () => ({
-  default: () => <span data-testid="loader" />,
+vi.mock('@/components/loaders/MuseLoader', () => ({
+  MuseLoader: () => <span data-testid="loader" />,
+  MuseProgress: () => <span data-testid="loader" />,
 }));
 
 vi.mock('@/components/upload/useFilePicker', () => ({

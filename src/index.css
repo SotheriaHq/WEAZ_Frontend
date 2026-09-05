@@ -306,6 +306,23 @@ html {
 /* Unified Dark Theme - YouTube-style consistency */
 @layer base {
   :root {
+    /* WIEZ artwork ramp — the eight tones the orb and the mark are painted in.
+       Light-ground values here; `.dark` swaps them. The mark is full-colour
+       artwork now, so it cannot be inverted into the other theme the way the
+       old flat-black asset was: each ground needs its own ramp. Both are
+       generated at fixed target luminances so every tone clears its own
+       background at 3:1 or better. Source of truth: src/brand/identity.ts. */
+    --wiez-t0: #300a70;
+    --wiez-t1: #3f0e94;
+    --wiez-t2: #4e11b8;
+    --wiez-t3: #6015e2;
+    --wiez-t4: #7530ec;
+    --wiez-t5: #894fef;
+    --wiez-t6: #9a67f1;
+    --wiez-t7: #a97ef3;
+    --wiez-ring: #6015e2;
+    --wiez-ring-track: rgba(96, 21, 226, 0.16);
+
     /* Brand Tokens */
     --brand-primary: #9333ea;
     --brand-primary-strong: #6b21a8;
@@ -459,6 +476,21 @@ html {
   }
 
   .dark {
+    /* The dark-ground ramp. Lighter across the board, and it has to be: the
+       source logo's four darkest tones sat at 1.0-2.1:1 against a near-black
+       ground, which is most of the mark's mass, and that is exactly why the
+       old logo dissolved at night. */
+    --wiez-t0: #732ceb;
+    --wiez-t1: #8446ee;
+    --wiez-t2: #945ef0;
+    --wiez-t3: #a171f2;
+    --wiez-t4: #af87f4;
+    --wiez-t5: #be9df6;
+    --wiez-t6: #cdb4f8;
+    --wiez-t7: #dbcafa;
+    --wiez-ring: #af87f4;
+    --wiez-ring-track: rgba(175, 135, 244, 0.2);
+
     --surface-primary: #0a0a0a;    /* true near-black */
     --surface-secondary: #141414;  /* slightly lifted dark surface */
     --surface-muted: #1c1c1c;      /* raised dark surface */

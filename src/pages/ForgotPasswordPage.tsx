@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { AuthApi } from '@/api/AuthApi';
 import BrandWordmark from '@/components/brand/BrandWordmark';
-import { COMPANY_NAME } from '@/lib/brand';
+import { PRODUCT_NAME } from '@/brand/identity';
 import '../styles/auth.css';
 
 const ForgotPasswordPage: React.FC = () => {
@@ -128,7 +128,7 @@ const ForgotPasswordPage: React.FC = () => {
                   Check your inbox
                 </h2>
                 <p className="text-sm auth-muted leading-relaxed mb-6">
-                  If an account with that email exists, {COMPANY_NAME} has sent a reset link. Check your inbox.
+                  If an account with that email exists, {PRODUCT_NAME} has sent a reset link. Check your inbox.
                 </p>
                 <div className="auth-raised auth-hairline rounded-xl border p-3 mb-6">
                   <p className="text-xs auth-subtext">

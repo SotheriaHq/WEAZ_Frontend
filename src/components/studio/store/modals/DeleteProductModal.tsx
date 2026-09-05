@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { productApi } from '@/api/ProductApi';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import MediaRenderer from '@/components/media/MediaRenderer';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -163,7 +163,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
             <div className="p-6">
               {loading ? (
                 <div className="py-8 text-center">
-                  <VLoader size={34} phase="loading" showLabel={false} className="mx-auto" />
+                  <MuseLoader size={34} className="mx-auto" />
                   <p className="text-gray-500 dark:text-gray-400 mt-3">Checking impact...</p>
                 </div>
               ) : impact ? (
@@ -323,7 +323,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
               >
                 {deleting ? (
                   <>
-                    <VLoader size={16} phase="loading" showLabel={false} />
+                    <MuseLoader size={16} />
                     Deleting...
                   </>
                 ) : (

@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { adminOrdersApi } from '@/api/AdminApi';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import ImageWithFallback from '@/components/ImageWithFallback';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { useReturnTo } from '@/hooks/useReturnTo';
 import { unwrapApiResponse } from '@/types/auth';
 import type { AdminStandardOrderDetail } from '@/types/admin';
@@ -126,7 +126,7 @@ const DetailRow: React.FC<{
 
 const LoaderBlock = () => (
   <div className="py-16">
-    <VLoader size={40} phase="loading" showLabel={false} />
+    <MuseLoader size={40} />
   </div>
 );
 

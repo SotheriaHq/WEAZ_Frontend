@@ -22,7 +22,7 @@ import {
   getPasswordPolicyErrorMessage,
 } from '@/lib/passwordPolicy';
 import Modal from '@/components/ui/Modal';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import GoogleSignInOverlayButton from '@/components/auth/GoogleSignInOverlayButton';
 import GoogleConsentModal from '@/components/auth/GoogleConsentModal';
@@ -1241,7 +1241,7 @@ const LoginPage = () => {
                   >
                     {loginOptionsLoading ? (
                       <span className="flex items-center justify-center gap-2">
-                        <VLoader size={16} phase="loading" showLabel={false} />
+                        <MuseLoader size={16} />
                         Checking...
                       </span>
                     ) : (
@@ -1290,7 +1290,7 @@ const LoginPage = () => {
                     >
                       {isLoading ? (
                         <span className="flex items-center justify-center gap-2">
-                          <VLoader size={16} phase="loading" showLabel={false} />
+                          <MuseLoader size={16} />
                           Signing In...
                         </span>
                       ) : lockoutSecondsLeft > 0 ? (
@@ -1309,7 +1309,7 @@ const LoginPage = () => {
                   >
                     {directLoginConfirmLoading ? (
                       <span className="flex items-center justify-center gap-2">
-                        <VLoader size={16} phase="loading" showLabel={false} />
+                        <MuseLoader size={16} />
                         Signing In...
                       </span>
                     ) : (

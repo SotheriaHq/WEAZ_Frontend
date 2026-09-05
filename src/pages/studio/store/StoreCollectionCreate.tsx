@@ -4,7 +4,7 @@ import { useSelector } from "react-redux";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { X } from "lucide-react";
-import VLoader from "@/components/loaders/VLoader";
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import type { RootState } from "@/store";
 import { brandApi } from "@/api/BrandApi";
 import { apiClient } from "@/api/httpClient";
@@ -3113,7 +3113,7 @@ const StoreCollectionCreate: React.FC = () => {
             className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60 inline-flex items-center gap-2"
           >
             {submitting && (
-              <VLoader size={14} phase="loading" showLabel={false} />
+              <MuseLoader size={14} />
             )}
             {submitting ? "Saving…" : "Save changes"}
           </button>
@@ -3126,7 +3126,7 @@ const StoreCollectionCreate: React.FC = () => {
               className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60 inline-flex items-center gap-2 dark:bg-white/10 dark:text-gray-300"
             >
               {submitting && submitAction === "draft" && (
-                <VLoader size={14} phase="loading" showLabel={false} />
+                <MuseLoader size={14} />
               )}
               {submitting && submitAction === "draft"
                 ? "Saving..."
@@ -3139,7 +3139,7 @@ const StoreCollectionCreate: React.FC = () => {
               className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60 inline-flex items-center gap-2"
             >
               {submitting && submitAction === "publish" && (
-                <VLoader size={14} phase="loading" showLabel={false} />
+                <MuseLoader size={14} />
               )}
               {submitting && submitAction === "publish"
                 ? primaryActionPendingLabel(collectionReviewStatus)

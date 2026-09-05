@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { StoreWizardData } from '@/types/storeWizard';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { sanitizeSingleSocialLink } from '@/utils/storeSetup';
 
 const SOCIAL_FIELD_IDS = ['instagram', 'tiktok', 'twitter'] as const;
@@ -358,7 +358,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                               disabled={isChecking || isBlocked}
                               className="px-4 py-2 rounded-lg bg-[color:var(--surface-muted)] dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 border border-[color:var(--border-default)] dark:border-white/10 text-sm font-medium text-[color:var(--text-primary)] dark:text-white transition-colors inline-flex items-center gap-2 disabled:opacity-60"
                             >
-                              {isChecking && <VLoader size={16} phase="loading" showLabel={false} />}
+                              {isChecking && <MuseLoader size={16} />}
                               {isChecking ? 'Checking' : 'Connect'}
                             </button>
                           )}
@@ -543,7 +543,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                   disabled={!canContinue}
                   className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-purple-500/20 transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none sm:px-8 sm:py-2.5 sm:text-sm"
                 >
-                  {isSaving ? <VLoader size={16} phase="loading" showLabel={false} /> : null}
+                  {isSaving ? <MuseLoader size={16} /> : null}
                   {isSaving ? 'Saving...' : 'Continue'}
                   {!isSaving ? <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : null}
                 </button>

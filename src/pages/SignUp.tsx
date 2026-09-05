@@ -18,7 +18,7 @@ import { getFriendlyErrorMessage } from '@/utils/errorMessage';
 import { env } from '@/config/env';
 
 import '../styles/auth.css';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import GoogleSignInOverlayButton from '@/components/auth/GoogleSignInOverlayButton';
 import {
@@ -26,7 +26,7 @@ import {
   PasswordPolicyFeedback,
 } from '@/components/auth/PasswordPolicyFeedback';
 import { AppleLogoIcon } from '@/components/auth/SocialAuthIcons';
-import { COMPANY_NAME } from '@/lib/brand';
+import { PRODUCT_NAME } from '@/brand/identity';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { PASSWORD_POLICY_MIN_LENGTH, getPasswordPolicyErrorMessage } from '@/lib/passwordPolicy';
 
@@ -201,7 +201,7 @@ const SignUpPage = () => {
 
     dispatch(setUser(user));
     dispatch(addLocalNotification({ message: 'Account created successfully!' }));
-    toast.success(`Welcome to ${COMPANY_NAME}!`);
+    toast.success(`Welcome to ${PRODUCT_NAME}!`);
 
     await celebrateSignupOnce(user.id);
 
@@ -463,7 +463,7 @@ const SignUpPage = () => {
             <div className="auth-glass-panel rounded-2xl p-8 sm:p-10 w-full">
               <div className="text-center mb-8">
                 <h1 className="auth-heading text-4xl font-extrabold tracking-tight mb-3" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>Create Account</h1>
-                <p className="auth-subtext text-base font-medium">Start your fashion journey with {COMPANY_NAME}.</p>
+                <p className="auth-subtext text-base font-medium">Start your fashion journey with {PRODUCT_NAME}.</p>
               </div>
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -740,7 +740,7 @@ const SignUpPage = () => {
                 >
                   {isLoading ? (
                     <span className="flex items-center justify-center gap-2">
-                      <VLoader size={16} phase="loading" showLabel={false} />
+                      <MuseLoader size={16} />
                       Creating Account...
                     </span>
                   ) : (

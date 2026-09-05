@@ -43,7 +43,7 @@ import {
   groupNotificationsBySection,
 } from '@/utils/notificationSections';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 
 const NOTIFICATIONS_PAGE_SIZE = 30;
 
@@ -207,7 +207,7 @@ const NotificationsPage: React.FC = () => {
 
       {showBlockingLoader ? (
         <div className="flex items-center justify-center py-16">
-          <VLoader size={28} phase="loading" showLabel={false} />
+          <MuseLoader size={28} />
         </div>
       ) : error && normalizedItems.length === 0 ? (
         <div className="rounded-2xl border border-theme p-6 text-center">

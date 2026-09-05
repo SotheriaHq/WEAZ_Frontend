@@ -27,7 +27,7 @@ import { NotificationTypes, getActionText } from '@/types/notificationTypes';
 import { NotificationIcon } from '@/components/notifications/NotificationIcon';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
-import { COMPANY_NAME } from '@/lib/brand';
+import { PRODUCT_NAME } from '@/brand/identity';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 
 interface Props { 
@@ -492,7 +492,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
               const hasActorLink = Boolean(n.actor?.id);
               const hasActorLabel =
                 Boolean(actorDisplayName) &&
-                actorDisplayName.toLowerCase() !== COMPANY_NAME.toLowerCase();
+                actorDisplayName.toLowerCase() !== PRODUCT_NAME.toLowerCase();
               const hasMeaningfulMessage =
                 typeof n.message === 'string' &&
                 n.message.trim().length > 0 &&
@@ -563,7 +563,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                                   <span className="font-bold italic text-[color:var(--brand-primary)] dark:text-purple-400">@{actorDisplayName}</span>
                                 )
                               ) : (
-                                showCompanyPrefix ? <span className="font-bold italic text-[color:var(--brand-primary)] dark:text-purple-400">{COMPANY_NAME}</span> : null
+                                showCompanyPrefix ? <span className="font-bold italic text-[color:var(--brand-primary)] dark:text-purple-400">{PRODUCT_NAME}</span> : null
                               )}
                               <span className={hasActorLabel || showCompanyPrefix ? 'ml-1' : undefined}>
                                 {renderStyledActionText(actionTextWithoutTitle)}

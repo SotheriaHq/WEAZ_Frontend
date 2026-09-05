@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { APP_NAME } from '@/config/productIdentity';
+import { PRODUCT_NAME } from '@/brand/identity';
 import { LEGAL_PAGES } from './legalDocuments';
 
 export default function LegalIndexPage() {
@@ -10,9 +10,9 @@ export default function LegalIndexPage() {
           <p className="text-xs font-black uppercase tracking-[0.24em] text-fuchsia-500 dark:text-fuchsia-300">
             Legal center
           </p>
-          <h1 className="mt-2 text-3xl font-black sm:text-4xl">{APP_NAME} Legal</h1>
+          <h1 className="mt-2 text-3xl font-black sm:text-4xl">{PRODUCT_NAME} Legal</h1>
           <p className="mt-3 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-            Official operating terms, consumer protections, merchant standards, and privacy directives governing the {APP_NAME} platform.
+            Official operating terms, consumer protections, merchant standards, and privacy directives governing the {PRODUCT_NAME} platform.
           </p>
         </div>
 

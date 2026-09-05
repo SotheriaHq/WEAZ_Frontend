@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader, MuseProgress } from '@/components/loaders/MuseLoader';
 import { normalizeHashtagLabel } from '@/utils/creatorMetadata';
 
 interface CollectionSummary {
@@ -43,7 +43,7 @@ type ModalState = 'confirm' | 'loading' | 'success';
  * 
  * States:
  * - confirm: Shows collection summary with Edit/Publish buttons
- * - loading: Shows thread loader while publishing
+ * - loading: Shows the brand loader while publishing
  * - success: Shows success animation with View/Create Another buttons
  */
 const PrePublishConfirmModal: React.FC<PrePublishConfirmModalProps> = ({
@@ -449,7 +449,14 @@ const LoadingContent: React.FC<{ progress?: number | null }> = ({ progress = nul
     className="py-12 flex flex-col items-center justify-center"
   >
     <div className="mb-6">
-      <VLoader size={64} progress={progress} phase="loading" />
+      {/* Publishing only reports a number once the upload starts. Until then
+          there is nothing real to show, and the old loader filled that gap by
+          inventing a percentage that crawled to 92 and stopped. */}
+      {progress === null ? (
+        <MuseLoader size={64} label="Publishing" />
+      ) : (
+        <MuseProgress size={64} progress={progress} label="Publishing" />
+      )}
     </div>
     
     <h3 className="text-lg text-gray-900 dark:text-white font-medium mb-1">Taking your design live...</h3>

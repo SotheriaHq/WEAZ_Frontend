@@ -31,7 +31,7 @@ import FrostedButton from './ui/FrostedButton';
 import { generateUserUid } from '@/utils/userUid';
 import { resolveProfileImageSource } from '@/utils/profileImage';
 import BrandWordmark from '@/components/brand/BrandWordmark';
-import { COMPANY_NAME } from '@/lib/brand';
+import { PRODUCT_NAME } from '@/brand/identity';
 import { hasActiveBrandMembership, resolveAccountDisplayName } from '@/lib/brandAccess';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
@@ -505,7 +505,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
                 logoSize={32}
                 textClassName="max-w-[200px] truncate text-lg font-bold tracking-tight text-theme"
               />
-              <span className="sr-only">{COMPANY_NAME}</span>
+              <span className="sr-only">{PRODUCT_NAME}</span>
             </div>
           )}
         </div>

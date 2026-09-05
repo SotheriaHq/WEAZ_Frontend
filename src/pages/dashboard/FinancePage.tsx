@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { brandApi } from '@/api/BrandApi';
 import { customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
 import { getStoreStatus } from '@/api/StoreApi';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import Modal from '@/components/ui/Modal';
 import { useCachedResource } from '@/hooks/useCachedResource';
 import { queryKeys } from '@/query/queryKeys';
@@ -690,7 +690,7 @@ const FinancePage: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center">
-                    <VLoader size={32} phase="loading" showLabel={false} />
+                    <MuseLoader size={32} />
                   </td>
                 </tr>
               ) : displayHeldFunds.length === 0 ? (
@@ -800,7 +800,7 @@ const FinancePage: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center">
-                    <VLoader size={32} phase="loading" showLabel={false} />
+                    <MuseLoader size={32} />
                   </td>
                 </tr>
               ) : incomingTransactions.length === 0 ? (
@@ -912,7 +912,7 @@ const FinancePage: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-12 text-center">
-                    <VLoader size={32} phase="loading" showLabel={false} />
+                    <MuseLoader size={32} />
                   </td>
                 </tr>
               ) : payouts.length === 0 ? (
@@ -1005,7 +1005,7 @@ const FinancePage: React.FC = () => {
             {heldDetailLoading ? (
               <div className="rounded-2xl border border-gray-200/80 bg-gray-50/80 dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="flex items-center justify-center py-10">
-                  <VLoader size={34} phase="loading" showLabel={false} />
+                  <MuseLoader size={34} />
                 </div>
               </div>
             ) : null}

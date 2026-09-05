@@ -3,7 +3,7 @@ import Cropper, { type Area } from 'react-easy-crop';
 import 'react-easy-crop/react-easy-crop.css';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../Button';
-import VLoader from '../loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { cropImageFromFile } from '../../utils/cropImage';
 import {
   isBrowserDisplayableSniff,
@@ -329,13 +329,13 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
                   />
                   {isImageLoading && (
                     <div className="absolute inset-0 flex items-center justify-center gap-2 bg-[#0b0b0b]">
-                      <VLoader size={36} />
+                      <MuseLoader size={36} />
                       <span className="text-xs text-white/50">Loading image…</span>
                     </div>
                   )}
                   {isProcessing && (
                     <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60">
-                      <VLoader size={36} />
+                      <MuseLoader size={36} />
                       <span className="text-xs text-white/70">Processing…</span>
                     </div>
                   )}

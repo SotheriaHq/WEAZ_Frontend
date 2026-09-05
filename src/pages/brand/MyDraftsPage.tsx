@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { brandApi } from '@/api/BrandApi';
 import { useNavigate } from 'react-router-dom';
 import { Trash2, Eye } from 'lucide-react';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
@@ -99,7 +99,7 @@ const MyDraftsPage: React.FC = () => {
         {/* Content */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <VLoader size={32} phase="loading" showLabel={false} />
+            <MuseLoader size={32} />
             <p className="ml-3 text-gray-600 dark:text-gray-400">Loading drafts...</p>
           </div>
         ) : drafts.length === 0 ? (
@@ -197,7 +197,7 @@ const MyDraftsPage: React.FC = () => {
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {deleting === draft.id ? (
-                        <VLoader size={16} phase="loading" showLabel={false} />
+                        <MuseLoader size={16} />
                       ) : (
                         <Trash2 className="h-4 w-4" />
                       )}

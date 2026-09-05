@@ -15,7 +15,7 @@ import {
 import type { StoreWizardData } from '@/types/storeWizard';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import UniversalSelect from '@/components/forms/UniversalSelect';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import {
   getStorePoliciesStepValidation,
   STORE_CUSTOM_ORDER_LEAD_TIME_OPTIONS,
@@ -1292,7 +1292,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                   disabled={!canContinue}
                   className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-purple-500/20 transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none sm:px-8 sm:py-3"
                 >
-                  {isSaving ? <VLoader size={16} phase="loading" showLabel={false} /> : null}
+                  {isSaving ? <MuseLoader size={16} /> : null}
                   {isSaving ? 'Saving...' : actionLabel}
                   {!isSaving ? <ArrowRight className="h-4 w-4" /> : null}
                 </button>

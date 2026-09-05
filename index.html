@@ -19,11 +19,11 @@
     <meta property="og:title" content="WIEZ" />
     <meta property="og:description" content="When you think WEARS, you think WIEZ. African fashion social commerce marketplace." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://weaz.me/brand/wiez-logo-mark.svg" />
+    <meta property="og:image" content="https://weaz.me/brand/wiez-og.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="WIEZ" />
     <meta name="twitter:description" content="When you think WEARS, you think WIEZ. African fashion social commerce marketplace." />
-    <meta name="twitter:image" content="https://weaz.me/brand/wiez-logo-mark.svg" />
+    <meta name="twitter:image" content="https://weaz.me/brand/wiez-og.png" />
     <!-- CSP NOTE: production script-src is 'self' with NO 'unsafe-inline'.
          Never add inline script blocks here; they are silently blocked on
          weaz.me (this froze the boot splash on mobile once already).
@@ -43,8 +43,9 @@
       href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <!-- Stable brand mark; cheap SVG, helps first paint when used in chrome. -->
-    <link rel="preload" as="image" href="/brand/wiez-logo-mark.svg" />
+    <!-- The orb: the boot splash draws it before React exists, and the app
+         chrome draws it after. Preloaded so the splash has it at first paint. -->
+    <link rel="preload" as="image" href="/brand/wiez-favicon.svg" />
   </head>
   <body>
     <!-- Brand boot gauge: a seal-shaped (curly-edged) filler ring that fills
@@ -66,8 +67,6 @@
         flex-direction: column;
         gap: 16px;
         padding: 24px;
-        background: #ffffff;
-        color: #16233f;
         font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
       "
     >
@@ -77,8 +76,8 @@
           style="
             position: absolute;
             inset: 0;
-            background: conic-gradient(rgba(147, 51, 234, 0.95) 28.8deg, rgba(147, 51, 234, 0.12) 0deg);
-            filter: drop-shadow(0 6px 16px rgba(147, 51, 234, 0.14));
+            background: conic-gradient(rgba(96, 21, 226, 0.95) 28.8deg, rgba(96, 21, 226, 0.12) 0deg);
+            filter: drop-shadow(0 6px 16px rgba(96, 21, 226, 0.14));
             animation: boot-drift 8s linear infinite;
           "
         ></div>
@@ -91,23 +90,27 @@
             justify-content: center;
           "
         >
-          <span
-            style="font-size: 1.25rem; line-height: 1; display: inline-block; animation: boot-thread 2.4s ease-in-out infinite;"
+          <img
+            src="/brand/wiez-favicon.svg"
+            alt=""
+            width="30"
+            height="30"
+            style="display: block; animation: boot-breathe 2.4s ease-in-out infinite;"
             aria-hidden="true"
-          >🧵</span>
+          />
         </div>
       </div>
     </div>
     <style>
-      @keyframes boot-thread {
-        0% {
-          transform: translate3d(-1px, 0, 0) rotate(-10deg) scale(0.96);
-        }
-        45% {
-          transform: translate3d(1px, -2px, 0) rotate(150deg) scale(1.04);
-        }
+      @keyframes boot-breathe {
+        0%,
         100% {
-          transform: translate3d(-1px, 0, 0) rotate(350deg) scale(0.96);
+          opacity: 0.78;
+          transform: scale(0.97);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1);
         }
       }
       @keyframes boot-sway {
@@ -136,9 +139,26 @@
         -webkit-mask-repeat: no-repeat;
         mask-repeat: no-repeat;
       }
+      /* Ground and ink live here, not on the element. An inline declaration
+         outranks any class selector, so while these sat in the style attribute
+         the dark rule below could never apply and a night-theme cold start
+         flashed white before React mounted. */
+      #boot-splash {
+        background: #ffffff;
+        color: #16121d;
+      }
       html.dark #boot-splash {
         background: #0a0a0a;
         color: #f3f4f6;
+      }
+      /* #6015e2 sits at 1.9:1 on this ground — the same reason the old logo
+         disappeared at night. The dark-ground violet is a different colour. */
+      html.dark #boot-splash-ring {
+        background: conic-gradient(
+          rgba(175, 135, 244, 0.95) 28.8deg,
+          rgba(175, 135, 244, 0.14) 0deg
+        );
+        filter: drop-shadow(0 6px 16px rgba(175, 135, 244, 0.16));
       }
     </style>
     <div id="root"></div>

@@ -4,7 +4,7 @@ import { messagingApi, type ThreadMessage } from '@/api/MessagingApi';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { resolveParticipantDisplayName } from '@/utils/participantDisplayName';
 
 type ContextType = 'CUSTOM_ORDER' | 'STANDARD_ORDER' | 'INQUIRY';
@@ -503,7 +503,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
       <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1 scrollbar-hide">
         {loading ? (
           <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
-            <VLoader size={24} phase="loading" showLabel={false} />
+            <MuseLoader size={24} />
             <span>Loading thread…</span>
           </div>
         ) : messages.length === 0 ? (

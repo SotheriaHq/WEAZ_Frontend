@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import UniversalSelect from '@/components/forms/UniversalSelect';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import Modal from '@/components/ui/Modal';
 import { adminBrandsApi, adminFinanceApi } from '@/api/AdminApi';
 import { unwrapApiResponse } from '@/types/auth';
@@ -1298,7 +1298,7 @@ const InlineError: React.FC<{ message: string }> = ({ message }) => (
 
 const LoaderBlock = () => (
   <div className="flex items-center justify-center py-14">
-    <VLoader size={34} phase="loading" showLabel={false} />
+    <MuseLoader size={34} />
   </div>
 );
 

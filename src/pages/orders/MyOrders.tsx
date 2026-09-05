@@ -6,7 +6,7 @@ import { customOrdersBuyerApi, type CustomOrderListItem } from '@/api/CustomOrde
 import { messagingApi, type ThreadSummaryResponse } from '@/api/MessagingApi';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import UniversalSelect from '@/components/forms/UniversalSelect';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import ReviewComposerModal from '@/components/reviews/ReviewComposerModal';
 import ReviewFormModal from '@/components/reviews/ReviewFormModal';
 import ReviewPromptCard from '@/components/reviews/ReviewPromptCard';
@@ -377,7 +377,7 @@ const MyOrders: React.FC = () => {
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20">
-          <VLoader size={48} phase="loading" />
+          <MuseLoader size={48} />
           <p className="mt-4 text-sm text-gray-500">Loading orders...</p>
         </div>
       ) : null}

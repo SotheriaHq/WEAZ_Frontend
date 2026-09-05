@@ -1,6 +1,6 @@
 import React from 'react';
 import DefaultAvatar from '../DefaultAvatar';
-import VLoader from '../loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import ImageWithFallback from '../ImageWithFallback';
 
 interface AvatarCardProps {
@@ -76,7 +76,7 @@ const AvatarCard: React.FC<AvatarCardProps> = ({
           not for the image load itself — ImageWithFallback handles that with its shimmer. */}
       {loading && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45 backdrop-blur-sm">
-          <VLoader size={44} />
+          <MuseLoader size={44} />
         </div>
       )}
 

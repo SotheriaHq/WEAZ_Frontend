@@ -20,7 +20,7 @@ import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useOverlayBackClose } from '@/hooks/useOverlayBackClose';
 import { formatPrice } from '@/utils/helpers';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagFlow } from '@/features/bagging/BagFlowProvider';
@@ -655,7 +655,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               {/* Only show media spinner when we have no usable preview yet */}
               {loadingMedia && !activeMedia?.url ? (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <VLoader size={28} phase="loading" showLabel={false} />
+                  <MuseLoader size={28} />
                 </div>
               ) : null}
 
@@ -975,7 +975,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
               {loadingMedia ? (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/25">
-                  <VLoader size={30} phase="loading" showLabel={false} />
+                  <MuseLoader size={30} />
                 </div>
               ) : null}
 
