@@ -83,8 +83,7 @@ const RUNWAY_STAGE_CHIPS_HEIGHT_PX = RUNWAY_CHIPS_HEIGHT_PX;
  * border. The tint is what makes it legible over white; the border is what
  * keeps its edge visible over black.
  */
-const GLASS_SURFACE =
-  'bg-black/35 backdrop-blur-md border border-white/15 shadow-[0_2px_12px_rgba(0,0,0,0.35)]';
+const GLASS_SURFACE = 'bg-black/35 backdrop-blur-md';
 
 const RunwayStageChrome: React.FC = () => {
   const navigate = useNavigate();
@@ -122,7 +121,7 @@ const RunwayStageChrome: React.FC = () => {
         }}
       >
       {/* One surface: the control and the identity it belongs to. */}
-      <div className={`pointer-events-auto relative rounded-full ${GLASS_SURFACE}`}>
+      <div className={`pointer-events-auto relative ${GLASS_SURFACE}`}>
         <button
           type="button"
           onClick={() => dispatch(toggleSidebar())}

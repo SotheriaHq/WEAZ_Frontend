@@ -6,7 +6,11 @@
          on the first data request of every session. -->
     <link rel="preconnect" href="https://api.weaz.me" crossorigin />
     <link rel="dns-prefetch" href="https://api.weaz.me" />
-    <link rel="icon" type="image/svg+xml" href="/brand/wiez-favicon.svg" />
+    <!-- The lockup, as a raster. The mark's vector is 381 KB and a favicon is
+         fetched on every page; at 32px the difference is invisible. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/wiez-favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/brand/wiez-favicon-48.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/brand/wiez-favicon-180.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#ffffff" />
@@ -43,9 +47,11 @@
       href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <!-- The orb: the boot splash draws it before React exists, and the app
-         chrome draws it after. Preloaded so the splash has it at first paint. -->
-    <link rel="preload" as="image" href="/brand/wiez-favicon.svg" />
+    <!-- The splash draws this before React exists, so it is preloaded to be
+         on screen at first paint. It must stay in step with the <img> below:
+         this pointed at the favicon after the splash switched to the mark, so
+         it was warming a file the splash no longer used. -->
+    <link rel="preload" as="image" href="/brand/wiez-mark-light.svg" />
   </head>
   <body>
     <!-- Brand boot gauge: a seal-shaped (curly-edged) filler ring that fills

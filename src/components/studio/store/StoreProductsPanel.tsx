@@ -2429,7 +2429,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           {showFiltersMenu && (
             <div
               ref={filtersMenuRef}
-              className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4.25rem)] z-50 max-h-[min(70vh,26rem)] overflow-y-auto rounded-xl border border-gray-200/90 bg-white/[0.98] p-2.5 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#12121a]/98 sm:absolute sm:inset-x-auto sm:right-4 sm:top-[64px] sm:w-[min(92vw,520px)] sm:p-3 lg:hidden"
+              className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4.25rem)] z-50 max-h-[min(70vh,26rem)] overflow-y-auto rounded-xl border border-gray-200/90 bg-white/[0.98] p-2.5 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#12121a]/[0.98] sm:absolute sm:inset-x-auto sm:right-4 sm:top-[64px] sm:w-[min(92vw,520px)] sm:p-3 lg:hidden"
             >
               {/* Status used to be repeated here as a chip grid. It is the tab
                   strip's job now, and having it in two places meant the visible

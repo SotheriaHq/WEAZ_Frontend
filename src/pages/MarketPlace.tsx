@@ -922,7 +922,7 @@ const MarketPlace: React.FC = () => {
       }`}
     >
       <div className="space-y-6">
-        <section className="rounded-2xl bg-white/35 p-3 backdrop-blur-[2px] ring-1 ring-gray-200/55 dark:bg-white/[0.03] dark:ring-white/10 sm:p-4">
+        <section>
           {/*
             An explicit, capped height — the hero no longer sizes itself.
 
@@ -938,7 +938,7 @@ const MarketPlace: React.FC = () => {
             same area shows more of the catalogue at a sensible size instead of
             two very tall slabs.
           */}
-          <div className="grid h-[13rem] grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-2 sm:h-[16rem] sm:gap-3 lg:h-[22rem] lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <div className="grid h-[13rem] grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] sm:h-[16rem] lg:h-[22rem] lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <div className="h-full min-h-0">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -1064,7 +1064,7 @@ const MarketPlace: React.FC = () => {
         )}
 
         <section className="space-y-5">
-          <div className="sticky top-16 z-20 rounded-2xl border border-gray-200/70 bg-white/[0.72] px-3 py-2 backdrop-blur-md dark:border-white/10 dark:bg-[#0f0b13]/78">
+          <div className="sticky top-16 z-20 bg-white/[0.72] px-3 py-2 backdrop-blur-md dark:bg-[#0f0b13]/[0.78]">
             {/* Heading + search row — on small screens header is compact, search hidden */}
             <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-stretch sm:gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
