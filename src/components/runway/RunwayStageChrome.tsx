@@ -83,7 +83,7 @@ const RUNWAY_STAGE_CHIPS_HEIGHT_PX = RUNWAY_CHIPS_HEIGHT_PX;
  * border. The tint is what makes it legible over white; the border is what
  * keeps its edge visible over black.
  */
-const GLASS_SURFACE = 'bg-black/35 backdrop-blur-md';
+const GLYPH_LEGIBILITY = 'drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)]';
 
 const RunwayStageChrome: React.FC = () => {
   const navigate = useNavigate();
@@ -121,7 +121,7 @@ const RunwayStageChrome: React.FC = () => {
         }}
       >
       {/* One surface: the control and the identity it belongs to. */}
-      <div className={`pointer-events-auto relative ${GLASS_SURFACE}`}>
+      <div className={`pointer-events-auto relative ${GLYPH_LEGIBILITY}`}>
         <button
           type="button"
           onClick={() => dispatch(toggleSidebar())}
@@ -175,7 +175,7 @@ const RunwayStageChrome: React.FC = () => {
       <button
         type="button"
         onClick={() => navigate('/search')}
-        className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${GLASS_SURFACE}`}
+        className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${GLYPH_LEGIBILITY}`}
         aria-label="Search"
       >
         <span aria-hidden="true" className="text-base leading-none">
