@@ -20,6 +20,7 @@ import { BAG_IT_LABEL } from '@/constants/bagging';
 import { formatPrice } from '@/utils/helpers';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import { useReelDesignMedia, type ReelMedia } from '@/hooks/useReelDesignMedia';
+import { preloadImageUrl } from '@/hooks/useImagePreload';
 import { resolveRunwayMediaFit } from '@/components/runway/runwayMediaFit';
 import { toast } from 'sonner';
 
@@ -169,11 +170,26 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
     [],
   );
 
-  // Only mount media within ±1 of the active slide (native shouldMountSlide).
+  // Only the settled vertical reel gets an adjacent horizontal window. Inactive
+  // reels retain their current cover alone so a long feed cannot start decoding
+  // two full-screen images for every off-screen design.
   const shouldMountSlide = useCallback(
-    (index: number) => Math.abs(index - activeSlide) <= 1,
-    [activeSlide],
+    (index: number) => (isActive ? Math.abs(index - activeSlide) <= 1 : index === activeSlide),
+    [activeSlide, isActive],
   );
+
+  // Prime the image decoder one gesture ahead in both directions. Fetching is
+  // not enough for progressive images: the browser may otherwise expose their
+  // partial decode while the horizontal carousel is already under the finger.
+  useEffect(() => {
+    const candidateIndices = [activeSlide, activeSlide - 1, activeSlide + 1, activeSlide - 2, activeSlide + 2];
+    candidateIndices.forEach((index) => {
+      const candidate = slides[index];
+      if (candidate?.type === 'image') {
+        void preloadImageUrl(candidate.url);
+      }
+    });
+  }, [activeSlide, slides]);
 
   // ── Reveal-on-tap meta (auto-hide) ─────────────────────────────────────
   const [metaRevealed, setMetaRevealed] = useState(false);
@@ -313,8 +329,11 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
                     maxHeightClassName="max-h-none"
                     className={`h-full w-full ${objectClass}`}
                     fallbackName={item.collectionTitle}
-                    loading={index === 0 && (priority || isActive) ? 'eager' : 'lazy'}
-                    fetchPriority={index === 0 && (priority || isActive) ? 'high' : 'low'}
+                    keepPreviousOnReload
+                    loadingPlaceholderClassName="animate-none bg-black"
+                    waitForDecode
+                    loading={isActive ? 'eager' : 'lazy'}
+                    fetchPriority={slideActive ? 'high' : 'low'}
                   />
                 )
               ) : null}

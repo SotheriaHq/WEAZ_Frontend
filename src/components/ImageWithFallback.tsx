@@ -30,6 +30,14 @@ interface ImageWithFallbackProps {
   loading?: 'lazy' | 'eager';
   /** Fetch priority hint forwarded to the underlying <img>. */
   fetchPriority?: 'high' | 'low' | 'auto';
+  /** Optional stable surface used while a first-time image is decoding. */
+  loadingPlaceholderClassName?: string;
+  /**
+   * Hold a newly introduced source behind its placeholder until final decode.
+   * Opt-in because document/grid callers retain their established eager paint;
+   * full-screen swipe media needs the stricter no-progressive-paint guarantee.
+   */
+  waitForDecode?: boolean;
   /**
    * Fires when the resolved image has actually painted. Lets a caller hold a
    * local preview underneath until the real one is on screen, so the swap is a
@@ -251,6 +259,8 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   keepPreviousOnReload = false,
   loading = 'eager',
   fetchPriority,
+  loadingPlaceholderClassName,
+  waitForDecode = false,
   onLoaded,
 }) => {
   const sourceCacheKey = resolveSourceCacheKey(fileId, src);
@@ -272,7 +282,13 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   // re-flashing the shimmer, which produced the jarring
   // skeleton -> initials -> skeleton -> initials sequence on market cards.
   const [everErrored, setEverErrored] = useState(false);
+  // A URL being known is not evidence that its pixels are decoded. The stricter
+  // runway path holds it transparent until `onLoad`, preventing progressive
+  // JPEG/AVIF paint from appearing as a 10% → 100% image build during a swipe.
+  // Cache hits are promoted synchronously by the layout effect below, before
+  // first paint. Other callers retain the existing eager-paint behavior.
   const [loaded, setLoaded] = useState(() => {
+    if (waitForDecode) return !src && !fileId;
     if (canUseSourceDirectly(src, fileId)) return true;
     if (fileId) return !!(getCachedUrl(fileId));
     if (src && isRawStorageKey(src)) return !!(getCachedUrl(`key:${src}`));
@@ -321,14 +337,15 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         Boolean(cachedFileUrl) ||
         Boolean(cachedSourceUrl) ||
         Boolean(sourceCacheKey && lastGoodUrlCache.get(sourceCacheKey));
+      const hasPreviouslyPaintedSource = Boolean(sourceCacheKey && lastGoodUrlCache.get(sourceCacheKey));
 
-      if (!hasInstantSource) {
+      if ((waitForDecode && !hasPreviouslyPaintedSource) || (!waitForDecode && !hasInstantSource)) {
         setLoaded(false);
       }
 
       if (canUseSourceDirectly(src, fileId)) {
         setResolved(src ?? null);
-        setLoaded(true);
+        if (!waitForDecode) setLoaded(true);
         return;
       }
 
@@ -372,7 +389,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         const cachedUrl = getCachedUrl(fileId);
         if (cachedUrl) {
           setResolved(cachedUrl);
-          setLoaded(true);
+          if (!waitForDecode) setLoaded(true);
           return; // Use cached URL, no need to fetch
         }
 
@@ -407,7 +424,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     return () => {
       mounted = false;
     };
-  }, [fileId, sourceCacheKey, src]);
+  }, [fileId, sourceCacheKey, src, waitForDecode]);
 
   useEffect(() => {
     if (hadError) setEverErrored(true);
@@ -555,7 +572,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     <div className={cn('relative', wrapperClassName)} onClick={onClick}>
       {showShimmer && (
         /* Shimmer skeleton — visible until the signed URL is fetched AND image is fully loaded */
-        <div className={cn('absolute inset-0 animate-pulse bg-gray-200 dark:bg-gray-700', roundClass(rounded))} aria-hidden="true" />
+        <div className={cn('absolute inset-0 animate-pulse bg-gray-200 dark:bg-gray-700', roundClass(rounded), loadingPlaceholderClassName)} aria-hidden="true" />
       )}
       {showFallback && (
         <DefaultAvatar name={fallbackName ?? alt} className={cn('w-full h-full', roundClass(rounded), className)} />

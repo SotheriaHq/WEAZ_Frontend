@@ -236,7 +236,11 @@ export const RunwayReelsFeed: React.FC<RunwayReelsFeedProps> = ({
             <RunwayReelsItem
               item={item}
               isActive={index === activeIndex}
-              priority={index < 2}
+              // Hydrate and decode the active reel plus two vertical neighbors
+              // before they become touch targets. This is deliberately bounded
+              // so a long Runway does not fan out detail/media work for every
+              // off-screen design.
+              priority={Math.abs(index - activeIndex) <= 2}
               isSaved={isSaved?.(item.id)}
               saveBusy={saveBusy?.(item.id)}
               isPatched={item.brandId ? isPatched?.(item.brandId) : false}
