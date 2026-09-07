@@ -395,8 +395,24 @@ export const EndUserProfile: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((state: RootState) => state.user.profile);
   const queryClient = useQueryClient();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const isOwner = !id || currentUser?.id === id;
+  const profileId = id ?? currentUser?.id;
+  const cachedProfile = normalizeProfile(
+    queryClient.getQueryData(
+      isOwner
+        ? queryKeys.user.meProfile(currentUser?.id ?? profileId)
+        : queryKeys.user.publicProfile(profileId),
+    ),
+  );
+  // The Redux auth profile is already verified for this open browser session.
+  // Use it as an in-memory fallback while the fuller profile query revalidates;
+  // replacing it with a page skeleton on each route return is a visible cache
+  // failure even when React Query has the requested data.
+  const initialProfile = cachedProfile ?? (isOwner ? normalizeProfile(currentUser) : null);
+  const [profile, setProfile] = useState<UserProfile | null>(() => initialProfile);
+  // A true first visit still has a skeleton. The distinction is whether there
+  // is known data to paint, not whether auth has supplied an id this render.
+  const [loading, setLoading] = useState(() => !initialProfile);
   const [error, setError] = useState<string | null>(null);
   const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
   const [savingQuickEdit, setSavingQuickEdit] = useState(false);
@@ -482,8 +498,6 @@ export const EndUserProfile: React.FC = () => {
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const avatarActionsRef = useRef<HTMLDivElement | null>(null);
 
-  const isOwner = !id || currentUser?.id === id;
-  const profileId = id ?? currentUser?.id;
   const publicProfileQuery = usePublicUserProfileQuery(profileId, {
     enabled: Boolean(!isOwner && profileId),
   });
@@ -534,8 +548,15 @@ export const EndUserProfile: React.FC = () => {
       }
 
       try {
-        if (mounted) {
-          setLoading(true);
+        const cachedOwnerProfile = normalizeProfile(
+          queryClient.getQueryData(queryKeys.user.meProfile(currentUser?.id ?? profileId)),
+        );
+        const authProfileFallback = normalizeProfile(currentUser);
+        if (mounted && (cachedOwnerProfile || authProfileFallback)) {
+          setProfile(cachedOwnerProfile ?? authProfileFallback);
+          // A known profile remains on screen while this request refreshes in
+          // the background. `loading` is reserved for a genuine cold visit.
+          setLoading(false);
           setError(null);
         }
 
@@ -577,7 +598,7 @@ export const EndUserProfile: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [profileId, isOwner, currentUser, queryClient]);
+  }, [profileId, isOwner, currentUser?.id, queryClient]);
 
   useEffect(() => {
     if (isOwner) return;

@@ -303,5 +303,11 @@ export const isPersistableWiezQueryKey = (queryKey: readonly unknown[]) => {
       scope === 'fallbackProducts'
     );
   }
+  // Runway used to share the `market.feed` key. It has its own root now so the
+  // design feed cannot be conflated with commerce, but it is still public
+  // display data and must survive a browser tab discard like the former key.
+  if (root === 'runway') {
+    return scope === 'feed' || scope === 'feedCategories';
+  }
   return false;
 };

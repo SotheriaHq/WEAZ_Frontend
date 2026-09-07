@@ -27,6 +27,7 @@ import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { useCachedResource } from '@/hooks/useCachedResource';
+import { useQueryClient } from '@tanstack/react-query';
 import { notifyMessagingRead } from '@/hooks/useMessagingUnreadCount';
 import { queryKeys } from '@/query/queryKeys';
 import { resolveParticipantDisplayName } from '@/utils/participantDisplayName';
@@ -466,6 +467,7 @@ const MessagingManagementPage: React.FC = () => {
   const surface: Surface = hasActiveBrandMembership(profile) ? 'BRAND' : 'BUYER';
   const [brandId, setBrandId] = useState<string | null>(null);
   const actorId = profile?.id;
+  const queryClient = useQueryClient();
   const { onNotification, onMessageEvent, socketConnected } = useRealtime();
 
   /**
@@ -496,7 +498,11 @@ const MessagingManagementPage: React.FC = () => {
   // Hybrid cache-first inbox: the cached resource paints instantly on revisits,
   // while local state stays the working copy for optimistic updates
   // (thread prefs, sent-message previews). Cache updates re-seed local state.
-  const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  const [conversations, setConversations] = useState<ConversationItem[]>(() =>
+    actorId
+      ? queryClient.getQueryData<ConversationItem[]>(queryKeys.messaging.inbox(actorId)) ?? []
+      : [],
+  );
   const [activeId, setActiveId] = useState<string>('');
   // Safety net: a thread resolved from an order/custom-order/thread reference that
   // is NOT present in the inbox list (e.g. archived, beyond the inbox window, or a

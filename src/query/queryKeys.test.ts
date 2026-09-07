@@ -32,6 +32,11 @@ describe('isPersistableWiezQueryKey', () => {
     expect(isPersistableWiezQueryKey(queryKeys.brand.profile('brand_1'))).toBe(true);
   });
 
+  it('persists the public Runway feed after its market-key rename', () => {
+    expect(isPersistableWiezQueryKey(queryKeys.runway.feed())).toBe(true);
+    expect(isPersistableWiezQueryKey(queryKeys.runway.feedCategories())).toBe(true);
+  });
+
   it('keeps PII and money off disk', () => {
     expect(isPersistableWiezQueryKey(['profile', 'orders', 'me'])).toBe(false);
     expect(isPersistableWiezQueryKey(['orders', 'detail', 'order_1'])).toBe(false);
