@@ -15,7 +15,10 @@ import { apiClient } from '@/api/httpClient';
 import { ProfilePhotoViewApi } from '@/api/ProfilePhotoViewApi';
 import type { AppDispatch, RootState } from '@/store';
 import { setUser } from '@/features/userSlice';
-import { EndUserQuickEditModal } from './EndUserQuickEditModal';
+import {
+  EndUserQuickEditModal,
+  type EndUserQuickEditValues,
+} from './EndUserQuickEditModal';
 import { EndUserSizeFitModal } from './EndUserSizeFitModal';
 import { EndUserSizeFitQuickShareModal } from './EndUserSizeFitQuickShareModal';
 import { EndUserProfileQrModal } from './EndUserProfileQrModal';
@@ -70,8 +73,14 @@ interface UserProfile {
     updatedAt?: string;
   } | null;
   bannerImage?: string;
+  /** Street address only — the administrative levels are their own fields. */
   address?: string;
+  country?: string;
+  state?: string;
+  /** Same administrative level Nigeria calls a Local Government Area. */
+  city?: string;
   profileVisibility: 'UNLOCKED' | 'LOCKED';
+  /** Server-composed "City, State, Country". Display only, never edited. */
   location?: string;
   profilePhotoUpdatedAt?: string | null;
   profilePhotoViewState?: ProfilePhotoViewState | null;
@@ -93,6 +102,9 @@ const normalizeProfile = (raw: any): UserProfile | null => {
     profileImageFile: source.profileImageFile ?? null,
     bannerImage: source.bannerImage ?? undefined,
     address: source.address ?? undefined,
+    country: source.country ?? undefined,
+    state: source.state ?? undefined,
+    city: source.city ?? undefined,
     location: source.location ?? source.address ?? undefined,
     profileVisibility: source.profileVisibility === 'LOCKED' ? 'LOCKED' : 'UNLOCKED',
     profilePhotoUpdatedAt: source.profilePhotoUpdatedAt ?? null,
@@ -126,174 +138,17 @@ const describeAlphaFit = (value?: string | null): string | null => {
   return labels[normalized] ? `${labels[normalized]} (${normalized})` : normalized;
 };
 
-/**
- * Canonical slot for a stored measurement key, mirroring the backend's
- * `measurement-normalization.service.ts`.
+/*
+ * `FITTING_CANONICAL_SLOTS`, `stripGenderPrefix`, `measurementKeyRank`,
+ * `dedupeMeasurementEntries` and `FittingsChipCloud` lived here and are gone.
  *
- * The API does not store one key per measurement. It stores up to THREE: the
- * key the shopper filled in, the canonical slot it maps to, and the gendered
- * registry spelling — so a single "shoulder width, 59" comes back as
- * SHOULDER_WIDTH, SHOULDER and WOMEN_SHOULDER_WIDTH. Rendering the raw object
- * therefore paints the same body measurement two or three times, which is the
- * duplicated carousel.
+ * All five existed to render the shopper's raw saved measurements on their
+ * own profile — de-duplicated, because the API stores each point under up to
+ * three keys. The profile no longer shows measurement values at any width:
+ * it shows the computed size, and the size-and-fit surface owns the numbers
+ * behind it, their duplicates and every way to correct one. Native lost the
+ * equivalent pair (`FittingsChips`, `FittingsSummaryCard`) in the same pass.
  */
-const FITTING_CANONICAL_SLOTS: Record<string, string> = {
-  HEIGHT: 'HEIGHT',
-  BODY_HEIGHT: 'HEIGHT',
-  STATURE: 'HEIGHT',
-  CHEST: 'CHEST_BUST',
-  BUST: 'CHEST_BUST',
-  FULL_BUST: 'CHEST_BUST',
-  CHEST_BUST: 'CHEST_BUST',
-  CHEST_FULL_BUST: 'CHEST_BUST',
-  WAIST: 'WAIST',
-  NATURAL_WAIST: 'WAIST',
-  HIP: 'HIP_SEAT',
-  HIPS: 'HIP_SEAT',
-  SEAT: 'HIP_SEAT',
-  HIP_SEAT: 'HIP_SEAT',
-  SHOULDER: 'SHOULDER',
-  SHOULDER_WIDTH: 'SHOULDER',
-  SLEEVE: 'SLEEVE_LENGTH',
-  SLEEVE_LENGTH: 'SLEEVE_LENGTH',
-  SLEEVE_LENGTH_LONG: 'SLEEVE_LENGTH',
-  SLEEVE_LENGTH_SHORT: 'SLEEVE_LENGTH',
-  ARM_LENGTH: 'SLEEVE_LENGTH',
-  INSEAM: 'INSEAM',
-  INSIDE_LEG: 'INSEAM',
-  NECK: 'NECK_COLLAR',
-  COLLAR: 'NECK_COLLAR',
-  COLLAR_SIZE: 'NECK_COLLAR',
-  NECK_GIRTH: 'NECK_COLLAR',
-  NECK_COLLAR: 'NECK_COLLAR',
-};
-
-const CANONICAL_SLOT_NAMES = new Set(Object.values(FITTING_CANONICAL_SLOTS));
-
-const stripGenderPrefix = (key: string) =>
-  key.replace(/^(MEN|WOMEN|MENS|WOMENS|UNISEX)_/i, '').toUpperCase();
-
-/**
- * Which of several spellings of one measurement to show.
- *
- * Highest wins. The key the shopper actually filled in is the one the sheet
- * labelled, so it reads best — that is the spelling that is neither a bare
- * canonical slot nor gender-namespaced.
- */
-const measurementKeyRank = (key: string): number => {
-  const isGendered = /^(MEN|WOMEN|MENS|WOMENS|UNISEX)_/i.test(key);
-  if (isGendered) return 0;
-  return CANONICAL_SLOT_NAMES.has(key.toUpperCase()) ? 1 : 2;
-};
-
-/**
- * Collapse the API's fan-out back to one entry per real measurement.
- *
- * Keyed on slot AND value, not slot alone: SLEEVE_LENGTH_LONG at 71 and
- * SLEEVE_LENGTH at 71 are the same number written twice and must merge, while a
- * separately-entered SLEEVE_LENGTH_SHORT at 25 is a different measurement and
- * has to survive. Keys outside the canonical table (there are 38 registry
- * points and only 8 canonical slots) are always kept — they have no duplicate
- * to merge with.
- */
-function dedupeMeasurementEntries(
-  entries: Array<[string, unknown]>,
-): Array<[string, unknown]> {
-  const bySlot = new Map<string, [string, unknown]>();
-  const passthrough: Array<[string, unknown]> = [];
-
-  for (const entry of entries) {
-    const [key, value] = entry;
-    const slot = FITTING_CANONICAL_SLOTS[stripGenderPrefix(key)];
-    if (!slot) {
-      passthrough.push(entry);
-      continue;
-    }
-    const dedupeKey = `${slot}:${String(value).trim()}`;
-    const existing = bySlot.get(dedupeKey);
-    if (!existing || measurementKeyRank(key) > measurementKeyRank(existing[0])) {
-      bySlot.set(dedupeKey, entry);
-    }
-  }
-
-  return [...bySlot.values(), ...passthrough];
-}
-
-/**
- * Renders one marquee row, cloning its content only when it actually overflows.
- *
- * The seamless loop works by holding the content twice and translating -50%. If
- * the content is NARROWER than the viewport there is no gap for the clone to
- * slide into, so both copies are simply on screen at once and every chip appears
- * twice — read, correctly, as duplicate data. A fixed chip-count threshold
- * cannot decide this: the same four chips overflow a phone and fit a desktop.
- *
- * So measure. `ResizeObserver` watches both the track and its container and the
- * clone appears only when it is needed; when it is not, the row renders once and
- * holds still, which is what "start again after the last one" means for a list
- * that already fits.
- */
-/**
- * The saved fittings, beside the name — as a wrapping cloud, not a marquee.
- *
- * It used to be a 32-second infinite marquee under a fade mask. Three problems,
- * all of them reported: the mask cut chips mid-word at both edges so a reader
- * saw "eat · 26 cm" and read it as broken data; a chip you want to read walks
- * away from the pointer; and it is unpaused autoplay motion sitting alongside
- * content, which needs a stop control it never had. A shopper's own body is
- * reference material — it should hold still and be readable at a glance.
- *
- * Wrapping also puts the fittings in the empty column beside the avatar rather
- * than in a full-width band beneath it, which is where they were asked for and
- * where the eye already is after the name.
- */
-const FittingsChipCloud: React.FC<{
-  row: Array<[string, unknown]>;
-  unitLabel: string;
-  formatLabel: (key: string) => string;
-  onSelect: () => void;
-  /** Keys the server withheld as unusable, so the chip can say so. */
-  problemKeys?: Set<string>;
-}> = ({ row, unitLabel, formatLabel, onSelect, problemKeys }) => {
-  return (
-    <div className="flex flex-wrap gap-1">
-      {row.map(([key, value]) => {
-        /*
-          Chips are keyed by whatever the profile stored (`MEN_CHEST`,
-          `CHEST_FULL_BUST`, …) while the server reports problems against the
-          canonical key, so the gender prefix is stripped before matching — the
-          same normalisation `formatLabel` already does for display.
-        */
-        const flagged = problemKeys?.has(
-          String(key)
-            .toUpperCase()
-            .replace(/^(MEN|WOMEN|MENS|WOMENS|UNISEX)_/, ''),
-        );
-        return (
-          <button
-            key={String(key)}
-            type="button"
-            onClick={onSelect}
-            title={
-              flagged
-                ? 'This measurement cannot be right — tap to fix it.'
-                : undefined
-            }
-            className={`rounded-lg border px-1.5 py-0.5 text-[11px] font-semibold tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] ${
-              flagged
-                ? 'border-amber-400/70 bg-amber-50 text-amber-700 hover:border-amber-500 dark:border-amber-400/40 dark:bg-amber-500/10 dark:text-amber-300'
-                : 'border-gray-200/70 bg-gray-50/80 text-gray-700 hover:border-indigo-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-indigo-400/50'
-            }`}
-          >
-            {flagged ? <span aria-hidden="true">⚠ </span> : null}
-            {formatLabel(String(key))}&nbsp;·&nbsp;{String(value)}
-            {unitLabel}
-          </button>
-        );
-      })}
-    </div>
-  );
-};
 
 /**
  * The chart(s) a display family actually computes against.
@@ -463,11 +318,6 @@ export const EndUserProfile: React.FC = () => {
   const [computedMeasurementProblems, setComputedMeasurementProblems] = useState<
     MeasurementProblem[]
   >([]);
-  const computedProblemKeys = useMemo(
-    () =>
-      new Set(computedMeasurementProblems.map((problem) => problem.key.toUpperCase())),
-    [computedMeasurementProblems],
-  );
   const [chartLoading, setChartLoading] = useState(false);
   const [chartSaving, setChartSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -494,6 +344,18 @@ export const EndUserProfile: React.FC = () => {
    * position, not on breakpoint.
    */
   const [avatarMenuDirection, setAvatarMenuDirection] = useState<'down' | 'up'>('down');
+  /**
+   * Which edge the avatar menu is anchored to.
+   *
+   * Same defect as the vertical one, on the other axis and never fixed. The
+   * trigger sits at the bottom-RIGHT of the avatar, and the avatar is the
+   * left-most thing in the profile header — so a menu anchored `right-0` grows
+   * 11rem LEFTWARD from a point about 5rem in, and on a phone that is off the
+   * left edge of the viewport. Measured on open for the same reason the
+   * vertical direction is: it depends on where the trigger actually is, not on
+   * a breakpoint.
+   */
+  const [avatarMenuAlign, setAvatarMenuAlign] = useState<'right' | 'left'>('right');
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const avatarActionsRef = useRef<HTMLDivElement | null>(null);
@@ -886,7 +748,7 @@ export const EndUserProfile: React.FC = () => {
   }, [profile]);
 
   const handleQuickProfileSave = useCallback(
-    async (values: { firstName: string; lastName: string; address: string }) => {
+    async (values: EndUserQuickEditValues) => {
       if (!profile) return;
       setSavingQuickEdit(true);
       try {
@@ -894,7 +756,16 @@ export const EndUserProfile: React.FC = () => {
           firstName: values.firstName,
           lastName: values.lastName,
           username: profile.username,
-          address: values.address || undefined,
+          /*
+            Empty STRING, not `undefined`. The server reads `undefined` as
+            "leave it alone", so `|| undefined` — which is what this sent —
+            made the location fields write-once: a shopper who cleared their
+            address saved successfully and watched the old value come back.
+          */
+          address: values.address,
+          country: values.country,
+          state: values.state,
+          city: values.city,
         });
 
         const payload = response.data?.data ?? response.data;
@@ -907,7 +778,23 @@ export const EndUserProfile: React.FC = () => {
                 firstName: String(updatedUser?.firstName ?? values.firstName),
                 lastName: String(updatedUser?.lastName ?? values.lastName),
                 address: String(updatedUser?.address ?? values.address ?? ''),
-                location: String(updatedUser?.address ?? values.address ?? ''),
+                country: String(updatedUser?.country ?? values.country ?? ''),
+                state: String(updatedUser?.state ?? values.state ?? ''),
+                city: String(updatedUser?.city ?? values.city ?? ''),
+                /*
+                  `location` is the server's composed "City, State, Country"
+                  display line — not the street address, which this used to
+                  echo into it. Compose the same way locally so the header
+                  updates without a refetch, and fall back to what the server
+                  actually returned.
+                */
+                location: String(
+                  updatedUser?.location ??
+                    [values.city, values.state, values.country]
+                      .map((part) => part.trim())
+                      .filter(Boolean)
+                      .join(', '),
+                ),
               }
             : prev,
         );
@@ -1062,6 +949,16 @@ export const EndUserProfile: React.FC = () => {
       const spaceAbove = rect.top;
       setAvatarMenuDirection(
         spaceBelow < NEEDED_BELOW && spaceAbove > spaceBelow ? 'up' : 'down',
+      );
+
+      // `w-44` = 11rem = 176px. Right-aligned, the menu occupies
+      // [rect.right - MENU_WIDTH, rect.right]; flip to left-aligned the moment
+      // that start point would leave the viewport, with a gutter so it never
+      // sits flush against the edge either.
+      const MENU_WIDTH = 176;
+      const EDGE_GUTTER = 12;
+      setAvatarMenuAlign(
+        rect.right - MENU_WIDTH < EDGE_GUTTER ? 'left' : 'right',
       );
     };
 
@@ -1367,52 +1264,12 @@ export const EndUserProfile: React.FC = () => {
         : 'profile-photo-ring-viewed'
       : 'profile-photo-frame-neutral';
   const alphaFitLabel = describeAlphaFit(computedAlphaSize);
-  // Quick-access fittings (parity with the native profile): every saved
-  // measurement as a compact chip. Keys carry MEN_/WOMEN_ namespacing that must
-  // never surface as a label — the brand already chose who the design is for.
-  /*
-    Chip labels, short.
-
-    The chips sit in the column beside the avatar, which on a 390px phone is
-    ~220px wide. At full label length ("Sleeve Length Long") one chip fills a
-    line and eight fittings become eight lines. The words below are what a tape
-    measure and a tailor call these points, so nothing is lost by dropping the
-    registry's qualifiers; anything not in the map keeps its full label.
-  */
-  const COMPACT_MEASUREMENT_LABELS: Record<string, string> = {
-    HEIGHT: 'Height',
-    CHEST_BUST: 'Chest',
-    CHEST_FULL_BUST: 'Chest',
-    WAIST: 'Waist',
-    HIP_SEAT: 'Hip',
-    HIP: 'Hip',
-    SHOULDER: 'Shoulder',
-    SHOULDER_WIDTH: 'Shoulder',
-    SLEEVE_LENGTH: 'Sleeve',
-    SLEEVE_LENGTH_LONG: 'Sleeve',
-    SLEEVE_LENGTH_SHORT: 'Sleeve (short)',
-    INSEAM: 'Inseam',
-    NECK_COLLAR: 'Neck',
-    NECK: 'Neck',
-  };
-  const compactMeasurementLabel = (key: string): string => {
-    const canonical = key
-      .toUpperCase()
-      .replace(/^(MEN|WOMEN|MENS|WOMENS|UNISEX)_/, '');
-    return COMPACT_MEASUREMENT_LABELS[canonical] ?? formatMeasurementLabel(key);
-  };
   const formatMeasurementLabel = (key: string): string =>
     key
       .replace(/^(MEN|WOMEN|MENS|WOMENS|UNISEX)_/i, '')
       .toLowerCase()
       .replace(/_/g, ' ')
       .replace(/\b\w/g, (ch) => ch.toUpperCase());
-  const savedMeasurementEntries = dedupeMeasurementEntries(
-    Object.entries(sizeFitProfile?.measurements ?? {}).filter(
-      ([, value]) => String(value ?? '').trim().length > 0,
-    ),
-  );
-  const measurementUnitLabel = (sizeFitProfile?.preferredLengthUnit ?? 'CM').toLowerCase();
   const profileActions: ProfileAction[] = [
     {
       key: 'edit',
@@ -1565,7 +1422,9 @@ export const EndUserProfile: React.FC = () => {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -8, scale: 0.98 }}
                         transition={{ duration: 0.16 }}
-                        className={`glass-menu absolute right-0 w-44 overflow-hidden p-1 ${
+                        className={`glass-menu absolute z-30 w-44 max-w-[calc(100vw-1.5rem)] overflow-hidden p-1 ${
+                          avatarMenuAlign === 'left' ? 'left-0' : 'right-0'
+                        } ${
                           avatarMenuDirection === 'up'
                             ? 'bottom-full mb-2'
                             : 'top-full mt-2'
@@ -1831,31 +1690,18 @@ export const EndUserProfile: React.FC = () => {
           ) : null}
 
           {/*
-            The full-width fittings band that used to sit here is gone. It ran
-            under the avatar, which is the one place on this screen that is
-            never short of room, while the column beside the name sat empty —
-            and being full-width is what forced it to be a marquee in the first
-            place. The chips are in the identity column now; at `lg` they are
-            joined there by the wide size widget.
+            No measurement values on the profile, at any width.
+
+            This was a desktop-only "My fittings · 8" cloud of the raw saved
+            numbers; before that a full-width marquee band. A profile answers
+            "what size am I" — the values behind that answer, their duplicate
+            storage keys and every correction path belong to the size-and-fit
+            surface, which is one tap away from the size itself. Parity with
+            native, where the same two blocks were removed at the same time.
+
+            What survives here is the problem notice below: it is about the
+            ANSWER being blocked, not about listing inputs.
           */}
-          {isOwner && savedMeasurementEntries.length > 0 ? (
-            <div className="mt-3 hidden lg:block">
-              <button
-                type="button"
-                onClick={() => setIsSizeFitOpen(true)}
-                className="mb-1.5 rounded-md text-xs font-bold uppercase tracking-wide text-gray-500 transition hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] dark:text-gray-400 dark:hover:text-indigo-300"
-              >
-                <span aria-hidden="true">📏</span> My fittings · {savedMeasurementEntries.length}
-              </button>
-              <FittingsChipCloud
-                row={savedMeasurementEntries}
-                unitLabel={measurementUnitLabel}
-                formatLabel={compactMeasurementLabel}
-                onSelect={() => setIsSizeFitOpen(true)}
-                problemKeys={computedProblemKeys}
-              />
-            </div>
-          ) : null}
 
           {/* ── ACTION BAR ── */}
           {isOwner ? (
@@ -1988,6 +1834,9 @@ export const EndUserProfile: React.FC = () => {
           firstName: profile.firstName,
           lastName: profile.lastName,
           address: profile.address ?? '',
+          country: profile.country ?? '',
+          state: profile.state ?? '',
+          city: profile.city ?? '',
         }}
         onClose={() => setIsQuickEditOpen(false)}
         onSave={handleQuickProfileSave}
