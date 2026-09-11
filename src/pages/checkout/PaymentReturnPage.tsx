@@ -86,11 +86,6 @@ const PaymentReturnPage: React.FC = () => {
   const referenceLooksCustom = reference.toUpperCase().startsWith(CUSTOM_ORDER_REFERENCE_PREFIX);
   const shouldOfferCustomOrderRetry = canOfferCustomOrderCardRetry(attempt);
 
-  const openBag = useCallback((replace?: boolean) => {
-    dispatch(openCartDrawer());
-    navigate('/', { replace });
-  }, [dispatch, navigate]);
-
   useEffect(() => {
     let active = true;
 
@@ -394,6 +389,26 @@ const PaymentReturnPage: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+      {/* Top navigation bar for mobile browser & desktop */}
+      <div className="mb-6 flex items-center justify-between gap-3 border-b border-gray-200/70 pb-4 dark:border-zinc-800">
+        <button
+          type="button"
+          onClick={() => navigate('/runway')}
+          className="flex items-center gap-1.5 rounded-full border border-black/10 bg-black/5 px-3.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-black/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 transition-colors"
+        >
+          <span>← 👗</span>
+          <span>Back to Runway</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/profile')}
+          className="flex items-center gap-1.5 rounded-full border border-black/10 bg-black/5 px-3.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-black/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 transition-colors"
+        >
+          <span>👤</span>
+          <span>My Profile</span>
+        </button>
+      </div>
+
       <div className="mb-6 text-6xl">{statusCopy.emoji}</div>
       <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">{statusCopy.headline}</h1>
       <p className="mb-8 text-gray-500 dark:text-zinc-400">{statusCopy.description}</p>
@@ -478,14 +493,14 @@ const PaymentReturnPage: React.FC = () => {
       <div className="flex flex-col justify-center gap-3 sm:flex-row">
         {resolvedStatus === 'PAID' ? (
           <Button onClick={() => navigate(`/bag/confirmation?reference=${encodeURIComponent(reference)}`)}>
-            Open confirmation
+            🧾 Open confirmation
           </Button>
         ) : (
           <Button
             onClick={() => void handleVerifyAgain()}
             loading={submitting || autoVerifying || preparingUnifiedRetry}
           >
-            Verify again
+            🔄 Verify again
           </Button>
         )}
         <Button
@@ -498,15 +513,15 @@ const PaymentReturnPage: React.FC = () => {
               : navigate('/profile?tab=orders')
           }
         >
-          {isCustomOrderAttempt
+          📦 {isCustomOrderAttempt
             ? attempt?.customOrderId
               ? 'Open custom order'
               : 'Open custom orders'
             : 'Open my orders'}
         </Button>
-        {!isCustomOrderAttempt && (
-          <Button variant="ghost" onClick={() => openBag()}>Return to bag</Button>
-        )}
+        <Button variant="secondary" onClick={() => navigate('/runway')}>
+          ← 👗 Back to Runway
+        </Button>
       </div>
     </div>
   );

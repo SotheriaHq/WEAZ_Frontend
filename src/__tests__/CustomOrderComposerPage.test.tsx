@@ -54,6 +54,25 @@ vi.mock('sonner', () => ({
   },
 }));
 
+vi.mock('@/services/LocationService', () => ({
+  locationService: {
+    getCountries: vi.fn().mockResolvedValue([
+      { name: 'Nigeria', iso2: 'NG' },
+      { name: 'Ghana', iso2: 'GH' },
+    ]),
+    getStates: vi.fn().mockResolvedValue([
+      { name: 'Lagos', state_code: 'LA' },
+      { name: 'Abuja', state_code: 'FC' },
+    ]),
+    getCities: vi.fn().mockResolvedValue(['Ikeja', 'Lekki', 'Lagos']),
+  },
+  LOCATION_FIELD_LABELS: {
+    country: 'Country',
+    state: 'State / Province',
+    city: 'City / LGA',
+  },
+}));
+
 describe('CustomOrderComposerPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -130,6 +149,9 @@ describe('CustomOrderComposerPage', () => {
     expect(screen.getByText('Measurement profile')).toBeInTheDocument();
     expect(screen.getByText('Bust')).toBeInTheDocument();
     expect(screen.getByText('Waist')).toBeInTheDocument();
+    expect(screen.queryByText('Payment split notice')).not.toBeInTheDocument();
+    expect(screen.queryByText('Live size recommendation')).not.toBeInTheDocument();
+    expect(screen.getByText('Nigeria')).toBeInTheDocument();
   });
 
   it('renders and submits freeform measurement keys resolved from the active configuration', async () => {

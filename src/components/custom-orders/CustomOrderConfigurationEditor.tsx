@@ -1632,6 +1632,16 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         {renderFieldError('buyerInstructionText')}
       </label>
 
+      {/* Brand payment split notice */}
+      <div className="mt-3 rounded-2xl border border-emerald-200/80 bg-emerald-50/80 p-3.5 text-xs text-emerald-950 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+        <p className="font-semibold flex items-center gap-1.5">
+          <span>ℹ️</span> Payment split notice
+        </p>
+        <p className="mt-1">
+          Customers pay the full quoted total at checkout. WIEZ retains the platform commission, and the brand receives the net settlement in milestone releases after production and delivery conditions are met.
+        </p>
+      </div>
+
       {/* Charges row — two equal columns */}
       <div className="mt-2 grid grid-cols-2 gap-2">
         <label

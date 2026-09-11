@@ -160,6 +160,26 @@ const OrderConfirmation: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+      {/* Top navigation bar for mobile browser & desktop */}
+      <div className="mb-6 flex items-center justify-between gap-3 border-b border-gray-200/70 pb-4 dark:border-zinc-800">
+        <button
+          type="button"
+          onClick={() => navigate('/runway')}
+          className="flex items-center gap-1.5 rounded-full border border-black/10 bg-black/5 px-3.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-black/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 transition-colors"
+        >
+          <span>← 👗</span>
+          <span>Back to Runway</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/profile')}
+          className="flex items-center gap-1.5 rounded-full border border-black/10 bg-black/5 px-3.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-black/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 transition-colors"
+        >
+          <span>👤</span>
+          <span>My Profile</span>
+        </button>
+      </div>
+
       <div className="mb-6 text-6xl">{statusCopy.emoji}</div>
       <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
         {statusCopy.headline}
@@ -290,7 +310,7 @@ const OrderConfirmation: React.FC = () => {
       <div className="flex flex-col justify-center gap-3 sm:flex-row">
         {canResumePayment && status !== 'PAID' && (
           <Button onClick={() => void handleContinuePayment()} size="lg" loading={resumingPayment}>
-            {nextAction?.ctaLabel || 'Continue Payment'}
+            💳 {nextAction?.ctaLabel || 'Continue Payment'}
           </Button>
         )}
         <Button
@@ -301,10 +321,10 @@ const OrderConfirmation: React.FC = () => {
           }
           size="lg"
         >
-          {attempt?.subjectType === 'CUSTOM_ORDER' ? 'Open Custom Order' : 'View My Orders'}
+          📦 {attempt?.subjectType === 'CUSTOM_ORDER' ? 'Open Custom Order' : 'View My Orders'}
         </Button>
-        <Button variant="secondary" onClick={() => navigate('/')} size="lg">
-          Continue Shopping
+        <Button variant="secondary" onClick={() => navigate('/runway')} size="lg">
+          ← 👗 Back to Runway
         </Button>
       </div>
     </div>

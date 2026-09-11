@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { X, Minus, Plus, Trash2, ShoppingBag, Lock, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingBag, Lock, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { AppDispatch, RootState } from '@/store';
 import {
@@ -344,10 +344,12 @@ const CartDrawer: React.FC = () => {
                   )}
                 </div>
                 <button
+                  type="button"
                   onClick={() => dispatch(closeCartDrawer())}
-                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors"
+                  aria-label="Close bag"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition-colors border border-black/10 dark:border-white/10 shadow-sm"
                 >
-                  <X size={16} className="text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm leading-none select-none font-bold">✖️</span>
                 </button>
               </div>
 

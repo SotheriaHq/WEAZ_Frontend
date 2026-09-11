@@ -13,8 +13,15 @@ import {
 } from '@/api/CustomOrderApi';
 import { createIdempotencyKey } from '@/api/idempotency';
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import LocationCascadeSelect from '@/components/forms/LocationCascadeSelect';
+import {
+  locationService,
+  LOCATION_FIELD_LABELS,
+  type CountryOption,
+  type StateOption,
+} from '@/services/LocationService';
 import { formatMeasurementLabel } from '@/components/custom-orders/customOrderFormatting';
-import { deriveSizeRecommendation, DISPLAY_CHART_OPTIONS, PRICING_CHART_OPTIONS } from '@/lib/sizeCharts';
+import { DISPLAY_CHART_OPTIONS, PRICING_CHART_OPTIONS } from '@/lib/sizeCharts';
 import type { SizeFitProfile } from '@/types/sizeFit';
 import {
   loadCustomOrderAddressBook,
@@ -168,10 +175,14 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   const [customerName, setCustomerName] = useState('');
   const [contactEmail, setContactEmail] = useState(profile?.email ?? '');
   const [contactPhone, setContactPhone] = useState(profile?.phoneNumber ?? '');
-  const [street, setStreet] = useState(profile?.address ?? '');
-  const [city, setCity] = useState(profile?.brandCity ?? '');
-  const [stateRegion, setStateRegion] = useState(profile?.brandState ?? '');
-  const [country, setCountry] = useState(profile?.brandCountry ?? 'Nigeria');
+  const [street, setStreet] = useState((profile as any)?.address ?? profile?.address ?? '');
+  const [city, setCity] = useState((profile as any)?.city ?? profile?.brandCity ?? '');
+  const [stateRegion, setStateRegion] = useState((profile as any)?.state ?? profile?.brandState ?? '');
+  const [country, setCountry] = useState((profile as any)?.country ?? profile?.brandCountry ?? 'Nigeria');
+  const [countries, setCountries] = useState<CountryOption[]>([]);
+  const [states, setStates] = useState<StateOption[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
   const [rushSelected, setRushSelected] = useState(false);
   const [measurementConfirmed, setMeasurementConfirmed] = useState(false);
   const [measurementRecencyConfirmed, setMeasurementRecencyConfirmed] = useState(false);
@@ -212,14 +223,14 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   }, [profile?.firstName, profile?.lastName]);
 
   /*
-    Seed the contact fields when the profile ARRIVES, not only at mount.
+    Seed the contact and delivery fields when the profile ARRIVES, not only at mount.
 
     These were useState(profile?.phoneNumber ?? "") - an initial value read
     exactly once, on the first render. The composer routinely mounts before the
     Redux profile is hydrated, so the initialiser read undefined and the field
     stayed empty for the rest of the session. customerName already had a
     corrective effect right above this one; the contact fields did not, which is
-    why somebody with a phone number on file was still asked to type it here.
+    why somebody with a phone number or address on file was still asked to type it here.
 
     Seeding happens exactly ONCE, the first render at which a profile exists,
     and the ref is what makes that true. Without it this runs on every render
@@ -233,10 +244,99 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   useEffect(() => {
     if (contactSeededRef.current || !profile) return;
     contactSeededRef.current = true;
-    setContactEmail((current) => current.trim() || profile.email || '');
-    setContactPhone((current) => current.trim() || profile.phoneNumber || '');
-    setStreet((current) => current.trim() || profile.address || '');
+    setContactEmail((current: string) => current.trim() || profile.email || '');
+    setContactPhone((current: string) => current.trim() || profile.phoneNumber || '');
+    setStreet((current: string) => current.trim() || (profile as any)?.address || profile.address || '');
+    setCountry((current: string) => current.trim() || (profile as any)?.country || profile.brandCountry || 'Nigeria');
+    setStateRegion((current: string) => current.trim() || (profile as any)?.state || profile.brandState || '');
+    setCity((current: string) => current.trim() || (profile as any)?.city || profile.brandCity || '');
   }, [profile]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingLocations(true);
+    void locationService.getCountries().then((data) => {
+      if (cancelled) return;
+      setCountries(data);
+      setLoadingLocations(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!country) {
+      setStates([]);
+      return;
+    }
+    setLoadingLocations(true);
+    const iso2 = countries.find((c) => c.name === country)?.iso2;
+    void locationService.getStates(country, iso2).then((data) => {
+      if (cancelled) return;
+      setStates(data);
+      setLoadingLocations(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [country, countries]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!country || !stateRegion) {
+      setCities([]);
+      return;
+    }
+    setLoadingLocations(true);
+    void locationService.getCities(country, stateRegion).then((data) => {
+      if (cancelled) return;
+      setCities(data);
+      setLoadingLocations(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [country, stateRegion]);
+
+  const withCurrent = useCallback(
+    (options: { value: string; label: string }[], current: string) => {
+      const trimmed = current.trim();
+      if (!trimmed || options.some((option) => option.value === trimmed)) {
+        return options;
+      }
+      return [{ value: trimmed, label: trimmed }, ...options];
+    },
+    [],
+  );
+
+  const countryOptions = useMemo(
+    () =>
+      withCurrent(
+        countries.map((entry) => ({ value: entry.name, label: entry.name })),
+        country,
+      ),
+    [countries, country, withCurrent],
+  );
+
+  const stateOptions = useMemo(
+    () =>
+      withCurrent(
+        states.map((entry) => ({ value: entry.name, label: entry.name })),
+        stateRegion,
+      ),
+    [states, stateRegion, withCurrent],
+  );
+
+  const cityOptions = useMemo(
+    () =>
+      withCurrent(
+        cities.map((entry) => ({ value: entry, label: entry })),
+        city,
+      ),
+    [cities, city, withCurrent],
+  );
 
   const applySavedAddress = useCallback((address: CustomOrderSavedAddress) => {
     setCustomerName(address.customerName);
@@ -417,11 +517,6 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   const hasPrefilledMeasurements = useMemo(
     () => Object.keys(measurementPayload).length > 0,
     [measurementPayload],
-  );
-
-  const liveRecommendation = useMemo(
-    () => deriveSizeRecommendation(measurementPayload, displayChartFamily),
-    [displayChartFamily, measurementPayload],
   );
 
   const currentMeasurementSignature = useMemo(
@@ -935,16 +1030,11 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
             }
             navigate(-1);
           }}
-          className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200"
+          className="flex items-center gap-1.5 rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-black/5 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5 transition-colors"
         >
-          Back
+          <span>←</span>
+          <span>Back</span>
         </button>
-      </div>
-      <div className="mb-6 rounded-3xl border border-emerald-200/80 bg-emerald-50/80 p-5 text-sm text-emerald-950 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
-        <p className="font-semibold">Payment split notice</p>
-        <p className="mt-2">
-          Customers pay the full quoted total at checkout. WIEZ retains the platform commission, and the brand receives the net settlement in milestone releases after production and delivery conditions are met.
-        </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
@@ -954,19 +1044,39 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
               Only the measurement points this brand requested are shown here. Any new values you confirm will be saved back to your profile so you do not need to type them again next time.
             </p>
-            <div className="mt-3 grid gap-3 md:grid-cols-3">
-              <UniversalSelect label="Length unit" value={lengthUnit} onChange={(value) => handleLengthUnitChange(value as 'CM' | 'IN')} options={[{ value: 'CM', label: 'Centimeters (cm)' }, { value: 'IN', label: 'Inches (in)' }]} />
-              <UniversalSelect label="Display chart" value={displayChartFamily} onChange={(value) => setDisplayChartFamily(value as CustomOrderChartFamily)} options={DISPLAY_CHART_OPTIONS} />
-              <UniversalSelect label="Pricing chart" value={pricingChartFamily} onChange={(value) => setPricingChartFamily(value as CustomOrderChartFamily)} options={PRICING_CHART_OPTIONS} />
-            </div>
-            <div className="mt-4 rounded-2xl border border-indigo-300/50 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100">
-              <div className="font-semibold">Live size recommendation</div>
-              <p className="mt-1">
-                {liveRecommendation.computedSize
-                  ? `${displayChartFamily} display resolves to ${liveRecommendation.computedSize}.`
-                  : 'Chart sizing is optional here. Add bust/chest, waist, and hip values if you want a live size recommendation too.'}
-              </p>
-              {liveRecommendation.conversionGuidance ? <p className="mt-1">{liveRecommendation.conversionGuidance}</p> : null}
+            <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3">
+              <UniversalSelect
+                size="sm"
+                label="Length unit"
+                value={lengthUnit}
+                onChange={(value) => handleLengthUnitChange(value as 'CM' | 'IN')}
+                options={[
+                  { value: 'CM', label: 'Centimeters (cm)' },
+                  { value: 'IN', label: 'Inches (in)' },
+                ]}
+                optionAllowWrap
+                selectedAllowWrap
+              />
+              <UniversalSelect
+                size="sm"
+                label="Display chart"
+                value={displayChartFamily}
+                onChange={(value) => setDisplayChartFamily(value as CustomOrderChartFamily)}
+                options={DISPLAY_CHART_OPTIONS}
+                optionAllowWrap
+                selectedAllowWrap
+              />
+              <div className="col-span-2 md:col-span-1">
+                <UniversalSelect
+                  size="sm"
+                  label="Pricing chart"
+                  value={pricingChartFamily}
+                  onChange={(value) => setPricingChartFamily(value as CustomOrderChartFamily)}
+                  options={PRICING_CHART_OPTIONS}
+                  optionAllowWrap
+                  selectedAllowWrap
+                />
+              </div>
             </div>
             {hasPrefilledMeasurements ? (
               <div className="mt-4 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">
@@ -1085,9 +1195,90 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
                   {renderDeliveryField('contactEmail', contactEmail, setContactEmail)}
                   {renderDeliveryField('contactPhone', contactPhone, (next) => setContactPhone(sanitizePhoneInput(next)), { inputMode: 'tel' })}
                   {renderDeliveryField('street', street, setStreet, { wide: true })}
-                  {renderDeliveryField('city', city, setCity)}
-                  {renderDeliveryField('stateRegion', stateRegion, setStateRegion)}
-                  {renderDeliveryField('country', country, setCountry, { wide: true })}
+                  <div id={deliveryFieldDomId('country')} tabIndex={-1} className="md:col-span-2">
+                    <UniversalSelect
+                      label={LOCATION_FIELD_LABELS.country}
+                      value={country}
+                      onChange={(next) => {
+                        setCountry(next);
+                        clearDeliveryFieldError('country');
+                        setStateRegion('');
+                        setCity('');
+                      }}
+                      options={countryOptions}
+                      placeholder={loadingLocations && countries.length === 0 ? 'Loading…' : 'Select country'}
+                      searchable
+                      searchPlaceholder="Search countries…"
+                      emptyMessage="No matching country found"
+                      menuLayer="modal"
+                      className="w-full"
+                      optionAllowWrap
+                      selectedAllowWrap
+                    />
+                    {deliveryFieldErrors['country'] ? (
+                      <span
+                        id={deliveryFieldDomId('country') + '-error'}
+                        className="mt-2 block text-xs font-medium text-rose-600 dark:text-rose-300"
+                      >
+                        {deliveryFieldErrors['country']}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div id={deliveryFieldDomId('stateRegion')} tabIndex={-1}>
+                    <LocationCascadeSelect
+                      label={LOCATION_FIELD_LABELS.state}
+                      value={stateRegion}
+                      onChange={(next) => {
+                        setStateRegion(next);
+                        clearDeliveryFieldError('stateRegion');
+                        setCity('');
+                      }}
+                      options={stateOptions}
+                      parentValue={country}
+                      parentPlaceholder="Select country first"
+                      loading={loadingLocations}
+                      placeholder="Select state / province"
+                      searchPlaceholder="Search states or provinces…"
+                      emptyMessage="No matching state or province found"
+                      fallbackHint="We couldn't load the list for this country — type your state or province."
+                      menuLayer="modal"
+                    />
+                    {deliveryFieldErrors['stateRegion'] ? (
+                      <span
+                        id={deliveryFieldDomId('stateRegion') + '-error'}
+                        className="mt-2 block text-xs font-medium text-rose-600 dark:text-rose-300"
+                      >
+                        {deliveryFieldErrors['stateRegion']}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div id={deliveryFieldDomId('city')} tabIndex={-1}>
+                    <LocationCascadeSelect
+                      label={LOCATION_FIELD_LABELS.city}
+                      value={city}
+                      onChange={(next) => {
+                        setCity(next);
+                        clearDeliveryFieldError('city');
+                      }}
+                      options={cityOptions}
+                      parentValue={stateRegion}
+                      parentPlaceholder="Select state first"
+                      loading={loadingLocations}
+                      placeholder="Select city / LGA"
+                      searchPlaceholder="Search cities or LGAs…"
+                      emptyMessage="No matching city or LGA found"
+                      fallbackHint="We couldn't load the list for this state — type your city or LGA."
+                      menuLayer="modal"
+                    />
+                    {deliveryFieldErrors['city'] ? (
+                      <span
+                        id={deliveryFieldDomId('city') + '-error'}
+                        className="mt-2 block text-xs font-medium text-rose-600 dark:text-rose-300"
+                      >
+                        {deliveryFieldErrors['city']}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-wrap justify-end gap-2">
                   {savedAddresses.length > 0 ? (
