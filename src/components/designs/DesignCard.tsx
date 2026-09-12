@@ -574,7 +574,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
         </div>
 
         {/* Mobile View Bottom Overlay */}
-        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/30 via-black/15 to-white/[0.04] backdrop-blur-md border-t border-white/20 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18)] z-10 flex items-center justify-between min-h-[32px] max-h-[38px]" onClick={(e) => e.stopPropagation()}>
+        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/50 via-black/25 to-transparent backdrop-blur-md [mask-image:linear-gradient(to_bottom,transparent_0%,black_8px,black_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_8px,black_100%)] z-10 flex items-center justify-between min-h-[32px] max-h-[38px]" onClick={(e) => e.stopPropagation()}>
           <div className="flex-1 min-w-0 flex flex-col justify-center pl-1">
             <h3 
               className="font-bold text-white truncate leading-none uppercase"

@@ -444,8 +444,8 @@ const MarketSectionPreviewRail: React.FC<{
                     </div>
                   )}
 
-                  {/* Same liquid glass bar as the product card: light translucent tint, refractive blur, and specular highlight. */}
-                  <div className="absolute inset-x-0 bottom-0 z-10 border-t border-white/20 bg-gradient-to-t from-black/30 via-black/15 to-white/[0.04] px-3.5 pb-2.5 pt-2 backdrop-blur-md backdrop-saturate-150 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18)]">
+                  {/* Liquid gradient blend: smoothly merges into the photograph without a sharp top border. */}
+                  <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/50 via-black/25 to-transparent px-3.5 pb-2.5 pt-7 backdrop-blur-md backdrop-saturate-150 [mask-image:linear-gradient(to_bottom,transparent_0%,black_24px,black_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_24px,black_100%)]">
                     <p className="line-clamp-1 text-sm font-semibold leading-snug text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
                       {item.title}
                     </p>
