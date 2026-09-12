@@ -36,4 +36,25 @@ export function useReturnTo(
   }, [fallbackLabel, fallbackTo, location.state]);
 }
 
+/**
+ * The same origin, but only when one was actually handed over.
+ *
+ * `useReturnTo` always answers with its fallback, which is right for a screen
+ * that must always offer a way out (an admin detail page). A page reachable
+ * from anywhere — a product, a brand catalogue — should show a return pointer
+ * ONLY when something sent the reader there, otherwise every visitor gets a
+ * "back" control pointing somewhere they have never been.
+ */
+export function useOptionalReturnTo(): ReturnTarget | null {
+  const location = useLocation();
+
+  return useMemo(() => {
+    const state = (location.state ?? null) as Record<string, unknown> | null;
+    const to = readString(state?.returnTo);
+    // Same-origin app paths only — never let route state redirect off-site.
+    if (!to || !to.startsWith('/') || to.startsWith('//')) return null;
+    return { to, label: readString(state?.returnLabel) ?? 'Back' };
+  }, [location.state]);
+}
+
 export default useReturnTo;

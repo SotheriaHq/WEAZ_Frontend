@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom';
+import { useOptionalReturnTo } from '@/hooks/useReturnTo';
 import { useBrandProfile } from '../../hooks/UseBrandHook';
 import { useDispatch, useSelector } from 'react-redux';
 import { selectIsMobile } from '@/features/uiSlice';
@@ -196,6 +197,8 @@ const CatalogTabNotice: React.FC<CatalogTabNoticeProps> = ({ title, description 
 );
 
 const ProfilePage: React.FC = () => {
+  // First hook in the component, so it stays above every early return below.
+  const catalogReturnTarget = useOptionalReturnTo();
   const { id: routeBrandId } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const {
@@ -2288,6 +2291,17 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div className="w-full">
+      {/* Only when something sent the reader here — a bagged item's brand name
+          in a notification, for instance. A catalogue reached directly gets no
+          pointer back to a screen its visitor never came from. */}
+      {catalogReturnTarget ? (
+        <Link
+          to={catalogReturnTarget.to}
+          className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-black/5 px-3.5 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-black/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+        >
+          {catalogReturnTarget.label}
+        </Link>
+      ) : null}
       {/* Long catalogs (hundreds of designs) need one-tap escape hatches back
           to the profile metadata or down to the end of the feed. */}
       <ScrollAssist />

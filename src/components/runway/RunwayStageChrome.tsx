@@ -145,23 +145,21 @@ const RunwayStageChrome: React.FC = () => {
             no mark at all — on the route whose whole job is showing pictures.
             22px of lockup is affordable; the centre of the frame is still clear.
           */}
-          <BrandWordmark
-            logoSize={22}
-            showName
-            className="gap-1.5"
-            
-          />
+          <span className="relative inline-flex items-center">
+            <BrandWordmark
+              logoSize={22}
+              showName
+              className="gap-1.5"
+            />
+            {unreadCount > 0 && (
+              <CountBadge
+                count={unreadCount}
+                placement="inline"
+                className="ml-1 -mt-1 self-start"
+              />
+            )}
+          </span>
         </button>
-
-        {/*
-          The shared badge: a numeral in the brand colour, no plate.
-
-          This drew a filled rose disc, which on a full-bleed photograph was the
-          highest-contrast object on the screen — louder than the image the page
-          exists to show. `CountBadge` carries its contrast in a text shadow
-          instead, which is the same technique the rest of this chrome uses.
-        */}
-        <CountBadge count={unreadCount} />
       </div>
 
       {/*

@@ -13,7 +13,7 @@ import { customOrdersBuyerApi } from '@/api/CustomOrderApi';
 import { getCheckoutStatusCopy } from '@/pages/checkout/checkoutStatusCopy';
 import { setRuntimeCardholderNameMatchMode } from '@/pages/checkout/paymentFlow';
 import { canOfferCustomOrderCardRetry } from '@/pages/checkout/paymentRetryFlow';
-import { fetchCart, openCartDrawer } from '@/features/cartSlice';
+import { fetchCart, fetchCustomBagCount, openCartDrawer } from '@/features/cartSlice';
 import { queryClient } from '@/query/queryClient';
 import type { AppDispatch } from '@/store';
 
@@ -164,6 +164,15 @@ const PaymentReturnPage: React.FC = () => {
   ) => {
     if (status === 'PAID') {
       await dispatch(fetchCart({ force: true }));
+      /*
+        The bag badge is `totalQuantity + customBagCount`, and `fetchCart` only
+        refreshes the standard half. A unified checkout that paid for CUSTOM
+        lines therefore left the badge showing the pre-order number until the
+        30s read TTL lapsed — the "bag count did not clear after placing the
+        order" report. `force` is required because the thunk short-circuits
+        inside that same TTL.
+      */
+      await dispatch(fetchCustomBagCount({ force: true }));
       // A new order now exists. The Orders tab uses a cache-first resource with
       // refetchOnMount:false, so without this it paints the pre-order cache and
       // the buyer had to hard-refresh to see the order they just placed. Force a

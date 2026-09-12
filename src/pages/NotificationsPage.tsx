@@ -144,6 +144,20 @@ const NotificationsPage: React.FC = () => {
     [isAdminConsoleUser, navigate],
   );
 
+  /*
+    Hand the destination a way back. Product and catalogue pages are reachable
+    from many places, so they read the origin off route state rather than
+    guessing — see `useReturnTo`.
+  */
+  const handleOpenEntity = useCallback(
+    (to: string) => {
+      navigate(to, {
+        state: { returnTo: '/notifications', returnLabel: '👈 Back to notifications' },
+      });
+    },
+    [navigate],
+  );
+
   const handleMarkRead = useCallback(
     (id: string) => {
       const notification = items.find((n) => n.id === id);
@@ -266,6 +280,7 @@ const NotificationsPage: React.FC = () => {
                       onBodyClick={handleBodyClick}
                       onMarkRead={handleMarkRead}
                       onDelete={handleDelete}
+                      onOpenEntity={handleOpenEntity}
                     />
                   ))}
                 </ul>

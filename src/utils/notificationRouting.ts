@@ -16,6 +16,98 @@ export function determineActorRoute(actorId: string): string {
     return `/profile/${actorId}`;
 }
 
+/**
+ * The independently openable parts of a bag notification.
+ *
+ * Pressing the ROW opens the bag — that is what the notification is about. But
+ * the two nouns in the sentence are destinations in their own right: the item
+ * that was bagged, and the brand that made it. They are returned as data rather
+ * than matched out of the rendered sentence, because the sentence is written by
+ * the server and substring matching would break the moment a brand is called
+ * something that also appears in the copy.
+ *
+ * Either half is null when the payload cannot name it — an older notification
+ * written before `brandId` was carried, for instance, still renders and still
+ * opens the bag; it just has nothing to link the brand name to.
+ */
+export interface NotificationEntityLink {
+    to: string;
+    label: string;
+}
+
+export interface BagNotificationLinks {
+    content: NotificationEntityLink | null;
+    brand: NotificationEntityLink | null;
+}
+
+const EMPTY_BAG_LINKS: BagNotificationLinks = { content: null, brand: null };
+
+export function resolveBagNotificationLinks(
+    notification: NormalizedNotification,
+): BagNotificationLinks {
+    if (
+        notification.type !== NotificationTypes.BAG_ITEM_ADDED &&
+        notification.type !== NotificationTypes.BAG_CHECKOUT_REMINDER
+    ) {
+        return EMPTY_BAG_LINKS;
+    }
+
+    const payload = (notification.payload ?? {}) as Record<string, unknown>;
+    const str = (value: unknown): string | null =>
+        typeof value === 'string' && value.trim() ? value.trim() : null;
+    const firstOf = (value: unknown): string | null =>
+        Array.isArray(value) ? str(value[0]) : null;
+
+    const productId = str(payload.productId);
+    const productName = str(payload.productName);
+    const collectionId = str(payload.collectionId);
+    const collectionName = str(payload.collectionName);
+    const firstProductId = firstOf(payload.productIds);
+    const firstProductName = firstOf(payload.productNames);
+    const sourceId = str(payload.sourceId);
+    const sourceType = str(payload.sourceType)?.toUpperCase() ?? null;
+
+    /*
+      The label and the destination are chosen TOGETHER, as pairs.
+
+      Taking the title from one source and the link from another is how a row
+      ends up naming a collection and opening a product: the collection-bagging
+      payload carries `collectionName` AND a `productIds` array, so a title
+      picked by "first non-empty" and a link picked by "first non-empty" do not
+      describe the same thing.
+    */
+    let content: NotificationEntityLink | null = null;
+    if (productId && productName) {
+        content = { to: `/products/${encodeURIComponent(productId)}`, label: productName };
+    } else if (collectionId && collectionName) {
+        content = { to: `/collections/${encodeURIComponent(collectionId)}`, label: collectionName };
+    } else if (firstProductId && firstProductName) {
+        content = { to: `/products/${encodeURIComponent(firstProductId)}`, label: firstProductName };
+    } else if (sourceId && productName) {
+        // A custom order names its source rather than a product row.
+        content = {
+            to:
+                sourceType === 'PRODUCT'
+                    ? `/products/${encodeURIComponent(sourceId)}`
+                    : buildDesignRoute({ designId: sourceId }),
+            label: productName,
+        };
+    }
+
+    const brandId = str(payload.brandId);
+    const brandName = str(payload.brandName);
+
+    return {
+        content,
+        // `/profile/:brandId` is how the rest of the app opens a brand catalogue
+        // (product page, featured gallery, patches tab all use exactly this).
+        brand:
+            brandId && brandName
+                ? { to: `/profile/${encodeURIComponent(brandId)}`, label: brandName }
+                : null,
+    };
+}
+
 /** Content-review lifecycle notifications (brand-owner facing). */
 const CONTENT_REVIEW_TYPE_ROUTES = new Set([
     'CONTENT_SUBMITTED_FOR_REVIEW',

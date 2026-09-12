@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { useOptionalReturnTo } from '@/hooks/useReturnTo';
 import { 
   Heart, 
   ChevronDown, 
@@ -168,6 +169,8 @@ export default function ProductDetailsPage({ resolvedProductId }: ProductDetails
   const id = resolvedProductId ?? routeProductId;
   const navigate = useNavigate();
   const location = useLocation();
+  // Declared with the other hooks, above the loading/error early returns.
+  const returnTarget = useOptionalReturnTo();
   const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((s: RootState) => s.user.profile);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
@@ -721,6 +724,19 @@ export default function ProductDetailsPage({ resolvedProductId }: ProductDetails
       </AnimatePresence>
 
       <main className={`flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-8 lg:px-12 py-8 lg:py-10 ${isStudioStoreView ? 'rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg' : ''}`}>
+        {/* Shown only when something sent the reader here (a notification, for
+            instance) — otherwise every visitor would get a way "back" to a
+            screen they never came from. */}
+        {returnTarget ? (
+          <button
+            type="button"
+            onClick={() => navigate(returnTarget.to)}
+            className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-black/5 px-3.5 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-black/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+          >
+            {returnTarget.label}
+          </button>
+        ) : null}
+
         <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           {isStudioStoreView ? (
             <>

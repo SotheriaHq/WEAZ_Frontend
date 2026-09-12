@@ -21,7 +21,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { getActorDisplayName, normalizeNotification } from '@/utils/notificationAdapter';
 import type { NormalizedNotification } from '@/utils/notificationAdapter';
-import { determineActorRoute, resolveNotificationClickRoute } from '@/utils/notificationRouting';
+import { determineActorRoute, resolveBagNotificationLinks, resolveNotificationClickRoute } from '@/utils/notificationRouting';
 import { trackDropdownOpen, trackDropdownClose, trackMarkAllRead } from '@/utils/notificationTelemetry';
 import { NotificationTypes, getActionText } from '@/types/notificationTypes';
 import { NotificationIcon } from '@/components/notifications/NotificationIcon';
@@ -216,6 +216,22 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
       onClose();
     },
     [handleMarkRead, isAdminConsoleUser, navigate, onClose],
+  );
+
+  /*
+    Opening the bagged item or its brand from the dropdown. The panel has to
+    close itself first, and the destination is handed an origin so its back
+    control returns here rather than guessing — see `useReturnTo`.
+  */
+  const handleOpenEntity = useCallback(
+    (notificationId: string, to: string) => {
+      handleMarkRead(notificationId);
+      navigate(to, {
+        state: { returnTo: '/notifications', returnLabel: '👈 Back to notifications' },
+      });
+      onClose();
+    },
+    [handleMarkRead, navigate, onClose],
   );
 
   const timeAgo = (dateString: string): string => {
@@ -488,6 +504,7 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
           <ul className="space-y-2" role="list">
             {normalizedItems.map((n) => {
               const isUnread = !n.isRead;
+              const entityLinks = resolveBagNotificationLinks(n);
               const actorDisplayName = getActorDisplayName(n);
               const hasActorLink = Boolean(n.actor?.id);
               const hasActorLabel =
@@ -574,6 +591,41 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                                 </span>
                               ) : null}
                             </p>
+                            {/* The nouns in the sentence are destinations too:
+                                the bagged item, and the brand that made it. */}
+                            {entityLinks.content || entityLinks.brand ? (
+                              <p className="mt-1 flex flex-wrap items-center gap-1.5">
+                                {entityLinks.content ? (
+                                  <button
+                                    type="button"
+                                    className="text-[11px] font-bold italic text-[color:var(--brand-primary)] hover:underline underline-offset-2 dark:text-purple-400"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenEntity(n.id, entityLinks.content!.to);
+                                    }}
+                                    aria-label={`Open ${entityLinks.content.label}`}
+                                  >
+                                    {entityLinks.content.label}
+                                  </button>
+                                ) : null}
+                                {entityLinks.content && entityLinks.brand ? (
+                                  <span className="text-[11px] text-theme-secondary" aria-hidden="true">·</span>
+                                ) : null}
+                                {entityLinks.brand ? (
+                                  <button
+                                    type="button"
+                                    className="text-[11px] font-bold italic text-[color:var(--brand-primary)] hover:underline underline-offset-2 dark:text-purple-400"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenEntity(n.id, entityLinks.brand!.to);
+                                    }}
+                                    aria-label={`Open ${entityLinks.brand.label}'s catalogue`}
+                                  >
+                                    {entityLinks.brand.label}
+                                  </button>
+                                ) : null}
+                              </p>
+                            ) : null}
                             <p className="mt-1 text-[11px] font-medium text-theme-secondary">{timeAgo(n.createdAt)}</p>
                           </div>
 

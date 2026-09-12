@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useDispatch } from 'react-redux';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { fetchCart, fetchCustomBagCount } from '@/features/cartSlice';
+import type { AppDispatch } from '@/store';
 import Button from '@/components/ui/Button';
 import { openPaystackInline } from '@/lib/paystackInline';
 import {
@@ -53,6 +56,7 @@ const OrderConfirmation: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const dispatch = useDispatch<AppDispatch>();
   const locationState = (location.state as ConfirmationState | null) ?? null;
   const [attempt, setAttempt] = useState<PaymentAttemptSummary | null>(null);
   const [loading, setLoading] = useState(Boolean(searchParams.get('reference')) && !locationState?.summary);
@@ -100,6 +104,22 @@ const OrderConfirmation: React.FC = () => {
   const status = attempt?.status ?? (nextAction?.type ? 'PENDING' : 'PAID');
   const statusCopy = getCheckoutStatusCopy('confirmation', status, nextAction);
   const canResumePayment = Boolean(String(providerAccessCode ?? '').trim());
+
+  /*
+    This page is a landing, not only a redirect target: it is reached straight
+    from a provider return and from "View receipt" in My Orders, where nothing
+    else has cleared the bag. `PaymentReturnPage` refreshes on its own PAID
+    transition, but a buyer who never passes through it would still see the
+    pre-order badge. Both halves are refreshed because the badge sums standard
+    and custom lines, and the ref keeps a re-render from re-firing the fetch.
+  */
+  const paidBagRefreshDoneRef = React.useRef(false);
+  useEffect(() => {
+    if (status !== 'PAID' || paidBagRefreshDoneRef.current) return;
+    paidBagRefreshDoneRef.current = true;
+    void dispatch(fetchCart({ force: true }));
+    void dispatch(fetchCustomBagCount({ force: true }));
+  }, [dispatch, status]);
 
   const paymentSummaryLines = useMemo(() => {
     if (!paymentMethod || !paymentData || !isCheckoutPaymentMethod(paymentMethod)) return [];

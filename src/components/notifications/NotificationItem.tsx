@@ -16,6 +16,7 @@ import { NotificationIcon } from './NotificationIcon';
 import { getActionText, getAriaAction } from '@/types/notificationTypes';
 import { hasValidActor, getActorDisplayName } from '@/utils/notificationAdapter';
 import type { NormalizedNotification } from '@/utils/notificationAdapter';
+import { resolveBagNotificationLinks } from '@/utils/notificationRouting';
 import { trackOnce, createTelemetryEvent } from '@/utils/notificationTelemetry';
 import './NotificationItem.css';
 
@@ -53,10 +54,17 @@ export interface NotificationItemProps {
    * nest one list item inside another.
    */
   onDelete?: (id: string) => void;
+  /**
+   * Opens one of the nouns in the sentence (the bagged item, or its brand).
+   * The caller navigates, because each surface needs to do something slightly
+   * different first — the dropdown has to close itself, the page does not —
+   * and both want to hand the destination a way back.
+   */
+  onOpenEntity?: (to: string, label: string) => void;
 }
 
 export const NotificationItem = React.memo<NotificationItemProps>(
-  ({ notification, onAvatarClick, onUsernameClick, onBodyClick, onMarkRead, onDelete }) => {
+  ({ notification, onAvatarClick, onUsernameClick, onBodyClick, onMarkRead, onDelete, onOpenEntity }) => {
     const { id, type, isRead, actor, target, message } = notification;
     const displayName = getActorDisplayName(notification);
     const actionText = getActionText(type);
@@ -131,6 +139,18 @@ export const NotificationItem = React.memo<NotificationItemProps>(
       e.stopPropagation();
       onDelete?.(id);
     }, [id, onDelete]);
+
+    const entityLinks = resolveBagNotificationLinks(notification);
+
+    // Opening a noun must not also open the bag behind it.
+    const handleEntityClick = useCallback(
+      (event: React.MouseEvent, link: { to: string; label: string }) => {
+        event.stopPropagation();
+        handleMarkRead();
+        onOpenEntity?.(link.to, link.label);
+      },
+      [handleMarkRead, onOpenEntity],
+    );
 
     // Keyboard handler for accessibility
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -213,6 +233,44 @@ export const NotificationItem = React.memo<NotificationItemProps>(
               )}
             </>
           )}
+
+          {/*
+            The row opens the bag, because that is what the notification is
+            about. These two are the nouns in that sentence and are destinations
+            in their own right, so they get their own targets rather than making
+            the reader go to the bag and hunt.
+          */}
+          {onOpenEntity && (entityLinks.content || entityLinks.brand) ? (
+            <p className="notification-entities">
+              {entityLinks.content ? (
+                <button
+                  type="button"
+                  className="notification-entity"
+                  onClick={(event) => handleEntityClick(event, entityLinks.content!)}
+                  aria-label={`Open ${entityLinks.content.label}`}
+                  data-testid="notification-entity-content"
+                >
+                  {entityLinks.content.label}
+                </button>
+              ) : null}
+              {entityLinks.content && entityLinks.brand ? (
+                <span className="notification-entity-separator" aria-hidden="true">
+                  ·
+                </span>
+              ) : null}
+              {entityLinks.brand ? (
+                <button
+                  type="button"
+                  className="notification-entity"
+                  onClick={(event) => handleEntityClick(event, entityLinks.brand!)}
+                  aria-label={`Open ${entityLinks.brand.label}'s catalogue`}
+                  data-testid="notification-entity-brand"
+                >
+                  {entityLinks.brand.label}
+                </button>
+              ) : null}
+            </p>
+          ) : null}
 
           {/* Timestamp */}
           <span className="timestamp" aria-hidden="true">
