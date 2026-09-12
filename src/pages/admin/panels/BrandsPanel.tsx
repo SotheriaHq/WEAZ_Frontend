@@ -335,8 +335,8 @@ const BrandsPanel: React.FC = () => {
         )}
 
         {loading ? (
-          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, idx) => (<div key={idx} className="h-36 animate-pulse rounded-2xl bg-gray-200/70 dark:bg-white/10" />))}
+          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            {Array.from({ length: 8 }).map((_, idx) => (<div key={idx} className="h-44 animate-pulse rounded-2xl bg-gray-200/70 dark:bg-white/10" />))}
           </div>
         ) : filteredBrands.length === 0 ? (
           <div className="p-10 text-center">
@@ -437,52 +437,62 @@ const BrandsPanel: React.FC = () => {
             </table>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 lg:grid-cols-3">
+          /*
+            A directory card identifies a brand and offers two actions; it is not
+            a place to display artwork. The logo was a 144px-tall full-bleed
+            banner above every card, which pushed the name, state and controls
+            below the fold, held the grid to three columns, and made a page of
+            brands read as a page of pictures. It is now a 48px tile beside the
+            name — the same treatment the table row uses — so a card costs about
+            a third of the height and four or five fit per row.
+          */
+          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {filteredBrands.map((brand) => {
               const visual = getBrandVisual(brand);
               const ownerStatus = normalizeStatus(brand.owner?.status);
+              const verification = verificationState(brand);
               return (
-                <article key={brand.id} className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white/85 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-                  <div className="h-36 w-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-500/20 dark:to-purple-500/20">
-                    {visual ? (
-                      <ImageWithFallback src={visual} alt={brand.name ?? 'Brand'} fallbackName={brand.name ?? 'Brand'} fit="cover" className="h-36 w-full" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-3xl text-gray-500 dark:text-gray-300">🏷️</div>
-                    )}
+                <article key={brand.id} className="flex flex-col gap-2.5 rounded-2xl border border-gray-200/80 bg-white/90 p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="flex items-start gap-2.5">
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-gray-200/70 bg-gray-100 dark:border-white/10 dark:bg-white/10">
+                      {visual ? (
+                        <ImageWithFallback src={visual} alt={brand.name ?? 'Brand'} fallbackName={brand.name ?? 'Brand'} fit="cover" className="h-12 w-12" rounded="xl" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-xs font-bold text-gray-500 dark:text-gray-300">{String(brand.name ?? 'BR').slice(0, 2).toUpperCase()}</div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-gray-900 dark:text-white" title={brand.name || 'Unnamed brand'}>{brand.name || 'Unnamed brand'}</p>
+                      <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">{getOwnerName(brand)}</p>
+                      <p className="truncate text-[11px] text-gray-400 dark:text-gray-500" title={brand.owner?.email ?? undefined}>{brand.owner?.email ?? 'No email'}</p>
+                    </div>
                   </div>
-                  <div className="space-y-3 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-base font-bold text-gray-900 dark:text-white">{brand.name || 'Unnamed brand'}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{getOwnerName(brand)}</p>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1">
-                        <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${brand.isStoreOpen ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200' : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'}`}>{brand.isStoreOpen ? 'Open' : 'Closed'}</span>
-                        <span
-                          className={`whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold ${verificationState(brand).tone}`}
-                          title={verificationState(brand).hint}
-                        >
-                          {verificationState(brand).label}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="line-clamp-2 min-h-[40px] text-sm text-gray-600 dark:text-gray-300">{brand.description?.trim() || 'No brand description provided.'}</p>
-                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                      <span>{brand.owner?.email ?? 'No email'}</span>
-                      <span>{ownerStatus === 'UNKNOWN' ? 'Unknown' : ownerStatus}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => openManageModal(brand)} className="flex-1 rounded-lg bg-indigo-100 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:hover:bg-indigo-500/30">⚙ Manage</button>
-                      {canStoreOverride && canOverrideStore(brand) ? (
-                        <button type="button" disabled={actionLoadingBrandId === brand.id} onClick={() => requestToggleStore(brand)} className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold ${brand.isStoreOpen ? 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-200 dark:hover:bg-rose-500/30' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30'} disabled:cursor-not-allowed disabled:opacity-60`}>
-                          {actionLoadingBrandId === brand.id ? 'Saving...' : brand.isStoreOpen ? 'Close store' : 'Open store'}
-                        </button>
-                      ) : canStoreOverride ? (
-                        <span className="flex-1 rounded-lg bg-gray-100 px-3 py-2 text-center text-xs font-semibold text-gray-500 dark:bg-white/5 dark:text-gray-400" title="This brand has never published a storefront, so there is nothing to open.">
-                          Setup incomplete
-                        </span>
-                      ) : null}
-                    </div>
+
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${brand.isStoreOpen ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200' : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'}`}>
+                      {brand.isStoreOpen ? '🟢 Open' : '🔴 Closed'}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${verification.tone}`} title={verification.hint}>
+                      {verification.label}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${ownerStatus === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200' : ownerStatus === 'SUSPENDED' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200' : ownerStatus === 'DEACTIVATED' ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200' : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'}`}>
+                      {ownerStatus === 'UNKNOWN' ? 'Unknown' : ownerStatus}
+                    </span>
+                  </div>
+
+                  <p className="line-clamp-2 text-[11px] leading-snug text-gray-500 dark:text-gray-400">{brand.description?.trim() || 'No brand description provided.'}</p>
+
+                  <div className="mt-auto flex gap-1.5">
+                    <button type="button" onClick={() => openManageModal(brand)} className="flex-1 rounded-lg bg-indigo-100 px-2 py-1.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:hover:bg-indigo-500/30">⚙ Manage</button>
+                    {canStoreOverride && canOverrideStore(brand) ? (
+                      <button type="button" disabled={actionLoadingBrandId === brand.id} onClick={() => requestToggleStore(brand)} className={`flex-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold ${brand.isStoreOpen ? 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-200 dark:hover:bg-rose-500/30' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30'} disabled:cursor-not-allowed disabled:opacity-60`}>
+                        {actionLoadingBrandId === brand.id ? 'Saving...' : brand.isStoreOpen ? 'Close store' : 'Open store'}
+                      </button>
+                    ) : canStoreOverride ? (
+                      <span className="flex-1 rounded-lg bg-gray-100 px-2 py-1.5 text-center text-[11px] font-semibold text-gray-500 dark:bg-white/5 dark:text-gray-400" title="This brand has never published a storefront, so there is nothing to open.">
+                        Setup incomplete
+                      </span>
+                    ) : null}
                   </div>
                 </article>
               );

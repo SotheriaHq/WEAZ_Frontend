@@ -1,45 +1,15 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store';
 import { closeSidebar } from '@/features/uiSlice';
 import IslandBottomNav from '@/components/navigation/IslandBottomNav';
-
-interface NavItem {
-  key: string;
-  label: string;
-  path: string;
-  emoji: string;
-  permission?: string;
-  permissions?: string[];
-  superAdminOnly?: boolean;
-}
-
-const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', path: '/admin', emoji: '📊' },
-  { key: 'orders', label: 'Orders', path: '/admin/orders', emoji: '🧾', permission: 'PAYOUTS_READ' },
-  { key: 'users', label: 'Users', path: '/admin/users', emoji: '👤', permissions: ['USERS_READ', 'BRANDS_READ', 'BRANDS_VERIFY'] },
-  {
-    key: 'content',
-    label: 'Content Management',
-    path: '/admin/content',
-    emoji: '🧰',
-    permissions: ['PRODUCTS_READ', 'COLLECTIONS_READ', 'CONTENT_REVIEW_READ'],
-  },
-  { key: 'taxonomy', label: 'Taxonomy', path: '/admin/taxonomy', emoji: '🧬', permission: 'TAXONOMY_READ' },
-  { key: 'tags', label: 'Hashtag moderation', path: '/admin/tags', emoji: '🏷️', permission: 'TAGS_READ' },
-  { key: 'finance', label: 'Finance', path: '/admin/finance', emoji: '🏦', permission: 'PAYOUTS_READ' },
-  { key: 'payouts', label: 'Payouts', path: '/admin/payouts', emoji: '💰', permission: 'PAYOUTS_READ' },
-  { key: 'disputes', label: 'Disputes', path: '/admin/disputes', emoji: '⚖️', permission: 'DISPUTES_READ' },
-  { key: 'messaging', label: 'Messaging', path: '/admin/messaging', emoji: '💬', permission: 'MESSAGING_READ' },
-  { key: 'moderation', label: 'Moderation', path: '/admin/moderation', emoji: '🛡️', permission: 'MODERATION_READ' },
-  { key: 'reviews', label: 'Reviews', path: '/admin/reviews', emoji: '⭐', permission: 'MODERATION_READ' },
-  { key: 'audit', label: 'Audit', path: '/admin/audit', emoji: '📋', permission: 'AUDIT_READ' },
-  { key: 'settings', label: 'Settings', path: '/admin/settings', emoji: '⚙️', superAdminOnly: true },
-  { key: 'monitoring', label: 'Monitoring', path: '/admin/monitoring', emoji: 'MON', permission: 'ALERTS_READ' },
-  { key: 'market-governance', label: 'Market Governance', path: '/admin/market-governance', emoji: 'MG', permission: 'MARKET_GOVERNANCE_READ' },
-];
+import {
+  ADMIN_NAV_ITEMS,
+  canAccessAdminPath,
+  type AdminNavItem,
+} from '@/components/admin/adminNavigation';
 
 const AdminSidebar: React.FC = () => {
   const navigate = useNavigate();
@@ -47,16 +17,19 @@ const AdminSidebar: React.FC = () => {
   const { hasPermission, isSuperAdmin } = useAdminPermissions();
   const dispatch = useDispatch<AppDispatch>();
 
-  const visibleItems = navItems.filter((item) => {
-    if (item.superAdminOnly && !isSuperAdmin) return false;
-    if (item.permission && !hasPermission(item.permission)) return false;
-    if (item.permissions && !item.permissions.some((code) => hasPermission(code))) {
-      return false;
-    }
-    return true;
-  });
+  const access = useMemo(
+    () => ({ hasPermission, isSuperAdmin }),
+    [hasPermission, isSuperAdmin],
+  );
 
-  const getIsActive = (item: NavItem) => {
+  // Requirements come from the shared route table, so the sidebar cannot offer
+  // a destination the router will bounce the admin straight back out of.
+  const visibleItems = useMemo(
+    () => ADMIN_NAV_ITEMS.filter((item) => canAccessAdminPath(item.path, access)),
+    [access],
+  );
+
+  const getIsActive = (item: AdminNavItem) => {
     const path = item.path.split('?')[0];
     if (item.path === '/admin') {
       return location.pathname === '/admin';

@@ -58,6 +58,16 @@ const CreateAdminModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
         <p className="text-xs text-slate-600/90 dark:text-slate-300/90">
           A temporary password is generated automatically and sent by email.
         </p>
+        {/*
+          The account is created with dashboard access and nothing else, so the
+          console it lands on is never empty. Saying so here is the difference
+          between a SuperAdmin knowing to go and grant the rest, and wondering
+          why the new admin reports seeing only one screen.
+        */}
+        <p className="text-xs text-slate-600/90 dark:text-slate-300/90">
+          The account starts with dashboard access only. Grant everything else
+          from Users → Team → Manage.
+        </p>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-800 dark:text-slate-200">Email</label>
           <input

@@ -1,10 +1,15 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminDashboardApi } from '../../api/AdminApi';
 import { unwrapApiResponse } from '@/types/auth';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import useCachedResource from '@/hooks/useCachedResource';
 import { WIEZ_COUNT_STALE_TIME_MS } from '@/query/queryClient';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import {
+  ADMIN_NAV_ITEMS,
+  canAccessAdminPath,
+} from '@/components/admin/adminNavigation';
 
 type RecentLog = {
   id: string;
@@ -115,8 +120,53 @@ const statusBadge = (status: string | null | undefined) => {
   return <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${style}`}>{label}</span>;
 };
 
+/*
+  Tile styling is split so a tile that cannot be opened does not advertise
+  itself as clickable: the lift, scale and shadow live only on the interactive
+  variant. The figure is still shown — an admin is allowed to know the platform
+  totals; what is gated is the route out of here.
+*/
+const PRIMARY_CARD_BASE =
+  'group relative overflow-hidden rounded-2xl border border-purple-200/30 bg-gradient-to-br from-white/90 to-purple-50/70 p-5 text-left backdrop-blur-sm dark:border-white/10 dark:from-white/[0.06] dark:to-purple-900/20';
+const PRIMARY_CARD_INTERACTIVE =
+  'transition-all hover:-translate-y-0.5 hover:scale-[1.01] hover:border-purple-300/50 hover:shadow-xl hover:shadow-purple-500/10 dark:hover:border-white/20 dark:hover:shadow-black/30';
+const METRIC_TILE_BASE =
+  'flex flex-col items-center rounded-xl border border-purple-200/30 bg-gradient-to-br from-white/80 to-purple-50/40 p-3 dark:border-white/10 dark:from-white/[0.05] dark:to-purple-900/10';
+const METRIC_TILE_INTERACTIVE =
+  'transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-purple-500/10';
+
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { hasPermission, isSuperAdmin } = useAdminPermissions();
+
+  const access = useMemo(
+    () => ({ hasPermission, isSuperAdmin }),
+    [hasPermission, isSuperAdmin],
+  );
+
+  /** Can this admin actually open that destination? Drives every link here. */
+  const canOpen = useCallback(
+    (route: string) => canAccessAdminPath(route, access),
+    [access],
+  );
+
+  /*
+    New admins are seeded `dashboard.read` at creation, so this is the edge case:
+    an account that predates the seed, or one a SuperAdmin has stripped back to
+    nothing. Firing the request anyway would 403 and paint a page of em-dashes,
+    which reads as an outage rather than as a permission boundary — so the fetch
+    is skipped and the page says plainly what is missing.
+  */
+  const canReadDashboard = hasPermission('DASHBOARD_READ');
+
+  /** Whether any console at all is reachable — drives the "nothing granted" note. */
+  const hasAnyConsole = useMemo(
+    () =>
+      ADMIN_NAV_ITEMS.some(
+        (item) => item.path !== '/admin' && canAccessAdminPath(item.path, access),
+      ),
+    [access],
+  );
 
   // Heavy platform totals — slower poll. Not re-run every 20s.
   const { data: stats, loading } = useCachedResource<DashboardStats>({
@@ -125,6 +175,7 @@ const AdminDashboard: React.FC = () => {
       const res = await adminDashboardApi.getStats();
       return unwrapApiResponse<DashboardStats>(res.data as any);
     },
+    enabled: canReadDashboard,
     staleTime: 60_000,
     refetchInterval: 60_000,
   });
@@ -136,6 +187,7 @@ const AdminDashboard: React.FC = () => {
       const res = await adminDashboardApi.getLiveBadges();
       return unwrapApiResponse<LiveBadges>(res.data as any);
     },
+    enabled: canReadDashboard,
     staleTime: WIEZ_COUNT_STALE_TIME_MS,
     refetchInterval: 20_000,
   });
@@ -176,6 +228,72 @@ const AdminDashboard: React.FC = () => {
     ];
   }, [stats, pendingPayouts, ordersNeedingAttention, pendingVerifications]);
 
+  /**
+   * Link lists, filtered to what this admin can actually open. A section that
+   * empties out is dropped rather than rendered as a heading over nothing, and a
+   * link that would only bounce the admin back to this page is worse than no
+   * link at all.
+   */
+  const linkSections = useMemo(() => {
+    const sections: Array<{
+      title: string;
+      gradient: string;
+      shadow: string;
+      items: Array<{ label: string; route: string; count?: number }>;
+    }> = [
+      {
+        title: 'Quick Actions',
+        gradient: 'to-fuchsia-50/30 dark:to-fuchsia-900/10',
+        shadow: 'shadow-fuchsia-500/10',
+        items: [
+          { label: 'Manage Users', route: '/admin/users' },
+          { label: 'Manage Brands', route: '/admin/brands' },
+          { label: 'Manage Content', route: '/admin/content' },
+          { label: 'Finance Workspace', route: '/admin/finance' },
+        ],
+      },
+      {
+        title: 'Moderation',
+        gradient: 'to-amber-50/30 dark:to-amber-900/10',
+        shadow: 'shadow-amber-500/10',
+        items: [
+          { label: 'Content Moderation', route: '/admin/moderation' },
+          { label: 'Disputes', route: '/admin/disputes', count: stats?.openDisputes },
+          { label: 'Payouts', route: '/admin/payouts', count: stats?.pendingPayouts },
+          { label: 'Audit Log', route: '/admin/audit' },
+        ],
+      },
+      {
+        title: 'System',
+        gradient: 'to-indigo-50/30 dark:to-indigo-900/10',
+        shadow: 'shadow-indigo-500/10',
+        items: [
+          { label: 'Taxonomy', route: '/admin/taxonomy' },
+          { label: 'Tags', route: '/admin/tags' },
+          { label: 'Measurements', route: '/admin/taxonomy?tab=measurements' },
+          { label: 'Settings', route: '/admin/settings' },
+        ],
+      },
+    ];
+
+    return sections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => canOpen(item.route)),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [canOpen, stats]);
+
+  /** Audit rows can point at consoles this admin cannot open; fall back home. */
+  const openLogTarget = useCallback(
+    (targetRoute: string | null | undefined) => {
+      const target = targetRoute && canOpen(targetRoute) ? targetRoute : '/admin/audit';
+      if (!canOpen(target)) return;
+      navigate(target);
+    },
+    [canOpen, navigate],
+  );
+
   const colorMap: Record<string, { glow: string; text: string }> = {
     indigo: { glow: 'bg-indigo-500/10', text: 'text-indigo-400' },
     fuchsia: { glow: 'bg-fuchsia-500/10', text: 'text-fuchsia-400' },
@@ -201,6 +319,32 @@ const AdminDashboard: React.FC = () => {
     return `${days}d ago`;
   };
 
+  /*
+    The empty admin state. An admin with no dashboard grant has nothing to read
+    and nowhere to go, so the page says that in words and names the remedy,
+    rather than rendering the full layout with every figure as an em-dash.
+  */
+  if (!canReadDashboard) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Platform Overview</h2>
+        </div>
+        <section className="rounded-2xl border border-amber-200/70 bg-amber-50/70 px-6 py-10 text-center dark:border-amber-500/30 dark:bg-amber-500/10">
+          <p className="text-4xl" aria-hidden="true">🔑</p>
+          <h3 className="mt-3 text-lg font-bold text-amber-900 dark:text-amber-100">
+            This admin account has no permissions yet
+          </h3>
+          <p className="mx-auto mt-2 max-w-md text-sm text-amber-800/90 dark:text-amber-200/90">
+            Your account is active, but nothing has been granted to it — so there
+            are no figures to show and no consoles to open. Ask a SuperAdmin to
+            grant your permissions from Users → Team → Manage.
+          </p>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -211,9 +355,19 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Dashboard-only admin: the figures are readable, but nothing else is
+          reachable, and an empty sidebar on its own never explains why. */}
+      {!hasAnyConsole ? (
+        <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 px-5 py-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+          You can see the platform overview, but no admin consoles have been
+          granted to your account yet. Ask a SuperAdmin to grant the permissions
+          you need.
+        </div>
+      ) : null}
+
       {/* Always-visible danger flag: custom orders escalated for admin review.
           Beats/pulses so the admin can't miss it even without opening notifications. */}
-      {!loading && customAttentionCount > 0 ? (
+      {!loading && customAttentionCount > 0 && canOpen('/admin/orders') ? (
         <button
           type="button"
           onClick={() => navigate('/admin/orders?tab=custom&attention=1')}
@@ -239,12 +393,9 @@ const AdminDashboard: React.FC = () => {
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {primaryCards.map((card) => {
           const colors = colorMap[card.color];
-          return (
-            <button
-              key={card.label}
-              onClick={() => navigate(card.route)}
-              className="group relative overflow-hidden rounded-2xl border border-purple-200/30 bg-gradient-to-br from-white/90 to-purple-50/70 p-5 text-left backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:scale-[1.01] hover:border-purple-300/50 hover:shadow-xl hover:shadow-purple-500/10 dark:border-white/10 dark:from-white/[0.06] dark:to-purple-900/20 dark:hover:border-white/20 dark:hover:shadow-black/30"
-            >
+          const canNavigate = canOpen(card.route);
+          const body = (
+            <>
               <div className={`absolute -right-4 -top-4 h-20 w-20 rounded-full blur-2xl ${colors.glow}`} />
               <p className="mb-1 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{card.label}</p>
               <p className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
@@ -253,29 +404,58 @@ const AdminDashboard: React.FC = () => {
               <div className={`mt-3 flex items-center gap-1 text-[10px] font-bold ${card.changeType === 'up' ? 'text-emerald-600 dark:text-emerald-400' : colors.text}`}>
                 <span>{card.change}</span>
               </div>
+            </>
+          );
+
+          return canNavigate ? (
+            <button
+              key={card.label}
+              onClick={() => navigate(card.route)}
+              className={`${PRIMARY_CARD_BASE} ${PRIMARY_CARD_INTERACTIVE}`}
+            >
+              {body}
             </button>
+          ) : (
+            <div key={card.label} className={PRIMARY_CARD_BASE}>
+              {body}
+            </div>
           );
         })}
       </section>
 
       <section className={`grid grid-cols-2 gap-3 md:grid-cols-3 ${secondaryMetrics.length > 6 ? 'xl:grid-cols-7' : 'lg:grid-cols-6'}`}>
-        {secondaryMetrics.map((metric) => (
-          <button
-            key={metric.label}
-            onClick={() => navigate(metric.route)}
-            className="flex flex-col items-center rounded-xl border border-purple-200/30 bg-gradient-to-br from-white/80 to-purple-50/40 p-3 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-purple-500/10 dark:border-white/10 dark:from-white/[0.05] dark:to-purple-900/10"
-          >
-            <p className="text-[10px] font-bold uppercase tracking-tighter text-gray-500 dark:text-gray-500">{metric.label}</p>
-            <p className="text-lg font-bold text-gray-900 dark:text-white">{loading ? '...' : metric.value}</p>
-          </button>
-        ))}
+        {secondaryMetrics.map((metric) => {
+          const canNavigate = canOpen(metric.route);
+          const body = (
+            <>
+              <p className="text-[10px] font-bold uppercase tracking-tighter text-gray-500 dark:text-gray-500">{metric.label}</p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white">{loading ? '...' : metric.value}</p>
+            </>
+          );
+
+          return canNavigate ? (
+            <button
+              key={metric.label}
+              onClick={() => navigate(metric.route)}
+              className={`${METRIC_TILE_BASE} ${METRIC_TILE_INTERACTIVE}`}
+            >
+              {body}
+            </button>
+          ) : (
+            <div key={metric.label} className={METRIC_TILE_BASE}>
+              {body}
+            </div>
+          );
+        })}
       </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="overflow-hidden rounded-2xl border border-purple-200/30 bg-gradient-to-br from-white/90 to-purple-50/40 shadow-sm shadow-purple-500/10 backdrop-blur-sm dark:border-white/10 dark:from-white/[0.05] dark:to-purple-900/10 lg:col-span-8">
           <div className="flex items-center justify-between px-5 pt-5 pb-3">
             <h3 className="text-base font-bold text-gray-900 dark:text-white">Recent Activity</h3>
-            <button onClick={() => navigate('/admin/audit')} className="text-xs font-bold text-purple-600 hover:underline dark:text-fuchsia-400">View All</button>
+            {canOpen('/admin/audit') ? (
+              <button onClick={() => navigate('/admin/audit')} className="text-xs font-bold text-purple-600 hover:underline dark:text-fuchsia-400">View All</button>
+            ) : null}
           </div>
           <div className="px-5 pb-5">
             {loading ? (
@@ -300,7 +480,7 @@ const AdminDashboard: React.FC = () => {
                     <button
                       key={log.id}
                       type="button"
-                      onClick={() => navigate(log.targetRoute || '/admin/audit')}
+                      onClick={() => openLogTarget(log.targetRoute)}
                       className="-mx-2 flex w-full items-center gap-3 rounded-lg px-2 py-3.5 text-left transition-colors hover:bg-gray-50/50 dark:hover:bg-white/[0.03]"
                     >
                       <div className="h-9 w-9 shrink-0 overflow-hidden rounded-2xl bg-gray-100 dark:bg-white/10">
@@ -389,41 +569,7 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {[
-          {
-            title: 'Quick Actions',
-            gradient: 'to-fuchsia-50/30 dark:to-fuchsia-900/10',
-            shadow: 'shadow-fuchsia-500/10',
-            items: [
-              { label: 'Manage Users', route: '/admin/users' },
-              { label: 'Manage Brands', route: '/admin/brands' },
-              { label: 'Manage Content', route: '/admin/content' },
-              { label: 'Finance Workspace', route: '/admin/finance' },
-            ],
-          },
-          {
-            title: 'Moderation',
-            gradient: 'to-amber-50/30 dark:to-amber-900/10',
-            shadow: 'shadow-amber-500/10',
-            items: [
-              { label: 'Content Moderation', route: '/admin/moderation' },
-              { label: 'Disputes', route: '/admin/disputes', count: stats?.openDisputes },
-              { label: 'Payouts', route: '/admin/payouts', count: stats?.pendingPayouts },
-              { label: 'Audit Log', route: '/admin/audit' },
-            ],
-          },
-          {
-            title: 'System',
-            gradient: 'to-indigo-50/30 dark:to-indigo-900/10',
-            shadow: 'shadow-indigo-500/10',
-            items: [
-              { label: 'Taxonomy', route: '/admin/taxonomy' },
-              { label: 'Tags', route: '/admin/tags' },
-              { label: 'Measurements', route: '/admin/taxonomy?tab=measurements' },
-              { label: 'Settings', route: '/admin/settings' },
-            ],
-          },
-        ].map((section) => (
+        {linkSections.map((section) => (
           <div key={section.title} className={`rounded-2xl border border-purple-200/30 bg-gradient-to-br from-white/90 ${section.gradient} p-5 shadow-sm ${section.shadow} backdrop-blur-sm dark:border-white/10 dark:from-white/[0.05]`}>
             <h3 className="mb-4 text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">{section.title}</h3>
             <div className="space-y-1">
@@ -435,7 +581,7 @@ const AdminDashboard: React.FC = () => {
                 >
                   <span className="font-medium">{link.label}</span>
                   <div className="flex items-center gap-2">
-                    {'count' in link && link.count && link.count > 0 ? (
+                    {link.count != null && link.count > 0 ? (
                       <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-600 dark:bg-rose-500/15 dark:text-rose-400">{link.count}</span>
                     ) : null}
                     <span aria-hidden="true" className="text-gray-300 transition-colors group-hover:text-purple-400 dark:text-gray-600">›</span>

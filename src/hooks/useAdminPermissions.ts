@@ -2,61 +2,29 @@ import { useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import { getStoredAccessToken } from '../api/httpClient';
+import { ADMIN_PERMISSION_CODE_BY_KEY } from '@/constants/adminPermissions';
 
-const PERMISSION_ALIASES: Record<string, string> = {
-  USERS_READ: 'users.read',
-  USERS_UPDATE: 'users.update',
+/**
+ * Keys that do not match a catalogue entry's name and so cannot be derived.
+ * They are kept because call sites still pass them.
+ */
+const LEGACY_PERMISSION_ALIASES: Record<string, string> = {
   USERS_WRITE: 'users.update',
-  USERS_ROLE_ASSIGN_ADMIN: 'users.role.assign_admin',
-  USERS_ROLE_ASSIGN_USER: 'users.role.assign_user',
-  USERS_DATA_EXPORT: 'users.data_export',
-  USERS_DATA_WIPE: 'users.data_wipe',
   USERS_SUSPEND: 'users.deactivate',
-  USERS_DEACTIVATE: 'users.deactivate',
   USERS_NOTIFY: 'notifications.send',
-  BRANDS_READ: 'brands.read',
-  BRANDS_VERIFY: 'brands.verify',
-  BRANDS_SUSPEND: 'brands.suspend',
-  BRANDS_STORE_OVERRIDE: 'brands.store_override',
-  PRODUCTS_READ: 'products.read',
-  PRODUCTS_MODERATE: 'products.moderate',
-  COLLECTIONS_READ: 'collections.read',
-  COLLECTIONS_MODERATE: 'collections.moderate',
-  TAXONOMY_READ: 'taxonomy.read',
-  TAXONOMY_WRITE: 'taxonomy.write',
-  TAXONOMY_SUGGESTIONS_MODERATE: 'taxonomy.suggestions.moderate',
-  TAGS_READ: 'tags.read',
-  TAGS_MODERATE: 'tags.moderate',
-  MEASUREMENTS_READ: 'measurements.read',
-  MEASUREMENTS_REVIEW: 'measurements.review',
-  PAYOUTS_READ: 'payouts.read',
-  PAYOUTS_PROCESS: 'payouts.process',
-  DISPUTES_READ: 'disputes.read',
-  DISPUTES_RESOLVE: 'disputes.resolve',
-  FEATURED_MANAGE: 'featured.manage',
-  CONTENT_REVIEW_READ: 'contentReview.read',
-  CONTENT_REVIEW_MANAGE: 'contentReview.manage',
-  MODERATION_READ: 'moderation.read',
   MODERATION_REVIEW: 'moderation.write',
-  AUDIT_READ: 'audit.read',
-  ALERTS_READ: 'alerts.read',
-  ALERTS_MANAGE: 'alerts.manage',
-  MARKET_GOVERNANCE_READ: 'market.governance.read',
-  MARKET_GOVERNANCE_WRITE: 'market.governance.write',
-  MARKET_GOVERNANCE_RELEASE: 'market.governance.release',
-  MARKET_RANKING_FORMULA_WRITE: 'market.ranking.formula.write',
-  MARKET_RANKING_ROLLBACK: 'market.ranking.rollback',
-  MARKET_SUGGESTIONS_WRITE: 'market.suggestions.write',
-  MESSAGING_READ: 'messaging.read',
-  MESSAGING_MODERATE: 'messaging.moderate',
-  NOTIFICATIONS_SEND: 'notifications.send',
-  SYSTEM_SETTINGS_WRITE: 'system.settings.write',
-  SYSTEM_SLA_READ: 'system.sla.read',
-  SYSTEM_SLA_WRITE: 'system.sla.write',
-  SYSTEM_DATA_RETENTION_WRITE: 'system.data_retention.write',
-  SYSTEM_FEATURE_FLAGS_WRITE: 'system.feature_flags.write',
-  ADMIN_EMAIL_CHANGE: 'admin.email_change',
-  PERMISSIONS_MANAGE: 'permissions.manage',
+};
+
+/**
+ * `USERS_READ` → `users.read`. Derived from the catalogue rather than
+ * hand-written: this map used to be maintained by hand and had fallen eight
+ * codes behind the backend, and because `hasPermission` falls back to the raw
+ * key when a code is missing, every one of those checks silently returned false
+ * instead of erroring.
+ */
+const PERMISSION_ALIASES: Record<string, string> = {
+  ...ADMIN_PERMISSION_CODE_BY_KEY,
+  ...LEGACY_PERMISSION_ALIASES,
 };
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {

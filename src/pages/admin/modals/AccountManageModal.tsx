@@ -7,6 +7,13 @@ import { adminUsersApi, adminBrandsApi } from '@/api/AdminApi';
 import type { AdminUser, AdminBrand, AdminBrandOverview } from '@/types/admin';
 import { unwrapApiResponse } from '@/types/auth';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import {
+  ADMIN_PERMISSION_GROUPS,
+  ALL_ADMIN_PERMISSION_CODES,
+  describeAdminPermission,
+  isSuperAdminOnlyPermission,
+  type AdminPermissionCode,
+} from '@/constants/adminPermissions';
 import { toast } from 'sonner';
 
 /**
@@ -73,57 +80,95 @@ const SEEDED_USER_EMAILS = new Set(
   ].filter(Boolean),
 );
 
-const ALL_PERMISSIONS = [
-  'users.read',
-  'users.update',
-  'users.deactivate',
-  'users.role.assign_admin',
-  'users.role.assign_user',
-  'users.data_export',
-  'users.data_wipe',
-  'brands.read',
-  'brands.verify',
-  'brands.suspend',
-  'brands.store_read',
-  'brands.store_verify',
-  'brands.store_override',
-  'products.read',
-  'products.moderate',
-  'collections.read',
-  'collections.moderate',
-  'featured.manage',
-  'taxonomy.read',
-  'taxonomy.write',
-  'taxonomy.suggestions.moderate',
-  'tags.read',
-  'tags.moderate',
-  'measurements.read',
-  'measurements.review',
-  'payouts.read',
-  'payouts.process',
-  'disputes.read',
-  'disputes.resolve',
-  'moderation.read',
-  'moderation.write',
-  'messaging.read',
-  'messaging.moderate',
-  'audit.read',
-  'market.governance.read',
-  'market.governance.write',
-  'market.governance.release',
-  'market.ranking.formula.write',
-  'market.ranking.rollback',
-  'market.suggestions.write',
-  'notifications.send',
-  'system.settings.write',
-  'system.sla.read',
-  'system.sla.write',
-  'system.data_retention.write',
-  'system.feature_flags.write',
-  'permissions.manage',
-] as const;
+type PermissionCode = AdminPermissionCode;
 
-type PermissionCode = (typeof ALL_PERMISSIONS)[number];
+interface PermissionColumnTone {
+  wrap: string;
+  head: string;
+  badge: string;
+  row: string;
+  empty: string;
+}
+
+/**
+ * One column of the permissions editor.
+ *
+ * Rows are grouped by area and written in human words. The raw code stays under
+ * the label rather than being dropped — it is what appears in the audit log and
+ * in support conversations — but it is no longer the only thing on screen, which
+ * is what made a fifty-row checkbox list unreadable and left long codes
+ * truncated mid-word.
+ */
+const PermissionColumn: React.FC<{
+  title: string;
+  codes: string[];
+  /** True when this column lists what the admin already holds. */
+  granted: boolean;
+  loading: boolean;
+  emptyLabel?: string;
+  tone: PermissionColumnTone;
+  onToggle: (code: PermissionCode) => void;
+}> = ({ title, codes, granted, loading, emptyLabel, tone, onToggle }) => {
+  const grouped = useMemo(() => {
+    const buckets = new Map<string, string[]>();
+    for (const code of codes) {
+      const { group } = describeAdminPermission(code);
+      const bucket = buckets.get(group);
+      if (bucket) bucket.push(code);
+      else buckets.set(group, [code]);
+    }
+    // Catalogue order, with anything unrecognised collected at the end.
+    return [...ADMIN_PERMISSION_GROUPS, 'Other']
+      .filter((group) => buckets.has(group))
+      .map((group) => ({ group, items: buckets.get(group) ?? [] }));
+  }, [codes]);
+
+  return (
+    <div className={`rounded-xl border p-3 ${tone.wrap}`}>
+      <div className="mb-2 flex items-center justify-between">
+        <h4 className={`text-xs font-semibold uppercase tracking-wide ${tone.head}`}>{title}</h4>
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone.badge}`}>{codes.length}</span>
+      </div>
+      <div className="grid max-h-72 grid-cols-1 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2">
+        {grouped.map((section) => (
+          <React.Fragment key={section.group}>
+            <p className="col-span-full mt-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400 first:mt-0 dark:text-gray-500">
+              {section.group}
+            </p>
+            {section.items.map((code) => {
+              const definition = describeAdminPermission(code);
+              // The API refuses SuperAdmin-only codes on an Admin account, so
+              // offering them as a live checkbox only ever produced a 400.
+              const blocked = !granted && isSuperAdminOnlyPermission(code);
+              return (
+                <label
+                  key={code}
+                  title={blocked ? 'Only a SuperAdmin can hold this permission.' : definition.description}
+                  className={`flex items-start justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${tone.row} ${
+                    blocked ? 'cursor-not-allowed opacity-55' : 'cursor-pointer'
+                  }`}
+                >
+                  <span className="min-w-0">
+                    <span className="block leading-snug text-gray-800 dark:text-gray-100">{definition.label}</span>
+                    <span className="mt-0.5 block break-all font-mono text-[10px] leading-tight text-gray-400 dark:text-gray-500">{code}</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={granted}
+                    disabled={loading || blocked}
+                    onChange={() => onToggle(code as PermissionCode)}
+                    className="mt-0.5 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600"
+                  />
+                </label>
+              );
+            })}
+          </React.Fragment>
+        ))}
+        {codes.length === 0 && emptyLabel ? <p className={`text-xs ${tone.empty}`}>{emptyLabel}</p> : null}
+      </div>
+    </div>
+  );
+};
 
 const normalizePermissions = (
   value: string[] | { permissionCode: string }[] | undefined,
@@ -285,6 +330,25 @@ const AccountManageModal: React.FC<Props> = ({
   }, [open, overviewBrandId]);
 
   const currentPerms = useMemo(() => new Set(livePermissions), [livePermissions]);
+
+  /*
+    Held codes first in catalogue order, then anything the server granted that
+    this build does not know about. Filtering strictly by the catalogue would
+    hide such a grant entirely — the admin would hold a permission with no way
+    to see or revoke it.
+  */
+  const grantedCodes = useMemo(() => {
+    const known = ALL_ADMIN_PERMISSION_CODES.filter((code) => currentPerms.has(code));
+    const unknown = Array.from(currentPerms).filter(
+      (code) => !ALL_ADMIN_PERMISSION_CODES.includes(code as AdminPermissionCode),
+    );
+    return [...known, ...unknown];
+  }, [currentPerms]);
+
+  const availableCodes = useMemo(
+    () => ALL_ADMIN_PERMISSION_CODES.filter((code) => !currentPerms.has(code)),
+    [currentPerms],
+  );
 
   // Header falls back to the seed row while the detail is loading.
   const seedName = seedUser
@@ -1067,43 +1131,40 @@ const AccountManageModal: React.FC<Props> = ({
           {canManagePermissions && isAdminTarget && !isDeleted && (
             <div className="rounded-2xl border border-gray-200/80 bg-white px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Permissions</h3>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Grant or revoke admin capabilities.</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Grant or revoke admin capabilities. Saving signs this admin out — the new set applies at their next sign-in.
+              </p>
               <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/60 p-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                  <div className="mb-2 flex items-center justify-between">
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-200">Granted</h4>
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200">
-                      {ALL_PERMISSIONS.filter((perm) => currentPerms.has(perm)).length}
-                    </span>
-                  </div>
-                  <div className="grid max-h-56 grid-cols-1 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2">
-                    {ALL_PERMISSIONS.filter((perm) => currentPerms.has(perm)).map((perm) => (
-                      <label key={perm} className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-emerald-200/70 bg-white/75 px-2.5 py-1.5 text-xs dark:border-emerald-500/25 dark:bg-black/20">
-                        <span className="truncate text-gray-800 dark:text-gray-100">{perm}</span>
-                        <input type="checkbox" checked onChange={() => void handlePermissionToggle(perm)} disabled={loading} className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600" />
-                      </label>
-                    ))}
-                    {ALL_PERMISSIONS.filter((perm) => currentPerms.has(perm)).length === 0 && (
-                      <p className="text-xs text-emerald-700/80 dark:text-emerald-200/80">No permissions granted.</p>
-                    )}
-                  </div>
-                </div>
-                <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-black/20">
-                  <div className="mb-2 flex items-center justify-between">
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Available</h4>
-                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-white/15 dark:text-slate-200">
-                      {ALL_PERMISSIONS.filter((perm) => !currentPerms.has(perm)).length}
-                    </span>
-                  </div>
-                  <div className="grid max-h-56 grid-cols-1 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2">
-                    {ALL_PERMISSIONS.filter((perm) => !currentPerms.has(perm)).map((perm) => (
-                      <label key={perm} className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs dark:border-white/10 dark:bg-black/25">
-                        <span className="truncate text-gray-700 dark:text-gray-200">{perm}</span>
-                        <input type="checkbox" checked={false} onChange={() => void handlePermissionToggle(perm)} disabled={loading} className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600" />
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                <PermissionColumn
+                  title="Granted"
+                  codes={grantedCodes}
+                  granted
+                  loading={loading}
+                  emptyLabel="No permissions granted."
+                  onToggle={(perm) => void handlePermissionToggle(perm)}
+                  tone={{
+                    wrap: 'border-emerald-200/70 bg-emerald-50/60 dark:border-emerald-500/30 dark:bg-emerald-500/10',
+                    head: 'text-emerald-700 dark:text-emerald-200',
+                    badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200',
+                    row: 'border-emerald-200/70 bg-white/75 dark:border-emerald-500/25 dark:bg-black/20',
+                    empty: 'text-emerald-700/80 dark:text-emerald-200/80',
+                  }}
+                />
+                <PermissionColumn
+                  title="Available"
+                  codes={availableCodes}
+                  granted={false}
+                  loading={loading}
+                  emptyLabel="Every permission is granted."
+                  onToggle={(perm) => void handlePermissionToggle(perm)}
+                  tone={{
+                    wrap: 'border-slate-200/80 bg-slate-50/70 dark:border-white/10 dark:bg-black/20',
+                    head: 'text-slate-700 dark:text-slate-300',
+                    badge: 'bg-slate-200 text-slate-700 dark:bg-white/15 dark:text-slate-200',
+                    row: 'border-slate-200/80 bg-white/80 dark:border-white/10 dark:bg-black/25',
+                    empty: 'text-slate-600 dark:text-slate-300',
+                  }}
+                />
               </div>
             </div>
           )}
