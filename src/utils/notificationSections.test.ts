@@ -51,7 +51,7 @@ describe('groupNotificationsBySection', () => {
     );
 
     expect(sections.map((s) => s.key)).toEqual(['highlights', 'last7days', 'older']);
-    expect(sections.map((s) => s.label)).toEqual(['Highlights', 'Last 7 days', 'Older']);
+    expect(sections.map((s) => s.label)).toEqual(['Today', 'Last 7 days', 'Older']);
   });
 
   it('preserves input order inside a section', () => {

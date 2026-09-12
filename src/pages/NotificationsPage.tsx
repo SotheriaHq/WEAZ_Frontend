@@ -167,43 +167,54 @@ const NotificationsPage: React.FC = () => {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-2 pb-24 pt-4 sm:px-4 sm:pt-6">
-      <div className="mb-2 flex items-center justify-between gap-3 px-2 sm:px-0">
-        <h1 className="flex min-w-0 items-center gap-1.5 text-xl font-semibold text-[color:var(--text-primary)] sm:text-2xl">
-          <button
-            type="button"
-            onClick={handleBack}
-            className="-ml-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg surface-interactive-hover"
-            aria-label="Go back"
-          >
-            <span aria-hidden="true">←</span>
-          </button>
+      {/*
+        The back control and the unread badge used to live INSIDE the h1, in a
+        row that was `justify-between` with the actions. The heading could not
+        then shrink below its own content, so on a 360px phone it grew straight
+        under "Mark all read" — the badge landed on top of the label. The title
+        is now the only thing that flexes, and the actions drop to their own
+        right-aligned line until there is room for them beside it.
+      */}
+      <header className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 px-1 sm:px-0">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="-ml-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg surface-interactive-hover"
+          aria-label="Go back"
+        >
+          <span aria-hidden="true">←</span>
+        </button>
+        <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-[color:var(--text-primary)] sm:text-2xl">
           Notifications
-          {unreadCount > 0 ? (
-            <span className="ml-1 inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white align-middle">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          ) : null}
         </h1>
-        <div className="flex shrink-0 items-center gap-2">
+        {unreadCount > 0 ? (
+          <span
+            className="inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white"
+            aria-label={`${unreadCount} unread`}
+          >
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        ) : null}
+        <div className="flex w-full shrink-0 items-center justify-end gap-1 sm:w-auto">
           {unreadCount > 0 ? (
             <button
               type="button"
               onClick={() => void dispatch(markAllNotificationsRead())}
-              className="rounded-xl px-3 py-1.5 text-sm font-semibold text-[color:var(--text-secondary)] surface-interactive-hover"
+              className="rounded-xl px-2 py-1.5 text-xs font-semibold text-[color:var(--text-secondary)] surface-interactive-hover sm:px-3 sm:text-sm"
             >
-              Mark all read
+              Mark all as read
             </button>
           ) : null}
           <button
             type="button"
             onClick={() => navigate('/settings?tab=notifications')}
-            className="rounded-xl px-3 py-1.5 text-sm font-semibold text-[color:var(--text-secondary)] surface-interactive-hover"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm surface-interactive-hover sm:h-9 sm:w-9"
             aria-label="Notification settings"
           >
             <span aria-hidden="true">⚙️</span>
           </button>
         </div>
-      </div>
+      </header>
 
       {showBlockingLoader ? (
         <div className="flex items-center justify-center py-16">

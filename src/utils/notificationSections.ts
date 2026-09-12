@@ -46,8 +46,13 @@ export const NOTIFICATION_SECTION_ORDER: readonly NotificationSectionKey[] = [
   'older',
 ];
 
+/**
+ * The labels name an AGE, because that is all these buckets encode. The newest
+ * one was called "Highlights", which promises editorial selection the list does
+ * not do — everything from the last 24 hours is in it, in arrival order.
+ */
 export const NOTIFICATION_SECTION_LABELS: Record<NotificationSectionKey, string> = {
-  highlights: 'Highlights',
+  highlights: 'Today',
   last3days: 'Last 3 days',
   last7days: 'Last 7 days',
   last30days: 'Last 30 days',

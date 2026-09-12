@@ -63,6 +63,29 @@ export const NotificationItem = React.memo<NotificationItemProps>(
     const ariaAction = getAriaAction(type);
     const hasActor = hasValidActor(notification);
 
+    /*
+      A system notification's `message` is a finished sentence written by the
+      server ("You've successfully bagged X by Y. Check out soon…").
+
+      The actor + action + preview template below is for notifications where a
+      PERSON acted on your content — "@ada commented on Wrap Dress". Running a
+      system row through it prepends the sender and appends the target preview
+      to a sentence that already reads correctly, and then drops the sentence
+      entirely (`message` only renders when there is no `actionText`). That is
+      how a bag confirmation rendered as "WIEZ added to your bag Bag", and an
+      unread-messages digest as "WIEZ you have unread order messages".
+
+      `NotificationsDropdown` already prefers the server sentence when there is
+      no actor, so this is what stops the two surfaces disagreeing about the
+      same notification.
+    */
+    const trimmedMessage = typeof message === 'string' ? message.trim() : '';
+    const isPlaceholderMessage =
+      /^you have a (new )?notification$/i.test(trimmedMessage);
+    const serverSentence =
+      trimmedMessage && !isPlaceholderMessage ? trimmedMessage : '';
+    const useServerSentence = !hasActor && Boolean(serverSentence);
+
     // Memoized mark-read handler
     const handleMarkRead = useCallback(() => {
       if (!isRead) {
@@ -122,7 +145,9 @@ export const NotificationItem = React.memo<NotificationItemProps>(
     }, [id, handleMarkRead, onBodyClick, notification]);
 
     // Construct full aria label
-    const ariaLabel = `${isRead ? 'Read' : 'Unread'} notification from ${displayName}: ${message}. ${timeAgo(notification.createdAt)}`;
+    const ariaLabel = useServerSentence
+      ? `${isRead ? 'Read' : 'Unread'} notification: ${serverSentence} ${timeAgo(notification.createdAt)}`
+      : `${isRead ? 'Read' : 'Unread'} notification from ${displayName}: ${message}. ${timeAgo(notification.createdAt)}`;
 
     return (
       <li
@@ -153,33 +178,40 @@ export const NotificationItem = React.memo<NotificationItemProps>(
 
         {/* Content Section */}
         <div className="content-section" data-testid="notification-body">
-          {/* Header with username and action */}
-          <div className="notification-header">
-            {hasActor ? (
-              <span
-                className="username"
-                onClick={handleUsernameClick}
-                role="link"
-                aria-label={`View profile of ${displayName}`}
-                tabIndex={0}
-                data-testid="notification-username"
-              >
-                {displayName}
-              </span>
-            ) : (
-              <span className="username system">{displayName}</span>
-            )}
-            {actionText && (
-              <span className="action-text"> {actionText}</span>
-            )}
-            {target?.preview && !isRouteyPreview(target.preview) && (
-              <span className="target-preview"> {target.preview}</span>
-            )}
-          </div>
+          {useServerSentence ? (
+            /* The server wrote the whole sentence — render it as one. */
+            <p className="notification-sentence">{serverSentence}</p>
+          ) : (
+            <>
+              {/* Header with username and action */}
+              <div className="notification-header">
+                {hasActor ? (
+                  <span
+                    className="username"
+                    onClick={handleUsernameClick}
+                    role="link"
+                    aria-label={`View profile of ${displayName}`}
+                    tabIndex={0}
+                    data-testid="notification-username"
+                  >
+                    {displayName}
+                  </span>
+                ) : (
+                  <span className="username system">{displayName}</span>
+                )}
+                {actionText && (
+                  <span className="action-text"> {actionText}</span>
+                )}
+                {target?.preview && !isRouteyPreview(target.preview) && (
+                  <span className="target-preview"> {target.preview}</span>
+                )}
+              </div>
 
-          {/* Preview text if no action text */}
-          {!actionText && message && (
-            <p className="preview-text">{message}</p>
+              {/* Preview text if no action text */}
+              {!actionText && message && (
+                <p className="preview-text">{message}</p>
+              )}
+            </>
           )}
 
           {/* Timestamp */}
