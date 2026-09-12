@@ -444,9 +444,8 @@ const MarketSectionPreviewRail: React.FC<{
                     </div>
                   )}
 
-                  {/* Same frosted bar as the product card: /40 tint, heavy blur,
-                      contrast carried by a text shadow rather than by opacity. */}
-                  <div className="absolute inset-x-0 bottom-0 z-10 border-t border-white/10 bg-black/40 px-4 pb-3 pt-2.5 backdrop-blur-xl backdrop-saturate-150">
+                  {/* Same liquid glass bar as the product card: light translucent tint, refractive blur, and specular highlight. */}
+                  <div className="absolute inset-x-0 bottom-0 z-10 border-t border-white/20 bg-gradient-to-t from-black/30 via-black/15 to-white/[0.04] px-3.5 pb-2.5 pt-2 backdrop-blur-md backdrop-saturate-150 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18)]">
                     <p className="line-clamp-1 text-sm font-semibold leading-snug text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
                       {item.title}
                     </p>
@@ -456,7 +455,7 @@ const MarketSectionPreviewRail: React.FC<{
                       </p>
                     ) : null}
                     {priceLabel ? (
-                      <p className="mt-1.5 text-sm font-bold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
+                      <p className="mt-1 text-sm font-bold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
                         {priceLabel}
                       </p>
                     ) : null}

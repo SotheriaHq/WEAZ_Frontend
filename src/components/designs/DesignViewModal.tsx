@@ -1012,7 +1012,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
 
             <div className="flex h-full min-w-0 flex-col overflow-hidden bg-white/65 text-slate-900 dark:bg-[#0f0b11]/70 dark:text-white">
               {/* Fixed metadata header — never scrolls; only the comments feed below does. */}
-              <div className="shrink-0 space-y-2.5 border-b border-slate-900/[0.08] p-3.5 dark:border-white/10 md:p-4">
+              <div className="shrink-0 space-y-2.5 p-3.5 md:p-4">
                 {/* Brand row */}
                 <div className="flex items-center justify-between gap-2 pr-8">
                   <div className="flex min-w-0 items-center gap-2.5">
@@ -1195,7 +1195,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               {/* Comments sit directly on the panel surface: no card, no border,
                   no tinted inner box — the list scrolls inline against the modal
                   background so the text reads as part of the content. */}
-              <div className="min-h-0 flex-1 overflow-hidden bg-slate-900/[0.03] px-3.5 py-3 dark:bg-black/25 md:px-4">
+              <div className="min-h-0 flex-1 overflow-hidden px-3.5 py-3 md:px-4">
                 <DesignCommentsPanel
                   mediaId={activeMediaId ?? item.id}
                   collectionId={item.collectionId}
@@ -1210,7 +1210,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
               </div>
 
               {/* Sticky composer — pinned below the scrolling feed. */}
-              <div className="relative shrink-0 border-t border-slate-900/[0.08] p-3 dark:border-white/10" onClick={(e) => e.stopPropagation()}>
+              <div className="relative shrink-0 p-3" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-1.5 rounded-xl bg-slate-900/5 px-2.5 py-1.5 dark:bg-white/10">
                   <input
                     type="text"

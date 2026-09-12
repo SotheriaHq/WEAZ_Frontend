@@ -49,10 +49,10 @@ const ProductCardSkeleton: React.FC<ProductCardSkeletonProps> = ({
         )}
       </div>
       
-      {/* Frosted glass info overlay skeleton */}
-      {/* Mirrors the real card's frosted bar — same tint, blur and padding — so
+      {/* Liquid glass info overlay skeleton */}
+      {/* Mirrors the real card's liquid glass bar — same tint, blur and padding — so
           the swap to live content does not move anything. */}
-      <div className="absolute inset-x-0 bottom-0 z-10 border-t border-white/10 bg-black/40 px-4 pb-3 pt-2.5 backdrop-blur-xl">
+      <div className="absolute inset-x-0 bottom-0 z-10 border-t border-white/20 bg-gradient-to-t from-black/30 via-black/15 to-white/[0.04] px-3.5 pb-2.5 pt-2 backdrop-blur-md shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18)]">
         <div className="flex flex-col gap-2">
           {/* Title */}
           <div className="h-4 w-3/4 bg-white/20 rounded-md" />

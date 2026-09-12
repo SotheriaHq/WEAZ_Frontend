@@ -594,10 +594,22 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           frame so those cards stay pixel-identical to before. */}
       <div
         className={`relative aspect-[4/5] w-full overflow-hidden ${
-          fillsFrameExactly ? 'bg-transparent' : 'bg-neutral-950'
+          fillsFrameExactly ? 'bg-transparent' : 'bg-neutral-900/60 dark:bg-neutral-950'
         }`}
         style={mediaFrameStyle}
       >
+        {!imgError && activeImage?.url && !fillsFrameExactly ? (
+          <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+            <img
+              src={activeImage.url}
+              alt=""
+              className="h-full w-full object-cover blur-2xl scale-125 opacity-40 dark:opacity-30"
+              decoding="async"
+            />
+            <div className="absolute inset-0 bg-black/10 dark:bg-black/30" />
+          </div>
+        ) : null}
+
         {hasDisplayImage && !activeImage?.url && !imgError ? (
           <div className="absolute inset-0 animate-pulse">
             <div className="h-full min-h-[240px] w-full bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 dark:from-zinc-900/60 dark:via-zinc-800/50 dark:to-zinc-900/60" />
@@ -787,23 +799,11 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         ) : null}
 
         {/*
-          Calm frosted bar, not a tall gradient. The old treatment was a
-          `pt-16` `from-black/[0.82]` scrim: it covered ~40% of the card (so media
-          never read "in full") and its perceived weight swung with the image —
-          invisible over dark media, a heavy black band over light media.
-          A constant blurred tint is legible against ANY content because it does
-          not depend on what is underneath.
-
-          The tint was black/55, chosen as the opacity that alone holds white
-          text above 4.5:1 over pure-white media. Carrying the entire contrast
-          budget in opacity is what made the bar read as a dark slab bolted to
-          the photograph. The same floor is now met by three cooperating layers
-          instead of one: a lighter /40 tint, a heavier blur that collapses the
-          luminance range of whatever is behind it, and a real text shadow on
-          every glyph. The shadow is the part that does the work over bright
-          media — it travels with the text rather than with the panel.
+          Liquid glass bar: light translucent gradient, gentle refractive blur,
+          and a specular rim highlight to make the backdrop fluid and radiant
+          without creating a heavy, deep dark slab over the garment.
         */}
-        <div className="hidden md:block absolute inset-x-0 bottom-0 z-10 border-t border-white/10 bg-black/40 px-4 pb-3 pt-2.5 backdrop-blur-xl backdrop-saturate-150">
+        <div className="hidden md:block absolute inset-x-0 bottom-0 z-10 border-t border-white/20 bg-gradient-to-t from-black/30 via-black/15 to-white/[0.04] px-3.5 pb-2.5 pt-2 backdrop-blur-md backdrop-saturate-150 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18)]">
           <h3 className="line-clamp-1 text-sm font-semibold leading-snug text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
             {product.name}
           </h3>
@@ -812,7 +812,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             {product.brand.name}
           </p>
 
-          <div className="mt-1.5 flex items-center justify-between">
+          <div className="mt-1 flex items-center justify-between">
             <div className="flex items-baseline gap-1.5">
               <span className={`text-sm font-bold [text-shadow:0_1px_3px_rgba(0,0,0,0.85)] ${product.isOnSale ? 'text-rose-300' : 'text-white'}`}>
                 {formatPrice(product.effectivePrice, product.brand.currency)}
@@ -873,9 +873,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         </div>
 
         {/* Mobile View Bottom Overlay */}
-        {/* Same frosted treatment as desktop, same reasoning: lighter tint,
-            heavier blur, contrast carried by the text shadow. */}
-        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-black/40 backdrop-blur-xl backdrop-saturate-150 z-10 flex items-center justify-between min-h-[32px] max-h-[38px] border-t border-white/10" onClick={(e) => e.stopPropagation()}>
+        {/* Same liquid glass treatment as desktop: light translucent tint, refractive blur, and specular highlight. */}
+        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/30 via-black/15 to-white/[0.04] backdrop-blur-md backdrop-saturate-150 border-t border-white/20 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18)] z-10 flex items-center justify-between min-h-[32px] max-h-[38px]" onClick={(e) => e.stopPropagation()}>
           <div className="flex-1 min-w-0 flex flex-col justify-center pl-1">
             <h3
               className="font-bold text-white truncate leading-none uppercase [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]"
