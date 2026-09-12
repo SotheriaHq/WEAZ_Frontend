@@ -43,8 +43,8 @@ import {
 } from '@/utils/phoneNumber';
 import { openPaystackInline } from '@/lib/paystackInline';
 import {
-  resolveInAppPaymentSession,
   resolvePaymentGateway,
+  resolvePaymentLaunchPlan,
 } from '@/lib/inAppPaymentSession';
 import { AnimatePresence, motion } from 'framer-motion';
 import PaymentDetailsSection from '@/pages/checkout/PaymentDetailsSection';
@@ -113,6 +113,10 @@ type InlinePaymentLaunchSession = {
   reference: string;
   gateway?: string;
   providerAccessCode?: string;
+  /** Issuer challenge URL, when the card needs 3-D Secure. */
+  authorizationUrl?: string;
+  /** Gateway outcome — a saved-card charge can already be accepted or declined. */
+  status?: string;
 };
 
 const STEPS: Step[] = ['shipping', 'payment', 'review'];
@@ -314,6 +318,16 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const user = useSelector((s: RootState) => s.user.profile);
   const submittingRef = useRef(false);
   const paymentInitIdempotencyKeyRef = useRef<string | null>(null);
+  /*
+    The card-validation session id rides in the initialize body, and the
+    idempotency interceptor hashes the WHOLE body. A retry that mints a fresh
+    validation session therefore changes the payload under a key that was never
+    reset — the server answers 409 "Idempotency-Key reuse with different request
+    payload" and the buyer is stuck. The session id cannot go in the reset
+    effect's deps (it is a local inside the submit handler), so the key is
+    rotated against the session it was minted for instead.
+  */
+  const paymentInitIdempotencySessionRef = useRef<string | null>(null);
 
   /* ── Step state ── */
   const [step, setStep] = useState<Step>('shipping');
@@ -693,6 +707,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
   useEffect(() => {
     paymentInitIdempotencyKeyRef.current = null;
+    paymentInitIdempotencySessionRef.current = null;
   }, [activePaymentData, address, cart.items, paymentMethod]);
 
   useEffect(() => {
@@ -1000,14 +1015,44 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     options?: { retry?: boolean },
   ) => {
     const resolvedGateway = resolvePaymentGateway(paymentInit);
-    const session = resolveInAppPaymentSession(paymentInit);
     const returnPath =
       `/bag/payment-return?reference=${encodeURIComponent(paymentInit.reference)}&gateway=${encodeURIComponent(resolvedGateway)}`;
+    const plan = resolvePaymentLaunchPlan(paymentInit);
 
     if (embedded) {
       dispatch(closeCartDrawer());
     }
 
+    if (plan.kind === 'FAILED') {
+      setCheckoutProgressStage('FAILED');
+      setCheckoutProgressMessage(plan.message);
+      toast.error(plan.message);
+      return;
+    }
+
+    /*
+      Nothing left for the buyer to do. A saved card is charged server-side and
+      comes back accepted with no access code and no challenge URL, so there is
+      no window to open — the return page polls the reference every 10s and
+      resolves it. Demanding an inline session here is what made saved-card
+      checkout fail after the card had already been charged.
+    */
+    if (plan.kind === 'CONFIRM' || plan.kind === 'SETTLED') {
+      clearCheckoutProgress();
+      navigate(returnPath);
+      return;
+    }
+
+    if (plan.kind === 'REDIRECT') {
+      setCheckoutProgressStage('OPENING_SECURE_WINDOW');
+      setCheckoutProgressMessage('Opening secure card verification...');
+      // The issuer challenge is hosted by the gateway; the callback URL brings
+      // the buyer back to the return page.
+      window.location.assign(plan.url);
+      return;
+    }
+
+    // Only an inline popup can be retried, so only this branch arms that UI.
     setPendingInlineSession(paymentInit);
     setCheckoutProgressStage('OPENING_SECURE_WINDOW');
     setCheckoutProgressMessage(
@@ -1016,7 +1061,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         : 'Opening secure checkout inside WIEZ...',
     );
 
-    await openPaystackInline(session.accessCode, {
+    await openPaystackInline(plan.accessCode, {
       onSuccess: () => {
         clearCheckoutProgress();
         navigate(returnPath);
@@ -1193,9 +1238,15 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       setCheckoutProgressStage('PREPARING_PAYMENT');
       setCheckoutProgressMessage('Preparing your secure payment session...');
 
-      const paymentInitIdempotencyKey =
-        paymentInitIdempotencyKeyRef.current ?? createIdempotencyKey();
+      const idempotencySessionMarker = cardValidationSessionId ?? '';
+      const reuseIdempotencyKey =
+        paymentInitIdempotencyKeyRef.current !== null &&
+        paymentInitIdempotencySessionRef.current === idempotencySessionMarker;
+      const paymentInitIdempotencyKey = reuseIdempotencyKey
+        ? (paymentInitIdempotencyKeyRef.current as string)
+        : createIdempotencyKey();
       paymentInitIdempotencyKeyRef.current = paymentInitIdempotencyKey;
+      paymentInitIdempotencySessionRef.current = idempotencySessionMarker;
 
       const customerName = `${address.firstName} ${address.lastName}`.trim();
       const unifiedPaymentInit = await paymentApi.initializeUnified({
@@ -1218,8 +1269,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         toast.error(getBlockedCustomBagMessage(unifiedPaymentInit.blockedLines!.length));
       }
 
-      setCheckoutProgressStage('OPENING_SECURE_WINDOW');
-      setPendingInlineSession(unifiedPaymentInit);
+      // The launch stage is set per outcome inside launchInitializedPayment —
+      // not every initialized payment opens a window.
       await launchInitializedPayment(unifiedPaymentInit);
       return;
     } catch (error: any) {

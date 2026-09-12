@@ -7,8 +7,8 @@ import type { AppDispatch } from '@/store';
 import Button from '@/components/ui/Button';
 import { openPaystackInline } from '@/lib/paystackInline';
 import {
-  resolveInAppPaymentSession,
   resolvePaymentGateway,
+  resolvePaymentLaunchPlan,
 } from '@/lib/inAppPaymentSession';
 // import LazyOrderQrCard from '@/components/qr/LazyOrderQrCard'; // disabled — order QR codes off
 import {
@@ -132,16 +132,40 @@ const OrderConfirmation: React.FC = () => {
     setResumingPayment(true);
     setPaymentActionMessage('Opening secure checkout inside WIEZ...');
     try {
-      const session = resolveInAppPaymentSession({
-        providerAccessCode,
-      });
       const resolvedGateway = resolvePaymentGateway({
         gateway: locationState?.gateway ?? attempt?.gateway,
       });
       const returnPath =
         `/bag/payment-return?reference=${encodeURIComponent(reference)}&gateway=${encodeURIComponent(resolvedGateway)}`;
+      const plan = resolvePaymentLaunchPlan({
+        providerAccessCode: providerAccessCode ?? attempt?.providerAccessCode,
+        authorizationUrl: attempt?.authorizationUrl,
+        status: attempt?.status,
+      });
 
-      await openPaystackInline(session.accessCode, {
+      if (plan.kind === 'FAILED') {
+        setPaymentActionMessage(plan.message);
+        toast.error(plan.message);
+        return;
+      }
+
+      /*
+        A saved-card charge is accepted server-side with no access code to
+        resume — there is no window to reopen, so hand the buyer to the return
+        page, which polls the reference until the gateway settles it.
+      */
+      if (plan.kind === 'CONFIRM' || plan.kind === 'SETTLED') {
+        navigate(returnPath);
+        return;
+      }
+
+      if (plan.kind === 'REDIRECT') {
+        setPaymentActionMessage('Opening secure card verification...');
+        window.location.assign(plan.url);
+        return;
+      }
+
+      await openPaystackInline(plan.accessCode, {
         onSuccess: () => {
           navigate(returnPath);
         },
