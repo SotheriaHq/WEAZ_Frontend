@@ -93,11 +93,14 @@ interface PermissionColumnTone {
 /**
  * One column of the permissions editor.
  *
- * Rows are grouped by area and written in human words. The raw code stays under
- * the label rather than being dropped — it is what appears in the audit log and
- * in support conversations — but it is no longer the only thing on screen, which
- * is what made a fifty-row checkbox list unreadable and left long codes
- * truncated mid-word.
+ * Rows are grouped by area, written in human words, and each group collapses.
+ * Fifty-five checkboxes in one scroller is a list nobody reads; a dozen named
+ * sections is something an operator can navigate.
+ *
+ * The raw code is NOT rendered — it was a second line under every label, which
+ * doubled the height of the list to restate what the label already said. It
+ * stays in the row's tooltip, because it is what appears in the audit log and in
+ * support conversations, and losing the mapping entirely would be worse.
  */
 const PermissionColumn: React.FC<{
   title: string;
@@ -106,9 +109,17 @@ const PermissionColumn: React.FC<{
   granted: boolean;
   loading: boolean;
   emptyLabel?: string;
+  /**
+   * Whether groups start open. Granted opens (it is short, and what an admin
+   * already holds is the thing you came to check); Available starts closed,
+   * since it is the long list and the point of collapsing is to scan it.
+   */
+  defaultExpanded: boolean;
   tone: PermissionColumnTone;
   onToggle: (code: PermissionCode) => void;
-}> = ({ title, codes, granted, loading, emptyLabel, tone, onToggle }) => {
+}> = ({ title, codes, granted, loading, emptyLabel, defaultExpanded, tone, onToggle }) => {
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
+
   const grouped = useMemo(() => {
     const buckets = new Map<string, string[]>();
     for (const code of codes) {
@@ -123,47 +134,80 @@ const PermissionColumn: React.FC<{
       .map((group) => ({ group, items: buckets.get(group) ?? [] }));
   }, [codes]);
 
+  // Keyed by group name rather than index: toggling a permission moves it
+  // between the columns, so the sections either side re-order under the state.
+  const isOpen = (group: string) => overrides[group] ?? defaultExpanded;
+  const toggleGroup = (group: string) =>
+    setOverrides((prev) => ({ ...prev, [group]: !(prev[group] ?? defaultExpanded) }));
+
   return (
     <div className={`rounded-xl border p-3 ${tone.wrap}`}>
       <div className="mb-2 flex items-center justify-between">
         <h4 className={`text-xs font-semibold uppercase tracking-wide ${tone.head}`}>{title}</h4>
         <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone.badge}`}>{codes.length}</span>
       </div>
-      <div className="grid max-h-72 grid-cols-1 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2">
-        {grouped.map((section) => (
-          <React.Fragment key={section.group}>
-            <p className="col-span-full mt-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400 first:mt-0 dark:text-gray-500">
-              {section.group}
-            </p>
-            {section.items.map((code) => {
-              const definition = describeAdminPermission(code);
-              // The API refuses SuperAdmin-only codes on an Admin account, so
-              // offering them as a live checkbox only ever produced a 400.
-              const blocked = !granted && isSuperAdminOnlyPermission(code);
-              return (
-                <label
-                  key={code}
-                  title={blocked ? 'Only a SuperAdmin can hold this permission.' : definition.description}
-                  className={`flex items-start justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${tone.row} ${
-                    blocked ? 'cursor-not-allowed opacity-55' : 'cursor-pointer'
-                  }`}
-                >
-                  <span className="min-w-0">
-                    <span className="block leading-snug text-gray-800 dark:text-gray-100">{definition.label}</span>
-                    <span className="mt-0.5 block break-all font-mono text-[10px] leading-tight text-gray-400 dark:text-gray-500">{code}</span>
+      <div className="max-h-72 space-y-1 overflow-y-auto pr-1">
+        {grouped.map((section) => {
+          const open = isOpen(section.group);
+          const panelId = `perm-${title}-${section.group}`.replace(/\s+/g, '-').toLowerCase();
+          return (
+            <div key={section.group}>
+              <button
+                type="button"
+                onClick={() => toggleGroup(section.group)}
+                aria-expanded={open}
+                aria-controls={panelId}
+                className="flex w-full items-center justify-between gap-2 rounded-lg px-1.5 py-1.5 text-left transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+              >
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span aria-hidden="true" className="text-[9px] text-gray-400 dark:text-gray-500">
+                    {open ? '▼' : '▶'}
                   </span>
-                  <input
-                    type="checkbox"
-                    checked={granted}
-                    disabled={loading || blocked}
-                    onChange={() => onToggle(code as PermissionCode)}
-                    className="mt-0.5 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600"
-                  />
-                </label>
-              );
-            })}
-          </React.Fragment>
-        ))}
+                  <span className="truncate text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {section.group}
+                  </span>
+                </span>
+                <span className="shrink-0 rounded-full bg-black/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 dark:bg-white/10 dark:text-gray-400">
+                  {section.items.length}
+                </span>
+              </button>
+              {open ? (
+                <div id={panelId} className="mb-1 mt-1 grid grid-cols-1 gap-1.5 pl-1 sm:grid-cols-2">
+                  {section.items.map((code) => {
+                    const definition = describeAdminPermission(code);
+                    // The API refuses SuperAdmin-only codes on an Admin account,
+                    // so offering them as a live checkbox only ever produced a 400.
+                    const blocked = !granted && isSuperAdminOnlyPermission(code);
+                    return (
+                      <label
+                        key={code}
+                        title={
+                          blocked
+                            ? `Only a SuperAdmin can hold this permission. (${code})`
+                            : `${definition.description} (${code})`
+                        }
+                        className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-xs ${tone.row} ${
+                          blocked ? 'cursor-not-allowed opacity-55' : 'cursor-pointer'
+                        }`}
+                      >
+                        <span className="min-w-0 leading-snug text-gray-800 dark:text-gray-100">
+                          {definition.label}
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={granted}
+                          disabled={loading || blocked}
+                          onChange={() => onToggle(code as PermissionCode)}
+                          className="shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
         {codes.length === 0 && emptyLabel ? <p className={`text-xs ${tone.empty}`}>{emptyLabel}</p> : null}
       </div>
     </div>
@@ -1140,6 +1184,7 @@ const AccountManageModal: React.FC<Props> = ({
                   codes={grantedCodes}
                   granted
                   loading={loading}
+                  defaultExpanded
                   emptyLabel="No permissions granted."
                   onToggle={(perm) => void handlePermissionToggle(perm)}
                   tone={{
@@ -1155,6 +1200,7 @@ const AccountManageModal: React.FC<Props> = ({
                   codes={availableCodes}
                   granted={false}
                   loading={loading}
+                  defaultExpanded={false}
                   emptyLabel="Every permission is granted."
                   onToggle={(perm) => void handlePermissionToggle(perm)}
                   tone={{

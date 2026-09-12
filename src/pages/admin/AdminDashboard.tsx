@@ -6,10 +6,7 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import useCachedResource from '@/hooks/useCachedResource';
 import { WIEZ_COUNT_STALE_TIME_MS } from '@/query/queryClient';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
-import {
-  ADMIN_NAV_ITEMS,
-  canAccessAdminPath,
-} from '@/components/admin/adminNavigation';
+import { canAccessAdminPath } from '@/components/admin/adminNavigation';
 
 type RecentLog = {
   id: string;
@@ -159,14 +156,6 @@ const AdminDashboard: React.FC = () => {
   */
   const canReadDashboard = hasPermission('DASHBOARD_READ');
 
-  /** Whether any console at all is reachable — drives the "nothing granted" note. */
-  const hasAnyConsole = useMemo(
-    () =>
-      ADMIN_NAV_ITEMS.some(
-        (item) => item.path !== '/admin' && canAccessAdminPath(item.path, access),
-      ),
-    [access],
-  );
 
   // Heavy platform totals — slower poll. Not re-run every 20s.
   const { data: stats, loading } = useCachedResource<DashboardStats>({
@@ -355,15 +344,6 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Dashboard-only admin: the figures are readable, but nothing else is
-          reachable, and an empty sidebar on its own never explains why. */}
-      {!hasAnyConsole ? (
-        <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 px-5 py-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-          You can see the platform overview, but no admin consoles have been
-          granted to your account yet. Ask a SuperAdmin to grant the permissions
-          you need.
-        </div>
-      ) : null}
 
       {/* Always-visible danger flag: custom orders escalated for admin review.
           Beats/pulses so the admin can't miss it even without opening notifications. */}
