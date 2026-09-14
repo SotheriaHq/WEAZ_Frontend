@@ -5,6 +5,7 @@ import { messagingApi, type ThreadSummaryByContextItem } from '@/api/MessagingAp
 import { getStoreStatus, getCachedStoreStatus } from '@/api/StoreApi';
 import OrderDetailsModal from '@/components/dashboard/OrderDetailsModal';
 import OrderChatDrawer from '@/components/messaging/OrderChatDrawer';
+import type { OrderChatReference } from '@/components/messaging/OrderReferenceCard';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { useRealtime } from '@/realtime/RealtimeProvider';
@@ -583,6 +584,33 @@ const OrderManagement: React.FC = () => {
     setSortBy(SORT_OPTIONS[nextIndex].value);
   };
 
+  /*
+    What the chat is about, read back out of the list the chat was opened from.
+
+    A standard order has no `source` the way a custom order does, so the drawer
+    cannot name itself here — the loaded row is the only thing that knows what
+    was bought. Looked up rather than carried in `chatOrder` so the deep-link
+    path (`?openChat=`, which knows an id and nothing else) gets the same card
+    as a tap on the list. An order outside the loaded page yields no reference
+    and the drawer simply renders without one.
+  */
+  const chatOrderRecord = chatOrder
+    ? sortedOrders.find((order) => order.id === chatOrder.id) ?? null
+    : null;
+  const chatReference: OrderChatReference | undefined = chatOrderRecord
+    ? {
+        title: summarizeOrderFit(chatOrderRecord).primaryName,
+        code: `#${chatOrderRecord.id.slice(0, 8).toUpperCase()}`,
+        coverUrl: chatOrderRecord.orderItems?.[0]?.thumbnail ?? null,
+        statusLabel: chatOrderRecord.status,
+        meta: formatCurrency(
+          normalizeAmount(chatOrderRecord.totalAmount),
+          chatOrderRecord.currency,
+        ),
+        onOpen: () => setSelectedOrder({ id: chatOrderRecord.id }),
+      }
+    : undefined;
+
   return (
     <div className="space-y-8 text-slate-900 dark:text-slate-100">
       <section className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
@@ -1082,6 +1110,7 @@ const OrderManagement: React.FC = () => {
           brandId={brandId}
           customerName={chatOrder.customerName}
           highlightMessageId={preselectedMessageId}
+          reference={chatReference}
         />
       ) : null}
     </div>

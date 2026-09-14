@@ -220,9 +220,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
   ];
 
   const mobileDockLinks = [
-    // Dock tabs are ~60px wide — "Subscriptions" cannot fit and clipped to
-    // "Subscri…"; show the short label on the phone dock only.
-    ...mainLinks.slice(0, 4).map((link) =>
+    /*
+      Every main link reaches the dock; the island decides how many get a chip.
+
+      This used to be `slice(0, 4)`, which silently dropped whatever came fifth
+      — Size Charts for a signed-in reader, since Messages is only in this list
+      when there is a user to read them. The island now measures its own row and
+      folds whatever will not fit into its More sheet, so truncating the list
+      here only hides links the dock could have shown.
+    */
+    ...mainLinks.map((link) =>
+      // Dock chips are ~60px wide — "Subscriptions" clips to "Subscri…";
+      // show the short label on the phone dock only.
       link.label === 'Subscriptions' ? { ...link, label: 'Subs' } : link,
     ),
     {

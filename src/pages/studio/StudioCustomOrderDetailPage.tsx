@@ -110,7 +110,27 @@ const stageDisplayOrder: CustomOrderProgressStage[] = [
   'READY_FOR_DELIVERY',
 ];
 
-const shell = 'relative rounded-[2rem] border border-white/40 bg-white/60 p-5 lg:p-6 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-black/20';
+/**
+ * The one word each stage is, for a column ~45px wide.
+ *
+ * "Fabric And Piece Purchase Gathering" is a sentence, and a six-step strip
+ * sized to hold six of those is 560px — which is why this strip used to be a
+ * hidden horizontal scroller that showed four and a half steps on a phone and
+ * cut the current one in half. The reader does not need the full sentence to
+ * follow a progress rail; they need to see all six steps and which one is lit.
+ * The sentence is still there from `sm:` up, and the stage is named in full by
+ * the "Current display" panel below regardless.
+ */
+const stageShortLabels: Partial<Record<CustomOrderProgressStage, string>> = {
+  ORDER_PLACED: 'Placed',
+  ORDER_RECEIVED: 'Received',
+  FABRIC_AND_PIECE_PURCHASE_GATHERING: 'Fabric',
+  DESIGN_MODE: 'Design',
+  FINAL_TOUCHES_AND_PACKAGING: 'Packing',
+  READY_FOR_DELIVERY: 'Ready',
+};
+
+const shell = 'relative min-w-0 rounded-[1.75rem] sm:rounded-[2rem] border border-white/40 bg-white/60 p-3 sm:p-5 lg:p-6 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-black/20';
 
 const formatCurrency = (value: number | undefined, currency = 'NGN') =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(Number(value ?? 0));
@@ -201,30 +221,60 @@ const getStageTone = (stage: CustomOrderProgressStage, currentStage: CustomOrder
   };
 };
 
-const StageStatusStrip: React.FC<{ currentStage: CustomOrderProgressStage }> = ({ currentStage }) => (
-  <div className="overflow-x-auto">
-    <div className="relative min-w-[560px] px-1">
-      <div className="absolute left-4 right-4 top-3 h-[2px] rounded-full bg-slate-200 dark:bg-slate-700" />
+/**
+ * Six steps, always all six, at any width.
+ *
+ * The rail is inset by half a column at each end (`100% / 6 / 2` = 8.333%) so
+ * it starts under the centre of the first dot and ends under the centre of the
+ * last, and the filled portion is that same span scaled by how far along the
+ * order is. The old fixed `left-4 right-4` was tuned for a 560px strip and drew
+ * a rail that missed its own dots at every other width.
+ */
+const STAGE_RAIL_INSET = '8.3333%';
+
+const StageStatusStrip: React.FC<{ currentStage: CustomOrderProgressStage }> = ({ currentStage }) => {
+  const progressRatio =
+    stageDisplayOrder.indexOf(currentStage) / (stageDisplayOrder.length - 1);
+
+  return (
+    <div className="relative min-w-0">
       <div
-        className="absolute left-4 top-3 h-[2px] rounded-full bg-sky-500 transition-[width] duration-300"
+        className="absolute top-2.5 h-[2px] rounded-full bg-slate-200 dark:bg-slate-700 sm:top-3"
+        style={{ left: STAGE_RAIL_INSET, right: STAGE_RAIL_INSET }}
+      />
+      <div
+        className="absolute top-2.5 h-[2px] rounded-full bg-sky-500 transition-[width] duration-300 sm:top-3"
         style={{
-          width: `calc(${(stageDisplayOrder.indexOf(currentStage) / (stageDisplayOrder.length - 1)) * 100}% - 8px)`,
+          left: STAGE_RAIL_INSET,
+          width: `calc((100% - ${STAGE_RAIL_INSET} * 2) * ${progressRatio})`,
         }}
       />
-      <div className="relative grid grid-cols-6 gap-1">
+      <div className="relative grid grid-cols-6 gap-0.5 sm:gap-1">
         {stageDisplayOrder.map((stage) => {
           const tone = getStageTone(stage, currentStage);
+          const fullLabel = humanizeCustomOrderToken(stage);
+          const shortLabel = stageShortLabels[stage] ?? fullLabel;
+
           return (
-            <div key={stage} className="min-w-0">
+            <div key={stage} className="min-w-0" title={fullLabel}>
               <div className="flex items-center justify-center">
-                <div className={`h-6 w-6 rounded-full border-2 transition-all duration-300 ${tone.dot}`} />
+                <div
+                  className={`h-5 w-5 rounded-full border-2 transition-all duration-300 sm:h-6 sm:w-6 ${tone.dot}`}
+                />
               </div>
-              <div className="mt-2 text-center">
-                <div className={`text-[10px] font-bold uppercase tracking-[0.12em] ${tone.helper}`}>
+              <div className="mt-1.5 text-center sm:mt-2">
+                {/* The marker repeats what the dot's colour already says, and
+                    it is the widest thing in the column. It waits for room. */}
+                <div
+                  className={`hidden text-[10px] font-bold uppercase tracking-[0.12em] sm:block ${tone.helper}`}
+                >
                   {tone.marker}
                 </div>
-                <div className={`mt-0.5 text-[11px] font-semibold leading-4 ${tone.label}`}>
-                  {humanizeCustomOrderToken(stage)}
+                <div
+                  className={`text-[9px] font-semibold leading-[1.15] sm:mt-0.5 sm:text-[11px] sm:leading-4 ${tone.label}`}
+                >
+                  <span className="sm:hidden">{shortLabel}</span>
+                  <span className="hidden sm:inline">{fullLabel}</span>
                 </div>
               </div>
             </div>
@@ -232,8 +282,8 @@ const StageStatusStrip: React.FC<{ currentStage: CustomOrderProgressStage }> = (
         })}
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const StudioCustomOrderDetailPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -1200,10 +1250,20 @@ const StudioCustomOrderDetailPage: React.FC = () => {
         <span className="font-medium">{formatCustomOrderCode(order.id)}</span>
       </div>
 
-      <section className="relative mt-5 rounded-[2.5rem] border border-white/40 bg-white/50 p-2 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-black/20">
-        <div className="relative rounded-[2rem] bg-white/60 p-5 shadow-sm ring-1 ring-inset ring-black/5 dark:bg-white/[0.02] dark:ring-white/10">
+      {/*
+        Frame padding scales with the screen.
+
+        Three nested rounded frames each contributed their own inset, and on a
+        360px phone that stack — page 12, section 8, shell 20, filler 20 — spent
+        120px, a third of the viewport, on the gaps between borders. The order
+        itself got 240px to be read in. The nesting is what makes this screen
+        look considered on a desktop, so it stays; the insets simply start small
+        and open up once there is width to spend.
+      */}
+      <section className="relative mt-5 rounded-[2rem] border border-white/40 bg-white/50 p-1.5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-black/20 sm:rounded-[2.5rem] sm:p-2">
+        <div className="relative rounded-[1.75rem] bg-white/60 p-3 shadow-sm ring-1 ring-inset ring-black/5 dark:bg-white/[0.02] dark:ring-white/10 sm:rounded-[2rem] sm:p-5">
           {/* Stage progress filler — full width, top of order */}
-          <div className="mb-5 rounded-2xl border border-sky-200/70 bg-gradient-to-r from-sky-50/90 via-indigo-50/60 to-sky-50/90 px-5 py-4 dark:border-sky-500/20 dark:from-sky-500/10 dark:via-indigo-500/5 dark:to-sky-500/10">
+          <div className="mb-4 rounded-2xl border border-sky-200/70 bg-gradient-to-r from-sky-50/90 via-indigo-50/60 to-sky-50/90 px-3 py-3 dark:border-sky-500/20 dark:from-sky-500/10 dark:via-indigo-500/5 dark:to-sky-500/10 sm:mb-5 sm:px-5 sm:py-4">
             <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.24em] text-sky-600 dark:text-sky-400">
               Production progress
             </div>
@@ -1235,18 +1295,27 @@ const StudioCustomOrderDetailPage: React.FC = () => {
               <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{order.source.title}</h1>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-3">
+            {/*
+              Two buttons, one row — scaled to fit rather than stacked.
+
+              `flex-wrap` at full desktop sizing meant "Open conversation" and
+              "Back to queue" could not share a 336px phone row, so each took a
+              whole line of its own. They are a pair and belong on one line; the
+              padding and type come down until they fit, which costs far less
+              than a second row of chrome above the order.
+            */}
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
               <button
                 type="button"
                 onClick={() => setDrawerOpen(true)}
-                className="rounded-full border border-black/10 bg-white/80 px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition-all hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+                className="rounded-full border border-black/10 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm transition-all hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 sm:px-5 sm:py-2.5 sm:text-sm"
               >
                 Open conversation
               </button>
               <button
                 type="button"
                 onClick={() => navigate('/studio?tab=orders&orderTab=custom')}
-                className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(15,23,42,0.15)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(15,23,42,0.2)] dark:bg-white dark:text-slate-950 dark:shadow-[0_4px_12px_rgba(255,255,255,0.1)]"
+                className="rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-[0_4px_12px_rgba(15,23,42,0.15)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(15,23,42,0.2)] dark:bg-white dark:text-slate-950 dark:shadow-[0_4px_12px_rgba(255,255,255,0.1)] sm:px-5 sm:py-2.5 sm:text-sm"
               >
                 Back to queue
               </button>
@@ -1354,7 +1423,17 @@ const StudioCustomOrderDetailPage: React.FC = () => {
         </button>
       ) : null}
 
-      <div className="max-w-full overflow-hidden">
+      {/*
+        `min-w-0`, not `overflow-hidden`.
+
+        `overflow-hidden` makes this div a scroll container, and a scroll
+        container becomes the containing block for any `position: sticky`
+        inside it — so the tab strip was pinned to a box exactly as tall as
+        itself and could never stick to anything. `min-w-0` gives the same
+        protection against a wide child stretching the column, without
+        disabling the strip.
+      */}
+      <div className="min-w-0">
         <CustomOrderWorkspaceTabs
           tabs={tabs}
           activeTab={activeTab}
@@ -1362,7 +1441,24 @@ const StudioCustomOrderDetailPage: React.FC = () => {
         />
       </div>
 
-      <div className="max-h-[calc(100vh-220px)] overflow-y-auto pr-1">{renderTab()}</div>
+      {/*
+        One scroller per screen, on a phone.
+
+        This pane used to be `max-h-[calc(100vh-220px)] overflow-y-auto` at
+        every width. On a mobile browser that is two nested scrollers in a
+        document that is already taller than the viewport: a drag inside the
+        pane scrolls the pane, a drag that starts a pixel outside it scrolls the
+        page, and the reader cannot tell which they are touching. `100vh` also
+        measures the viewport WITH the URL bar retracted, so the pane was taller
+        than the space it had and its last rows sat under the island dock.
+
+        Below `lg` the page simply scrolls. The contained pane returns where it
+        earns its keep — a desktop, where the tab strip and the order header
+        stay in view beside it and there is only ever one scrollbar in reach.
+      */}
+      <div className="min-w-0 lg:max-h-[calc(100dvh-220px)] lg:overflow-y-auto lg:pr-1">
+        {renderTab()}
+      </div>
 
       <OrderChatDrawer
         open={drawerOpen}

@@ -22,18 +22,18 @@ const ALL_ITEMS = [
 ];
 
 /**
- * Studio sections that only earn a slot on the desktop sidebar.
+ * Dock order, lowest-frequency last.
  *
  * `ALL_ITEMS` drives two very different surfaces: a 220px vertical `<aside>`
  * with room for nine labelled rows, and the island dock — a single phone-width
- * strip where every extra chip shrinks the ones that matter. Reviews and Staff
- * are deliberate, low-frequency, read-mostly destinations a brand opens from a
- * desk; they are not what anyone reaches for one-handed mid-task.
- *
- * They stay in the aside untouched. This list only withholds them where
- * horizontal space is the binding constraint.
+ * strip. The dock used to WITHHOLD Reviews and Staff outright, because a strip
+ * that cannot fit nine chips was going to hide something and those two are the
+ * least reached-for one-handed. Withholding is no longer the only option: the
+ * island measures its row and folds whatever does not fit into a More sheet,
+ * so the answer is to rank rather than to drop. The brand keeps every section
+ * on a phone; the ones they open from a desk are simply one tap further in.
  */
-const DESKTOP_ONLY_ITEM_KEYS = new Set(['reviews', 'staff']);
+const DOCK_LAST_ITEM_KEYS = ['reviews', 'staff'];
 
 export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }) => {
   const navigate = useNavigate();
@@ -67,10 +67,14 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
     navigate(path, options);
   };
 
-  // Dock-only list. The aside above still renders `groups` in full.
+  // Dock order. The aside above still renders `groups` in its own order.
   const flatItems = groups
     .flatMap((group) => group.items)
-    .filter((item) => !DESKTOP_ONLY_ITEM_KEYS.has(item.key));
+    .slice()
+    .sort(
+      (a, b) =>
+        DOCK_LAST_ITEM_KEYS.indexOf(a.key) - DOCK_LAST_ITEM_KEYS.indexOf(b.key),
+    );
 
   return (
     <>

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { CustomOrderProgressStage } from '@/api/CustomOrderApi';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import Tabs from '@/components/Tabs';
 import { humanizeCustomOrderToken } from './customOrderFormatting';
 
 const stageLabelMap: Record<CustomOrderProgressStage, string> = {
@@ -360,12 +361,37 @@ export const CustomOrderMetricCard: React.FC<{ label: string; value: React.React
   </div>
 );
 
+/**
+ * Two columns on a phone, one labelled row per line once there is room.
+ *
+ * A `label ————— value` row needs the full width of the card to work, so on a
+ * 360px screen these lists were one tall single-file column: four facts about a
+ * buyer took four rows and half a screen, and every card on an order page did
+ * the same underneath the last. Stacking is the only thing a row layout can do
+ * when it runs out of width.
+ *
+ * Under the row's break point the pair simply turns: the label sits ON the
+ * value instead of across from it, and a pair then needs about half the width —
+ * so two fit side by side and the card is half as tall. Nothing is dropped, no
+ * value is truncated (`break-words` still applies, and an email at 11px fits a
+ * ~160px column), and the familiar row layout returns at `sm:`.
+ *
+ * Shared by the studio order workspace and all three admin order consoles, so
+ * they agree by construction rather than by each being fixed separately.
+ */
 export const CustomOrderKeyValueList: React.FC<{ items: Array<{ label: string; value: React.ReactNode }> }> = ({ items }) => (
-  <dl className="space-y-2 text-[13px] text-slate-600 dark:text-slate-300">
+  <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-[13px] text-slate-600 dark:text-slate-300 sm:grid-cols-1 sm:gap-y-2">
     {items.map((item) => (
-      <div key={item.label} className="group flex items-start justify-between gap-3 rounded-xl px-2 py-1.5 transition-colors duration-200 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
-        <dt className="min-w-0 font-medium opacity-80 transition-opacity group-hover:opacity-100">{item.label}</dt>
-        <dd className="min-w-0 break-words text-right font-semibold text-slate-900 dark:text-white">{item.value}</dd>
+      <div
+        key={item.label}
+        className="group flex min-w-0 flex-col gap-0.5 rounded-xl px-2 py-1.5 transition-colors duration-200 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] sm:flex-row sm:items-start sm:justify-between sm:gap-3"
+      >
+        <dt className="min-w-0 text-[11px] font-medium opacity-70 transition-opacity group-hover:opacity-100 sm:text-[13px] sm:opacity-80">
+          {item.label}
+        </dt>
+        <dd className="min-w-0 break-words font-semibold text-slate-900 dark:text-white sm:text-right">
+          {item.value}
+        </dd>
       </div>
     ))}
   </dl>
@@ -468,51 +494,49 @@ export const CustomOrderStageProgress: React.FC<{
   );
 };
 
+/**
+ * Order workspace tabs — an underline, not a rail of gradient cards.
+ *
+ * Each tab used to be a 160px-wide card carrying a label AND a caption, in a
+ * horizontal scroller. On a 360px phone that is two tabs on screen and the rest
+ * found by swiping a strip with nothing to say it scrolls; the selected one was
+ * a filled indigo block that jumped between positions on every change.
+ *
+ * The caption is why the card was that wide, and it is not per-tab furniture —
+ * it describes the section you are IN. So it moved below the strip, where it
+ * says the same thing about the tab you actually chose and costs the row
+ * nothing. What is left is one line of labels the width of their own words,
+ * marked by a rule that slides between them.
+ */
 export const CustomOrderWorkspaceTabs: React.FC<{
   tabs: Array<{ id: string; label: string; emoji: string; helper?: string }>;
   activeTab: string;
   onChange: (tabId: string) => void;
-}> = ({ tabs, activeTab, onChange }) => (
-  <div className="sticky top-20 z-10 overflow-x-auto rounded-[2rem] p-1 backdrop-blur-md">
-    <div className="inline-flex min-w-full gap-2 rounded-[2rem] border border-white/40 bg-white/70 p-2 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-black/40">
-      {tabs.map((tab) => {
-        const isActive = tab.id === activeTab;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => onChange(tab.id)}
-            className={`group relative min-w-[160px] rounded-[1.5rem] px-5 py-3.5 text-left transition-all duration-300 ${
-              isActive
-                ? 'text-white'
-                : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
-            }`}
-          >
-            {isActive && (
-              <div className="absolute inset-0 rounded-[1.5rem] bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 shadow-[0_8px_16px_rgba(99,102,241,0.3)] transition-all dark:from-indigo-400 dark:via-purple-400 dark:to-indigo-500 dark:shadow-[0_8px_16px_rgba(99,102,241,0.2)]" />
-            )}
-            {isActive && (
-              <div className="pointer-events-none absolute inset-0 -translate-x-full rounded-[1.5rem] bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 transition-opacity duration-1000 group-hover:animate-shimmer group-hover:opacity-100" />
-            )}
-            {!isActive && (
-              <div className="absolute inset-0 rounded-[1.5rem] bg-black/[0.02] opacity-0 transition-opacity duration-200 group-hover:opacity-100 dark:bg-white/[0.04]" />
-            )}
-            
-            <div className="relative z-10 flex items-center text-sm font-bold">
-              <span className="mr-2 text-lg transition-transform duration-300 group-hover:scale-110" aria-hidden="true">{tab.emoji}</span>
-              {tab.label}
-            </div>
-            {tab.helper ? (
-              <div className={`relative z-10 mt-1 text-xs font-medium transition-colors duration-300 ${isActive ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>
-                {tab.helper}
-              </div>
-            ) : null}
-          </button>
-        );
-      })}
+}> = ({ tabs, activeTab, onChange }) => {
+  const activeHelper = tabs.find((tab) => tab.id === activeTab)?.helper;
+
+  return (
+    // Opaque, not translucent. A strip that pins itself over scrolling content
+    // has to hide what passes under it — at 90% the rows underneath showed
+    // through the labels and the tabs became the least readable thing on screen.
+    <div className="sticky top-20 z-10 min-w-0 bg-[color:var(--surface-primary)] pt-1">
+      <Tabs
+        tabs={tabs.map((tab) => tab.id)}
+        labels={Object.fromEntries(tabs.map((tab) => [tab.id, tab.label]))}
+        icons={Object.fromEntries(tabs.map((tab) => [tab.id, tab.emoji]))}
+        activeTab={activeTab}
+        onTabChange={onChange}
+        ariaLabel="Order workspace"
+        size="sm"
+      />
+      {activeHelper ? (
+        <p className="px-2 pt-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+          {activeHelper}
+        </p>
+      ) : null}
     </div>
-  </div>
-);
+  );
+};
 
 export const CustomOrderMediaPreview: React.FC<{
   src?: string | null;
@@ -549,9 +573,20 @@ export const CustomOrderMediaPreview: React.FC<{
             fallbackName={title}
             fit="contain"
             rounded="none"
-            containerClassName="flex min-h-[240px] w-full items-center justify-center overflow-hidden lg:min-h-[320px]"
-            className="h-auto w-full max-h-[85vh] transition-transform duration-700 group-hover:scale-[1.02]"
-            maxHeightClassName="max-h-[85vh]"
+            /*
+              85vh of a phone is the whole screen.
+
+              This cap was written for a desktop column, where 85vh of a 900px
+              window is a generous preview beside the order details. On a 360×800
+              phone the same rule hands a portrait photograph 680px — the entire
+              viewport, with the order it belongs to pushed off both ends of it,
+              so scrolling past the picture is the first thing anyone has to do.
+              A preview earns about half a phone screen; the full image is one
+              tap away and the desktop behaviour is unchanged.
+            */
+            containerClassName="flex min-h-[180px] w-full items-center justify-center overflow-hidden sm:min-h-[240px] lg:min-h-[320px]"
+            className="h-auto w-full max-h-[45vh] transition-transform duration-700 group-hover:scale-[1.02] sm:max-h-[60vh] lg:max-h-[85vh]"
+            maxHeightClassName="max-h-[45vh] sm:max-h-[60vh] lg:max-h-[85vh]"
           />
           <div className="pointer-events-none absolute inset-0 rounded-[2rem] ring-1 ring-inset ring-black/10 dark:ring-white/10" />
           {images.length > 1 ? (
@@ -584,7 +619,7 @@ export const CustomOrderMediaPreview: React.FC<{
           ) : null}
         </>
       ) : (
-        <div className="flex min-h-[260px] items-center justify-center bg-slate-900 text-7xl text-white transition-colors duration-500 group-hover:bg-slate-800 dark:bg-slate-950">
+        <div className="flex min-h-[180px] items-center justify-center bg-slate-900 text-6xl text-white transition-colors duration-500 group-hover:bg-slate-800 dark:bg-slate-950 sm:min-h-[260px] sm:text-7xl">
           <span aria-hidden="true" className="transition-transform duration-500 group-hover:scale-110">{emoji}</span>
         </div>
       )}

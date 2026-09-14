@@ -17,6 +17,7 @@ import {
 import OrderChatDrawer from '@/components/messaging/OrderChatDrawer';
 import {
   formatCustomOrderCode,
+  humanizeCustomOrderToken,
 } from '@/components/custom-orders/customOrderFormatting';
 import ImageWithFallback from '@/components/ImageWithFallback';
 
@@ -237,7 +238,9 @@ type CustomOrdersData = {
 
 const CustomOrdersPage: React.FC = () => {
   const navigate = useNavigate();
-  const [chatTarget, setChatTarget] = useState<Pick<CustomOrderListItem, 'id'> & { customerName: string } | null>(null);
+  // The whole row, not just its id: the drawer pins a reference card naming the
+  // piece, and the queue already holds the title, cover and status it needs.
+  const [chatTarget, setChatTarget] = useState<CustomOrderListItem | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
@@ -334,18 +337,24 @@ const CustomOrdersPage: React.FC = () => {
         </div>
 
         {/*
-          Four counters, four columns - the same shape the standard-orders tab
-          uses, because they are the same kind of thing.
+          Four counters in a grid - the same shape the standard-orders tab uses,
+          because they are the same kind of thing.
 
           `flex-wrap` gave these a different ragged layout at every width: three
           on one line and a lonely fourth below it, or two and two, depending on
           how long the numbers happened to be. A grid makes the row stable and
           makes the two tabs agree with each other.
 
+          Two columns on a phone, four once there is room - which is the shape
+          the standard-orders metrics settled on for the same reason. Four
+          across 360px gives each counter ~72px, and "awaiting payment" then
+          wraps to three lines under a number it no longer sits with. This said
+          it matched that tab while doing the opposite of it.
+
           Number over label rather than beside it, so the label has the full
           column width and does not have to compete with the figure for it.
         */}
-        <div className="mt-4 grid grid-cols-4 gap-2">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <div className="min-w-0 rounded-xl bg-white/10 px-2 py-2 sm:px-3.5">
             <div className="text-base font-bold leading-tight sm:text-lg">{metrics.total}</div>
             <div className="text-[10px] leading-tight text-slate-300 sm:text-xs">in view</div>
@@ -417,12 +426,7 @@ const CustomOrdersPage: React.FC = () => {
               order={order}
               summary={summaryByOrderId[order.id]}
               onOpenOrder={() => navigate(`/studio/custom-orders/${order.id}`)}
-              onOpenMessages={() =>
-                setChatTarget({
-                  id: order.id,
-                  customerName: order.buyer?.name || order.sourceTitle || 'Buyer',
-                })
-              }
+              onOpenMessages={() => setChatTarget(order)}
             />
           ))}
         </div>
@@ -435,7 +439,22 @@ const CustomOrdersPage: React.FC = () => {
         contextType="CUSTOM_ORDER"
         brandId={brandId}
         actorSurface="BRAND"
-        customerName={chatTarget?.customerName || 'Buyer'}
+        customerName={chatTarget?.buyer?.name || chatTarget?.sourceTitle || 'Buyer'}
+        reference={
+          chatTarget
+            ? {
+                title: chatTarget.sourceTitle,
+                code: formatCustomOrderCode(chatTarget.id),
+                coverUrl: chatTarget.sourcePrimaryMediaUrl ?? null,
+                statusLabel: humanizeCustomOrderToken(chatTarget.status),
+                meta: formatCurrency(
+                  chatTarget.buyerPriceSummary.grandTotal,
+                  chatTarget.buyerPriceSummary.currency,
+                ),
+                onOpen: () => navigate(`/studio/custom-orders/${chatTarget.id}`),
+              }
+            : undefined
+        }
       />
     </div>
   );

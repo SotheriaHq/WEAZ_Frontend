@@ -7,6 +7,38 @@ export interface MessagingCursor {
   id: string;
 }
 
+/**
+ * The thing a message is ABOUT, carried alongside it.
+ *
+ * The backend accepts these on every send path (`buildContentContextMeta` in
+ * `messaging.service.ts` copies them into `metadataJson`), and `MessageBubble`
+ * renders them as a tappable card above the text. Only `sendBrandMessage`
+ * declared them on the web, which is why a message sent from an ORDER arrived
+ * naming nothing: the brand writes "your piece is ready" and the shopper — who
+ * may have several orders open with several brands — has to work out which
+ * piece from a truncated UUID in the thread header.
+ *
+ * Design and product are parallel sets rather than a generic
+ * contextType/contextId pair; see the DTO for why.
+ */
+export interface MessageContentContext {
+  contextDesignId?: string;
+  contextDesignTitle?: string;
+  contextDesignCoverFileId?: string;
+  contextDesignCoverUrl?: string;
+  contextProductId?: string;
+  contextProductTitle?: string;
+  contextProductCoverFileId?: string;
+  contextProductCoverUrl?: string;
+}
+
+export interface SendMessagePayload extends MessageContentContext {
+  bodyText?: string;
+  clientMessageId: string;
+  attachmentFileIds?: string[];
+  replyToMessageId?: string;
+}
+
 export interface MessageAttachment {
   id: string;
   kind: 'IMAGE' | 'DOCUMENT';
@@ -287,7 +319,7 @@ export const messagingApi = {
     return unwrapApiResponse<any>(response.data);
   },
 
-  async sendCustomOrderMessage(orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
+  async sendCustomOrderMessage(orderId: string, payload: SendMessagePayload) {
     const response = await apiClient.post(
       `/custom-orders/${orderId}/messages`,
       payload,
@@ -297,7 +329,7 @@ export const messagingApi = {
     return unwrapApiResponse<any>(response.data);
   },
 
-  async sendCustomOrderMessageForBrand(brandId: string, orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
+  async sendCustomOrderMessageForBrand(brandId: string, orderId: string, payload: SendMessagePayload) {
     const response = await apiClient.post(
       `/brands/${brandId}/custom-orders/${orderId}/messages`,
       payload,
@@ -371,7 +403,7 @@ export const messagingApi = {
     return parseMessageList(response.data);
   },
 
-  async sendOrderMessage(orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
+  async sendOrderMessage(orderId: string, payload: SendMessagePayload) {
     const response = await apiClient.post(
       `/orders/${orderId}/messages`,
       payload,
@@ -381,7 +413,7 @@ export const messagingApi = {
     return unwrapApiResponse<any>(response.data);
   },
 
-  async sendOrderMessageForBrand(brandId: string, orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
+  async sendOrderMessageForBrand(brandId: string, orderId: string, payload: SendMessagePayload) {
     const response = await apiClient.post(
       `/brands/${brandId}/orders/${orderId}/messages`,
       payload,
@@ -599,7 +631,7 @@ export const messagingApi = {
    * design or a Market product. Sending a remark composed from a piece of
    * content without them leaves the brand reading a sentence with no subject.
    */
-  async sendBrandMessage(brandId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; contextDesignId?: string; contextDesignTitle?: string; contextDesignCoverFileId?: string; contextDesignCoverUrl?: string; contextProductId?: string; contextProductTitle?: string; contextProductCoverFileId?: string; contextProductCoverUrl?: string; replyToMessageId?: string }) {
+  async sendBrandMessage(brandId: string, payload: SendMessagePayload) {
     const response = await apiClient.post(
       `/messaging/brands/${brandId}/messages`,
       payload,
@@ -608,7 +640,7 @@ export const messagingApi = {
     return unwrapApiResponse<any>(response.data);
   },
 
-  async sendThreadMessage(threadId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
+  async sendThreadMessage(threadId: string, payload: SendMessagePayload) {
     const response = await apiClient.post(
       `/messaging/threads/${threadId}/messages`,
       payload,

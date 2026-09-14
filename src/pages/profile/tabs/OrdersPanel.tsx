@@ -512,7 +512,7 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
       </div>
 
       <section className="overflow-hidden rounded-[28px] border border-gray-200/80 bg-white/70 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
-        <div className="grid gap-6 p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="grid gap-4 p-3 sm:gap-6 sm:p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           <CustomOrderMediaPreview
             src={firstItem?.thumbnail ?? null}
             sources={standardMediaUrls}
@@ -1108,7 +1108,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
         </div>
 
         <section className="overflow-hidden rounded-[2rem] border border-black/10 bg-white/90 shadow-[0_30px_120px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04]">
-          <div className="grid gap-6 p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="grid gap-4 p-3 sm:gap-6 sm:p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
             <CustomOrderMediaPreview
               src={previewOrder.sourcePrimaryMediaUrl}
               title={previewOrder.sourceTitle}
@@ -1183,7 +1183,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
       </div>
 
       <section className="overflow-hidden rounded-[2rem] border border-black/10 bg-white/90 shadow-[0_30px_120px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04]">
-        <div className="grid gap-6 p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="grid gap-4 p-3 sm:gap-6 sm:p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           <CustomOrderMediaPreview
             src={mediaUrl}
             sources={sourceMediaUrls}

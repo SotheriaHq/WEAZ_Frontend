@@ -1,13 +1,22 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { messagingApi, type ThreadMessage } from '@/api/MessagingApi';
+import {
+  messagingApi,
+  type MessageContentContext,
+  type ThreadMessage,
+} from '@/api/MessagingApi';
 import { customOrdersBuyerApi, customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import MessageBubble, { formatDate } from './MessageBubble';
 import ComposeArea from './ComposeArea';
+import OrderReferenceCard, { type OrderChatReference } from './OrderReferenceCard';
 import { MuseLoader } from '@/components/loaders/MuseLoader';
+import {
+  formatCustomOrderCode,
+  humanizeCustomOrderToken,
+} from '@/components/custom-orders/customOrderFormatting';
 
 type ContextType = 'CUSTOM_ORDER' | 'STANDARD_ORDER';
 
@@ -21,6 +30,15 @@ interface OrderChatDrawerProps {
   customerName?: string;
   readOnly?: boolean;
   highlightMessageId?: string | null;
+  /**
+   * The order this conversation is about, pinned above the messages.
+   *
+   * Optional, and for CUSTOM_ORDER the drawer can build its own from the detail
+   * it already fetches. A caller passes one when it holds better information
+   * than the detail endpoint returns — a standard order has no `source`, so the
+   * orders list is the only place that knows what was bought.
+   */
+  reference?: OrderChatReference;
 }
 
 const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
@@ -33,6 +51,7 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
   customerName,
   readOnly = false,
   highlightMessageId,
+  reference,
 }) => {
   const profile = useSelector((s: RootState) => s.user.profile);
   const myId = profile?.id;
@@ -97,6 +116,25 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
         }
       }
     } catch (err: any) {
+      /*
+        A thread that does not exist yet is an empty thread, not a failure.
+
+        The backend mints the thread row on the FIRST message, so every order
+        nobody has written to yet answers `GET …/messages` with 404 "Message
+        thread not found for this custom order". The drawer was reporting that
+        as an error, so opening the chat on a fresh order — which is exactly
+        when a brand opens it — put a red toast over a screen that was, right
+        underneath, correctly saying "No messages yet. Start a conversation
+        about this order". Two contradictory answers to the same question.
+
+        Anything else still surfaces: a 403, a 500 or a dropped connection are
+        real, and silently showing an empty thread for those would invite a
+        brand to retype a message they had already sent.
+      */
+      if (err?.response?.status === 404) {
+        setMessages([]);
+        return;
+      }
       toast.error(err?.response?.data?.message || 'Failed to load messages');
     }
   }, [actorSurface, brandId, contextType, orderId]);
@@ -321,12 +359,83 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
     return () => window.clearTimeout(timer);
   }, [highlightMessageId, messages]);
 
+  /**
+   * The pinned reference: what the caller gave us, else what the order says.
+   *
+   * A custom order already carries its own subject — `source` is the design or
+   * product the piece is being made from — so the drawer can name the thread
+   * without the caller doing anything. A standard order has no such field, and
+   * for those the caller is the only one who knows; it passes `reference`.
+   */
+  const resolvedReference = useMemo<OrderChatReference | null>(() => {
+    if (reference) return reference;
+    if (!customOrderDetail) return null;
+    return {
+      title: customOrderDetail.source.title,
+      code: formatCustomOrderCode(customOrderDetail.id),
+      coverUrl: customOrderDetail.source.primaryMediaUrl ?? null,
+      statusLabel: humanizeCustomOrderToken(customOrderDetail.status),
+      meta: customOrderDetail.source.brandName ?? null,
+    };
+  }, [customOrderDetail, reference]);
+
+  /**
+   * The same reference, travelling WITH each message.
+   *
+   * The pinned card above only exists for whoever has this drawer open. The
+   * shopper reads the reply in their inbox, where the thread is one row among
+   * many and the subject is a truncated id — so the message itself has to carry
+   * what it is about, exactly as a message composed from a Runway or Market
+   * card does. `MessageBubble` already renders these keys as a tappable card on
+   * both sides, and `handleOpenDesignContext` in the inbox already opens it.
+   *
+   * A custom order is made FROM a design or a product, and that source is the
+   * thing a shopper recognises, so it is what gets attached. Only custom orders
+   * have one; a standard-order thread is named by its pinned card alone.
+   */
+  const contentContext = useMemo<MessageContentContext>(() => {
+    const source = customOrderDetail?.source;
+    if (source?.id && source.title) {
+      const cover = source.primaryMediaUrl ?? undefined;
+      return source.type === 'PRODUCT'
+        ? {
+            contextProductId: source.id,
+            contextProductTitle: source.title,
+            contextProductCoverUrl: cover,
+          }
+        : {
+            contextDesignId: source.id,
+            contextDesignTitle: source.title,
+            contextDesignCoverUrl: cover,
+          };
+    }
+
+    /*
+      A standard order names the item without linking to it.
+
+      The orders list carries the line item's name and thumbnail but not its
+      product id — so the card can say WHAT the message is about but has nowhere
+      to send a tap. `MessageBubble` already handles exactly this shape (it
+      renders a static card rather than a button that goes nowhere), and a card
+      that names the piece beats a thread that names nothing.
+    */
+    if (resolvedReference?.title) {
+      return {
+        contextProductTitle: resolvedReference.title,
+        contextProductCoverUrl: resolvedReference.coverUrl ?? undefined,
+      };
+    }
+
+    return {};
+  }, [customOrderDetail?.source, resolvedReference]);
+
   const handleSend = useCallback(async (bodyText: string, attachmentFileIds: string[]) => {
     const clientMessageId = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const payload = {
       bodyText: bodyText || undefined,
       clientMessageId,
       attachmentFileIds,
+      ...contentContext,
     };
 
     // Optimistic: add message to local list immediately
@@ -373,7 +482,7 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
         ),
       );
     }
-  }, [actorSurface, brandId, contextType, orderId, fetchMessages, scrollToBottom, myId, profile]);
+  }, [actorSurface, brandId, contentContext, contextType, orderId, fetchMessages, scrollToBottom, myId, profile]);
 
   if (!open) return null;
 
@@ -422,6 +531,19 @@ const OrderChatDrawer: React.FC<OrderChatDrawerProps> = memo(({
             ✕
           </button>
         </div>
+
+        {/*
+          The subject of the conversation, directly under the people in it.
+
+          Above the quick actions rather than below them: "Request extra time"
+          and "Open dispute" are decisions about THIS order, and a control whose
+          object is named underneath it is a control you press on trust.
+        */}
+        {resolvedReference ? (
+          <div className="shrink-0 border-b border-gray-200/50 px-4 py-2.5 dark:border-white/10">
+            <OrderReferenceCard reference={resolvedReference} />
+          </div>
+        ) : null}
 
         {actorSurface !== 'ADMIN' && !readOnly ? (
           <div className="shrink-0 border-b border-gray-200/50 px-4 py-2.5 dark:border-white/10">
