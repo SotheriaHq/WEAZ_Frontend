@@ -206,7 +206,14 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
 
   if (requiresEmailVerification) {
     if (isEmbeddedMobile) {
-      postStudioNativeEvent({ type: 'PROFILE_SETUP_REQUIRED', path: verificationPromptDestination });
+      // `reason` lets the native shell route: these two blocks post the same
+      // event type but need different destinations, and without it the shell
+      // cannot tell an unverified email from an unfinished brand profile.
+      postStudioNativeEvent({
+        type: 'PROFILE_SETUP_REQUIRED',
+        reason: 'email-verification',
+        path: verificationPromptDestination,
+      });
       return (
         <div className="flex min-h-screen items-center justify-center bg-white px-5 text-slate-900 dark:bg-black dark:text-white">
           <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm dark:border-white/10 dark:bg-zinc-950">
@@ -223,7 +230,11 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
 
   if (requiresProfileCompletion) {
     if (isEmbeddedMobile) {
-      postStudioNativeEvent({ type: 'PROFILE_SETUP_REQUIRED', path: brandProfileSetupDestination });
+      postStudioNativeEvent({
+        type: 'PROFILE_SETUP_REQUIRED',
+        reason: 'brand-profile',
+        path: brandProfileSetupDestination,
+      });
       return (
         <div className="flex min-h-screen items-center justify-center bg-white px-5 text-slate-900 dark:bg-black dark:text-white">
           <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm dark:border-white/10 dark:bg-zinc-950">
