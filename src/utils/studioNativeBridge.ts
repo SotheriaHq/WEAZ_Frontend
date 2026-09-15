@@ -20,6 +20,8 @@ export type StudioNativeEvent =
   | {
       type: 'PROFILE_SETUP_REQUIRED';
       reason?: 'brand-profile' | 'email-verification';
+      /** Server's own `profileMissingFields`: 'description' | 'tags' | 'location'. */
+      missingFields?: string[];
       path?: string;
     }
   | { type: 'ACTION_COMPLETE'; action?: string; path?: string }

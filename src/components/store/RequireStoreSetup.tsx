@@ -15,6 +15,34 @@ import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 
+/**
+ * `/store/status` has always returned `profileMissingFields` — the server
+ * computes exactly which of the three checks failed — and no client has ever
+ * read it. Both the web card and the native toast said only that setup was
+ * required, so someone who believed they had filled the form in had no way to
+ * find out which field the server disagreed about, or that it disagreed at all.
+ *
+ * The server's vocabulary is 'description' | 'tags' | 'location'; these say the
+ * same thing in the terms the form uses, including the 20-character minimum,
+ * which is the one rule a filled-in-looking description can still fail.
+ */
+const PROFILE_FIELD_LABELS: Record<string, string> = {
+  description: 'a description of at least 20 characters',
+  tags: 'at least one tag',
+  location: 'a country or state',
+};
+
+export const describeMissingProfileFields = (
+  fields?: string[] | null,
+): string | null => {
+  const labels = (fields ?? [])
+    .map((field) => PROFILE_FIELD_LABELS[field] ?? field)
+    .filter(Boolean);
+  if (labels.length === 0) return null;
+  if (labels.length === 1) return labels[0];
+  return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
+};
+
 const STATUS_RETRY_ATTEMPTS = 5;
 const STATUS_RETRY_DELAY_MS = 600;
 const STORE_STATUS_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -163,6 +191,9 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     hasBrandAccess && effectiveEmailVerified === false;
   const requiresProfileCompletion =
     hasBrandAccess && effectiveProfileComplete === false;
+  const missingProfileFieldsLabel = describeMissingProfileFields(
+    status?.profileMissingFields,
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -233,14 +264,19 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
       postStudioNativeEvent({
         type: 'PROFILE_SETUP_REQUIRED',
         reason: 'brand-profile',
+        ...(status?.profileMissingFields
+          ? { missingFields: status.profileMissingFields }
+          : null),
         path: brandProfileSetupDestination,
       });
       return (
         <div className="flex min-h-screen items-center justify-center bg-white px-5 text-slate-900 dark:bg-black dark:text-white">
           <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm dark:border-white/10 dark:bg-zinc-950">
-            <div className="text-base font-semibold">Profile setup required</div>
+            <div className="text-base font-semibold">Finish your brand profile</div>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Return to the app to complete your brand profile before opening Studio.
+              {missingProfileFieldsLabel
+                ? `Studio opens once your profile has ${missingProfileFieldsLabel}.`
+                : 'Studio opens once your brand profile is complete.'}
             </p>
           </div>
         </div>
