@@ -12,6 +12,7 @@ interface SidebarItem {
   danger?: boolean;
   description?: string;
   nonAdmin?: boolean;
+  endUserOnly?: boolean; // hidden for brand accounts (shopper-only settings)
 }
 
 interface SidebarGroup {
@@ -55,6 +56,7 @@ const sidebarGroups: SidebarGroup[] = [
     brandOnly: true,
     items: [
       { key: 'store-general', label: 'General', path: '/settings?tab=store-general', icon: '⚙️', description: 'Store name, bio, logo' },
+      { key: 'store-hours', label: 'Working Hours', path: '/settings?tab=store-hours', icon: '🕒', description: 'Days & hours you operate' },
       { key: 'store-social', label: 'Social & Links', path: '/settings?tab=store-social', icon: '🔗', description: 'Social links, verification' },
       { key: 'store-policies', label: 'Policies', path: '/settings?tab=store-policies', icon: '📄', description: 'Return, shipping, terms' },
       { key: 'store-team', label: 'Team Members', path: '/settings?tab=store-team', icon: '👥', description: 'Manage access' },
@@ -86,7 +88,6 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
   const me = useSelector((state: RootState) => state.user.profile);
   const isBrandUser = hasActiveBrandMembership(me);
   const isAdmin = me?.role === 'SuperAdmin' || me?.role === 'Admin';
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     for (const group of sidebarGroups) {
@@ -104,14 +105,18 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
   const handleSelect = (key: string, path: string) => {
     onSelect(key);
     navigate(path);
-    setMobileOpen(false);
   };
 
   const visibleGroups = sidebarGroups
     .filter((group) => !group.brandOnly || isBrandUser)
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => !isAdmin || !item.nonAdmin),
+      items: group.items.filter(
+        (item) =>
+          (!isAdmin || !item.nonAdmin) &&
+          // Shopper-only links never show for brand accounts, and vice-versa.
+          (!isBrandUser || !item.endUserOnly),
+      ),
     }));
 
   const renderGroup = (group: SidebarGroup) => {
@@ -146,8 +151,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
                 <button
                   key={key}
                   onClick={() => handleSelect(key, path)}
-                  className={`flex w-full items-center gap-2.5 py-2 text-left text-sm transition-colors ${
-                    group.collapsible ? 'pl-6 pr-4' : 'px-4'
+            className={`flex w-full items-center gap-2 py-2.5 text-left text-[11px] leading-snug transition-colors md:gap-2.5 md:py-2 md:text-sm ${
+                    group.collapsible ? 'pl-3 pr-2 md:pl-6 md:pr-4' : 'px-3 md:px-4'
                   } ${
                     isActive
                       ? '-ml-[1px] border-l-[3px] border-primary bg-primary/10 font-medium text-primary'
@@ -156,8 +161,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
                         : 'text-gray-600 hover:bg-gray-100 hover:text-black dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'
                   }`}
                 >
-                  <span className="shrink-0" aria-hidden="true">{icon}</span>
-                  {label}
+                  <span className="shrink-0 text-sm md:text-base" aria-hidden="true">{icon}</span>
+                  <span className="min-w-0">{label}</span>
                 </button>
               );
             })}
@@ -169,7 +174,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
 
   const sidebarContent = (
     <div className="py-4">
-      <h2 className="mb-4 px-4 text-xl font-semibold text-gray-900 dark:text-white">Settings</h2>
+      <h2 className="mb-2 px-2 text-sm font-semibold text-gray-900 md:mb-4 md:px-4 md:text-xl dark:text-white">Settings</h2>
       <nav className="space-y-1">
         {visibleGroups.map((group, index) => (
           <React.Fragment key={group.id}>
@@ -184,37 +189,10 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
   );
 
   return (
-    <>
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="fixed bottom-4 right-4 z-30 rounded-full bg-primary p-3 text-white shadow-lg transition-colors hover:bg-primary/90 md:hidden"
-        aria-label="Open settings menu"
-      >
-        <span aria-hidden="true">☰</span>
-      </button>
-
-      {mobileOpen ? (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 h-full w-[280px] overflow-y-auto bg-white shadow-xl dark:bg-zinc-900">
-            <div className="flex items-center justify-between px-4 pt-4">
-              <span className="text-lg font-semibold text-gray-900 dark:text-white">Settings</span>
-              <button
-                onClick={() => setMobileOpen(false)}
-                className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-white/10"
-              >
-                <span className="text-gray-500" aria-hidden="true">✕</span>
-              </button>
-            </div>
-            {sidebarContent}
-          </aside>
-        </div>
-      ) : null}
-
-      <aside className="fixed left-0 top-16 z-20 hidden h-[calc(100vh-64px)] w-[240px] overflow-y-auto border-r border-gray-200 bg-white scrollbar-hide dark:border-white/5 dark:bg-zinc-900 md:block">
-        {sidebarContent}
-      </aside>
-    </>
+    // Scaled fixed sidebar — stays visible on mobile (narrow) and full-width on md+.
+    <aside className="fixed left-0 top-16 z-20 block h-[calc(100vh-64px)] w-[118px] overflow-y-auto border-r border-gray-200 bg-white scrollbar-hide dark:border-white/5 dark:bg-zinc-900 md:w-[220px]">
+      {sidebarContent}
+    </aside>
   );
 };
 

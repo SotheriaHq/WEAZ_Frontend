@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import DefaultAvatar from './DefaultAvatar';
 import { brandApi } from '@/api/BrandApi';
 import MediaRenderer from './media/MediaRenderer';
@@ -20,6 +20,30 @@ interface ImageWithFallbackProps {
   draggable?: boolean;
   onClick?: () => void;
   keepPreviousOnReload?: boolean;
+  /**
+   * Native <img> loading hint. Defaults to 'eager' to preserve existing
+   * behavior. Pass 'lazy' for grid/feed cards in a DOCUMENT-scrolled layout so
+   * off-screen images defer instead of all firing at once and queuing behind
+   * the browser's ~6-connection cap (the "cards render one at a time" symptom).
+   * Do NOT use 'lazy' inside a custom overflow-scroll container.
+   */
+  loading?: 'lazy' | 'eager';
+  /** Fetch priority hint forwarded to the underlying <img>. */
+  fetchPriority?: 'high' | 'low' | 'auto';
+  /** Optional stable surface used while a first-time image is decoding. */
+  loadingPlaceholderClassName?: string;
+  /**
+   * Hold a newly introduced source behind its placeholder until final decode.
+   * Opt-in because document/grid callers retain their established eager paint;
+   * full-screen swipe media needs the stricter no-progressive-paint guarantee.
+   */
+  waitForDecode?: boolean;
+  /**
+   * Fires when the resolved image has actually painted. Lets a caller hold a
+   * local preview underneath until the real one is on screen, so the swap is a
+   * crossfade instead of a gap.
+   */
+  onLoaded?: () => void;
 }
 
 const roundClass = (rounded: ImageWithFallbackProps['rounded']) => {
@@ -40,7 +64,7 @@ const roundClass = (rounded: ImageWithFallbackProps['rounded']) => {
 };
 
 // Session-storage backed cache for signed URLs to prevent flickering on navigation
-const CACHE_KEY = 'threadly_signed_url_cache';
+const CACHE_KEY = 'wiez_signed_url_cache';
 const CACHE_EXPIRY_MS = 14 * 60 * 1000; // 14 minutes (signed URLs typically expire at 15min)
 
 interface CacheEntry {
@@ -177,11 +201,15 @@ const isRawStorageKey = (value?: string | null) => {
 
 const shouldPreferFileIdResolution = (value?: string | null, fileId?: string | null) => {
   if (!value || !fileId) return false;
+  // Market rails and catalog cards often ship a freshly signed URL alongside
+  // a fileId. Prefer the usable signed src so we don't re-hit /public-url
+  // (which 400s for some product images and blanks the card).
+  if (isUsableInitialUrl(value)) return false;
   return isS3LikeUrl(value);
 };
 
-const canUseSourceDirectly = (value?: string | null, fileId?: string | null) =>
-  isUsableInitialUrl(value) && !shouldPreferFileIdResolution(value, fileId);
+const canUseSourceDirectly = (src?: string | null, fileId?: string | null) =>
+  isUsableInitialUrl(src) && !shouldPreferFileIdResolution(src, fileId);
 
 const resolveSourceCacheKey = (fileId?: string | null, src?: string | null) => {
   if (fileId) return fileId;
@@ -229,6 +257,11 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   draggable: _draggable = false,
   onClick,
   keepPreviousOnReload = false,
+  loading = 'eager',
+  fetchPriority,
+  loadingPlaceholderClassName,
+  waitForDecode = false,
+  onLoaded,
 }) => {
   const sourceCacheKey = resolveSourceCacheKey(fileId, src);
   const cachedLastGoodUrl = sourceCacheKey ? lastGoodUrlCache.get(sourceCacheKey) ?? null : null;
@@ -244,7 +277,18 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     return src ?? null;
   });
   const [hadError, setHadError] = useState(false);
+  // Sticky "this source has failed at least once" flag. After a first failure we
+  // keep the stable fallback avatar visible during the silent retry instead of
+  // re-flashing the shimmer, which produced the jarring
+  // skeleton -> initials -> skeleton -> initials sequence on market cards.
+  const [everErrored, setEverErrored] = useState(false);
+  // A URL being known is not evidence that its pixels are decoded. The stricter
+  // runway path holds it transparent until `onLoad`, preventing progressive
+  // JPEG/AVIF paint from appearing as a 10% → 100% image build during a swipe.
+  // Cache hits are promoted synchronously by the layout effect below, before
+  // first paint. Other callers retain the existing eager-paint behavior.
   const [loaded, setLoaded] = useState(() => {
+    if (waitForDecode) return !src && !fileId;
     if (canUseSourceDirectly(src, fileId)) return true;
     if (fileId) return !!(getCachedUrl(fileId));
     if (src && isRawStorageKey(src)) return !!(getCachedUrl(`key:${src}`));
@@ -254,6 +298,13 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   const [lastGoodUrl, setLastGoodUrl] = useState<string | null>(() =>
     cachedLastGoodUrl ?? (loaded ? resolved : null),
   );
+  /**
+   * True when the image was already decoded at mount, so it needs no fade.
+   *
+   * A cache hit and a cold network fetch look identical to `loaded` — both end
+   * up true. Only one of them should animate.
+   */
+  const [instant, setInstant] = useState(false);
   const retryCountRef = React.useRef(0);
   const imgRef = React.useRef<HTMLImageElement | null>(null);
 
@@ -262,19 +313,39 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     retryCountRef.current = 0;
 
     const run = async () => {
-      // If src/fileId changed, reset error
+      // If src/fileId changed, reset error state (new image starts fresh, so it
+      // is allowed to show the shimmer again).
       setHadError(false);
+      setEverErrored(false);
+      setInstant(false);
       if (sourceCacheKey) {
         const cachedLastGood = lastGoodUrlCache.get(sourceCacheKey);
         if (cachedLastGood) {
           setLastGoodUrl(cachedLastGood);
         }
       }
-      setLoaded(false);
+
+      const cachedFileUrl = fileId ? getCachedUrl(fileId) : null;
+      const cachedSourceUrl =
+        !fileId && src && isRawStorageKey(src)
+          ? getCachedUrl(`key:${src}`)
+          : !fileId && src && isS3LikeUrl(src)
+            ? getCachedUrl(src)
+            : null;
+      const hasInstantSource =
+        canUseSourceDirectly(src, fileId) ||
+        Boolean(cachedFileUrl) ||
+        Boolean(cachedSourceUrl) ||
+        Boolean(sourceCacheKey && lastGoodUrlCache.get(sourceCacheKey));
+      const hasPreviouslyPaintedSource = Boolean(sourceCacheKey && lastGoodUrlCache.get(sourceCacheKey));
+
+      if ((waitForDecode && !hasPreviouslyPaintedSource) || (!waitForDecode && !hasInstantSource)) {
+        setLoaded(false);
+      }
 
       if (canUseSourceDirectly(src, fileId)) {
         setResolved(src ?? null);
-        setLoaded(true);
+        if (!waitForDecode) setLoaded(true);
         return;
       }
 
@@ -318,6 +389,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         const cachedUrl = getCachedUrl(fileId);
         if (cachedUrl) {
           setResolved(cachedUrl);
+          if (!waitForDecode) setLoaded(true);
           return; // Use cached URL, no need to fetch
         }
 
@@ -352,7 +424,11 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     return () => {
       mounted = false;
     };
-  }, [fileId, sourceCacheKey, src]);
+  }, [fileId, sourceCacheKey, src, waitForDecode]);
+
+  useEffect(() => {
+    if (hadError) setEverErrored(true);
+  }, [hadError]);
 
   // Auto-retry once on error after a short delay
   useEffect(() => {
@@ -374,8 +450,36 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         brandApi.invalidateSignedUrlCache(src);
       }
 
+      /*
+       * On retry, ask for a SIGNED url — not the public one that just failed.
+       *
+       * `getSignedFileUrl` tries `/uploads/public-url` first and only falls
+       * through to the signed endpoint when the public one returns nothing. A
+       * public url that RESOLVES but cannot be fetched defeats that: the server
+       * keeps handing back the same string, the <img> keeps 403ing, and the
+       * retry re-runs the identical request. The image is then permanently the
+       * initials fallback, unchanged by a reload — which is exactly what a
+       * misconfigured MEDIA_PUBLIC_BASE_URL produces, since the code builds
+       * `${base}/${key}` and returns it without ever checking it is readable.
+       *
+       * The signed endpoint is the authoritative path and is what the fallback
+       * existed for. Going straight there turns a hard outage into one slow
+       * frame.
+       */
       const fetcher = fileId
-        ? () => brandApi.getSignedFileUrl(fileId, { forceRefresh: true })
+        ? async () =>
+            /*
+             * Private FIRST, public as the fallback — not private alone.
+             *
+             * Going straight to the signed endpoint fixes the case where a
+             * public url resolves but cannot be fetched. On its own it breaks a
+             * different one: `/uploads/signed-url/:id` authorises by ownership,
+             * so viewing SOMEONE ELSE'S avatar or a brand's catalogue image
+             * would fail closed and stick on the initials. Trying both, in the
+             * order that inverts the primary path, covers both cases.
+             */
+            (await brandApi.getPrivateSignedFileUrl(fileId, { forceRefresh: true })) ??
+            (await brandApi.getPublicFileUrl(fileId, { forceRefresh: true }))
         : src && isS3LikeUrl(src)
           ? () => brandApi.getSignedS3Url(src, { forceRefresh: true })
           : src && !/^https?:\/\//i.test(src)
@@ -401,18 +505,46 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   // Shimmer should stay visible until the image is fully loaded, not just until the URL resolves.
   // Without this, there is a white flash between "URL resolved" and "image onLoad" because the
   // <img> is opacity-0 with no background behind it during that window.
-  const showFallback = hadError || isKnownUnavailableSource;
+  const showFallback = !hasSource || hadError || isKnownUnavailableSource;
+  // Once a source has errored, a silent retry may be in flight (hadError back to
+  // false while a fresh signed URL loads). Keep the stable fallback painted
+  // during that window instead of re-showing the shimmer.
+  const showRetryFallback = everErrored && !showFallback && !loaded;
   const showPreviousImage =
     keepPreviousOnReload && Boolean(lastGoodUrl) && !showFallback && hasSource && (isResolving || !loaded);
-  const showShimmer = !showPreviousImage && !showFallback && (isResolving || (hasSource && !hadError && !loaded));
+  const showShimmer =
+    !showPreviousImage &&
+    !showFallback &&
+    !showRetryFallback &&
+    !everErrored &&
+    (isResolving || (hasSource && !hadError && !loaded));
   const wrapperClassName = cn('overflow-hidden', roundClass(rounded), containerClassName);
 
-  useEffect(() => {
+  /*
+   * Cached images must paint instantly — no shimmer, no fade.
+   *
+   * This was a `useEffect`, which runs AFTER the browser paints. So an image
+   * already in the browser cache went: paint one frame at `opacity-0` with the
+   * shimmer over it, THEN flip `loaded`, THEN fade in over 300ms. Every card
+   * that remounted while scrolling replayed that, which is the "it settles and
+   * then flickers and re-settles" report — and why the feed never feels as
+   * still as a native app's, where a cached image simply appears.
+   *
+   * `useLayoutEffect` runs after the DOM is attached but BEFORE paint, so
+   * `image.complete` is already true for a cache hit and the state flip is
+   * flushed synchronously. The opacity-0 frame is never painted.
+   *
+   * `instant` then suppresses the transition. Without it the class flip still
+   * animates from 0 to 1 even though nothing was ever waiting on the network.
+   */
+  useLayoutEffect(() => {
     if (loaded || showFallback || isResolving) return;
     const image = imgRef.current;
     if (!image) return;
     if (image.complete && image.naturalWidth > 0) {
+      setInstant(true);
       setLoaded(true);
+      onLoaded?.();
       if (resolved) {
         setLastGoodUrl(resolved);
         if (sourceCacheKey) {
@@ -420,10 +552,14 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         }
       }
     }
+    // `onLoaded` is deliberately absent: callers pass an inline closure, and
+    // depending on it would re-run this cache-warming effect every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isResolving, loaded, resolved, showFallback, sourceCacheKey]);
 
   const handleImageLoaded = () => {
     setLoaded(true);
+    onLoaded?.();
     if (resolved) {
       setLastGoodUrl(resolved);
       if (sourceCacheKey) {
@@ -436,10 +572,15 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     <div className={cn('relative', wrapperClassName)} onClick={onClick}>
       {showShimmer && (
         /* Shimmer skeleton — visible until the signed URL is fetched AND image is fully loaded */
-        <div className={cn('absolute inset-0 animate-pulse bg-gray-200 dark:bg-gray-700', roundClass(rounded))} aria-hidden="true" />
+        <div className={cn('absolute inset-0 animate-pulse bg-gray-200 dark:bg-gray-700', roundClass(rounded), loadingPlaceholderClassName)} aria-hidden="true" />
       )}
       {showFallback && (
         <DefaultAvatar name={fallbackName ?? alt} className={cn('w-full h-full', roundClass(rounded), className)} />
+      )}
+      {showRetryFallback && (
+        /* Silent-retry placeholder: overlay the fallback so the reloading image
+           can mount underneath and swap in on load — no shimmer re-flash. */
+        <DefaultAvatar name={fallbackName ?? alt} className={cn('absolute inset-0 w-full h-full', roundClass(rounded), className)} />
       )}
       {showPreviousImage && lastGoodUrl ? (
         <MediaRenderer
@@ -463,9 +604,10 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           imgRef={imgRef}
           onError={() => setHadError(true)}
           onLoad={handleImageLoaded}
-          loading="eager"
+          loading={loading}
+          fetchPriority={fetchPriority}
           className="w-full h-full"
-          mediaClassName={`transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${className ?? ''}`}
+          mediaClassName={`${instant ? '' : 'transition-opacity duration-300'} ${loaded ? 'opacity-100' : 'opacity-0'} ${className ?? ''}`}
           maxHeightClassName={maxHeightClassName ?? 'max-h-[70vh]'}
           maxWidthClassName="max-w-full"
         />

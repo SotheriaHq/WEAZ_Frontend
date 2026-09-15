@@ -322,7 +322,7 @@ const SecuritySettings: React.FC = () => {
                     type="button"
                     disabled={revoked || isCurrentSession}
                     onClick={() => void handleRevokeDevice(device.id)}
-                    className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-red-500/40"
                   >
                     {isCurrentSession ? 'This is you' : 'Revoke'}
                   </button>

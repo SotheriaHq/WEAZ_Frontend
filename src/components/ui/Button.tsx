@@ -1,6 +1,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
@@ -90,7 +90,7 @@ const Button: React.FC<ButtonProps> = ({
       </span>
       {showLoader ? (
         <span className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
-          <VLoader size={16} phase="loading" showLabel={false} />
+          <MuseLoader size={16} />
         </span>
       ) : null}
     </button>

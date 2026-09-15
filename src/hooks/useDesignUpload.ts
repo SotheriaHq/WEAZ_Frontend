@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SizingMode } from '@/types/sizing';
 import type { MediaItem } from '../types/media';
 import { normalizeMediaViewSlot } from '@/utils/contentIntegrity';
@@ -13,6 +13,15 @@ import {
   type PresignEntry,
 } from '../api/DesignApi';
 import { WEB_UPLOAD_POLICIES, assertValidUploadFiles } from '@/utils/uploadValidation';
+import { addClientDiagnostic } from '@/utils/clientDiagnostics';
+import { preprocessImageFile } from '@/utils/imagePreprocess';
+import { getNormalizedImageFile } from '@/api/UploadApi';
+import {
+  sniffImageFormat,
+  isBrowserDisplayableSniff,
+  isUnreadableSniff,
+  type SniffedImageFormat,
+} from '@/utils/imageByteSniff';
 
 const MAX_RETRY_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 750;
@@ -76,11 +85,203 @@ const resolveFile = (item: UploadSource): File | null => {
   return null;
 };
 
+const fileDiagnostic = (file: File) => ({
+  name: file.name,
+  type: file.type,
+  size: file.size,
+});
+
+type PreparedUploadItem = {
+  file: File;
+  originalFile: File;
+  viewSlot: ReturnType<typeof normalizeMediaViewSlot>;
+  optimized: boolean;
+  reason?: string;
+};
+
+const uploadHost = (entry: PresignEntry) => {
+  try {
+    return new URL(entry.uploadUrl).host;
+  } catch {
+    return 'invalid-url';
+  }
+};
+
 const resolveViewSlot = (item: UploadSource, index: number) => {
   if (item instanceof File) {
     return normalizeMediaViewSlot(null, index);
   }
   return normalizeMediaViewSlot(item.viewSlot, index);
+};
+
+const isImageUploadFile = (file: File) =>
+  file.type.trim().toLowerCase().startsWith('image/') ||
+  /\.(jpe?g|png|webp|gif|heic|heif|avif|bmp)$/i.test(file.name);
+
+/**
+ * Backstop only: selection-time normalization in useMediaStore already
+ * converts undecodable files (HEIC named .jpg etc.) to server JPEGs, so this
+ * usually hits the shared transcode cache. It exists for files that entered
+ * the flow without the media store or whose normalization failed earlier.
+ */
+const prepareViaServerTranscode = async (
+  file: File,
+  maxSizeBytes: number,
+  sniffedFormat: SniffedImageFormat,
+): Promise<File | null> => {
+  if (!isImageUploadFile(file)) return null;
+  addClientDiagnostic('info', 'design-upload', 'Requesting server media transcode', {
+    file: fileDiagnostic(file),
+    sniffedFormat,
+  });
+  if (isUnreadableSniff(sniffedFormat)) {
+    return null;
+  }
+  try {
+    const transcoded = await getNormalizedImageFile(file, {
+      maxWidth: 2048,
+      quality: 99,
+      maxBytes: Math.max(100 * 1024, Math.min(maxSizeBytes, Math.floor(file.size * 0.1))),
+    });
+    if (transcoded.size > maxSizeBytes) return null;
+    addClientDiagnostic('info', 'design-upload', 'Server media transcode succeeded', {
+      original: fileDiagnostic(file),
+      prepared: fileDiagnostic(transcoded),
+      sniffedFormat,
+    });
+    return transcoded;
+  } catch (error) {
+    addClientDiagnostic('warn', 'design-upload', 'Server media transcode failed', {
+      file: fileDiagnostic(file),
+      sniffedFormat,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+};
+
+const isAlreadyUploadReady = (file: File, maxSizeBytes: number) => {
+  if (!isImageUploadFile(file)) return file.size <= maxSizeBytes;
+  const type = file.type.trim().toLowerCase();
+  // Animated GIF is the sole preservation exception. Browser canvas would turn
+  // it into a still image; all static images must carry the optimizer's `.pre`
+  // marker before this upload boundary can skip reprocessing.
+  if (file.size <= maxSizeBytes && /image\/gif/i.test(type)) {
+    return true;
+  }
+  if (file.size <= maxSizeBytes && /\.pre\.(jpe?g|png|webp)$/i.test(file.name)) {
+    return true;
+  }
+  return false;
+};
+
+const prepareDesignUploadItems = async (
+  items: UploadSource[],
+): Promise<PreparedUploadItem[]> => {
+  const maxSizeBytes = WEB_UPLOAD_POLICIES.designMedia.maxSizeBytes;
+  const prepared = await Promise.all(
+    items.map(async (item, index): Promise<PreparedUploadItem | null> => {
+      const file = resolveFile(item);
+      if (!file) return null;
+      const viewSlot = resolveViewSlot(item, index);
+
+      if (isAlreadyUploadReady(file, maxSizeBytes)) {
+        return {
+          file,
+          originalFile: file,
+          viewSlot,
+          optimized: false,
+          reason: 'already-ready',
+        };
+      }
+
+      let localFailureReason: string | undefined;
+      try {
+        const processed = await preprocessImageFile(file, 'detail', {
+          maxSizeBytes,
+          targetReductionRatio: 0.9,
+          quality: 0.99,
+          minQuality: 0.9,
+        });
+        if (processed.file.size <= maxSizeBytes || !isImageUploadFile(file)) {
+          return {
+            file: processed.file,
+            originalFile: file,
+            viewSlot,
+            optimized: !processed.skipped,
+            reason: processed.reason,
+          };
+        }
+        localFailureReason = 'still-over-limit';
+      } catch (error) {
+        addClientDiagnostic('warn', 'design-upload', 'Image preprocessing failed', {
+          file: fileDiagnostic(file),
+          error: error instanceof Error ? error.message : String(error),
+        });
+        localFailureReason = 'preprocess-failed';
+      }
+
+      // Server-normalize when the file is oversized OR its bytes are not
+      // browser-decodable (HEIC named .jpg, unknown container) — size is not
+      // the test: an under-limit HEIC uploaded raw breaks direct display and
+      // can strand non-HEIC garbage in "rendering" at the variant worker.
+      const sniffedFormat = isImageUploadFile(file)
+        ? await sniffImageFormat(file)
+        : undefined;
+      const needsServerTranscode =
+        sniffedFormat !== undefined &&
+        (file.size > maxSizeBytes ||
+          localFailureReason === 'still-over-limit' ||
+          (localFailureReason === 'preprocess-failed' &&
+            !isBrowserDisplayableSniff(sniffedFormat)));
+
+      if (needsServerTranscode) {
+        const transcoded = await prepareViaServerTranscode(
+          file,
+          maxSizeBytes,
+          sniffedFormat,
+        );
+        if (transcoded) {
+          return {
+            file: transcoded,
+            originalFile: file,
+            viewSlot,
+            optimized: true,
+            reason: 'server-transcoded',
+          };
+        }
+      }
+
+      return {
+        file,
+        originalFile: file,
+        viewSlot,
+        optimized: false,
+        reason: localFailureReason,
+      };
+    }),
+  );
+
+  const preparedItems = prepared.filter(
+    (entry): entry is PreparedUploadItem => entry !== null,
+  );
+
+  // Every optimization path (local decode AND server transcode) failed for an
+  // oversized image. The policy message ("must be 2 MB or smaller") would
+  // blame the user for a pipeline failure — say what actually happened.
+  const unoptimizable = preparedItems.find(
+    (entry) =>
+      isImageUploadFile(entry.file) &&
+      entry.file.size > maxSizeBytes &&
+      (entry.reason === 'preprocess-failed' || entry.reason === 'still-over-limit'),
+  );
+  if (unoptimizable) {
+    throw new Error(
+      `${unoptimizable.originalFile.name} couldn't be optimized on this device — check your connection and save again, or re-add the photo.`,
+    );
+  }
+
+  return preparedItems;
 };
 
 const computeAggregateProgress = (
@@ -206,17 +407,44 @@ const uploadPresignedFile = async (
     };
     xhr.onerror = () => {
       cleanup();
+      addClientDiagnostic('error', 'design-upload', 'Presigned file upload network error', {
+        file: fileDiagnostic(file),
+        fileId: entry.fileId,
+        method: entry.method ?? (entry.uploadFields ? 'POST' : 'PUT'),
+        host: uploadHost(entry),
+        status: xhr.status,
+      });
       reject(new Error('File upload failed'));
     };
     xhr.onabort = () => {
       cleanup();
+      addClientDiagnostic('warn', 'design-upload', 'Presigned file upload aborted', {
+        file: fileDiagnostic(file),
+        fileId: entry.fileId,
+        method: entry.method ?? (entry.uploadFields ? 'POST' : 'PUT'),
+        host: uploadHost(entry),
+      });
       reject(new Error('Upload cancelled'));
     };
     xhr.onload = () => {
       cleanup();
       if (xhr.status >= 200 && xhr.status < 300) {
+        addClientDiagnostic('info', 'design-upload', 'Presigned file upload completed', {
+          file: fileDiagnostic(file),
+          fileId: entry.fileId,
+          method: entry.method ?? (entry.uploadFields ? 'POST' : 'PUT'),
+          host: uploadHost(entry),
+          status: xhr.status,
+        });
         resolve();
       } else {
+        addClientDiagnostic('error', 'design-upload', 'Presigned file upload returned non-2xx', {
+          file: fileDiagnostic(file),
+          fileId: entry.fileId,
+          method: entry.method ?? (entry.uploadFields ? 'POST' : 'PUT'),
+          host: uploadHost(entry),
+          status: xhr.status,
+        });
         reject(new Error(`File upload failed with status ${xhr.status}`));
       }
     };
@@ -225,9 +453,21 @@ const uploadPresignedFile = async (
     try {
       xhr.open(method, entry.uploadUrl, true);
     } catch {
+      addClientDiagnostic('error', 'design-upload', 'Invalid presigned upload URL', {
+        file: fileDiagnostic(file),
+        fileId: entry.fileId,
+        method,
+      });
       reject(new Error(`Invalid upload URL: ${entry.uploadUrl}`));
       return;
     }
+
+    addClientDiagnostic('info', 'design-upload', 'Starting presigned file upload', {
+      file: fileDiagnostic(file),
+      fileId: entry.fileId,
+      method,
+      host: uploadHost(entry),
+    });
 
     if (method === 'POST') {
       const form = new FormData();
@@ -254,12 +494,40 @@ export function useDesignUpload() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const activeXhrsRef = useRef<Set<XMLHttpRequest>>(new Set());
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const uploadDesign = useCallback(async (...args: unknown[]) => {
     const parsed = parseUploadArgs(args);
-    const resolvedFiles = parsed.items
+    const originalFiles = parsed.items
       .map(resolveFile)
       .filter((file): file is File => file !== null);
+    addClientDiagnostic('info', 'design-upload', 'Upload flow started', {
+      shouldPublish: parsed.shouldPublish,
+      fileCount: originalFiles.length,
+      files: originalFiles.map(fileDiagnostic),
+    });
+
+    const uploadItems = await prepareDesignUploadItems(parsed.items);
+    const resolvedFiles = uploadItems.map((item) => item.file);
+    const optimizedItems = uploadItems.filter((item) => item.optimized);
+    addClientDiagnostic('info', 'design-upload', 'Upload media prepared', {
+      shouldPublish: parsed.shouldPublish,
+      fileCount: resolvedFiles.length,
+      optimizedCount: optimizedItems.length,
+      files: uploadItems.map((item) => ({
+        original: fileDiagnostic(item.originalFile),
+        prepared: fileDiagnostic(item.file),
+        optimized: item.optimized,
+        reason: item.reason,
+      })),
+    });
     assertValidUploadFiles(resolvedFiles, WEB_UPLOAD_POLICIES.designMedia);
 
     if (parsed.shouldPublish) {
@@ -286,21 +554,25 @@ export function useDesignUpload() {
       }
     }
 
-    setIsUploading(true);
-    setProgress(0);
-    setPerFileProgress({});
-    setError(null);
+    if (mountedRef.current) {
+      setIsUploading(true);
+      setProgress(0);
+      setPerFileProgress({});
+      setError(null);
+    }
+
+    // Exposed on thrown errors so callers can reconcile: once initialize
+    // succeeds a draft design EXISTS server-side even if upload/finalize
+    // later fails — task cards must not pretend otherwise.
+    let createdDesignId: string | undefined;
+    let failureStage: 'initialize' | 'upload' | 'finalize' = 'initialize';
 
     try {
-      const uploadItems = parsed.items
-        .map((item, index) => {
-          const file = resolveFile(item);
-          return file ? { file, viewSlot: resolveViewSlot(item, index) } : null;
-        })
-        .filter(
-          (entry): entry is { file: File; viewSlot: ReturnType<typeof normalizeMediaViewSlot> } =>
-            entry !== null,
-        );
+      addClientDiagnostic('info', 'design-upload', 'Initializing design uploads', {
+        shouldPublish: parsed.shouldPublish,
+        fileCount: uploadItems.length,
+      });
+
       const initResp = await initializeDesignUploads({
         title: normalizeString(parsed.title),
         description: optionalString(parsed.description),
@@ -334,32 +606,40 @@ export function useDesignUpload() {
       if (!designId) {
         throw new Error('Server did not return a design id');
       }
+      createdDesignId = designId;
+      failureStage = 'upload';
 
       const uploads = Array.isArray(initResp.uploads) ? initResp.uploads : [];
+      addClientDiagnostic('info', 'design-upload', 'Design uploads initialized', {
+        designId,
+        uploadCount: uploads.length,
+      });
       if (resolvedFiles.length > 0 && uploads.length === 0) {
         throw new Error('Server did not return upload instructions');
       }
 
-      if (uploads.length > 0) {
+      let progressSnapshot: Record<string, number> = {};
+
+      if (uploads.length > 0 && mountedRef.current) {
+        progressSnapshot = Object.fromEntries(
+          uploads.map((entry) => [entry.fileId, 0]),
+        ) as Record<string, number>;
         setPerFileProgress(
-          Object.fromEntries(uploads.map((entry) => [entry.fileId, 0])) as Record<
-            string,
-            number
-          >,
+          progressSnapshot,
         );
       }
 
       const updateFileProgress = (fileId: string, value: number) => {
-        setPerFileProgress((current) => {
-          const next = {
-            ...current,
-            [fileId]: clamp(value),
-          };
-          const aggregate = computeAggregateProgress(next, uploads.length);
+        progressSnapshot = {
+          ...progressSnapshot,
+          [fileId]: clamp(value),
+        };
+        const aggregate = computeAggregateProgress(progressSnapshot, uploads.length);
+        if (mountedRef.current) {
+          setPerFileProgress(progressSnapshot);
           setProgress(aggregate);
-          parsed.onProgress?.(aggregate);
-          return next;
-        });
+        }
+        parsed.onProgress?.(aggregate);
       };
 
       const completions: CompletionDto[] = [];
@@ -399,6 +679,13 @@ export function useDesignUpload() {
         }),
       );
 
+      failureStage = 'finalize';
+      addClientDiagnostic('info', 'design-upload', 'Finalizing design uploads', {
+        designId,
+        completionCount: completions.length,
+        shouldPublish: parsed.shouldPublish,
+      });
+
       const finalized = await finalizeDesignUploads(
         designId,
         completions,
@@ -410,17 +697,41 @@ export function useDesignUpload() {
         },
       );
 
-      setProgress(100);
-      setPerFileProgress({});
+      if (mountedRef.current) {
+        setProgress(100);
+        setPerFileProgress({});
+      }
       parsed.onProgress?.(100);
+      addClientDiagnostic('info', 'design-upload', 'Upload flow completed', {
+        designId,
+        shouldPublish: parsed.shouldPublish,
+      });
       return finalized;
     } catch (caughtError) {
       const normalizedError =
         caughtError instanceof Error ? caughtError : new Error('Upload failed');
-      setError(normalizedError);
+      if (createdDesignId) {
+        (normalizedError as Error & { designId?: string; stage?: string }).designId =
+          createdDesignId;
+        (normalizedError as Error & { designId?: string; stage?: string }).stage =
+          failureStage;
+      }
+      addClientDiagnostic('error', 'design-upload', 'Upload flow failed', {
+        shouldPublish: parsed.shouldPublish,
+        fileCount: resolvedFiles.length,
+        designId: createdDesignId,
+        stage: failureStage,
+        errorName: normalizedError.name,
+        errorMessage: normalizedError.message,
+      });
+      if (mountedRef.current) {
+        setError(normalizedError);
+      }
       throw normalizedError;
     } finally {
-      setIsUploading(false);
+      if (mountedRef.current) {
+        setIsUploading(false);
+      }
     }
   }, []);
 

@@ -291,8 +291,8 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                           className="mb-2 w-full rounded-lg border border-gray-300/60 bg-white px-2.5 py-1.5 text-xs text-gray-800 placeholder:text-gray-400 focus:border-purple-400 focus:outline-none dark:border-white/15 dark:bg-white/5 dark:text-gray-200"
                         />
                       )}
-                      <div className="max-h-44 overflow-y-auto pr-1 scrollbar-threadly-strong">
-                        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                      <div className="max-h-44 overflow-y-auto pr-1 scrollbar-wiez-strong">
+                        <div className="grid grid-cols-2 gap-1.5">
                           {filteredValues.map((val) => {
                             const isSelected = selectedValues.includes(val.id);
                             return (
@@ -320,7 +320,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                                     <span className="h-1.5 w-1.5 rounded-full bg-white" />
                                   ) : null}
                                 </span>
-                                <span className="truncate">{val.name}</span>
+                                <span className="whitespace-normal break-words leading-tight text-left">{val.name}</span>
                               </button>
                             );
                           })}

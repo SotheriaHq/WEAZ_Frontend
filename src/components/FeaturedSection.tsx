@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { featuredApi, type PublicFeaturedItem } from '@/api/FeaturedApi';
 import { unwrapApiResponse } from '@/types/auth';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import useCachedResource from '@/hooks/useCachedResource';
 
 interface FeaturedSectionProps {
   filterType?: 'PRODUCT' | 'DESIGN';
@@ -17,28 +18,29 @@ const FeaturedSection: React.FC<FeaturedSectionProps> = ({
   onViewDesign,
   onSeeAll,
 }) => {
-  const [items, setItems] = useState<PublicFeaturedItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const railRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
+  // One shared cache entry for every screen that mounts this section (Runway +
+  // Market filter it locally), so a visit to either warms both.
+  const { data: allItems } = useCachedResource<PublicFeaturedItem[]>({
+    queryKey: ['featured', 'active'],
+    queryFn: async () => {
       try {
         const res = await featuredApi.listActive();
         const data = unwrapApiResponse<PublicFeaturedItem[]>(res.data as any);
-        const list = Array.isArray(data) ? data : [];
-        if (mounted) setItems(filterType ? list.filter((i) => i.entityType === filterType) : list);
+        return Array.isArray(data) ? data : [];
       } catch {
         // silently fail — empty section
-      } finally {
-        if (mounted) setLoading(false);
+        return [];
       }
-    };
-    void load();
-    return () => { mounted = false; };
-  }, [filterType]);
+    },
+  });
+
+  const items = useMemo(() => {
+    const list = allItems ?? [];
+    return filterType ? list.filter((i) => i.entityType === filterType) : list;
+  }, [allItems, filterType]);
 
   // Auto-rotate spotlight
   useEffect(() => {
@@ -71,19 +73,9 @@ const FeaturedSection: React.FC<FeaturedSectionProps> = ({
     }).format(price);
   };
 
-  if (loading) {
-    return (
-      <section className="space-y-4">
-        <div className="h-6 w-40 animate-pulse rounded-lg bg-gray-200/80 dark:bg-white/10" />
-        <div className="flex gap-4 overflow-hidden">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-48 min-w-[260px] animate-pulse rounded-2xl bg-gray-200/70 dark:bg-white/10" />
-          ))}
-        </div>
-      </section>
-    );
-  }
-
+  // No skeleton here on purpose: this is an optional promo section that often
+  // resolves to empty. A placeholder that can collapse to nothing shoves the
+  // whole feed up when it disappears — render nothing until items exist.
   if (items.length === 0) return null;
 
   const spotlight = items[activeIndex] ?? items[0];

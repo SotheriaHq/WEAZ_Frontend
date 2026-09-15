@@ -46,6 +46,15 @@ describe('uploadValidation', () => {
     expect(() => assertValidUploadFiles([file], WEB_UPLOAD_POLICIES.productMedia)).not.toThrow();
   });
 
+  // AVIF is rejected by every server FileType (see upload-policy.ts), so the
+  // client must reject it here rather than at multer, where the upload UI has
+  // no way to explain what happened. This test used to assert the opposite.
+  it('rejects AVIF images, which no upload endpoint accepts', () => {
+    const file = makeFile('look.avif', 'image/avif', 1024);
+
+    expect(validateUploadFile(file, WEB_UPLOAD_POLICIES.designMedia)).not.toEqual([]);
+  });
+
   it('uses extension fallback when picker MIME metadata is missing', () => {
     const file = makeFile('look.jpg', '', 1024);
 

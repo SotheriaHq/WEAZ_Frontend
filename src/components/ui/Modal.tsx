@@ -4,6 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { OverlayPortal } from './OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import {
+  useKeyboardInset,
+  useScrollFocusedFieldIntoView,
+} from '@/hooks/useKeyboardInset';
 
 export interface ModalProps {
   open: boolean;
@@ -30,12 +34,16 @@ const Modal: React.FC<ModalProps> = ({
   glassBackdrop = true,
 }) => {
   const panelRef = React.useRef<HTMLDivElement | null>(null);
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
 
   useFocusTrap({
     active: open,
     containerRef: panelRef,
     onEscape: onClose,
   });
+
+  const keyboardInset = useKeyboardInset(open);
+  useScrollFocusedFieldIntoView(open, contentRef);
 
   const sizeClasses = {
     sm: 'max-w-md',
@@ -84,7 +92,7 @@ const Modal: React.FC<ModalProps> = ({
                     className={clsx(
                       'absolute inset-0',
                       backdropStyle === 'light'
-                        ? 'bg-gradient-to-br from-slate-700/12 via-indigo-700/10 to-sky-700/12'
+                        ? 'bg-gradient-to-br from-slate-700/[0.12] via-indigo-700/10 to-sky-700/[0.12]'
                         : 'bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40'
                     )}
                   />
@@ -97,7 +105,7 @@ const Modal: React.FC<ModalProps> = ({
                   <div
                     className={clsx(
                       'absolute inset-0',
-                      backdropStyle === 'light' ? 'bg-black/12' : 'bg-black/40'
+                      backdropStyle === 'light' ? 'bg-black/[0.12]' : 'bg-black/40'
                     )}
                   />
                 </>
@@ -106,7 +114,7 @@ const Modal: React.FC<ModalProps> = ({
                   className={clsx(
                     'absolute inset-0',
                     scope === 'parent'
-                      ? 'bg-gradient-to-br from-slate-900/20 via-slate-800/16 to-indigo-900/20 backdrop-blur-[2px]'
+                      ? 'bg-gradient-to-br from-slate-900/20 via-slate-800/[0.16] to-indigo-900/20 backdrop-blur-[2px]'
                       : 'bg-black/50 backdrop-blur-sm'
                   )}
                 />
@@ -121,6 +129,10 @@ const Modal: React.FC<ModalProps> = ({
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="absolute inset-0 flex items-center justify-center p-4"
               onClick={onClose}
+              // Shrink the centring box by the keyboard's height so the panel
+              // centres in the space that is actually visible, instead of
+              // centring in a viewport whose bottom half the keyboard covers.
+              style={{ paddingBottom: keyboardInset ? keyboardInset + 16 : undefined }}
             >
               <div
                 ref={panelRef}
@@ -151,7 +163,13 @@ const Modal: React.FC<ModalProps> = ({
                 )}
 
                 {/* Content */}
-                <div className="px-6 pb-5 pt-2 max-h-[calc(100vh-200px)] overflow-y-auto">
+                <div
+                  ref={contentRef}
+                  className="px-6 pb-5 pt-2 overflow-y-auto"
+                  style={{
+                    maxHeight: `calc(100vh - 200px - ${keyboardInset}px)`,
+                  }}
+                >
                   {children}
                 </div>
               </div>

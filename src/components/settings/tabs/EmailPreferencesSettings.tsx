@@ -20,7 +20,7 @@ const GROUP_ORDER = [
   'Security',
   'Orders & Checkout',
   'Messaging & Social',
-  'Brand & Catalog',
+  'Brand & Content',
   'Size & Fit',
   'Platform & Operations',
 ] as const;
@@ -32,7 +32,7 @@ const GROUP_COPY: Record<string, string> = {
     'Track purchases, delivery progress, and custom-order milestones from payment through completion.',
   'Messaging & Social':
     'Control email alerts for replies, comments, threads, tags, follows, and conversation activity.',
-  'Brand & Catalog':
+  'Brand & Content':
     'Manage publishing, verification, private-access, and collaboration updates for brand work.',
   'Size & Fit':
     'Choose which fitting reminders and size-fit sharing events should still reach your inbox.',
@@ -44,13 +44,13 @@ const SCENARIO_OVERRIDES: Record<string, ScenarioMeta> = {
   'auth.signin.new_device': {
     title: 'New sign-in from a new device',
     description:
-      'Sent when your account is accessed from a device WEAZ has not seen before so you can confirm it was really you.',
+      'Sent when your account is accessed from a device WIEZ has not seen before so you can confirm it was really you.',
     group: 'Security',
   },
   'auth.signin.high_risk': {
     title: 'High-risk sign-in alert',
     description:
-      'Sent when WEAZ detects a sign-in that looks unusual or risky and wants you to review it immediately.',
+      'Sent when WIEZ detects a sign-in that looks unusual or risky and wants you to review it immediately.',
     group: 'Security',
   },
   'notification.LOGIN': {
@@ -73,7 +73,7 @@ const SCENARIO_OVERRIDES: Record<string, ScenarioMeta> = {
   'notification.SIGNUP': {
     title: 'Account creation confirmation',
     description:
-      'Sent when your WEAZ account is created and ready for setup.',
+      'Sent when your WIEZ account is created and ready for setup.',
     group: 'Security',
   },
   'notification.ORDER_PLACED': {
@@ -103,7 +103,7 @@ const SCENARIO_OVERRIDES: Record<string, ScenarioMeta> = {
   'notification.MESSAGE_RECEIVED': {
     title: 'New direct or order message',
     description:
-      'Sent when a new message arrives in a conversation WEAZ tracks for you.',
+      'Sent when a new message arrives in a conversation WIEZ tracks for you.',
     group: 'Messaging & Social',
   },
   'notification.MESSAGE_UNREAD_REMINDER': {
@@ -116,43 +116,43 @@ const SCENARIO_OVERRIDES: Record<string, ScenarioMeta> = {
     title: 'Design published',
     description:
       'Sent when a design is successfully published and visible to its intended audience.',
-    group: 'Brand & Catalog',
+    group: 'Brand & Content',
   },
   'notification.PRODUCT_UPLOAD': {
     title: 'Product published',
     description:
       'Sent when a store product goes live and becomes available in the catalog.',
-    group: 'Brand & Catalog',
+    group: 'Brand & Content',
   },
   'notification.COLLECTION_DELETED': {
     title: 'Design removed',
     description:
       'Sent when a design is deleted or otherwise removed from active use.',
-    group: 'Brand & Catalog',
+    group: 'Brand & Content',
   },
   'notification.PRIVATE_ACCESS_REQUESTED': {
     title: 'Private access request received',
     description:
       'Sent when someone asks for access to private content you control.',
-    group: 'Brand & Catalog',
+    group: 'Brand & Content',
   },
   'notification.PRIVATE_ACCESS_APPROVED': {
     title: 'Private access approved',
     description:
       'Sent when a private access request is approved and the requester can now view the content.',
-    group: 'Brand & Catalog',
+    group: 'Brand & Content',
   },
   'notification.PRIVATE_ACCESS_REJECTED': {
     title: 'Private access rejected',
     description:
       'Sent when a private access request is declined.',
-    group: 'Brand & Catalog',
+    group: 'Brand & Content',
   },
   'notification.PRIVATE_ACCESS_REVOKED': {
     title: 'Private access revoked',
     description:
       'Sent when previously granted private access is removed.',
-    group: 'Brand & Catalog',
+    group: 'Brand & Content',
   },
   'notification.SIZE_FIT_UPDATE_REMINDER': {
     title: 'Size-fit update reminder',
@@ -238,7 +238,7 @@ function inferScenarioGroup(scenarioKey: string) {
     key.includes('CONTRIBUTION') ||
     key.includes('VERIFICATION')
   ) {
-    return 'Brand & Catalog';
+    return 'Brand & Content';
   }
   if (key.includes('SIZE_FIT')) {
     return 'Size & Fit';
@@ -283,7 +283,7 @@ function describeScenario(title: string, scenarioKey: string) {
     return `Sent when ${title.toLowerCase()} changes and there is something new to review.`;
   }
 
-  return `Sent when ${title.toLowerCase()} happens in WEAZ.`;
+  return `Sent when ${title.toLowerCase()} happens in WIEZ.`;
 }
 
 function getScenarioMeta(scenarioKey: string): ScenarioMeta {
@@ -515,7 +515,7 @@ const EmailPreferencesSettings: React.FC = () => {
       <div>
         <h1 className="mb-2 text-2xl font-semibold text-gray-900 dark:text-white">Email notifications</h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Control which email updates WEAZ sends you. Security emails stay protected unless you confirm the change with your password.
+          Control which email updates WIEZ sends you. Security emails stay protected unless you confirm the change with your password.
         </p>
       </div>
 

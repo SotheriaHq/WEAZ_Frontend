@@ -179,24 +179,38 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
     };
   }, [appendText, showEmojiPicker]);
 
+  /**
+   * Clear the composer on the keystroke, not on the response.
+   *
+   * The box used to hold the text until the round trip finished, which on a
+   * slow connection reads as "nothing happened" — so people press Enter again
+   * and send it twice. The message is now already in the thread by the time
+   * this returns (the parent puts it there optimistically and owns its
+   * sending/failed state), so the composer's job is done the moment it hands
+   * the text over, and there is nothing left for it to report.
+   *
+   * A failure surfaces on the message itself, with Resend and Delete, rather
+   * than as a toast over an emptied box: the words are not lost, they are in
+   * the thread marked "not sent".
+   */
   const handleSend = useCallback(async () => {
     if (!canSend) return;
     const body = text.trim();
     const attIds = files.map((f) => f.fileId).filter(Boolean);
+    const sentFiles = files;
+
+    setText('');
+    setFiles([]);
+    onCancelReply?.();
+    textareaRef.current?.focus();
 
     setSending(true);
     try {
       await onSend(body, attIds, replyTo?.id);
-      setText('');
-      for (const f of files) {
+    } finally {
+      for (const f of sentFiles) {
         if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
       }
-      setFiles([]);
-      onCancelReply?.();
-      textareaRef.current?.focus();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to send message');
-    } finally {
       setSending(false);
     }
   }, [canSend, text, files, onSend, replyTo, onCancelReply]);
@@ -209,7 +223,7 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
   }, [handleSend]);
 
   return (
-    <div className="shrink-0 border-t border-gray-200/50 bg-white/60 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm dark:border-white/10 dark:bg-black/20">
+    <div className="shrink-0 bg-white/70 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm dark:bg-white/[0.04]">
       {/* Reply preview */}
       {replyTo && (
         <div className="flex items-center gap-2 mb-2 rounded-xl border-l-4 border-purple-500 bg-purple-50/80 dark:bg-purple-500/10 px-3 py-2">
@@ -233,7 +247,7 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">
           {files.map(f => (
-            <div key={f.fileId} className="flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-white/8 border border-gray-200/60 dark:border-white/10 px-2.5 py-1.5 text-xs">
+            <div key={f.fileId} className="flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-white/[0.08] px-2.5 py-1.5 text-xs">
               {f.previewUrl ? (
                 <MediaRenderer
                   kind="image"
@@ -259,13 +273,13 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
         </div>
       )}
 
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-1 sm:gap-2">
         <div className="relative shrink-0" ref={emojiPopoverRef}>
           <button
             type="button"
             onClick={() => setShowEmojiPicker((prev) => !prev)}
             disabled={disabled || sending}
-            className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/8 transition-colors"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-white/[0.08] transition-colors sm:h-10 sm:w-10"
             title="Open emoji picker"
             aria-label="Open emoji picker"
           >
@@ -279,7 +293,7 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
         </div>
 
         {/* Attach button */}
-        <label className="shrink-0 cursor-pointer p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/8 transition-colors" title="Attach files">
+        <label className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-white/[0.08] transition-colors sm:h-10 sm:w-10" title="Attach files">
           <input
             type="file"
             multiple
@@ -301,21 +315,36 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
           rows={1}
           placeholder={placeholder}
           disabled={disabled || sending}
-          className="flex-1 resize-none rounded-2xl border border-gray-200/60 dark:border-white/10 bg-white/80 dark:bg-white/5 px-3.5 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-shadow"
+          className="min-w-0 flex-1 resize-none rounded-2xl bg-gray-100 dark:bg-white/[0.08] px-3.5 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-shadow"
         />
 
-        {/* Send button */}
+        {/*
+          Send button.
+
+          `overflow-hidden` + a spinner sized in `em` keeps the busy state
+          INSIDE the button: the old ⏳ glyph was an emoji, and emoji are laid
+          out with their own optical metrics, so at `text-sm` it still drew
+          past a 40px box on the fonts that render it large.
+
+          Sizes step down under `sm:` so the row (emoji · attach · textarea ·
+          send) still fits a 320px-wide phone without the textarea being
+          squeezed to nothing.
+        */}
         <button
           type="button"
           onClick={() => void handleSend()}
           disabled={!canSend}
-          className="shrink-0 h-10 w-10 rounded-xl bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-purple-500/25 transition-all"
-          aria-label="Send message"
+          className="shrink-0 h-9 w-9 sm:h-10 sm:w-10 overflow-hidden rounded-xl bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-purple-500/25 transition-shadow"
+          aria-label={sending ? 'Sending message' : 'Send message'}
+          aria-busy={sending}
         >
           {sending ? (
-            <span className="text-sm animate-pulse">⏳</span>
+            <span
+              className="h-[1.1em] w-[1.1em] animate-spin rounded-full border-2 border-white/40 border-t-white motion-reduce:animate-none"
+              aria-hidden="true"
+            />
           ) : (
-            <span className="text-base" aria-hidden="true">📨</span>
+            <span className="text-sm sm:text-base leading-none" aria-hidden="true">📨</span>
           )}
         </button>
       </div>
@@ -327,7 +356,7 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
             type="button"
             onClick={() => appendText(sticker)}
             disabled={disabled || sending}
-            className="rounded-full border border-gray-200/70 bg-gray-100/70 px-2.5 py-1 text-[11px] font-semibold text-gray-600 hover:border-purple-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
+            className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-600 transition-colors hover:bg-purple-100 hover:text-purple-700 dark:bg-white/[0.08] dark:text-gray-300 dark:hover:bg-purple-500/20 dark:hover:text-purple-200"
           >
             {sticker}
           </button>

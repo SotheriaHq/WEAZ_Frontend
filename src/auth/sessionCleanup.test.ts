@@ -28,8 +28,8 @@ vi.mock('@/services/marketSignalQueue', () => ({
 
 const loadCleanupModule = async () => {
   vi.stubEnv('VITE_API_BASE_URL', 'http://localhost:3040');
-  vi.stubEnv('VITE_TOKEN_STORAGE_KEY', 'THREADLY_ACCESS_TOKEN');
-  vi.stubEnv('VITE_USER_STORAGE_KEY', 'THREADLY_USER');
+  vi.stubEnv('VITE_TOKEN_STORAGE_KEY', 'WIEZ_ACCESS_TOKEN');
+  vi.stubEnv('VITE_USER_STORAGE_KEY', 'WIEZ_USER');
   return import('./sessionCleanup');
 };
 
@@ -53,13 +53,13 @@ describe('clearWebPrivateSessionState', () => {
     client.setQueryData(['media', 'signedUrl', 'private-file'], 'https://signed.example/private');
     client.setQueryData(['config', 'uploadLimits'], { maxBytes: 1_000_000 });
 
-    localStorage.setItem('THREADLY_ACCESS_TOKEN', 'token');
-    localStorage.setItem('THREADLY_USER', JSON.stringify({ id: 'previous-user' }));
-    localStorage.setItem('THREADLY_QUERY_CACHE_V1', JSON.stringify({ private: true }));
-    localStorage.setItem('threadly.activeBrandId', 'brand-1');
-    sessionStorage.setItem('threadly_signed_url_cache', JSON.stringify({ file: 'signed-url' }));
-    sessionStorage.setItem('threadly.pendingBagAction.v1', JSON.stringify({ productId: 'product-1' }));
-    sessionStorage.setItem('threadly.unifiedCheckout.queue.v1', JSON.stringify({ lines: [] }));
+    localStorage.setItem('WIEZ_ACCESS_TOKEN', 'token');
+    localStorage.setItem('WIEZ_USER', JSON.stringify({ id: 'previous-user' }));
+    localStorage.setItem('WIEZ_QUERY_CACHE_V1', JSON.stringify({ private: true }));
+    localStorage.setItem('wiez.activeBrandId', 'brand-1');
+    sessionStorage.setItem('wiez_signed_url_cache', JSON.stringify({ file: 'signed-url' }));
+    sessionStorage.setItem('wiez.pendingBagAction.v1', JSON.stringify({ productId: 'product-1' }));
+    sessionStorage.setItem('wiez.unifiedCheckout.queue.v1', JSON.stringify({ lines: [] }));
 
     await clearWebPrivateSessionState({ client });
 
@@ -74,13 +74,13 @@ describe('clearWebPrivateSessionState', () => {
     expect(client.getQueryData(['saved', 'batch', 'previous-user', 'PRODUCT', ['product-1']])).toBeUndefined();
     expect(client.getQueryData(['media', 'signedUrl', 'private-file'])).toBeUndefined();
     expect(client.getQueryData(['config', 'uploadLimits'])).toEqual({ maxBytes: 1_000_000 });
-    expect(localStorage.getItem('THREADLY_ACCESS_TOKEN')).toBeNull();
-    expect(localStorage.getItem('THREADLY_USER')).toBeNull();
-    expect(localStorage.getItem('THREADLY_QUERY_CACHE_V1')).toBeNull();
-    expect(localStorage.getItem('threadly.activeBrandId')).toBeNull();
-    expect(sessionStorage.getItem('threadly_signed_url_cache')).toBeNull();
-    expect(sessionStorage.getItem('threadly.pendingBagAction.v1')).toBeNull();
-    expect(sessionStorage.getItem('threadly.unifiedCheckout.queue.v1')).toBeNull();
+    expect(localStorage.getItem('WIEZ_ACCESS_TOKEN')).toBeNull();
+    expect(localStorage.getItem('WIEZ_USER')).toBeNull();
+    expect(localStorage.getItem('WIEZ_QUERY_CACHE_V1')).toBeNull();
+    expect(localStorage.getItem('wiez.activeBrandId')).toBeNull();
+    expect(sessionStorage.getItem('wiez_signed_url_cache')).toBeNull();
+    expect(sessionStorage.getItem('wiez.pendingBagAction.v1')).toBeNull();
+    expect(sessionStorage.getItem('wiez.unifiedCheckout.queue.v1')).toBeNull();
   });
 
   it('uses the same cleanup function for failed refresh/auth-expired wiring', async () => {

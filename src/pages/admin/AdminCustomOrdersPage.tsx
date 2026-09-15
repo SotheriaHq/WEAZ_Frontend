@@ -22,6 +22,8 @@ import {
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
   CustomOrderBadge,
+  CustomOrderBuyerPaymentBreakdown,
+  CustomOrderFieldTitle,
   CustomOrderJsonBreakdown,
   CustomOrderKeyValueList,
   CustomOrderMetricCard,
@@ -38,6 +40,38 @@ interface PendingAdminAction {
   tone?: 'default' | 'danger';
   execute: () => Promise<boolean>;
 }
+
+const isBrandReminderEvent = (event: {
+  eventType?: string;
+  payloadJson?: Record<string, unknown> | null;
+}) => {
+  const type = String(event.eventType || '').toUpperCase();
+  const reason = String(event.payloadJson?.reason || '').toUpperCase();
+  return type === 'ADMIN_ESCALATED' && reason === 'MANUAL_BRAND_REMINDER';
+};
+
+const shortRef = (value?: string | null) => {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raw)) {
+    return `#${raw.slice(0, 8).toUpperCase()}`;
+  }
+  return raw.length > 24 ? `${raw.slice(0, 20)}…` : raw;
+};
+
+const formatCurrency = (amount: number | null | undefined, currency = 'NGN') => {
+  const parsed = Number(amount ?? 0);
+  const safe = Number.isFinite(parsed) ? parsed : 0;
+  try {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 2,
+    }).format(safe);
+  } catch {
+    return `${currency} ${safe.toFixed(2)}`;
+  }
+};
 
 const ENABLE_FABRIC_RULE_BASIS_MODERATION_PANEL = false;
 
@@ -98,6 +132,16 @@ const AdminCustomOrdersPage: React.FC = () => {
     [pendingBases, selectedBasisId],
   );
   const selectedSource = selected?.source ?? null;
+  const brandReminders = useMemo(() => {
+    const events = selected?.timelineEvents ?? [];
+    return events
+      .filter(isBrandReminderEvent)
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+  }, [selected?.timelineEvents]);
 
   const loadSelection = useCallback(async (targetOrderId: string, sequence: number) => {
     const [detail, allocationData] = await Promise.all([
@@ -357,20 +401,25 @@ const AdminCustomOrdersPage: React.FC = () => {
                 <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">Payment: {selected.paymentStatus} • Disputes: {selected.disputes.length} • Issues: {selected.issues.length}</div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 <CustomOrderMetricCard label="Measurement confirmed" value={formatDateTime(selected.measurementConfirmedAt)} helper="Buyer-approved snapshot" />
-                <CustomOrderMetricCard label="Configuration version" value={selected.configurationVersionId} helper="Immutable pricing version" />
                 <CustomOrderMetricCard label="Production deadline" value={formatDateTime(selected.promisedProductionAt)} helper={getRelativeDeadlineText(selected.promisedProductionAt)} />
                 <CustomOrderMetricCard label="Delivery deadline" value={formatDateTime(selected.promisedDeliveryAt)} helper={getRelativeDeadlineText(selected.promisedDeliveryAt)} />
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
-                  <div className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Order snapshot</div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-black/10 p-3 dark:border-white/10">
+                  <div className="mb-2">
+                    <CustomOrderFieldTitle
+                      title="Order snapshot"
+                      description="High-level order context: source, brand, deadlines, and measurement retention state."
+                    />
+                  </div>
                   <CustomOrderKeyValueList
                     items={[
                       { label: 'Source type', value: selectedSource?.type ?? 'Unknown' },
                       { label: 'Brand', value: selectedSource?.brandName ?? 'Brand' },
+                      { label: 'Buyer total', value: formatCurrency(selected.buyerPriceSummary?.grandTotal, selected.buyerPriceSummary?.currency || 'NGN') },
                       { label: 'Promised dispatch', value: formatDateTime(selected.promisedDispatchAt) },
                       { label: 'Acceptance window', value: formatDateTime(selected.buyerAcceptanceWindowEndsAt) },
                       { label: 'Retention until', value: formatDateTime(selected.measurementRetentionUntil) },
@@ -378,21 +427,44 @@ const AdminCustomOrdersPage: React.FC = () => {
                     ]}
                   />
                 </div>
-                <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
-                  <div className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Internal price breakdown</div>
-                  <CustomOrderJsonBreakdown data={selected.internalPriceBreakdown as Record<string, unknown> | null | undefined} />
+                <div className="rounded-2xl border border-black/10 p-3 dark:border-white/10">
+                  <CustomOrderBuyerPaymentBreakdown
+                    summary={selected.buyerPriceSummary}
+                    formatCurrency={(value, currency) =>
+                      formatCurrency(value, currency || selected.buyerPriceSummary?.currency || 'NGN')
+                    }
+                  />
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
-                  <div className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Payout allocations</div>
-                  <div className="space-y-3">
+              <div className="rounded-2xl border border-black/10 p-3 dark:border-white/10">
+                <div className="mb-2">
+                  <CustomOrderFieldTitle
+                    title="Internal price breakdown"
+                    description="Technical pricing snapshot for audit. Prefer the buyer payment breakdown for readable money lines."
+                  />
+                </div>
+                <CustomOrderJsonBreakdown data={selected.internalPriceBreakdown as Record<string, unknown> | null | undefined} />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-black/10 p-3 dark:border-white/10">
+                  <div className="mb-2">
+                    <CustomOrderFieldTitle
+                      title="Payout allocations"
+                      description="How buyer payment is split for the brand: production advance vs final completion hold."
+                    />
+                  </div>
+                  <div className="space-y-2">
                     {ledgerAllocations.length === 0 ? (
                       <div className="text-sm text-slate-500 dark:text-slate-400">No ledger allocations linked to this order yet.</div>
                     ) : (
-                      ledgerAllocations.map((allocation) => (
-                        <div key={allocation.id} className="rounded-2xl border border-black/10 px-4 py-3 text-sm dark:border-white/10">
+                      ledgerAllocations.map((allocation) => {
+                        const payoutLabel =
+                          shortRef(allocation.payout?.reference) ||
+                          (allocation.payout?.id ? shortRef(allocation.payout.id) : null);
+                        return (
+                        <div key={allocation.id} className="rounded-xl border border-black/10 px-3 py-2.5 text-sm dark:border-white/10">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
                               <div className="font-semibold text-slate-900 dark:text-white">{allocation.allocationType.replace(/_/g, ' ')}</div>
@@ -406,18 +478,24 @@ const AdminCustomOrdersPage: React.FC = () => {
                             </div>
                           </div>
                           {allocation.payout ? (
-                            <div className="mt-2 rounded-2xl bg-black/[0.03] px-3 py-2 text-xs text-slate-600 dark:bg-white/[0.04] dark:text-slate-300">
-                              Payout {allocation.payout.reference ?? allocation.payout.id} • {allocation.payout.status} • {allocation.payout.currency} {String(allocation.payout.amount)}
+                            <div className="mt-2 rounded-xl bg-black/[0.03] px-3 py-2 text-xs text-slate-600 dark:bg-white/[0.04] dark:text-slate-300">
+                              Payout{payoutLabel ? ` ${payoutLabel}` : ''} • {allocation.payout.status} • {allocation.payout.currency} {String(allocation.payout.amount)}
                             </div>
                           ) : null}
                         </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
-                  <div className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Retention hold</div>
+                <div className="rounded-2xl border border-black/10 p-3 dark:border-white/10">
+                  <div className="mb-2">
+                    <CustomOrderFieldTitle
+                      title="Retention hold"
+                      description="Blocks automatic anonymization of buyer measurements. Clear when the investigation is finished."
+                    />
+                  </div>
                   <div className="text-xs text-slate-500 dark:text-slate-400">
                     Active hold: {selected.retentionHoldType ? `${selected.retentionHoldType} until ${formatDateTime(selected.retentionHoldUntil)}` : 'None'}
                   </div>
@@ -477,10 +555,13 @@ const AdminCustomOrdersPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-white">Remind brand</div>
-                  <textarea value={reminderNote} onChange={(event) => setReminderNote(event.target.value)} rows={3} className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Reminder note" />
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-black/10 p-3 dark:border-white/10">
+                  <CustomOrderFieldTitle
+                    title="Remind brand"
+                    description="Sends an operational nudge to the brand owner and marks the order with an admin notice in their studio."
+                  />
+                  <textarea value={reminderNote} onChange={(event) => setReminderNote(event.target.value)} rows={2} className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Optional note" />
                   <button
                     type="button"
                     disabled={busy}
@@ -492,15 +573,38 @@ const AdminCustomOrdersPage: React.FC = () => {
                         execute: () => runAction(() => customOrdersAdminApi.remindBrand(selected.id, reminderNote), 'Brand reminder queued'),
                       })
                     }
-                    className="mt-3 rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white"
+                    className="mt-2 rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white"
                   >
                     Send reminder
                   </button>
+                  <div className="mt-3 border-t border-black/5 pt-3 dark:border-white/10">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Reminders already sent ({brandReminders.length})
+                    </div>
+                    {brandReminders.length === 0 ? (
+                      <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">No brand reminders sent yet.</p>
+                    ) : (
+                      <ul className="mt-2 max-h-40 space-y-2 overflow-y-auto">
+                        {brandReminders.map((event) => {
+                          const note = String(event.payloadJson?.note ?? '').trim();
+                          return (
+                            <li key={event.id} className="rounded-xl border border-black/10 bg-black/[0.02] px-3 py-2 text-sm dark:border-white/10 dark:bg-white/[0.03]">
+                              <div className="font-medium text-slate-900 dark:text-white">{formatDateTime(event.createdAt)}</div>
+                              <div className="mt-0.5 break-words text-xs text-slate-600 dark:text-slate-300">{note || 'Reminder sent (no note)'}</div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
                 </div>
-                <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-white">Flag risk</div>
-                  <input value={riskReason} onChange={(event) => setRiskReason(event.target.value)} placeholder="Short reason" className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" />
-                  <textarea value={riskNote} onChange={(event) => setRiskNote(event.target.value)} rows={3} className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Admin note" />
+                <div className="rounded-2xl border border-black/10 p-3 dark:border-white/10">
+                  <CustomOrderFieldTitle
+                    title="Flag risk"
+                    description="Records an elevated risk signal and keeps the order in the admin attention queue until resolved."
+                  />
+                  <input value={riskReason} onChange={(event) => setRiskReason(event.target.value)} placeholder="Short reason (required)" className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950" />
+                  <textarea value={riskNote} onChange={(event) => setRiskNote(event.target.value)} rows={2} className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Internal admin note (optional)" />
                   <button
                     type="button"
                     disabled={busy || riskReason.trim().length < 3}
@@ -513,17 +617,20 @@ const AdminCustomOrdersPage: React.FC = () => {
                         execute: () => runAction(() => customOrdersAdminApi.flagRisk(selected.id, { reason: riskReason.trim(), note: riskNote.trim() || undefined }), 'Risk flag recorded'),
                       })
                     }
-                    className="mt-3 rounded-full bg-rose-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                    className="mt-2 rounded-full bg-rose-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                   >
                     Flag risk
                   </button>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
-                <div className="text-sm font-semibold text-slate-900 dark:text-white">Super admin cancellation</div>
-                <input value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Cancellation reason" className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" />
-                <textarea value={cancelNote} onChange={(event) => setCancelNote(event.target.value)} rows={3} className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Refund note" />
+              <div className="rounded-2xl border border-black/10 p-3 dark:border-white/10">
+                <CustomOrderFieldTitle
+                  title="Super admin cancellation"
+                  description="Only for paid orders. Cancels the order and starts the full refund workflow. Irreversible money path."
+                />
+                <input value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Cancellation reason (required)" className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950" />
+                <textarea value={cancelNote} onChange={(event) => setCancelNote(event.target.value)} rows={2} className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Refund note (optional)" />
                 <button
                   type="button"
                   disabled={busy || selected.paymentStatus !== 'PAID' || cancelReason.trim().length < 3}
@@ -536,7 +643,7 @@ const AdminCustomOrdersPage: React.FC = () => {
                       execute: () => runAction(() => customOrdersAdminApi.cancelPaidOrder(selected.id, { reason: cancelReason.trim(), note: cancelNote.trim() || undefined }), 'Custom order cancelled and refund started'),
                     })
                   }
-                  className="mt-3 rounded-full bg-rose-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  className="mt-2 rounded-full bg-rose-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                 >
                   Cancel paid order
                 </button>
@@ -547,10 +654,13 @@ const AdminCustomOrdersPage: React.FC = () => {
                 ) : null}
               </div>
 
-              <div className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
-                <div className="text-sm font-semibold text-slate-900 dark:text-white">Escalate refund review</div>
-                <input value={refundReason} onChange={(event) => setRefundReason(event.target.value)} placeholder="Escalation reason" className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" />
-                <textarea value={refundNote} onChange={(event) => setRefundNote(event.target.value)} rows={3} className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Refund note" />
+              <div className="rounded-2xl border border-black/10 p-3 dark:border-white/10">
+                <CustomOrderFieldTitle
+                  title="Escalate refund review"
+                  description="Moves the order into refund-review handling for deeper investigation without immediately cancelling."
+                />
+                <input value={refundReason} onChange={(event) => setRefundReason(event.target.value)} placeholder="Escalation reason (required)" className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950" />
+                <textarea value={refundNote} onChange={(event) => setRefundNote(event.target.value)} rows={2} className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Refund note (optional)" />
                 <button
                   type="button"
                   disabled={busy || refundReason.trim().length < 3}
@@ -563,7 +673,7 @@ const AdminCustomOrdersPage: React.FC = () => {
                       execute: () => runAction(() => customOrdersAdminApi.escalateRefundReview(selected.id, { reason: refundReason.trim(), note: refundNote.trim() || undefined }), 'Refund review escalated'),
                     })
                   }
-                  className="mt-3 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-black"
+                  className="mt-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-black"
                 >
                   Escalate refund review
                 </button>

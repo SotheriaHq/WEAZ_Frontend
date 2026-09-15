@@ -13,18 +13,22 @@ import {
   useLocation,
   Navigate,
   Outlet,
-  useParams,
   useSearchParams,
 } from 'react-router-dom';
+import { useProfileRouteId } from '@/context/ProfileRouteContext';
 import { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
 import { ISLAND_BOTTOM_NAV_CLEARANCE_CLASS } from '@/components/navigation/IslandBottomNav';
-import { hasActiveBrandMembership } from '@/lib/brandAccess';
+import { isBrandAccount } from '@/lib/brandAccess';
 import { setUser } from '@/features/userSlice';
 import { unwrapApiResponse } from '@/types/auth';
 import type { AuthProfileResponse, AuthUserDto } from '@/types/auth';
-import { getPublicProfileUserType, usePublicUserProfileQuery } from '@/query/queries';
+import {
+  getPublicProfileUserType,
+  useBrandProfileQuery,
+  usePublicUserProfileQuery,
+} from '@/query/queries';
 import { AuthApi } from '@/api/AuthApi';
 import EmailVerificationBanner from '@/components/auth/EmailVerificationBanner';
 
@@ -36,23 +40,11 @@ export const ProfileContentLoadingFallback: React.FC<{
 }> = ({ brandSetupPrompt = false }) => (
   <div className="p-4 sm:p-6" role="status" aria-live="polite">
     <div className="mx-auto max-w-screen-xl space-y-6">
-      <div className="rounded-2xl border border-theme bg-[color:var(--surface-secondary)] p-5 shadow-sm">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="h-10 w-10 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800" />
-          <div className="min-w-0 flex-1">
-            <div className="h-4 w-48 animate-pulse rounded-full bg-gray-200 dark:bg-gray-800" />
-            <div className="mt-2 h-3 w-64 max-w-full animate-pulse rounded-full bg-gray-100 dark:bg-gray-900" />
-          </div>
-        </div>
-        <p className="text-sm font-semibold text-theme">
-          {brandSetupPrompt ? 'Preparing brand setup...' : 'Loading profile...'}
-        </p>
-        <p className="mt-1 text-xs text-theme-secondary">
-          {brandSetupPrompt
-            ? 'Your profile is loading. The setup form will open automatically.'
-            : 'Your profile content is loading.'}
-        </p>
-      </div>
+      {/* Skeleton only — no spinner. The shimmer signals loading. */}
+      <ProfileHeaderSkeleton />
+      {brandSetupPrompt ? (
+        <span className="sr-only">Preparing brand setup...</span>
+      ) : null}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-3">
           <div className="h-64 w-full animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-900/40" />
@@ -109,7 +101,7 @@ export const ProfileLayout: React.FC = () => {
   const isMobile = useSelector(selectIsMobile);
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { id: routeBrandId } = useParams<{ id?: string }>();
+  const routeBrandId = useProfileRouteId();
 
   const isVisitorRoute = Boolean(routeBrandId);
   const [isResendingVerification, setIsResendingVerification] = useState(false);
@@ -117,15 +109,36 @@ export const ProfileLayout: React.FC = () => {
   const visitorProfileQuery = usePublicUserProfileQuery(routeBrandId, {
     enabled: Boolean(isVisitorRoute && routeBrandId),
   });
-  const visitorType = useMemo(
-    () => getPublicProfileUserType(visitorProfileQuery.data),
-    [visitorProfileQuery.data],
-  );
-  const visitorLoading = Boolean(
-    isVisitorRoute &&
-      !visitorProfileQuery.data &&
-      !visitorProfileQuery.error,
-  );
+  // Resolve brand profile in PARALLEL with public user profile. Sequential
+  // fallback waited on a failed/hung user lookup and left a permanent skeleton
+  // (client reported 30+ minutes of skeleton on brand→brand catalog open).
+  const visitorBrandProfileQuery = useBrandProfileQuery(routeBrandId, {
+    enabled: Boolean(isVisitorRoute && routeBrandId),
+  });
+  const visitorType = useMemo(() => {
+    const fromUser = getPublicProfileUserType(visitorProfileQuery.data);
+    if (fromUser) return fromUser;
+    if (visitorBrandProfileQuery.data) return 'BRAND' as const;
+    return null;
+  }, [visitorBrandProfileQuery.data, visitorProfileQuery.data]);
+  // Only block on initial pending. Never use isFetching — background refetch
+  // would re-trap the whole shell on skeleton.
+  const visitorIdentityPending =
+    Boolean(isVisitorRoute && routeBrandId) &&
+    !visitorType &&
+    (visitorProfileQuery.isPending || visitorBrandProfileQuery.isPending) &&
+    !visitorProfileQuery.isError &&
+    !visitorBrandProfileQuery.isError;
+  const [visitorLoadTimedOut, setVisitorLoadTimedOut] = useState(false);
+  useEffect(() => {
+    if (!isVisitorRoute || !routeBrandId || visitorType || !visitorIdentityPending) {
+      setVisitorLoadTimedOut(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setVisitorLoadTimedOut(true), 20_000);
+    return () => window.clearTimeout(timer);
+  }, [isVisitorRoute, routeBrandId, visitorIdentityPending, visitorType]);
+  const visitorLoading = visitorIdentityPending && !visitorLoadTimedOut;
 
   const verificationPromptContext = searchParams.get('verifyEmailPrompt') ?? '';
   const isBrandSetupPrompt = searchParams.get('modal') === 'brand-setup';
@@ -180,7 +193,7 @@ export const ProfileLayout: React.FC = () => {
         title: 'Verify email to create catalog products',
         description: (
           <>
-            Catalog product creation is locked until verification is complete. Open the link sent to <span className="font-semibold">{maskedVerificationEmail}</span> and return.
+            Product creation is locked until verification is complete. Open the link sent to <span className="font-semibold">{maskedVerificationEmail}</span> and return.
           </>
         ),
         toastMessage:
@@ -275,7 +288,12 @@ export const ProfileLayout: React.FC = () => {
     }
   };
 
-  const refreshVerificationStatus = async () => {
+  /**
+   * `silent` runs from the automatic watchers below, where a toast on every
+   * poll would be noise — only a deliberate press should announce a result.
+   */
+  const refreshVerificationStatus = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
     if (!user || isCheckingVerification) return;
 
     setIsCheckingVerification(true);
@@ -301,15 +319,50 @@ export const ProfileLayout: React.FC = () => {
           next.delete('next');
           return next;
         }, { replace: true });
-      } else {
+      } else if (!silent) {
         toast.info('Still waiting for verification. Open the email link, then check again.');
       }
     } catch {
-      toast.error('Unable to check verification right now. Please try again shortly.');
+      if (!silent) {
+        toast.error('Unable to check verification right now. Please try again shortly.');
+      }
     } finally {
       setIsCheckingVerification(false);
     }
   };
+
+  /**
+   * The banner verifies its own premise, so nobody has to press "check".
+   *
+   * Verification happens outside this tab by definition — in a mail client,
+   * often on another device — so a cached `isEmailVerified: false` cannot be
+   * trusted while it is the thing putting a banner on screen. Refreshing when
+   * the tab regains focus covers the ordinary path (leave, click the link, come
+   * back); the slow poll covers verifying elsewhere. Both stop the moment the
+   * prompt goes away, because the effect is gated on it being shown.
+   */
+  useEffect(() => {
+    if (!showEmailVerificationPrompt) return;
+
+    const check = () => void refreshVerificationStatus({ silent: true });
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') check();
+    };
+
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', onVisible);
+    const interval = window.setInterval(check, 15_000);
+
+    return () => {
+      window.removeEventListener('focus', check);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.clearInterval(interval);
+    };
+    // `refreshVerificationStatus` is recreated each render and guards itself
+    // with `isCheckingVerification`; depending on it would resubscribe on every
+    // keystroke elsewhere in the layout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showEmailVerificationPrompt]);
 
   if (!isVisitorRoute) {
     if (loading && !user) {
@@ -373,6 +426,54 @@ export const ProfileLayout: React.FC = () => {
     );
   }
 
+  if (
+    isVisitorRoute &&
+    routeBrandId &&
+    !visitorType &&
+    !visitorLoading &&
+    (visitorLoadTimedOut ||
+      visitorProfileQuery.isError ||
+      visitorBrandProfileQuery.isError ||
+      visitorProfileQuery.isFetched ||
+      visitorBrandProfileQuery.isFetched)
+  ) {
+    return (
+      <div className="min-h-screen bg-[color:var(--surface-primary)] text-gray-900 dark:text-white">
+        {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
+        <Navbar />
+        <main className={PROFILE_MAIN_CLASS} style={{ marginLeft: mainMarginLeft }}>
+          <div className="mx-auto max-w-lg p-8 text-center">
+            <p className="text-4xl" aria-hidden="true">🧭</p>
+            <h1 className="mt-4 text-xl font-bold">Brand profile unavailable</h1>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              We could not load this catalog. The link may be outdated, or the network request timed out.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                className="rounded-full bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-purple-700"
+                onClick={() => {
+                  void visitorProfileQuery.refetch();
+                  void visitorBrandProfileQuery.refetch();
+                  setVisitorLoadTimedOut(false);
+                }}
+              >
+                Try again
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-800 dark:border-white/15 dark:text-gray-100"
+                onClick={() => window.history.back()}
+              >
+                Go back
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
       <div className="min-h-screen bg-[color:var(--surface-primary)] text-gray-900 dark:text-white">
         {!isRouteSidebarHidden && (computedSidebarMode !== 'HIDDEN' || isSidebarOpen || isMobile) && <Sidebar />}
@@ -387,18 +488,22 @@ export const ProfileLayout: React.FC = () => {
                 <EmailVerificationBanner
                   title={verificationPromptDetails.title}
                   description={verificationPromptDetails.description}
-                  statusLabel={verificationPromptDetails.actionLabel}
                   isResending={isResendingVerification}
                   isChecking={isCheckingVerification}
                   onResend={resendVerificationEmail}
-                  onCheckStatus={refreshVerificationStatus}
                 />
               </div>
             </div>
           ) : null}
           <div className="px-0 sm:px-2">
+            {/*
+              Identity, not capability: a brand that has not finished store
+              setup is still a brand. `hasActiveBrandMembership` is false until
+              a store exists, which sent every freshly verified brand to the
+              shopper profile.
+            */}
             {location.pathname === '/profile' ? (
-              hasActiveBrandMembership(user) ? (
+              isBrandAccount(user) ? (
                 <Suspense fallback={<ProfileContentLoadingFallback brandSetupPrompt={isBrandSetupPrompt} />}>
                   <Profile />
                 </Suspense>

@@ -82,7 +82,7 @@ const ContentReviewDecisionModal: React.FC<ContentReviewDecisionModalProps> = ({
         </div>
 
         {loading ? (
-          <div className="h-28 animate-pulse rounded-xl bg-gray-100 dark:bg-white/8" />
+          <div className="h-28 animate-pulse rounded-xl bg-gray-100 dark:bg-white/[0.08]" />
         ) : (
           <div className="space-y-3">
             <div className="rounded-xl border border-gray-200 p-4 dark:border-white/10">
@@ -116,7 +116,7 @@ const ContentReviewDecisionModal: React.FC<ContentReviewDecisionModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/8"
+            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.08]"
           >
             Close
           </button>

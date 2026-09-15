@@ -29,19 +29,30 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
+import BackLink from '@/components/ui/BackLink';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { formatPrice } from '@/utils/helpers';
+import {
+  isEmptyPhone,
+  isValidPhone,
+  normalizePhoneToE164,
+  PHONE_INVALID_MESSAGE,
+  PHONE_REQUIRED_MESSAGE,
+  sanitizePhoneInput,
+} from '@/utils/phoneNumber';
 import { openPaystackInline } from '@/lib/paystackInline';
 import {
-  resolveInAppPaymentSession,
   resolvePaymentGateway,
+  resolvePaymentLaunchPlan,
 } from '@/lib/inAppPaymentSession';
 import { AnimatePresence, motion } from 'framer-motion';
 import PaymentDetailsSection from '@/pages/checkout/PaymentDetailsSection';
 import {
   loadDeliveryAddressBook,
+  pushDeliveryAddressBook,
   removeDeliveryAddress,
+  syncDeliveryAddressBook,
   toShippingAddress,
   upsertDeliveryAddress,
   type SavedDeliveryAddress,
@@ -102,6 +113,10 @@ type InlinePaymentLaunchSession = {
   reference: string;
   gateway?: string;
   providerAccessCode?: string;
+  /** Issuer challenge URL, when the card needs 3-D Secure. */
+  authorizationUrl?: string;
+  /** Gateway outcome — a saved-card charge can already be accepted or declined. */
+  status?: string;
 };
 
 const STEPS: Step[] = ['shipping', 'payment', 'review'];
@@ -251,19 +266,9 @@ function isActiveCardValidationSession(
   return Number.isFinite(expiry) && expiry > Date.now();
 }
 
-const CheckoutBackLink: React.FC<{
-  label: string;
-  onClick: () => void;
-}> = ({ label, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 underline decoration-slate-400/80 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 dark:text-slate-200 dark:decoration-slate-500 dark:hover:text-white"
-  >
-    <span aria-hidden>←</span>
-    <span>{label}</span>
-  </button>
-);
+// Shared, stable back affordance (see components/ui/BackLink). Kept as a local
+// alias so the existing call sites below read unchanged.
+const CheckoutBackLink = BackLink;
 
 const CheckoutPanel: React.FC<{
   kicker: string;
@@ -271,7 +276,7 @@ const CheckoutPanel: React.FC<{
   description: string;
   children: React.ReactNode;
 }> = ({ kicker, title, description, children }) => (
-  <section className="threadly-chrome-surface relative overflow-hidden rounded-[32px] p-6 sm:p-8">
+  <section className="wiez-chrome-surface relative overflow-hidden rounded-[32px] p-6 sm:p-8">
     <div className="space-y-6">
       <div className="space-y-3">
         <div className="text-[11px] font-black uppercase tracking-[0.28em] text-fuchsia-500 dark:text-fuchsia-300">
@@ -297,7 +302,7 @@ interface CheckoutPageProps {
 }
 
 const PROMO_CODES_UNAVAILABLE_MESSAGE =
-  'Promo codes are not available during MVP checkout. Final totals are calculated securely by WEAZ at payment time.';
+  'Promo codes are not available during MVP checkout. Final totals are calculated securely by WIEZ at payment time.';
 
 /* ─── Component ─── */
 
@@ -313,6 +318,16 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const user = useSelector((s: RootState) => s.user.profile);
   const submittingRef = useRef(false);
   const paymentInitIdempotencyKeyRef = useRef<string | null>(null);
+  /*
+    The card-validation session id rides in the initialize body, and the
+    idempotency interceptor hashes the WHOLE body. A retry that mints a fresh
+    validation session therefore changes the payload under a key that was never
+    reset — the server answers 409 "Idempotency-Key reuse with different request
+    payload" and the buyer is stuck. The session id cannot go in the reset
+    effect's deps (it is a local inside the submit handler), so the key is
+    rotated against the session it was minted for instead.
+  */
+  const paymentInitIdempotencySessionRef = useRef<string | null>(null);
 
   /* ── Step state ── */
   const [step, setStep] = useState<Step>('shipping');
@@ -355,6 +370,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const [cardValidationSession, setCardValidationSession] =
     useState<CardValidationSessionSummary | null>(null);
   const [cardValidationLoading, setCardValidationLoading] = useState(false);
+  const [customCardEntryEnabled, setCustomCardEntryEnabled] = useState(false);
 
   /* ── Submission state ── */
   const [submitting, setSubmitting] = useState(false);
@@ -374,10 +390,12 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         }
 
         setRuntimeCardholderNameMatchMode(policy.paystack.cardholderNameMatchMode);
+        setCustomCardEntryEnabled(Boolean(policy.paystack.customCardEntryEnabled));
       })
       .catch(() => {
         if (active) {
           setRuntimeCardholderNameMatchMode(null);
+          setCustomCardEntryEnabled(false);
         }
       });
 
@@ -568,7 +586,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     const loadSavedAddresses = async () => {
       setSavedAddressesLoading(true);
       try {
-        const stored = loadDeliveryAddressBook(user?.id);
+        const stored = await syncDeliveryAddressBook(user?.id);
         if (!active) return;
 
         if (stored.length > 0) {
@@ -611,6 +629,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         if (nextSavedAddresses[0]) {
           setEditingAddressId(nextSavedAddresses[0].id);
           setAddress(toShippingAddress(nextSavedAddresses[0]));
+        }
+        if (nextSavedAddresses.length > 0) {
+          pushDeliveryAddressBook(user?.id, nextSavedAddresses);
         }
       } catch {
         if (!active) return;
@@ -661,10 +682,13 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const grandTotal = standardGrandTotal + customSubtotal;
   const brandGroups = useMemo(() => groupByBrand(cart.items), [cart.items]);
   const activePaymentData = paymentMethod === 'PENDING_SELECTION' ? null : paymentState[paymentMethod];
+  // With custom card entry enabled (SIT/test keys), new cards are collected on
+  // this page and follow the standard Review flow instead of the hosted CTA.
   const isHostedNewCardSelection =
     paymentMethod === 'PAYSTACK' &&
     activePaymentData?.channel === 'CARD' &&
     !activePaymentData.useSavedCard &&
+    !customCardEntryEnabled &&
     !hasCollectedPaystackCardDraft(activePaymentData);
   const paymentSummaryLines = useMemo(
     () => (activePaymentData && paymentMethod !== 'PENDING_SELECTION' ? getPaymentSummaryLines(paymentMethod, activePaymentData) : []),
@@ -683,6 +707,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
   useEffect(() => {
     paymentInitIdempotencyKeyRef.current = null;
+    paymentInitIdempotencySessionRef.current = null;
   }, [activePaymentData, address, cart.items, paymentMethod]);
 
   useEffect(() => {
@@ -700,7 +725,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         user?.email?.trim() ||
         paymentState.PAYSTACK.email ||
         '',
-      phone: address.phone.trim(),
+      phone:
+        normalizePhoneToE164(address.phone) ?? address.phone.trim(),
       street: address.street.trim(),
       apartment: String(address.apartment ?? '').trim(),
       city: address.city.trim(),
@@ -720,7 +746,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
           currentAddressDraft.street &&
           currentAddressDraft.city &&
           currentAddressDraft.state &&
-          currentAddressDraft.phone,
+          currentAddressDraft.phone &&
+          isValidPhone(currentAddressDraft.phone),
       ),
     [currentAddressDraft],
   );
@@ -733,7 +760,11 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     if (!address.street.trim()) errors.street = 'Street address is required';
     if (!address.city.trim()) errors.city = 'City is required';
     if (!address.state) errors.state = 'State is required';
-    if (!address.phone.trim()) errors.phone = 'Phone number is required';
+    if (isEmptyPhone(address.phone)) {
+      errors.phone = PHONE_REQUIRED_MESSAGE;
+    } else if (!isValidPhone(address.phone)) {
+      errors.phone = PHONE_INVALID_MESSAGE;
+    }
     setShippingErrors(errors);
     return Object.keys(errors).length === 0;
   }, [address]);
@@ -817,7 +848,17 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         toast.error('Please select a payment method');
         return;
       }
-      const validationErrors = validatePaymentData(paymentMethod, paymentState[paymentMethod], address);
+      const validationErrors = validatePaymentData(
+        paymentMethod,
+        paymentState[paymentMethod],
+        address,
+        {
+          requireNewCardDraft:
+            customCardEntryEnabled &&
+            paymentState[paymentMethod].channel === 'CARD' &&
+            !paymentState[paymentMethod].useSavedCard,
+        },
+      );
       setPaymentErrors(validationErrors);
       if (Object.keys(validationErrors).length > 0) {
         setCheckoutProgressStage('FAILED');
@@ -857,6 +898,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     paymentMethod,
     paymentState,
     address,
+    customCardEntryEnabled,
     getFirstPaymentErrorMessage,
     ensureCardValidationSession,
   ]);
@@ -973,23 +1015,53 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     options?: { retry?: boolean },
   ) => {
     const resolvedGateway = resolvePaymentGateway(paymentInit);
-    const session = resolveInAppPaymentSession(paymentInit);
     const returnPath =
       `/bag/payment-return?reference=${encodeURIComponent(paymentInit.reference)}&gateway=${encodeURIComponent(resolvedGateway)}`;
+    const plan = resolvePaymentLaunchPlan(paymentInit);
 
     if (embedded) {
       dispatch(closeCartDrawer());
     }
 
+    if (plan.kind === 'FAILED') {
+      setCheckoutProgressStage('FAILED');
+      setCheckoutProgressMessage(plan.message);
+      toast.error(plan.message);
+      return;
+    }
+
+    /*
+      Nothing left for the buyer to do. A saved card is charged server-side and
+      comes back accepted with no access code and no challenge URL, so there is
+      no window to open — the return page polls the reference every 10s and
+      resolves it. Demanding an inline session here is what made saved-card
+      checkout fail after the card had already been charged.
+    */
+    if (plan.kind === 'CONFIRM' || plan.kind === 'SETTLED') {
+      clearCheckoutProgress();
+      navigate(returnPath);
+      return;
+    }
+
+    if (plan.kind === 'REDIRECT') {
+      setCheckoutProgressStage('OPENING_SECURE_WINDOW');
+      setCheckoutProgressMessage('Opening secure card verification...');
+      // The issuer challenge is hosted by the gateway; the callback URL brings
+      // the buyer back to the return page.
+      window.location.assign(plan.url);
+      return;
+    }
+
+    // Only an inline popup can be retried, so only this branch arms that UI.
     setPendingInlineSession(paymentInit);
     setCheckoutProgressStage('OPENING_SECURE_WINDOW');
     setCheckoutProgressMessage(
       options?.retry
-        ? 'Retrying secure checkout inside WEAZ...'
-        : 'Opening secure checkout inside WEAZ...',
+        ? 'Retrying secure checkout inside WIEZ...'
+        : 'Opening secure checkout inside WIEZ...',
     );
 
-    await openPaystackInline(session.accessCode, {
+    await openPaystackInline(plan.accessCode, {
       onSuccess: () => {
         clearCheckoutProgress();
         navigate(returnPath);
@@ -1158,6 +1230,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         contactEmail: currentAddressDraft.contactEmail || paymentSubmissionData.email || '',
       });
       setSavedAddresses(nextAddresses);
+      pushDeliveryAddressBook(user?.id, nextAddresses);
       if (nextAddresses[0]) {
         setEditingAddressId(nextAddresses[0].id);
       }
@@ -1165,9 +1238,15 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       setCheckoutProgressStage('PREPARING_PAYMENT');
       setCheckoutProgressMessage('Preparing your secure payment session...');
 
-      const paymentInitIdempotencyKey =
-        paymentInitIdempotencyKeyRef.current ?? createIdempotencyKey();
+      const idempotencySessionMarker = cardValidationSessionId ?? '';
+      const reuseIdempotencyKey =
+        paymentInitIdempotencyKeyRef.current !== null &&
+        paymentInitIdempotencySessionRef.current === idempotencySessionMarker;
+      const paymentInitIdempotencyKey = reuseIdempotencyKey
+        ? (paymentInitIdempotencyKeyRef.current as string)
+        : createIdempotencyKey();
       paymentInitIdempotencyKeyRef.current = paymentInitIdempotencyKey;
+      paymentInitIdempotencySessionRef.current = idempotencySessionMarker;
 
       const customerName = `${address.firstName} ${address.lastName}`.trim();
       const unifiedPaymentInit = await paymentApi.initializeUnified({
@@ -1190,8 +1269,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
         toast.error(getBlockedCustomBagMessage(unifiedPaymentInit.blockedLines!.length));
       }
 
-      setCheckoutProgressStage('OPENING_SECURE_WINDOW');
-      setPendingInlineSession(unifiedPaymentInit);
+      // The launch stage is set per outcome inside launchInitializedPayment —
+      // not every initialized payment opens a window.
       await launchInitializedPayment(unifiedPaymentInit);
       return;
     } catch (error: any) {
@@ -1219,8 +1298,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   /* ─── Step Indicator ─── */
   const stepIdx = STEPS.indexOf(step);
   const shellClassName = embedded
-    ? 'threadly-shell-bg min-h-full'
-    : 'threadly-shell-bg min-h-screen';
+    ? 'wiez-shell-bg min-h-full'
+    : 'wiez-shell-bg min-h-screen';
   const contentClassName = embedded
     ? 'relative mx-auto max-w-7xl px-4 py-6 sm:px-5 lg:px-8 lg:py-8'
     : 'relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12';
@@ -1252,7 +1331,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       </div>
 
       {/* Step indicator */}
-      <nav className="threadly-chrome-surface mb-8 flex items-center justify-center gap-2 rounded-full px-3 py-3" aria-label="Checkout steps">
+      <nav className="wiez-chrome-surface mb-8 flex items-center justify-center gap-2 rounded-full px-3 py-3" aria-label="Checkout steps">
         {STEPS.map((s, i) => {
           const isActive = s === step;
           const isCompleted = i < stepIdx;
@@ -1278,7 +1357,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     isActive
                       ? 'border-fuchsia-500 bg-fuchsia-500 text-white shadow-[0_0_0_8px_rgba(217,70,239,0.12)]'
                       : isCompleted
-                        ? 'border-fuchsia-400 bg-fuchsia-50 text-fuchsia-600 dark:bg-fuchsia-500/18 dark:text-fuchsia-200'
+                        ? 'border-fuchsia-400 bg-fuchsia-50 text-fuchsia-600 dark:bg-fuchsia-500/[0.18] dark:text-fuchsia-200'
                         : 'border-slate-300 dark:border-zinc-600 text-slate-400 dark:text-zinc-500'
                   }`}
                 >
@@ -1505,7 +1584,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                   label="Phone number"
                   type="tel"
                   value={address.phone}
-                  onChange={(e) => updateField('phone', e.target.value)}
+                  onChange={(e) =>
+                    updateField('phone', sanitizePhoneInput(e.target.value))
+                  }
                   placeholder="080XXXXXXXX"
                   error={shippingErrors.phone}
                   required
@@ -1578,6 +1659,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                             shippingAddress={address}
                             errors={paymentErrors}
                             onChange={updateSelectedPaymentData}
+                            customCardEntryEnabled={customCardEntryEnabled}
                             savedCards={savedCards}
                             savedCardsLoading={savedCardsLoading}
                             savedCardsError={savedCardsError}
@@ -1658,7 +1740,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 </div>
               )}
               {/* Shipping summary */}
-              <div className="rounded-[28px] border border-white/60 bg-white/72 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="rounded-[28px] border border-white/60 bg-white/[0.72] p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">📍 Shipping Address</h3>
                   <button type="button" onClick={() => setStep('shipping')} className="text-sm font-semibold text-indigo-700 underline decoration-indigo-300 decoration-2 underline-offset-4 dark:text-indigo-300 dark:decoration-indigo-500">
@@ -1675,7 +1757,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
               </div>
 
               {/* Payment summary */}
-              <div className="rounded-[28px] border border-white/60 bg-white/72 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="rounded-[28px] border border-white/60 bg-white/[0.72] p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">💳 Payment Method</h3>
                   <button type="button" onClick={() => setStep('payment')} className="text-sm font-semibold text-indigo-700 underline decoration-indigo-300 decoration-2 underline-offset-4 dark:text-indigo-300 dark:decoration-indigo-500">
@@ -1696,7 +1778,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
               </div>
 
               {/* Items grouped by brand */}
-              <div className="rounded-[28px] border border-white/60 bg-white/72 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03] space-y-4">
+              <div className="rounded-[28px] border border-white/60 bg-white/[0.72] p-5 shadow-[0_12px_32px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.03] space-y-4">
                 <h3 className="font-semibold">{BAG_IT_EMOJI} Bag lines</h3>
 
                 {brandGroups.length > 0 && brandGroups.map((group) => (
@@ -1805,7 +1887,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
         {/* ─── Order Summary Sidebar ─── */}
         <div className="lg:sticky lg:top-24 self-start">
-          <div className="threadly-summary-surface overflow-hidden rounded-[32px] p-6">
+          <div className="wiez-summary-surface overflow-hidden rounded-[32px] p-6">
             <div className="space-y-6">
               <div className="space-y-1">
                 <p className="text-[11px] font-black uppercase tracking-[0.28em] text-fuchsia-500 dark:text-fuchsia-300/80">Checkout</p>
@@ -1814,7 +1896,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
               <div className="space-y-4">
                 {cart.items.map((item) => (
-                  <div key={item.id} className="flex items-start gap-3 rounded-[22px] border border-slate-200/80 bg-white/70 p-3 dark:border-white/8 dark:bg-white/[0.03]">
+                  <div key={item.id} className="flex items-start gap-3 rounded-[22px] border border-slate-200/80 bg-white/70 p-3 dark:border-white/[0.08] dark:bg-white/[0.03]">
                     <div className="h-16 w-16 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/70 dark:bg-white/10 dark:ring-white/10">
                       {item.product.thumbnail ? (
                         <ImageWithFallback
@@ -1882,13 +1964,13 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 })}
 
                 {customBagLoading && (
-                  <div className="rounded-[22px] border border-slate-200/80 bg-white/70 p-3 text-xs text-slate-500 dark:border-white/8 dark:bg-white/[0.03] dark:text-slate-400">
+                  <div className="rounded-[22px] border border-slate-200/80 bg-white/70 p-3 text-xs text-slate-500 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-slate-400">
                     Loading custom requests...
                   </div>
                 )}
               </div>
 
-              <div className="space-y-3 border-t border-slate-200/80 pt-4 text-sm dark:border-white/8">
+              <div className="space-y-3 border-t border-slate-200/80 pt-4 text-sm dark:border-white/[0.08]">
                 <div className="flex justify-between text-slate-600 dark:text-slate-400">
                   <span>Store items</span>
                   <span className="text-slate-950 dark:text-white">{formatPrice(cart.subtotal)}</span>
@@ -1911,7 +1993,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 )}
               </div>
 
-              <div className="flex items-end justify-between border-t border-slate-200/80 pt-5 dark:border-white/8">
+              <div className="flex items-end justify-between border-t border-slate-200/80 pt-5 dark:border-white/[0.08]">
                 <div>
                   <p className="text-sm uppercase tracking-[0.2em] text-slate-500 dark:text-slate-500">Total</p>
                   <p className="mt-1 text-3xl font-black tracking-tight">{formatPrice(grandTotal)}</p>
@@ -1921,7 +2003,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 </div>
               </div>
 
-              <div className="threadly-chrome-surface rounded-[22px] px-4 py-4 text-sm text-slate-700 dark:text-slate-300">
+              <div className="wiez-chrome-surface rounded-[22px] px-4 py-4 text-sm text-slate-700 dark:text-slate-300">
                 <div className="flex gap-3">
                   <span className="mt-0.5 text-base text-fuchsia-500 dark:text-fuchsia-300">◉</span>
                   <p>

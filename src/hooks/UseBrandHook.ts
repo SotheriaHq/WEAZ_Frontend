@@ -20,6 +20,21 @@ import {
   useBrandProfileQuery,
 } from '@/query/queries';
 import { queryKeys } from '@/query/queryKeys';
+import { WIEZ_QUERY_STALE_TIME_MS } from '@/query/queryClient';
+
+type BrandReviewsData = {
+  reviews: ProductReviewResponse[];
+  averageRating: number;
+  totalReviews: number;
+  ratingDistribution: ReviewRatingDistributionItem[];
+};
+
+const EMPTY_BRAND_REVIEWS: BrandReviewsData = {
+  reviews: [],
+  averageRating: 0,
+  totalReviews: 0,
+  ratingDistribution: [],
+};
 
 const areStringArraysEqual = (left: string[] | null | undefined, right: string[] | null | undefined) => {
   if (left === right) return true;
@@ -200,7 +215,8 @@ const syncBrandProfileWithUser = (
       website: user.socialWebsite,
     },
     contactInfo: {
-      email: user.email,
+      // Owner-only mirror: public brand API redacts email for visitors.
+      email: user.email ?? null,
       phone: user.phoneNumber,
       businessType: user.brandBusinessType,
     },
@@ -243,20 +259,40 @@ export const useBrandProfile = () => {
   const brandDetailEndpointsEnabled = env.featureFlags.brandDetailEndpoints;
   const { flags: reviewFlags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
   const queryClient = useQueryClient();
+  const initialOwnerReviews = ownerBrandId
+    ? queryClient.getQueryData<BrandReviewsData>(queryKeys.reviews.brand(ownerBrandId))
+    : undefined;
 
-  // Brand profile state
-  const [brandProfile, setBrandProfile] = useState<BrandProfileDto | null>(null);
-  const [brandProfileLoading, setBrandProfileLoading] = useState(false);
+  const ownerCollectionsQuery = useBrandCollectionsQuery(
+    { ownerId: ownerBrandId, visibility: 'all', scope: 'design' },
+    { enabled: Boolean(ownerBrandId) },
+  );
+  const ownerBrandProfileQuery = useBrandProfileQuery(ownerBrandId, {
+    enabled: Boolean(ownerBrandId && hasBrandMembership && brandDetailEndpointsEnabled),
+  });
+
+  // Brand profile state — seed from react-query cache so revisits never flash
+  // a full-page skeleton while the network revalidates.
+  const [brandProfile, setBrandProfile] = useState<BrandProfileDto | null>(
+    () => ownerBrandProfileQuery.data ?? null,
+  );
+  const [brandProfileLoading, setBrandProfileLoading] = useState(
+    () => Boolean(ownerBrandId && hasBrandMembership && !ownerBrandProfileQuery.data),
+  );
   const [brandProfileError, setBrandProfileError] = useState<string | null>(null);
-  const brandProfileRef = useRef<BrandProfileDto | null>(null);
+  const brandProfileRef = useRef<BrandProfileDto | null>(ownerBrandProfileQuery.data ?? null);
   const brandProfileFetchPromiseRef = useRef<Promise<void> | null>(null);
 
-  // Collections state
-  const [collections, setCollections] = useState<CollectionDto[]>([]);
-  const [collectionsLoading, setCollectionsLoading] = useState(true);
+  // Collections state — same cache-first seed as profile.
+  const [collections, setCollections] = useState<CollectionDto[]>(
+    () => ownerCollectionsQuery.data ?? [],
+  );
+  const [collectionsLoading, setCollectionsLoading] = useState(
+    () => Boolean(ownerBrandId) && !ownerCollectionsQuery.data,
+  );
   const [collectionsError, setCollectionsError] = useState<string | null>(null);
   const collectionsFetchPromiseRef = useRef<Promise<void> | null>(null);
-  const collectionsRef = useRef<CollectionDto[]>([]);
+  const collectionsRef = useRef<CollectionDto[]>(ownerCollectionsQuery.data ?? []);
 
   useEffect(() => {
     collectionsRef.current = collections;
@@ -267,20 +303,53 @@ export const useBrandProfile = () => {
   }, [brandProfile]);
 
   // Reviews state
-  const [reviews, setReviews] = useState<ProductReviewResponse[]>([]);
-  const [averageRating, setAverageRating] = useState(0);
-  const [totalReviews, setTotalReviews] = useState(0);
-  const [ratingDistribution, setRatingDistribution] = useState<ReviewRatingDistributionItem[]>([]);
+  const [reviews, setReviews] = useState<ProductReviewResponse[]>(
+    () => initialOwnerReviews?.reviews ?? [],
+  );
+  const [averageRating, setAverageRating] = useState(
+    () => initialOwnerReviews?.averageRating ?? 0,
+  );
+  const [totalReviews, setTotalReviews] = useState(
+    () => initialOwnerReviews?.totalReviews ?? 0,
+  );
+  const [ratingDistribution, setRatingDistribution] = useState<ReviewRatingDistributionItem[]>(
+    () => initialOwnerReviews?.ratingDistribution ?? [],
+  );
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
-  const [loadedReviewsBrandId, setLoadedReviewsBrandId] = useState<string | null>(null);
-  const ownerCollectionsQuery = useBrandCollectionsQuery(
-    { ownerId: ownerBrandId, visibility: 'all', scope: 'design' },
-    { enabled: Boolean(ownerBrandId) },
+  const [loadedReviewsBrandId, setLoadedReviewsBrandId] = useState<string | null>(
+    () => (initialOwnerReviews ? ownerBrandId : null),
   );
-  const ownerBrandProfileQuery = useBrandProfileQuery(ownerBrandId, {
-    enabled: Boolean(ownerBrandId && hasBrandMembership && brandDetailEndpointsEnabled),
-  });
+
+  // Render-phase mirror (NOT an effect): with a warm react-query cache the
+  // first committed frame already carries the owner's collections. The effect
+  // below still reconciles loading/error state, but effects run after paint —
+  // relying on them alone guaranteed a one-frame skeleton flash on EVERY
+  // owner profile visit even when cached data was already present.
+  if (ownerCollectionsQuery.data && collections !== ownerCollectionsQuery.data) {
+    setCollections(ownerCollectionsQuery.data);
+  }
+  if (
+    ownerBrandProfileQuery.data &&
+    brandProfile !== ownerBrandProfileQuery.data
+  ) {
+    setBrandProfile(ownerBrandProfileQuery.data);
+  }
+
+  // Blocking-skeleton signal derived at render time: once any data exists
+  // (cached rows or a resolved-empty response) the skeleton must never cover
+  // it; background refetches stay silent per stale-while-revalidate.
+  const collectionsBlockingLoading =
+    Boolean(ownerBrandId) &&
+    collections.length === 0 &&
+    !ownerCollectionsQuery.data &&
+    (collectionsLoading || ownerCollectionsQuery.isLoading);
+
+  const brandProfileBlockingLoading =
+    Boolean(ownerBrandId && hasBrandMembership && brandDetailEndpointsEnabled) &&
+    !brandProfile &&
+    !ownerBrandProfileQuery.data &&
+    (brandProfileLoading || ownerBrandProfileQuery.isLoading);
 
   // Fetch brand profile
   const fetchBrandProfile = useCallback(async (brandId: string, options?: { forceRefresh?: boolean }) => {
@@ -358,30 +427,51 @@ export const useBrandProfile = () => {
 
   // Fetch reviews
   const fetchReviews = useCallback(async (brandId: string) => {
+    const applyReviews = (data: BrandReviewsData) => {
+      setReviews(data.reviews);
+      setAverageRating(data.averageRating);
+      setTotalReviews(data.totalReviews);
+      setRatingDistribution(data.ratingDistribution);
+      setLoadedReviewsBrandId(brandId);
+    };
+
     if (reviewFlagsLoading) {
       return;
     }
 
     if (!reviewFlags.readEnabled) {
-      setReviews([]);
-      setAverageRating(0);
-      setTotalReviews(0);
-      setRatingDistribution([]);
+      applyReviews(EMPTY_BRAND_REVIEWS);
       setReviewsError(null);
       setReviewsLoading(false);
       setLoadedReviewsBrandId(null);
       return;
     }
 
-    setReviewsLoading(true);
+    const cacheKey = queryKeys.reviews.brand(brandId);
+    const cached = queryClient.getQueryData<BrandReviewsData>(cacheKey);
+    if (cached) {
+      applyReviews(cached);
+      setReviewsLoading(false);
+    } else {
+      setReviews([]);
+      setAverageRating(0);
+      setTotalReviews(0);
+      setRatingDistribution([]);
+      setReviewsLoading(true);
+    }
     setReviewsError(null);
     try {
-      const data = await brandApi.getReviews(brandId);
-      setReviews(data.reviews);
-      setAverageRating(data.averageRating);
-      setTotalReviews(data.totalReviews);
-      setRatingDistribution(data.ratingDistribution);
-      setLoadedReviewsBrandId(brandId);
+      const data = await queryClient.fetchQuery({
+        queryKey: cacheKey,
+        queryFn: () => brandApi.getReviews(brandId),
+        // `fetchQuery` defaults staleTime to 0, so leaving this off meant every
+        // return to the Reviews tab went to the network even when the cache had
+        // been filled seconds earlier — the request the user was watching when
+        // the cards "flickered in a few seconds later". With the global window
+        // applied it resolves from cache instantly and silently.
+        staleTime: WIEZ_QUERY_STALE_TIME_MS,
+      });
+      applyReviews(data);
     } catch (error) {
       setReviewsError('Failed to load reviews');
       setLoadedReviewsBrandId(null);
@@ -389,7 +479,7 @@ export const useBrandProfile = () => {
     } finally {
       setReviewsLoading(false);
     }
-  }, [reviewFlags.readEnabled, reviewFlagsLoading]);
+  }, [queryClient, reviewFlags.readEnabled, reviewFlagsLoading]);
 
   // Create collection
   const createCollection = useCallback(async (data: { name: string; description?: string; isPublic?: boolean }) => {
@@ -494,27 +584,40 @@ export const useBrandProfile = () => {
     website: user?.socialWebsite ?? 'https://example.com',
   };
 
+  // Prefer brand profile API for public identity (username/location/tags), then
+  // auth user fallbacks — same fields visitors resolve for catalog headers.
+  const profileUsername =
+    ((brandProfile as unknown) as { username?: string | null } | null)?.username?.trim() ||
+    user?.username ||
+    '';
+  const profileLocation =
+    brandProfile?.location ||
+    user?.companyLocation ||
+    [user?.brandCity, user?.brandState, user?.brandCountry]
+      .filter((segment) => segment && segment.length > 0)
+      .join(', ') ||
+    user?.address ||
+    '';
   const displayData = {
     brandName:
       user?.brandFullName ||
+      brandProfile?.brandFullName ||
       `${user?.firstName || ''} ${user?.lastName || ''}`.trim() ||
-      user?.username ||
+      profileUsername ||
       'Brand Name',
-  // brandProfile type may not include username in some API shapes; use a safe access here
-  username: ((brandProfile as unknown) as { username?: string })?.username ?? user?.username ?? '',
-    location:
-      brandProfile?.location ||
-      user?.companyLocation ||
-      [user?.brandCity, user?.brandState, user?.brandCountry]
-        .filter((segment) => segment && segment.length > 0)
-        .join(', ') ||
-      user?.address ||
-      'Lagos, Nigeria',
+    username: profileUsername,
+    location: profileLocation,
     bannerImage: brandProfile?.bannerImage ?? null,
     bannerImageMeta: brandProfile?.bannerImageMeta ?? null,
     logoImage: brandProfile?.logoImage ?? null,
     logoImageMeta: brandProfile?.logoImageMeta ?? null,
-    hashtags: brandProfile?.tags ?? brandProfile?.hashtags ?? defaultFallbackTags,
+    // Empty arrays fall through: a profile snapshot with no tags must not
+    // mask real tags on the fresher redux user (e.g. right after a save).
+    hashtags: brandProfile?.tags?.length
+      ? brandProfile.tags
+      : brandProfile?.hashtags?.length
+        ? brandProfile.hashtags
+        : defaultFallbackTags,
     description: brandProfile?.description ?? user?.brandDescription ?? null,
     socialLinks: {
       instagram: brandProfile?.socialLinks?.instagram ?? socialFallback.instagram,
@@ -548,10 +651,14 @@ export const useBrandProfile = () => {
   return {
     user,
     brandProfile,
-    brandProfileLoading,
+    // Derived: never skeleton when cache already has a profile snapshot.
+    brandProfileLoading: brandProfileBlockingLoading,
     brandProfileError,
     collections,
-    collectionsLoading,
+    // Derived blocking flag (render-time), NOT the raw state: the raw state
+    // starts true and is only reconciled after paint, which skeleton-flashed
+    // every owner profile visit even with warm cached data.
+    collectionsLoading: collectionsBlockingLoading,
     collectionsError,
     reviews,
     averageRating,

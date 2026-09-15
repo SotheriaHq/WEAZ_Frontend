@@ -4,22 +4,27 @@ type EmailVerificationBannerProps = {
   title: string;
   description: React.ReactNode;
   resendLabel?: string;
-  statusLabel?: string;
   isResending?: boolean;
+  /** Drives the passive "checking" hint; there is no button to press. */
   isChecking?: boolean;
   onResend: () => void;
-  onCheckStatus: () => void;
 };
 
+/**
+ * "Check status" is gone.
+ *
+ * The banner's owner re-checks on focus, on tab visibility and on a slow poll,
+ * so by the time a user could reach for a button the answer has already
+ * arrived. Asking someone to tell the app to notice something it can see for
+ * itself is work the app should be doing.
+ */
 export const EmailVerificationBanner: React.FC<EmailVerificationBannerProps> = ({
   title,
   description,
   resendLabel = 'Resend email',
-  statusLabel = 'Check status',
   isResending = false,
   isChecking = false,
   onResend,
-  onCheckStatus,
 }) => (
   <aside
     aria-label="Email verification required"
@@ -42,14 +47,9 @@ export const EmailVerificationBanner: React.FC<EmailVerificationBannerProps> = (
         >
           {isResending ? 'Sending...' : resendLabel}
         </button>
-        <button
-          type="button"
-          onClick={onCheckStatus}
-          disabled={isChecking}
-          className="rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-300/30 dark:bg-transparent dark:text-amber-100 dark:hover:bg-amber-400/10"
-        >
-          {isChecking ? 'Checking...' : statusLabel}
-        </button>
+        <span className="text-[11px] font-medium text-amber-900/70 dark:text-amber-100/70">
+          {isChecking ? 'Checking…' : 'This clears itself once you confirm.'}
+        </span>
       </div>
     </div>
   </aside>

@@ -1,4 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import {
+  readProfileSizeCategory,
+  resolveDisplayCategory,
+  writeProfileSizeCategory,
+} from '@/lib/profileSizePreference';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import type { SizeFitProfile } from '@/types/sizeFit';
@@ -8,18 +13,29 @@ interface EndUserSizeFitModalProps {
   loading: boolean;
   saving: boolean;
   profile: SizeFitProfile | null;
+  /**
+   * Computed sizes, so the shopper can choose which one their profile leads
+   * with. The profile shows exactly one now, and this is where that is picked.
+   */
+  categorySizes?: Array<{ key: string; label: string; size: string }>;
   onClose: () => void;
-  onSaveMeasurements: (payload: {
+  /**
+   * One save for the whole dialog.
+   *
+   * This replaced a pair of `onSaveMeasurements` / `onSaveSettings` props that
+   * backed a button each. Beyond the split being invisible to the user, both
+   * payloads carried `requireUpdateEveryDays` from the SAME field, so the two
+   * buttons wrote conflicting values for it and the later press won. One
+   * payload means the reminder cycle is sent exactly once.
+   */
+  onSave: (payload: {
     measurements: Record<string, unknown>;
     notes?: string;
-    requireUpdateEveryDays?: number;
     preferredLengthUnit?: 'CM' | 'IN';
-  }) => Promise<void>;
-  onSaveSettings: (payload: {
+    requireUpdateEveryDays?: number;
     visibility?: 'PUBLIC' | 'PRIVATE';
     sharePolicy?: 'OWNER_ONLY' | 'REQUIRE_PERMISSION' | 'ALLOW_ANYONE';
     notifyOnShare?: boolean;
-    requireUpdateEveryDays?: number;
   }) => Promise<void>;
 }
 
@@ -28,10 +44,17 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
   loading,
   saving,
   profile,
+  categorySizes = [],
   onClose,
-  onSaveMeasurements,
-  onSaveSettings,
+  onSave,
 }) => {
+  const [profileSizeCategory, setProfileSizeCategory] = useState(() =>
+    readProfileSizeCategory(),
+  );
+  const selectedProfileCategory = resolveDisplayCategory(
+    profileSizeCategory,
+    categorySizes,
+  );
   const toInches = (cm: number) => cm / 2.54;
   const toCentimeters = (inch: number) => inch * 2.54;
   const round = (value: number) => Math.round(value * 100) / 100;
@@ -92,7 +115,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
 
   if (!open) return null;
 
-  const handleSaveMeasurements = async () => {
+  const handleSave = async () => {
     const measurements: Record<string, unknown> = {};
     for (const point of baselinePoints) {
       const value = values[point.key] ?? '';
@@ -107,11 +130,14 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
         measurements[point.key] = value.trim();
       }
     }
-    await onSaveMeasurements({
+    await onSave({
       measurements,
       notes,
-      requireUpdateEveryDays: reminderDays,
       preferredLengthUnit: lengthUnit,
+      requireUpdateEveryDays: reminderDays,
+      visibility,
+      sharePolicy,
+      notifyOnShare,
     });
   };
 
@@ -133,18 +159,9 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
     setLengthUnit(nextUnit);
   };
 
-  const handleSaveSettings = async () => {
-    await onSaveSettings({
-      visibility,
-      sharePolicy,
-      notifyOnShare,
-      requireUpdateEveryDays: reminderDays,
-    });
-  };
-
   return (
     <OverlayPortal>
-      <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6">
+      <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-2 sm:p-6">
         <button
           type="button"
           className="absolute inset-0 z-0 bg-black/55 backdrop-blur-sm"
@@ -152,17 +169,17 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
           aria-label="Close custom size fits modal"
         />
 
-        <section className="relative z-10 w-full max-w-5xl max-h-[calc(100vh-2rem)] overflow-hidden rounded-3xl neu-modal-surface shadow-2xl">
+        <section className="relative z-10 w-full max-w-5xl max-h-[85dvh] sm:max-h-[min(calc(100vh-4rem),720px)] overflow-hidden rounded-3xl neu-modal-surface shadow-2xl flex flex-col">
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 z-20 inline-flex items-center justify-center h-9 w-9 rounded-xl neu-modal-inset focus-visible:ring-2 focus-visible:ring-indigo-400"
+            className="absolute top-3 right-3 z-20 inline-flex items-center justify-center h-8 w-8 rounded-xl neu-modal-inset focus-visible:ring-2 focus-visible:ring-indigo-400 sm:top-4 sm:right-4 sm:h-9 sm:w-9"
             aria-label="Close"
           >
             <span className="text-[color:var(--neu-text-muted)]" aria-hidden="true">✕</span>
           </button>
 
-          <div className="p-5 flex items-start justify-between gap-4">
+          <div className="p-3.5 sm:p-5 flex items-start justify-between gap-4 shrink-0">
             <div className="flex items-center gap-3 min-w-0 pr-10">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white grid place-items-center">
                 <span aria-hidden="true">📏</span>
@@ -179,12 +196,54 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
           </div>
 
           {loading ? (
-            <div className="p-10 flex items-center justify-center text-[color:var(--neu-text-muted)]">
-              <span className="mr-2 animate-pulse" aria-hidden="true">⏳</span>
-              Loading fitting profile...
+            <div className="p-10 flex flex-col items-center justify-center text-[color:var(--neu-text-muted)] flex-1">
+              <span className="mr-2 animate-pulse text-xl" aria-hidden="true">⏳</span>
+              <span>Loading fitting profile...</span>
             </div>
           ) : (
-            <div className="px-5 pb-5 space-y-4 max-h-[calc(100vh-8rem)] overflow-y-auto scrollbar-hide overscroll-contain">
+            <div className="px-3.5 pb-3.5 space-y-3.5 flex-1 overflow-y-auto scrollbar-hide overscroll-contain sm:px-5 sm:pb-5 sm:space-y-4">
+              {/*
+                Which size the PROFILE leads with.
+
+                The profile used to list every computed category at once. It
+                shows one now, so the choice of which one has to live
+                somewhere — and it belongs beside the sizes themselves rather
+                than on the profile it configures.
+              */}
+              {categorySizes.length > 0 ? (
+                <div className="rounded-2xl neu-modal-inset p-4">
+                  <p className="font-semibold text-[color:var(--neu-text)]">
+                    Shown on your profile
+                  </p>
+                  <p className="mt-1 text-xs text-[color:var(--neu-text-muted)]">
+                    Your profile shows one size. Pick the one that matters most to you.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {categorySizes.map((entry) => {
+                      const active = entry.key === selectedProfileCategory;
+                      return (
+                        <button
+                          key={entry.key}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => {
+                            writeProfileSizeCategory(entry.key);
+                            setProfileSizeCategory(entry.key);
+                          }}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--menu-focus-ring)] ${
+                            active
+                              ? 'border-indigo-500 bg-indigo-600 text-white'
+                              : 'border-gray-300 text-[color:var(--neu-text-muted)] hover:border-indigo-400 dark:border-white/15'
+                          }`}
+                        >
+                          {entry.label} {entry.size}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
               <details
                 open
                 className="rounded-2xl neu-modal-inset p-4"
@@ -205,6 +264,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                     label="Length Unit"
                     value={lengthUnit}
                     onChange={(value) => handleLengthUnitChange(value as 'CM' | 'IN')}
+                    menuLayer="modal"
                     options={[
                       { value: 'CM', label: 'Centimeters (cm)' },
                       { value: 'IN', label: 'Inches (in)' },
@@ -278,29 +338,29 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                     />
                   </label>
                 </div>
-                <div className="mt-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => void handleSaveMeasurements()}
-                    disabled={saving || baselinePoints.length === 0}
-                    className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 disabled:opacity-60"
-                  >
-                    {saving ? 'Saving…' : 'Save Measurements'}
-                  </button>
-                </div>
-              </details>
+                {/*
+                  Permissions sit in the same panel as the measurements they
+                  govern, under one save.
 
-              <details className="rounded-2xl neu-modal-inset p-4">
-                <summary className="cursor-pointer font-semibold text-[color:var(--neu-text)] flex items-center gap-2">
-                  <span aria-hidden="true">🛡️</span>
-                  Permissions & Visibility
-                </summary>
+                  They were a sibling <details> with a button of their own. Two
+                  save buttons in one dialog put the burden of knowing which
+                  half each commits onto the shopper, and a collapsed section
+                  hid the second one entirely — change a measurement and a share
+                  rule, press the visible button, and the share rule was quietly
+                  dropped.
+                */}
+                <div className="mt-5 border-t border-black/10 pt-4 dark:border-white/10">
+                  <h3 className="flex items-center gap-2 font-semibold text-[color:var(--neu-text)]">
+                    <span aria-hidden="true">🛡️</span>
+                    Permissions &amp; Visibility
+                  </h3>
 
-                <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
                   <UniversalSelect
                     label="Visibility"
                     value={visibility}
                     onChange={(value) => setVisibility(value as 'PUBLIC' | 'PRIVATE')}
+                    menuLayer="modal"
                     options={[
                       { value: 'PRIVATE', label: 'Private' },
                       { value: 'PUBLIC', label: 'Public' },
@@ -313,6 +373,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                     onChange={(value) =>
                       setSharePolicy(value as 'OWNER_ONLY' | 'REQUIRE_PERMISSION' | 'ALLOW_ANYONE')
                     }
+                    menuLayer="modal"
                     options={[
                       { value: 'OWNER_ONLY', label: 'Only I can share' },
                       { value: 'REQUIRE_PERMISSION', label: 'Ask permission before sharing' },
@@ -331,25 +392,30 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
                   Notify me whenever my fittings are shared.
                 </label>
 
-                <div className="mt-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => void handleSaveSettings()}
-                    disabled={saving}
-                    className="rounded-xl border border-gray-300/80 dark:border-white/20 text-sm font-medium px-4 py-2 hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-60"
-                  >
-                    {saving ? 'Saving…' : 'Save Permission Settings'}
-                  </button>
                 </div>
               </details>
 
-              <div className="flex justify-end pt-1">
+              {/*
+                Sticky so the single save is reachable at any scroll position.
+                The measurement grid is long enough on a phone that a footer
+                pinned to the end of the document would sit below the fold for
+                most of the editing session.
+              */}
+              <div className="neu-modal-surface sticky bottom-0 -mx-3.5 flex items-center justify-end gap-2 border-t border-black/10 px-3.5 py-3 dark:border-white/10 sm:-mx-5 sm:px-5">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-xl neu-modal-inset px-4 py-2 text-sm font-medium text-[color:var(--neu-text)]"
+                  className="rounded-xl neu-modal-inset px-3 py-1.5 text-xs font-medium text-[color:var(--neu-text)] sm:text-sm sm:px-4 sm:py-2"
                 >
                   Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSave()}
+                  disabled={saving}
+                  className="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-60 sm:text-sm sm:px-4 sm:py-2"
+                >
+                  {saving ? 'Saving…' : 'Save changes'}
                 </button>
               </div>
             </div>

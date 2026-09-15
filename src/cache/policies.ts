@@ -1,8 +1,8 @@
 import {
-  THREADLY_COUNT_STALE_TIME_MS,
-  THREADLY_QUERY_GC_TIME_MS,
-  THREADLY_QUERY_STALE_TIME_MS,
-  THREADLY_SAVED_STATUS_STALE_TIME_MS,
+  WIEZ_COUNT_STALE_TIME_MS,
+  WIEZ_QUERY_GC_TIME_MS,
+  WIEZ_QUERY_STALE_TIME_MS,
+  WIEZ_SAVED_STATUS_STALE_TIME_MS,
 } from '@/query/queryClient';
 
 export type CachePolicy = {
@@ -13,35 +13,35 @@ export type CachePolicy = {
   retry?: boolean | number;
 };
 
-export const THREADLY_CATEGORY_FILTER_STALE_TIME_MS = 30 * 60 * 1000;
+export const WIEZ_CATEGORY_FILTER_STALE_TIME_MS = 30 * 60 * 1000;
 
 export const cachePolicies = {
   defaultQuery: {
-    ttl: THREADLY_QUERY_STALE_TIME_MS,
+    ttl: WIEZ_QUERY_STALE_TIME_MS,
     staleWhileRevalidate: true,
     persist: true,
-    gcTime: THREADLY_QUERY_GC_TIME_MS,
+    gcTime: WIEZ_QUERY_GC_TIME_MS,
     retry: 1,
   },
   count: {
-    ttl: THREADLY_COUNT_STALE_TIME_MS,
+    ttl: WIEZ_COUNT_STALE_TIME_MS,
     staleWhileRevalidate: true,
     persist: false,
-    gcTime: THREADLY_QUERY_STALE_TIME_MS,
+    gcTime: WIEZ_QUERY_STALE_TIME_MS,
     retry: 1,
   },
   savedStatus: {
-    ttl: THREADLY_SAVED_STATUS_STALE_TIME_MS,
+    ttl: WIEZ_SAVED_STATUS_STALE_TIME_MS,
     staleWhileRevalidate: true,
     persist: false,
-    gcTime: THREADLY_QUERY_STALE_TIME_MS,
+    gcTime: WIEZ_QUERY_STALE_TIME_MS,
     retry: 1,
   },
   categoryMetadata: {
-    ttl: THREADLY_CATEGORY_FILTER_STALE_TIME_MS,
+    ttl: WIEZ_CATEGORY_FILTER_STALE_TIME_MS,
     staleWhileRevalidate: true,
     persist: true,
-    gcTime: THREADLY_QUERY_GC_TIME_MS,
+    gcTime: WIEZ_QUERY_GC_TIME_MS,
     retry: 1,
   },
   interactionStatus: {

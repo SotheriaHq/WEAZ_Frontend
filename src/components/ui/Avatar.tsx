@@ -23,7 +23,7 @@ const Avatar: React.FC<AvatarProps> = ({
     xs: 'max-w-6 max-h-6 text-xs',
     sm: 'max-w-8 max-h-8 text-sm',
     md: 'max-w-10 max-h-10 text-base',
-    lg: 'max-w-12 max-h-12 text-lg',
+    lg: 'max-w-[3rem] max-h-12 text-lg',
     xl: 'max-w-16 max-h-16 text-xl',
     '2xl': 'max-w-24 max-h-24 text-2xl',
   };

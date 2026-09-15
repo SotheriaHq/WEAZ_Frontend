@@ -92,8 +92,8 @@ const EMPTY_STATES: Record<EmptyStateType, {
   'empty-cart': {
     icon: <ShoppingBag size={48} className="text-gray-400" />,
     emoji: '🛒',
-    title: 'Your cart is empty',
-    description: 'Looks like you haven\'t added anything yet. Discover amazing fashion from African designers!',
+    title: 'Your bag is empty',
+    description: 'Looks like you haven\'t bagged anything yet. Discover amazing fashion from African designers!',
     actionLabel: 'Start Shopping',
   },
   'empty-wishlist': {
@@ -187,17 +187,17 @@ const StoreEmptyState: React.FC<StoreEmptyStateProps> = ({
         onClearFilters?.();
         break;
       case 'brand-not-found':
-        navigate('/market');
+        navigate('/runway');
         break;
       case 'store-not-setup':
         navigate('/studio/store');
         break;
       case 'no-products':
       case 'coming-soon':
-        navigate('/market');
+        navigate('/runway');
         break;
       default:
-        navigate('/market');
+        navigate('/runway');
     }
   };
 

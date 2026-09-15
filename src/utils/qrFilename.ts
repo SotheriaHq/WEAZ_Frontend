@@ -4,7 +4,7 @@ const SEPARATOR = /-+/g;
 
 export const sanitizeQrFilename = (
   value: string | null | undefined,
-  fallback = 'threadly-qr',
+  fallback = 'wiez-qr',
 ): string => {
   const base = (value || '')
     .trim()

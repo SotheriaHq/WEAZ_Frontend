@@ -9,7 +9,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { Select } from '@/components/ui/Select';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import ImageWithFallback from '@/components/ImageWithFallback';
@@ -17,8 +17,8 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 /**
  * Collection Cart Preview Modal (Item #3 Frontend)
  * 
- * Shows which items from a collection can/cannot be added to cart.
- * Allows users to review availability before bulk-adding to cart.
+ * Shows which items from a collection can/cannot be added to bag.
+ * Allows users to review availability before bulk-adding to bag.
  * 
  * USAGE:
  * const { data } = useQuery(['cart-preview', collectionId], () => 
@@ -845,7 +845,7 @@ export const CollectionCartPreviewModal: React.FC<CollectionCartPreviewModalProp
             >
               {isAdding ? (
                 <>
-                  <VLoader size={16} phase="loading" showLabel={false} />
+                  <MuseLoader size={16} />
                   Adding to Bag...
                 </>
               ) : (

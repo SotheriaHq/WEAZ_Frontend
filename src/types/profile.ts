@@ -78,6 +78,8 @@ export interface BrandMediaAssetDto {
 
 export interface BrandProfileDto {
   id: string;
+  /** Public handle for `/u/:username` links. */
+  username?: string | null;
   brandFullName: string;
   description: string | null;
   isStoreOpen?: boolean;
@@ -85,6 +87,8 @@ export interface BrandProfileDto {
   state: string | null;
   city: string | null;
   location: string | null;
+  /** Exact street address. Owner-only, and null when "show my location" is off. */
+  streetAddress?: string | null;
   bannerImage: string | null;
   bannerImageMeta?: BrandMediaAssetDto | null;
   logoImage: string | null;
@@ -98,7 +102,8 @@ export interface BrandProfileDto {
     website?: string | null;
   };
   contactInfo: {
-    email: string;
+    /** Null for public/QR viewers — account email is owner-only. */
+    email: string | null;
     phone?: string | null;
     businessType?: string | null;
   };

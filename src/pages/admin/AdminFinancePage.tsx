@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import UniversalSelect from '@/components/forms/UniversalSelect';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import Modal from '@/components/ui/Modal';
 import { adminFinanceApi, adminOrdersApi } from '@/api/AdminApi';
 import { customOrdersAdminApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
@@ -446,6 +446,18 @@ const AdminFinancePage: React.FC = () => {
     void loadOverview();
   }, [loadOverview]);
 
+  // Near-real-time finance metrics: refresh the overview every 20s (paused when
+  // the tab is hidden). The payments table is intentionally NOT auto-refreshed
+  // so it doesn't reorder while an admin is reading/filtering it.
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadOverview();
+      }
+    }, 20_000);
+    return () => window.clearInterval(interval);
+  }, [loadOverview]);
+
   useEffect(() => {
     if (activeTab === 'payments') void loadPayments();
     if (activeTab === 'escrow') void loadEscrow();
@@ -672,6 +684,30 @@ const AdminFinancePage: React.FC = () => {
     }
   }, [loadOverview, loadPayments, staleLimit, staleOlderThanMinutes]);
 
+  const handleRepairCustomSettlements = useCallback(async () => {
+    setBusyKey('repair:custom-settlements');
+    try {
+      const response = await adminFinanceApi.repairCustomOrderSettlements({ limit: 50 });
+      const data = unwrapApiResponse<{
+        scanned: number;
+        repaired: number;
+        limit: number;
+        message: string;
+      }>(response.data as any);
+      toast.success(
+        data?.message ||
+          `Custom settlement repair: ${data?.repaired ?? 0} repaired of ${data?.scanned ?? 0} scanned.`,
+      );
+      void loadOverview();
+      void loadEscrow();
+      void loadTransactions();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to repair custom-order settlements');
+    } finally {
+      setBusyKey(null);
+    }
+  }, [loadEscrow, loadOverview, loadTransactions]);
+
   const handleReconciliationAction = useCallback(
     async (item: AdminReconciliationItem, action: 'claim' | 'release' | 'resolve') => {
       setBusyKey(`${action}:${item.id}`);
@@ -786,6 +822,24 @@ const AdminFinancePage: React.FC = () => {
   return (
     <div className="space-y-6">
       <AdminBreadcrumb segments={[{ label: 'Finance' }]} />
+
+      <div className="flex border-b border-black/10 dark:border-white/10 gap-6">
+        <button
+          type="button"
+          onClick={() => navigate('/admin/finance')}
+          className="pb-3 text-sm font-semibold transition-all border-b-2 border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
+        >
+          Finance Control
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/admin/finance/settlement-policies')}
+          className="pb-3 text-sm font-semibold transition-all border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+        >
+          Settlement Policies
+        </button>
+      </div>
+
       <section className="rounded-3xl border border-black/10 bg-white/85 p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -795,13 +849,6 @@ const AdminFinancePage: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/admin/finance/settlement-policies')}
-              className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]"
-            >
-              Settlement policies
-            </button>
             <button
               type="button"
               onClick={refreshCurrentTab}
@@ -817,6 +864,18 @@ const AdminFinancePage: React.FC = () => {
                 className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950"
               >
                 {busyKey === 'run:LEDGER_INTEGRITY' ? 'Running...' : '🧾 Run ledger check'}
+              </button>
+            )}
+            {canProcess && (
+              <button
+                type="button"
+                onClick={() => void handleRepairCustomSettlements()}
+                disabled={busyKey === 'repair:custom-settlements'}
+                className="rounded-full border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100 dark:hover:bg-violet-500/20"
+              >
+                {busyKey === 'repair:custom-settlements'
+                  ? 'Repairing...'
+                  : '🛠️ Repair custom settlements'}
               </button>
             )}
           </div>
@@ -1803,7 +1862,7 @@ const TableWrap: React.FC<{ loading: boolean; empty: boolean; emptyMessage: stri
 
 const LoaderBlock = () => (
   <div className="flex items-center justify-center py-16">
-    <VLoader size={34} phase="loading" showLabel={false} />
+    <MuseLoader size={34} />
   </div>
 );
 

@@ -1,0 +1,26 @@
+# WIEZ (weaz.me)
+
+> African fashion social commerce marketplace — discover designs, shop brands, commission custom pieces.
+
+## About
+
+WIEZ is a social commerce platform for fashion and design. Public content includes brand storefronts, product listings, runway designs, and collections.
+
+## Canonical public URLs
+
+- Homepage: https://weaz.me/
+- Market feed: https://weaz.me/market
+- Brand storefront: https://weaz.me/brand/{username}
+- Product: https://weaz.me/p/{product-slug}
+- Design: https://weaz.me/designs/{design-id}
+- Legal: https://weaz.me/legal
+
+## Crawling policy
+
+- Search indexing policy is controlled via /robots.txt
+- Private/authenticated areas (studio, checkout, bag, admin, messages) are not intended for indexing
+- Sitemap: https://weaz.me/sitemap.xml
+
+## Contact
+
+- Support: support@wiez.me

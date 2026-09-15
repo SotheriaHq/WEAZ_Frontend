@@ -17,13 +17,15 @@ import { getStoreStatus } from '@/api/StoreApi';
 import { DesignApi } from '@/api/DesignApi';
 import type { CommentTarget, CommentV2Dto, PageResult } from '@/types/comments';
 import type { BrandProfileDto, CollectionDto } from '@/types/profile';
-import { THREADLY_QUERY_STALE_TIME_MS } from './queryClient';
+import { WIEZ_QUERY_STALE_TIME_MS } from './queryClient';
 import { queryKeys } from './queryKeys';
+import { isUuidV4, normalizeUuidV4List } from '@/utils/uuid';
+import type { SizingRegion } from '@/types/sizeFit';
 
 type EnabledOption = { enabled?: boolean };
 type ThreadContentType = 'COLLECTION' | 'COLLECTION_MEDIA';
-const THREADLY_COMMENT_STALE_TIME_MS = 60 * 1000;
-const THREADLY_NOTIFICATION_SETTINGS_STALE_TIME_MS = 10 * 60 * 1000;
+const WIEZ_COMMENT_STALE_TIME_MS = 60 * 1000;
+const WIEZ_NOTIFICATION_SETTINGS_STALE_TIME_MS = 10 * 60 * 1000;
 const EMPTY_COMMENT_PAGE: PageResult<CommentV2Dto> = {
   items: [],
   hasNextPage: false,
@@ -60,15 +62,6 @@ type BrandCollectionsArgs = {
 };
 
 const isEnabled = (value: unknown, enabled = true) => Boolean(value) && enabled;
-const normalizeIdList = (values?: Array<string | null | undefined> | null) =>
-  Array.from(
-    new Set(
-      (values ?? [])
-        .map((value) => String(value ?? '').trim())
-        .filter(Boolean),
-    ),
-  ).sort();
-
 const toSavedStatusMap = (items: unknown) => {
   const result: Record<string, boolean> = {};
   if (!Array.isArray(items)) return result;
@@ -119,15 +112,25 @@ export async function fetchMyUserProfileQuery(
       const response = await apiClient.get('/users/me/profile');
       return response.data?.data ?? response.data ?? null;
     },
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
 export function useBrandProfileQuery(brandId?: string | null, options?: EnabledOption) {
   return useQuery({
     queryKey: queryKeys.brand.profile(brandId),
-    queryFn: () => brandApi.getBrandProfile(String(brandId)),
+    queryFn: async () => {
+      // BrandApi historically returned null on 404/error, which RQ treats as
+      // a successful empty result — callers then sat on permanent skeletons
+      // waiting for collections that never enabled. Throw so isError settles.
+      const profile = await brandApi.getBrandProfile(String(brandId));
+      if (!profile || typeof (profile as { id?: unknown }).id !== 'string') {
+        throw new Error('Brand not found');
+      }
+      return profile;
+    },
     enabled: isEnabled(brandId, options?.enabled ?? true),
+    retry: 1,
   });
 }
 
@@ -154,6 +157,29 @@ export function useBrandCollectionsQuery(args: BrandCollectionsArgs, options?: E
     queryKey: queryKeys.brand.collections(ownerId, { scope, visibility, includeDeleted, onlyDeleted }),
     queryFn: () => brandApi.getCollections(String(ownerId), { scope, visibility, includeDeleted, onlyDeleted }),
     enabled: isEnabled(ownerId, options?.enabled ?? true),
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useMyDraftCollectionsQuery(
+  ownerId?: string | null,
+  options?: EnabledOption,
+) {
+  return useQuery({
+    queryKey: queryKeys.brand.myDrafts(ownerId),
+    queryFn: () => brandApi.getMyDraftCollections(),
+    enabled: isEnabled(ownerId, options?.enabled ?? true),
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
+    // Deliberately no `refetchOnMount: 'always'` / `refetchOnWindowFocus`.
+    //
+    // Those overrode the global policy and made Drafts the one catalog tab that
+    // hit the network on every single visit. Cached rows still painted, but the
+    // response replaced the array with fresh object identities, so every card
+    // remounted and re-fetched its image — the "cards flicker/shake in a few
+    // seconds after the tab appears" report. Freshness is already covered:
+    // staleTime governs, and Catalog invalidates this key after a background
+    // draft save, which the global `refetchOnMount` predicate honours.
   });
 }
 
@@ -166,7 +192,7 @@ export function useBrandPrivateAccessStatesQuery(
     queryKey: queryKeys.brandPrivateAccess.myStates(brandId, viewerId),
     queryFn: (): Promise<BrandPrivateAccessState[]> => brandApi.getBrandPrivateStates(String(brandId)),
     enabled: Boolean(brandId && viewerId && (options?.enabled ?? true)),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -213,14 +239,18 @@ export function useCollectionDetailQuery(
 ) {
   const queryClient = useQueryClient();
   const initialData =
-    scope === 'design'
+    queryClient.getQueryData(queryKeys.brand.collectionDetail(collectionId, scope)) ??
+    (scope === 'design'
       ? queryClient.getQueryData(queryKeys.design.detail(collectionId))
-      : undefined;
+      : undefined);
 
   return useQuery({
     queryKey: queryKeys.brand.collectionDetail(collectionId, scope),
     queryFn: async () => {
-      const data = await brandApi.getCollectionDetail(String(collectionId), { scope });
+      const data =
+        scope === 'design'
+          ? await DesignApi.getDesignDetail(String(collectionId))
+          : await brandApi.getCollectionDetail(String(collectionId), { scope });
       if (scope === 'design') {
         queryClient.setQueryData(queryKeys.design.detail(collectionId), data);
       }
@@ -247,7 +277,10 @@ export async function fetchCollectionDetailQuery(
     }
   }
   if (options?.forceRefresh) {
-    const data = await brandApi.getCollectionDetail(collectionId, { scope, forceRefresh: true });
+    const data =
+      scope === 'design'
+        ? await DesignApi.getDesignDetail(collectionId, { forceRefresh: true })
+        : await brandApi.getCollectionDetail(collectionId, { scope, forceRefresh: true });
     queryClient.setQueryData(key, data);
     if (scope === 'design') {
       queryClient.setQueryData(queryKeys.design.detail(collectionId), data);
@@ -256,7 +289,10 @@ export async function fetchCollectionDetailQuery(
   }
   const data = await queryClient.fetchQuery({
     queryKey: key,
-    queryFn: () => brandApi.getCollectionDetail(collectionId, { scope }),
+    queryFn: () =>
+      scope === 'design'
+        ? DesignApi.getDesignDetail(collectionId)
+        : brandApi.getCollectionDetail(collectionId, { scope }),
   });
   if (scope === 'design') {
     queryClient.setQueryData(queryKeys.design.detail(collectionId), data);
@@ -319,7 +355,7 @@ export function useNotificationSettingsQuery(userId?: string | null, options?: E
     queryKey: queryKeys.notifications.settings(userId),
     queryFn: () => NotificationsApi.getSettings(),
     enabled: isEnabled(userId, options?.enabled ?? true),
-    staleTime: THREADLY_NOTIFICATION_SETTINGS_STALE_TIME_MS,
+    staleTime: WIEZ_NOTIFICATION_SETTINGS_STALE_TIME_MS,
   });
 }
 
@@ -336,7 +372,7 @@ export function useMediaPublicUrlQuery(fileId?: string | null, options?: Enabled
     queryKey: queryKeys.media.publicUrl(fileId),
     queryFn: () => brandApi.getPublicFileUrl(String(fileId)),
     enabled: isEnabled(fileId, options?.enabled ?? true),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -345,8 +381,8 @@ export function useMediaSignedUrlQuery(fileId?: string | null, options?: Enabled
     queryKey: queryKeys.media.signedUrl(fileId),
     queryFn: () => brandApi.getPrivateSignedFileUrl(String(fileId)),
     enabled: isEnabled(fileId, options?.enabled ?? true),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
-    gcTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
+    gcTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -355,7 +391,7 @@ export function useSavedBatchStatusQuery(
   targetIds?: Array<string | null | undefined> | null,
   options?: EnabledOption,
 ) {
-  const normalizedTargetIds = normalizeIdList(targetIds);
+  const normalizedTargetIds = normalizeUuidV4List(targetIds);
   return useQuery({
     queryKey: queryKeys.saved.batch(targetType, normalizedTargetIds),
     queryFn: async () => {
@@ -367,7 +403,7 @@ export function useSavedBatchStatusQuery(
       return toSavedStatusMap(items);
     },
     enabled: normalizedTargetIds.length > 0 && (options?.enabled ?? true),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -376,17 +412,18 @@ export function useSavedStatusQuery(
   targetId?: string | null,
   options?: EnabledOption,
 ) {
+  const normalizedTargetId = String(targetId ?? '').trim();
   return useQuery({
-    queryKey: queryKeys.saved.status(targetType, targetId),
+    queryKey: queryKeys.saved.status(targetType, normalizedTargetId),
     queryFn: async () => {
       const response = await apiClient.get('/saved/check', {
-        params: { targetType, targetId },
+        params: { targetType, targetId: normalizedTargetId },
       });
       const payload = response.data?.data ?? response.data ?? {};
       return Boolean((payload as { isSaved?: unknown }).isSaved);
     },
-    enabled: isEnabled(targetId, options?.enabled ?? true),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    enabled: isUuidV4(normalizedTargetId) && (options?.enabled ?? true),
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -405,7 +442,7 @@ export function useThreadedStatusQuery(
         ? ReactionsApi.getCollectionMediaIsThreaded(String(contentId))
         : ReactionsApi.getCollectionIsThreaded(String(contentId)),
     enabled: isEnabled(contentId, options?.enabled ?? true),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -434,7 +471,7 @@ export async function fetchCommentListQuery(
         throw error;
       }
     },
-    staleTime: THREADLY_COMMENT_STALE_TIME_MS,
+    staleTime: WIEZ_COMMENT_STALE_TIME_MS,
   });
 }
 
@@ -462,7 +499,7 @@ export async function fetchUnifiedCollectionCommentsQuery(
         throw error;
       }
     },
-    staleTime: THREADLY_COMMENT_STALE_TIME_MS,
+    staleTime: WIEZ_COMMENT_STALE_TIME_MS,
   });
 }
 
@@ -490,7 +527,7 @@ export async function fetchCommentRepliesQuery(
         throw error;
       }
     },
-    staleTime: THREADLY_COMMENT_STALE_TIME_MS,
+    staleTime: WIEZ_COMMENT_STALE_TIME_MS,
   });
 }
 
@@ -528,7 +565,28 @@ export async function fetchMySizeFitProfileQuery(
   return queryClient.fetchQuery({
     queryKey: key,
     queryFn: () => SizeFitApi.getMyProfile(),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
+  });
+}
+
+export async function fetchMyComputedSizeFitQuery(
+  queryClient: QueryClient,
+  userId?: string | null,
+  region?: string | null,
+  options?: { forceRefresh?: boolean },
+) {
+  if (!userId) return null;
+  const key = queryKeys.sizeFit.computed(userId, region);
+  if (options?.forceRefresh) {
+    await queryClient.removeQueries({ queryKey: key, exact: true });
+  }
+  return queryClient.fetchQuery({
+    queryKey: key,
+    queryFn: () =>
+      SizeFitApi.getComputedProfile(
+        region ? { region: region as SizingRegion } : undefined,
+      ),
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -545,7 +603,7 @@ export async function fetchMySizeFitSharesQuery(
   return queryClient.fetchQuery({
     queryKey: key,
     queryFn: () => SizeFitApi.getShares(),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -562,7 +620,7 @@ export async function fetchDisplayChartPreferenceQuery(
   return queryClient.fetchQuery({
     queryKey: key,
     queryFn: () => customOrdersBuyerApi.getDisplayChartPreference(),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -583,7 +641,7 @@ export async function fetchActiveCustomOrderConfigurationQuery(
       sourceType === 'PRODUCT'
         ? customOrderConfigurationsApi.getActiveForProduct(sourceId)
         : customOrderConfigurationsApi.getActiveForDesign(sourceId),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -599,7 +657,7 @@ export function useActiveCustomOrderConfigurationQuery(
         ? customOrderConfigurationsApi.getActiveForProduct(sourceId as string)
         : customOrderConfigurationsApi.getActiveForDesign(sourceId as string),
     enabled: isEnabled(sourceType, options?.enabled ?? true) && isEnabled(sourceId, options?.enabled ?? true),
-    staleTime: THREADLY_QUERY_STALE_TIME_MS,
+    staleTime: WIEZ_QUERY_STALE_TIME_MS,
   });
 }
 
@@ -634,4 +692,51 @@ export const setBrandProfileQueryData = (
   profile: BrandProfileDto | null,
 ) => {
   queryClient.setQueryData(queryKeys.brand.profile(brandId), profile);
+};
+
+export const setMyDraftsQueryData = (
+  queryClient: QueryClient,
+  ownerId: string | null | undefined,
+  updater: (items: CollectionDto[]) => CollectionDto[],
+) => {
+  if (!ownerId) return;
+  queryClient.setQueryData<CollectionDto[]>(
+    queryKeys.brand.myDrafts(ownerId),
+    (current) => updater(current ?? []),
+  );
+};
+
+export const removeFromMyDraftsQueryData = (
+  queryClient: QueryClient,
+  ownerId: string | null | undefined,
+  collectionId: string,
+) => {
+  setMyDraftsQueryData(queryClient, ownerId, (items) =>
+    items.filter((item) => item.id !== collectionId),
+  );
+};
+
+/** Stale-while-revalidate: patch cache immediately, refetch in background. */
+export const refreshOwnerCatalogQueries = (
+  queryClient: QueryClient,
+  ownerId: string | null | undefined,
+) => {
+  if (!ownerId) return;
+  // `refetchType: 'all'` (not just 'active') so the catalog list/detail queries
+  // are refreshed even while the catalog is UNMOUNTED — e.g. a cover/media edit
+  // made on the create/edit screen. With the global `refetchOnMount: false`, an
+  // 'active'-only invalidation left the now-inactive query stale, so the catalog
+  // painted the OLD cover on reroute until a manual browser refresh.
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.brand.myDrafts(ownerId),
+    refetchType: 'all',
+  });
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.brand.collections(ownerId),
+    refetchType: 'all',
+  });
+  void queryClient.invalidateQueries({
+    queryKey: ['design', 'detail'],
+    refetchType: 'all',
+  });
 };
