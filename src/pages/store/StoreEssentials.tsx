@@ -163,28 +163,27 @@ const StoreEssentials: React.FC = () => {
           : [];
 
         /**
-         * Chips come pre-selected only from choices made in THIS flow.
+         * Chips come pre-selected ONLY from choices made in this flow, never
+         * from `brand.tags`.
          *
-         * The original rule was "localStorage only", because brand-profile
-         * hashtags had once been mapped onto these chips and users had to
-         * unselect choices they never made. That concern stands — but
-         * `brand.tags` is not those hashtags: `persistAndContinue` below writes
-         * `tags: selected` from this very screen, so the server copy IS the
-         * saved essentials selection.
+         * Reading the server copy assumed `brand.tags` could only have been
+         * written by this screen's own `persistAndContinue`. It cannot: the
+         * native brand-profile editor writes the same `Brand.tags` column from
+         * a much larger vocabulary (`threadly-mobile/src/data/brandTags.ts`),
+         * and `Bridal` and `Womenswear` are spelled identically in both lists.
+         * So picking them as profile hashtags silently pre-ticked them as store
+         * specialisations — choices the brand never made here, arriving already
+         * made, on the first screen of setup.
          *
-         * It has to be read, too. Now that this page no longer skips itself, a
-         * returning brand lands here with their selection intact instead of
-         * empty chips they must re-pick to get past `canContinue`. localStorage
-         * still wins when present — it is the more recent of the two.
+         * That is exactly the failure the original "localStorage only" rule
+         * existed to prevent; it came back through a different door once the
+         * native editor started writing that column. The cost is that a
+         * returning brand re-picks their chips — a visible, correctable tap,
+         * unlike a selection made on their behalf that they have to notice
+         * before they can undo it.
          */
-        const serverCategories = normalizeSpecializationSelection(
-          Array.isArray(prefill.brand?.tags) ? prefill.brand.tags : [],
-          BRAND_SPECIALIZATION_OPTIONS,
-        );
-        const resolvedCategories = localCategories.length > 0 ? localCategories : serverCategories;
-
-        if (resolvedCategories.length > 0) {
-          setSelected(resolvedCategories);
+        if (localCategories.length > 0) {
+          setSelected(localCategories);
         }
 
         const resolvedDescription =
@@ -207,7 +206,9 @@ const StoreEssentials: React.FC = () => {
             apiTagline: prefill.brand?.tagline,
             description: resolvedDescription,
             userBrandDescription: user?.brandDescription,
-            tags: resolvedCategories,
+            // Suggestion input only — it shapes proposed copy, it never ticks
+            // a chip, so this one may still read the brand's own tags.
+            tags: localCategories,
           }),
         );
       } catch (error) {

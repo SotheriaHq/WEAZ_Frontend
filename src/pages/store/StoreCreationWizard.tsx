@@ -546,11 +546,44 @@ const StoreCreationWizard: React.FC = () => {
     setWizardData(prev => ({ ...prev, ...updates }));
   }, []);
 
+  /**
+   * A step change starts at the top of the new step.
+   *
+   * This used to run inside each handler, next to `setCurrentStep` — that is,
+   * against the OUTGOING step's layout, before the incoming one had mounted.
+   * `behavior: 'smooth'` then animated across a height change as React swapped
+   * the content, and a browser abandons a smooth scroll whose target moves, so
+   * leaving a long step (Policies) dropped you into the middle or bottom of
+   * the next one. An effect runs after the commit, when the new step's height
+   * is real.
+   *
+   * `auto`, not `smooth`: this is a page change, not a scroll within a page.
+   * And `window` is not always the scroller — inside the Studio WebView the
+   * app renders in its own overflow container, where `window.scrollTo` does
+   * nothing at all — so the scrollable ancestors are reset too.
+   */
+  const wizardRootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    document.documentElement.scrollTop = 0;
+
+    let node: HTMLElement | null = wizardRootRef.current;
+    while (node) {
+      if (node.scrollTop > 0) {
+        const { overflowY } = window.getComputedStyle(node);
+        if (overflowY === 'auto' || overflowY === 'scroll') {
+          node.scrollTop = 0;
+        }
+      }
+      node = node.parentElement;
+    }
+  }, [currentStep]);
+
   const goToNextStep = useCallback(() => {
     const currentIndex = STEP_ORDER.indexOf(currentStep);
     if (currentIndex < STEP_ORDER.length - 1) {
       setCurrentStep(STEP_ORDER[currentIndex + 1]);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [currentStep]);
 
@@ -558,7 +591,6 @@ const StoreCreationWizard: React.FC = () => {
     const currentIndex = STEP_ORDER.indexOf(currentStep);
     if (currentIndex > 0) {
       setCurrentStep(STEP_ORDER[currentIndex - 1]);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       // `fromWizard` tells Essentials this is a deliberate step BACKWARDS, so it
       // does not forward straight here again. Without it, Back from the first
@@ -571,7 +603,6 @@ const StoreCreationWizard: React.FC = () => {
   // Go to specific step (for edit navigation from review page)
   const goToStep = useCallback((step: WizardStep) => {
     setCurrentStep(step);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   // Final publish handler - publishes store immediately
@@ -678,7 +709,7 @@ const StoreCreationWizard: React.FC = () => {
 
   // --- RENDER ---
   return (
-    <div className="transition-colors">
+    <div ref={wizardRootRef} className="transition-colors">
       {/* Numbered across BOTH setup pages — see StoreSetupProgress. */}
       <StoreSetupProgress current={currentStep} className="mb-6" />
 

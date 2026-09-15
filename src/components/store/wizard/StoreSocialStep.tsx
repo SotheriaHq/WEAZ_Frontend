@@ -332,7 +332,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                           {isConnected ? (
                             <div className="flex items-center gap-2">
                               <div
-                                className={`w-8 h-8 rounded-full flex items-center justify-center border ${
+                                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border ${
                                   isVerified
                                     ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                                     : 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30'
@@ -445,16 +445,21 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                 <h4 className="text-xs font-semibold text-[color:var(--text-secondary)] uppercase tracking-wider">
                   Potential Trust Badges
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Three at a time on every width. These are a progress
+                    read-out — their meaning is comparative, so stacking them
+                    one per row on a phone turned a glance into a scroll and
+                    lost the "one of three earned" shape entirely. They scale
+                    down instead. */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   <div
-                    className={`flex flex-col items-center justify-center p-3 rounded-xl text-center gap-2 transition-all ${
+                    className={`flex flex-col items-center justify-center p-2 sm:p-3 rounded-xl text-center gap-1.5 sm:gap-2 transition-all ${
                       hasSocialConnected
                         ? 'bg-purple-600/5 border border-purple-500/20'
                         : 'bg-[color:var(--surface-muted)]/50 dark:bg-white/[0.02] border border-[color:var(--border-default)]/50 dark:border-white/5 opacity-60'
                     }`}
                   >
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 ${
                         hasSocialConnected
                           ? 'bg-purple-600/20 text-purple-600 dark:text-purple-400'
                           : 'bg-gray-200 dark:bg-gray-800 text-[color:var(--text-muted)] dark:text-gray-500'
@@ -463,7 +468,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                       <Share2 className="w-4 h-4" />
                     </div>
                     <span
-                      className={`text-xs font-medium ${
+                      className={`text-[11px] leading-tight sm:text-xs font-medium ${
                         hasSocialConnected
                           ? 'text-[color:var(--text-primary)] dark:text-white'
                           : 'text-[color:var(--text-secondary)] dark:text-gray-400'
@@ -474,14 +479,14 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                   </div>
 
                   <div
-                    className={`flex flex-col items-center justify-center p-3 rounded-xl text-center gap-2 transition-all ${
+                    className={`flex flex-col items-center justify-center p-2 sm:p-3 rounded-xl text-center gap-1.5 sm:gap-2 transition-all ${
                       hasVerifiedHandle
                         ? 'bg-emerald-500/5 border border-emerald-500/20'
                         : 'bg-[color:var(--surface-muted)]/50 dark:bg-white/[0.02] border border-[color:var(--border-default)]/50 dark:border-white/5 opacity-60'
                     }`}
                   >
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 ${
                         hasVerifiedHandle
                           ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                           : 'bg-gray-200 dark:bg-gray-800 text-[color:var(--text-muted)] dark:text-gray-500'
@@ -489,20 +494,20 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                     >
                       <Check className="w-4 h-4" />
                     </div>
-                    <span className="text-xs font-medium text-[color:var(--text-secondary)] dark:text-gray-400">
+                    <span className="text-[11px] leading-tight sm:text-xs font-medium text-[color:var(--text-secondary)] dark:text-gray-400">
                       Handles Verified
                     </span>
                   </div>
 
                   <div
-                    className={`flex flex-col items-center justify-center p-3 rounded-xl text-center gap-2 transition-all ${
+                    className={`flex flex-col items-center justify-center p-2 sm:p-3 rounded-xl text-center gap-1.5 sm:gap-2 transition-all ${
                       data.website
                         ? 'bg-blue-500/5 border border-blue-500/20'
                         : 'bg-[color:var(--surface-muted)]/50 dark:bg-white/[0.02] border border-[color:var(--border-default)]/50 dark:border-white/5 opacity-60'
                     }`}
                   >
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 ${
                         data.website
                           ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
                           : 'bg-gray-200 dark:bg-gray-800 text-[color:var(--text-muted)] dark:text-gray-500'
@@ -510,7 +515,7 @@ const StoreSocialStep: React.FC<StoreSocialStepProps> = ({
                     >
                       <Globe className="w-4 h-4" />
                     </div>
-                    <span className="text-xs font-medium text-[color:var(--text-secondary)] dark:text-gray-400">
+                    <span className="text-[11px] leading-tight sm:text-xs font-medium text-[color:var(--text-secondary)] dark:text-gray-400">
                       Website Added
                     </span>
                   </div>

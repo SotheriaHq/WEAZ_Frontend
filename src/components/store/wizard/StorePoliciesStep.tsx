@@ -517,28 +517,22 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                   )}
                 </div>
 
-                {/* Orders & Custom Orders Card */}
+                {/* Orders Card */}
                 <div className="space-y-4 rounded-xl border border-[color:var(--border-default)]/50 bg-[color:var(--surface-secondary)]/50 p-4 dark:border-white/5 dark:bg-white/[0.02] sm:space-y-5 sm:p-6">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-lg">
                       🧾
                     </div>
                     <h3 className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
-                      Orders & Custom Orders
+                      Orders
                     </h3>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-[color:var(--text-primary)] dark:text-gray-300">
-                      Standard Order Processing
-                    </label>
-                    <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-100">
-                      <div className="font-semibold">System managed</div>
-                      <div className="mt-1">
-                        Standard orders are auto-confirmed by system policy. Super-admin category-based controls can be introduced centrally.
-                      </div>
-                    </div>
-                  </div>
+                  {/* The "System managed" notice is gone. It described an
+                      internal policy and an unbuilt super-admin control, and
+                      sat in a setup flow whose every other block is something
+                      the brand decides. A panel a brand cannot act on is noise
+                      between the two settings they came here to set. */}
 
                   <div className="space-y-2">
                     <UniversalSelect
