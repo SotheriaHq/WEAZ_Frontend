@@ -110,6 +110,102 @@ const formatPercent = (value: unknown) => {
   return `${parsed.toFixed(2).replace(/\.00$/, '')}%`;
 };
 
+/**
+ * How long an order has been waiting on an admin, not merely THAT it is.
+ *
+ * `adminAttentionRequiredAt` is a timestamp, and the row treated it as a
+ * boolean — every flagged order got the same 4%-opacity rose wash, which is
+ * invisible on white and gone entirely on the dark surface. An order raised
+ * four minutes ago and one ignored for four days looked identical, so the one
+ * signal an admin most needs (which of these is actually late) was the one the
+ * table refused to show.
+ *
+ * Severity now comes from elapsed time, and the palette moves with it —
+ * amber, then orange, then rose — at opacities that survive both themes.
+ */
+const ATTENTION_OVERDUE_HOURS = 24;
+const ATTENTION_CRITICAL_HOURS = 72;
+
+type AttentionLevel = 'none' | 'raised' | 'overdue' | 'critical';
+
+const attentionLevelOf = (raisedAt?: string | null): AttentionLevel => {
+  if (!raisedAt) return 'none';
+  const raised = new Date(raisedAt).getTime();
+  if (Number.isNaN(raised)) return 'raised';
+  const hours = (Date.now() - raised) / 3_600_000;
+  if (hours >= ATTENTION_CRITICAL_HOURS) return 'critical';
+  if (hours >= ATTENTION_OVERDUE_HOURS) return 'overdue';
+  return 'raised';
+};
+
+const ATTENTION_ROW_CLASS: Record<AttentionLevel, string> = {
+  none: '',
+  raised: 'bg-amber-400/[0.12] dark:bg-amber-300/[0.10]',
+  overdue: 'bg-orange-500/[0.16] dark:bg-orange-400/[0.14]',
+  critical: 'bg-rose-500/[0.18] dark:bg-rose-500/[0.18]',
+};
+
+const ATTENTION_PANEL_CLASS: Record<AttentionLevel, string> = {
+  none: 'border-slate-100 bg-white dark:border-white/5 dark:bg-slate-900',
+  raised:
+    'border-amber-300/70 bg-amber-400/[0.10] dark:border-amber-300/25 dark:bg-amber-300/[0.08]',
+  overdue:
+    'border-orange-400/70 bg-orange-500/[0.12] dark:border-orange-400/30 dark:bg-orange-400/[0.10]',
+  critical:
+    'border-rose-400/80 bg-rose-500/[0.14] dark:border-rose-500/40 dark:bg-rose-500/[0.14]',
+};
+
+const ATTENTION_CHIP_CLASS: Record<AttentionLevel, string> = {
+  none: '',
+  raised:
+    'bg-amber-500/15 text-amber-800 ring-amber-500/30 dark:text-amber-200',
+  overdue:
+    'bg-orange-500/20 text-orange-800 ring-orange-500/40 dark:text-orange-200',
+  critical:
+    'bg-rose-500/20 text-rose-800 ring-rose-500/40 dark:text-rose-200',
+};
+
+const ATTENTION_LABEL: Record<AttentionLevel, string> = {
+  none: '',
+  raised: 'Awaiting review',
+  overdue: 'Overdue',
+  critical: 'Critical',
+};
+
+const attentionWaitedFor = (raisedAt?: string | null): string => {
+  if (!raisedAt) return '';
+  const raised = new Date(raisedAt).getTime();
+  if (Number.isNaN(raised)) return '';
+  const minutes = Math.max(0, Math.round((Date.now() - raised) / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
+};
+
+/**
+ * The flag alone said "something", never "how long". Pulsing is reserved for
+ * critical so it means something when it happens.
+ */
+const AttentionChip: React.FC<{ level: AttentionLevel; raisedAt?: string | null }> = ({
+  level,
+  raisedAt,
+}) => {
+  if (level === 'none') return null;
+  const waited = attentionWaitedFor(raisedAt);
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset ${ATTENTION_CHIP_CLASS[level]}`}
+      title={`Needs admin review — waiting ${waited || 'a moment'}`}
+      aria-label={`${ATTENTION_LABEL[level]}, waiting ${waited || 'a moment'}`}
+    >
+      <span className={level === 'critical' ? 'motion-safe:animate-pulse' : undefined}>🚩</span>
+      {ATTENTION_LABEL[level]}
+      {waited ? <span className="opacity-75">· {waited}</span> : null}
+    </span>
+  );
+};
+
 const AdminOrdersPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -767,22 +863,16 @@ const AdminOrdersPage: React.FC = () => {
         </thead>
         <tbody className="font-hanken-grotesk text-sm text-slate-900 dark:text-white divide-y divide-slate-100/80 dark:divide-white/5 bg-white dark:bg-slate-900">
           {visibleCustomOrders.map((entry) => {
-            const flagged = Boolean(entry.adminAttentionRequiredAt);
+            const attention = attentionLevelOf(entry.adminAttentionRequiredAt);
             return (
               <tr
                 key={entry.id}
                 onClick={() => navigate(`/admin/custom-orders/${entry.id}`)}
-                className={`hover:bg-slate-50/80 dark:hover:bg-white/[0.03] transition-colors cursor-pointer ${
-                  flagged
-                    ? 'bg-rose-500/[0.04] dark:bg-rose-500/[0.06]'
-                    : ''
-                }`}
+                className={`hover:bg-slate-50/80 dark:hover:bg-white/[0.03] transition-colors cursor-pointer ${ATTENTION_ROW_CLASS[attention]}`}
               >
                 <td className="py-3.5 px-5 align-middle">
                   <div className="flex items-center gap-2">
-                    {flagged ? (
-                      <span className="motion-safe:animate-pulse text-base leading-none" title="Needs admin review" aria-label="Needs admin review">🚩</span>
-                    ) : null}
+                    <AttentionChip level={attention} raisedAt={entry.adminAttentionRequiredAt} />
                     <div className="font-semibold text-slate-900 dark:text-white">
                       {entry.sourceTitle || 'Custom order configuration'}
                     </div>
@@ -829,22 +919,18 @@ const AdminOrdersPage: React.FC = () => {
   const renderCustomList = () => (
     <div className="space-y-2.5 p-3.5">
       {visibleCustomOrders.map((entry) => {
-        const flagged = Boolean(entry.adminAttentionRequiredAt);
+        const attention = attentionLevelOf(entry.adminAttentionRequiredAt);
         return (
           <button
             key={entry.id}
             type="button"
             onClick={() => navigate(`/admin/custom-orders/${entry.id}`)}
-            className={`w-full rounded-xl border p-3.5 text-left transition hover:bg-slate-50/80 dark:hover:bg-white/[0.04] ${
-              flagged
-                ? 'border-rose-300/60 bg-rose-500/[0.04] dark:border-rose-500/30 dark:bg-rose-500/[0.06]'
-                : 'border-slate-100 bg-white dark:border-white/5 dark:bg-slate-900'
-            }`}
+            className={`w-full rounded-xl border p-3.5 text-left transition hover:bg-slate-50/80 dark:hover:bg-white/[0.04] ${ATTENTION_PANEL_CLASS[attention]}`}
           >
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  {flagged ? <span className="motion-safe:animate-pulse text-base leading-none" aria-label="Needs admin review">🚩</span> : null}
+                  <AttentionChip level={attention} raisedAt={entry.adminAttentionRequiredAt} />
                   <div className="font-hanken-grotesk font-semibold text-slate-900 dark:text-white text-sm">
                     {entry.sourceTitle || 'Custom order configuration'}
                   </div>
@@ -872,23 +958,19 @@ const AdminOrdersPage: React.FC = () => {
   const renderCustomCards = () => (
     <div className="grid gap-3.5 md:grid-cols-2 xl:grid-cols-3 p-3.5">
       {visibleCustomOrders.map((entry) => {
-        const flagged = Boolean(entry.adminAttentionRequiredAt);
+        const attention = attentionLevelOf(entry.adminAttentionRequiredAt);
         return (
           <button
             key={entry.id}
             type="button"
             onClick={() => navigate(`/admin/custom-orders/${entry.id}`)}
-            className={`rounded-xl border p-4 text-left transition hover:bg-slate-50/80 dark:hover:bg-white/[0.04] ${
-              flagged
-                ? 'border-rose-300/60 bg-rose-500/[0.04] dark:border-rose-500/30 dark:bg-rose-500/[0.06]'
-                : 'border-slate-100 bg-white dark:border-white/5 dark:bg-slate-900'
-            }`}
+            className={`rounded-xl border p-4 text-left transition hover:bg-slate-50/80 dark:hover:bg-white/[0.04] ${ATTENTION_PANEL_CLASS[attention]}`}
           >
             <div className="flex items-center justify-between gap-2">
               <div className="font-geist text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                 #{entry.id.slice(0, 8).toUpperCase()}
               </div>
-              {flagged ? <span className="motion-safe:animate-pulse text-base leading-none" aria-label="Needs admin review">🚩</span> : null}
+              <AttentionChip level={attention} raisedAt={entry.adminAttentionRequiredAt} />
             </div>
             <div className="mt-1.5 font-hanken-grotesk font-bold text-slate-900 dark:text-white text-sm">
               {entry.sourceTitle || 'Custom order configuration'}
