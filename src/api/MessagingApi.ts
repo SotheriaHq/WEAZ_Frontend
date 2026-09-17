@@ -186,6 +186,10 @@ export interface InboxResponse {
   endCursor: { cursorLastMessageAt: string; cursorThreadId: string } | null;
 }
 
+export type OrderConversationRef =
+  | { orderId: string; customOrderId?: never }
+  | { customOrderId: string; orderId?: never };
+
 export interface ResolvedThreadRoute {
   threadId: string;
   contextType: 'DIRECT' | 'INQUIRY' | 'STANDARD_ORDER' | 'CUSTOM_ORDER';
@@ -607,6 +611,25 @@ export const messagingApi = {
       params,
     });
     return unwrapApiResponse<ResolvedThreadRoute>(response.data);
+  },
+
+  /**
+   * Read-only: is there already a conversation with this order's brand?
+   * Drives "Go to conversation" vs "Open conversation"; never creates a thread.
+   */
+  async findOrderConversation(params: OrderConversationRef, signal?: AbortSignal) {
+    const response = await apiClient.get('/messaging/conversations/by-order', { params, signal });
+    return unwrapApiResponse<{ exists: boolean; threadId: string | null }>(response.data);
+  },
+
+  /**
+   * Open the conversation for an order. Reuses the one buyer<->brand thread
+   * (creating it only if none exists) and links the order into it, so it opens
+   * with the order attached instead of 404ing into a blank inbox.
+   */
+  async openOrderConversation(params: OrderConversationRef) {
+    const response = await apiClient.post('/messaging/conversations/by-order', params);
+    return unwrapApiResponse<ResolvedThreadRoute & { created: boolean }>(response.data);
   },
 
   async listThreadMessages(threadId: string, params?: { cursorCreatedAt?: string; cursorId?: string; limit?: number }) {

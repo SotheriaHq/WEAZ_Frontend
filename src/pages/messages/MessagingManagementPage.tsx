@@ -757,15 +757,29 @@ const MessagingManagementPage: React.FC = () => {
     }
 
     // Explicit order/custom-order that didn't directly match an inbox item:
-    // resolve it to its actual (often DIRECT/BUYER_BRAND) thread. Never fall
-    // through to conversations[0] here — that opened an unrelated brand's chat.
+    // open its conversation. Never fall through to conversations[0] here — that
+    // opened an unrelated brand's chat.
+    //
+    // `resolveConversation` only matched a thread already LINKED to the order,
+    // so a buyer who had never written about this order — every custom order
+    // paid through unified checkout, which links nothing — got a 404 and a
+    // blank screen even with a live chat with that brand. `openOrderConversation`
+    // reuses the one buyer<->brand thread (creating it only if none exists) and
+    // links the order into it, so this always lands in the brand's window.
     if (queryOrderId || queryCustomOrderId) {
       const resolveKey = `co:${queryCustomOrderId ?? ''}|o:${queryOrderId ?? ''}`;
       if (contextResolveKeyRef.current !== resolveKey) {
         contextResolveKeyRef.current = resolveKey;
-        void messagingApi.resolveConversation({
-          orderId: queryOrderId ?? undefined,
-          customOrderId: queryCustomOrderId ?? undefined,
+        void messagingApi.openOrderConversation(
+          queryCustomOrderId ? { customOrderId: queryCustomOrderId } : { orderId: queryOrderId as string },
+        ).catch((error: { response?: { status?: number } }) => {
+          // Brand staff can read a thread they participate in without being the
+          // order's buyer or brand owner; the resolver still serves them.
+          if (error?.response?.status !== 403) throw error;
+          return messagingApi.resolveConversation({
+            orderId: queryOrderId ?? undefined,
+            customOrderId: queryCustomOrderId ?? undefined,
+          });
         }).then((resolved) => {
           if (!resolved?.threadId) return;
           // Carry the requested order reference into the resolved route so the
@@ -778,8 +792,18 @@ const MessagingManagementPage: React.FC = () => {
           };
           setResolvedThreadFallback(enriched);
           setActiveId(resolved.threadId);
+          // The synthesized row is titled "Conversation"; a thread that was
+          // just created is not in the inbox yet, so nothing else would ever
+          // replace that placeholder with the brand's name and avatar.
+          if (!conversations.some((i) => i.id === resolved.threadId)) {
+            void refreshInbox();
+          }
         }).catch(() => {
-          // Leave nothing selected rather than opening the wrong conversation.
+          // Leave nothing selected rather than opening the wrong conversation —
+          // but say so, instead of leaving a blank pane to be read as a bug. The
+          // resolve key stays set: this effect re-runs on every inbox poll, and
+          // clearing it would retry (and toast) on each one.
+          toast.error('Could not open the conversation for this order. Please try again.');
         });
       }
       return;
@@ -788,7 +812,7 @@ const MessagingManagementPage: React.FC = () => {
     if (!hasExplicitContext && (!activeId || !conversations.some((i) => i.id === activeId))) {
       setActiveId(conversations[0].id);
     }
-  }, [activeId, conversations, params, setParams]);
+  }, [activeId, conversations, params, refreshInbox, setParams]);
 
   /**
    * Reflect a completed mark-read locally.

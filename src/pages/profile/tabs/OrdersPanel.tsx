@@ -52,6 +52,7 @@ import {
 } from '@/pages/checkout/paymentFlow';
 import { useConfirm } from '@/components/ui/useConfirm';
 import BackLink from '@/components/ui/BackLink';
+import { CustomOrderTag, OrderConversationButton } from '@/components/messaging/OrderConversationButton';
 import { useCachedResource } from '@/hooks/useCachedResource';
 import { queryClient } from '@/query/queryClient';
 import { useRealtime } from '@/realtime/RealtimeProvider';
@@ -1170,15 +1171,9 @@ export const BuyerCustomOrderDetailView: React.FC<{
       {ConfirmDialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <BackLink label="Back to orders" onClick={onBack} variant="pill" />
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => navigate(`/messages?customOrderId=${encodeURIComponent(order.id)}`)}
-            className="rounded-full border border-gray-200/80 bg-white/80 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-fuchsia-300 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:text-white"
-          >
-            Open conversation
-          </button>
-          <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Custom order</div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <CustomOrderTag />
+          <OrderConversationButton order={{ customOrderId: order.id }} brandName={brandName} />
         </div>
       </div>
 
@@ -1497,13 +1492,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
           <div>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm font-semibold text-gray-900 dark:text-white">Conversation and extension</div>
-              <button
-                type="button"
-                onClick={() => navigate(`/messages?customOrderId=${encodeURIComponent(order.id)}`)}
-                className="rounded-full border border-gray-200/80 bg-white/80 px-3 py-2 text-xs font-semibold text-gray-700 transition hover:border-fuchsia-300 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:text-white"
-              >
-                Open conversation
-              </button>
+              <OrderConversationButton order={{ customOrderId: order.id }} brandName={brandName} size="sm" />
             </div>
             <div className="mt-4 space-y-3">
               {order.extensionRequests.length === 0 ? (
