@@ -713,6 +713,12 @@ const MessagingManagementPage: React.FC = () => {
      brand's chat. Only default to the first conversation when NO specific
      context was requested. */
   const contextResolveKeyRef = useRef<string | null>(null);
+  // Bumped only by the failure toast's Retry. The resolve key is latched so the
+  // inbox poll cannot re-fire (and re-toast) a failed resolution on every tick,
+  // which also meant a second press of "Go to conversation" — same URL, same key
+  // — did nothing at all. Folding this counter into the key makes a deliberate
+  // retry a genuinely new attempt while polls stay silent.
+  const [contextRetryNonce, setContextRetryNonce] = useState(0);
   useEffect(() => {
     const queryOrderId = params.get('orderId');
     const queryCustomOrderId = params.get('customOrderId');
@@ -767,7 +773,7 @@ const MessagingManagementPage: React.FC = () => {
     // reuses the one buyer<->brand thread (creating it only if none exists) and
     // links the order into it, so this always lands in the brand's window.
     if (queryOrderId || queryCustomOrderId) {
-      const resolveKey = `co:${queryCustomOrderId ?? ''}|o:${queryOrderId ?? ''}`;
+      const resolveKey = `co:${queryCustomOrderId ?? ''}|o:${queryOrderId ?? ''}|r:${contextRetryNonce}`;
       if (contextResolveKeyRef.current !== resolveKey) {
         contextResolveKeyRef.current = resolveKey;
         void messagingApi.openOrderConversation(
@@ -802,8 +808,15 @@ const MessagingManagementPage: React.FC = () => {
           // Leave nothing selected rather than opening the wrong conversation —
           // but say so, instead of leaving a blank pane to be read as a bug. The
           // resolve key stays set: this effect re-runs on every inbox poll, and
-          // clearing it would retry (and toast) on each one.
-          toast.error('Could not open the conversation for this order. Please try again.');
+          // clearing it would retry (and toast) on each one. Retry therefore has
+          // to be explicit, and it lives on the toast rather than in copy that
+          // tells the reader to press a button that would do nothing.
+          toast.error('Could not open the conversation for this order.', {
+            action: {
+              label: 'Retry',
+              onClick: () => setContextRetryNonce((nonce) => nonce + 1),
+            },
+          });
         });
       }
       return;
@@ -812,7 +825,7 @@ const MessagingManagementPage: React.FC = () => {
     if (!hasExplicitContext && (!activeId || !conversations.some((i) => i.id === activeId))) {
       setActiveId(conversations[0].id);
     }
-  }, [activeId, conversations, params, refreshInbox, setParams]);
+  }, [activeId, contextRetryNonce, conversations, params, refreshInbox, setParams]);
 
   /**
    * Reflect a completed mark-read locally.
