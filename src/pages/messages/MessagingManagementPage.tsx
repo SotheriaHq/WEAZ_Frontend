@@ -20,6 +20,11 @@ import { selectIsMobile } from '@/features/uiSlice';
 import type { MarketItem } from '@/types/market';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import UniversalSelect from '@/components/forms/UniversalSelect';
+import {
+  formatCustomOrderCode,
+  humanizeCustomOrderToken,
+} from '@/components/custom-orders/customOrderFormatting';
 import MessageBubble, { formatDate } from '@/components/messaging/MessageBubble';
 import ComposeArea, { type ReplyTo } from '@/components/messaging/ComposeArea';
 import ChatContactSidebar from '@/components/messaging/ChatContactSidebar';
@@ -86,6 +91,15 @@ const FILTERS = [
   { label: 'Inquiries', value: 'inquiry' },
   { label: 'Archived', value: 'archived' },
 ] as const;
+
+/** Narrows the orders linked to the open thread. Mutable so it satisfies `UniversalSelectOption[]`. */
+const ORDER_FILTER_OPTIONS = [
+  { label: 'All', value: 'all' },
+  { label: 'Active', value: 'active' },
+  { label: 'Closed', value: 'closed' },
+  { label: 'Cancelled', value: 'cancelled' },
+  { label: 'Disputed', value: 'disputed' },
+];
 
 const DISPUTE_ISSUE_TYPES = [
   { label: 'Wrong Item', value: 'WRONG_ITEM' },
@@ -659,6 +673,44 @@ const MessagingManagementPage: React.FC = () => {
     [selectedOrderKey, threadOrders],
   );
   const showOrderActions = threadOrders.length > 0 && Boolean(selectedOrder);
+
+  /* ---- Order reference strip ----
+     What the conversation is ABOUT. Arriving from an order left no trace of
+     which order it was: the only mention was a 180px native <select> parked
+     among the header's icon buttons, which reads as a filter, not a reference.
+     These derive the display copy for the strip that now sits under the header. */
+  const selectedOrderCode = useMemo(() => {
+    if (!selectedOrder) return '';
+    return selectedOrder.type === 'CUSTOM_ORDER'
+      ? formatCustomOrderCode(selectedOrder.id)
+      : `#${selectedOrder.id.slice(0, 8).toUpperCase()}`;
+  }, [selectedOrder]);
+
+  const selectedOrderAmount = useMemo(() => {
+    if (!selectedOrder) return '';
+    const amount = Number(selectedOrder.totalAmount);
+    if (!Number.isFinite(amount) || amount <= 0) return '';
+    try {
+      // Intl throws RangeError on an unknown currency code rather than falling
+      // back, and a thrown render is a worse outcome than an unstyled amount.
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: selectedOrder.currency || 'NGN',
+        maximumFractionDigits: 0,
+      }).format(amount);
+    } catch {
+      return `${selectedOrder.currency ?? ''} ${amount.toLocaleString()}`.trim();
+    }
+  }, [selectedOrder]);
+
+  const threadOrderOptions = useMemo(
+    () =>
+      threadOrders.map((order) => ({
+        value: `${order.type}:${order.id}`,
+        label: order.title,
+      })),
+    [threadOrders],
+  );
 
   const visibleConversations = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -2098,31 +2150,17 @@ const MessagingManagementPage: React.FC = () => {
               <div className="flex items-center gap-1.5 shrink-0">
                 {threadOrders.length > 0 && (
                   <>
-                    <select
+                    {/* Rule 9: no native <select> anywhere in the product. */}
+                    <UniversalSelect
                       value={orderFilter}
-                      onChange={(event) => setOrderFilter(event.target.value as typeof orderFilter)}
-                      className="hidden sm:block rounded-lg bg-gray-100 px-2 py-1.5 text-[11px] font-medium text-gray-700 outline-none dark:bg-white/[0.08] dark:text-gray-200"
-                      aria-label="Filter orders"
-                    >
-                      <option value="all">All</option>
-                      <option value="active">Active</option>
-                      <option value="closed">Closed</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="disputed">Disputed</option>
-                    </select>
-                    <select
-                      value={selectedOrderKey}
-                      onChange={(event) => setSelectedOrderKey(event.target.value)}
-                      className="max-w-[180px] rounded-lg bg-gray-100 px-2 py-1.5 text-[11px] font-medium text-gray-700 outline-none dark:bg-white/[0.08] dark:text-gray-200"
-                      aria-label="Select order"
-                    >
-                      <option value="">Select order</option>
-                      {threadOrders.map((order) => (
-                        <option key={`${order.type}:${order.id}`} value={`${order.type}:${order.id}`}>
-                          {order.title}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) => setOrderFilter(value as typeof orderFilter)}
+                      options={ORDER_FILTER_OPTIONS}
+                      placeholder="Filter orders"
+                      size="sm"
+                      compact
+                      fitContent
+                      className="hidden shrink-0 sm:block"
+                    />
                   </>
                 )}
 
@@ -2158,17 +2196,10 @@ const MessagingManagementPage: React.FC = () => {
                   </button>
                 )}
 
-                {/* View Order (not inquiry) — uses orderDetailUrl for canonical order page */}
-                {showOrderActions && selectedOrder?.orderDetailUrl && (
-                  <button
-                    type="button"
-                    onClick={() => openRoute(selectedOrder.orderDetailUrl as string)}
-                    className="rounded-lg px-2.5 py-1.5 text-theme-secondary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
-                    title="View Order"
-                  >
-                    <span className="text-base" role="img" aria-label="order">📦</span>
-                  </button>
-                )}
+                {/* The 📦 "View Order" icon that used to sit here is now the
+                    labelled "View order" button in the reference strip below —
+                    one control per action, and this one no longer has to be
+                    guessed from an emoji. */}
 
                 {/* Refresh */}
                 <button
@@ -2189,6 +2220,71 @@ const MessagingManagementPage: React.FC = () => {
                 </button>
               </div>
             </div>
+
+            {/* Order reference — the subject of this conversation, stated once,
+                where the eye lands before the first message. The order switcher
+                lives here too when a thread carries more than one, because it
+                changes WHAT is referenced; with a single order there is nothing
+                to switch and the reference stands alone. */}
+            {threadOrders.length > 0 && (
+              <div className="shrink-0 border-b border-gray-200/60 bg-purple-50/70 px-4 py-2.5 dark:border-white/[0.06] dark:bg-purple-500/[0.08]">
+                <div className="flex items-center gap-3">
+                  <span aria-hidden="true" className="text-base leading-none">
+                    {selectedOrder?.type === 'STANDARD_ORDER' ? '📦' : '🧵'}
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    {selectedOrder ? (
+                      <>
+                        <div className="flex flex-wrap items-baseline gap-x-2">
+                          <span className="truncate text-xs font-semibold text-theme">{selectedOrder.title}</span>
+                          <span className="font-mono text-[11px] text-theme-secondary">{selectedOrderCode}</span>
+                        </div>
+                        <div className="mt-0.5 truncate text-[11px] text-theme-secondary">
+                          {[
+                            selectedOrder.type === 'CUSTOM_ORDER' ? 'Custom order' : 'Order',
+                            humanizeCustomOrderToken(selectedOrder.status) || selectedOrder.status,
+                            selectedOrderAmount,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </div>
+                      </>
+                    ) : (
+                      // Several orders live in this thread and none was asked for
+                      // by name, so the strip says what it can and hands over the
+                      // switcher rather than disappearing with it.
+                      <span className="text-xs font-semibold text-theme">
+                        {threadOrders.length} orders in this conversation
+                      </span>
+                    )}
+                  </div>
+
+                  {threadOrders.length > 1 && (
+                    <UniversalSelect
+                      value={selectedOrderKey}
+                      onChange={setSelectedOrderKey}
+                      options={threadOrderOptions}
+                      placeholder="Select order"
+                      size="sm"
+                      compact
+                      fitContent
+                      className="shrink-0"
+                    />
+                  )}
+
+                  {selectedOrder?.orderDetailUrl && (
+                    <button
+                      type="button"
+                      onClick={() => openRoute(selectedOrder.orderDetailUrl as string)}
+                      className="shrink-0 rounded-full bg-purple-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm shadow-purple-500/20 transition-colors hover:bg-purple-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950"
+                    >
+                      View order <span aria-hidden className="opacity-80">→</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Messages area */}
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3">
