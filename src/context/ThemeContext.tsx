@@ -10,8 +10,8 @@ import {
 const THEME_TRANSITION_DURATION_MS = 300;
 const LIGHT_THEME_COLOR = '#ffffff';
 const DARK_THEME_COLOR = '#0a0a0a';
-const EMBEDDED_SURFACE_SESSION_KEY = 'threadly.studio.embeddedSurface';
-const EMBEDDED_THEME_SESSION_KEY = 'threadly.studio.embeddedTheme';
+const EMBEDDED_SURFACE_SESSION_KEY = 'wiez.studio.embeddedSurface';
+const EMBEDDED_THEME_SESSION_KEY = 'wiez.studio.embeddedTheme';
 
 const getEmbeddedTheme = (): ResolvedTheme | null => {
   if (typeof window === 'undefined') return null;
@@ -152,6 +152,9 @@ export function ThemeProvider({
       return preloadedTheme;
     }
 
+    if (typeof window.matchMedia !== 'function') {
+      return 'light';
+    }
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
   const transitionTimerRef = useRef<number | null>(null);
@@ -212,6 +215,10 @@ export function ThemeProvider({
 
   // Sync when system theme changes (only when theme is 'system') and across tabs
   useEffect(() => {
+    if (typeof window.matchMedia !== 'function') {
+      return undefined;
+    }
+
     const mql = window.matchMedia('(prefers-color-scheme: dark)');
 
     const handleMql = () => {

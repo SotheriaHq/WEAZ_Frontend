@@ -5,7 +5,7 @@ import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { toast } from 'sonner';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { unwrapApiResponse } from '@/types/auth';
 import useDebounce from '@/hooks/useDebounce';
 
@@ -170,7 +170,7 @@ const AdminCollectionsPage: React.FC = () => {
           </table>
           {isLoadingMore && (
             <div className="flex items-center justify-center gap-2 py-4 text-sm text-gray-500">
-              <VLoader size={16} phase="loading" showLabel={false} />
+              <MuseLoader size={16} />
               Loading more...
             </div>
           )}

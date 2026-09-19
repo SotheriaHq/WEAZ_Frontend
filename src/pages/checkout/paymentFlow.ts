@@ -4,6 +4,13 @@ import type {
   PaystackPaymentData,
   ShippingAddress,
 } from '@/api/StoreApi';
+import {
+  isEmptyPhone,
+  isValidPhone,
+  normalizePhoneToE164,
+  PHONE_INVALID_MESSAGE,
+  PHONE_REQUIRED_MESSAGE,
+} from '@/utils/phoneNumber';
 
 export interface PaymentOptionMeta {
   value: keyof PaymentFormState;
@@ -84,6 +91,45 @@ const namesSoftMatch = (left: string, right: string): boolean => {
 };
 
 const digitsOnly = (value: string): string => value.replace(/\D/g, '');
+
+/**
+ * Client-side card brand detection from leading digits (free "custom guard":
+ * Luhn + length + brand pattern — no external API involved).
+ */
+export function detectCardBrand(cardNumber: string): string | null {
+  const digits = digitsOnly(cardNumber);
+  if (!digits) {
+    return null;
+  }
+  if (/^(506[01]|507[89]|6500)/.test(digits)) {
+    return 'Verve';
+  }
+  if (/^4/.test(digits)) {
+    return 'Visa';
+  }
+  if (/^(5[1-5]|2[2-7])/.test(digits)) {
+    return 'Mastercard';
+  }
+  if (/^3[47]/.test(digits)) {
+    return 'American Express';
+  }
+  return null;
+}
+
+/** Groups digits 4-4-4-… for display while typing. */
+export function formatCardNumberInput(value: string): string {
+  const digits = digitsOnly(value).slice(0, 19);
+  return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+}
+
+/** Normalizes expiry typing to MM/YY (auto-inserts the slash). */
+export function formatExpiryInput(value: string): string {
+  const digits = digitsOnly(value).slice(0, 4);
+  if (digits.length <= 2) {
+    return digits;
+  }
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
 
 const isLuhnValid = (value: string): boolean => {
   const digits = digitsOnly(value);
@@ -318,6 +364,7 @@ export function validatePaymentData(
   paymentMethod: string,
   paymentData: PaymentData,
   shippingAddress: ShippingAddress,
+  options?: { requireNewCardDraft?: boolean },
 ): PaymentFormErrors {
   const errors: PaymentFormErrors = {};
 
@@ -332,11 +379,15 @@ export function validatePaymentData(
     errors.email = 'Enter a valid email address';
   }
 
-  if (!paymentData.phone.trim()) {
-    errors.phone = 'Phone number is required';
+  if (isEmptyPhone(paymentData.phone)) {
+    errors.phone = PHONE_REQUIRED_MESSAGE;
+  } else if (!isValidPhone(paymentData.phone)) {
+    errors.phone = PHONE_INVALID_MESSAGE;
   }
 
-  if (!shippingAddress.phone.trim()) {
+  if (isEmptyPhone(shippingAddress.phone)) {
+    errors.phone = 'Add a valid shipping phone number first';
+  } else if (!isValidPhone(shippingAddress.phone)) {
     errors.phone = 'Add a valid shipping phone number first';
   }
 
@@ -363,7 +414,7 @@ export function validatePaymentData(
       errors.savedCardId = 'Select a saved card or switch to a new card';
     }
   } else if (paymentData.channel === 'CARD') {
-    if (hasRawCardDraft(paymentData)) {
+    if (hasRawCardDraft(paymentData) || options?.requireNewCardDraft) {
       validateCardDraft(paymentData, shippingAddress, errors);
     }
   }
@@ -393,11 +444,25 @@ export function buildContactInfo(
         savedCardDisplay: null,
       } satisfies PaystackPaymentData);
 
+  const billingAddress = resolveBillingAddress(paystackData, shippingAddress);
+  // The backend validates billingAddress as a full ShippingAddressDto whose
+  // phone is required — but the web billing form has no phone field and
+  // shippingToBillingAddress drops it. Carry the best phone we have so
+  // /payment/initialize-unified doesn't 400 on new-card payments.
+  const billingPhoneRaw =
+    String((billingAddress as { phone?: string }).phone ?? '').trim() ||
+    String(paystackData.phone ?? '').trim() ||
+    String(shippingAddress.phone ?? '').trim();
+  const billingPhone =
+    normalizePhoneToE164(billingPhoneRaw) ?? billingPhoneRaw;
+  const contactPhone =
+    normalizePhoneToE164(paystackData.phone) ?? String(paystackData.phone ?? '').trim();
+
   return {
-    phone: paystackData.phone,
+    phone: contactPhone,
     email: paystackData.email,
     billingSameAsShipping: paystackData.billingSameAsShipping,
-    billingAddress: resolveBillingAddress(paystackData, shippingAddress),
+    billingAddress: { ...billingAddress, phone: billingPhone },
     channel: paystackData.channel,
   };
 }
@@ -426,13 +491,27 @@ export function buildPaymentSubmissionData(
 
   const draft = normalizeCardDraft(paystackData);
 
+  const submissionPhone =
+    normalizePhoneToE164(paystackData.phone) ?? String(paystackData.phone ?? '').trim();
+  const billingAddress = resolveBillingAddress(paystackData, shippingAddress);
+  const billingPhoneRaw =
+    String((billingAddress as { phone?: string }).phone ?? '').trim() ||
+    submissionPhone ||
+    String(shippingAddress.phone ?? '').trim();
+  const billingPhone =
+    normalizePhoneToE164(billingPhoneRaw) ?? billingPhoneRaw;
+
   return {
     method: 'PAYSTACK',
     channel: paystackData.channel,
     email: paystackData.email,
-    phone: paystackData.phone,
+    phone: submissionPhone,
     billingSameAsShipping: paystackData.billingSameAsShipping,
-    billingAddress: resolveBillingAddress(paystackData, shippingAddress),
+    // Backend ShippingAddressDto requires phone on billing; BillingAddress type is a subset.
+    billingAddress: {
+      ...billingAddress,
+      phone: billingPhone,
+    } as BillingAddress,
     consentAccepted: paystackData.consentAccepted,
     legalAcceptances: paystackData.legalAcceptances ?? [],
     useSavedCard:
@@ -480,7 +559,7 @@ export function getPaymentSummaryLines(
       ? ` (${paymentData.savedCardDisplay.bank})`
       : '';
     lines.push(`${brand}${bank} ending ${paymentData.savedCardDisplay.last4}`);
-    lines.push('WEAZ will verify the saved-card authorization after you continue');
+    lines.push('WIEZ will verify the saved-card authorization after you continue');
   } else {
     lines[lines.length - 1] = 'Card checkout';
     if (hasRawCardDraft(paymentData)) {
@@ -507,6 +586,9 @@ export function getReviewCtaLabel(
     }
     if (paymentData.channel === 'CARD' && paymentData.useSavedCard && paymentData.savedCardId) {
       return 'Continue with saved card';
+    }
+    if (paymentData.channel === 'CARD' && hasRawCardDraft(paymentData)) {
+      return 'Pay with new card';
     }
     return 'Open secure card checkout';
   }

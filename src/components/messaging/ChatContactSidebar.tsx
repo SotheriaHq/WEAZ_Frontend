@@ -130,7 +130,10 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
       {/* Profile section */}
       <div className="flex flex-col items-center px-5 pt-6 pb-4">
         <div className="relative">
-          <div className="h-20 w-20 rounded-[1.5rem] overflow-hidden ring-2 ring-gray-200/60 dark:ring-white/10">
+          {/* No ring. An avatar is already a shape against the panel; the ring
+              was a second edge drawn around an image that has its own, and it
+              landed on the same line as the panel's own divider. */}
+          <div className="h-20 w-20 rounded-[1.5rem] overflow-hidden">
             {participant?.profileImage ? (
               <ImageWithFallback
                 src={participantAvatarSource.src}
@@ -178,7 +181,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
         )}
       </div>
 
-      <div className="mx-4 h-px bg-gray-200/60 dark:bg-white/8" />
+      <div className="mx-4 h-px bg-gray-200/60 dark:bg-white/[0.08]" />
 
       {/* Quick actions */}
       <div className="px-4 py-3 space-y-1">
@@ -255,7 +258,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
       {/* Shared Media */}
       {sharedMedia.length > 0 && (
         <>
-          <div className="mx-4 h-px bg-gray-200/60 dark:bg-white/8" />
+          <div className="mx-4 h-px bg-gray-200/60 dark:bg-white/[0.08]" />
           <div className="px-4 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
               Shared Media ({sharedMedia.length})
@@ -292,7 +295,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
       {/* Shared Documents */}
       {sharedDocs.length > 0 && (
         <>
-          <div className="mx-4 h-px bg-gray-200/60 dark:bg-white/8" />
+          <div className="mx-4 h-px bg-gray-200/60 dark:bg-white/[0.08]" />
           <div className="px-4 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
               Shared Files ({sharedDocs.length})
@@ -304,7 +307,7 @@ const ChatContactSidebar: React.FC<ChatContactSidebarProps> = ({
                   href={doc.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/8 transition-colors"
+                  className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/[0.08] transition-colors"
                 >
                   <span aria-hidden="true" className="shrink-0">📄</span>
                   <span className="truncate">{doc.name}</span>

@@ -7,13 +7,33 @@ import type { AuthUserDto } from '../../types/auth';
 import type { BrandProfileDto } from '../../types/profile';
 import { brandApi, type UpdateBrandProfilePayload } from '../../api/BrandApi';
 import { toast } from 'sonner';
-import { locationService, type CountryOption, type StateOption } from '../../services/LocationService';
+import {
+  LOCATION_FIELD_LABELS,
+  locationService,
+  type CountryOption,
+  type StateOption,
+} from '../../services/LocationService';
 import UniversalSelect from '../forms/UniversalSelect';
+import LocationCascadeSelect from '../forms/LocationCascadeSelect';
+import PhoneNumberField from '../forms/PhoneNumberField';
+import { resolveCountryIso2 } from '@/data/countryRegions';
+import type { CountryCode } from 'libphonenumber-js';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import {
+  useKeyboardInset,
+  useScrollFocusedFieldIntoView,
+} from '@/hooks/useKeyboardInset';
 import { BRAND_TAG_OPTIONS, BRAND_TAG_SELECTION_LIMIT } from '../../data/brandTags';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
+import {
+  isEmptyPhone,
+  isValidPhone,
+  normalizePhoneToE164,
+  PHONE_E164_MAX_LENGTH,
+  PHONE_INVALID_MESSAGE,
+} from '@/utils/phoneNumber';
 
 // ----------------------------------------------------------------------------
 // Zod Schemas & Helpers
@@ -49,6 +69,13 @@ const profileSchema = z
     brandCountry: z.string().optional(),
     brandState: z.string().optional(),
     brandCity: z.string().optional(),
+    // Free text: real addresses carry digits, commas and slashes, so this gets
+    // a length cap and nothing else.
+    brandStreetAddress: z
+      .string()
+      .trim()
+      .max(255, { message: 'Address must be 255 characters or fewer' })
+      .optional(),
     brandTags: z
       .array(z.string())
       .max(BRAND_TAG_SELECTION_LIMIT, {
@@ -59,7 +86,14 @@ const profileSchema = z
     socialFacebook: optionalSocialSchema,
     socialTwitter: optionalSocialSchema,
     socialWebsite: optionalSocialSchema,
-    phoneNumber: z.string().trim().max(30, { message: 'Phone number is too long' }).optional(),
+    phoneNumber: z
+      .string()
+      .trim()
+      .max(PHONE_E164_MAX_LENGTH, { message: 'Phone number is too long' })
+      .optional()
+      .refine((value) => isEmptyPhone(value) || isValidPhone(value), {
+        message: PHONE_INVALID_MESSAGE,
+      }),
     businessType: z.string().trim().max(120, { message: 'Business type is too long' }).optional(),
   })
   .refine(
@@ -83,10 +117,10 @@ const BRAND_TAG_CHIP_PALETTE = [
   'bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-indigo-500/25',
 ];
 const BUSINESS_TYPE_OPTIONS = [
-  { value: 'Retailer', label: 'Retailer' },
+  { value: 'Retailer', label: 'Retailer', disabled: true },
   { value: 'Designer', label: 'Designer' },
-  { value: 'Wholesaler', label: 'Wholesaler' },
-  { value: 'Boutique', label: 'Boutique' },
+  { value: 'Wholesaler', label: 'Wholesaler', disabled: true },
+  { value: 'Boutique', label: 'Boutique', disabled: true },
 ];
 
 const getFirstErrorMessage = (errors: unknown): string | null => {
@@ -191,6 +225,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       brandCountry: brandProfile?.country || user.brandCountry || '',
       brandState: brandProfile?.state || user.brandState || '',
       brandCity: brandProfile?.city || user.brandCity || '',
+      brandStreetAddress: brandProfile?.streetAddress || '',
       brandTags:
         brandProfile?.tags ||
         user.brandTags ||
@@ -272,6 +307,19 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     }
   }, [isOpen, initialValues, reset]);
 
+  /**
+   * Dial code follows the business country when we can map it, so a Ghanaian
+   * brand is not silently defaulted to +234. Falls back to NG, the primary
+   * market, when the country is unset or unrecognised.
+   */
+  const phoneDefaultCountry = useMemo<CountryCode>(() => {
+    const iso2 = resolveCountryIso2(
+      selectedCountry,
+      countries.find((c) => c.name === selectedCountry)?.iso2,
+    );
+    return (iso2 as CountryCode) || 'NG';
+  }, [selectedCountry, countries]);
+
   // Cascade: Load States when Country changes
   useEffect(() => {
     const loadStates = async () => {
@@ -280,12 +328,15 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             return;
         }
         setLoadingLocations(true);
-        const data = await locationService.getStates(selectedCountry);
+        // Pass ISO2 so the offline fallback can resolve the country even when
+        // the remote display name does not match one of its known aliases.
+        const iso2 = countries.find((c) => c.name === selectedCountry)?.iso2;
+        const data = await locationService.getStates(selectedCountry, iso2);
         setStates(data);
         setLoadingLocations(false);
     };
     void loadStates();
-  }, [selectedCountry]);
+  }, [selectedCountry, countries]);
 
   // Cascade: Load Cities when State changes
   useEffect(() => {
@@ -336,7 +387,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         const brandCountry = values.brandCountry?.trim() || undefined;
         const brandState = values.brandState?.trim() || undefined;
         const brandCity = values.brandCity?.trim() || undefined;
-        const phoneNumber = values.phoneNumber?.trim() || undefined;
+        const rawPhone = values.phoneNumber?.trim() || '';
+        const phoneNumber = isEmptyPhone(rawPhone)
+          ? undefined
+          : (normalizePhoneToE164(rawPhone) ?? undefined);
         const businessType = values.businessType?.trim() || undefined;
 
         const payload: UpdateBrandProfilePayload = {
@@ -345,6 +399,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
           brandCountry,
           brandState,
           brandCity,
+          // Sent even when cleared: '' tells the API to erase a stored address,
+          // where `undefined` would silently keep it.
+          brandStreetAddress: values.brandStreetAddress?.trim() ?? '',
           brandTags: selectedTags,
           socialInstagram: normalizeSocialLink('instagram', values.socialInstagram),
           socialFacebook: normalizeSocialLink('facebook', values.socialFacebook),
@@ -434,12 +491,16 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   };
 
   const dialogRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useFocusTrap({
     active: isOpen,
     containerRef: dialogRef,
     onEscape: onClose,
   });
+
+  const keyboardInset = useKeyboardInset(isOpen);
+  useScrollFocusedFieldIntoView(isOpen, formRef);
 
   if (!isOpen) return null;
 
@@ -452,11 +513,27 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         </div>
 
         {/* Main Modal Container */}
-        <div className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" aria-label="Brand setup">
-          <div ref={dialogRef} tabIndex={-1} className="relative w-full max-w-4xl neu-modal-surface surface-card rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in border border-theme">
+        <div
+          className="fixed inset-0 z-layer-modal flex items-center justify-center p-4 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Brand setup"
+          // Mobile browsers keep `fixed inset-0` at full height when the
+          // keyboard opens, so the lower half of this modal sits underneath it.
+          // Reserving the keyboard's height re-centres the panel in the space
+          // that is actually visible.
+          style={{ paddingBottom: keyboardInset ? keyboardInset + 16 : undefined }}
+        >
+          <div
+            ref={dialogRef}
+            tabIndex={-1}
+            className="relative w-full max-w-4xl neu-modal-surface surface-card rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-in border border-theme"
+            style={{ maxHeight: `calc(90vh - ${keyboardInset}px)` }}
+          >
 
           {/* Scrollable Content */}
-          <form 
+          <form
+            ref={formRef}
             onSubmit={handleSubmit(onSubmit, onInvalid)}
             className="overflow-y-auto custom-scrollbar p-8 space-y-10 overscroll-contain"
           >
@@ -510,8 +587,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   <label className="text-sm font-semibold text-theme-secondary">Brand Name</label>
                   <input 
                     type="text" 
-                    placeholder="e.g. WEAZ Couture"
-                    className="w-full h-12 px-4 rounded-lg border border-theme-strong surface-card text-theme placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" 
+                    placeholder="e.g. WIEZ Couture"
+                    className="form-field w-full h-12 px-4 rounded-lg"
                     {...register('brandFullName')}
                   />
                   {errors.brandFullName && <p className="text-xs text-red-500 font-medium">{errors.brandFullName.message}</p>}
@@ -522,8 +599,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">@</span>
                     <input 
                       type="text" 
-                      placeholder="username" 
-                      className="w-full h-12 pl-8 pr-4 rounded-lg border border-theme-strong surface-subtle text-gray-500 cursor-not-allowed" 
+                      placeholder="username"
+                      className="form-field w-full h-12 pl-8 pr-4 rounded-lg"
                       value={user.username}
                       disabled
                       title="Username cannot be changed here"
@@ -536,8 +613,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     <label className="text-sm font-semibold text-theme-secondary">Email Address <span className="text-gray-400 font-normal text-xs ml-2">(Private)</span></label>
                     <input 
                         type="email" 
-                        placeholder="contact@brand.com" 
-                        className="w-full h-12 px-4 rounded-lg border border-theme-strong surface-subtle text-gray-500 cursor-not-allowed" 
+                        placeholder="contact@brand.com"
+                        className="form-field w-full h-12 px-4 rounded-lg"
                         value={user.email}
                         disabled
                     />
@@ -564,8 +641,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
               <div className="space-y-6">
                 <div className="space-y-2 relative">
                     <label className="text-sm font-semibold text-theme-secondary">Brand Story</label>
-                    <textarea 
-                        className="w-full h-40 p-4 rounded-lg border border-theme-strong surface-card text-theme placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none leading-relaxed" 
+                    <textarea
+                        className="form-field w-full h-40 p-4 rounded-lg resize-none leading-relaxed"
                         placeholder="Tell the world about your vision, heritage, and what makes your fashion unique..."
                         {...brandDescriptionField}
                         ref={(e) => {
@@ -575,7 +652,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     ></textarea>
                      <div className="text-right">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                            (descriptionValue?.length || 0) < 20 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
+                            (descriptionValue?.length || 0) < 20 ? 'bg-red-100 text-red-600 dark:bg-red-500/20' : 'bg-green-100 text-green-600 dark:bg-green-500/20'
                         }`}>
                              Minimum 20 chars ({descriptionValue?.length || 0}/2000)
                         </span>
@@ -638,7 +715,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
               <div className="space-y-2">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <UniversalSelect
-                          label="Country"
+                          label={LOCATION_FIELD_LABELS.country}
                           value={selectedCountry || ''}
                           onChange={(val) => {
                               setValue('brandCountry', val, {
@@ -660,9 +737,11 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           disabled={loadingLocations}
                           className="w-full"
                           menuLayer="modal"
+                          optionAllowWrap
+                          selectedAllowWrap
                       />
-                       <UniversalSelect
-                          label="State / Province"
+                       <LocationCascadeSelect
+                          label={LOCATION_FIELD_LABELS.state}
                           value={selectedState || ''}
                           onChange={(val) => {
                               setValue('brandState', val, {
@@ -673,16 +752,16 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                               clearErrors('brandCountry');
                           }}
                           options={stateOptions}
-                          placeholder={loadingLocations ? "Loading..." : "State/Province"}
-                          searchable
+                          parentValue={selectedCountry || ''}
+                          parentPlaceholder="Select country first"
+                          loading={loadingLocations}
+                          placeholder="Select state / province"
                           searchPlaceholder="Search states or provinces..."
                           emptyMessage="No matching state or province found"
-                          disabled={!selectedCountry || stateOptions.length === 0 || loadingLocations}
-                          className="w-full"
-                          menuLayer="modal"
+                          fallbackHint="We couldn't load the list for this country — type your state or province."
                       />
-                       <UniversalSelect
-                          label="City"
+                       <LocationCascadeSelect
+                          label={LOCATION_FIELD_LABELS.city}
                           value={watch('brandCity') || ''}
                           onChange={(val) =>
                             setValue('brandCity', val, {
@@ -691,18 +770,50 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                             })
                           }
                           options={cityOptions}
-                          placeholder={loadingLocations ? "Loading..." : "City"}
-                          searchable
-                          searchPlaceholder="Search cities..."
-                          emptyMessage="No matching city found"
-                          disabled={!selectedState || cityOptions.length === 0 || loadingLocations}
-                          className="w-full"
-                          menuLayer="modal"
+                          parentValue={selectedState || ''}
+                          parentPlaceholder="Select state first"
+                          loading={loadingLocations}
+                          placeholder="Select city / LGA"
+                          searchPlaceholder="Search cities or LGAs..."
+                          emptyMessage="No matching city or LGA found"
+                          fallbackHint="We couldn't load the list for this state — type your city or LGA."
                       />
                   </div>
                   {errors.brandCountry && (
                     <p className="text-xs text-red-500 font-medium">{errors.brandCountry.message}</p>
                   )}
+
+                  {/* The exact address. Country/state/city give the line shown
+                      under a brand name; this is where the brand actually is,
+                      and it is owner-only — it follows the same "show my
+                      location" privacy toggle as the rest. */}
+                  <div className="mt-4 space-y-2">
+                    <label htmlFor="brand-street-address" className="block text-sm font-semibold text-theme">
+                      Street address <span className="font-normal text-theme-secondary">(optional)</span>
+                    </label>
+                    <input
+                      id="brand-street-address"
+                      type="text"
+                      autoComplete="street-address"
+                      maxLength={255}
+                      value={watch('brandStreetAddress') || ''}
+                      onChange={(event) =>
+                        setValue('brandStreetAddress', event.target.value, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        })
+                      }
+                      disabled={isSubmitting}
+                      placeholder="12 Adeola Odeku St, Victoria Island"
+                      className="w-full rounded-lg border border-[color:var(--field-border)] bg-[color:var(--surface-primary)] px-3 py-2.5 text-sm text-theme placeholder:text-theme-muted focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary disabled:opacity-60"
+                    />
+                    <p className="text-xs text-theme-secondary">
+                      Only you can see this. Hidden entirely when “Show my location” is off in Settings.
+                    </p>
+                    {errors.brandStreetAddress && (
+                      <p className="text-xs text-red-500 font-medium">{errors.brandStreetAddress.message}</p>
+                    )}
+                  </div>
               </div>
 
               <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -732,16 +843,20 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   )}
                 </div>
                 
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-theme-secondary">Phone Number</label>
-                  <input 
-                    type="tel" 
-                    placeholder="+1 (555) 000-0000" 
-                    className="w-full h-12 px-4 rounded-lg border border-theme-strong surface-card text-theme placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                    {...register('phoneNumber')}
-                  />
-                  {errors.phoneNumber && <p className="text-xs text-red-500 font-medium">{errors.phoneNumber.message}</p>}
-                </div>
+                <PhoneNumberField
+                  value={watch('phoneNumber') || ''}
+                  onChange={(next) =>
+                    setValue('phoneNumber', next, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+                  }
+                  // Seed the dial code from the business country the user just
+                  // picked, so most people never touch the country selector.
+                  defaultCountry={phoneDefaultCountry}
+                  error={errors.phoneNumber?.message}
+                  helperText="Include your country code. Local trunk zeros (0803…) are handled for you."
+                />
                 
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-sm font-semibold text-theme-secondary">Instagram Handle</label>
@@ -755,8 +870,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     </div>
                     <input 
                       type="text" 
-                      placeholder="instagram.com/" 
-                      className="w-full h-12 pl-12 pr-4 rounded-lg border border-theme-strong surface-card text-theme placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                      placeholder="instagram.com/"
+                      className="form-field w-full h-12 pl-12 pr-4 rounded-lg"
                       {...register('socialInstagram')}
                     />
                   </div>
@@ -771,7 +886,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             <div className="flex justify-end gap-4 pt-2">
               {isSubmitting && submitStatusMessage ? (
                 <div className="mr-auto flex min-h-11 items-center gap-2 rounded-full bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 dark:bg-purple-500/10 dark:text-fuchsia-200" role="status" aria-live="polite">
-                  <VLoader size={18} phase={submitStatus === 'almost' ? 'finishing' : 'loading'} showLabel={false} />
+                  <MuseLoader size={18} />
                   <span>{submitStatusMessage}</span>
                 </div>
               ) : null}

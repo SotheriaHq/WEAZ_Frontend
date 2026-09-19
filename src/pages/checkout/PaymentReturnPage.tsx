@@ -13,7 +13,8 @@ import { customOrdersBuyerApi } from '@/api/CustomOrderApi';
 import { getCheckoutStatusCopy } from '@/pages/checkout/checkoutStatusCopy';
 import { setRuntimeCardholderNameMatchMode } from '@/pages/checkout/paymentFlow';
 import { canOfferCustomOrderCardRetry } from '@/pages/checkout/paymentRetryFlow';
-import { fetchCart, openCartDrawer } from '@/features/cartSlice';
+import { fetchCart, fetchCustomBagCount, openCartDrawer } from '@/features/cartSlice';
+import { queryClient } from '@/query/queryClient';
 import type { AppDispatch } from '@/store';
 
 type ViewState = 'verifying' | 'resolved' | 'missing';
@@ -84,11 +85,6 @@ const PaymentReturnPage: React.FC = () => {
   const statusHint = searchParams.get('status')?.trim() || undefined;
   const referenceLooksCustom = reference.toUpperCase().startsWith(CUSTOM_ORDER_REFERENCE_PREFIX);
   const shouldOfferCustomOrderRetry = canOfferCustomOrderCardRetry(attempt);
-
-  const openBag = useCallback((replace?: boolean) => {
-    dispatch(openCartDrawer());
-    navigate('/', { replace });
-  }, [dispatch, navigate]);
 
   useEffect(() => {
     let active = true;
@@ -168,6 +164,23 @@ const PaymentReturnPage: React.FC = () => {
   ) => {
     if (status === 'PAID') {
       await dispatch(fetchCart({ force: true }));
+      /*
+        The bag badge is `totalQuantity + customBagCount`, and `fetchCart` only
+        refreshes the standard half. A unified checkout that paid for CUSTOM
+        lines therefore left the badge showing the pre-order number until the
+        30s read TTL lapsed — the "bag count did not clear after placing the
+        order" report. `force` is required because the thunk short-circuits
+        inside that same TTL.
+      */
+      await dispatch(fetchCustomBagCount({ force: true }));
+      // A new order now exists. The Orders tab uses a cache-first resource with
+      // refetchOnMount:false, so without this it paints the pre-order cache and
+      // the buyer had to hard-refresh to see the order they just placed. Force a
+      // fresh fetch (active + inactive) so the tab is populated on arrival.
+      void queryClient.invalidateQueries({
+        queryKey: ['profile', 'orders', 'me'],
+        refetchType: 'all',
+      });
       toast.success('Your order is placed successfully, Thank you for shopping.');
       navigate(`/bag/confirmation?reference=${encodeURIComponent(reference)}`, {
         replace: options?.replace,
@@ -346,7 +359,7 @@ const PaymentReturnPage: React.FC = () => {
         <div className="mb-6 text-6xl">🧾</div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Payment return data is missing</h1>
         <p className="mb-8 text-gray-500 dark:text-zinc-400">
-          WEAZ could not find the reference needed to resume this payment flow.
+          WIEZ could not find the reference needed to resume this payment flow.
         </p>
         <div className="flex flex-col justify-center gap-3 sm:flex-row">
           <Button onClick={() => navigate('/profile?tab=orders')}>Open my orders</Button>
@@ -363,7 +376,7 @@ const PaymentReturnPage: React.FC = () => {
         <div className="mb-6 text-6xl">🌀</div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Verifying payment</h1>
         <p className="text-gray-500 dark:text-zinc-400">
-          Stage 1/2 - WEAZ is checking the latest payment status for reference {reference || 'unknown'}.
+          Stage 1/2 - WIEZ is checking the latest payment status for reference {reference || 'unknown'}.
         </p>
       </div>
     );
@@ -385,6 +398,26 @@ const PaymentReturnPage: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+      {/* Top navigation bar for mobile browser & desktop */}
+      <div className="mb-6 flex items-center justify-between gap-3 border-b border-gray-200/70 pb-4 dark:border-zinc-800">
+        <button
+          type="button"
+          onClick={() => navigate('/runway')}
+          className="flex items-center gap-1.5 rounded-full border border-black/10 bg-black/5 px-3.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-black/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 transition-colors"
+        >
+          <span>← 👗</span>
+          <span>Back to Runway</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/profile')}
+          className="flex items-center gap-1.5 rounded-full border border-black/10 bg-black/5 px-3.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-black/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 transition-colors"
+        >
+          <span>👤</span>
+          <span>My Profile</span>
+        </button>
+      </div>
+
       <div className="mb-6 text-6xl">{statusCopy.emoji}</div>
       <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">{statusCopy.headline}</h1>
       <p className="mb-8 text-gray-500 dark:text-zinc-400">{statusCopy.description}</p>
@@ -419,7 +452,7 @@ const PaymentReturnPage: React.FC = () => {
       {shouldAutoVerify && autoVerifyAttempts < AUTO_VERIFY_MAX_ATTEMPTS && (
         <div className="mb-8 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-left text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
           <p>
-            WEAZ is checking automatically every 10 seconds (attempt {Math.min(autoVerifyAttempts + 1, AUTO_VERIFY_MAX_ATTEMPTS)} of {AUTO_VERIFY_MAX_ATTEMPTS}).
+            WIEZ is checking automatically every 10 seconds (attempt {Math.min(autoVerifyAttempts + 1, AUTO_VERIFY_MAX_ATTEMPTS)} of {AUTO_VERIFY_MAX_ATTEMPTS}).
           </p>
           <p className="mt-1">
             You can safely leave this page — your payment is being confirmed in the background.
@@ -450,7 +483,7 @@ const PaymentReturnPage: React.FC = () => {
               Retry this payment from your bag checkout
             </h2>
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              WEAZ now uses one payment initialization path. Prepare this custom order in your bag, then complete payment in checkout.
+              WIEZ now uses one payment initialization path. Prepare this custom order in your bag, then complete payment in checkout.
             </p>
           </div>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -469,14 +502,14 @@ const PaymentReturnPage: React.FC = () => {
       <div className="flex flex-col justify-center gap-3 sm:flex-row">
         {resolvedStatus === 'PAID' ? (
           <Button onClick={() => navigate(`/bag/confirmation?reference=${encodeURIComponent(reference)}`)}>
-            Open confirmation
+            🧾 Open confirmation
           </Button>
         ) : (
           <Button
             onClick={() => void handleVerifyAgain()}
             loading={submitting || autoVerifying || preparingUnifiedRetry}
           >
-            Verify again
+            🔄 Verify again
           </Button>
         )}
         <Button
@@ -489,15 +522,15 @@ const PaymentReturnPage: React.FC = () => {
               : navigate('/profile?tab=orders')
           }
         >
-          {isCustomOrderAttempt
+          📦 {isCustomOrderAttempt
             ? attempt?.customOrderId
               ? 'Open custom order'
               : 'Open custom orders'
             : 'Open my orders'}
         </Button>
-        {!isCustomOrderAttempt && (
-          <Button variant="ghost" onClick={() => openBag()}>Return to bag</Button>
-        )}
+        <Button variant="secondary" onClick={() => navigate('/runway')}>
+          ← 👗 Back to Runway
+        </Button>
       </div>
     </div>
   );

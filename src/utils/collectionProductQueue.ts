@@ -18,8 +18,8 @@ export interface CollectionProductQueueItem {
   updatedAt: number;
 }
 
-const STORAGE_PREFIX = 'threadly.collectionProductQueue.';
-const EVENT_NAME = 'threadly:collection-product-queue-changed';
+const STORAGE_PREFIX = 'wiez.collectionProductQueue.';
+const EVENT_NAME = 'wiez:collection-product-queue-changed';
 
 type QueueChangeEventDetail = {
   sessionId: string;

@@ -6,13 +6,13 @@ import { env } from '@/config/env';
 import { clearSignedFileUrlSessionCache } from '@/hooks/useSignedFileUrl';
 import { ACTIVE_BRAND_STORAGE_KEY } from '@/lib/brandAccess';
 import { disconnectSocket } from '@/lib/ws';
-import { purgeWebPersistedQueryCache, THREADLY_QUERY_CACHE_STORAGE_KEY } from '@/query/queryPersistor';
+import { purgeWebPersistedQueryCache, WIEZ_QUERY_CACHE_STORAGE_KEY } from '@/query/queryPersistor';
 import { PRIVATE_QUERY_ROOTS } from '@/query/queryKeys';
 import { clearWebMarketSignalQueue } from '@/services/marketSignalQueue';
 
-const SIGNED_URL_SESSION_STORAGE_KEY = 'threadly_signed_url_cache';
-const PENDING_BAG_ACTION_SESSION_STORAGE_KEY = 'threadly.pendingBagAction.v1';
-const UNIFIED_CHECKOUT_QUEUE_SESSION_STORAGE_KEY = 'threadly.unifiedCheckout.queue.v1';
+const SIGNED_URL_SESSION_STORAGE_KEY = 'wiez_signed_url_cache';
+const PENDING_BAG_ACTION_SESSION_STORAGE_KEY = 'wiez.pendingBagAction.v1';
+const UNIFIED_CHECKOUT_QUEUE_SESSION_STORAGE_KEY = 'wiez.unifiedCheckout.queue.v1';
 
 export const isWebPrivateSessionQueryKey = (queryKey: QueryKey) => {
   const [root, scope] = queryKey;
@@ -73,7 +73,7 @@ export const clearWebPrivateSessionState = async ({
     env.tokenStorageKey,
     env.userStorageKey,
     ACTIVE_BRAND_STORAGE_KEY,
-    THREADLY_QUERY_CACHE_STORAGE_KEY,
+    WIEZ_QUERY_CACHE_STORAGE_KEY,
   ]);
   removeSessionStorageKeys([
     SIGNED_URL_SESSION_STORAGE_KEY,

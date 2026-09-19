@@ -14,6 +14,7 @@ import EmailPreferencesSettings from '@/components/settings/tabs/EmailPreference
 import StoreGeneralSettings from '@/components/settings/tabs/StoreGeneralSettings';
 import StorePoliciesSettings from '@/components/settings/tabs/StorePoliciesSettings';
 import StorePaymentsSettings from '@/components/settings/tabs/StorePaymentsSettings';
+import StoreHoursSettings from '@/components/settings/tabs/StoreHoursSettings';
 import ProfileVisibilitySettings from '@/components/settings/tabs/ProfileVisibilitySettings';
 import SizeFitSettings from '@/components/settings/tabs/SizeFitSettings';
 import HiddenContentSettings from './HiddenContentSettings';
@@ -67,7 +68,7 @@ const LocationSettings: React.FC = () => {
           Location
         </h1>
         <p className="text-gray-500 dark:text-gray-400">
-          Choose whether WEAZ can ask for your location to personalize nearby brands, delivery context, and future local discovery.
+          Choose whether WIEZ can ask for your location to personalize nearby brands, delivery context, and future local discovery.
         </p>
       </div>
 
@@ -79,7 +80,7 @@ const LocationSettings: React.FC = () => {
           Share your location?
         </h2>
         <p className="mb-5 max-w-xl text-sm leading-6 text-gray-600 dark:text-gray-300">
-          WEAZ will always ask before using your location. Your precise location will not be shared with brands or other users from this screen.
+          WIEZ will always ask before using your location. Your precise location will not be shared with brands or other users from this screen.
         </p>
         <button
           type="button"
@@ -194,6 +195,7 @@ const sections: Record<string, React.ReactNode> = {
 
   // Studio
   'store-general': <StoreGeneralSettings />,
+  'store-hours': <StoreHoursSettings />,
   'store-social': (
     <ComingSoon
       title="Social & Links"
@@ -268,15 +270,16 @@ const SettingsHome: React.FC = () => {
   }, [active, isBrandUser, setSearchParams]);
 
   const setActive = (key: string) => {
-    setSearchParams({ tab: key });
+    // Tab switches are UI state — replace so mobile back doesn't replay them.
+    setSearchParams({ tab: key }, { replace: true });
   };
 
   return (
     <div className="min-h-screen">
       <SettingsSidebar active={resolvedActive} onSelect={setActive} />
 
-      <div className="min-h-screen pb-10 px-4 md:pl-[248px] pt-6">
-        <div className="max-w-4xl mx-auto">
+      <div className="min-h-screen pb-10 pl-[126px] pr-3 pt-4 text-[13px] md:pl-[236px] md:pr-4 md:pt-6 md:text-base">
+        <div className="max-w-4xl mx-auto [&_h1]:text-xl [&_h1]:md:text-2xl [&_h2]:text-base [&_h2]:md:text-lg">
           <Breadcrumbs activeKey={resolvedActive} onNavigate={setActive} />
           {resolvedSection ?? (
             <ComingSoon

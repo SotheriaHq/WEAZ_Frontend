@@ -225,6 +225,8 @@ export interface OrderItem {
   productName?: string | null;
   thumbnail?: string | null;
   image?: string | null;
+  /** All renderable angles for this product (falls back to the cover). */
+  images?: string[] | null;
   price: number;
   unitPrice?: number;
   quantity: number;
@@ -581,6 +583,18 @@ export const getMyOrder = async (orderId: string): Promise<Order> => {
   return extractData<Order>(res);
 };
 
+// Lightweight change-detection signature for the buyer's orders (standard +
+// custom). Used as a cheap disconnected-socket fallback so the Orders tab only
+// refetches the heavy list when this signature actually changes.
+export const getMyOrdersVersion = async (): Promise<{
+  version: string;
+  count: number;
+  lastUpdated: string | null;
+}> => {
+  const res = await apiClient.get('/store/orders/version');
+  return extractData(res);
+};
+
 export const confirmMyOrderDelivery = async (
   orderId: string,
   note?: string,
@@ -668,13 +682,40 @@ export interface BrandStoreInfo {
 
 // ============= Store Status & Setup =============
 
+export type WeekdayKey =
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday';
+
+export interface DaySchedule {
+  /** "HH:mm" 24h. */
+  open: string;
+  close: string;
+  closed: boolean;
+}
+
+export type WorkingHoursSchedule = Record<WeekdayKey, DaySchedule>;
+
 export interface StoreStatusResponse {
   brandId: string;
   isStoreOpen: boolean;
   isEmailVerified?: boolean;
   isProfileComplete?: boolean;
   profileMissingFields?: string[];
+  /** True only after the owner pressed Publish AND data is complete. */
   isSetupComplete: boolean;
+  /** Data completeness only — enables the Publish button, never the studio. */
+  isReadyToPublish?: boolean;
+  /** Owner has pressed Publish at least once (survives pausing). */
+  isPublished?: boolean;
+  /** Whether the brand has configured its working hours (Business Hours). */
+  businessHoursConfigured?: boolean;
+  /** Whether working hours are currently a hard requirement (server flag). */
+  workingHoursRequired?: boolean;
   missingFields: string[];
   profile: {
     name: string;
@@ -689,6 +730,8 @@ export interface StoreStatusResponse {
     socialTiktok?: string | null;
     socialWebsite?: string | null;
     responseTimeSla?: string | null;
+    workingHours?: WorkingHoursSchedule | null;
+    timezone?: string | null;
   };
   paymentAccount?: StorePaymentAccountSummary | null;
 }
@@ -723,7 +766,22 @@ export interface StorePaymentAccountSummary {
   updatedAt: string | null;
 }
 
-const STORE_STATUS_TTL_MS = 30 * 1000;
+/**
+ * Store status is invalidated on the things that change it, so it can be held.
+ *
+ * This was 30 seconds. Every Studio screen resolves `brandId` from
+ * `/store/status` before its own query is allowed to run, so a 30-second TTL
+ * meant that navigating around Studio for longer than half a minute put a fresh
+ * blocking request in front of EVERY screen — a loader on arrival at a screen
+ * whose data was already cached and ready. That is the "everything reloads when
+ * I come back" report.
+ *
+ * Nothing here is guessy: `clearStoreStatusCache()` already runs on the
+ * mutations that can change this (opening the store, completing setup), so a
+ * long TTL cannot serve a stale brandId or a stale setup flag. The TTL is only
+ * a backstop for changes made in another tab or by an admin.
+ */
+const STORE_STATUS_TTL_MS = 10 * 60 * 1000;
 let storeStatusCache: { data: StoreStatusResponse; expiresAt: number } | null = null;
 let storeStatusPending: Promise<StoreStatusResponse> | null = null;
 
@@ -864,6 +922,8 @@ export interface StoreProfileUpdateData {
   banner?: string;
   tags?: string[];
   contactEmail?: string;
+  /** Publish `contactEmail` on the public brand profile. Brand-only. */
+  contactEmailPublic?: boolean;
   socialInstagram?: string;
   socialTwitter?: string;
   socialTiktok?: string;
@@ -890,6 +950,13 @@ export interface StoreWizardPrefillResponse {
   flags: {
     isEmailVerified: boolean;
     hasLiveStore: boolean;
+    /**
+     * Server truth for "has Essentials been saved". Prefer this over the
+     * localStorage flag, which the mobile WebView cannot be trusted to hold
+     * and which strands brands mid-flow when it is stale. Optional so an older
+     * API build degrades to the local hint rather than to `false`.
+     */
+    essentialsComplete?: boolean;
   };
 }
 
@@ -903,9 +970,16 @@ export interface StoreGeneralSettingsResponse {
   banner: string;
   tags: string[];
   contactEmail: string;
+  /** Whether the contact email is currently shown on the public profile. */
+  contactEmailPublic?: boolean;
   isEmailVerified: boolean;
   isStoreOpen: boolean;
+  /** True only after the owner pressed Publish AND data is complete. */
   isSetupComplete: boolean;
+  /** Data completeness only — enables the Publish button, never the studio. */
+  isReadyToPublish?: boolean;
+  /** Owner has pressed Publish at least once (survives pausing). */
+  isPublished?: boolean;
   missingFields: string[];
   storeNameLastChangedAt: string | null;
   storeNameNextAllowedAt: string | null;
@@ -960,6 +1034,22 @@ export const updateStoreName = async (payload: {
   return extractData<StoreGeneralSettingsResponse>(res);
 };
 
+/**
+ * The cached status, or null — without awaiting anything.
+ *
+ * `getStoreStatus` is async even on a cache hit, so a component that resolves
+ * `brandId` in an effect renders at least once with `brandId === null`. Screens
+ * gate their data query on `enabled: Boolean(brandId)`, so that one render is
+ * enough to show a skeleton for data that was already in hand. Seeding the
+ * state from this instead means a warm cache costs no render at all.
+ */
+export const getCachedStoreStatus = (): StoreStatusResponse | null => {
+  if (storeStatusCache && storeStatusCache.expiresAt > Date.now()) {
+    return storeStatusCache.data;
+  }
+  return null;
+};
+
 export const getStoreStatus = async (options?: { forceRefresh?: boolean }): Promise<StoreStatusResponse> => {
   const forceRefresh = options?.forceRefresh === true;
   if (!forceRefresh && storeStatusCache && storeStatusCache.expiresAt > Date.now()) {
@@ -1006,6 +1096,20 @@ export const updateStoreProfile = async (data: StoreProfileUpdateData): Promise<
   const status = extractData<StoreStatusResponse>(res);
   storeStatusCache = { data: status, expiresAt: Date.now() + STORE_STATUS_TTL_MS };
   return status;
+};
+
+export const updateWorkingHours = async (data: {
+  workingHours: WorkingHoursSchedule;
+  timezone: string;
+}): Promise<{
+  workingHours: WorkingHoursSchedule;
+  timezone: string;
+  businessHoursConfiguredAt: string | null;
+}> => {
+  const res = await apiClient.patch('/store/working-hours', data);
+  // Setup status now depends on this; drop the cache so the gate re-evaluates.
+  clearStoreStatusCache();
+  return extractData(res);
 };
 
 export const getStorePolicies = async (): Promise<StorePoliciesResponse> => {
@@ -1201,6 +1305,7 @@ export default {
   openStore,
   closeStore,
   updateStoreProfile,
+  updateWorkingHours,
   getStorePolicies,
   updateStorePaymentAccount,
   updateStorePolicies,

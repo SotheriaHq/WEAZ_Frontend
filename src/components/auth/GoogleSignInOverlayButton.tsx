@@ -49,7 +49,15 @@ export default function GoogleSignInOverlayButton({
   }, [context, loading]);
 
   return (
-    <div className="relative">
+    /*
+      `group` and `auth-social-overlay-host` both exist because Google's real
+      button is mounted as a transparent iframe pinned over ours. The pointer
+      therefore never reaches the styled <button>, so `.auth-social-btn:hover`
+      and the label's `group-hover:` never fired and Google was the only social
+      button with no hover state. Hover is driven from this wrapper instead,
+      which covers the overlay as well as the button.
+    */
+    <div className="auth-social-overlay-host group relative">
       <GoogleSignInButton
         label={label}
         loading={loading}

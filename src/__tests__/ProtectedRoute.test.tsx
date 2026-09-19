@@ -15,8 +15,8 @@ vi.mock('@/context/AuthContext', () => ({
 
 const baseUser: AuthUserDto = {
   id: 'user-1',
-  username: 'threadly',
-  email: 'threadly@example.com',
+  username: 'wiez',
+  email: 'wiez@example.com',
   firstName: 'Thread',
   lastName: 'Ly',
   role: 'User',
@@ -99,7 +99,9 @@ describe('RequireAuthenticated', () => {
 
     renderProtectedPage(null);
 
-    expect(screen.getByText('Verifying your session...')).toBeInTheDocument();
+    // The guard renders nothing for the first 400ms so a fast hydration never
+    // flashes a loader. What matters here is that private content is withheld.
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.queryByText('Private profile content')).not.toBeInTheDocument();
     expect(screen.queryByText('Login page')).not.toBeInTheDocument();
   });
@@ -119,7 +121,9 @@ describe('RequireAuthenticated', () => {
 
     renderProtectedPage(baseUser);
 
-    expect(screen.getByText('Verifying your session...')).toBeInTheDocument();
+    // The guard renders nothing for the first 400ms so a fast hydration never
+    // flashes a loader. What matters here is that private content is withheld.
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.queryByText('Private profile content')).not.toBeInTheDocument();
   });
 

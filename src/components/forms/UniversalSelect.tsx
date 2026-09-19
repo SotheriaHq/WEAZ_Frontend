@@ -13,6 +13,7 @@ export interface UniversalSelectOption {
   label: string;
   icon?: React.ReactNode;
   description?: string;
+  disabled?: boolean;
 }
 
 interface UniversalSelectProps {
@@ -24,6 +25,8 @@ interface UniversalSelectProps {
   disabled?: boolean;
   className?: string;
   error?: string;
+  /** Shows the required asterisk, matching `Input`/`Textarea`. */
+  required?: boolean;
   searchable?: boolean;
   searchPlaceholder?: string;
   emptyMessage?: string;
@@ -31,6 +34,9 @@ interface UniversalSelectProps {
   optionAllowWrap?: boolean;
   selectedAllowWrap?: boolean;
   menuLayer?: 'dropdown' | 'modal';
+  size?: 'sm' | 'md' | 'lg';
+  compact?: boolean;
+  fitContent?: boolean;
 }
 
 const normalizeSearchText = (value: string): string =>
@@ -46,6 +52,7 @@ const MENU_MIN_HEIGHT = 120;
 const MENU_MAX_HEIGHT = 320;
 
 const UniversalSelect: React.FC<UniversalSelectProps> = ({
+  required,
   label,
   value,
   onChange,
@@ -58,10 +65,26 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
   searchPlaceholder = 'Search options...',
   emptyMessage = 'No matching options',
   optionCompact = false,
-  optionAllowWrap = false,
-  selectedAllowWrap = false,
+  /**
+   * Wraps by default.
+   *
+   * This defaulted to `false`, i.e. `truncate` — so every dropdown in the app
+   * clipped its own option labels unless a caller remembered to opt out. A
+   * truncated option is the one thing a picker must never do: the label IS the
+   * choice, and "Chest (across bust, unde…" and "Chest (across back, unde…" are
+   * the same option as far as the reader can tell. Wrapping costs a row of
+   * height; truncation costs the decision.
+   */
+  optionAllowWrap = true,
+  // Same reasoning as `optionAllowWrap`: the closed control must show which
+  // option is actually selected, not a prefix of it.
+  selectedAllowWrap = true,
   menuLayer = 'dropdown',
+  size = 'md',
+  compact = false,
+  fitContent = false,
 }) => {
+  const isSmall = compact || size === 'sm';
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties | null>(null);
@@ -106,7 +129,13 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
       ),
     );
 
-    const optionRowHeight = optionCompact ? 42 : 50;
+    const optionRowHeight = optionAllowWrap
+      ? optionCompact
+        ? 56
+        : 64
+      : optionCompact
+        ? 42
+        : 50;
     const searchHeight = searchable ? 58 : 0;
     const contentHeight =
       searchHeight +
@@ -151,18 +180,20 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
           ? 'calc(var(--z-modal) + 1)'
           : 'var(--z-dropdown)',
     });
-  }, [filteredOptions.length, menuLayer, optionCompact, searchable]);
+  }, [filteredOptions.length, menuLayer, optionAllowWrap, optionCompact, searchable]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
+    // Pointer events cover mouse + touch (iPad/iOS Safari often misses mousedown-only).
+    const handlePointerOutside = (event: Event) => {
+      const target = event.target as Node | null;
+      if (!target) return;
       if (containerRef.current?.contains(target)) return;
       if (menuRef.current?.contains(target)) return;
       setIsOpen(false);
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('pointerdown', handlePointerOutside, true);
+    return () => document.removeEventListener('pointerdown', handlePointerOutside, true);
   }, []);
 
   useEffect(() => {
@@ -213,8 +244,8 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
-  const handleSelect = (optionValue: string) => {
-    if (disabled) return;
+  const handleSelect = (optionValue: string, optionDisabled?: boolean) => {
+    if (disabled || optionDisabled) return;
     onChange(optionValue);
     setIsOpen(false);
   };
@@ -243,24 +274,42 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
             <div
               role="listbox"
               aria-label={label ?? placeholder}
-              className="max-h-56 space-y-1 overflow-y-auto overscroll-contain p-1 pr-1.5 scrollbar-threadly"
+              className="max-h-56 space-y-1 overflow-y-auto overscroll-contain p-1 pr-1.5 scrollbar-wiez"
               onWheel={(event) => event.stopPropagation()}
               onTouchMove={(event) => event.stopPropagation()}
             >
               {filteredOptions.map((option) => {
                 const isSelected = option.value === value;
+                const optionDisabled = option.disabled;
                 return (
                   <div
                     key={option.value}
                     role="option"
                     aria-selected={isSelected}
-                    onClick={() => handleSelect(option.value)}
+                    onPointerDown={(event) => {
+                      // Prevent parent modal focus-trap / backdrop from stealing
+                      // the gesture on iPad before click fires.
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (optionDisabled) return;
+                      handleSelect(option.value, optionDisabled);
+                    }}
                     className={`
-                      relative cursor-pointer select-none rounded-xl ${optionCompact ? 'py-2 pl-2.5 pr-8' : 'py-2.5 pl-3 pr-9'} transition-colors
+                      relative select-none rounded-xl touch-manipulation ${optionCompact ? 'min-h-[44px] py-2 pl-2.5 pr-8' : 'min-h-[48px] py-2.5 pl-3 pr-9'} transition-colors
                       ${
-                        isSelected
+                        optionDisabled
+                          ? 'opacity-40 cursor-not-allowed text-[color:var(--text-secondary)] bg-transparent'
+                          : 'cursor-pointer'
+                      }
+                      ${
+                        !optionDisabled && isSelected
                           ? 'menu-item-selected'
-                          : 'menu-item-interactive'
+                          : !optionDisabled
+                            ? 'menu-item-interactive'
+                            : ''
                       }
                     `}
                   >
@@ -317,14 +366,15 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
       : null;
 
   return (
-    <div className={`relative space-y-2 ${className}`} ref={containerRef}>
+    <div className={`relative ${fitContent ? 'inline-block' : 'w-full space-y-1.5'} ${className}`} ref={containerRef}>
       {label && (
-        <label className="block text-sm font-medium text-[color:var(--text-secondary)]">
+        <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">
           {label}
+          {required && <span className="text-purple-500 ml-1">*</span>}
         </label>
       )}
 
-      <div className="relative">
+      <div className={fitContent ? 'inline-block' : 'relative w-full'}>
         <button
           type="button"
           onClick={() => !disabled && setIsOpen(!isOpen)}
@@ -333,38 +383,59 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
           aria-haspopup="listbox"
           aria-expanded={isOpen}
           className={`
-            relative w-full cursor-pointer rounded-2xl border text-left shadow-sm transition-colors duration-200
-            flex items-center justify-between px-4 py-3.5 ${selectedAllowWrap ? 'items-start' : 'items-center'}
+            relative cursor-pointer text-left transition-all duration-200
+            flex items-center ${fitContent ? 'w-auto gap-2' : 'w-full justify-between gap-3'}
+            ${isSmall ? 'rounded-xl px-3 py-2 text-xs font-semibold' : 'rounded-2xl px-4 py-3.5 text-sm'}
             ${disabled ? 'cursor-not-allowed opacity-60 bg-[color:var(--surface-muted)]' : 'surface-menu backdrop-blur-xl surface-interactive-hover'}
             ${
               error
                 ? 'border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.10)]'
-                : 'border-[color:var(--border-default)] hover:border-[color:var(--border-strong)]'
+                : isSmall
+                  ? 'border border-slate-200/70 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
+                  : 'border border-[color:var(--border-default)] hover:border-[color:var(--border-strong)]'
             }
           `}
         >
-          <span className={`flex min-w-0 flex-1 ${selectedAllowWrap ? 'items-start' : 'items-center'} ${!selectedOption ? 'text-[color:var(--text-secondary)]' : 'text-[color:var(--text-primary)]'}`}>
+          <span
+            className={`flex min-w-0 ${fitContent ? '' : 'flex-1'} ${selectedAllowWrap ? 'items-start pr-4' : 'items-center'} ${!selectedOption ? 'text-[color:var(--text-secondary)]' : 'text-[color:var(--text-primary)]'}`}
+          >
             {selectedOption ? (
-              <span className={`flex min-w-0 gap-2 ${selectedAllowWrap ? 'items-start' : 'items-center'}`}>
+              <span className={`flex min-w-0 ${fitContent ? '' : 'flex-1'} gap-1.5 ${selectedAllowWrap ? 'items-start' : 'items-center'}`}>
                 {selectedOption.icon && (
                   <span className="flex-shrink-0 text-[color:var(--text-secondary)]">
                     {selectedOption.icon}
                   </span>
                 )}
-                <span className={selectedAllowWrap ? 'whitespace-normal break-words text-sm leading-5' : 'truncate'}>
+                <span
+                  className={
+                    selectedAllowWrap
+                      ? 'block w-full whitespace-normal break-words text-xs leading-4'
+                      : 'truncate'
+                  }
+                >
                   {selectedOption.label}
                 </span>
               </span>
             ) : (
-              <span className={selectedAllowWrap ? 'whitespace-normal break-words text-sm leading-5' : 'truncate'}>
+              <span
+                className={
+                  selectedAllowWrap
+                    ? 'block w-full whitespace-normal break-words text-xs leading-4'
+                    : 'truncate'
+                }
+              >
                 {placeholder}
               </span>
             )}
           </span>
-          <span className="pointer-events-none flex items-center pr-2">
+          <span
+            className={`pointer-events-none flex items-center shrink-0 ${
+              selectedAllowWrap ? 'absolute right-2.5 top-2.5' : 'pl-0.5'
+            }`}
+          >
             <span
               aria-hidden="true"
-              className={`text-base leading-none text-[color:var(--text-secondary)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+              className={`leading-none text-[color:var(--text-secondary)] opacity-70 transition-transform duration-200 ${isSmall ? 'text-xs' : 'text-base'} ${isOpen ? 'rotate-180' : ''}`}
             >
               ⌄
             </span>

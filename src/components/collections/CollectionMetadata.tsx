@@ -170,8 +170,8 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
               <span
                 className={`inline-block text-[9px] px-1.5 py-0.5 rounded-md border font-medium uppercase tracking-wider ${
                   visibility === 'PUBLIC'
-                    ? 'text-emerald-700 border-emerald-300/60 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-300'
-                    : 'text-amber-700 border-amber-300/60 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-300'
+                    ? 'text-emerald-700 border-emerald-300/60 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-500/40'
+                    : 'text-amber-700 border-amber-300/60 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-500/40'
                 }`}
               >
                 {visibility}
@@ -340,7 +340,7 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-sm hover:from-purple-700 hover:to-indigo-700 transition shadow-lg shadow-purple-500/30"
             >
               <ShoppingCart className="w-4 h-4" />
-              Add to Cart
+              Bag It
             </button>
           )}
           {onAddToWishlist && (
@@ -365,7 +365,7 @@ export const CollectionMetadata: React.FC<CollectionMetadataProps> = ({
           {onCancelSale && (
             <button
               onClick={onCancelSale}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-red-300/40 bg-white/50 dark:bg-white/10 text-red-700 dark:text-red-300 hover:bg-white/70 dark:hover:bg-white/15 transition text-xs font-semibold backdrop-blur-md shadow-sm"
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-red-300/40 bg-white/50 dark:bg-white/10 text-red-700 dark:text-red-300 hover:bg-white/70 dark:hover:bg-white/15 transition text-xs font-semibold backdrop-blur-md shadow-sm dark:border-red-500/40"
             >
               Cancel Sale
             </button>

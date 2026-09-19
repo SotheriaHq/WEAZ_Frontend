@@ -7,6 +7,38 @@ export interface MessagingCursor {
   id: string;
 }
 
+/**
+ * The thing a message is ABOUT, carried alongside it.
+ *
+ * The backend accepts these on every send path (`buildContentContextMeta` in
+ * `messaging.service.ts` copies them into `metadataJson`), and `MessageBubble`
+ * renders them as a tappable card above the text. Only `sendBrandMessage`
+ * declared them on the web, which is why a message sent from an ORDER arrived
+ * naming nothing: the brand writes "your piece is ready" and the shopper — who
+ * may have several orders open with several brands — has to work out which
+ * piece from a truncated UUID in the thread header.
+ *
+ * Design and product are parallel sets rather than a generic
+ * contextType/contextId pair; see the DTO for why.
+ */
+export interface MessageContentContext {
+  contextDesignId?: string;
+  contextDesignTitle?: string;
+  contextDesignCoverFileId?: string;
+  contextDesignCoverUrl?: string;
+  contextProductId?: string;
+  contextProductTitle?: string;
+  contextProductCoverFileId?: string;
+  contextProductCoverUrl?: string;
+}
+
+export interface SendMessagePayload extends MessageContentContext {
+  bodyText?: string;
+  clientMessageId: string;
+  attachmentFileIds?: string[];
+  replyToMessageId?: string;
+}
+
 export interface MessageAttachment {
   id: string;
   kind: 'IMAGE' | 'DOCUMENT';
@@ -39,9 +71,24 @@ export interface ThreadMessage {
   createdAt: string;
   /** Delivery status: SENT (single tick), DELIVERED (double tick), READ (colored double tick) */
   deliveryStatus?: 'SENT' | 'DELIVERED' | 'READ';
+  /**
+   * CLIENT-ONLY, never sent by the server.
+   *
+   * A message appears in the thread the moment it is written, so the thread has
+   * to be able to say "on its way" and "did not go" — states that do not exist
+   * for a message the server has already accepted. Present on a bubble only
+   * until the real row arrives to replace it.
+   */
+  _optimistic?: 'sending' | 'failed';
   sender?: {
     id: string;
     username?: string | null;
+    /**
+     * Canonical, server-resolved name — brand name for a brand account, full
+     * name for a person. Prefer this over joining the parts below; read it
+     * through `resolveParticipantDisplayName`.
+     */
+    displayName?: string | null;
     firstName?: string | null;
     lastName?: string | null;
     profileImage?: string | null;
@@ -52,6 +99,11 @@ export interface ThreadMessage {
     contextDesignTitle?: string;
     contextDesignCoverFileId?: string;
     contextDesignCoverUrl?: string;
+    /* A message composed from a Market product references it the same way. */
+    contextProductId?: string;
+    contextProductTitle?: string;
+    contextProductCoverFileId?: string;
+    contextProductCoverUrl?: string;
     [key: string]: unknown;
   } | null;
   /** Quoted message for replies (set when replyToMessageId was provided on send) */
@@ -106,6 +158,12 @@ export interface InboxItem {
   participant?: {
     id: string;
     username?: string | null;
+    /**
+     * Canonical, server-resolved name — brand name for a brand account, full
+     * name for a person. Prefer this over joining the parts below; read it
+     * through `resolveParticipantDisplayName`.
+     */
+    displayName?: string | null;
     firstName?: string | null;
     lastName?: string | null;
     profileImage?: string | null;
@@ -127,6 +185,10 @@ export interface InboxResponse {
   hasNextPage: boolean;
   endCursor: { cursorLastMessageAt: string; cursorThreadId: string } | null;
 }
+
+export type OrderConversationRef =
+  | { orderId: string; customOrderId?: never }
+  | { customOrderId: string; orderId?: never };
 
 export interface ResolvedThreadRoute {
   threadId: string;
@@ -261,7 +323,7 @@ export const messagingApi = {
     return unwrapApiResponse<any>(response.data);
   },
 
-  async sendCustomOrderMessage(orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
+  async sendCustomOrderMessage(orderId: string, payload: SendMessagePayload) {
     const response = await apiClient.post(
       `/custom-orders/${orderId}/messages`,
       payload,
@@ -271,7 +333,7 @@ export const messagingApi = {
     return unwrapApiResponse<any>(response.data);
   },
 
-  async sendCustomOrderMessageForBrand(brandId: string, orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
+  async sendCustomOrderMessageForBrand(brandId: string, orderId: string, payload: SendMessagePayload) {
     const response = await apiClient.post(
       `/brands/${brandId}/custom-orders/${orderId}/messages`,
       payload,
@@ -345,7 +407,7 @@ export const messagingApi = {
     return parseMessageList(response.data);
   },
 
-  async sendOrderMessage(orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
+  async sendOrderMessage(orderId: string, payload: SendMessagePayload) {
     const response = await apiClient.post(
       `/orders/${orderId}/messages`,
       payload,
@@ -355,7 +417,7 @@ export const messagingApi = {
     return unwrapApiResponse<any>(response.data);
   },
 
-  async sendOrderMessageForBrand(brandId: string, orderId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
+  async sendOrderMessageForBrand(brandId: string, orderId: string, payload: SendMessagePayload) {
     const response = await apiClient.post(
       `/brands/${brandId}/orders/${orderId}/messages`,
       payload,
@@ -536,6 +598,40 @@ export const messagingApi = {
     return unwrapApiResponse<ResolvedThreadRoute>(response.data);
   },
 
+  // Resolve a conversation from a context reference (order/custom order/brand)
+  // to its actual thread. Actor-scoped server-side (JWT), so it only ever
+  // returns a thread the caller participates in — no cross-account resolution.
+  async resolveConversation(params: {
+    orderId?: string;
+    customOrderId?: string;
+    brandId?: string;
+    threadId?: string;
+  }) {
+    const response = await apiClient.get('/messaging/conversations/resolve', {
+      params,
+    });
+    return unwrapApiResponse<ResolvedThreadRoute>(response.data);
+  },
+
+  /**
+   * Read-only: is there already a conversation with this order's brand?
+   * Drives "Go to conversation" vs "Open conversation"; never creates a thread.
+   */
+  async findOrderConversation(params: OrderConversationRef, signal?: AbortSignal) {
+    const response = await apiClient.get('/messaging/conversations/by-order', { params, signal });
+    return unwrapApiResponse<{ exists: boolean; threadId: string | null }>(response.data);
+  },
+
+  /**
+   * Open the conversation for an order. Reuses the one buyer<->brand thread
+   * (creating it only if none exists) and links the order into it, so it opens
+   * with the order attached instead of 404ing into a blank inbox.
+   */
+  async openOrderConversation(params: OrderConversationRef) {
+    const response = await apiClient.post('/messaging/conversations/by-order', params);
+    return unwrapApiResponse<ResolvedThreadRoute & { created: boolean }>(response.data);
+  },
+
   async listThreadMessages(threadId: string, params?: { cursorCreatedAt?: string; cursorId?: string; limit?: number }) {
     const response = await apiClient.get(`/messaging/threads/${threadId}/messages`, { params });
     return parseMessageList(response.data);
@@ -551,7 +647,14 @@ export const messagingApi = {
     return unwrapApiResponse<{ unreadCount: number }>(response.data);
   },
 
-  async sendBrandMessage(brandId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; contextDesignId?: string; contextDesignTitle?: string; contextDesignCoverFileId?: string; contextDesignCoverUrl?: string; replyToMessageId?: string }) {
+  /**
+   * Start or continue a thread with a brand.
+   *
+   * The `context*` fields carry the content the message is ABOUT — a Runway
+   * design or a Market product. Sending a remark composed from a piece of
+   * content without them leaves the brand reading a sentence with no subject.
+   */
+  async sendBrandMessage(brandId: string, payload: SendMessagePayload) {
     const response = await apiClient.post(
       `/messaging/brands/${brandId}/messages`,
       payload,
@@ -560,7 +663,7 @@ export const messagingApi = {
     return unwrapApiResponse<any>(response.data);
   },
 
-  async sendThreadMessage(threadId: string, payload: { bodyText?: string; clientMessageId: string; attachmentFileIds?: string[]; replyToMessageId?: string }) {
+  async sendThreadMessage(threadId: string, payload: SendMessagePayload) {
     const response = await apiClient.post(
       `/messaging/threads/${threadId}/messages`,
       payload,

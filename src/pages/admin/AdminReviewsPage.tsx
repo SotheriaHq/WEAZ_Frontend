@@ -44,7 +44,7 @@ const statusTone: Record<AdminLifecycleReviewStatus, string> = {
   PENDING_MODERATION: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
   HIDDEN: 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300',
   FLAGGED: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
-  DELETED: 'bg-slate-100 text-slate-600 dark:bg-white/8 dark:text-slate-300',
+  DELETED: 'bg-slate-100 text-slate-600 dark:bg-white/[0.08] dark:text-slate-300',
 };
 
 type ReviewFilters = {
@@ -259,7 +259,7 @@ const AdminReviewsPage: React.FC = () => {
         ) : !analytics ? (
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="h-20 animate-pulse rounded-lg bg-gray-100 dark:bg-white/8" />
+              <div key={index} className="h-20 animate-pulse rounded-lg bg-gray-100 dark:bg-white/[0.08]" />
             ))}
           </div>
         ) : (
@@ -376,7 +376,7 @@ const AdminReviewsPage: React.FC = () => {
         {loading ? (
           <div className="space-y-3 p-4">
             {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="h-16 animate-pulse rounded-lg bg-gray-100 dark:bg-white/8" />
+              <div key={index} className="h-16 animate-pulse rounded-lg bg-gray-100 dark:bg-white/[0.08]" />
             ))}
           </div>
         ) : reviews.length === 0 ? (
@@ -398,7 +398,7 @@ const AdminReviewsPage: React.FC = () => {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-white/8">
+              <tbody className="divide-y divide-gray-100 dark:divide-white/[0.08]">
                 {reviews.map((review) => (
                   <tr key={review.id} className="align-top text-gray-700 dark:text-gray-200">
                     <td className="px-4 py-3">
@@ -433,7 +433,7 @@ const AdminReviewsPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => void loadDetail(review.id)}
-                          className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/8"
+                          className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.08]"
                         >
                           View detail
                         </button>
@@ -496,14 +496,14 @@ const AdminReviewsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setDetail(null)}
-                className="rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-500 hover:bg-gray-100 dark:hover:bg-white/8"
+                className="rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.08]"
               >
                 Close
               </button>
             </div>
 
             {detailLoading || !detail ? (
-              <div className="mt-4 h-48 animate-pulse rounded-xl bg-gray-100 dark:bg-white/8" />
+              <div className="mt-4 h-48 animate-pulse rounded-xl bg-gray-100 dark:bg-white/[0.08]" />
             ) : (
               <div className="mt-5 space-y-5">
                 <div className="rounded-xl border border-gray-200 p-4 dark:border-white/10">
@@ -607,7 +607,7 @@ const AdminReviewsPage: React.FC = () => {
                   setPendingAction(null);
                   setReason('');
                 }}
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/8"
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.08]"
               >
                 Cancel
               </button>

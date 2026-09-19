@@ -27,7 +27,7 @@ describe('third-party theme alignment', () => {
     setSystemDark(false);
   });
 
-  it('loads PrimeReact base CSS before Threadly app CSS so token overrides win', () => {
+  it('loads PrimeReact base CSS before WIEZ app CSS so token overrides win', () => {
     const mainTsx = readFileSync(resolve(process.cwd(), 'src/main.tsx'), 'utf8');
 
     expect(mainTsx.indexOf("import 'primereact/resources/themes/lara-light-blue/theme.css'")).toBeLessThan(
@@ -38,7 +38,7 @@ describe('third-party theme alignment', () => {
     );
   });
 
-  it('binds PrimeReact and portal surface selectors to Threadly semantic tokens', () => {
+  it('binds PrimeReact and portal surface selectors to WIEZ semantic tokens', () => {
     const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
 
     expect(css).toContain('PrimeReact and third-party portal theme alignment');

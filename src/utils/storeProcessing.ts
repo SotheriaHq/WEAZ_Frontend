@@ -3,9 +3,9 @@ export const STORE_PROCESSING_TIME_LABELS: Record<string, string> = {
   '3-5': '3-5 business days',
   '5-7': '5-7 business days',
   '7-14': '7-14 business days',
-  '14-21': '14-21 days',
-  '21-30': '21-30 days',
-  '30-plus': '30+ days',
+  '1-2-days': '1-2 days',
+  '2-4': '2-4 days',
+  '4-7': '4-7 days',
 };
 
 export const getStoreProcessingTimeLabel = (value?: string | null): string => {

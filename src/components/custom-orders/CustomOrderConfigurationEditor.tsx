@@ -1,8 +1,10 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { getStoreStatus } from '@/api/StoreApi';
+import { MeasurementPointsApi } from '@/api/MeasurementPointsApi';
 import { useMeasurementPoints } from '@/hooks/useMeasurementPoints';
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import { sanitizeDecimalInput, sanitizeIntegerInput } from '@/utils/numericInput';
 import {
   customOrderConfigurationsApi,
   type CreateCustomFabricRuleBasisInput,
@@ -24,11 +26,21 @@ interface CustomOrderConfigurationEditorProps {
   defaultProductionLeadLabel?: string | null;
   disabled?: boolean;
   onRequiredMeasurementKeysChange?: (keys: string[]) => void;
+  /**
+   * Fires whenever the set of still-missing required fields changes.
+   *
+   * The parent needs this to warn BEFORE the brand presses "Go live". Until
+   * now the only thing that knew the setup was incomplete was the gate, and the
+   * gate runs after the click — so the product summary showed a cheerful
+   * "Custom order: Enabled" for a configuration that could not be published.
+   * An empty array means ready.
+   */
+  onCompletenessChange?: (missingFieldLabels: string[]) => void;
 }
 
 export interface CustomOrderConfigurationEditorHandle {
-  saveConfiguration: (options?: { silentSuccess?: boolean }) => Promise<boolean>;
-  buildConfigurationDraft: () => Omit<CustomOrderConfigurationUpsertInput, 'sourceId'> | null;
+  saveConfiguration: (options?: { silentSuccess?: boolean; silent?: boolean }) => Promise<boolean>;
+  buildConfigurationDraft: (options?: { silent?: boolean }) => Omit<CustomOrderConfigurationUpsertInput, 'sourceId'> | null;
 }
 
 type ConfigurationFormState = {
@@ -124,6 +136,41 @@ type FieldErrors = Partial<Record<
 >>;
 
 const REQUIRED_FIELDS_SUMMARY = 'Some required fields need attention.';
+
+/**
+ * Field labels, so a blocked draft save can name what it is waiting for.
+ *
+ * A draft save runs the same completeness check a publish does, and when it
+ * fails it saves NOTHING — the whole custom-order configuration, base
+ * production charge and rush fee included. That part is forced by the API: the
+ * create endpoint requires the full set and the columns behind it are NOT NULL,
+ * so there is no partial record to write on a first save.
+ *
+ * What was wrong was the silence. The check ran with toasts and inline errors
+ * suppressed (correctly — a draft save must not steal focus), so the brand saw
+ * "Draft saved", came back, and found the prices they had typed were gone with
+ * nothing to explain it. The list below is what turns that into an answer.
+ */
+const CONFIGURATION_FIELD_LABELS: Record<keyof FieldErrors, string> = {
+  buyerInstructionText: 'Buyer instructions',
+  baseProductionCharge: 'Base production charge',
+  fabricCostPerYard: 'Material cost per yard',
+  productionLeadDays: 'Production timeline',
+  deliveryMinDays: 'Minimum delivery days',
+  deliveryMaxDays: 'Maximum delivery days',
+  requiredMeasurementKeys: 'Required measurement points',
+  fabricRuleBasisId: 'Fabric basis',
+  revisionPolicy: 'Revision policy',
+  returnPolicy: 'Return policy',
+  defectPolicy: 'Defect policy',
+  rushFee: 'Rush fee',
+  rushProductionLeadDays: 'Rush production lead days',
+};
+
+const describeMissingConfigurationFields = (errors: FieldErrors): string[] =>
+  FIELD_ERROR_FOCUS_ORDER.filter((key) => Boolean(errors[key])).map(
+    (key) => CONFIGURATION_FIELD_LABELS[key],
+  );
 const MEASUREMENT_REGISTRY_EMPTY_MESSAGE =
   'No measurement points are available. Run the measurement registry seed or contact an admin.';
 const MEASUREMENT_REGISTRY_LOAD_ERROR_MESSAGE =
@@ -351,6 +398,26 @@ const requiredFieldLabelClassName =
 const infoBadgeClassName =
   'inline-flex h-4 w-4 items-center justify-center rounded-full bg-black/[0.06] text-[10px] leading-none dark:bg-white/[0.1]';
 
+/**
+ * The required mark that sits on each field's own label.
+ *
+ * Requirements belong to the field they constrain. Listing them in a banner at
+ * the bottom — "Some required fields need attention", then a roll-call of names
+ * — asks the reader to hold a list in their head and go hunting for each entry,
+ * and it only appears AFTER a failed submit, so until then nothing on the form
+ * says which fields are obligatory at all.
+ *
+ * A mark on the label says it up front, in place, for every field, and turns
+ * red on the one that is actually blocking. Nothing to match up, nothing to
+ * scroll back to.
+ */
+const REQUIRED_MARK_BASE =
+  'ml-0.5 select-none text-sm font-bold leading-none transition-colors';
+// Same purple mark `UniversalSelect`/`TextField`/`Input` use, so the app has
+// ONE required indicator rather than a different one per form.
+const REQUIRED_MARK_RESTING = 'text-purple-500 dark:text-purple-400';
+const REQUIRED_MARK_ERROR = 'text-rose-500 dark:text-rose-400';
+
 const KEY_CHIP_PREVIEW_LIMIT = 14;
 
 const mapConfigurationToForm = (configuration: CustomOrderConfiguration): ConfigurationFormState => ({
@@ -394,6 +461,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   defaultProductionLeadLabel,
   disabled = false,
   onRequiredMeasurementKeysChange,
+  onCompletenessChange,
 }, ref) => {
   const [brandId, setBrandId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -420,11 +488,21 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   ]);
   const [showFabricRules, setShowFabricRules] = useState(false);
   const [manualMeasurementKeyInput, setManualMeasurementKeyInput] = useState('');
+  const [isSubmittingManualKey, setIsSubmittingManualKey] = useState(false);
   const [hasEditedBaseCharge, setHasEditedBaseCharge] = useState(false);
   const [showAllSelectedKeys, setShowAllSelectedKeys] = useState(false);
   const [showAllPoolKeys, setShowAllPoolKeys] = useState(false);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  /**
+   * What a silent (draft) save could not persist, and why.
+   *
+   * Kept apart from `validationMessage`/`fieldErrors` because those belong to an
+   * explicit save: they colour fields red and pull focus, which is exactly what
+   * a background draft save must not do. This one only renders a banner.
+   */
+  const [draftBlockedFields, setDraftBlockedFields] = useState<string[]>([]);
+  const [draftBlockedReason, setDraftBlockedReason] = useState<string | null>(null);
   const containerRef = useRef<HTMLElement | null>(null);
   const fieldErrorRefs = useRef<Partial<Record<keyof FieldErrors, HTMLElement | null>>>({});
   const seededMeasurementKeysSignatureRef = useRef<string>('');
@@ -903,23 +981,92 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     );
   };
 
-  const addManualMeasurementKey = () => {
-    const normalized = manualMeasurementKeyInput
-      .trim()
-      .toUpperCase()
-      .replace(/\s+/g, '_');
+  const addManualMeasurementKey = async () => {
+    const rawLabel = manualMeasurementKeyInput.trim();
+    if (!rawLabel) {
+      return;
+    }
+    const normalized = rawLabel.toUpperCase().replace(/\s+/g, '_');
 
-    if (!normalized) {
+    const alreadySelected = (candidateKey: string) =>
+      form.requiredMeasurementKeys.some(
+        (key) => key.trim().toUpperCase() === candidateKey.trim().toUpperCase(),
+      );
+
+    // Reuse an existing point (system, approved-global, or this brand's own
+    // freeform) instead of resubmitting it — match by key or display label.
+    const existing = measurementPoints.find((point) => {
+      const keyUpper = String(point.key ?? '').trim().toUpperCase();
+      const labelUpper = String(point.label ?? '').trim().toUpperCase();
+      return keyUpper === normalized || labelUpper === rawLabel.toUpperCase();
+    });
+
+    if (existing) {
+      if (alreadySelected(existing.key)) {
+        toast.error('Measurement key already selected.');
+        return;
+      }
+      updateForm('requiredMeasurementKeys', [
+        ...form.requiredMeasurementKeys,
+        existing.key,
+      ]);
+      setManualMeasurementKeyInput('');
       return;
     }
 
-    if (form.requiredMeasurementKeys.includes(normalized)) {
+    if (alreadySelected(normalized)) {
       toast.error('Measurement key already selected.');
       return;
     }
 
-    updateForm('requiredMeasurementKeys', [...form.requiredMeasurementKeys, normalized]);
-    setManualMeasurementKeyInput('');
+    // Genuinely new key: register it as a freeform measurement point so admins
+    // can review it for the shared standards, AND add it to this order. Adding
+    // it locally only (the old behavior) meant brand-invented keys like this
+    // never reached the admin approval queue. Use the server-assigned key so the
+    // config references the exact point that was created.
+    const genderForSubmit =
+      measurementGender === 'MEN' ||
+      measurementGender === 'WOMEN' ||
+      measurementGender === 'UNISEX'
+        ? measurementGender
+        : undefined;
+    try {
+      setIsSubmittingManualKey(true);
+      const { point } = await MeasurementPointsApi.submitFreeform({
+        label: rawLabel,
+        category: 'GENERAL',
+        gender: genderForSubmit,
+      });
+      updateForm('requiredMeasurementKeys', [
+        ...form.requiredMeasurementKeys,
+        point.key,
+      ]);
+      setManualMeasurementKeyInput('');
+      toast.success(
+        'Measurement key added and sent to admin for global approval.',
+      );
+    } catch (error: any) {
+      const message = String(
+        error?.response?.data?.message ?? error?.message ?? '',
+      );
+      // Already exists globally (e.g. a system/approved point outside this
+      // gender filter). Add the key so the order still works.
+      if (/already exists/i.test(message)) {
+        updateForm('requiredMeasurementKeys', [
+          ...form.requiredMeasurementKeys,
+          normalized,
+        ]);
+        setManualMeasurementKeyInput('');
+        toast.info('That measurement already exists — added it to this order.');
+        return;
+      }
+      toast.error(
+        message ||
+          'Could not add this measurement key. Use letters, numbers, spaces, or hyphens.',
+      );
+    } finally {
+      setIsSubmittingManualKey(false);
+    }
   };
 
   const updateRuleCondition = (
@@ -997,12 +1144,58 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     }
   };
 
-  const buildConfigurationDraft = useCallback(() => {
+  /**
+   * The required-field gate, as a pure read.
+   *
+   * `buildConfigurationDraft` owns the authoritative version, but it has side
+   * effects (banner, field errors, focus) so it cannot be called during render.
+   * This mirrors only the COMPLETENESS half - the same list, in the same order -
+   * so the parent can show the state of the section without anything being
+   * clicked. Value-sanity checks (ranges, min <= max) stay in the builder; they
+   * are about correctness, not about being finished.
+   */
+  const missingRequiredFieldLabels = useMemo(() => {
+    const missing = new Set<keyof FieldErrors>();
+    if (!form.baseProductionCharge.trim()) missing.add('baseProductionCharge');
+    if (!form.fabricCostPerYard.trim()) missing.add('fabricCostPerYard');
+    if (!form.productionLeadDays.trim()) missing.add('productionLeadDays');
+    if (!form.deliveryMinDays.trim()) missing.add('deliveryMinDays');
+    if (!form.deliveryMaxDays.trim()) missing.add('deliveryMaxDays');
+    if (form.requiredMeasurementKeys.length === 0) missing.add('requiredMeasurementKeys');
+    if (showFabricRules && !form.fabricRuleBasisId.trim()) missing.add('fabricRuleBasisId');
+    if (!form.revisionPolicy.trim()) missing.add('revisionPolicy');
+    if (!form.returnPolicy.trim()) missing.add('returnPolicy');
+    if (!form.defectPolicy.trim()) missing.add('defectPolicy');
+    if (form.rushEnabled) {
+      if (!form.rushFee.trim()) missing.add('rushFee');
+      if (!form.rushProductionLeadDays.trim()) missing.add('rushProductionLeadDays');
+    }
+    return FIELD_ERROR_FOCUS_ORDER.filter((key) => missing.has(key)).map(
+      (key) => CONFIGURATION_FIELD_LABELS[key],
+    );
+  }, [form, showFabricRules]);
+
+  useEffect(() => {
+    onCompletenessChange?.(missingRequiredFieldLabels);
+  }, [missingRequiredFieldLabels, onCompletenessChange]);
+
+  const buildConfigurationDraft = useCallback((buildOptions?: { silent?: boolean }) => {
+    // Silent mode is used by draft saves: an incomplete custom-order config must
+    // never block, toast, or steal focus while saving a draft.
+    const silent = buildOptions?.silent === true;
     const failDraftValidation = (
       message: string,
       errors?: FieldErrors,
       options?: { showBanner?: boolean },
     ) => {
+      if (silent) {
+        // Say what is missing, quietly. No toast, no red fields, no focus jump —
+        // but no longer nothing, which is what let a draft swallow a brand's
+        // pricing without a word.
+        setDraftBlockedFields(errors ? describeMissingConfigurationFields(errors) : []);
+        setDraftBlockedReason(message);
+        return null;
+      }
       setValidationMessage(options?.showBanner === false ? null : message);
       setFieldErrors(errors ?? {});
       focusFirstFieldError(errors);
@@ -1245,15 +1438,19 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
     sourceType,
   ]);
 
-  const handleSaveConfiguration = useCallback(async (options?: { silentSuccess?: boolean }) => {
+  const handleSaveConfiguration = useCallback(async (options?: { silentSuccess?: boolean; silent?: boolean }) => {
     if (!sourceId) {
-      toast.error('Save the product or design first, then configure its custom-order configuration.');
+      if (!options?.silent) {
+        toast.error('Save the product or design first, then configure its custom-order configuration.');
+      }
       return false;
     }
-    const draft = buildConfigurationDraft();
+    const draft = buildConfigurationDraft(options?.silent ? { silent: true } : undefined);
     if (!draft) {
       return false;
     }
+    setDraftBlockedFields([]);
+    setDraftBlockedReason(null);
 
     let payload: CustomOrderConfigurationUpsertInput = {
       ...draft,
@@ -1275,7 +1472,9 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           fabricRuleBasisId: hiddenBasis.id,
         };
       } catch (error: any) {
-        toast.error(error?.response?.data?.message || 'Unable to prepare fabric-rule basis');
+        if (!options?.silent) {
+          toast.error(error?.response?.data?.message || 'Unable to prepare fabric-rule basis');
+        }
         return false;
       }
     } else if (fabricRuleBasisId !== payload.fabricRuleBasisId) {
@@ -1302,7 +1501,9 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       }
       return true;
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Unable to save custom-order configuration');
+      if (!options?.silent) {
+        toast.error(error?.response?.data?.message || 'Unable to save custom-order configuration');
+      }
       return false;
     } finally {
       setSaving(false);
@@ -1317,15 +1518,34 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   ]);
 
   useImperativeHandle(ref, () => ({
-    saveConfiguration: (options?: { silentSuccess?: boolean }) =>
+    saveConfiguration: (options?: { silentSuccess?: boolean; silent?: boolean }) =>
       handleSaveConfiguration(options),
-    buildConfigurationDraft: () => buildConfigurationDraft(),
+    buildConfigurationDraft: (options?: { silent?: boolean }) => buildConfigurationDraft(options),
   }), [buildConfigurationDraft, handleSaveConfiguration]);
 
   const getFieldErrorId = (key: keyof FieldErrors) =>
     `custom-order-${key}-error`;
   const getFieldInputClassName = (key: keyof FieldErrors) =>
     `${fieldClassName} ${fieldErrors[key] ? 'border-rose-400 focus:border-rose-500 dark:border-rose-500/50' : ''}`;
+  /**
+   * `*` on a required field's label; rose while that field is the problem.
+   *
+   * `aria-hidden` because the input itself already carries `required`/
+   * `aria-invalid` and the error text is wired through `aria-describedby` —
+   * a screen reader announcing a literal asterisk adds noise, not information.
+   */
+  const renderRequiredMark = (key: keyof FieldErrors) => (
+    <span
+      aria-hidden="true"
+      title="Required"
+      className={`${REQUIRED_MARK_BASE} ${
+        fieldErrors[key] ? REQUIRED_MARK_ERROR : REQUIRED_MARK_RESTING
+      }`}
+    >
+      *
+    </span>
+  );
+
   const renderFieldError = (key: keyof FieldErrors) =>
     fieldErrors[key] ? (
       <p
@@ -1356,9 +1576,35 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         </div>
       ) : null}
 
+      {draftBlockedReason ? (
+        <div
+          role="status"
+          className="mb-3 rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
+        >
+          <p className="font-semibold">
+            Your draft was saved, but these custom-order settings were not.
+          </p>
+          {draftBlockedFields.length > 0 ? (
+            <p className="mt-1">
+              A custom-order configuration can only be stored once it is complete, so nothing
+              here is kept — including the base production charge and rush fee — until you
+              fill in: <span className="font-semibold">{draftBlockedFields.join(', ')}</span>.
+            </p>
+          ) : (
+            <p className="mt-1">{draftBlockedReason}</p>
+          )}
+        </div>
+      ) : null}
+
       {!sourceId ? (
         <div className="mt-5 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-4 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">
-          Save this item first so the custom-order settings can attach to it.
+          {/* This used to promise the settings "save together with the item".
+              They only do once the section is complete — an incomplete
+              configuration cannot be stored at all — and saying otherwise is
+              what made the loss feel like a bug rather than a missing field. */}
+          Fill this in before you save. Custom-order settings are stored as one complete
+          configuration, so they save with the item only once every field below has a value —
+          a part-filled section is not kept, even on a draft.
         </div>
       ) : null}
 
@@ -1394,7 +1640,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           className="block"
         >
           <span className={requiredFieldLabelClassName}>
-            Base charge <span className="text-rose-500">*</span>
+            Base charge {renderRequiredMark('baseProductionCharge')}
             <span className={infoBadgeClassName} title="Labor and production-only cost, excluding fabric yard cost.">i</span>
           </span>
           <input
@@ -1425,12 +1671,12 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           className="block"
         >
           <span className={requiredFieldLabelClassName}>
-            Material cost per yard <span className="text-rose-500">*</span>
+            Material cost per yard {renderRequiredMark('fabricCostPerYard')}
             <span className={infoBadgeClassName} title="Estimated material cost used when pricing custom orders.">i</span>
           </span>
           <input
             value={form.fabricCostPerYard}
-            onChange={(event) => updateForm('fabricCostPerYard', event.target.value)}
+            onChange={(event) => updateForm('fabricCostPerYard', sanitizeDecimalInput(event.target.value))}
             disabled={disabled}
             aria-invalid={Boolean(fieldErrors.fabricCostPerYard)}
             aria-describedby={fieldErrors.fabricCostPerYard ? getFieldErrorId('fabricCostPerYard') : undefined}
@@ -1449,12 +1695,12 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           className="block"
         >
           <span className={requiredFieldLabelClassName}>
-            Lead days <span className="text-rose-500">*</span>
+            Lead days {renderRequiredMark('productionLeadDays')}
             <span className={infoBadgeClassName} title="Production days before dispatch. Must be 1-7 days.">i</span>
           </span>
           <input
             value={form.productionLeadDays}
-            onChange={(event) => updateForm('productionLeadDays', event.target.value)}
+            onChange={(event) => updateForm('productionLeadDays', sanitizeIntegerInput(event.target.value))}
             disabled={disabled}
             aria-invalid={Boolean(fieldErrors.productionLeadDays)}
             aria-describedby={fieldErrors.productionLeadDays ? getFieldErrorId('productionLeadDays') : undefined}
@@ -1474,12 +1720,12 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           className="block"
         >
           <span className={requiredFieldLabelClassName}>
-            Min delivery <span className="text-rose-500">*</span>
+            Min delivery {renderRequiredMark('deliveryMinDays')}
             <span className={infoBadgeClassName} title="Fastest delivery target after dispatch.">i</span>
           </span>
           <input
             value={form.deliveryMinDays}
-            onChange={(event) => updateForm('deliveryMinDays', event.target.value)}
+            onChange={(event) => updateForm('deliveryMinDays', sanitizeIntegerInput(event.target.value))}
             disabled={disabled}
             aria-invalid={Boolean(fieldErrors.deliveryMinDays)}
             aria-describedby={fieldErrors.deliveryMinDays ? getFieldErrorId('deliveryMinDays') : undefined}
@@ -1494,12 +1740,12 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           className="block"
         >
           <span className={requiredFieldLabelClassName}>
-            Max delivery <span className="text-rose-500">*</span>
+            Max delivery {renderRequiredMark('deliveryMaxDays')}
             <span className={infoBadgeClassName} title="Latest delivery target after dispatch.">i</span>
           </span>
           <input
             value={form.deliveryMaxDays}
-            onChange={(event) => updateForm('deliveryMaxDays', event.target.value)}
+            onChange={(event) => updateForm('deliveryMaxDays', sanitizeIntegerInput(event.target.value))}
             disabled={disabled}
             aria-invalid={Boolean(fieldErrors.deliveryMaxDays)}
             aria-describedby={fieldErrors.deliveryMaxDays ? getFieldErrorId('deliveryMaxDays') : undefined}
@@ -1519,19 +1765,19 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         tabIndex={-1}
         aria-invalid={Boolean(fieldErrors.requiredMeasurementKeys)}
         aria-describedby={fieldErrors.requiredMeasurementKeys ? getFieldErrorId('requiredMeasurementKeys') : undefined}
-        className={`mt-4 rounded-2xl border p-4 ${fieldErrors.requiredMeasurementKeys ? 'border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-black/10 dark:border-white/10'}`}
+        className={`mt-4 rounded-xl sm:rounded-2xl p-3 sm:p-4 ${fieldErrors.requiredMeasurementKeys ? 'border border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-none bg-transparent'}`}
       >
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-          Measurement points <span className="text-rose-500">*</span>
+          Measurement points {renderRequiredMark('requiredMeasurementKeys')}
           <span className={infoBadgeClassName} title="This defines which buyer measurements are mandatory and which sizing basis this yard-rule setup belongs to.">i</span>
         </div>
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
           Select the measurements buyers must provide for this custom order.
         </p>
         {renderFieldError('requiredMeasurementKeys')}
         {/* Selected keys */}
-        <div className="mt-4">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <div className="mt-3">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1.5">
             In use
             {selectedMeasurementKeys.length > 0 && (
               <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
@@ -1539,13 +1785,13 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               </span>
             )}
           </div>
-          <div className="mt-2 min-h-[2.75rem] rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 dark:border-emerald-300/20 dark:bg-emerald-400/10">
+          <div className="w-full min-h-[2.75rem] rounded-xl border-none bg-emerald-500/5 p-3 sm:p-4 dark:bg-emerald-400/10">
             {selectedMeasurementKeys.length === 0 ? (
               <div className="text-xs text-slate-500 dark:text-slate-400">
                 Select measurement points below to build this custom order.
               </div>
             ) : (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full">
                 {selectedKeysVisible.map((key) => (
                   <button
                     key={key}
@@ -1581,8 +1827,8 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
         </div>
 
         {/* Left in pool */}
-        <div className="mt-4 max-h-44 overflow-y-auto rounded-xl border border-black/5 p-3 pr-2 dark:border-white/10">
-          <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <div className="mt-3 w-full max-h-none overflow-y-visible rounded-xl border-none p-3 sm:p-4 dark:bg-white/[0.02] sm:max-h-44 sm:overflow-y-auto">
+          <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Left in pool
             {selectableMeasurementKeys.length > 0 && (
               <span className="rounded-full bg-black/[0.06] px-1.5 py-0.5 text-[10px] font-bold tabular-nums dark:bg-white/[0.08]">
@@ -1590,7 +1836,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               </span>
             )}
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full">
           {selectableMeasurementKeys.length === 0 ? (
             <div className="text-xs text-slate-500 dark:text-slate-400">
               {isMeasurementPointsLoading
@@ -1634,21 +1880,21 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             </button>
           ) : null}
         </div>
-        <div className="mt-4 grid gap-2 md:grid-cols-[1fr_auto]">
+        <div className="mt-4 flex gap-2">
           <input
             value={manualMeasurementKeyInput}
             onChange={(event) => setManualMeasurementKeyInput(event.target.value)}
-            disabled={disabled}
-            className={fieldClassName}
+            disabled={disabled || isSubmittingManualKey}
+            className={`${fieldClassName} flex-1`}
             placeholder="Add missing measurement key"
           />
           <button
             type="button"
-            onClick={addManualMeasurementKey}
-            disabled={disabled || !manualMeasurementKeyInput.trim()}
-            className="rounded-full border border-black/10 px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:border-white/10 dark:text-slate-200"
+            onClick={() => void addManualMeasurementKey()}
+            disabled={disabled || isSubmittingManualKey || !manualMeasurementKeyInput.trim()}
+            className="rounded-full border border-black/10 px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:border-white/10 dark:text-slate-200 whitespace-nowrap"
           >
-            Add key
+            {isSubmittingManualKey ? 'Adding…' : 'Add key'}
           </button>
         </div>
 
@@ -1722,7 +1968,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       {ENABLE_LEGACY_YARD_SETUP_PANEL ? (
       <details className="mt-4 rounded-2xl border border-black/10 p-3 dark:border-white/10" open>
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-          Brand yard setup <span className="text-rose-500">*</span>
+          Brand yard setup {renderRequiredMark('fabricRuleBasisId')}
           <span className={infoBadgeClassName} title="Set base yard for this outfit and extra yards by computed buyer size.">i</span>
         </summary>
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
@@ -1734,7 +1980,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Average base yards</span>
             <input
               value={averageBaseYards}
-              onChange={(event) => setAverageBaseYards(event.target.value)}
+              onChange={(event) => setAverageBaseYards(sanitizeDecimalInput(event.target.value))}
               disabled={disabled}
               className={fieldClassName}
               placeholder="e.g. 2"
@@ -1777,7 +2023,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               <input
                 value={row.extraYards}
                 onChange={(event) => {
-                  const value = event.target.value;
+                  const value = sanitizeDecimalInput(event.target.value);
                   setSizeExtraRows((current) =>
                     current.map((entry, entryIndex) =>
                       entryIndex === index ? { ...entry, extraYards: value } : entry,
@@ -1864,12 +2110,12 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                 className="space-y-1.5"
               >
                 <span className={requiredFieldLabelClassName}>
-                  Rush fee <span className="text-rose-500">*</span>
+                  Rush fee {renderRequiredMark('rushFee')}
                   <span className={infoBadgeClassName} title="Extra amount charged when the buyer selects rush production.">i</span>
                 </span>
                 <input
                   value={form.rushFee}
-                  onChange={(event) => updateForm('rushFee', event.target.value)}
+                  onChange={(event) => updateForm('rushFee', sanitizeDecimalInput(event.target.value))}
                   disabled={disabled}
                   aria-invalid={Boolean(fieldErrors.rushFee)}
                   aria-describedby={fieldErrors.rushFee ? getFieldErrorId('rushFee') : undefined}
@@ -1885,12 +2131,12 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                 className="space-y-1.5"
               >
                 <span className={requiredFieldLabelClassName}>
-                  Rush lead days <span className="text-rose-500">*</span>
+                  Rush lead days {renderRequiredMark('rushProductionLeadDays')}
                   <span className={infoBadgeClassName} title="Must be shorter than the standard lead time and 1-3 days.">i</span>
                 </span>
                 <input
                   value={form.rushProductionLeadDays}
-                  onChange={(event) => updateForm('rushProductionLeadDays', event.target.value)}
+                  onChange={(event) => updateForm('rushProductionLeadDays', sanitizeIntegerInput(event.target.value))}
                   disabled={disabled}
                   aria-invalid={Boolean(fieldErrors.rushProductionLeadDays)}
                   aria-describedby={fieldErrors.rushProductionLeadDays ? getFieldErrorId('rushProductionLeadDays') : undefined}
@@ -1909,10 +2155,10 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             <div
               ref={registerFieldErrorRef('revisionPolicy')}
               tabIndex={-1}
-              className={`space-y-1.5 rounded-xl border p-3 ${fieldErrors.revisionPolicy ? 'border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-black/10 dark:border-white/10'}`}
+              className="space-y-1.5"
             >
               <span className={requiredFieldLabelClassName}>
-                Revision <span className="text-rose-500">*</span>
+                Revision {renderRequiredMark('revisionPolicy')}
                 <span className={infoBadgeClassName} title="How many revisions the buyer gets and under what timeline.">i</span>
               </span>
               <UniversalSelect
@@ -1944,10 +2190,10 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             <div
               ref={registerFieldErrorRef('returnPolicy')}
               tabIndex={-1}
-              className={`space-y-1.5 rounded-xl border p-3 ${fieldErrors.returnPolicy ? 'border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-black/10 dark:border-white/10'}`}
+              className="space-y-1.5"
             >
               <span className={requiredFieldLabelClassName}>
-                Returns <span className="text-rose-500">*</span>
+                Returns {renderRequiredMark('returnPolicy')}
                 <span className={infoBadgeClassName} title="Return/refund expectations for custom orders.">i</span>
               </span>
               <UniversalSelect
@@ -1979,10 +2225,10 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             <div
               ref={registerFieldErrorRef('defectPolicy')}
               tabIndex={-1}
-              className={`space-y-1.5 rounded-xl border p-3 ${fieldErrors.defectPolicy ? 'border-rose-300 bg-rose-50/40 dark:border-rose-500/40 dark:bg-rose-500/10' : 'border-black/10 dark:border-white/10'}`}
+              className="space-y-1.5"
             >
               <span className={requiredFieldLabelClassName}>
-                Defects <span className="text-rose-500">*</span>
+                Defects {renderRequiredMark('defectPolicy')}
                 <span className={infoBadgeClassName} title="How defect reports are handled (repair/remake/refund flow).">i</span>
               </span>
               <UniversalSelect
@@ -2030,7 +2276,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       {showFabricRules ? (
         <details className="mt-4 rounded-2xl border border-black/10 p-3 dark:border-white/10">
           <summary className="mb-2 flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-            Fabric yard rules builder <span className="text-rose-500">*</span>
+            Fabric yard rules builder {renderRequiredMark('fabricRuleBasisId')}
             <span className={infoBadgeClassName} title="Each rule maps buyer measurements to required fabric yards. Fallback is used when no condition rule matches.">i</span>
           </summary>
           <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">

@@ -1,7 +1,41 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouteError, isRouteErrorResponse, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, RefreshCcw, AlertTriangle, WifiOff, ServerCrash, ShieldX } from 'lucide-react';
+import { captureClientException } from '@/observability/sentry';
+
+const STALE_BUNDLE_RELOAD_KEY = 'wiez:error-page-auto-recovered';
+
+/**
+ * Stale-deploy render crashes: React.lazy resolving a mixed-version chunk
+ * throws "Cannot read properties of undefined (reading 'default')" (Sentry
+ * 2026-07-11, /studio/store on release V2026.07.09). A fresh cache-busted
+ * document fixes it — showing users a dead error page does not.
+ */
+const isLikelyStaleBundleError = (value: unknown): boolean => {
+  const message =
+    value instanceof Error
+      ? value.message || ''
+      : typeof value === 'string'
+        ? value
+        : value && typeof value === 'object' && 'message' in value
+          ? String((value as { message?: unknown }).message ?? '')
+          : String(value ?? '');
+  if (!message) return false;
+  return (
+    message.includes("reading 'default'") ||
+    message.includes('Failed to fetch dynamically imported module') ||
+    message.includes('Importing a module script failed') ||
+    message.includes('error loading dynamically imported module') ||
+    message.includes('Loading chunk') ||
+    message.includes('ChunkLoadError') ||
+    // SPA fallback HTML served for a hashed .js URL (deploy race / poisoned cache).
+    message.includes('Failed to load module script') ||
+    message.includes('MIME type of "text/html"') ||
+    message.includes("MIME type of 'text/html'") ||
+    message.includes('Expected a JavaScript-or-Wasm module script')
+  );
+};
 
 /**
  * ErrorPage - Premium error boundary page
@@ -17,6 +51,43 @@ const ErrorPage: React.FC = () => {
   const error = useRouteError();
   const navigate = useNavigate();
   console.error('ErrorPage caught:', error);
+
+  // Auto-recover ONCE per session from stale-bundle render crashes with a
+  // cache-busted reload instead of stranding the user on this page.
+  const [recovering] = useState<boolean>(() => {
+    if (isRouteErrorResponse(error) || !isLikelyStaleBundleError(error)) {
+      return false;
+    }
+    try {
+      if (sessionStorage.getItem(STALE_BUNDLE_RELOAD_KEY) === '1') return false;
+      sessionStorage.setItem(STALE_BUNDLE_RELOAD_KEY, '1');
+    } catch {
+      return false;
+    }
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('_r', String(Date.now()));
+      window.location.replace(url.toString());
+    } catch {
+      window.location.reload();
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    // Router errorElement intercepts render errors before RootErrorBoundary,
+    // so this boundary must report to Sentry itself.
+    if (!isRouteErrorResponse(error)) {
+      captureClientException(error, {
+        boundary: recovering ? 'router-error-page-auto-recovery' : 'router-error-page',
+      });
+    }
+  }, [error, recovering]);
+
+  if (recovering) {
+    // Reload is in flight — a blank surface beats flashing an error page.
+    return <div className="min-h-screen bg-[#0a0a0a]" aria-busy="true" />;
+  }
 
   // Determine error type and customize display
   let status = 500;
@@ -160,7 +231,7 @@ const ErrorPage: React.FC = () => {
         >
           <button
             onClick={() => window.location.reload()}
-            className={`flex items-center gap-2 px-6 py-3 rounded-full bg-white text-gray-900 font-medium hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5`}
+            className={`flex items-center gap-2 px-6 py-3 rounded-full bg-white text-gray-900 font-medium hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 dark:bg-white/5 dark:text-white`}
           >
             <RefreshCcw className="w-5 h-5" />
             Try Again

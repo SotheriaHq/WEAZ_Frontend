@@ -72,7 +72,7 @@ const PatchesSettings: React.FC = () => {
   ]);
 
   const setActiveTab = (tab: PatchesFilter) => {
-    setSearchParams({ tab: 'patches', filter: tab });
+    setSearchParams({ tab: 'patches', filter: tab }, { replace: true });
   };
 
   const handleAccept = (patchId: string) => {

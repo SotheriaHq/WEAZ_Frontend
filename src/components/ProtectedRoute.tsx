@@ -6,12 +6,10 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import { useAuth } from '@/context/AuthContext';
+import { AuthGateFallback } from '@/components/AuthGateFallback';
 
-const AuthRouteFallback: React.FC = () => (
-  <div className="flex min-h-[240px] items-center justify-center text-sm text-gray-500">
-    Verifying your session...
-  </div>
-);
+/** Shared with GuestRoute: delayed skeleton, no words. */
+const AuthRouteFallback: React.FC = () => <AuthGateFallback />;
 
 export const RequireAuthenticated: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, profile } = useSelector((state: RootState) => state.user);

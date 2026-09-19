@@ -4,7 +4,6 @@ import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@/compone
 import { buildDesignRoute } from '@/utils/catalogRoutes';
 
 interface AddCollectionDropdownProps {
-  openModal: (type: 'BASIC' | 'INSTORE') => void;
   // Variants available:
   // - Button variants: 'primary' | 'ghost' | 'outline'
   // - Sizes: 'xs' | 'sm' | 'md' | 'lg'
@@ -13,7 +12,7 @@ interface AddCollectionDropdownProps {
   asLink?: boolean;
 }
 
-const AddCollectionDropdown: React.FC<AddCollectionDropdownProps> = ({ openModal: _openModal, variant = 'primary', asLink = false }) => {
+const AddCollectionDropdown: React.FC<AddCollectionDropdownProps> = ({ variant = 'primary', asLink = false }) => {
   const navigate = useNavigate();
   return (
     <Dropdown>

@@ -400,6 +400,8 @@ const AdminProductsPage: React.FC = () => {
                     <th className="px-3 py-3">Brand</th>
                     <th className="px-3 py-3">Price</th>
                     <th className="px-3 py-3">Status</th>
+                    <th className="px-3 py-3 text-right">Views</th>
+                    <th className="px-3 py-3 text-right">Orders</th>
                     <th className="px-3 py-3">Created</th>
                     {canModerate && <th className="px-3 py-3">Actions</th>}
                   </tr>
@@ -433,6 +435,12 @@ const AdminProductsPage: React.FC = () => {
                           <span>{product.isActive ? '🟢' : '🔴'}</span>
                           {product.isActive ? 'Active' : 'Inactive'}
                         </span>
+                      </td>
+                      <td className="px-3 py-3 text-right font-mono text-xs tabular-nums text-gray-700 dark:text-gray-200">
+                        {(product.viewCount ?? 0).toLocaleString()}
+                      </td>
+                      <td className="px-3 py-3 text-right font-mono text-xs tabular-nums text-gray-700 dark:text-gray-200">
+                        {(product.orderCount ?? 0).toLocaleString()}
                       </td>
                       <td className="px-3 py-3 text-xs text-gray-500 dark:text-gray-400">
                         {new Date(product.createdAt).toLocaleDateString()}
