@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
-import { messagingApi, type InboxItem, type ThreadMessage, type ThreadOrderItem, type ResolvedThreadRoute } from '@/api/MessagingApi';
+import { messagingApi, type InboxItem, type ThreadMessage, type ThreadOrderItem, type ResolvedThreadRoute, type MessageContentContext } from '@/api/MessagingApi';
 import { customOrdersBuyerApi, customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
 import { getStoreStatus } from '@/api/StoreApi';
 import { isRateLimited, shouldAnnounceRateLimit } from '@/api/httpClient';
@@ -21,10 +21,6 @@ import type { MarketItem } from '@/types/market';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import UniversalSelect from '@/components/forms/UniversalSelect';
-import {
-  formatCustomOrderCode,
-  humanizeCustomOrderToken,
-} from '@/components/custom-orders/customOrderFormatting';
 import MessageBubble, { formatDate } from '@/components/messaging/MessageBubble';
 import ComposeArea, { type ReplyTo } from '@/components/messaging/ComposeArea';
 import ChatContactSidebar from '@/components/messaging/ChatContactSidebar';
@@ -202,7 +198,9 @@ const synthesizeConversationFromRoute = (route: ResolvedThreadRoute): Conversati
  */
 type OutgoingDraft = {
   conversation: ConversationItem;
-  payload: {
+  /* `MessageContentContext` so a retry re-sends the order reference the first
+     attempt carried, rather than a bare message that lost its subject. */
+  payload: MessageContentContext & {
     bodyText?: string;
     clientMessageId: string;
     attachmentFileIds: string[];
@@ -674,34 +672,87 @@ const MessagingManagementPage: React.FC = () => {
   );
   const showOrderActions = threadOrders.length > 0 && Boolean(selectedOrder);
 
-  /* ---- Order reference strip ----
-     What the conversation is ABOUT. Arriving from an order left no trace of
-     which order it was: the only mention was a 180px native <select> parked
-     among the header's icon buttons, which reads as a filter, not a reference.
-     These derive the display copy for the strip that now sits under the header. */
-  const selectedOrderCode = useMemo(() => {
-    if (!selectedOrder) return '';
-    return selectedOrder.type === 'CUSTOM_ORDER'
-      ? formatCustomOrderCode(selectedOrder.id)
-      : `#${selectedOrder.id.slice(0, 8).toUpperCase()}`;
-  }, [selectedOrder]);
+  /* ---- The order, referenced the way the Runway references a design ----
+     A message composed from a design card carries that design with it
+     (`contextDesign*`), and `MessageBubble` draws it as a tappable card above
+     the bubble. An order thread earns the same treatment — not a banner pinned
+     over the whole conversation, which says the same thing once and then keeps
+     saying it. A custom order is made FROM a design or a product, and that
+     source is the thing a shopper recognises, so it is what gets attached.
+     `OrderChatDrawer` already does this; this is the inbox's copy of it.
 
-  const selectedOrderAmount = useMemo(() => {
-    if (!selectedOrder) return '';
-    const amount = Number(selectedOrder.totalAmount);
-    if (!Number.isFinite(amount) || amount <= 0) return '';
-    try {
-      // Intl throws RangeError on an unknown currency code rather than falling
-      // back, and a thrown render is a worse outcome than an unstyled amount.
-      return new Intl.NumberFormat(undefined, {
-        style: 'currency',
-        currency: selectedOrder.currency || 'NGN',
-        maximumFractionDigits: 0,
-      }).format(amount);
-    } catch {
-      return `${selectedOrder.currency ?? ''} ${amount.toLocaleString()}`.trim();
+     Primitives in the deps, not `selectedOrder`: that object is rebuilt on
+     every `threadOrders` change, and this effect issues a request. */
+  const selectedOrderId = selectedOrder?.id ?? '';
+  const selectedOrderType = selectedOrder?.type ?? null;
+  const selectedOrderTitle = selectedOrder?.title ?? '';
+  const [orderContentContext, setOrderContentContext] = useState<MessageContentContext | null>(null);
+
+  useEffect(() => {
+    if (!selectedOrderId || !selectedOrderType) {
+      setOrderContentContext(null);
+      return;
     }
-  }, [selectedOrder]);
+
+    /* A standard order names its item without linking to it: the thread's order
+       list carries no product id, so there is nowhere to send a tap.
+       `MessageBubble` renders exactly this shape as a static card rather than a
+       button that goes nowhere. */
+    if (selectedOrderType === 'STANDARD_ORDER') {
+      setOrderContentContext(selectedOrderTitle ? { contextProductTitle: selectedOrderTitle } : null);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const detail = surface === 'BRAND' && brandId
+          ? await customOrdersBrandApi.getById(brandId, selectedOrderId)
+          : await customOrdersBuyerApi.getById(selectedOrderId);
+        if (cancelled) return;
+        const source = detail?.source;
+        if (!source?.id || !source.title) {
+          setOrderContentContext(selectedOrderTitle ? { contextDesignTitle: selectedOrderTitle } : null);
+          return;
+        }
+        const cover = source.primaryMediaUrl ?? undefined;
+        setOrderContentContext(
+          source.type === 'PRODUCT'
+            ? {
+                contextProductId: source.id,
+                contextProductTitle: source.title,
+                contextProductCoverUrl: cover,
+              }
+            : {
+                contextDesignId: source.id,
+                contextDesignTitle: source.title,
+                contextDesignCoverUrl: cover,
+              },
+        );
+      } catch {
+        // The order's own title still says what the message is about; losing the
+        // cover and the link is far better than losing the reference.
+        if (!cancelled) {
+          setOrderContentContext(selectedOrderTitle ? { contextDesignTitle: selectedOrderTitle } : null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId, selectedOrderId, selectedOrderTitle, selectedOrderType, surface]);
+
+  /** The same reference, rendered in the composer so it is seen before it ships. */
+  const orderContextChip = useMemo(() => {
+    if (!orderContentContext) return null;
+    const title = orderContentContext.contextDesignTitle ?? orderContentContext.contextProductTitle;
+    if (!title) return null;
+    return {
+      title,
+      coverUrl: orderContentContext.contextDesignCoverUrl ?? orderContentContext.contextProductCoverUrl ?? null,
+    };
+  }, [orderContentContext]);
 
   const threadOrderOptions = useMemo(
     () =>
@@ -1636,6 +1687,10 @@ const MessagingManagementPage: React.FC = () => {
       clientMessageId: nextClientMessageId(),
       attachmentFileIds,
       replyToMessageId,
+      // The reference travels with the message. The thread is one row among many
+      // in the recipient's inbox, so the message itself has to say what it is
+      // about — the same contract a Runway-composed message ships under.
+      ...(orderContentContext ?? {}),
     };
 
     setMessages((items) => [
@@ -1650,6 +1705,8 @@ const MessagingManagementPage: React.FC = () => {
         bodyText: bodyText || null,
         createdAt: new Date().toISOString(),
         attachments: [],
+        // So the card is there on the keystroke, not one round trip later.
+        metadataJson: orderContentContext ?? null,
         quotedMessage: replyToMessage
           ? {
               id: replyToMessage.id,
@@ -1664,7 +1721,7 @@ const MessagingManagementPage: React.FC = () => {
 
     setReplyToMessage(null);
     await dispatchSend({ conversation, payload });
-  }, [actorId, activeConversation, dispatchSend, replyToMessage, surface]);
+  }, [actorId, activeConversation, dispatchSend, orderContentContext, replyToMessage, surface]);
 
   /** Re-send a message that failed, from the bubble it failed in. */
   const handleRetryMessage = useCallback((messageId: string) => {
@@ -2161,6 +2218,20 @@ const MessagingManagementPage: React.FC = () => {
                       fitContent
                       className="hidden shrink-0 sm:block"
                     />
+                    {/* Which order the next message is about. Only worth a
+                        control when there is a choice to make. */}
+                    {threadOrders.length > 1 && (
+                      <UniversalSelect
+                        value={selectedOrderKey}
+                        onChange={setSelectedOrderKey}
+                        options={threadOrderOptions}
+                        placeholder="Select order"
+                        size="sm"
+                        compact
+                        fitContent
+                        className="shrink-0"
+                      />
+                    )}
                   </>
                 )}
 
@@ -2196,10 +2267,17 @@ const MessagingManagementPage: React.FC = () => {
                   </button>
                 )}
 
-                {/* The 📦 "View Order" icon that used to sit here is now the
-                    labelled "View order" button in the reference strip below —
-                    one control per action, and this one no longer has to be
-                    guessed from an emoji. */}
+                {/* View Order (not inquiry) — uses orderDetailUrl for canonical order page */}
+                {showOrderActions && selectedOrder?.orderDetailUrl && (
+                  <button
+                    type="button"
+                    onClick={() => openRoute(selectedOrder.orderDetailUrl as string)}
+                    className="rounded-lg px-2.5 py-1.5 text-theme-secondary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                    title="View Order"
+                  >
+                    <span className="text-base" role="img" aria-label="order">📦</span>
+                  </button>
+                )}
 
                 {/* Refresh */}
                 <button
@@ -2220,71 +2298,6 @@ const MessagingManagementPage: React.FC = () => {
                 </button>
               </div>
             </div>
-
-            {/* Order reference — the subject of this conversation, stated once,
-                where the eye lands before the first message. The order switcher
-                lives here too when a thread carries more than one, because it
-                changes WHAT is referenced; with a single order there is nothing
-                to switch and the reference stands alone. */}
-            {threadOrders.length > 0 && (
-              <div className="shrink-0 border-b border-gray-200/60 bg-purple-50/70 px-4 py-2.5 dark:border-white/[0.06] dark:bg-purple-500/[0.08]">
-                <div className="flex items-center gap-3">
-                  <span aria-hidden="true" className="text-base leading-none">
-                    {selectedOrder?.type === 'STANDARD_ORDER' ? '📦' : '🧵'}
-                  </span>
-
-                  <div className="min-w-0 flex-1">
-                    {selectedOrder ? (
-                      <>
-                        <div className="flex flex-wrap items-baseline gap-x-2">
-                          <span className="truncate text-xs font-semibold text-theme">{selectedOrder.title}</span>
-                          <span className="font-mono text-[11px] text-theme-secondary">{selectedOrderCode}</span>
-                        </div>
-                        <div className="mt-0.5 truncate text-[11px] text-theme-secondary">
-                          {[
-                            selectedOrder.type === 'CUSTOM_ORDER' ? 'Custom order' : 'Order',
-                            humanizeCustomOrderToken(selectedOrder.status) || selectedOrder.status,
-                            selectedOrderAmount,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </div>
-                      </>
-                    ) : (
-                      // Several orders live in this thread and none was asked for
-                      // by name, so the strip says what it can and hands over the
-                      // switcher rather than disappearing with it.
-                      <span className="text-xs font-semibold text-theme">
-                        {threadOrders.length} orders in this conversation
-                      </span>
-                    )}
-                  </div>
-
-                  {threadOrders.length > 1 && (
-                    <UniversalSelect
-                      value={selectedOrderKey}
-                      onChange={setSelectedOrderKey}
-                      options={threadOrderOptions}
-                      placeholder="Select order"
-                      size="sm"
-                      compact
-                      fitContent
-                      className="shrink-0"
-                    />
-                  )}
-
-                  {selectedOrder?.orderDetailUrl && (
-                    <button
-                      type="button"
-                      onClick={() => openRoute(selectedOrder.orderDetailUrl as string)}
-                      className="shrink-0 rounded-full bg-purple-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm shadow-purple-500/20 transition-colors hover:bg-purple-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950"
-                    >
-                      View order <span aria-hidden className="opacity-80">→</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
 
             {/* Messages area */}
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3">
@@ -2370,6 +2383,8 @@ const MessagingManagementPage: React.FC = () => {
               placeholder="Type a message..."
               replyTo={replyToMessage}
               onCancelReply={() => setReplyToMessage(null)}
+              contextRef={orderContextChip}
+              onClearContext={() => setOrderContentContext(null)}
             />
           </>
         )}

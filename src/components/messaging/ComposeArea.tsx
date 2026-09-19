@@ -23,6 +23,14 @@ interface ComposeAreaProps {
   /** When set, shows a reply preview above the input */
   replyTo?: ReplyTo | null;
   onCancelReply?: () => void;
+  /**
+   * What the next message will reference — the order this conversation was
+   * opened from, shown the way the Runway shows the design you are writing
+   * about. Seeing it before pressing send is the point: the card lands on the
+   * message, so the composer is the only chance to notice it is wrong.
+   */
+  contextRef?: { title: string; coverUrl?: string | null } | null;
+  onClearContext?: () => void;
 }
 
 const MAX_ATTACHMENTS = 5;
@@ -36,6 +44,8 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
   maxLength = 4000,
   replyTo = null,
   onCancelReply,
+  contextRef = null,
+  onClearContext,
 }) => {
   const [text, setText] = useState('');
   const [files, setFiles] = useState<PendingFile[]>([]);
@@ -224,6 +234,37 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
 
   return (
     <div className="shrink-0 bg-white/70 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm dark:bg-white/[0.04]">
+      {/* What this message is about. Same chip family as the reply preview, one
+          line, dismissible — a thread is not obliged to stay on one order. */}
+      {contextRef && (
+        <div className="mb-2 flex items-center gap-2 rounded-xl border-l-4 border-purple-500 bg-purple-50/80 px-2.5 py-1.5 dark:bg-purple-500/10">
+          {contextRef.coverUrl ? (
+            <MediaRenderer
+              kind="image"
+              src={contextRef.coverUrl}
+              alt=""
+              fit="cover"
+              className="h-7 w-7 shrink-0 rounded-lg"
+            />
+          ) : (
+            <span aria-hidden="true" className="shrink-0 text-sm leading-none">🎨</span>
+          )}
+          <p className="min-w-0 flex-1 truncate text-[11px] font-medium leading-snug text-gray-700 dark:text-gray-300">
+            <span className="font-semibold text-purple-700 dark:text-purple-300">About</span>{' '}
+            {contextRef.title}
+          </p>
+          {onClearContext && (
+            <button
+              type="button"
+              onClick={onClearContext}
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-purple-100 hover:text-gray-700 dark:hover:bg-purple-500/20 dark:hover:text-gray-200"
+              aria-label={`Stop referencing ${contextRef.title}`}
+            >
+              <span aria-hidden="true" className="text-sm leading-none">✕</span>
+            </button>
+          )}
+        </div>
+      )}
       {/* Reply preview */}
       {replyTo && (
         <div className="flex items-center gap-2 mb-2 rounded-xl border-l-4 border-purple-500 bg-purple-50/80 dark:bg-purple-500/10 px-3 py-2">
