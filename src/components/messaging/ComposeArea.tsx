@@ -250,7 +250,6 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
             <span aria-hidden="true" className="shrink-0 text-sm leading-none">🎨</span>
           )}
           <p className="min-w-0 flex-1 truncate text-[11px] font-medium leading-snug text-gray-700 dark:text-gray-300">
-            <span className="font-semibold text-purple-700 dark:text-purple-300">About</span>{' '}
             {contextRef.title}
           </p>
           {onClearContext && (

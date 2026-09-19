@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import type { RootState } from '@/store';
@@ -475,6 +475,7 @@ const MessagingManagementPage: React.FC = () => {
   const navigate = useNavigate();
   const isEmbeddedMobile = useEmbeddedSurface() === 'mobile-app';
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
   const profile = useSelector((state: RootState) => state.user.profile);
   const surface: Surface = hasActiveBrandMembership(profile) ? 'BRAND' : 'BUYER';
   const [brandId, setBrandId] = useState<string | null>(null);
@@ -743,16 +744,32 @@ const MessagingManagementPage: React.FC = () => {
     };
   }, [brandId, selectedOrderId, selectedOrderTitle, selectedOrderType, surface]);
 
+  /* ---- The reference is spent by the first message that carries it ----
+     Opening a thread from an order says "this next thing I say is about this
+     order" — once. Leaving it armed stamped every later message in the same
+     window with the same card, which is how a reference stops meaning anything.
+
+     Armed only by `OrderConversationButton`, which sets `referenceOrder` in
+     navigation state; the URL alone cannot be the signal, because clicking a
+     row in the inbox rewrites the same params and would re-arm it forever.
+     `location.key` is per history entry, so pressing the button again — even on
+     the same order — is a new arrival and arms it again. */
+  const referenceArrivalKey =
+    (location.state as { referenceOrder?: boolean } | null)?.referenceOrder === true ? location.key : '';
+  const [spentReferenceKey, setSpentReferenceKey] = useState<string | null>(null);
+  const activeOrderContext =
+    referenceArrivalKey && spentReferenceKey !== referenceArrivalKey ? orderContentContext : null;
+
   /** The same reference, rendered in the composer so it is seen before it ships. */
   const orderContextChip = useMemo(() => {
-    if (!orderContentContext) return null;
-    const title = orderContentContext.contextDesignTitle ?? orderContentContext.contextProductTitle;
+    if (!activeOrderContext) return null;
+    const title = activeOrderContext.contextDesignTitle ?? activeOrderContext.contextProductTitle;
     if (!title) return null;
     return {
       title,
-      coverUrl: orderContentContext.contextDesignCoverUrl ?? orderContentContext.contextProductCoverUrl ?? null,
+      coverUrl: activeOrderContext.contextDesignCoverUrl ?? activeOrderContext.contextProductCoverUrl ?? null,
     };
-  }, [orderContentContext]);
+  }, [activeOrderContext]);
 
   const threadOrderOptions = useMemo(
     () =>
@@ -1690,8 +1707,12 @@ const MessagingManagementPage: React.FC = () => {
       // The reference travels with the message. The thread is one row among many
       // in the recipient's inbox, so the message itself has to say what it is
       // about — the same contract a Runway-composed message ships under.
-      ...(orderContentContext ?? {}),
+      ...(activeOrderContext ?? {}),
     };
+
+    // Spent, whatever happens next: the draft keeps the reference, so a retry
+    // re-sends this same message with its card rather than arming a new one.
+    if (activeOrderContext && referenceArrivalKey) setSpentReferenceKey(referenceArrivalKey);
 
     setMessages((items) => [
       ...items,
@@ -1706,7 +1727,7 @@ const MessagingManagementPage: React.FC = () => {
         createdAt: new Date().toISOString(),
         attachments: [],
         // So the card is there on the keystroke, not one round trip later.
-        metadataJson: orderContentContext ?? null,
+        metadataJson: activeOrderContext ?? null,
         quotedMessage: replyToMessage
           ? {
               id: replyToMessage.id,
@@ -1721,7 +1742,7 @@ const MessagingManagementPage: React.FC = () => {
 
     setReplyToMessage(null);
     await dispatchSend({ conversation, payload });
-  }, [actorId, activeConversation, dispatchSend, orderContentContext, replyToMessage, surface]);
+  }, [actorId, activeConversation, activeOrderContext, dispatchSend, referenceArrivalKey, replyToMessage, surface]);
 
   /** Re-send a message that failed, from the bubble it failed in. */
   const handleRetryMessage = useCallback((messageId: string) => {
@@ -2384,7 +2405,7 @@ const MessagingManagementPage: React.FC = () => {
               replyTo={replyToMessage}
               onCancelReply={() => setReplyToMessage(null)}
               contextRef={orderContextChip}
-              onClearContext={() => setOrderContentContext(null)}
+              onClearContext={() => setSpentReferenceKey(referenceArrivalKey)}
             />
           </>
         )}

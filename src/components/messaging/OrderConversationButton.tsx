@@ -75,7 +75,20 @@ export function OrderConversationButton({
       exists: true,
       threadId: data?.threadId ?? null,
     });
-    navigate(`/messages?${param}=${encodeURIComponent(id)}`);
+    /*
+      `referenceOrder` arms the order reference on the messages screen for
+      exactly one message.
+
+      The press is the intent: "this next thing I say is about this order." The
+      messages screen cannot infer that from the URL alone, because clicking a
+      row in the inbox rewrites the same params and would keep re-arming it —
+      so the intent travels as navigation state, which only this button sets and
+      any later in-page navigation drops. Pressing it again, even on the same
+      order, is a new navigation and arms it again.
+    */
+    navigate(`/messages?${param}=${encodeURIComponent(id)}`, {
+      state: { referenceOrder: true },
+    });
   };
 
   return (
