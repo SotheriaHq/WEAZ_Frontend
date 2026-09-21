@@ -38,8 +38,11 @@ import { MY_BAG_EMOJI } from '@/constants/bagging';
  */
 const CheckoutPage = lazy(() => import('@/pages/checkout/CheckoutPage'));
 
-const PROMO_CODES_UNAVAILABLE_MESSAGE =
-  'Promo codes are not available during MVP checkout. Final totals are calculated securely by WIEZ at payment time.';
+/*
+  No promo code notice here either — see `CheckoutPage`. A banner explaining
+  that a feature does not exist is still that feature taking up space, and this
+  drawer has less of it than anywhere else in the product.
+*/
 
 // Small component to handle signed URL resolution for cart thumbnails
 const CartItemThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
@@ -64,9 +67,11 @@ const CartItemThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt })
  * 
  * A slide-in drawer displaying the shopping bag with:
  * - Product list with quantity controls
- * - Promo code input with validation
- * - Order summary with discounts
+ * - Order summary, totalled by the server
  * - Checkout CTA with payment methods
+ *
+ * No promo codes and no discounts: neither has ever existed here, and the list
+ * above claimed both long after the input was removed.
  * 
  * Design: Glassmorphism with gradient blur backdrop
  */
@@ -655,16 +660,6 @@ const CartDrawer: React.FC = () => {
               {/* Footer - only show when cart has items */}
               {hasBagItems && (
                 <div className="border-t border-gray-200/60 dark:border-gray-800/60 bg-white/40 dark:bg-gray-950/40 backdrop-blur-2xl px-3 py-1.5">
-                  {/* Promo Code Section */}
-                  <div className="mb-1.5">
-                    <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[10px] leading-relaxed text-amber-800 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
-                      <div className="flex gap-1.5">
-                        <span aria-hidden="true">🎟️</span>
-                        <span>{PROMO_CODES_UNAVAILABLE_MESSAGE}</span>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Order Summary */}
                   <div className="space-y-0.5 mb-1.5">
                     <div className="flex items-center justify-between text-xs">

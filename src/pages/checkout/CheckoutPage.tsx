@@ -301,8 +301,16 @@ interface CheckoutPageProps {
   onClose?: () => void;
 }
 
-const PROMO_CODES_UNAVAILABLE_MESSAGE =
-  'Promo codes are not available during MVP checkout. Final totals are calculated securely by WIEZ at payment time.';
+/*
+  There is no promo code anywhere in checkout, by decision.
+
+  A notice explaining that promo codes are unavailable is still a promo code
+  feature: it puts the idea on the screen, gives the buyer something to go
+  looking for, and asks them to read a sentence about a thing that does not
+  exist. Nothing here applies a discount — `discountAmount` is a hard zero and
+  totals are the server's — so there is nothing to explain. When promo codes
+  ship, they ship as a field.
+*/
 
 /* ─── Component ─── */
 
@@ -348,6 +356,19 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const [savedAddresses, setSavedAddresses] = useState<SavedDeliveryAddress[]>([]);
   const [savedAddressesLoading, setSavedAddressesLoading] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  /**
+   * Whether the delivery form is on screen at all.
+   *
+   * A returning buyer already gave us this. Showing them nine prefilled fields
+   * asks them to re-read their own address and decide whether anything needs
+   * doing, on the step whose only real question is "send it to the usual
+   * place?" — so the saved cards answer it and the form stays folded until
+   * something actually needs typing.
+   *
+   * It opens on its own for the one person who has nothing saved (see the
+   * effect below), because for them the form IS the step.
+   */
+  const [addressFormOpen, setAddressFormOpen] = useState(false);
   const [openAddressMenuId, setOpenAddressMenuId] = useState<string | null>(null);
 
   /* ── Payment state ── */
@@ -951,6 +972,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       setEditingAddressId(nextAddresses[0].id);
     }
     setOpenAddressMenuId(null);
+    // Saving is the end of editing: fold the form away and let the card that
+    // now holds this address speak for it.
+    setAddressFormOpen(false);
     toast.success(editingAddressId ? 'Shipping address updated.' : 'Shipping address saved.');
   }, [currentAddressDraft, editingAddressId, isCurrentAddressComplete, user?.id]);
 
@@ -969,7 +993,36 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
       phone: user?.phoneNumber ?? address.phone,
     });
     setShippingErrors({});
+    setAddressFormOpen(true);
   }, [address.firstName, address.lastName, address.phone, user?.firstName, user?.lastName, user?.phoneNumber]);
+
+  /** Edit the address that is currently selected, with its values already in. */
+  const handleEditSelectedAddress = useCallback(() => {
+    const selected =
+      savedAddresses.find((entry) => entry.id === editingAddressId) ?? savedAddresses[0];
+    if (selected) applySavedAddress(selected);
+    setAddressFormOpen(true);
+  }, [applySavedAddress, editingAddressId, savedAddresses]);
+
+  /** Abandon an edit and go back to the saved list, reselecting what was chosen. */
+  const handleCancelAddressForm = useCallback(() => {
+    const selected =
+      savedAddresses.find((entry) => entry.id === editingAddressId) ?? savedAddresses[0];
+    if (selected) applySavedAddress(selected);
+    setAddressFormOpen(false);
+  }, [applySavedAddress, editingAddressId, savedAddresses]);
+
+  /*
+    Nothing saved means there is nothing to choose between, and a collapsed
+    form would be a dead end — the buyer would have to find a button to reach
+    the only thing this step does. Opens on the empty case, and again if the
+    last saved address is deleted. Never forces itself CLOSED: that would yank
+    the form away from someone mid-edit.
+  */
+  useEffect(() => {
+    if (savedAddressesLoading) return;
+    if (savedAddresses.length === 0) setAddressFormOpen(true);
+  }, [savedAddresses.length, savedAddressesLoading]);
 
   const handleDeleteSavedAddress = useCallback(
     (addressId: string) => {
@@ -1414,22 +1467,40 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     <p className="text-sm font-semibold text-slate-900 dark:text-white">Saved shipping addresses</p>
                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Checkout now uses the same saved delivery address book as custom orders. Your most recent address is selected first.</p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={handleSaveCurrentAddress}
-                      className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:text-slate-300 dark:hover:border-white/20 dark:hover:text-white"
-                    >
-                      {editingAddressId ? 'Update address' : 'Save current address'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleStartNewAddress}
-                      className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-semibold text-black"
-                    >
-                      Add new address
-                    </button>
-                  </div>
+                  {/*
+                    One pair, one geometry. These were a grey outline chip next
+                    to a solid EMERALD pill — a colour that appears nowhere else
+                    in checkout — at different weights, so they read as two
+                    unrelated controls rather than the secondary/primary pair
+                    they are. Same size, same radius, system fuchsia for the
+                    primary.
+
+                    While the form is open these are not offered: the actions
+                    that belong to an open form (save it, abandon it) live with
+                    the form, and duplicating them up here is how a buyer ends
+                    up pressing "Add new address" to try to save the one they
+                    are already typing.
+                  */}
+                  {!addressFormOpen ? (
+                    <div className="flex flex-wrap gap-2">
+                      {savedAddresses.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={handleEditSelectedAddress}
+                          className="rounded-full border border-slate-300 px-3.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-fuchsia-300 hover:text-fuchsia-700 dark:border-white/15 dark:text-slate-200 dark:hover:border-fuchsia-400/40 dark:hover:text-fuchsia-300"
+                        >
+                          Update address
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={handleStartNewAddress}
+                        className="rounded-full bg-fuchsia-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-fuchsia-500/20 transition-colors hover:bg-fuchsia-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950"
+                      >
+                        Add new address
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
 
                 {savedAddressesLoading ? (
@@ -1510,6 +1581,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 )}
               </div>
 
+              {addressFormOpen ? (
+                <>
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <Input
                   label="First name"
@@ -1593,6 +1666,34 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                   className="[&_input]:rounded-2xl [&_input]:border-white/60 [&_input]:bg-white/80 [&_input]:shadow-[0_10px_24px_rgba(15,23,42,0.06)] dark:[&_input]:border-white/10 dark:[&_input]:bg-white/[0.03]"
                 />
               </div>
+
+              {/*
+                The form's own actions, with the form. Saving adds this to the
+                address book and folds the form away; cancelling restores the
+                address that was selected before the edit. Neither is required
+                to continue — "Continue to Payment" uses what is typed here
+                whether or not it was ever saved.
+              */}
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {savedAddresses.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={handleCancelAddressForm}
+                    className="rounded-full border border-slate-300 px-3.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:text-slate-900 dark:border-white/15 dark:text-slate-200 dark:hover:border-white/25 dark:hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handleSaveCurrentAddress}
+                  className="rounded-full bg-fuchsia-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm shadow-fuchsia-500/20 transition-colors hover:bg-fuchsia-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950"
+                >
+                  {editingAddressId ? 'Save changes' : 'Save address'}
+                </button>
+              </div>
+                </>
+              ) : null}
 
               <div className="flex flex-col gap-4 border-t border-slate-200/70 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
                 <CheckoutBackLink label="Back to bag" onClick={handleBackToBag} />
@@ -1678,16 +1779,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     </div>
                   );
                 })}
-              </div>
-
-              {/* Promo code */}
-              <div className="pt-2">
-                <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-zinc-300">
-                  Promo Code
-                </label>
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-                  {PROMO_CODES_UNAVAILABLE_MESSAGE}
-                </div>
               </div>
 
               <div className="flex flex-col gap-4 border-t border-slate-200/70 pt-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">

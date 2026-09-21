@@ -69,6 +69,16 @@ export interface ThreadMessage {
   visibilityState: 'VISIBLE' | 'HIDDEN' | 'REDACTED';
   bodyText?: string | null;
   createdAt: string;
+  /**
+   * The id the SENDING device minted for this message, echoed back.
+   *
+   * Stored so a retry is idempotent (`@@unique([threadId, senderUserId,
+   * clientMessageId])`) and returned on every message. It is what lets a client
+   * recognise the real row as the one standing in for its own optimistic bubble
+   * and drop the placeholder in the same update — see `withPendingLocalMessages`.
+   * Absent on messages sent from surfaces that do not mint one.
+   */
+  clientMessageId?: string | null;
   /** Delivery status: SENT (single tick), DELIVERED (double tick), READ (colored double tick) */
   deliveryStatus?: 'SENT' | 'DELIVERED' | 'READ';
   /**

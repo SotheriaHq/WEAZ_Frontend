@@ -7,6 +7,7 @@ import { messagingApi, type InboxItem, type ThreadMessage, type ThreadOrderItem,
 import { customOrdersBuyerApi, customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
 import { getStoreStatus } from '@/api/StoreApi';
 import { isRateLimited, shouldAnnounceRateLimit } from '@/api/httpClient';
+import { withPendingLocalMessages } from '@/lib/optimisticMessages';
 import {
   ISLAND_BOTTOM_NAV_BREAKPOINT_PX,
   ISLAND_BOTTOM_NAV_RESERVED_PX,
@@ -213,27 +214,6 @@ const getSendErrorMessage = (error: unknown): string => {
   return typeof message === 'string' && message.trim()
     ? message
     : 'Message not sent. Tap retry to try again.';
-};
-
-/**
- * Server messages, with this device's in-flight ones kept.
- *
- * Sending triggers a refresh, and a refresh replaces the whole list — so
- * sending a second message while the first was still settling used to erase
- * the second one's bubble mid-flight, and it reappeared seconds later out of
- * nowhere. A message that is still sending, or has failed and is waiting to be
- * retried, exists only here: nothing the server returns can contain it, so it
- * survives every replacement until it resolves.
- *
- * Appended after the server's rows because the list runs oldest-first and these
- * are, by definition, the newest thing in the thread.
- */
-const withPendingLocalMessages = (
-  incoming: ThreadMessage[],
-  current: ThreadMessage[],
-): ThreadMessage[] => {
-  const pending = current.filter((message) => message._optimistic);
-  return pending.length > 0 ? [...incoming, ...pending] : incoming;
 };
 
 const nextClientMessageId = () => {
