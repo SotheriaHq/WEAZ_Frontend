@@ -1,7 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
-import { brandApi } from '@/api/BrandApi';
+import {
+  PAYOUT_ACCOUNT_SETTINGS_PATH,
+  resolvePayoutAccountIssue,
+} from '@/lib/payoutAccountIssue';
+import { brandApi, type PayoutChallenge } from '@/api/BrandApi';
+import PayoutConfirmDialog from '@/components/payouts/PayoutConfirmDialog';
 import { customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
 import { getStoreStatus } from '@/api/StoreApi';
 import { MuseLoader } from '@/components/loaders/MuseLoader';
@@ -187,8 +193,11 @@ const toArrayOrItems = <T,>(value: any): T[] =>
   Array.isArray(value?.items) ? value.items : Array.isArray(value) ? value : [];
 
 const FinancePage: React.FC = () => {
+  const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
   const [requesting, setRequesting] = useState(false);
+  /** The live payout challenge, or null when no payout is awaiting a code. */
+  const [payoutChallenge, setPayoutChallenge] = useState<PayoutChallenge | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<IncomingTransaction | null>(null);
   const [selectedHeldFund, setSelectedHeldFund] = useState<HeldFundsItem | null>(null);
   const [selectedHeldStandardOrder, setSelectedHeldStandardOrder] = useState<any | null>(null);
@@ -543,10 +552,32 @@ const FinancePage: React.FC = () => {
 
     setRequesting(true);
     try {
-      await brandApi.requestPayout(brandId, availableBalance);
-      toast.success('Payout requested successfully');
-      void refetchFinance();
+      /*
+        This no longer creates the payout. It validates the request and emails
+        a code; the dialog below spends it. A session that can press this button
+        should not, on its own, be able to move money off the platform.
+      */
+      const challenge = await brandApi.requestPayout(brandId, availableBalance);
+      setPayoutChallenge(challenge);
+      toast.success(`Confirmation code sent to ${challenge.emailHint}`);
     } catch (error: any) {
+      /*
+        A payout that fails because of the payout account is not news, it is a
+        task. The brand is one screen away from fixing it, so say what is wrong
+        and carry them there rather than leaving them to work out that "does not
+        have an active transfer recipient" means "go to settings".
+      */
+      const issue = resolvePayoutAccountIssue(error);
+      if (issue) {
+        toast.error(issue.message, {
+          duration: 8000,
+          action: {
+            label: issue.ctaLabel,
+            onClick: () => navigate(PAYOUT_ACCOUNT_SETTINGS_PATH),
+          },
+        });
+        return;
+      }
       toast.error(error?.response?.data?.message || 'Failed to request payout');
     } finally {
       setRequesting(false);
@@ -1190,6 +1221,34 @@ const FinancePage: React.FC = () => {
           </div>
         ) : null}
       </Modal>
+
+      <PayoutConfirmDialog
+        open={Boolean(payoutChallenge)}
+        brandId={brandId ?? ''}
+        challenge={payoutChallenge}
+        onCancel={() => setPayoutChallenge(null)}
+        onConfirmed={() => {
+          setPayoutChallenge(null);
+          void refetchFinance();
+        }}
+        /*
+          Resending re-runs the request, which re-validates the payout from
+          scratch: the balance or the payout account may have changed in the
+          ten minutes the first code was alive, and a fresh code for a payout
+          that can no longer happen would be a lie.
+        */
+        onResend={async () => {
+          if (!brandId) return null;
+          try {
+            return await brandApi.requestPayout(brandId, availableBalance);
+          } catch (error: any) {
+            toast.error(
+              error?.response?.data?.message || 'Could not send a new code.',
+            );
+            return null;
+          }
+        }}
+      />
     </div>
   );
 };

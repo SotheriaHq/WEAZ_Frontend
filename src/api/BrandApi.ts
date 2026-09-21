@@ -23,6 +23,25 @@ import { resolveCatalogEntityType } from '../utils/catalogEntity';
 import { filterV1GarmentCategories } from '../utils/v1Taxonomy';
 import { WEB_UPLOAD_POLICIES, assertValidUploadFile } from '../utils/uploadValidation';
 
+/**
+ * What `requestPayout` returns instead of a payout.
+ *
+ * A session alone cannot move money off the platform: the request is
+ * validated, a time-limited code is emailed to the account, and the payout is
+ * created only when that code comes back.
+ */
+export interface PayoutChallenge {
+  challengeRequired: true;
+  /** What the code authorises. The server will not accept any other figure. */
+  amount: number;
+  expiresInSeconds: number;
+  maxAttempts: number;
+  resendAfterSeconds: number;
+  /** Masked, e.g. `br***@example.com` — enough to recognise the inbox. */
+  emailHint: string;
+  message: string;
+}
+
 export interface UpdateBrandProfilePayload {
   brandFullName?: string;
   brandDescription: string;
@@ -2183,13 +2202,37 @@ export const brandApi = {
     return unwrapApiResponse<any>(response.data);
   },
 
-  async requestPayout(brandId: string, amount: number) {
+  /**
+   * Start a payout. This creates NOTHING — it validates the request and emails
+   * a confirmation code. The payout exists only once `confirmPayoutRequest`
+   * spends that code.
+   */
+  async requestPayout(brandId: string, amount: number): Promise<PayoutChallenge> {
     try {
       const response = await apiClient.post(`/brands/${brandId}/payouts/request`, { amount });
-      return unwrapApiResponse<any>(response.data);
+      return unwrapApiResponse<PayoutChallenge>(response.data);
     } catch (error) {
       console.error('Error requesting payout:', error);
       throw error; // Re-throw to handle in UI
+    }
+  },
+
+  /**
+   * Spend the emailed code and create the payout.
+   *
+   * No amount is sent. The server takes it from the code, so a client cannot
+   * confirm one figure and submit another.
+   */
+  async confirmPayoutRequest(brandId: string, code: string) {
+    try {
+      const response = await apiClient.post(
+        `/brands/${brandId}/payouts/request/confirm`,
+        { code },
+      );
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error confirming payout:', error);
+      throw error;
     }
   },
 };

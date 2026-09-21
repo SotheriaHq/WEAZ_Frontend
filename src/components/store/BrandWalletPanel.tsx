@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { brandApi } from '@/api/BrandApi';
+import { brandApi, type PayoutChallenge } from '@/api/BrandApi';
+import PayoutConfirmDialog from '@/components/payouts/PayoutConfirmDialog';
 import { getStoreWallet, type StoreWalletResponse } from '@/api/StoreApi';
 import { getPayoutStatusMeta } from '@/components/payouts/payoutStatus';
+import { resolvePayoutAccountIssue } from '@/lib/payoutAccountIssue';
 
 const formatMoney = (amount: number, currency: string) => {
   return new Intl.NumberFormat('en-NG', {
@@ -28,6 +30,8 @@ const BrandWalletPanel: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [wallet, setWallet] = useState<StoreWalletResponse | null>(null);
   const [requesting, setRequesting] = useState(false);
+  /** The live payout challenge, or null when no payout is awaiting a code. */
+  const [payoutChallenge, setPayoutChallenge] = useState<PayoutChallenge | null>(null);
 
   const loadWallet = useCallback(async () => {
     setLoading(true);
@@ -64,7 +68,7 @@ const BrandWalletPanel: React.FC = () => {
     : availableForPayout < 5000
       ? 'Minimum payout amount is NGN 5,000.'
       : !payoutAccountReady
-        ? 'Complete payout account setup and wait for ACTIVE + recipient sync before requesting payout.'
+        ? 'Finish setting up your payout account below before requesting a payout.'
         : null;
 
   const handleRequestPayout = useCallback(async () => {
@@ -76,24 +80,37 @@ const BrandWalletPanel: React.FC = () => {
       toast.error('Minimum payout amount is NGN 5,000');
       return;
     }
+    /*
+      This panel sits directly above the payout account form, so the remedy is
+      on screen already — sending the brand somewhere would be sending them
+      here. Point down the page instead, in words that say what to do rather
+      than naming internal state ("complete account sync", "transfer recipient
+      is active" — neither is a thing a brand owner has ever heard of).
+    */
     if (!payoutAccountReady) {
-      toast.error(
-        'Payout account is not ready yet. Complete account sync and ensure transfer recipient is active.',
-      );
+      toast.error('Finish setting up your payout account below, then request the payout.');
       return;
     }
 
     setRequesting(true);
     try {
-      await brandApi.requestPayout(wallet.brandId, availableForPayout);
-      toast.success('Payout requested successfully');
-      await loadWallet();
+      // Validates and emails a code; the dialog below creates the payout.
+      const challenge = await brandApi.requestPayout(wallet.brandId, availableForPayout);
+      setPayoutChallenge(challenge);
+      toast.success(`Confirmation code sent to ${challenge.emailHint}`);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Unable to request payout');
+      const issue = resolvePayoutAccountIssue(err);
+      toast.error(
+        issue
+          ? `${issue.message} The form is just below.`
+          : err?.response?.data?.message || 'Unable to request payout',
+      );
     } finally {
       setRequesting(false);
     }
-  }, [availableForPayout, loadWallet, payoutAccountReady, wallet?.brandId]);
+    // `loadWallet` is no longer called here: requesting only issues a code, and
+    // the wallet is reloaded when the dialog confirms the payout.
+  }, [availableForPayout, payoutAccountReady, wallet?.brandId]);
 
   const metrics = useMemo(() => {
     const currency = wallet?.currency || 'NGN';
@@ -219,6 +236,26 @@ const BrandWalletPanel: React.FC = () => {
           })}
         </div>
       </div>
+
+      <PayoutConfirmDialog
+        open={Boolean(payoutChallenge)}
+        brandId={wallet?.brandId ?? ''}
+        challenge={payoutChallenge}
+        onCancel={() => setPayoutChallenge(null)}
+        onConfirmed={() => {
+          setPayoutChallenge(null);
+          void loadWallet();
+        }}
+        onResend={async () => {
+          if (!wallet?.brandId) return null;
+          try {
+            return await brandApi.requestPayout(wallet.brandId, availableForPayout);
+          } catch (error: any) {
+            toast.error(error?.response?.data?.message || 'Could not send a new code.');
+            return null;
+          }
+        }}
+      />
     </section>
   );
 };
