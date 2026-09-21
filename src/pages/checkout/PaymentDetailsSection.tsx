@@ -8,6 +8,7 @@ import type { LegalAcceptancePayload } from '@/api/LegalApi';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import SavedCardFace from '@/components/payments/SavedCardFace';
 import {
   detectCardBrand,
   formatCardNumberInput,
@@ -227,40 +228,30 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
             {savedCardsLoading ? (
               <p className="text-sm text-slate-500 dark:text-slate-400">Loading saved cards...</p>
             ) : savedCards.length > 0 ? (
-              <div className="space-y-2">
+              /*
+                The cards lie side by side the way they would in a wallet, and
+                their controls sit UNDER each card rather than inside it. A
+                "Remove" chip printed on the face of a card is not a thing that
+                exists, and putting one there made the object read as a form
+                row again.
+              */
+              <div className="flex flex-wrap gap-4">
                 {savedCards.map((card) => {
                   const isSelected =
                     paymentData.useSavedCard && paymentData.savedCardId === card.id;
                   const isMutating = savedCardMutatingId === card.id;
-                  const brand = card.brand || 'Card';
-                  const bank = card.bank ? ` (${card.bank})` : '';
                   return (
-                    <div
-                      key={card.id}
-                      className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                        isSelected
-                          ? 'border-fuchsia-400/80 bg-fuchsia-50/70 dark:border-fuchsia-400/30 dark:bg-fuchsia-500/10'
-                          : 'border-slate-200/80 bg-white/70 hover:border-fuchsia-300 dark:border-white/10 dark:bg-white/[0.03]'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <button
-                          type="button"
-                          onClick={() => selectSavedCard(card)}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                            {brand}
-                            {bank} ending {card.last4}
-                          </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {card.expMonth && card.expYear
-                              ? `Exp ${card.expMonth}/${card.expYear}`
-                              : 'Expiration unavailable'}
-                            {card.reusable ? ' · Reusable' : ''}
-                            {card.isDefault ? ' · Default' : ''}
-                          </p>
-                        </button>
+                    <div key={card.id} className="w-full max-w-[22rem] space-y-2">
+                      <SavedCardFace
+                        card={card}
+                        selected={isSelected}
+                        busy={isMutating}
+                        onSelect={() => selectSavedCard(card)}
+                      />
+                      <div className="flex items-center justify-between gap-2 px-1">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {isSelected ? 'Paying with this card' : 'Tap to pay with this card'}
+                        </span>
                         <div className="flex items-center gap-2">
                           {!card.isDefault && onSetDefaultSavedCard ? (
                             <button
@@ -286,9 +277,6 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
                               {isMutating ? 'Removing...' : 'Remove'}
                             </button>
                           ) : null}
-                          <span className="text-lg" aria-hidden>
-                            {isSelected ? '✅' : '💳'}
-                          </span>
                         </div>
                       </div>
                     </div>
