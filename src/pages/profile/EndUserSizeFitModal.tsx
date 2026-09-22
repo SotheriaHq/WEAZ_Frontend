@@ -6,6 +6,7 @@ import {
 } from '@/lib/profileSizePreference';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { useOverlayBackClose } from '@/hooks/useOverlayBackClose';
 import type { SizeFitProfile } from '@/types/sizeFit';
 
 interface EndUserSizeFitModalProps {
@@ -48,6 +49,8 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
   onClose,
   onSave,
 }) => {
+  useOverlayBackClose(open, onClose);
+
   const [profileSizeCategory, setProfileSizeCategory] = useState(() =>
     readProfileSizeCategory(),
   );
@@ -179,16 +182,16 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
             <span className="text-[color:var(--neu-text-muted)]" aria-hidden="true">✕</span>
           </button>
 
-          <div className="p-3.5 sm:p-5 flex items-start justify-between gap-4 shrink-0">
+          <div className="p-3.5 sm:p-5 flex items-start justify-between gap-4 shrink-0 border-b border-black/5 dark:border-white/10">
             <div className="flex items-center gap-3 min-w-0 pr-10">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white grid place-items-center">
-                <span aria-hidden="true">📏</span>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white grid place-items-center shrink-0">
+                <span aria-hidden="true" className="text-lg">📏</span>
               </div>
               <div className="min-w-0">
-                <h2 className="text-lg font-semibold text-[color:var(--neu-text)] truncate">
+                <h2 className="text-lg font-semibold text-[color:var(--neu-text)] leading-snug">
                   Custom Size/Fits
                 </h2>
-                <p className="text-xs text-[color:var(--neu-text-muted)]">
+                <p className="text-xs text-[color:var(--neu-text-muted)] leading-relaxed mt-0.5">
                   Keep these baseline measurements current for fast custom-order checkout.
                 </p>
               </div>
@@ -201,7 +204,7 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
               <span>Loading fitting profile...</span>
             </div>
           ) : (
-            <div className="px-3.5 pb-3.5 space-y-3.5 flex-1 overflow-y-auto scrollbar-hide overscroll-contain sm:px-5 sm:pb-5 sm:space-y-4">
+            <div className="px-3.5 py-3.5 pb-6 space-y-3.5 flex-1 min-h-0 overflow-y-auto scrollbar-hide overscroll-contain sm:px-5 sm:py-5 sm:pb-8 sm:space-y-4">
               {/*
                 Which size the PROFILE leads with.
 
@@ -394,32 +397,26 @@ export const EndUserSizeFitModal: React.FC<EndUserSizeFitModalProps> = ({
 
                 </div>
               </details>
-
-              {/*
-                Sticky so the single save is reachable at any scroll position.
-                The measurement grid is long enough on a phone that a footer
-                pinned to the end of the document would sit below the fold for
-                most of the editing session.
-              */}
-              <div className="neu-modal-surface sticky bottom-0 -mx-3.5 flex items-center justify-end gap-2 border-t border-black/10 px-3.5 py-3 dark:border-white/10 sm:-mx-5 sm:px-5">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="rounded-xl neu-modal-inset px-3 py-1.5 text-xs font-medium text-[color:var(--neu-text)] sm:text-sm sm:px-4 sm:py-2"
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleSave()}
-                  disabled={saving}
-                  className="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-60 sm:text-sm sm:px-4 sm:py-2"
-                >
-                  {saving ? 'Saving…' : 'Save changes'}
-                </button>
-              </div>
             </div>
           )}
+
+          <footer className="neu-modal-surface shrink-0 flex items-center justify-end gap-3 border-t border-black/10 px-4 py-3 dark:border-white/10 sm:px-6 sm:py-3.5 rounded-b-3xl">
+            <button
+              type="button"
+              onClick={onClose}
+              className="min-h-[44px] rounded-xl neu-modal-inset px-4 py-2 text-sm font-medium text-[color:var(--neu-text)] hover:opacity-80 transition focus-visible:ring-2 focus-visible:ring-indigo-400"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={saving || loading}
+              className="min-h-[44px] rounded-xl bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 transition focus-visible:ring-2 focus-visible:ring-indigo-400"
+            >
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+          </footer>
         </section>
       </div>
     </OverlayPortal>
