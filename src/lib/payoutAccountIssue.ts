@@ -25,9 +25,11 @@ export type PayoutAccountIssueCode =
 
 export type PayoutAccountIssue = {
   code: PayoutAccountIssueCode;
+  /** The notice heading: what needs doing, not what went wrong. */
+  title: string;
   /** What the brand is told, in their terms. */
   message: string;
-  /** The action on the toast. Names the destination, not the problem. */
+  /** The primary action. Names the destination, not the problem. */
   ctaLabel: string;
 };
 
@@ -44,17 +46,29 @@ export const PAYOUT_ACCOUNT_ANCHOR_ID = 'payout-account';
  */
 export const PAYOUT_ACCOUNT_SETTINGS_PATH = `/settings?tab=billing&focus=${PAYOUT_ACCOUNT_ANCHOR_ID}`;
 
-const COPY: Record<PayoutAccountIssueCode, { message: string; ctaLabel: string }> = {
+/*
+  Title says what to do; message says why it is in the way. They were one
+  sentence doing both jobs, which is fine in a toast and flat in a dialog, where
+  the heading is the first — often the only — thing read.
+*/
+const COPY: Record<
+  PayoutAccountIssueCode,
+  { title: string; message: string; ctaLabel: string }
+> = {
   PAYOUT_ACCOUNT_MISSING: {
-    message: 'Add the bank account WIEZ should pay you into before requesting a payout.',
+    title: 'Add a payout account',
+    message: 'WIEZ needs to know which bank account to pay you into before it can release a payout.',
     ctaLabel: 'Add payout account',
   },
   PAYOUT_ACCOUNT_INACTIVE: {
-    message: 'Your payout account is not active yet. Confirm your bank details to finish setting it up.',
+    title: 'Finish your payout account',
+    message: 'Your payout account is saved but not active yet. Confirm your bank details to finish setting it up.',
     ctaLabel: 'Open payout settings',
   },
   PAYOUT_RECIPIENT_INACTIVE: {
-    message: 'Your bank account still needs to be verified before WIEZ can pay into it.',
+    title: 'Verify your bank account',
+    message:
+      'WIEZ can’t send your payout until your bank account is verified. Confirm your bank and account number, and WIEZ will check them with your bank.',
     ctaLabel: 'Verify bank account',
   },
 };

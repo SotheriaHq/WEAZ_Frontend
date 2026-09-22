@@ -22,8 +22,23 @@ describe('resolvePayoutAccountIssue', () => {
   ])('recognises %s', (code) => {
     const issue = resolvePayoutAccountIssue(apiError({ code }));
     expect(issue?.code).toBe(code);
+    expect(issue?.title).toBeTruthy();
     expect(issue?.message).toBeTruthy();
     expect(issue?.ctaLabel).toBeTruthy();
+  });
+
+  /*
+    The notice's heading is read first and often alone. If it repeats the
+    message, the dialog says one thing twice and the "what do I do" is lost.
+  */
+  it.each([
+    ['PAYOUT_ACCOUNT_MISSING'],
+    ['PAYOUT_ACCOUNT_INACTIVE'],
+    ['PAYOUT_RECIPIENT_INACTIVE'],
+  ])('gives %s a heading that is not just its message again', (code) => {
+    const issue = resolvePayoutAccountIssue(apiError({ code }));
+    expect(issue?.title).not.toBe(issue?.message);
+    expect(issue?.message.startsWith(issue?.title ?? '')).toBe(false);
   });
 
   /*

@@ -1,11 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { showNotice } from '@/components/ui/NoticeModal';
 import { brandApi, type PayoutChallenge } from '@/api/BrandApi';
 import PayoutConfirmDialog from '@/components/payouts/PayoutConfirmDialog';
 import { getStoreWallet, type StoreWalletResponse } from '@/api/StoreApi';
 import { getPayoutStatusMeta } from '@/components/payouts/payoutStatus';
-import { resolvePayoutAccountIssue } from '@/lib/payoutAccountIssue';
+import {
+  PAYOUT_ACCOUNT_SETTINGS_PATH,
+  resolvePayoutAccountIssue,
+} from '@/lib/payoutAccountIssue';
 
 const formatMoney = (amount: number, currency: string) => {
   return new Intl.NumberFormat('en-NG', {
@@ -26,6 +30,7 @@ const cardClassName =
   'rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-black/20';
 
 const BrandWalletPanel: React.FC = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [wallet, setWallet] = useState<StoreWalletResponse | null>(null);
@@ -100,17 +105,33 @@ const BrandWalletPanel: React.FC = () => {
       toast.success(`Confirmation code sent to ${challenge.emailHint}`);
     } catch (err: any) {
       const issue = resolvePayoutAccountIssue(err);
-      toast.error(
-        issue
-          ? `${issue.message} The form is just below.`
-          : err?.response?.data?.message || 'Unable to request payout',
-      );
+      if (issue) {
+        /*
+          The form is on this page, just below — so the action does not leave.
+          It sets the same `focus` param the Finance screen links with, and the
+          payout panel answers it by scrolling itself into view and marking
+          itself, which is the arrival a brand gets from anywhere else too.
+        */
+        showNotice({
+          tone: 'action',
+          emoji: '🏦',
+          title: issue.title,
+          message: issue.message,
+          detail: `Your ${formatMoney(availableForPayout, wallet.currency || 'NGN')} stays in your available balance while you do this. Nothing is lost.`,
+          action: {
+            label: issue.ctaLabel,
+            onSelect: () => navigate(PAYOUT_ACCOUNT_SETTINGS_PATH),
+          },
+        });
+        return;
+      }
+      toast.error(err?.response?.data?.message || 'Unable to request payout');
     } finally {
       setRequesting(false);
     }
     // `loadWallet` is no longer called here: requesting only issues a code, and
     // the wallet is reloaded when the dialog confirms the payout.
-  }, [availableForPayout, payoutAccountReady, wallet?.brandId]);
+  }, [availableForPayout, navigate, payoutAccountReady, wallet?.brandId, wallet?.currency]);
 
   const metrics = useMemo(() => {
     const currency = wallet?.currency || 'NGN';

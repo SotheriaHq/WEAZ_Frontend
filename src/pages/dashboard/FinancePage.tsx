@@ -8,6 +8,7 @@ import {
 } from '@/lib/payoutAccountIssue';
 import { brandApi, type PayoutChallenge } from '@/api/BrandApi';
 import PayoutConfirmDialog from '@/components/payouts/PayoutConfirmDialog';
+import { showNotice } from '@/components/ui/NoticeModal';
 import { customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
 import { getStoreStatus } from '@/api/StoreApi';
 import { MuseLoader } from '@/components/loaders/MuseLoader';
@@ -563,17 +564,29 @@ const FinancePage: React.FC = () => {
     } catch (error: any) {
       /*
         A payout that fails because of the payout account is not news, it is a
-        task. The brand is one screen away from fixing it, so say what is wrong
-        and carry them there rather than leaving them to work out that "does not
-        have an active transfer recipient" means "go to settings".
+        task. The brand is one screen away from fixing it.
+
+        A notice, not a toast. The toast carried the fix as a small button in a
+        corner that disappears on its own — and many people never press a
+        button inside a toast at all, because toasts read as announcements, not
+        as things you act on. The brand read the sentence, it went away, and
+        they were left with a payout button that "does nothing". A dialog stays
+        until it is answered, and its primary button IS the fix.
+
+        The detail line answers the question a refused payout actually raises —
+        "is my money gone?" — which the message alone does not.
       */
       const issue = resolvePayoutAccountIssue(error);
       if (issue) {
-        toast.error(issue.message, {
-          duration: 8000,
+        showNotice({
+          tone: 'action',
+          emoji: '🏦',
+          title: issue.title,
+          message: issue.message,
+          detail: `Your ${formatCurrency(availableBalance)} stays in your available balance while you do this. Nothing is lost.`,
           action: {
             label: issue.ctaLabel,
-            onClick: () => navigate(PAYOUT_ACCOUNT_SETTINGS_PATH),
+            onSelect: () => navigate(PAYOUT_ACCOUNT_SETTINGS_PATH),
           },
         });
         return;
