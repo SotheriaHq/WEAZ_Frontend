@@ -10,6 +10,7 @@ import { unwrapApiResponse, type ApiSuccessPayload } from '@/types/auth';
 import type { AppDispatch, RootState } from '@/store';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreProductCard';
+import ContentTile from '@/components/catalog/ContentTile';
 import ProductCardSkeleton from '@/components/designs/ProductCardSkeleton';
 import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 import { fetchWishlist } from '@/features/wishlistSlice';
@@ -289,33 +290,34 @@ const MarketSectionPreviewRail: React.FC<{
 
   return (
     <section ref={sectionRef} className={compact ? 'space-y-2' : 'space-y-3'}>
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h2 className={`font-bold text-gray-900 dark:text-white ${compact ? 'text-base sm:text-xl' : 'text-xl'}`}>
-            {section.title}
-          </h2>
-          {section.subtitle ? (
-            <p className={`mt-1 text-gray-600 dark:text-gray-400 ${compact ? 'hidden text-xs sm:block sm:text-sm' : 'text-sm'}`}>
-              {section.subtitle}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {section.emotionalLabel ? (
-            <span className="hidden rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 dark:bg-white/10 dark:text-gray-300 sm:inline-flex">
-              {section.emotionalLabel}
-            </span>
-          ) : null}
-          {section.viewAll?.enabled ? (
-            <button
-              type="button"
-              onClick={() => onViewAll(section)}
-              className="rounded-full border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 transition hover:bg-gray-100 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/10"
-            >
-              {section.viewAll.label || 'View all'}
-            </button>
-          ) : null}
-        </div>
+      {/*
+        The title, and the way out. Nothing else.
+
+        "Hot Right Now" carried FOUR pieces of chrome above one strip of cards:
+        the title, a subtitle written for whoever tuned the ranking
+        ("Deterministic V1 heat from product views and thread activity"), a grey
+        chip restating the same idea in shopper words ("People are checking
+        these out"), and a bordered "See What's Hot" button. Three of them say
+        the same thing and none of them is a garment.
+
+        What is left is the heading and a link. The link is italic and the system
+        colour — moving sideways is not a decision, so it does not get a border
+        and a fill that outrank the cards underneath. Matches the app, which
+        carries the identical rule in `components/ui/InlineNavLink.tsx`.
+      */}
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 className={`font-bold text-gray-900 dark:text-white ${compact ? 'text-base sm:text-xl' : 'text-xl'}`}>
+          {section.title}
+        </h2>
+        {section.viewAll?.enabled ? (
+          <button
+            type="button"
+            onClick={() => onViewAll(section)}
+            className="shrink-0 rounded text-xs font-bold italic text-[color:var(--brand-accent,#9333EA)] underline-offset-2 transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--brand-accent,#9333EA)]"
+          >
+            See more →
+          </button>
+        ) : null}
       </div>
 
       <div className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -412,73 +414,42 @@ const MarketSectionPreviewRail: React.FC<{
                 key={`${section.key}-${item.sourceType}-${item.sourceId}`}
                 ref={(node) => setItemRef(signalKey, node)}
                 data-market-signal-key={signalKey}
-                className={`group relative shrink-0 overflow-hidden rounded-2xl bg-transparent text-left shadow-sm transition hover:shadow-lg ${
-                  compact ? 'w-[240px] sm:w-[280px]' : 'w-[300px]'
-                } max-w-[82vw]`}
+                className={`shrink-0 ${compact ? 'w-[240px] sm:w-[280px]' : 'w-[300px]'} max-w-[82vw]`}
               >
-                <button
-                  type="button"
+                <ContentTile
+                  title={item.title}
+                  subtitle={item.subtitle || item.brand?.name || null}
+                  priceLabel={priceLabel}
+                  mediaUrl={mediaUrl}
+                  mediaFileId={mediaFileId}
+                  mediaAlt={item.media?.alt || item.title}
                   disabled={!canOpen}
-                  onClick={() => {
+                  onOpen={() => {
                     if (!canOpen) return;
                     trackOpen();
                     onOpenItem(item);
                   }}
-                  className="relative block aspect-[4/5] w-full overflow-hidden rounded-2xl text-left disabled:cursor-default"
-                >
-                  {mediaUrl || mediaFileId ? (
-                    <ImageWithFallback
-                      src={mediaUrl}
-                      fileId={mediaFileId}
-                      alt={item.media?.alt || item.title}
-                      fit="cover"
-                      rounded="none"
-                      containerClassName="absolute inset-0 h-full w-full bg-neutral-950"
-                      className="h-full w-full transition-transform duration-500 group-hover:scale-105"
-                      maxHeightClassName="max-h-full"
-                      fallbackName={item.title}
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex w-full items-center justify-center bg-gray-100 text-3xl dark:bg-white/5">
-                      #
-                    </div>
-                  )}
-
-                  {/* Liquid gradient blend: smoothly merges into the photograph without a sharp top border. */}
-                  <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/50 via-black/25 to-transparent px-3.5 pb-2.5 pt-7 backdrop-blur-md backdrop-saturate-150 [mask-image:linear-gradient(to_bottom,transparent_0%,black_24px,black_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_24px,black_100%)]">
-                    <p className="line-clamp-1 text-sm font-semibold leading-snug text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
-                      {item.title}
-                    </p>
-                    {item.subtitle || item.brand?.name ? (
-                      <p className="mt-0.5 line-clamp-1 text-[11px] text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">
-                        {item.subtitle || item.brand?.name}
-                      </p>
-                    ) : null}
-                    {priceLabel ? (
-                      <p className="mt-1 text-sm font-bold text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
-                        {priceLabel}
-                      </p>
-                    ) : null}
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onTrackSignal({
-                      targetType: item.entityType,
-                      targetId: targetId || item.sourceId || item.id,
-                      signalType: 'NOT_INTERESTED',
-                      surface: 'MARKET_HOME',
-                      sectionKey: section.key,
-                      position: index,
-                    });
-                    onHideItem(section, item);
-                  }}
-                  className="absolute right-2 top-2 rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-semibold text-white opacity-0 shadow-sm transition-opacity hover:bg-black/80 focus:opacity-100 group-hover:opacity-100"
-                >
-                  Not interested
-                </button>
+                  actions={
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onTrackSignal({
+                          targetType: item.entityType,
+                          targetId: targetId || item.sourceId || item.id,
+                          signalType: 'NOT_INTERESTED',
+                          surface: 'MARKET_HOME',
+                          sectionKey: section.key,
+                          position: index,
+                        });
+                        onHideItem(section, item);
+                      }}
+                      className="rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-semibold text-white opacity-0 shadow-sm transition-opacity hover:bg-black/80 focus:opacity-100 group-hover:opacity-100"
+                    >
+                      Not interested
+                    </button>
+                  }
+                />
               </div>
             );
           })}

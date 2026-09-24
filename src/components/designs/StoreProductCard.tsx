@@ -22,6 +22,7 @@ import {
   type ContentPublicationStatus,
 } from '@/utils/contentIntegrity';
 import ContentReviewDecisionModal from '@/components/content-integrity/ContentReviewDecisionModal';
+import { SYSTEM_TILE_ASPECT } from '@/components/catalog/ContentTile';
 
 export interface StoreProduct {
   id: string;
@@ -593,7 +594,10 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           content, and it is skipped entirely when the media already fills the
           frame so those cards stay pixel-identical to before. */}
       <div
-        className={`relative aspect-[4/5] w-full overflow-hidden ${
+        /* SYSTEM_TILE_ASPECT: the phone takes the native app's 1:1.58 so a
+           product looks like the same product in the browser and in the app;
+           `sm:` and up keeps the 4:5 this card has always been. */
+        className={`relative ${SYSTEM_TILE_ASPECT} w-full overflow-hidden ${
           fillsFrameExactly ? 'bg-transparent' : 'bg-neutral-900/60 dark:bg-neutral-950'
         }`}
         style={mediaFrameStyle}
