@@ -892,11 +892,16 @@ const LoginPage = () => {
             <p className="text-[var(--brand-accent)]/80 font-medium tracking-widest uppercase text-sm">— Bill Cunningham</p>
           </div>
 
-          {/* Footer Links */}
+          {/* Footer Links.
+              About Us / Collection / Contact pointed at /about, /collections and
+              /contact. None of the three is a route, so every one of them sent a
+              signed-out visitor to the catch-all 404 from the sign-in screen.
+              These three are real pages, and are the ones an auth screen owes
+              the reader anyway. */}
           <div className="relative z-10 flex gap-6 text-sm text-[var(--text-secondary)] dark:text-gray-400">
-            <Link to="/about" className="hover:text-[var(--brand-accent)] transition-colors">About Us</Link>
-            <Link to="/collections" className="hover:text-[var(--brand-accent)] transition-colors">Collection</Link>
-            <Link to="/contact" className="hover:text-[var(--brand-accent)] transition-colors">Contact</Link>
+            <Link to="/terms" className="hover:text-[var(--brand-accent)] transition-colors">Terms</Link>
+            <Link to="/privacy" className="hover:text-[var(--brand-accent)] transition-colors">Privacy</Link>
+            <Link to="/legal" className="hover:text-[var(--brand-accent)] transition-colors">Legal</Link>
           </div>
         </div>
 

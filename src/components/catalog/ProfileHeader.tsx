@@ -242,17 +242,23 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                   All three are SEALS, distinguished by colour + mark:
                   Purple = verified · Gold = subscribed · Green = open store. */}
               <span className="inline-flex flex-shrink-0 items-center gap-1 align-middle not-italic">
+              {/* A seal, not a link. This pointed at `/help/subscribed`, which
+                  is not a route — every press on a subscribed brand's badge
+                  landed on the 404 page. The verified seal beside it has a real
+                  explainer page and keeps its link; this one has nothing to
+                  explain, so it is simply the mark. */}
               {(profile as any).isSubscribed ? (
-                <Link
-                  to="/help/subscribed"
+                <span
                   title="Subscribed"
+                  aria-label="Subscribed"
+                  role="img"
                   className="inline-flex items-center"
                 >
                   <svg className="w-[23px] h-[23px] flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.99-3.818-3.99-.48 0-.941.1-1.356.278C14.774 2.525 13.5 1.5 12 1.5s-2.774 1.025-3.416 2.288C8.17 3.6 7.708 3.5 7.23 3.5 5.12 3.5 3.41 5.28 3.41 7.49c0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.21 1.71 3.99 3.818 3.99.48 0 .941-.1 1.356-.278C9.226 21.475 10.5 22.5 12 22.5s2.774-1.025 3.416-2.288c.415.178.876.278 1.356.278 2.108 0 3.818-1.78 3.818-3.99 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6z" fill="var(--brand-accent, #d4af37)" />
                     <path d="M9.7 16.1l-3.2-3.2 1.4-1.4 1.8 1.8 5.8-5.8 1.4 1.4-7.2 7.2z" fill="#0d0d0d" />
                   </svg>
-                </Link>
+                </span>
               ) : null}
               {profile.verificationBadgeVisible ? (
                 <Link
