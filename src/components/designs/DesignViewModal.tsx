@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import type { RootState } from '@/store';
 import type { MarketItem } from '@/types/market';
 import { CommentsApi } from '@/api/CommentsApi';
+import { messagingApi } from '@/api/MessagingApi';
 import { apiClient } from '@/api/httpClient';
 import { brandApi } from '@/api/BrandApi';
 import DesignCommentsPanel from '@/components/designs/DesignCommentsPanel';
@@ -117,6 +118,9 @@ const DesignViewModal: React.FC<Props> = ({
   const [externalComment, setExternalComment] = React.useState<CommentV2Dto | null>(null);
   const [isSaved, setIsSaved] = React.useState(false);
   const [saveBusy, setSaveBusy] = React.useState(false);
+  const [messageOpen, setMessageOpen] = React.useState(false);
+  const [messageText, setMessageText] = React.useState('');
+  const [messageBusy, setMessageBusy] = React.useState(false);
   const [mediaItems, setMediaItems] = React.useState<ModalMedia[]>([]);
   const [activeMediaIndex, setActiveMediaIndex] = React.useState(0);
   const [loadingMedia, setLoadingMedia] = React.useState(false);
@@ -182,6 +186,57 @@ const DesignViewModal: React.FC<Props> = ({
   const isPatched = brandId ? getPatched(brandId) : false;
   const patchBusy = brandId ? isPatchLoading(brandId) : false;
   const isOwnBrandContent = ownsDesignBrand(authProfile, item?.brandId);
+  const canMessageBrand = Boolean(brandId) && !isOwnBrandContent;
+
+  /*
+    Message the brand, from the thing you are looking at.
+
+    The viewer had Bag It, Tag, Share, Report and Store and no way to ask the
+    maker a question — the one action a shopper most wants on a piece that is
+    made to order. The grid card underneath it has had a composer all along, so
+    opening a design to look at it properly REMOVED the ability to talk to whom
+    made it.
+
+    Send and stay, exactly as the card does: the message is delivered and the
+    reply lands in the inbox, so navigating to the thread would only cost the
+    reader the design they were looking at.
+  */
+  const handleSendBrandMessage = React.useCallback(async () => {
+    if (!isAuth) {
+      toast.info('Please sign in to message this brand.');
+      return;
+    }
+    const content = messageText.trim();
+    if (!content || content.length > 4000) {
+      toast.error('Message must be 1-4000 characters.');
+      return;
+    }
+    if (!brandId) {
+      toast.error('Brand is unavailable for this design.');
+      return;
+    }
+    setMessageBusy(true);
+    try {
+      await messagingApi.sendBrandMessage(brandId, {
+        bodyText: content,
+        clientMessageId:
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        contextDesignId: item?.designId ?? undefined,
+        contextDesignTitle: item?.collectionTitle,
+        contextDesignCoverFileId: item?.coverMediaId ?? item?.media?.fileId ?? undefined,
+        contextDesignCoverUrl: item?.media?.url ?? item?.media?.previewUrl ?? undefined,
+      });
+      setMessageText('');
+      setMessageOpen(false);
+      toast.success('Message sent — the reply lands in your inbox.');
+    } catch (sendError: any) {
+      toast.error(sendError?.response?.data?.message ?? 'Failed to send message');
+    } finally {
+      setMessageBusy(false);
+    }
+  }, [brandId, isAuth, item, messageText]);
   const brandBagBlocked = isBrandAccountBlockedFromBagging(authProfile);
   const canPatchBrand = Boolean(isAuth && isPatchCapable && isRegularViewer && item?.brandId && !isOwnBrandContent);
 
@@ -834,6 +889,16 @@ const DesignViewModal: React.FC<Props> = ({
                           <span aria-hidden="true">{isSaved ? TAGGED_EMOJI : TAG_EMOJI}</span>
                           {tagActionLabel(isSaved)}
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setMessageOpen((prev) => !prev)}
+                          disabled={!canMessageBrand}
+                          aria-expanded={messageOpen}
+                          className={`${mobileActionBtn} disabled:opacity-50`}
+                        >
+                          <span aria-hidden="true">✉️</span>
+                          Message
+                        </button>
                         <button type="button" onClick={handleShare} className={mobileActionBtn}>
                           <span aria-hidden="true">🔗</span>
                           Share
@@ -851,6 +916,38 @@ const DesignViewModal: React.FC<Props> = ({
                           Store
                         </button>
                       </div>
+
+                      {messageOpen && canMessageBrand ? (
+                        <div className="mt-2 flex items-center gap-1.5 rounded-xl bg-slate-900/5 px-2.5 py-1.5 dark:bg-white/10">
+                          <input
+                            type="text"
+                            value={messageText}
+                            autoFocus
+                            onChange={(event) => setMessageText(event.target.value)}
+                            onKeyDown={(event) => {
+                              event.stopPropagation();
+                              if (event.key === 'Enter' && !event.shiftKey) {
+                                event.preventDefault();
+                                void handleSendBrandMessage();
+                              }
+                              if (event.key === 'Escape') setMessageOpen(false);
+                            }}
+                            disabled={messageBusy}
+                            maxLength={4000}
+                            placeholder={`Message ${item.brandName ?? 'this brand'}...`}
+                            aria-label="Message this brand"
+                            className="flex-1 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-500 dark:text-white dark:placeholder:text-white/50"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void handleSendBrandMessage()}
+                            disabled={messageBusy || !messageText.trim()}
+                            className="shrink-0 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-slate-900"
+                          >
+                            {messageBusy ? 'Sending...' : 'Send'}
+                          </button>
+                        </div>
+                      ) : null}
                 </>
               </div>
 
@@ -1144,7 +1241,10 @@ const DesignViewModal: React.FC<Props> = ({
                     ("Save"→"Saved", "Bag It"→"Loading..."). The old wrap-flow of
                     pills re-laid-out on every state change, which is what read
                     as the panel shaking. */}
-                <div className="grid grid-cols-5 gap-1.5">
+                {/* Six, not five: Message earned a place beside Bag It. The
+                    tiles hold a fixed height so nothing reflows when a label
+                    changes length. */}
+                <div className="grid grid-cols-6 gap-1.5">
                   <button
                     type="button"
                     disabled={
@@ -1207,6 +1307,25 @@ const DesignViewModal: React.FC<Props> = ({
                   </button>
                   <button
                     type="button"
+                    onClick={() => setMessageOpen((prev) => !prev)}
+                    disabled={!canMessageBrand}
+                    aria-expanded={messageOpen}
+                    title={
+                      isOwnBrandContent
+                        ? 'This is your design'
+                        : canMessageBrand
+                          ? `Message ${item.brandName ?? 'this brand'}`
+                          : 'Brand unavailable'
+                    }
+                    className={`${ACTION_TILE_CLASS} ${ACTION_TILE_NEUTRAL_CLASS} disabled:opacity-50`}
+                  >
+                    {/* ✉️ is direct message. 💬 is comments, and the two must not
+                        swap — the app settled that split deliberately. */}
+                    <span aria-hidden="true" className="text-base leading-none">✉️</span>
+                    <span className={ACTION_TILE_LABEL_CLASS}>Message</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleShare}
                     className={`${ACTION_TILE_CLASS} ${ACTION_TILE_NEUTRAL_CLASS}`}
                   >
@@ -1233,6 +1352,38 @@ const DesignViewModal: React.FC<Props> = ({
                     <span className={ACTION_TILE_LABEL_CLASS}>Store</span>
                   </button>
                 </div>
+
+                {messageOpen && canMessageBrand ? (
+                  <div className="mt-2 flex items-center gap-1.5 rounded-xl bg-slate-900/5 px-2.5 py-1.5 dark:bg-white/10">
+                    <input
+                      type="text"
+                      value={messageText}
+                      autoFocus
+                      onChange={(event) => setMessageText(event.target.value)}
+                      onKeyDown={(event) => {
+                        event.stopPropagation();
+                        if (event.key === 'Enter' && !event.shiftKey) {
+                          event.preventDefault();
+                          void handleSendBrandMessage();
+                        }
+                        if (event.key === 'Escape') setMessageOpen(false);
+                      }}
+                      disabled={messageBusy}
+                      maxLength={4000}
+                      placeholder={`Message ${item.brandName ?? 'this brand'}...`}
+                      aria-label="Message this brand"
+                      className="flex-1 border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-500 dark:text-white dark:placeholder:text-white/50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleSendBrandMessage()}
+                      disabled={messageBusy || !messageText.trim()}
+                      className="shrink-0 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-slate-900"
+                    >
+                      {messageBusy ? 'Sending...' : 'Send'}
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               {/* Comments sit directly on the panel surface: no card, no border,
