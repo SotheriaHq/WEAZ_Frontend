@@ -5,6 +5,7 @@ import CatalogEntityCard from './CatalogEntityCard';
 import { useSelector } from 'react-redux';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
+import { TAG_ADDED_TOAST, TAG_ERROR_TOAST, TAG_REMOVED_TOAST } from '@/constants/tagging';
 import type { RootState } from '@/store';
 import { resolveCatalogEntityType } from '@/utils/catalogEntity';
 import { mapCatalogTargetForLegacyApi } from '@/utils/catalogTarget';
@@ -139,9 +140,9 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
         queryKeys.saved.batch('COLLECTION', collectionIdsRef.current),
         (current) => ({ ...(current ?? {}), [collectionId]: !isSaved }),
       );
-      toast.success(isSaved ? 'Removed from saved.' : 'Saved for later.');
+      toast.success(isSaved ? TAG_REMOVED_TOAST : TAG_ADDED_TOAST);
     } catch {
-      toast.error('Unable to update saved items.');
+      toast.error(TAG_ERROR_TOAST);
     } finally {
       setSavingIds((prev) => {
         const next = new Set(prev);

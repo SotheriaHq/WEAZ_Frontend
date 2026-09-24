@@ -7,7 +7,6 @@ import ThreadButton from '@/components/ui/ThreadButton';
 import InlineTextInput from '@/components/ui/CommentInput';
 import type { MarketItem } from '@/types/market';
 import MediaRenderer from '@/components/media/MediaRenderer';
-import { apiClient } from '@/api/httpClient';
 import { Link, Tag } from 'lucide-react';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
@@ -25,6 +24,9 @@ import {
   isBrandAccountBlockedFromBagging,
 } from '@/lib/baggingAccess';
 import { BAG_IT_LABEL } from '@/constants/bagging';
+import { TAG_OWN_CONTENT_TOAST, tagActionHint } from '@/constants/tagging';
+import useTagTarget from '@/features/tagging/useTagTarget';
+import { useSavedStatusQuery } from '@/query/queries';
 import { formatPrice } from '@/utils/helpers';
 import { CustomOrderIndicator } from '@/components/custom-orders/CustomOrderIndicator';
 
@@ -69,6 +71,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   priority = false,
 }) => {
   const navigate = useNavigate();
+  const { toggleTag } = useTagTarget();
   const isVideo = Boolean(item.media.type?.toUpperCase().includes('VIDEO'));
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const bagFlow = useBagFlow();
@@ -79,7 +82,6 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   const [isHidden, setIsHidden] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showTags, setShowTags] = useState(false);
-  const [isSavedLocal, setIsSavedLocal] = useState(false);
   const [saveBusyLocal, setSaveBusyLocal] = useState(false);
   const isRegular = user?.type === 'REGULAR';
   const {
@@ -91,6 +93,23 @@ export const DesignCard: React.FC<DesignCardProps> = ({
   } = useBrandPatchState();
   const isSaveControlled = typeof isSavedProp === 'boolean' && typeof onToggleSave === 'function';
   const isPatchControlled = typeof isPatchedProp === 'boolean' && typeof onTogglePatch === 'function';
+  /*
+    Tag state comes from the shared cache, not from this card.
+
+    It used to be a `useState` filled by this card's OWN `GET /saved/check` on
+    mount. Two consequences, both of which the shopper sees as the tag not
+    sticking: tagging the same piece in the viewer left this card saying the
+    opposite until it remounted, and every remount (the feed virtualises, so
+    scrolling away and back IS a remount) fired another request and started
+    again from `false` — a tagged card that flickers to untagged and back.
+
+    `useSavedStatusQuery` is keyed on the target, so every surface showing this
+    piece reads one answer, and `useTagTarget` writes to that key.
+  */
+  const savedStatusQuery = useSavedStatusQuery('COLLECTION_MEDIA', item.id, {
+    enabled: Boolean(!isSaveControlled && isAuth),
+  });
+  const isSavedLocal = Boolean(savedStatusQuery.data);
   const resolvedSaved = isSaveControlled ? (isSavedProp as boolean) : isSavedLocal;
   const resolvedSaveBusy = isSaveControlled ? Boolean(saveBusyProp) : saveBusyLocal;
   const resolvedPatched = isPatchControlled
@@ -108,28 +127,6 @@ export const DesignCard: React.FC<DesignCardProps> = ({
     }
   }, [item.id]);
 
-  useEffect(() => {
-    let mounted = true;
-    const loadSaved = async () => {
-      if (isSaveControlled) return;
-      if (!isAuth) {
-        if (mounted) setIsSavedLocal(false);
-        return;
-      }
-      try {
-        const res = await apiClient.get('/saved/check', {
-          params: { targetType: 'COLLECTION_MEDIA', targetId: item.id },
-        });
-        if (mounted) {
-          setIsSavedLocal(Boolean(res.data?.isSaved));
-        }
-      } catch {
-        if (mounted) setIsSavedLocal(false);
-      }
-    };
-    void loadSaved();
-    return () => { mounted = false; };
-  }, [isAuth, item.id, isSaveControlled]);
 
   useEffect(() => {
     if (isPatchControlled) return;
@@ -159,26 +156,18 @@ export const DesignCard: React.FC<DesignCardProps> = ({
       return;
     }
     if (user?.id && item.brandId && user.id === item.brandId) {
-      toast.info('Brands cannot save their own products.');
+      toast.info(TAG_OWN_CONTENT_TOAST);
       return;
     }
-    if (!isAuth) { toast.info('Please sign in to save items.'); return; }
     if (saveBusyLocal) return;
     try {
       setSaveBusyLocal(true);
-      if (isSavedLocal) {
-        await apiClient.delete('/saved', {
-          data: { targetType: 'COLLECTION_MEDIA', targetId: item.id },
-        });
-        setIsSavedLocal(false);
-        toast.success('Removed from saved.');
-      } else {
-        await apiClient.post('/saved', { targetType: 'COLLECTION_MEDIA', targetId: item.id });
-        setIsSavedLocal(true);
-        toast.success('Saved for later.');
-      }
-    } catch {
-      toast.error('Unable to update saved items.');
+      await toggleTag({
+        targetType: 'COLLECTION_MEDIA',
+        targetId: item.id,
+        tagged: isSavedLocal,
+        isAuthenticated: isAuth,
+      });
     } finally {
       setSaveBusyLocal(false);
       setShowMenu(false);
@@ -367,7 +356,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
                 </svg>
-                {resolvedSaved ? 'Unsave' : 'Save'}
+                {tagActionHint(resolvedSaved)}
               </button>
               {isRegular && item.brandId && (
                 <>

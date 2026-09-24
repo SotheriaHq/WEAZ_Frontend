@@ -33,6 +33,16 @@ import {
   isBrandAccountBlockedFromBagging,
 } from '@/lib/baggingAccess';
 import { BAG_IT_LABEL } from '@/constants/bagging';
+import {
+  TAG_ADDED_TOAST,
+  TAG_EMOJI,
+  TAG_ERROR_TOAST,
+  TAG_OWN_CONTENT_TOAST,
+  TAG_REMOVED_TOAST,
+  TAGGED_EMOJI,
+  tagActionHint,
+  tagActionLabel,
+} from '@/constants/tagging';
 import type { CommentV2Dto } from '@/types/comments';
 import {
   CONTENT_DISPLAY_FRAME_CLASS,
@@ -61,6 +71,16 @@ type Props = {
   item: MarketItem | null;
   onClose: () => void;
   onCommentCountChange?: (newCount: number) => void;
+  /**
+   * Where closing goes, in one word, when it is not "away".
+   *
+   * Opened over a grid, this is a dismiss and × is right. Opened as a ROUTE —
+   * from a tag, a notification, a shared link — closing navigates somewhere,
+   * and × tells the reader their content is being thrown away rather than that
+   * they are going back to their tags. Pass the destination's name and the chip
+   * becomes a back arrow labelled with it.
+   */
+  backLabel?: string | null;
 };
 
 type ModalMedia = {
@@ -83,7 +103,13 @@ const ACTION_TILE_NEUTRAL_CLASS =
   'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/[0.08] dark:text-slate-200 dark:hover:bg-white/[0.14]';
 const ACTION_TILE_LABEL_CLASS = 'w-full truncate text-[9px] font-bold leading-none';
 
-const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountChange }) => {
+const DesignViewModal: React.FC<Props> = ({
+  open,
+  item,
+  onClose,
+  onCommentCountChange,
+  backLabel = null,
+}) => {
   const [commentCount, setCommentCount] = React.useState<number>(0);
   const [commentText, setCommentText] = React.useState('');
   const [showCommentEmojiPicker, setShowCommentEmojiPicker] = React.useState(false);
@@ -490,7 +516,7 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           queryKeys.saved.status('COLLECTION_MEDIA', activeMediaId),
           false,
         );
-        toast.success('Removed from saved.');
+        toast.success(TAG_REMOVED_TOAST);
       } else {
         await apiClient.post('/saved', { targetType: 'COLLECTION_MEDIA', targetId: activeMediaId });
         setIsSaved(true);
@@ -498,10 +524,10 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
           queryKeys.saved.status('COLLECTION_MEDIA', activeMediaId),
           true,
         );
-        toast.success('Saved to your saved items.');
+        toast.success(TAG_ADDED_TOAST);
       }
     } catch {
-      toast.error('Unable to update saved items.');
+      toast.error(TAG_ERROR_TOAST);
     } finally {
       setSaveBusy(false);
     }
@@ -610,14 +636,19 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
             style={{ maxHeight: '94vh' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close chip */}
+            {/* Close chip — a back arrow when closing means going somewhere. */}
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close"
-              className="absolute right-3 top-3 z-30 flex size-9 items-center justify-center rounded-full bg-black/50 text-white"
+              aria-label={backLabel ? `Back to ${backLabel}` : 'Close'}
+              className={`absolute right-3 top-3 z-30 flex h-9 items-center justify-center gap-1 rounded-full bg-black/50 text-white ${
+                backLabel ? 'px-3' : 'w-9'
+              }`}
             >
-              <span aria-hidden="true" className="text-lg">×</span>
+              <span aria-hidden="true" className="text-lg leading-none">{backLabel ? '←' : '×'}</span>
+              {backLabel ? (
+                <span className="text-xs font-semibold">{backLabel}</span>
+              ) : null}
             </button>
 
             {/* MEDIA REGION — flexes to the image's natural height and shrinks
@@ -797,11 +828,11 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                           type="button"
                           onClick={handleToggleSave}
                           disabled={saveBusy}
-                          title={isOwnBrandContent ? 'Brands cannot save their own products' : isSaved ? 'Unsave' : 'Save'}
+                          title={isOwnBrandContent ? TAG_OWN_CONTENT_TOAST : tagActionHint(isSaved)}
                           className={`${mobileActionBtn} disabled:opacity-50`}
                         >
-                          <span aria-hidden="true">🔖</span>
-                          {isSaved ? 'Saved' : 'Save'}
+                          <span aria-hidden="true">{isSaved ? TAGGED_EMOJI : TAG_EMOJI}</span>
+                          {tagActionLabel(isSaved)}
                         </button>
                         <button type="button" onClick={handleShare} className={mobileActionBtn}>
                           <span aria-hidden="true">🔗</span>
@@ -954,10 +985,17 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
         >
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 z-50 inline-flex items-center justify-center size-9 rounded-full neu-modal-inset"
-            aria-label="Close"
+            className={`absolute top-3 right-3 z-50 inline-flex h-9 items-center justify-center gap-1 rounded-full neu-modal-inset ${
+              backLabel ? 'px-3' : 'w-9'
+            }`}
+            aria-label={backLabel ? `Back to ${backLabel}` : 'Close'}
           >
-            <span aria-hidden="true" className="text-lg text-[color:var(--neu-text-muted)]">×</span>
+            <span aria-hidden="true" className="text-lg leading-none text-[color:var(--neu-text-muted)]">
+              {backLabel ? '←' : '×'}
+            </span>
+            {backLabel ? (
+              <span className="text-xs font-semibold text-[color:var(--neu-text-muted)]">{backLabel}</span>
+            ) : null}
           </button>
 
           <div className="grid md:grid-cols-[minmax(0,58%)_minmax(0,42%)] h-[min(92vh,860px)]">
@@ -1159,11 +1197,13 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     type="button"
                     onClick={handleToggleSave}
                     disabled={saveBusy}
-                    title={isOwnBrandContent ? 'Brands cannot save their own products' : isSaved ? 'Unsave' : 'Save'}
+                    title={isOwnBrandContent ? TAG_OWN_CONTENT_TOAST : tagActionHint(isSaved)}
                     className={`${ACTION_TILE_CLASS} ${ACTION_TILE_NEUTRAL_CLASS} disabled:opacity-50`}
                   >
-                    <span aria-hidden="true" className="text-base leading-none">{isSaved ? '🔖' : '🏷️'}</span>
-                    <span className={ACTION_TILE_LABEL_CLASS}>{isSaved ? 'Saved' : 'Save'}</span>
+                    <span aria-hidden="true" className="text-base leading-none">
+                      {isSaved ? TAGGED_EMOJI : TAG_EMOJI}
+                    </span>
+                    <span className={ACTION_TILE_LABEL_CLASS}>{tagActionLabel(isSaved)}</span>
                   </button>
                   <button
                     type="button"
@@ -1171,7 +1211,10 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
                     className={`${ACTION_TILE_CLASS} ${ACTION_TILE_NEUTRAL_CLASS}`}
                   >
                     <span aria-hidden="true" className="text-base leading-none">🔗</span>
-                    <span className={ACTION_TILE_LABEL_CLASS}>Share</span>
+                    <span className={ACTION_TILE_LABEL_CLASS}>
+                      {/* The collab count came off the deleted floating button. */}
+                      {item.collectionCollabCount ? `Share ${item.collectionCollabCount}` : 'Share'}
+                    </span>
                   </button>
                   {item ? (
                     <ReportContentButton
@@ -1278,22 +1321,15 @@ const DesignViewModal: React.FC<Props> = ({ open, item, onClose, onCommentCountC
             </div>
           </div>
 
-          <div className="absolute right-4 bottom-28 z-20">
-            <div className="group relative">
-              <button
-                type="button"
-                className="flex flex-col items-center text-white/90 hover:scale-110 transition-transform"
-                onClick={handleShare}
-                aria-label="Share this collection"
-              >
-                <span aria-hidden="true" className="text-lg">🔗</span>
-                <span className="text-xs font-bold mt-1 drop-shadow">{item.collectionCollabCount ?? 0}</span>
-              </button>
-              <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 rounded-lg bg-black/85 px-2 py-1 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100">
-                Share collection
-              </span>
-            </div>
-          </div>
+          {/* The floating share button that used to live here is gone.
+              It hovered at `right-4 bottom-28`, which put it on top of the
+              comment list — a white glyph over other people's words, with a
+              tooltip that opened across them. It ran `handleShare`, the exact
+              same action as the Share tile in the action row above, so the only
+              thing it carried that the tile did not was the collab count. That
+              count moved onto the tile; the duplicate is deleted. Actions belong
+              together at the top of the panel, not scattered over the reading
+              area. */}
         </div>
       </div>
 

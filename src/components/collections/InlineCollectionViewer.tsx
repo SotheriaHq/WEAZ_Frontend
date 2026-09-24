@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react'
 import { brandApi } from '@/api/BrandApi';
 import AccessApi, { type AccessState } from '@/api/AccessApi';
 import { toast } from 'sonner';
+import { TAG_ADDED_TOAST, TAG_REMOVED_TOAST } from '@/constants/tagging';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import StackedCarousel, { type CarouselMediaItem } from '@/components/collections/StackedCarousel';
@@ -303,7 +304,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
 
   const handleWishlist = async () => {
     setIsWishlisted((prev) => !prev);
-    toast.success(!isWishlisted ? 'Added to saved items' : 'Removed from saved items');
+    toast.success(!isWishlisted ? TAG_ADDED_TOAST : TAG_REMOVED_TOAST);
   };
 
   const handleShare = async () => {

@@ -26,8 +26,8 @@ export const CATALOG_ENTITY_CARD_COPY: Record<
   design: {
     badgeLabel: 'Design',
     titleFallback: 'Untitled design',
-    saveLabel: 'Save design',
-    unsaveLabel: 'Unsave design',
+    saveLabel: 'Tag design',
+    unsaveLabel: 'Untag design',
     signInSaveMessage: 'Please sign in to save designs.',
     commentPlaceholder: 'Comment on this design...',
     viewLabel: 'View design',
@@ -43,8 +43,8 @@ export const CATALOG_ENTITY_CARD_COPY: Record<
   product: {
     badgeLabel: 'Product',
     titleFallback: 'Untitled product',
-    saveLabel: 'Save product',
-    unsaveLabel: 'Unsave product',
+    saveLabel: 'Tag product',
+    unsaveLabel: 'Untag product',
     signInSaveMessage: 'Please sign in to save products.',
     commentPlaceholder: 'Comment on this product...',
     viewLabel: 'View product',
@@ -60,8 +60,8 @@ export const CATALOG_ENTITY_CARD_COPY: Record<
   collection: {
     badgeLabel: 'Collection',
     titleFallback: 'Untitled collection',
-    saveLabel: 'Save collection',
-    unsaveLabel: 'Unsave collection',
+    saveLabel: 'Tag collection',
+    unsaveLabel: 'Untag collection',
     signInSaveMessage: 'Please sign in to save collections.',
     commentPlaceholder: 'Comment on this collection...',
     viewLabel: 'View collection',
@@ -77,8 +77,8 @@ export const CATALOG_ENTITY_CARD_COPY: Record<
   legacy: {
     badgeLabel: 'Catalog item',
     titleFallback: 'Untitled item',
-    saveLabel: 'Save item',
-    unsaveLabel: 'Unsave item',
+    saveLabel: 'Tag item',
+    unsaveLabel: 'Untag item',
     signInSaveMessage: 'Please sign in to save this item.',
     commentPlaceholder: 'Add a comment...',
     viewLabel: 'View',

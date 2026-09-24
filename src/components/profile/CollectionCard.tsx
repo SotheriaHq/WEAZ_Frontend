@@ -11,6 +11,7 @@ import ManageAccessModal from './ManageAccessModal';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
+import { TAG_ADDED_TOAST, TAG_ERROR_TOAST, TAG_REMOVED_TOAST } from '@/constants/tagging';
 import type { RootState } from '@/store';
 
 import { getCatalogEntityCardCopy, resolveCatalogEntityCardBranch } from './catalogEntityCardModel';
@@ -340,14 +341,14 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
       if (isSavedLocal) {
         await apiClient.delete('/saved', { data: savedTarget });
         setIsSavedLocal(false);
-        toast.success('Removed from saved.');
+        toast.success(TAG_REMOVED_TOAST);
       } else {
         await apiClient.post('/saved', savedTarget);
         setIsSavedLocal(true);
-        toast.success('Saved for later.');
+        toast.success(TAG_ADDED_TOAST);
       }
     } catch {
-      toast.error('Unable to update saved items.');
+      toast.error(TAG_ERROR_TOAST);
     } finally {
       setSaveBusyLocal(false);
     }
