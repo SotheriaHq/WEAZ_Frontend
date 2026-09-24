@@ -35,15 +35,15 @@ import {
 } from '@/lib/baggingAccess';
 import { BAG_IT_LABEL } from '@/constants/bagging';
 import {
-  TAG_ADDED_TOAST,
-  TAG_EMOJI,
-  TAG_ERROR_TOAST,
-  TAG_OWN_CONTENT_TOAST,
-  TAG_REMOVED_TOAST,
-  TAGGED_EMOJI,
-  tagActionHint,
-  tagActionLabel,
-} from '@/constants/tagging';
+  CLIP_ADDED_TOAST,
+  CLIP_EMOJI,
+  CLIP_ERROR_TOAST,
+  CLIP_OWN_CONTENT_TOAST,
+  CLIP_REMOVED_TOAST,
+  CLIPPED_EMOJI,
+  clipActionHint,
+  clipActionLabel,
+} from '@/constants/clipping';
 import type { CommentV2Dto } from '@/types/comments';
 import {
   CONTENT_DISPLAY_FRAME_CLASS,
@@ -76,9 +76,9 @@ type Props = {
    * Where closing goes, in one word, when it is not "away".
    *
    * Opened over a grid, this is a dismiss and × is right. Opened as a ROUTE —
-   * from a tag, a notification, a shared link — closing navigates somewhere,
+   * from a clip, a notification, a shared link — closing navigates somewhere,
    * and × tells the reader their content is being thrown away rather than that
-   * they are going back to their tags. Pass the destination's name and the chip
+   * they are going back to their clips. Pass the destination's name and the chip
    * becomes a back arrow labelled with it.
    */
   backLabel?: string | null;
@@ -191,7 +191,7 @@ const DesignViewModal: React.FC<Props> = ({
   /*
     Message the brand, from the thing you are looking at.
 
-    The viewer had Bag It, Tag, Share, Report and Store and no way to ask the
+    The viewer had Bag It, Clip, Share, Report and Store and no way to ask the
     maker a question — the one action a shopper most wants on a piece that is
     made to order. The grid card underneath it has had a composer all along, so
     opening a design to look at it properly REMOVED the ability to talk to whom
@@ -571,7 +571,7 @@ const DesignViewModal: React.FC<Props> = ({
           queryKeys.saved.status('COLLECTION_MEDIA', activeMediaId),
           false,
         );
-        toast.success(TAG_REMOVED_TOAST);
+        toast.success(CLIP_REMOVED_TOAST);
       } else {
         await apiClient.post('/saved', { targetType: 'COLLECTION_MEDIA', targetId: activeMediaId });
         setIsSaved(true);
@@ -579,10 +579,10 @@ const DesignViewModal: React.FC<Props> = ({
           queryKeys.saved.status('COLLECTION_MEDIA', activeMediaId),
           true,
         );
-        toast.success(TAG_ADDED_TOAST);
+        toast.success(CLIP_ADDED_TOAST);
       }
     } catch {
-      toast.error(TAG_ERROR_TOAST);
+      toast.error(CLIP_ERROR_TOAST);
     } finally {
       setSaveBusy(false);
     }
@@ -883,11 +883,11 @@ const DesignViewModal: React.FC<Props> = ({
                           type="button"
                           onClick={handleToggleSave}
                           disabled={saveBusy}
-                          title={isOwnBrandContent ? TAG_OWN_CONTENT_TOAST : tagActionHint(isSaved)}
+                          title={isOwnBrandContent ? CLIP_OWN_CONTENT_TOAST : clipActionHint(isSaved)}
                           className={`${mobileActionBtn} disabled:opacity-50`}
                         >
-                          <span aria-hidden="true">{isSaved ? TAGGED_EMOJI : TAG_EMOJI}</span>
-                          {tagActionLabel(isSaved)}
+                          <span aria-hidden="true">{isSaved ? CLIPPED_EMOJI : CLIP_EMOJI}</span>
+                          {clipActionLabel(isSaved)}
                         </button>
                         <button
                           type="button"
@@ -1297,13 +1297,13 @@ const DesignViewModal: React.FC<Props> = ({
                     type="button"
                     onClick={handleToggleSave}
                     disabled={saveBusy}
-                    title={isOwnBrandContent ? TAG_OWN_CONTENT_TOAST : tagActionHint(isSaved)}
+                    title={isOwnBrandContent ? CLIP_OWN_CONTENT_TOAST : clipActionHint(isSaved)}
                     className={`${ACTION_TILE_CLASS} ${ACTION_TILE_NEUTRAL_CLASS} disabled:opacity-50`}
                   >
                     <span aria-hidden="true" className="text-base leading-none">
-                      {isSaved ? TAGGED_EMOJI : TAG_EMOJI}
+                      {isSaved ? CLIPPED_EMOJI : CLIP_EMOJI}
                     </span>
-                    <span className={ACTION_TILE_LABEL_CLASS}>{tagActionLabel(isSaved)}</span>
+                    <span className={ACTION_TILE_LABEL_CLASS}>{clipActionLabel(isSaved)}</span>
                   </button>
                   <button
                     type="button"

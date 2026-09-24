@@ -11,7 +11,7 @@ import ManageAccessModal from './ManageAccessModal';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
-import { TAG_ADDED_TOAST, TAG_ERROR_TOAST, TAG_REMOVED_TOAST } from '@/constants/tagging';
+import { CLIP_ADDED_TOAST, CLIP_ERROR_TOAST, CLIP_REMOVED_TOAST } from '@/constants/clipping';
 import type { RootState } from '@/store';
 
 import { getCatalogEntityCardCopy, resolveCatalogEntityCardBranch } from './catalogEntityCardModel';
@@ -341,14 +341,14 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
       if (isSavedLocal) {
         await apiClient.delete('/saved', { data: savedTarget });
         setIsSavedLocal(false);
-        toast.success(TAG_REMOVED_TOAST);
+        toast.success(CLIP_REMOVED_TOAST);
       } else {
         await apiClient.post('/saved', savedTarget);
         setIsSavedLocal(true);
-        toast.success(TAG_ADDED_TOAST);
+        toast.success(CLIP_ADDED_TOAST);
       }
     } catch {
-      toast.error(TAG_ERROR_TOAST);
+      toast.error(CLIP_ERROR_TOAST);
     } finally {
       setSaveBusyLocal(false);
     }

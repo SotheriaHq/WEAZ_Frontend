@@ -8,7 +8,7 @@ import { useSelector } from 'react-redux';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
-import { TAG_ADDED_TOAST, TAG_ERROR_TOAST, TAG_REMOVED_TOAST } from '@/constants/tagging';
+import { CLIP_ADDED_TOAST, CLIP_ERROR_TOAST, CLIP_REMOVED_TOAST } from '@/constants/clipping';
 import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreProductCard';
 import ProductCardSkeleton from '@/components/designs/ProductCardSkeleton';
 import StoreEmptyState from '@/components/designs/StoreEmptyState';
@@ -642,9 +642,9 @@ export default function CatalogShopTab({
           queryKeys.saved.batch('COLLECTION', collectionTargetIds),
           (current) => ({ ...(current ?? {}), [collectionId]: !currentlySaved }),
         );
-        toast.success(currentlySaved ? TAG_REMOVED_TOAST : TAG_ADDED_TOAST);
+        toast.success(currentlySaved ? CLIP_REMOVED_TOAST : CLIP_ADDED_TOAST);
       } catch {
-        toast.error(TAG_ERROR_TOAST);
+        toast.error(CLIP_ERROR_TOAST);
       } finally {
         setSavingIds((prev) => {
           const next = new Set(prev);

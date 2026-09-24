@@ -6,19 +6,19 @@ import { apiClient } from '@/api/httpClient';
 import ContentTile from '@/components/catalog/ContentTile';
 import { buildCollectionRoute, buildDesignRoute, buildProductRoute } from '@/utils/catalogRoutes';
 import useCachedResource from '@/hooks/useCachedResource';
-import useTagTarget, { type TagTargetType } from '@/features/tagging/useTagTarget';
-import { TAGGED_EMOJI, UNTAG_LABEL } from '@/constants/tagging';
+import useClipTarget, { type ClipTargetType } from '@/features/clipping/useClipTarget';
+import { CLIPPED_EMOJI, UNCLIP_LABEL } from '@/constants/clipping';
 import { formatPrice } from '@/utils/helpers';
 
 interface SavedItem {
   id: string;
-  targetType: TagTargetType;
+  targetType: ClipTargetType;
   targetId: string;
   designId?: string;
   productId?: string;
   collectionId?: string;
   legacyCollectionId?: string;
-  /** Present on COLLECTION_MEDIA rows: the exact frame that was tagged. */
+  /** Present on COLLECTION_MEDIA rows: the exact frame that was clipped. */
   mediaId?: string;
   title: string;
   thumbnail?: string;
@@ -92,12 +92,12 @@ const brandLabel = (brand: SavedItem['brand']): string =>
   [brand.firstName, brand.lastName].filter(Boolean).join(' ') || brand.username || 'Unknown';
 
 /**
- * Where opening a tagged item should land.
+ * Where opening a clipped item should land.
  *
  * Every row here is a real destination, which was not true before: a
  * COLLECTION_MEDIA row is one FRAME of a design, so it has to carry
  * `openMedia` or the viewer opens the cover instead of the piece the shopper
- * actually tagged. Returns null only when the row has no id to open at all.
+ * actually clipped. Returns null only when the row has no id to open at all.
  */
 const routeForSavedItem = (item: SavedItem): string | null => {
   if (item.targetType === 'COLLECTION_MEDIA') {
@@ -125,9 +125,9 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { toggleTag } = useTagTarget();
+  const { toggleClip } = useClipTarget();
 
-  // Cached fetch: on revisit within the retention window, tagged items paint
+  // Cached fetch: on revisit within the retention window, clipped items paint
   // instantly (no skeleton) and revalidate silently. See useCachedResource.
   const {
     data: savedItems = [],
@@ -142,13 +142,13 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
     },
     enabled: isOwner,
   });
-  const error = fetchError ? 'Failed to load your tags' : null;
+  const error = fetchError ? 'Failed to load your clips' : null;
 
   /**
    * Closing the viewer comes back HERE.
    *
    * `DesignDetailsPage` falls back to `/runway` when nobody tells it where the
-   * reader came from, so opening a tag and pressing back dropped the shopper
+   * reader came from, so opening a clip and pressing back dropped the shopper
    * into the feed with their tab, their scroll position and their place in the
    * list all gone. That is the broken flow.
    */
@@ -162,23 +162,23 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
     [location.pathname, location.search, navigate],
   );
 
-  const untag = useCallback(
+  const unclip = useCallback(
     async (item: SavedItem) => {
       // Drop it from the visible list first — the grid IS the confirmation.
       queryClient.setQueryData<SavedItem[]>(['saved', 'me'], (current) =>
         Array.isArray(current) ? current.filter((row) => row.id !== item.id) : current,
       );
-      const result = await toggleTag({
+      const result = await toggleClip({
         targetType: item.targetType,
         targetId: item.targetId,
-        tagged: true,
+        clipped: true,
       });
       if (result === null) {
         // The server refused; put the row back rather than leave a hole.
         await refetch();
       }
     },
-    [queryClient, refetch, toggleTag],
+    [queryClient, refetch, toggleClip],
   );
 
   if (!isOwner) {
@@ -204,7 +204,7 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/40">
           <AlertTriangle className="h-6 w-6" />
         </div>
-        <p className="text-sm font-semibold">Your tags could not load</p>
+        <p className="text-sm font-semibold">Your clips could not load</p>
         <p className="mt-1 text-xs opacity-90">{error}</p>
       </div>
     );
@@ -215,11 +215,11 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
       <section className="glass-panel min-h-[340px] rounded-[2rem] border border-gray-200/70 bg-white/70 p-8 text-center backdrop-blur-md dark:border-white/10 dark:bg-white/5 sm:p-12">
         <div className="mx-auto flex h-full max-w-lg flex-col items-center justify-center">
           <div className="mb-4 text-6xl" aria-hidden="true">
-            {TAGGED_EMOJI}
+            {CLIPPED_EMOJI}
           </div>
-          <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Nothing tagged yet</h3>
+          <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Nothing clipped yet</h3>
           <p className="mt-3 text-sm text-gray-500 dark:text-gray-400 sm:text-base">
-            Tag a design, a product or a collection and it waits for you here.
+            Clip a design, a product or a collection and it waits for you here.
           </p>
           <button
             type="button"
@@ -248,19 +248,19 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
           onOpen={() => openItem(item)}
           actions={
             /* The bookmark here used to be decoration — a badge that looked
-               like a control and did nothing. It untags now, which is the one
+               like a control and did nothing. It unclips now, which is the one
                thing a shopper wants from this grid. */
             <button
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
-                void untag(item);
+                void unclip(item);
               }}
-              aria-label={`${UNTAG_LABEL} ${item.title}`}
-              title={UNTAG_LABEL}
+              aria-label={`${UNCLIP_LABEL} ${item.title}`}
+              title={UNCLIP_LABEL}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/60 bg-black/45 text-base leading-none text-white backdrop-blur-sm transition hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
-              <span aria-hidden="true">{TAGGED_EMOJI}</span>
+              <span aria-hidden="true">{CLIPPED_EMOJI}</span>
             </button>
           }
         />

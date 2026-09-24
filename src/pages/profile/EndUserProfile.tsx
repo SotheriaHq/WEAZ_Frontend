@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDispatch, useSelector } from 'react-redux';
 import { SavedTab } from './tabs/SavedTab';
-import { TAGGED_EMOJI, TAGS_TAB_LABEL } from '@/constants/tagging';
+import { CLIPPED_EMOJI, CLIPS_TAB_LABEL } from '@/constants/clipping';
 import { PatchesTab } from './tabs/PatchesTab';
 import { OrdersPanel, type OrdersPanelSelection } from './tabs/OrdersPanel';
 import { apiClient } from '@/api/httpClient';
@@ -365,7 +365,7 @@ export const EndUserProfile: React.FC = () => {
     enabled: Boolean(!isOwner && profileId),
   });
   const availableTabs = useMemo(
-    () => (isOwner ? [TAGS_TAB_LABEL, 'Patches', 'Orders'] : ['Patches']),
+    () => (isOwner ? [CLIPS_TAB_LABEL, 'Patches', 'Orders'] : ['Patches']),
     [isOwner],
   );
   const computedSizingRegions = useMemo(
@@ -380,7 +380,7 @@ export const EndUserProfile: React.FC = () => {
   const tabParam = searchParams.get('tab');
   const derivedTab = (() => {
     if (tabParam === 'orders' && isOwner) return 'Orders';
-    return isOwner ? TAGS_TAB_LABEL : 'Patches';
+    return isOwner ? CLIPS_TAB_LABEL : 'Patches';
   })();
   const [activeTab, setActiveTab] = useState<string>(derivedTab);
   const [ordersSelection, setOrdersSelection] = useState<OrdersPanelSelection | null>(null);
@@ -1311,7 +1311,7 @@ export const EndUserProfile: React.FC = () => {
   ];
 
   const TAB_ICONS: Record<string, string> = {
-    [TAGS_TAB_LABEL]: TAGGED_EMOJI,
+    [CLIPS_TAB_LABEL]: CLIPPED_EMOJI,
     Patches: '🪡',
     Orders: '📦',
   };
@@ -1786,7 +1786,7 @@ export const EndUserProfile: React.FC = () => {
                   initialSelection={ordersSelection}
                   onSelectionHandled={() => setOrdersSelection(null)}
                 />
-              ) : activeTab === TAGS_TAB_LABEL ? (
+              ) : activeTab === CLIPS_TAB_LABEL ? (
                 isOwner
                   ? <SavedTab isOwner={isOwner} />
                   : <PatchesTab isOwner={isOwner} profileVisibility={profile.profileVisibility} />

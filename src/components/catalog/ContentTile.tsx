@@ -5,12 +5,12 @@ import ImageWithFallback from '@/components/ImageWithFallback';
  * The one card shell.
  *
  * Every content surface in the app — a product in Market, a design in a brand's
- * catalogue, a rail tile, a saved item — is the same object: full-bleed media at
- * 4:5, and a frosted copy panel that blends up out of the bottom of the
- * photograph rather than sitting on it as a separate slab. The panel's exact
- * recipe (gradient + `backdrop-blur-md backdrop-saturate-150` + a soft mask so
- * there is no hard top edge) was duplicated in three places by hand, which is
- * how the Saved tab ended up with a white box, a cropped thumbnail and text
+ * catalogue, a rail tile, a clipped piece — is the same object: full-bleed media
+ * and a frosted copy panel that blends up out of the bottom of the photograph
+ * rather than sitting on it as a separate slab. The panel's exact recipe
+ * (gradient + `backdrop-blur-md backdrop-saturate-150` + a soft mask so there is
+ * no hard top edge) was duplicated in three places by hand, which is how the
+ * shopper's own tab ended up with a white box, a cropped thumbnail and text
  * stacked underneath while everything around it was full-bleed.
  *
  * Only the CONTENTS of the panel differ between surfaces, because only the
@@ -33,7 +33,7 @@ export interface ContentTileProps {
   disabled?: boolean;
   /** Top-left: a kind badge, a status chip. */
   badge?: React.ReactNode;
-  /** Top-right: save/tag, overflow, dismiss. Rendered OUTSIDE the open button. */
+  /** Top-right: clip, overflow, dismiss. Rendered OUTSIDE the open button. */
   actions?: React.ReactNode;
   /** Anything that must sit over the media above the copy panel. */
   overlay?: React.ReactNode;

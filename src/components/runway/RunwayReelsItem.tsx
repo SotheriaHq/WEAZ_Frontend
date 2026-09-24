@@ -23,7 +23,7 @@ import { useReelDesignMedia, type ReelMedia } from '@/hooks/useReelDesignMedia';
 import { preloadImageUrl } from '@/hooks/useImagePreload';
 import { resolveRunwayMediaFit } from '@/components/runway/runwayMediaFit';
 import { toast } from 'sonner';
-import { tagActionHint, tagActionLabel } from '@/constants/tagging';
+import { clipActionHint, clipActionLabel } from '@/constants/clipping';
 
 export type RunwayReelsItemProps = {
   item: MarketItem;
@@ -473,8 +473,8 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
             onToggleSave?.(item.id);
           }}
           disabled={saveBusy}
-          aria-label={tagActionHint(isSaved)}
-          title={tagActionHint(isSaved)}
+          aria-label={clipActionHint(isSaved)}
+          title={clipActionHint(isSaved)}
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/25 backdrop-blur-sm">
             <Bookmark
@@ -482,7 +482,7 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
               aria-hidden
             />
           </span>
-          <span className="-mt-1 text-[10px] font-bold drop-shadow">{tagActionLabel(isSaved)}</span>
+          <span className="-mt-1 text-[10px] font-bold drop-shadow">{clipActionLabel(isSaved)}</span>
         </button>
 
         {/* Patch is NOT here any more — it moved onto the brand avatar in the
