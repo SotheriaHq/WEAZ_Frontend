@@ -8,13 +8,22 @@ import type { LegalAcceptancePayload } from '@/api/LegalApi';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import UniversalSelect from '@/components/forms/UniversalSelect';
-import type { PaymentFormErrors } from '@/pages/checkout/paymentFlow';
+import SavedCardFace from '@/components/payments/SavedCardFace';
+import {
+  detectCardBrand,
+  formatCardNumberInput,
+  formatExpiryInput,
+  getCardholderNameHelperText,
+  type PaymentFormErrors,
+} from '@/pages/checkout/paymentFlow';
+import { sanitizePhoneInput } from '@/utils/phoneNumber';
 
 interface PaymentDetailsSectionProps {
   paymentData: PaystackPaymentData;
   shippingAddress: ShippingAddress;
   errors: PaymentFormErrors;
   onChange: (updater: (current: PaystackPaymentData) => PaystackPaymentData) => void;
+  customCardEntryEnabled?: boolean;
   savedCards?: SavedPaymentCardSummary[];
   savedCardsLoading?: boolean;
   savedCardsError?: string | null;
@@ -49,6 +58,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
   shippingAddress,
   errors,
   onChange,
+  customCardEntryEnabled = false,
   savedCards = [],
   savedCardsLoading = false,
   savedCardsError = null,
@@ -68,6 +78,24 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
   ) => {
     onChange((current) => ({ ...current, [field]: value }));
   };
+
+  const updateDraftField = (
+    field: keyof NonNullable<PaystackPaymentData['newCardDraft']>,
+    value: string,
+  ) => {
+    onChange((current) => ({
+      ...current,
+      newCardDraft: {
+        cardHolderName: current.newCardDraft?.cardHolderName ?? '',
+        cardNumber: current.newCardDraft?.cardNumber ?? '',
+        expiry: current.newCardDraft?.expiry ?? '',
+        cvv: current.newCardDraft?.cvv ?? '',
+        [field]: value,
+      },
+    }));
+  };
+
+  const draftCardBrand = detectCardBrand(paymentData.newCardDraft?.cardNumber ?? '');
 
   const handleChannelChange = (value: string) => {
     const nextChannel = value as PaystackPaymentData['channel'];
@@ -117,7 +145,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
   return (
     <div
       className={`space-y-6 rounded-[28px] border ${
-        compact ? 'threadly-chrome-surface p-4' : 'threadly-chrome-surface p-5'
+        compact ? 'wiez-chrome-surface p-4' : 'wiez-chrome-surface p-5'
       }`}
     >
       <div className="space-y-1">
@@ -146,7 +174,9 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
           label="Payer phone"
           type="tel"
           value={paymentData.phone}
-          onChange={(event) => updateField('phone', event.target.value)}
+          onChange={(event) =>
+            updateField('phone', sanitizePhoneInput(event.target.value))
+          }
           error={errors.phone}
           required
           helperText={`Shipping phone on file: ${shippingAddress.phone || 'none yet'}`}
@@ -198,40 +228,30 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
             {savedCardsLoading ? (
               <p className="text-sm text-slate-500 dark:text-slate-400">Loading saved cards...</p>
             ) : savedCards.length > 0 ? (
-              <div className="space-y-2">
+              /*
+                The cards lie side by side the way they would in a wallet, and
+                their controls sit UNDER each card rather than inside it. A
+                "Remove" chip printed on the face of a card is not a thing that
+                exists, and putting one there made the object read as a form
+                row again.
+              */
+              <div className="flex flex-wrap gap-4">
                 {savedCards.map((card) => {
                   const isSelected =
                     paymentData.useSavedCard && paymentData.savedCardId === card.id;
                   const isMutating = savedCardMutatingId === card.id;
-                  const brand = card.brand || 'Card';
-                  const bank = card.bank ? ` (${card.bank})` : '';
                   return (
-                    <div
-                      key={card.id}
-                      className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                        isSelected
-                          ? 'border-fuchsia-400/80 bg-fuchsia-50/70 dark:border-fuchsia-400/30 dark:bg-fuchsia-500/10'
-                          : 'border-slate-200/80 bg-white/70 hover:border-fuchsia-300 dark:border-white/10 dark:bg-white/[0.03]'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <button
-                          type="button"
-                          onClick={() => selectSavedCard(card)}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                            {brand}
-                            {bank} ending {card.last4}
-                          </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {card.expMonth && card.expYear
-                              ? `Exp ${card.expMonth}/${card.expYear}`
-                              : 'Expiration unavailable'}
-                            {card.reusable ? ' · Reusable' : ''}
-                            {card.isDefault ? ' · Default' : ''}
-                          </p>
-                        </button>
+                    <div key={card.id} className="w-full max-w-[22rem] space-y-2">
+                      <SavedCardFace
+                        card={card}
+                        selected={isSelected}
+                        busy={isMutating}
+                        onSelect={() => selectSavedCard(card)}
+                      />
+                      <div className="flex items-center justify-between gap-2 px-1">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {isSelected ? 'Paying with this card' : 'Tap to pay with this card'}
+                        </span>
                         <div className="flex items-center gap-2">
                           {!card.isDefault && onSetDefaultSavedCard ? (
                             <button
@@ -257,9 +277,6 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
                               {isMutating ? 'Removing...' : 'Remove'}
                             </button>
                           ) : null}
-                          <span className="text-lg" aria-hidden>
-                            {isSelected ? '✅' : '💳'}
-                          </span>
                         </div>
                       </div>
                     </div>
@@ -270,7 +287,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
               <div className={infoCardClassName}>
                 <p className="font-semibold text-slate-900 dark:text-white">No saved cards yet</p>
                 <p className="mt-1">
-                  Complete one successful card payment and WEAZ will show it here for faster reuse.
+                  Complete one successful card payment and WIEZ will show it here for faster reuse.
                 </p>
               </div>
             )}
@@ -286,9 +303,13 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">Add a new card securely</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                    {customCardEntryEnabled ? 'Pay with a new card' : 'Add a new card securely'}
+                  </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    WEAZ will prepare Paystack checkout and you will enter card details there.
+                    {customCardEntryEnabled
+                      ? 'Enter the card details below. It can be saved for faster reuse.'
+                      : 'WIEZ will prepare Paystack checkout and you will enter card details there.'}
                   </p>
                 </div>
                 <span className="text-lg" aria-hidden>
@@ -297,7 +318,83 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
               </div>
             </button>
 
-            {!paymentData.useSavedCard ? (
+            {!paymentData.useSavedCard && customCardEntryEnabled ? (
+              <div className="space-y-4 rounded-[22px] border border-slate-200/80 bg-white/55 p-4 dark:border-white/10 dark:bg-white/[0.02]">
+                <Input
+                  label="Card holder name"
+                  value={paymentData.newCardDraft?.cardHolderName ?? ''}
+                  onChange={(event) => updateDraftField('cardHolderName', event.target.value)}
+                  error={errors.cardHolderName}
+                  helperText={getCardholderNameHelperText()}
+                  required
+                  autoComplete="cc-name"
+                  className={inputClassName}
+                />
+                <Input
+                  label={draftCardBrand ? `Card number (${draftCardBrand})` : 'Card number'}
+                  value={formatCardNumberInput(paymentData.newCardDraft?.cardNumber ?? '')}
+                  onChange={(event) => updateDraftField('cardNumber', event.target.value)}
+                  error={errors.cardNumber}
+                  required
+                  inputMode="numeric"
+                  autoComplete="cc-number"
+                  placeholder="0000 0000 0000 0000"
+                  maxLength={23}
+                  className={inputClassName}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Expiry (MM/YY)"
+                    value={paymentData.newCardDraft?.expiry ?? ''}
+                    onChange={(event) =>
+                      updateDraftField('expiry', formatExpiryInput(event.target.value))
+                    }
+                    error={errors.expiry}
+                    required
+                    inputMode="numeric"
+                    autoComplete="cc-exp"
+                    placeholder="MM/YY"
+                    maxLength={5}
+                    className={inputClassName}
+                  />
+                  <Input
+                    label="CVV"
+                    type="password"
+                    value={paymentData.newCardDraft?.cvv ?? ''}
+                    onChange={(event) =>
+                      updateDraftField('cvv', event.target.value.replace(/\D/g, '').slice(0, 4))
+                    }
+                    error={errors.cvv}
+                    required
+                    inputMode="numeric"
+                    autoComplete="cc-csc"
+                    placeholder="123"
+                    maxLength={4}
+                    className={inputClassName}
+                  />
+                </div>
+
+                <label className="flex items-start gap-3 rounded-[20px] border border-slate-200/80 bg-white/70 px-4 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(paymentData.saveNewCard ?? true)}
+                    onChange={(event) => updateField('saveNewCard', event.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-fuchsia-500 focus:ring-fuchsia-500/30"
+                  />
+                  <span>
+                    Save this card for faster checkout next time when Paystack confirms it as reusable.
+                  </span>
+                </label>
+
+                <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 px-3 py-3 text-xs text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+                  🔒 Card details are sent only for payment authorization and are never stored on
+                  WIEZ servers. Your bank can still open a secure Paystack window for PIN, OTP, or
+                  3-D Secure verification after you continue.
+                </div>
+              </div>
+            ) : null}
+
+            {!paymentData.useSavedCard && !customCardEntryEnabled ? (
               <div className="space-y-4 rounded-[22px] border border-slate-200/80 bg-white/55 p-4 dark:border-white/10 dark:bg-white/[0.02]">
                 <label className="flex items-start gap-3 rounded-[20px] border border-slate-200/80 bg-white/70 px-4 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
                   <input
@@ -312,7 +409,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
                 </label>
 
                 <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 px-3 py-3 text-xs text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-                  WEAZ will prepare Paystack secure checkout inside this flow. Enter card number,
+                  WIEZ will prepare Paystack secure checkout inside this flow. Enter card number,
                   expiry, CVV, PIN, or OTP only inside the secure payment window that opens next.
                 </div>
 
@@ -369,8 +466,10 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
         <span>
           I confirm these payment details are correct, and I understand this payment can require
           issuer verification, provider challenges, or delayed confirmation before the order is
-          fulfilled. If I add a new card, the details will be entered only inside the secure
-          Paystack checkout window.
+          fulfilled.{' '}
+          {customCardEntryEnabled
+            ? 'New card details are sent securely to the payment provider for authorization and are never stored on WIEZ servers.'
+            : 'If I add a new card, the details will be entered only inside the secure Paystack checkout window.'}
           {errors.consentAccepted ? (
             <span className="mt-1 block text-xs text-red-500">{errors.consentAccepted}</span>
           ) : null}

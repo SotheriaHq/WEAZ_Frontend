@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
+import { PAYOUT_ACCOUNT_ANCHOR_ID } from '@/lib/payoutAccountIssue';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import type { RootState } from '@/store';
@@ -14,6 +16,13 @@ import {
   type StorePaymentBankOption,
 } from '@/api/StoreApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import {
+  isEmptyPhone,
+  isValidPhone,
+  normalizePhoneToE164,
+  PHONE_INVALID_MESSAGE,
+  sanitizePhoneInput,
+} from '@/utils/phoneNumber';
 
 interface StorePaymentAccountPanelProps {
   mode?: 'settings' | 'wizard';
@@ -258,6 +267,36 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
   const lastVerificationKeyRef = useRef('');
   const verificationRunRef = useRef(0);
 
+  /**
+   * Bring this panel forward when something sent the brand here to fix it.
+   *
+   * Only in settings: the wizard shows one step at a time, so there is nothing
+   * to scroll past and nothing to pick out. The param is cleared once consumed
+   * so a refresh, or a later visit from the sidebar, is an ordinary one.
+   */
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [focused, setFocused] = useState(false);
+  const requestedFocus =
+    mode === 'settings' && searchParams.get('focus') === PAYOUT_ACCOUNT_ANCHOR_ID;
+
+  useEffect(() => {
+    if (!requestedFocus) return;
+
+    rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setFocused(true);
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('focus');
+    setSearchParams(next, { replace: true });
+
+    const timer = window.setTimeout(() => setFocused(false), 2600);
+    return () => window.clearTimeout(timer);
+    // `searchParams`/`setSearchParams` are deliberately absent: this runs on the
+    // arrival, and clearing the param must not re-trigger it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedFocus]);
+
   const applyLoadedPanelData = useCallback((
     nextAccount: StorePaymentAccountResponse,
     nextBanks: StorePaymentBankOption[],
@@ -437,6 +476,19 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
     verificationState.accountName ?? account?.accountName ?? '';
   const showAccountNameField = Boolean(resolvedVerifiedAccountName);
   const isDevRuntime = import.meta.env.DEV;
+  const [useModalBankMenu, setUseModalBankMenu] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(max-width: 640px)').matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const media = window.matchMedia('(max-width: 640px)');
+    const update = () => setUseModalBankMenu(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
 
   const executeSync = useCallback(async ({
     useExistingAccountNumber,
@@ -462,6 +514,12 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
       return;
     }
 
+    const trimmedPhone = primaryContactPhone.trim();
+    if (!isEmptyPhone(trimmedPhone) && !isValidPhone(trimmedPhone)) {
+      toast.error(PHONE_INVALID_MESSAGE);
+      return;
+    }
+
     setSaving(true);
     setSyncAction(action);
     try {
@@ -470,7 +528,9 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
         accountNumber: resolvedAccountNumber,
         primaryContactName: primaryContactName.trim() || undefined,
         primaryContactEmail: primaryContactEmail.trim() || undefined,
-        primaryContactPhone: primaryContactPhone.trim() || undefined,
+        primaryContactPhone: isEmptyPhone(trimmedPhone)
+          ? undefined
+          : (normalizePhoneToE164(trimmedPhone) ?? undefined),
       });
       setAccountNumber('');
       await loadPanel(true);
@@ -642,7 +702,24 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
   }, [accountNumber, bankCode, executeSync, mode, hasExistingAccount, isDevRuntime]);
 
   return (
-    <div className={`${panelClassName} space-y-6`}>
+    <div
+      id={PAYOUT_ACCOUNT_ANCHOR_ID}
+      ref={rootRef}
+      /*
+        Arriving from a failed payout has to LAND somewhere. Without this the
+        brand presses "Add payout account" on a toast and is dropped at the top
+        of a settings page to go looking for the thing they were just told to
+        fix. The ring holds for a few seconds and fades — long enough to say
+        "this one", short enough not to become decoration — and is skipped
+        entirely under `prefers-reduced-motion`, where the scroll alone does
+        the job.
+      */
+      className={`${panelClassName} space-y-6 scroll-mt-24 transition-shadow duration-500 ${
+        focused
+          ? 'ring-2 ring-fuchsia-400 ring-offset-2 ring-offset-white motion-safe:animate-pulse dark:ring-offset-slate-950'
+          : ''
+      }`}
+    >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -751,24 +828,28 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <UniversalSelect
-          label="Settlement bank"
-          value={bankCode}
-          onChange={setBankCode}
-          options={banks.map((bank) => ({
-            value: bank.code,
-            label: normalizeBankDisplayName(bank.name),
-            description: `${bank.currency} • ${bank.code}`,
-            icon: <BankOptionIcon bankName={bank.name} />,
-          }))}
-          placeholder={loading ? 'Loading banks...' : 'Choose a bank'}
-          searchable
-          searchPlaceholder="Search bank name or code"
-          emptyMessage="No banks match your search"
-          optionCompact
-          optionAllowWrap
-          disabled={loading || saving}
-        />
+        <div className="min-w-0 origin-top scale-[0.92] sm:scale-100">
+          <UniversalSelect
+            label="Settlement bank"
+            value={bankCode}
+            onChange={setBankCode}
+            options={banks.map((bank) => ({
+              value: bank.code,
+              label: normalizeBankDisplayName(bank.name),
+              description: `${bank.currency} • ${bank.code}`,
+              icon: <BankOptionIcon bankName={bank.name} />,
+            }))}
+            placeholder={loading ? 'Loading banks...' : 'Choose a bank'}
+            searchable
+            searchPlaceholder="Search bank name or code"
+            emptyMessage="No banks match your search"
+            selectedAllowWrap
+            optionCompact
+            optionAllowWrap
+            menuLayer={useModalBankMenu ? 'modal' : 'dropdown'}
+            disabled={loading || saving}
+          />
+        </div>
         {!hasExistingAccount && hasTemporaryTestBankOption && bankCode !== '001' ? (
           <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
             Test-mode limit is active for live bank resolves. Select <span className="font-semibold">Test Bank (001)</span> to continue development verification.
@@ -878,9 +959,12 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
           <input
             type="tel"
             value={primaryContactPhone}
-            onChange={(event) => setPrimaryContactPhone(event.target.value)}
+            onChange={(event) =>
+              setPrimaryContactPhone(sanitizePhoneInput(event.target.value))
+            }
             disabled={loading || saving}
             className={inputClassName}
+            placeholder="080XXXXXXXX or +234..."
           />
         </div>
       </div>

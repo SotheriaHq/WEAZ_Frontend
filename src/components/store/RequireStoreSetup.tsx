@@ -15,6 +15,34 @@ import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 
+/**
+ * `/store/status` has always returned `profileMissingFields` — the server
+ * computes exactly which of the three checks failed — and no client has ever
+ * read it. Both the web card and the native toast said only that setup was
+ * required, so someone who believed they had filled the form in had no way to
+ * find out which field the server disagreed about, or that it disagreed at all.
+ *
+ * The server's vocabulary is 'description' | 'tags' | 'location'; these say the
+ * same thing in the terms the form uses, including the 20-character minimum,
+ * which is the one rule a filled-in-looking description can still fail.
+ */
+const PROFILE_FIELD_LABELS: Record<string, string> = {
+  description: 'a description of at least 20 characters',
+  tags: 'at least one tag',
+  location: 'a country or state',
+};
+
+export const describeMissingProfileFields = (
+  fields?: string[] | null,
+): string | null => {
+  const labels = (fields ?? [])
+    .map((field) => PROFILE_FIELD_LABELS[field] ?? field)
+    .filter(Boolean);
+  if (labels.length === 0) return null;
+  if (labels.length === 1) return labels[0];
+  return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
+};
+
 const STATUS_RETRY_ATTEMPTS = 5;
 const STATUS_RETRY_DELAY_MS = 600;
 const STORE_STATUS_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -36,6 +64,18 @@ let storeStatusCacheUserId: string | null = null;
 let inFlightStoreStatusCheck: Promise<StoreStatusCache> | null = null;
 let inFlightStoreStatusCheckUserId: string | null = null;
 
+/**
+ * Reset this guard's module-level status cache so the next render refetches.
+ * Call after mutating anything the gate depends on (e.g. saving working hours),
+ * otherwise a published brand — whose fresh cache short-circuits the refetch —
+ * could keep being redirected by a stale `businessHoursConfigured` for up to the
+ * cache TTL.
+ */
+export function invalidateRequireStoreSetupCache(): void {
+  storeStatusCache = { status: null, hadError: false, checkedAt: 0 };
+  storeStatusCacheUserId = null;
+}
+
 const normalizeCacheUserId = (userId?: string | null): string | null => {
   const candidate = String(userId ?? '').trim();
   return candidate.length > 0 ? candidate : null;
@@ -49,7 +89,7 @@ const isCacheFresh = (userId?: string | null) =>
 const canServeFromCache = (userId?: string | null) =>
   isCacheFresh(userId) &&
   !storeStatusCache.hadError &&
-  Boolean(storeStatusCache.status?.isStoreOpen);
+  Boolean(storeStatusCache.status?.isSetupComplete);
 
 const fetchStoreStatusWithRetry = async (
   userId?: string | null,
@@ -151,6 +191,9 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     hasBrandAccess && effectiveEmailVerified === false;
   const requiresProfileCompletion =
     hasBrandAccess && effectiveProfileComplete === false;
+  const missingProfileFieldsLabel = describeMissingProfileFields(
+    status?.profileMissingFields,
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -169,7 +212,7 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
 
     const shouldBlockWithLoader =
       !isCacheFresh(user?.id) ||
-      !storeStatusCache.status?.isStoreOpen ||
+      !storeStatusCache.status?.isSetupComplete ||
       storeStatusCache.hadError;
     if (shouldBlockWithLoader) {
       setLoading(true);
@@ -194,7 +237,14 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
 
   if (requiresEmailVerification) {
     if (isEmbeddedMobile) {
-      postStudioNativeEvent({ type: 'PROFILE_SETUP_REQUIRED', path: verificationPromptDestination });
+      // `reason` lets the native shell route: these two blocks post the same
+      // event type but need different destinations, and without it the shell
+      // cannot tell an unverified email from an unfinished brand profile.
+      postStudioNativeEvent({
+        type: 'PROFILE_SETUP_REQUIRED',
+        reason: 'email-verification',
+        path: verificationPromptDestination,
+      });
       return (
         <div className="flex min-h-screen items-center justify-center bg-white px-5 text-slate-900 dark:bg-black dark:text-white">
           <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm dark:border-white/10 dark:bg-zinc-950">
@@ -211,13 +261,22 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
 
   if (requiresProfileCompletion) {
     if (isEmbeddedMobile) {
-      postStudioNativeEvent({ type: 'PROFILE_SETUP_REQUIRED', path: brandProfileSetupDestination });
+      postStudioNativeEvent({
+        type: 'PROFILE_SETUP_REQUIRED',
+        reason: 'brand-profile',
+        ...(status?.profileMissingFields
+          ? { missingFields: status.profileMissingFields }
+          : null),
+        path: brandProfileSetupDestination,
+      });
       return (
         <div className="flex min-h-screen items-center justify-center bg-white px-5 text-slate-900 dark:bg-black dark:text-white">
           <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm dark:border-white/10 dark:bg-zinc-950">
-            <div className="text-base font-semibold">Profile setup required</div>
+            <div className="text-base font-semibold">Finish your brand profile</div>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Return to the app to complete your brand profile before opening Studio.
+              {missingProfileFieldsLabel
+                ? `Studio opens once your profile has ${missingProfileFieldsLabel}.`
+                : 'Studio opens once your brand profile is complete.'}
             </p>
           </div>
         </div>
@@ -234,8 +293,34 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     return <>{children}</>;
   }
 
-  if (status?.isStoreOpen) {
-    clearStoreOpenPending(user?.id);
+  // Business Hours hard gate, for ALREADY-PUBLISHED stores only.
+  //
+  // Hours are part of `isSetupComplete` now, so an unpublished brand missing
+  // them is handled below by the normal setup redirect — the wizard collects
+  // hours as a step. A brand that published BEFORE hours were required has no
+  // such path: sending it to the wizard would bounce off `ShopSetupWizardPage`,
+  // which redirects any open store back to `/studio/store`, and this guard would
+  // send it to the wizard again — an infinite loop. Route those brands straight
+  // at the hours settings instead, which lives outside this guard.
+  //
+  // Gated on `isPublished` for the other direction too: a brand that has not
+  // started setup must land in the wizard, not in a working-hours form for a
+  // store that does not exist yet. Only acts on a cleanly loaded status so a
+  // failed request never gates anyone.
+  if (
+    !hadError &&
+    status &&
+    status.isPublished === true &&
+    status.workingHoursRequired === true &&
+    status.businessHoursConfigured === false
+  ) {
+    return <Navigate to="/settings?tab=store-hours" replace />;
+  }
+
+  // Setup complete → allow Studio regardless of open/paused, so a paused store is
+  // never redirected back into the setup flow. Clear pending only once truly open.
+  if (status?.isSetupComplete) {
+    if (status.isStoreOpen) clearStoreOpenPending(user?.id);
     return <>{children}</>;
   }
 
@@ -248,7 +333,7 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     return <>{children}</>;
   }
 
-  if (status.isStoreOpen) {
+  if (status.isSetupComplete) {
     return <>{children}</>;
   }
 

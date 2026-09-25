@@ -49,7 +49,7 @@ vi.mock('@/components/notifications/NotificationsDropdown', () => ({
 
 vi.mock('@/components/brand/BrandWordmark', () => ({
   default: ({ textClassName }: { textClassName?: string }) => (
-    <span className={textClassName}>Threadly</span>
+    <span className={textClassName}>WIEZ</span>
   ),
 }));
 
@@ -72,8 +72,8 @@ const setSystemDark = (matches: boolean) => {
 
 const baseUser: AuthUserDto = {
   id: 'user-1',
-  username: 'threadly',
-  email: 'threadly@example.com',
+  username: 'wiez',
+  email: 'wiez@example.com',
   firstName: 'Thread',
   lastName: 'Ly',
   role: 'User',

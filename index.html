@@ -2,89 +2,139 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/brand/weaz-favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Warm the API connection during JS boot: saves DNS+TCP+TLS (~300-600ms)
+         on the first data request of every session. -->
+    <link rel="preconnect" href="https://api.weaz.me" crossorigin />
+    <link rel="dns-prefetch" href="https://api.weaz.me" />
+    <!-- The lockup, as a raster. The mark's vector is 381 KB and a favicon is
+         fetched on every page; at 32px the difference is invisible. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/wiez-favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/brand/wiez-favicon-48.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/brand/wiez-favicon-180.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#ffffff" />
-    <title>WEAZ</title>
-    <script>
-      (function () {
-        var storageKey = 'vite-ui-theme';
-        var embeddedSurfaceKey = 'WEAZ.studio.embeddedSurface';
-        var embeddedThemeKey = 'WEAZ.studio.embeddedTheme';
-        var fallbackTheme = 'system';
-        var root = document.documentElement;
-        var storedTheme = null;
-        var params = new URLSearchParams(window.location.search);
-        var explicitEmbeddedSurface = params.get('surface') === 'mobile-app';
-        var sessionEmbeddedSurface = false;
-        var embeddedTheme = null;
-
-        try {
-          storedTheme = localStorage.getItem(storageKey);
-        } catch (_error) {
-          storedTheme = null;
-        }
-
-        try {
-          sessionEmbeddedSurface = sessionStorage.getItem(embeddedSurfaceKey) === 'mobile-app';
-        } catch (_error) {
-          sessionEmbeddedSurface = false;
-        }
-
-        if (explicitEmbeddedSurface || sessionEmbeddedSurface) {
-          var requestedTheme = params.get('theme');
-          if (requestedTheme === 'light' || requestedTheme === 'dark') {
-            embeddedTheme = requestedTheme;
-            try {
-              sessionStorage.setItem(embeddedSurfaceKey, 'mobile-app');
-              sessionStorage.setItem(embeddedThemeKey, requestedTheme);
-            } catch (_error) {}
-          } else {
-            try {
-              var savedEmbeddedTheme = sessionStorage.getItem(embeddedThemeKey);
-              embeddedTheme =
-                savedEmbeddedTheme === 'light' || savedEmbeddedTheme === 'dark'
-                  ? savedEmbeddedTheme
-                  : null;
-            } catch (_error) {
-              embeddedTheme = null;
-            }
-          }
-        }
-
-        var theme =
-          embeddedTheme ||
-          (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system'
-            ? storedTheme
-            : fallbackTheme);
-
-        var prefersDark =
-          window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        var className = theme === 'dark' || (theme === 'system' && prefersDark)
-          ? 'dark'
-          : 'light';
-
-        root.classList.remove('light', 'dark');
-        root.classList.add(className);
-        root.dataset.theme = className;
-        root.dataset.themePreference = theme;
-        root.style.colorScheme = className;
-
-        var themeColorMeta = document.querySelector('meta[name="theme-color"]');
-        if (themeColorMeta) {
-          themeColorMeta.setAttribute('content', className === 'dark' ? '#0a0a0a' : '#ffffff');
-        }
-      })();
-    </script>
-    <!-- Google Fonts: Playfair Display for elegant product titles -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <title>WIEZ</title>
+    <meta name="description" content="When you think WEARS, you think WIEZ. African fashion social commerce marketplace." />
+    <meta name="robots" content="index,follow" />
+    <link rel="canonical" href="https://weaz.me/" />
+    <meta property="og:site_name" content="WIEZ" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="WIEZ" />
+    <meta property="og:description" content="When you think WEARS, you think WIEZ. African fashion social commerce marketplace." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://weaz.me/brand/wiez-og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="WIEZ" />
+    <meta name="twitter:description" content="When you think WEARS, you think WIEZ. African fashion social commerce marketplace." />
+    <meta name="twitter:image" content="https://weaz.me/brand/wiez-og.png" />
+    <!-- CSP NOTE: production script-src is 'self' with NO 'unsafe-inline'.
+         Never add inline script blocks here; they are silently blocked on
+         weaz.me (this froze the boot splash on mobile once already).
+         Pre-paint logic lives in external files under /boot/. -->
+    <!-- theme-init must stay sync (prevents theme FOUC). Everything else is
+         deferred so it does not block HTML parse / first paint. -->
+    <script src="/boot/theme-init.js"></script>
+    <!-- Kick off primary data fetches in parallel with the JS bundle
+         (anonymous visitors) — adopted by the app via window.__WIEZ_EARLY__. -->
+    <script src="/boot/early-data.js" defer></script>
+    <script src="/boot/analytics.js" defer></script>
+    <!-- Fonts: fewer families/weights = less LCP contention. display=swap so
+         text paints with system fallback immediately. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- The splash draws this before React exists, so it is preloaded to be
+         on screen at first paint. It must stay in step with the <img> below:
+         this pointed at the favicon after the splash switched to the mark, so
+         it was warming a file the splash no longer used. -->
+    <link rel="preload" as="image" href="/brand/wiez-mark-light.svg" />
   </head>
   <body>
+    <!-- Brand boot gauge: a seal-shaped (curly-edged) filler ring that fills
+         toward completion around the spinning thread — no text, the fill IS
+         the progress. Driven by /boot/boot-splash.js (external for CSP). -->
+    <div
+      id="boot-splash"
+      role="status"
+      aria-live="polite"
+      aria-label="Loading WIEZ"
+      style="
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: flex;
+        min-height: 100dvh;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 16px;
+        padding: 24px;
+        font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+      "
+    >
+      <div
+        id="boot-splash-gauge"
+        style="position: relative; width: 132px; height: 123px; animation: boot-breathe 2.6s ease-in-out infinite;"
+      >
+        <img
+          src="/brand/wiez-mark-light.svg"
+          alt=""
+          aria-hidden="true"
+          style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.18"
+        />
+        <img
+          id="boot-splash-fill"
+          src="/brand/wiez-mark-light.svg"
+          alt=""
+          aria-hidden="true"
+          style="
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            clip-path: inset(92% 0 0 0);
+            transition: clip-path 420ms cubic-bezier(0.22, 1, 0.36, 1);
+          "
+        />
+      </div>
+    </div>
+    <style>
+      @keyframes boot-breathe {
+        0%,
+        100% {
+          opacity: 0.78;
+          transform: scale(0.97);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      /* Ground and ink live here, not on the element. An inline declaration
+         outranks any class selector, so while these sat in the style attribute
+         the dark rule below could never apply and a night-theme cold start
+         flashed white before React mounted. */
+      #boot-splash {
+        background: #ffffff;
+        color: #16121d;
+      }
+      html.dark #boot-splash {
+        background: #0a0a0a;
+        color: #f3f4f6;
+      }
+      /* The mark is full-colour artwork with a ramp per ground, so the splash
+         swaps the file rather than filtering it. */
+      html.dark #boot-splash-gauge img {
+        content: url('/brand/wiez-mark-dark.svg');
+      }
+    </style>
     <div id="root"></div>
     <div id="overlay-root"></div>
+    <script src="/boot/boot-splash.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -32,7 +32,7 @@ export default function BrandSwitcher() {
     }
     setStoredActiveBrandId(brandId);
     window.dispatchEvent(
-      new CustomEvent('threadly:active-brand-change', {
+      new CustomEvent('wiez:active-brand-change', {
         detail: { brandId },
       }),
     );

@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Legal sync CI contract
+        run: npm run test:legal-sync-ci-contract
+
       - name: Build
         run: npm run build
 

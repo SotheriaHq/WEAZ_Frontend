@@ -12,6 +12,7 @@ import OrderChatDrawer from '@/components/messaging/OrderChatDrawer';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
   CustomOrderBadge,
+  CustomOrderBuyerPaymentBreakdown,
   CustomOrderDataTable,
   CustomOrderJsonBreakdown,
   CustomOrderKeyValueList,
@@ -27,9 +28,19 @@ import {
 } from '@/components/custom-orders/customOrderFormatting';
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 
-type StudioDetailTab = 'overview' | 'measurements' | 'operations' | 'timeline';
+type StudioDetailTab =
+  | 'overview'
+  | 'notices'
+  | 'measurements'
+  | 'operations'
+  | 'timeline';
 
-const TABS: Array<{ id: StudioDetailTab; label: string; emoji: string; helper: string }> = [
+const BASE_TABS: Array<{
+  id: StudioDetailTab;
+  label: string;
+  emoji: string;
+  helper: string;
+}> = [
   { id: 'overview', label: 'Overview', emoji: '🧾', helper: 'Status, summary and audit' },
   { id: 'measurements', label: 'Measurements', emoji: '📏', helper: 'Approved body points' },
   { id: 'operations', label: 'Operations', emoji: '🛠️', helper: 'Acceptance and lifecycle' },
@@ -99,7 +110,27 @@ const stageDisplayOrder: CustomOrderProgressStage[] = [
   'READY_FOR_DELIVERY',
 ];
 
-const shell = 'relative rounded-[2rem] border border-white/40 bg-white/60 p-5 lg:p-6 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-black/20';
+/**
+ * The one word each stage is, for a column ~45px wide.
+ *
+ * "Fabric And Piece Purchase Gathering" is a sentence, and a six-step strip
+ * sized to hold six of those is 560px — which is why this strip used to be a
+ * hidden horizontal scroller that showed four and a half steps on a phone and
+ * cut the current one in half. The reader does not need the full sentence to
+ * follow a progress rail; they need to see all six steps and which one is lit.
+ * The sentence is still there from `sm:` up, and the stage is named in full by
+ * the "Current display" panel below regardless.
+ */
+const stageShortLabels: Partial<Record<CustomOrderProgressStage, string>> = {
+  ORDER_PLACED: 'Placed',
+  ORDER_RECEIVED: 'Received',
+  FABRIC_AND_PIECE_PURCHASE_GATHERING: 'Fabric',
+  DESIGN_MODE: 'Design',
+  FINAL_TOUCHES_AND_PACKAGING: 'Packing',
+  READY_FOR_DELIVERY: 'Ready',
+};
+
+const shell = 'relative min-w-0 rounded-[1.75rem] sm:rounded-[2rem] border border-white/40 bg-white/60 p-3 sm:p-5 lg:p-6 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-black/20';
 
 const formatCurrency = (value: number | undefined, currency = 'NGN') =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(Number(value ?? 0));
@@ -114,12 +145,30 @@ const textValue = (value: unknown, fallback = '—') =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
+// Human title for a read-only admin notice (reminder / risk flag / escalation)
+// derived from the ADMIN-authored timeline event's payload.
+const describeAdminNoticeTitle = (
+  payload: Record<string, unknown> | null | undefined,
+): string => {
+  const reason = typeof payload?.reason === 'string' ? payload.reason : '';
+  const action = typeof payload?.action === 'string' ? payload.action : '';
+  if (reason === 'MANUAL_BRAND_REMINDER') return '📣 Reminder from admin';
+  if (action === 'FLAG_RISK') return '🚩 Risk flag from admin';
+  if (reason) return `📣 ${humanizeCustomOrderToken(reason)}`;
+  return '📣 Admin notice';
+};
+
+const disputeIsClosed = (status: string) =>
+  ['RESOLVED', 'CLOSED'].includes(status.toUpperCase());
+
 const hashToTab = (hash: string): StudioDetailTab | null => {
   const key = hash.replace('#', '').trim().toLowerCase();
   if (key === 'measurements') return 'measurements';
   if (key === 'operations') return 'operations';
   if (key === 'timeline') return 'timeline';
   if (key === 'overview') return 'overview';
+  // Admin reminder emails/notifications can deep-link straight to the notice.
+  if (key === 'notices') return 'notices';
   return null;
 };
 
@@ -172,30 +221,60 @@ const getStageTone = (stage: CustomOrderProgressStage, currentStage: CustomOrder
   };
 };
 
-const StageStatusStrip: React.FC<{ currentStage: CustomOrderProgressStage }> = ({ currentStage }) => (
-  <div className="overflow-x-auto">
-    <div className="relative min-w-[560px] px-1">
-      <div className="absolute left-4 right-4 top-3 h-[2px] rounded-full bg-slate-200 dark:bg-slate-700" />
+/**
+ * Six steps, always all six, at any width.
+ *
+ * The rail is inset by half a column at each end (`100% / 6 / 2` = 8.333%) so
+ * it starts under the centre of the first dot and ends under the centre of the
+ * last, and the filled portion is that same span scaled by how far along the
+ * order is. The old fixed `left-4 right-4` was tuned for a 560px strip and drew
+ * a rail that missed its own dots at every other width.
+ */
+const STAGE_RAIL_INSET = '8.3333%';
+
+const StageStatusStrip: React.FC<{ currentStage: CustomOrderProgressStage }> = ({ currentStage }) => {
+  const progressRatio =
+    stageDisplayOrder.indexOf(currentStage) / (stageDisplayOrder.length - 1);
+
+  return (
+    <div className="relative min-w-0">
       <div
-        className="absolute left-4 top-3 h-[2px] rounded-full bg-sky-500 transition-[width] duration-300"
+        className="absolute top-2.5 h-[2px] rounded-full bg-slate-200 dark:bg-slate-700 sm:top-3"
+        style={{ left: STAGE_RAIL_INSET, right: STAGE_RAIL_INSET }}
+      />
+      <div
+        className="absolute top-2.5 h-[2px] rounded-full bg-sky-500 transition-[width] duration-300 sm:top-3"
         style={{
-          width: `calc(${(stageDisplayOrder.indexOf(currentStage) / (stageDisplayOrder.length - 1)) * 100}% - 8px)`,
+          left: STAGE_RAIL_INSET,
+          width: `calc((100% - ${STAGE_RAIL_INSET} * 2) * ${progressRatio})`,
         }}
       />
-      <div className="relative grid grid-cols-6 gap-1">
+      <div className="relative grid grid-cols-6 gap-0.5 sm:gap-1">
         {stageDisplayOrder.map((stage) => {
           const tone = getStageTone(stage, currentStage);
+          const fullLabel = humanizeCustomOrderToken(stage);
+          const shortLabel = stageShortLabels[stage] ?? fullLabel;
+
           return (
-            <div key={stage} className="min-w-0">
+            <div key={stage} className="min-w-0" title={fullLabel}>
               <div className="flex items-center justify-center">
-                <div className={`h-6 w-6 rounded-full border-2 transition-all duration-300 ${tone.dot}`} />
+                <div
+                  className={`h-5 w-5 rounded-full border-2 transition-all duration-300 sm:h-6 sm:w-6 ${tone.dot}`}
+                />
               </div>
-              <div className="mt-2 text-center">
-                <div className={`text-[10px] font-bold uppercase tracking-[0.12em] ${tone.helper}`}>
+              <div className="mt-1.5 text-center sm:mt-2">
+                {/* The marker repeats what the dot's colour already says, and
+                    it is the widest thing in the column. It waits for room. */}
+                <div
+                  className={`hidden text-[10px] font-bold uppercase tracking-[0.12em] sm:block ${tone.helper}`}
+                >
                   {tone.marker}
                 </div>
-                <div className={`mt-0.5 text-[11px] font-semibold leading-4 ${tone.label}`}>
-                  {humanizeCustomOrderToken(stage)}
+                <div
+                  className={`text-[9px] font-semibold leading-[1.15] sm:mt-0.5 sm:text-[11px] sm:leading-4 ${tone.label}`}
+                >
+                  <span className="sm:hidden">{shortLabel}</span>
+                  <span className="hidden sm:inline">{fullLabel}</span>
                 </div>
               </div>
             </div>
@@ -203,8 +282,8 @@ const StageStatusStrip: React.FC<{ currentStage: CustomOrderProgressStage }> = (
         })}
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const StudioCustomOrderDetailPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -223,6 +302,8 @@ const StudioCustomOrderDetailPage: React.FC = () => {
   const [extensionReason, setExtensionReason] = useState('');
   const [exceptionReason, setExceptionReason] = useState('');
   const [exceptionQuote, setExceptionQuote] = useState('');
+  const [ackingNotices, setAckingNotices] = useState(false);
+  const [disputeResponses, setDisputeResponses] = useState<Record<string, string>>({});
   const highlightMessageId = searchParams.get('messageId');
 
   const loadOrder = useCallback(async (resolvedBrandId?: string | null) => {
@@ -349,6 +430,60 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     () => Object.entries(order?.measurementSnapshot ?? {}),
     [order?.measurementSnapshot],
   );
+
+  // Read-only admin notices: reminders / risk flags / escalations authored by
+  // the admin team (actorType ADMIN), newest first. Brands never reply here.
+  const adminNotices = useMemo(
+    () =>
+      (order?.timelineEvents ?? [])
+        .filter((event) => String(event.actorType).toUpperCase() === 'ADMIN')
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        ),
+    [order?.timelineEvents],
+  );
+  const disputes = useMemo(() => order?.disputes ?? [], [order?.disputes]);
+  const hasAdminNoticeContent = adminNotices.length > 0 || disputes.length > 0;
+
+  /**
+   * Notices live in their own tab so they survive being acknowledged.
+   *
+   * The panel used to sit inline above the tabs and, once "Mark as seen" was
+   * pressed, there was nowhere to go back and re-read what admin had actually
+   * said — which matters when the notice is "act on this order or it will be
+   * cancelled". An open dispute or an unread notice raises the urgency marker
+   * on the tab label so it still demands attention without shouting forever.
+   */
+  const openDisputeCount = useMemo(
+    () => disputes.filter((dispute) => !disputeIsClosed(String(dispute.status))).length,
+    [disputes],
+  );
+  const noticeUrgency: 'urgent' | 'new' | 'calm' =
+    openDisputeCount > 0 ? 'urgent' : order?.hasUnreadAdminNotice ? 'new' : 'calm';
+
+  const tabs = useMemo(() => {
+    if (!hasAdminNoticeContent) return BASE_TABS;
+    const noticeEmoji =
+      noticeUrgency === 'urgent' ? '🚨' : noticeUrgency === 'new' ? '🔴' : '📣';
+    const noticeHelper =
+      noticeUrgency === 'urgent'
+        ? `${openDisputeCount} open dispute${openDisputeCount === 1 ? '' : 's'}`
+        : noticeUrgency === 'new'
+          ? 'Unread admin notice'
+          : 'Admin reminders and disputes';
+    return [
+      BASE_TABS[0],
+      {
+        id: 'notices' as StudioDetailTab,
+        label: 'Notices',
+        emoji: noticeEmoji,
+        helper: noticeHelper,
+      },
+      ...BASE_TABS.slice(1),
+    ];
+  }, [hasAdminNoticeContent, noticeUrgency, openDisputeCount]);
 
   const currentStage = order?.currentProgressStage ?? 'ORDER_RECEIVED';
   const currentStageLabel = humanizeCustomOrderToken(currentStage);
@@ -506,6 +641,75 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     }
   };
 
+  // Read-only acknowledgement — clears the 📣 badge; brands never reply here.
+  const handleAckAdminNotices = async () => {
+    if (!brandId || !order) return;
+    setAckingNotices(true);
+    try {
+      await customOrdersBrandApi.ackAdminNotices(brandId, order.id);
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              hasUnreadAdminNotice: false,
+              brandAdminNoticeAckAt: new Date().toISOString(),
+            }
+          : prev,
+      );
+      toast.success('Admin notices marked as seen.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to update admin notices.');
+    } finally {
+      setAckingNotices(false);
+    }
+  };
+
+  // One-time brand response to an admin-adjudicated dispute (locked afterward).
+  const handleRespondToDispute = async (disputeId: string) => {
+    if (!brandId || !order) return;
+    const text = (disputeResponses[disputeId] ?? '').trim();
+    if (text.length < 5) {
+      toast.error('Please write at least a sentence before submitting.');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const result = await customOrdersBrandApi.respondToDispute(
+        brandId,
+        order.id,
+        disputeId,
+        { response: text },
+      );
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              disputes: prev.disputes.map((dispute) =>
+                dispute.id === disputeId
+                  ? {
+                      ...dispute,
+                      brandResponse: result.brandResponse ?? text,
+                      status: result.status,
+                    }
+                  : dispute,
+              ),
+            }
+          : prev,
+      );
+      setDisputeResponses((prev) => {
+        const next = { ...prev };
+        delete next[disputeId];
+        return next;
+      });
+      toast.success('Your response was submitted to the admin team.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to submit your response.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // Filter out non-human-readable fields from timeline payloads
   const filterTimelinePayload = (payload: Record<string, unknown>): Record<string, unknown> => {
     const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -534,8 +738,183 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     return 'border-black/10 bg-white/80 dark:border-white/10 dark:bg-white/[0.04]';
   };
 
+  /**
+   * Notices tab.
+   *
+   * Previously an inline panel above the tabs: once the brand pressed
+   * "Mark as seen" the block lost its unread styling and there was no durable
+   * place to re-read what admin had said - which matters when the notice is
+   * "act on this order or it will be cancelled". Living in a tab, the history
+   * stays available and the urgency marker rides on the tab label instead.
+   */
+  const renderNotices = () => {
+    if (!order) return null;
+    if (!hasAdminNoticeContent) {
+      return (
+        <section className={shell}>
+          <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+            No admin notices or disputes have been raised on this order.
+          </div>
+        </section>
+      );
+    }
+    return (
+      <section className={shell}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
+                <span aria-hidden="true">📣</span>
+                <span>Admin notices</span>
+                {order.hasUnreadAdminNotice ? (
+                  <span className="inline-flex animate-pulse rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-rose-700 dark:text-rose-300">
+                    New
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Reminders and dispute notices from the WIEZ admin team. These are read-only — you can submit a single response on a dispute, but there's no back-and-forth here.
+              </p>
+            </div>
+            {order.hasUnreadAdminNotice ? (
+              <button
+                type="button"
+                onClick={() => void handleAckAdminNotices()}
+                disabled={ackingNotices}
+                className="shrink-0 rounded-full bg-slate-950 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-slate-950"
+              >
+                {ackingNotices ? 'Marking…' : 'Mark as seen'}
+              </button>
+            ) : null}
+          </div>
+
+          {adminNotices.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              {adminNotices.map((event) => {
+                const payload = isRecord(event.payloadJson) ? event.payloadJson : null;
+                const note = typeof payload?.note === 'string' ? payload.note : '';
+                return (
+                  <div
+                    key={event.id}
+                    className="rounded-2xl border border-black/10 bg-white/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {describeAdminNoticeTitle(payload)}
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {formatDateTime(event.createdAt)}
+                      </div>
+                    </div>
+                    {note ? (
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
+                        {note}
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-sm italic text-slate-400 dark:text-slate-500">
+                        No additional note was left.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {disputes.length > 0 ? (
+            <div className="mt-4 space-y-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                Disputes
+              </div>
+              {disputes.map((dispute) => {
+                const status = String(dispute.status);
+                const alreadyResponded = Boolean(dispute.brandResponse);
+                const canRespond = !alreadyResponded && !disputeIsClosed(status);
+                const draft = disputeResponses[dispute.id] ?? '';
+                return (
+                  <div
+                    key={dispute.id}
+                    className="rounded-2xl border border-rose-200/70 bg-white/70 px-4 py-4 dark:border-rose-500/20 dark:bg-white/[0.03]"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {dispute.reasonType
+                          ? humanizeCustomOrderToken(String(dispute.reasonType))
+                          : 'Dispute'}
+                      </div>
+                      <CustomOrderBadge value={status} />
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      Opened {formatDateTime(dispute.openedAt)}
+                    </div>
+
+                    {dispute.buyerStatement ? (
+                      <div className="mt-3 rounded-xl border border-black/10 bg-black/[0.02] px-3 py-2 text-sm text-slate-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">
+                          Buyer statement
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap">{dispute.buyerStatement}</p>
+                      </div>
+                    ) : null}
+
+                    {alreadyResponded ? (
+                      <div className="mt-3 rounded-xl border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-300">
+                          Your response (submitted)
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap">{dispute.brandResponse}</p>
+                      </div>
+                    ) : canRespond ? (
+                      <div className="mt-3">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                          Submit your response — you can only do this once
+                        </div>
+                        <textarea
+                          value={draft}
+                          onChange={(event) =>
+                            setDisputeResponses((prev) => ({
+                              ...prev,
+                              [dispute.id]: event.target.value,
+                            }))
+                          }
+                          rows={3}
+                          maxLength={2000}
+                          placeholder="Explain your side of this dispute for the admin team…"
+                          className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                        />
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <span className="text-xs text-slate-400 dark:text-slate-500">
+                            {draft.trim().length}/2000
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => void handleRespondToDispute(dispute.id)}
+                            disabled={busy || draft.trim().length < 5}
+                            className="rounded-full bg-rose-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                          >
+                            Submit response
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-3 text-sm italic text-slate-400 dark:text-slate-500">
+                        This dispute is closed — no response can be submitted.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+      </section>
+    );
+  };
+
   const renderTab = () => {
     if (!order) return null;
+
+    if (activeTab === 'notices') {
+      return renderNotices();
+    }
 
     if (activeTab === 'overview') {
       return (
@@ -574,25 +953,34 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                 <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
                   Current display
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex min-w-0 flex-wrap gap-2">
                   <CustomOrderBadge value={currentStage} type="stage" />
                 </div>
-                <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                <p className="mt-3 break-words text-sm text-slate-600 dark:text-slate-300">
                   Order placed and order received are system-managed. Brand production updates begin from fabric and piece gathering after payment is confirmed.
                 </p>
               </div>
             </section>
           </div>
 
+          <section className={shell}>
+            <CustomOrderBuyerPaymentBreakdown
+              summary={order.buyerPriceSummary}
+              formatCurrency={(value, currency) =>
+                formatCurrency(value, currency ?? order.buyerPriceSummary.currency ?? 'NGN')
+              }
+            />
+          </section>
+
           {/* Technical breakdown merged into Overview */}
           <div className="grid items-start gap-5 min-[1080px]:grid-cols-[minmax(0,1fr)_360px]">
             <section className={shell}>
-              <div className="text-lg font-semibold text-slate-900 dark:text-white">Price breakdown</div>
+              <div className="text-lg font-semibold text-slate-900 dark:text-white">Internal price details</div>
               <div className="mt-4 space-y-4">
                 {technicalBreakdown && Object.keys(technicalBreakdown).length > 0 ? (
                   <CustomOrderJsonBreakdown data={technicalBreakdown} />
                 ) : (
-                  <div className="text-sm text-slate-500 dark:text-slate-400">No breakdown available.</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">No internal technical breakdown available.</div>
                 )}
                 {chartLock ? (
                   <CustomOrderDataTable
@@ -862,10 +1250,20 @@ const StudioCustomOrderDetailPage: React.FC = () => {
         <span className="font-medium">{formatCustomOrderCode(order.id)}</span>
       </div>
 
-      <section className="relative mt-5 rounded-[2.5rem] border border-white/40 bg-white/50 p-2 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-black/20">
-        <div className="relative rounded-[2rem] bg-white/60 p-5 shadow-sm ring-1 ring-inset ring-black/5 dark:bg-white/[0.02] dark:ring-white/10">
+      {/*
+        Frame padding scales with the screen.
+
+        Three nested rounded frames each contributed their own inset, and on a
+        360px phone that stack — page 12, section 8, shell 20, filler 20 — spent
+        120px, a third of the viewport, on the gaps between borders. The order
+        itself got 240px to be read in. The nesting is what makes this screen
+        look considered on a desktop, so it stays; the insets simply start small
+        and open up once there is width to spend.
+      */}
+      <section className="relative mt-5 rounded-[2rem] border border-white/40 bg-white/50 p-1.5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-black/20 sm:rounded-[2.5rem] sm:p-2">
+        <div className="relative rounded-[1.75rem] bg-white/60 p-3 shadow-sm ring-1 ring-inset ring-black/5 dark:bg-white/[0.02] dark:ring-white/10 sm:rounded-[2rem] sm:p-5">
           {/* Stage progress filler — full width, top of order */}
-          <div className="mb-5 rounded-2xl border border-sky-200/70 bg-gradient-to-r from-sky-50/90 via-indigo-50/60 to-sky-50/90 px-5 py-4 dark:border-sky-500/20 dark:from-sky-500/10 dark:via-indigo-500/5 dark:to-sky-500/10">
+          <div className="mb-4 rounded-2xl border border-sky-200/70 bg-gradient-to-r from-sky-50/90 via-indigo-50/60 to-sky-50/90 px-3 py-3 dark:border-sky-500/20 dark:from-sky-500/10 dark:via-indigo-500/5 dark:to-sky-500/10 sm:mb-5 sm:px-5 sm:py-4">
             <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.24em] text-sky-600 dark:text-sky-400">
               Production progress
             </div>
@@ -897,18 +1295,27 @@ const StudioCustomOrderDetailPage: React.FC = () => {
               <h1 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{order.source.title}</h1>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-3">
+            {/*
+              Two buttons, one row — scaled to fit rather than stacked.
+
+              `flex-wrap` at full desktop sizing meant "Open conversation" and
+              "Back to queue" could not share a 336px phone row, so each took a
+              whole line of its own. They are a pair and belong on one line; the
+              padding and type come down until they fit, which costs far less
+              than a second row of chrome above the order.
+            */}
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
               <button
                 type="button"
                 onClick={() => setDrawerOpen(true)}
-                className="rounded-full border border-black/10 bg-white/80 px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition-all hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+                className="rounded-full border border-black/10 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm transition-all hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 sm:px-5 sm:py-2.5 sm:text-sm"
               >
                 Open conversation
               </button>
               <button
                 type="button"
                 onClick={() => navigate('/studio?tab=orders&orderTab=custom')}
-                className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(15,23,42,0.15)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(15,23,42,0.2)] dark:bg-white dark:text-slate-950 dark:shadow-[0_4px_12px_rgba(255,255,255,0.1)]"
+                className="rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white shadow-[0_4px_12px_rgba(15,23,42,0.15)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(15,23,42,0.2)] dark:bg-white dark:text-slate-950 dark:shadow-[0_4px_12px_rgba(255,255,255,0.1)] sm:px-5 sm:py-2.5 sm:text-sm"
               >
                 Back to queue
               </button>
@@ -995,15 +1402,63 @@ const StudioCustomOrderDetailPage: React.FC = () => {
         </section>
       ) : null}
 
-      <div className="max-w-full overflow-hidden">
+      {/* Notices moved into their own tab (rendered by renderNotices) so they
+          remain readable after "Mark as seen". What stays here is a one-line
+          pointer, shown only while something is genuinely outstanding. */}
+      {hasAdminNoticeContent && noticeUrgency !== 'calm' && activeTab !== 'notices' ? (
+        <button
+          type="button"
+          onClick={() => setActiveTab('notices')}
+          className="flex w-full flex-wrap items-center justify-between gap-3 rounded-[1.75rem] border border-rose-300/70 bg-rose-50/90 p-4 text-left dark:border-rose-500/25 dark:bg-rose-500/10"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold text-rose-900 dark:text-rose-100">
+            <span aria-hidden="true">{noticeUrgency === 'urgent' ? '🚨' : '🔴'}</span>
+            {noticeUrgency === 'urgent'
+              ? `${openDisputeCount} open dispute${openDisputeCount === 1 ? '' : 's'} need your attention`
+              : 'You have an unread notice from the WIEZ admin team'}
+          </span>
+          <span className="shrink-0 text-xs font-bold uppercase tracking-[0.16em] text-rose-700 dark:text-rose-300">
+            Open notices →
+          </span>
+        </button>
+      ) : null}
+
+      {/*
+        `min-w-0`, not `overflow-hidden`.
+
+        `overflow-hidden` makes this div a scroll container, and a scroll
+        container becomes the containing block for any `position: sticky`
+        inside it — so the tab strip was pinned to a box exactly as tall as
+        itself and could never stick to anything. `min-w-0` gives the same
+        protection against a wide child stretching the column, without
+        disabling the strip.
+      */}
+      <div className="min-w-0">
         <CustomOrderWorkspaceTabs
-          tabs={TABS}
+          tabs={tabs}
           activeTab={activeTab}
           onChange={(nextTab) => setActiveTab(nextTab as StudioDetailTab)}
         />
       </div>
 
-      <div className="max-h-[calc(100vh-220px)] overflow-y-auto pr-1">{renderTab()}</div>
+      {/*
+        One scroller per screen, on a phone.
+
+        This pane used to be `max-h-[calc(100vh-220px)] overflow-y-auto` at
+        every width. On a mobile browser that is two nested scrollers in a
+        document that is already taller than the viewport: a drag inside the
+        pane scrolls the pane, a drag that starts a pixel outside it scrolls the
+        page, and the reader cannot tell which they are touching. `100vh` also
+        measures the viewport WITH the URL bar retracted, so the pane was taller
+        than the space it had and its last rows sat under the island dock.
+
+        Below `lg` the page simply scrolls. The contained pane returns where it
+        earns its keep — a desktop, where the tab strip and the order header
+        stay in view beside it and there is only ever one scrollbar in reach.
+      */}
+      <div className="min-w-0 lg:max-h-[calc(100dvh-220px)] lg:overflow-y-auto lg:pr-1">
+        {renderTab()}
+      </div>
 
       <OrderChatDrawer
         open={drawerOpen}
@@ -1020,3 +1475,4 @@ const StudioCustomOrderDetailPage: React.FC = () => {
 };
 
 export default StudioCustomOrderDetailPage;
+

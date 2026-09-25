@@ -21,8 +21,8 @@ export const useRunwayPinnedFeed = (
   const enabled = options?.enabled !== false && Boolean(params.query.trim());
   return useQuery<RunwayPinnedFeedResponse>({
     queryKey: [
-      'market',
-      'runwayPinned',
+      'runway',
+      'pinned',
       params.query,
       params.anchorDesignId ?? null,
       params.cursor ?? null,

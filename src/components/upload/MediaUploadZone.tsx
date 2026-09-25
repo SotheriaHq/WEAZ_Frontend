@@ -64,7 +64,7 @@ const MediaUploadZone: React.FC<MediaUploadZoneProps> = ({
               'mb-6 w-20 h-20 rounded-2xl flex items-center justify-center border transition-colors duration-300',
               isDragActive
                 ? 'bg-purple-100 dark:bg-purple-500/20 border-purple-300 dark:border-purple-500/40'
-                : 'bg-gray-100 dark:bg-white/8 border-gray-200 dark:border-white/10 group-hover:bg-purple-50 dark:group-hover:bg-purple-500/10 group-hover:border-purple-200 dark:group-hover:border-purple-500/30',
+                : 'bg-gray-100 dark:bg-white/[0.08] border-gray-200 dark:border-white/10 group-hover:bg-purple-50 dark:group-hover:bg-purple-500/10 group-hover:border-purple-200 dark:group-hover:border-purple-500/30',
             ].join(' ')}
           >
             <span className="text-3xl" aria-hidden="true">
@@ -97,7 +97,7 @@ const MediaUploadZone: React.FC<MediaUploadZoneProps> = ({
             ].map(({ label, emoji }) => (
               <span
                 key={label}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-white/8 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-white/[0.08] border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300"
               >
                 <span>{emoji}</span>
                 {label}

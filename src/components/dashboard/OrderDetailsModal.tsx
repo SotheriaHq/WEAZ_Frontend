@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { brandApi } from '@/api/BrandApi';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getSizingModeLabel } from '@/types/sizing';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
@@ -27,7 +27,7 @@ const isLikelyFileId = (value?: string | null) =>
 
 const getPaymentTone = (status?: string | null) =>
   String(status || '').toUpperCase() === 'PAID'
-    ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20'
+    ? 'bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300 border border-emerald-500/20'
     : 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border border-slate-500/20';
 
 const ORDER_STEPS = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'] as const;
@@ -211,7 +211,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         <div ref={dialogRef} tabIndex={-1} className="relative z-layer-modal flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white/95 shadow-2xl outline-none dark:border-white/10 dark:bg-[linear-gradient(160deg,rgba(16,16,16,0.98),rgba(10,10,10,0.96))]">
           {updatingStatus ? (
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-slate-950/35 backdrop-blur-sm">
-              <VLoader size={64} phase="loading" />
+              <MuseLoader size={64} />
               <p className="text-sm font-semibold text-white">Updating order to {updatingStatus.toLowerCase()}…</p>
             </div>
           ) : null}
@@ -246,12 +246,12 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           <div className="flex-1 overflow-y-auto p-6 scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden space-y-6 overscroll-contain md:p-7">
             {loading ? (
               <div className="flex justify-center py-16">
-                <VLoader size={64} phase="loading" />
+                <MuseLoader size={64} />
               </div>
             ) : order ? (
               <>
                 <section className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Order workflow</p>
@@ -302,7 +302,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Payment & totals</p>
                     <div className="mt-4 space-y-3 text-sm">
                       <div className="flex items-center justify-between">
@@ -361,7 +361,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                 </section>
 
                 <section className="grid gap-4 md:grid-cols-3">
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Customer</p>
                     <div className="mt-4 space-y-2 text-sm">
                       <p className="text-lg font-bold">{order.customerName}</p>
@@ -370,7 +370,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Shipping</p>
                     <div className="mt-4 text-sm text-slate-600 dark:text-slate-400">
                       <p>
@@ -379,7 +379,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Order facts</p>
                     <div className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-400">
                       <p>🧾 {lineItems.length} item{lineItems.length === 1 ? '' : 's'}</p>
@@ -422,7 +422,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                         const src = fileId ? undefined : thumb || undefined;
 
                         return (
-                          <article key={item.id || idx} className="rounded-[26px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                          <article key={item.id || idx} className="rounded-[26px] border border-slate-200 bg-slate-50/90 p-5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                               <div className="flex flex-1 gap-4">
                                 <div className="h-20 w-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/5">

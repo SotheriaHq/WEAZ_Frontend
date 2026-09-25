@@ -1,7 +1,7 @@
 export function uiDebug(): boolean {
   try {
     if (typeof localStorage !== 'undefined') {
-      const v = localStorage.getItem('threadly.uiDebug');
+      const v = localStorage.getItem('wiez.uiDebug');
       if (v === '1' || v === 'true') return true;
     }
     // Vite env variable fallback

@@ -6,15 +6,21 @@ import Button from '@/components/ui/Button';
 import type { RootState } from '@/store';
 import { setUser } from '@/features/userSlice';
 import { brandApi } from '@/api/BrandApi';
-import VerificationHero from '@/components/studio/verification/VerificationHero';
 import VerificationHistoryPanel from '@/components/studio/verification/VerificationHistoryPanel';
 import {
   getVerificationCallToAction,
   verificationStatusLabel,
-  verificationStatusTone,
 } from '@/components/studio/verification/verificationShared';
 import type { VerificationInfoItem, VerificationStatusResponse } from '@/types/verification';
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
+import { showNotice } from '@/components/ui/NoticeModal';
+
+/**
+ * Profile → Apply → Review → Active. Named so the rail, the "Step n of N"
+ * heading and the completion check cannot drift apart.
+ */
+const VERIFICATION_JOURNEY_STEPS = [1, 2, 3, 4] as const;
+const TOTAL_VERIFICATION_STEPS = VERIFICATION_JOURNEY_STEPS.length;
 
 export default function StoreVerificationPage() {
   const navigate = useNavigate();
@@ -111,10 +117,20 @@ export default function StoreVerificationPage() {
     [hasDraft, status],
   );
 
-  const statusDisplayLabel =
-    status?.verificationStatus === 'NOT_SUBMITTED' && hasDraft
-      ? 'Drafted'
-      : verificationStatusLabel(status?.verificationStatus);
+  /*
+    "Drafted" is not a status, it is an autosave.
+
+    Every keystroke in the wizard is persisted, so labelling the record
+    "Drafted" told the owner about our storage rather than about their
+    application — and it read as a state the reviewer might be looking at, when
+    nothing has been sent. The honest label for an unsent application is the one
+    the server already gives it. The word "draft" now appears in exactly one
+    place: the toast that fires when someone presses Save draft, where it
+    confirms an action they took.
+  */
+  const statusDisplayLabel = verificationStatusLabel(
+    status?.verificationStatus,
+  );
 
   const handleCancel = async () => {
     if (!brandId || !status) return;
@@ -169,6 +185,7 @@ export default function StoreVerificationPage() {
   };
 
   const infoItems = status?.infoRequestedItems ?? [];
+  const storePending = status?.storeReadiness?.pending ?? [];
   const cooldownTarget = useMemo(() => {
     if (!status) return null;
 
@@ -189,13 +206,50 @@ export default function StoreVerificationPage() {
     const diffMs = cooldownTarget.getTime() - countdownNow;
     if (diffMs <= 0) return 'You can reapply now';
 
-    const totalHours = Math.floor(diffMs / (60 * 60 * 1000));
-    const days = Math.floor(totalHours / 24);
-    const hours = totalHours % 24;
-    return `${days} day${days === 1 ? '' : 's'}, ${hours} hour${hours === 1 ? '' : 's'} remaining`;
+    const totalMinutes = Math.floor(diffMs / (60 * 1000));
+    const days = Math.floor(totalMinutes / (60 * 24));
+    const hours = Math.floor(totalMinutes / 60) % 24;
+    const minutes = totalMinutes % 60;
+
+    // The unit has to follow the magnitude down, or the last hour of a lockout
+    // reads "0 days, 0 hours remaining" — which says the wait is over while the
+    // button is still disabled, and is the only part of this a brand is
+    // actually watching.
+    if (days > 0) {
+      return `${days} day${days === 1 ? '' : 's'}, ${hours} hour${hours === 1 ? '' : 's'} remaining`;
+    }
+    if (hours > 0) {
+      return `${hours} hour${hours === 1 ? '' : 's'}, ${minutes} min remaining`;
+    }
+    return `${Math.max(1, minutes)} min remaining`;
   }, [cooldownTarget, countdownNow]);
 
   const handlePrimaryAction = () => {
+    // Never let the owner walk the whole evidence wizard only to be refused at
+    // submit. Point them at the outstanding store step instead.
+    if (
+      storePending.length > 0 &&
+      callToAction.primaryTo === '/studio/verification/apply'
+    ) {
+      const first = storePending[0];
+      showNotice({
+        title: 'Finish your store first',
+        message: `Verification opens once your store is complete and published. Still to do: ${storePending
+          .map((step) => step.label)
+          .join(', ')}.`,
+        action: {
+          label: `Go to: ${first.label}`,
+          onSelect: () =>
+            navigate(first.href, {
+              state: {
+                from: `${location.pathname}${location.search}${location.hash}`,
+              },
+            }),
+        },
+      });
+      return;
+    }
+
     if (
       callToAction.primaryTo === '/studio/verification' &&
       (status?.verificationStatus === 'PENDING' ||
@@ -222,90 +276,183 @@ export default function StoreVerificationPage() {
       ? 'View status'
       : callToAction.primaryLabel;
 
+  const currentStep = useMemo(() => {
+    if (status?.badgeState.isVerifiedBrand) return 4;
+    if (
+      status?.verificationStatus === 'PENDING' ||
+      status?.verificationStatus === 'IN_REVIEW'
+    )
+      return 3;
+    return 2;
+  }, [status]);
+
   if (loading) {
     return <StudioPageSkeleton variant="detail" />;
   }
 
   return (
-    <div className="space-y-6">
-      <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-        <Link to="/studio/store" className="transition hover:text-gray-700">
-          Store
-        </Link>
-        <span>/</span>
-        <span className="text-gray-800">Verification</span>
-      </nav>
+    <div className="space-y-8 bg-surface min-h-screen">
+      {/* Navigation Breadcrumb */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => navigate('/studio/store')}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant shadow-sm transition hover:bg-surface-container-low hover:text-on-surface"
+          aria-label="Back to store"
+        >
+          ←
+        </button>
+        <nav className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-widest text-on-surface-variant">
+          <Link to="/studio/store" className="transition hover:text-primary">
+            Store
+          </Link>
+          <span className="text-outline-variant">/</span>
+          <span className="text-primary font-bold">Verification</span>
+        </nav>
+      </div>
 
-      <VerificationHero
-        eyebrow="Seller trust"
-        title="Verification workspace"
-        description="Track your status, review your badge state, and jump back into the submission flow only when action is required."
-        statusLabel={statusDisplayLabel}
-        statusTone={verificationStatusTone(status?.verificationStatus)}
-        actions={
-          <div className="flex flex-wrap gap-3">
-            <Button
-              size="sm"
-              onClick={handlePrimaryAction}
-            >
-              {heroPrimaryLabel}
-            </Button>
-            {status &&
-            (status.verificationStatus === 'PENDING' ||
-              status.verificationStatus === 'IN_REVIEW' ||
-              status.verificationStatus === 'ADDITIONAL_INFO_REQUESTED') ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => void handleCancel()}
-                disabled={saving}
-              >
-                Cancel request
-              </Button>
-            ) : null}
+      {/* Progress Stepper Banner */}
+      <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_8px_32px_rgba(109,35,249,0.04)] relative overflow-hidden">
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-on-surface-variant mb-1">
+              Verification Workspace
+            </p>
+            <h2 className="text-xl font-bold text-on-surface">
+              {currentStep === 4
+                ? 'Step 4 of 4 — Badge is Active 🎉'
+                : currentStep === 3
+                  ? 'Step 3 of 4 — Under WIEZ Review'
+                  : 'Step 2 of 4 — Identity & Evidence Submission'}
+            </h2>
           </div>
-        }
-      />
+          <div className="flex flex-1 max-w-md items-center gap-4">
+            {VERIFICATION_JOURNEY_STEPS.map((step) => {
+              const label =
+                step === 1
+                  ? 'Profile'
+                  : step === 2
+                    ? 'Apply'
+                    : step === 3
+                      ? 'Review'
+                      : 'Active';
+              // Step 4 (`Active`) is a TERMINAL state, not work in progress.
+              //
+              // `isDone = step < currentStep` left the final segment rendering
+              // as "current" — pale `bg-tertiary` with a pulse — on a brand
+              // whose badge was already live. So an approved brand saw a header
+              // reading "Step 4 of 4 — Badge is Active 🎉" above a rail whose
+              // last bar was visibly unfilled, and the pulse implied something
+              // was still running. The journey is finished; fill it.
+              const isFlowComplete = currentStep === TOTAL_VERIFICATION_STEPS;
+              const isDone =
+                step < currentStep || (isFlowComplete && step === currentStep);
+              const isCurrent = step === currentStep && !isDone;
+              return (
+                <div key={step} className="flex flex-1 flex-col items-center gap-2">
+                  <div
+                    className={`h-2 w-full rounded-full transition-all duration-500 ${
+                      isDone
+                        ? 'bg-primary'
+                        : isCurrent
+                          ? 'bg-tertiary animate-pulse'
+                          : 'bg-surface-container-highest'
+                    }`}
+                  />
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider ${
+                      isDone || isCurrent
+                        ? 'text-primary'
+                        : 'text-on-surface-variant/60'
+                    }`}
+                  >
+                    {label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Store-readiness gate.
+          A verified badge needs an APPROVED verification AND an open store, so
+          verifying before the store is finished produces an approval that
+          changes nothing visible — the brand assumes it failed. Block entry here
+          and link to the exact step that is outstanding. */}
+      {storePending.length > 0 &&
+      status?.verificationStatus !== 'APPROVED' &&
+      status?.verificationStatus !== 'PENDING' &&
+      status?.verificationStatus !== 'IN_REVIEW' ? (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-800 dark:text-amber-300">
+            ⚠️ Finish your store first
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-amber-900 dark:text-amber-300">
+            You can apply for verification once your store is complete and published.
+            Being verified only shows a badge on an open store, so we hold the
+            application until these are done:
+          </p>
+          <ul className="mt-4 space-y-2">
+            {storePending.map((step) => (
+              <li key={step.code}>
+                <Link
+                  to={step.href}
+                  state={{
+                    from: `${location.pathname}${location.search}${location.hash}`,
+                  }}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-white/80 p-3 text-sm text-amber-900 transition hover:border-amber-300 hover:bg-theme dark:border-amber-500/30 dark:text-amber-300"
+                >
+                  <span className="font-semibold">{step.label}</span>
+                  <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                    Fix →
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {status?.verificationStatus === 'REJECTED' &&
       status.rejectionReasons.length > 0 ? (
-        <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50 p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-rose-600">
-            Review outcome
+        <section className="rounded-2xl border border-rose-200 bg-rose-50 p-6 shadow-sm dark:border-rose-500/30 dark:bg-rose-500/10">
+          <p className="text-xs font-bold uppercase tracking-widest text-rose-700 dark:text-rose-300">
+            Review Outcome Feedback
           </p>
-          <ul className="mt-4 space-y-2 text-sm text-rose-800">
+          <ul className="mt-3 space-y-2 text-xs text-rose-900 dark:text-rose-300">
             {status.rejectionReasons.map((reason) => (
               <li key={`${reason.code}-${reason.label}`}>• {reason.label}</li>
             ))}
           </ul>
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            <div className="rounded-2xl border border-rose-200/80 bg-white/80 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-500">
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-rose-200/80 bg-white/80 p-4 dark:border-rose-500/30">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">
                 Applied on
               </p>
-              <p className="mt-2 text-sm font-semibold text-rose-900">
+              <p className="mt-1 text-xs font-semibold text-rose-950">
                 {status.verificationSubmittedAt
                   ? new Date(status.verificationSubmittedAt).toLocaleString()
                   : 'Not recorded'}
               </p>
             </div>
-            <div className="rounded-2xl border border-rose-200/80 bg-white/80 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-500">
-                Next reapply window
+            <div className="rounded-xl border border-rose-200/80 bg-white/80 p-4 dark:border-rose-500/30">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">
+                Reapply Window
               </p>
               {status.cooldownRemainingDays > 0 && cooldownTarget ? (
                 <>
-                  <p className="mt-2 text-sm font-semibold text-rose-900">
+                  <p className="mt-1 text-xs font-semibold text-rose-950">
                     {cooldownTarget.toLocaleString()}
                   </p>
-                  <p className="mt-1 text-xs text-rose-700">
+                  <p className="mt-0.5 text-[11px] text-rose-700 dark:text-rose-300">
                     {cooldownRemainingText}
                   </p>
                 </>
               ) : (
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-emerald-700">
-                    You can reapply now
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                    Eligible to reapply now
                   </p>
                   <Button
                     size="sm"
@@ -327,21 +474,21 @@ export default function StoreVerificationPage() {
       ) : null}
 
       {status?.verificationStatus === 'ADDITIONAL_INFO_REQUESTED' ? (
-        <section className="rounded-[1.75rem] border border-amber-200 bg-amber-50 p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-700">
-            More information requested
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-800 dark:text-amber-300">
+            More Information Requested
           </p>
           {status.infoRequestMessage ? (
-            <p className="mt-3 text-sm leading-6 text-amber-900">
+            <p className="mt-2 text-xs leading-relaxed text-amber-900 dark:text-amber-300">
               {status.infoRequestMessage}
             </p>
           ) : null}
           {infoItems.length > 0 ? (
-            <ul className="mt-4 space-y-3 text-sm text-amber-900">
+            <ul className="mt-4 space-y-2 text-xs text-amber-900 dark:text-amber-300">
               {infoItems.map((item: VerificationInfoItem) => (
                 <li
                   key={`${item.field}-${item.label}`}
-                  className="rounded-2xl border border-amber-200 bg-white/80 px-4 py-3"
+                  className="rounded-xl border border-amber-200 bg-white/80 p-3 dark:border-amber-500/30"
                 >
                   <span className="font-semibold">{item.label}</span>
                   {item.message ? `: ${item.message}` : ''}
@@ -366,160 +513,182 @@ export default function StoreVerificationPage() {
         </section>
       ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-6">
-          <section
-            id="verification-current-state"
-            className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm"
-          >
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-                  Current state
-                </p>
-                <h2 className="mt-3 text-2xl font-black text-gray-900">
-                  {status?.badgeState.isVerifiedBrand
-                    ? 'Badge is active'
-                    : 'Badge is not active'}
-                </h2>
-                <p className="mt-3 max-w-xl text-sm leading-7 text-gray-600">
-                  Badge visibility is calculated from your verification status,
-                  store state, and account state. This keeps the public trust
-                  signal aligned with the real store state.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[280px]">
-                <div className="rounded-3xl border border-sky-200 bg-sky-50 px-4 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-600">
-                    Status
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-sky-900">
-                    {statusDisplayLabel}
-                  </p>
-                </div>
-                <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-500">
-                    Attempt
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-gray-900">
-                    {status?.verificationAttemptNumber ?? 0}
-                  </p>
-                </div>
-                <div className={`rounded-3xl border px-4 py-4 ${
-                  status?.cooldownRemainingDays
-                    ? 'border-amber-200 bg-amber-50'
-                    : 'border-emerald-200 bg-emerald-50'
+      {/* Main Content Bento Grid */}
+      <section className="grid gap-6 lg:grid-cols-10">
+        {/* Left Sidebar (40%) */}
+        <div className="space-y-6 lg:col-span-4">
+          <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm" id="verification-current-state">
+            <p className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4">
+              Store Badge Status
+            </p>
+            
+            {/* Prominent badge display */}
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-outline-variant/40 bg-surface-container-low p-6 text-center">
+              <span className="text-4xl mb-2">
+                {status?.badgeState.isVerifiedBrand ? '🛡️' : '⚠️'}
+              </span>
+              <h3 className={`text-lg font-extrabold ${
+                status?.badgeState.isVerifiedBrand 
+                  ? 'text-emerald-700 dark:text-emerald-300' 
+                  : 'text-amber-700 dark:text-amber-300'
+              }`}>
+                {status?.badgeState.isVerifiedBrand ? 'Verified Brand' : 'Verification Incomplete'}
+              </h3>
+              <p className="mt-2 text-xs text-on-surface-variant max-w-xs">
+                {status?.badgeState.isVerifiedBrand
+                  ? 'Your trust badge is displayed across storefronts, catalog items, and brand cards.'
+                  : 'Complete verification to earn your official WIEZ verification badge.'}
+              </p>
+            </div>
+
+            {/* Status Pills */}
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
+                <span className="text-xs text-on-surface-variant">Verification Status</span>
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+                  status?.verificationStatus === 'APPROVED'
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
+                    : status?.verificationStatus === 'REJECTED'
+                      ? 'bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300'
+                      : status?.verificationStatus === 'PENDING' || status?.verificationStatus === 'IN_REVIEW'
+                        ? 'bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-300'
+                        : 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
                 }`}>
-                  <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${
-                    status?.cooldownRemainingDays ? 'text-amber-600' : 'text-emerald-600'
-                  }`}>
-                    Cooldown
-                  </p>
-                  <p className={`mt-2 text-sm font-semibold ${
-                    status?.cooldownRemainingDays ? 'text-amber-900' : 'text-emerald-900'
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                  {statusDisplayLabel}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
+                <span className="text-xs text-on-surface-variant">Attempt Number</span>
+                <span className="text-xs font-bold text-on-surface">
+                  {status?.verificationAttemptNumber ?? 0} attempt(s)
+                </span>
+              </div>
+
+              {/* Reminders Toggle Switch */}
+              <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
+                <div>
+                  <span className="text-xs text-on-surface-variant font-medium">Email Reminders</span>
+                  <p className="text-[10px] text-on-surface-variant/70">Nudge updates when action is required</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleNudgePreference(!(status?.nudgeOptOut ?? false))}
+                  disabled={saving}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    status?.nudgeOptOut
+                      ? 'bg-surface-container-high'
+                      : 'bg-primary'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      status?.nudgeOptOut ? 'translate-x-0' : 'translate-x-4'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-1">
+                <span className="text-xs font-medium text-on-surface-variant">Reapply Lockout</span>
+                <div className={`rounded-xl border p-3 ${
+                  status?.cooldownRemainingDays
+                    ? 'border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10'
+                    : 'border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10'
+                }`}>
+                  <p className={`text-xs font-semibold ${
+                    status?.cooldownRemainingDays ? 'text-amber-800 dark:text-amber-300' : 'text-emerald-800 dark:text-emerald-300'
                   }`}>
                     {status?.cooldownRemainingDays
                       ? cooldownRemainingText ?? `${status.cooldownRemainingDays} day(s)`
-                      : 'No lockout'}
-                  </p>
-                  {status?.cooldownRemainingDays && cooldownTarget ? (
-                    <p className="mt-1 text-xs text-amber-700">
-                      Reapply on {cooldownTarget.toLocaleString()}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-600">
-                    Reminders
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-emerald-900">
-                    {status?.nudgeOptOut ? 'Off' : 'On'}
+                      : 'No active lockout'}
                   </p>
                 </div>
               </div>
             </div>
-          </section>
-
-          <VerificationHistoryPanel attempts={status?.attemptHistory ?? []} />
+          </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <section className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-              Next action
+        {/* Right Main Section (60%) */}
+        <div className="space-y-6 lg:col-span-6">
+          {/* Next Action Bento Card */}
+          <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full pointer-events-none"></div>
+            <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">
+              Next Recommended Action
             </p>
-            <p className="mt-3 text-lg font-bold text-gray-900">
+            <h3 className="text-lg font-bold text-on-surface">
               {callToAction.primaryLabel}
+            </h3>
+            <p className="mt-2 text-xs text-on-surface-variant leading-relaxed">
+              Complete your verification sequence to earn verified brand status. Draft state saves automatically.
             </p>
-            <p className="mt-2 text-sm leading-7 text-gray-600">
-              Use the guided wizard for submissions, corrections, and letter
-              signing. The form saves draft data as you move through the steps.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button onClick={handlePrimaryAction}>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Button onClick={handlePrimaryAction} className="rounded-xl px-5 shadow-sm">
                 {heroPrimaryLabel}
               </Button>
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  void handleNudgePreference(!(status?.nudgeOptOut ?? false))
-                }
-                disabled={saving}
-              >
-                {status?.nudgeOptOut
-                  ? 'Turn reminders on'
-                  : 'Turn reminders off'}
-              </Button>
+              {status &&
+              (status.verificationStatus === 'PENDING' ||
+                status.verificationStatus === 'IN_REVIEW' ||
+                status.verificationStatus === 'ADDITIONAL_INFO_REQUESTED') ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => void handleCancel()}
+                  disabled={saving}
+                  className="rounded-xl"
+                >
+                  Cancel request
+                </Button>
+              ) : null}
             </div>
-          </section>
+          </div>
 
-          <section className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-              Timeline
+          {/* Verification Checklist */}
+          <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4">
+              Verification Flow Checklist
             </p>
-            <div className="mt-4 space-y-3 text-sm text-gray-600">
-              <p>
-                Last submitted:{' '}
-                {status?.verificationSubmittedAt
-                  ? new Date(status.verificationSubmittedAt).toLocaleString()
-                  : 'Not yet'}
-              </p>
-              <p>
-                Last reviewed:{' '}
-                {status?.verificationReviewedAt
-                  ? new Date(status.verificationReviewedAt).toLocaleString()
-                  : 'Not yet'}
-              </p>
-              <p>
-                Current record version:{' '}
-                <span className="font-medium text-gray-900">
-                  {status?.updatedAt
-                    ? new Date(status.updatedAt).toLocaleString()
-                    : 'Unknown'}
-                </span>
-              </p>
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-on-primary">✓</span>
+                <div>
+                  <p className="text-xs font-bold text-on-surface">1. Setup Store Profile</p>
+                  <p className="text-[11px] text-on-surface-variant">Storefront name, brand username, and logo configured.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                  currentStep >= 2
+                    ? 'bg-primary text-on-primary'
+                    : 'bg-surface-container-high text-on-surface-variant'
+                }`}>2</span>
+                <div>
+                  <p className="text-xs font-bold text-on-surface">2. Provide Legal & Evidence Details</p>
+                  <p className="text-[11px] text-on-surface-variant">Provide legal identity, CAC number, business address, and ID uploads.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                  currentStep >= 3
+                    ? 'bg-primary text-on-primary'
+                    : 'bg-surface-container-high text-on-surface-variant'
+                }`}>3</span>
+                <div>
+                  <p className="text-xs font-bold text-on-surface">3. Digital Signature & Review</p>
+                  <p className="text-[11px] text-on-surface-variant">Sign the legal letter to submit into the compliance review queue.</p>
+                </div>
+              </div>
             </div>
-          </section>
-
-          {status?.badgeState.verifiedExplanationUrl ? (
-            <section className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
-                Public explanation
-              </p>
-              <p className="mt-3 text-sm leading-7 text-gray-600">
-                The badge explanation is reusable across store, product, and
-                profile surfaces so public trust copy stays consistent.
-              </p>
-              <Link
-                to={status.badgeState.verifiedExplanationUrl}
-                className="mt-4 inline-flex text-sm font-semibold text-sky-700 transition hover:text-sky-800"
-              >
-                Open badge explanation route
-              </Link>
-            </section>
-          ) : null}
+          </div>
         </div>
       </section>
+
+      {/* History Log Section */}
+      <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm">
+        <VerificationHistoryPanel attempts={status?.attemptHistory ?? []} />
+      </div>
     </div>
   );
 }

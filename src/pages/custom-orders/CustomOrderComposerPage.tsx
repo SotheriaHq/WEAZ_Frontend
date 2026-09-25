@@ -13,8 +13,15 @@ import {
 } from '@/api/CustomOrderApi';
 import { createIdempotencyKey } from '@/api/idempotency';
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import LocationCascadeSelect from '@/components/forms/LocationCascadeSelect';
+import {
+  locationService,
+  LOCATION_FIELD_LABELS,
+  type CountryOption,
+  type StateOption,
+} from '@/services/LocationService';
 import { formatMeasurementLabel } from '@/components/custom-orders/customOrderFormatting';
-import { deriveSizeRecommendation, DISPLAY_CHART_OPTIONS, PRICING_CHART_OPTIONS } from '@/lib/sizeCharts';
+import { DISPLAY_CHART_OPTIONS, PRICING_CHART_OPTIONS } from '@/lib/sizeCharts';
 import type { SizeFitProfile } from '@/types/sizeFit';
 import {
   loadCustomOrderAddressBook,
@@ -23,6 +30,14 @@ import {
   type CustomOrderSavedAddress,
 } from '@/lib/customOrderAddressBook';
 import { openCartDrawer } from '@/features/cartSlice';
+import {
+  isEmptyPhone,
+  isValidPhone,
+  normalizePhoneToE164,
+  PHONE_INVALID_MESSAGE,
+  PHONE_REQUIRED_MESSAGE,
+  sanitizePhoneInput,
+} from '@/utils/phoneNumber';
 
 export interface CustomOrderComposerPageProps {
   configurationIdOverride?: string | null;
@@ -88,6 +103,42 @@ const formatCurrency = (value: number | undefined, currency = 'NGN') =>
 const inputClassName =
   'w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-400 dark:border-white/10 dark:bg-slate-950 dark:text-white';
 
+/* Same shape, red border - the flag under the field carries the words. */
+const inputErrorClassName =
+  'w-full rounded-2xl border border-rose-400 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-rose-500 dark:border-rose-500/60 dark:bg-slate-950 dark:text-white';
+
+/*
+  The delivery fields, in the order they appear on screen.
+
+  Order matters: it decides which field a failed submit scrolls to, and the
+  reader expects that to be the first one they can see is wrong, not whichever
+  key happened to come first out of an object.
+*/
+const DELIVERY_FIELD_ORDER = [
+  'customerName',
+  'contactEmail',
+  'contactPhone',
+  'street',
+  'city',
+  'stateRegion',
+  'country',
+] as const;
+
+type DeliveryFieldKey = (typeof DELIVERY_FIELD_ORDER)[number];
+
+/* The label the reader sees, so the flag names the field they are looking at. */
+const DELIVERY_FIELD_LABELS: Record<DeliveryFieldKey, string> = {
+  customerName: 'Customer name',
+  contactEmail: 'Email',
+  contactPhone: 'Phone',
+  street: 'Street',
+  city: 'City',
+  stateRegion: 'State',
+  country: 'Country',
+};
+
+const deliveryFieldDomId = (field: DeliveryFieldKey) => 'custom-order-delivery-' + field;
+
 const buildMeasurementSignature = (values: Record<string, number>) =>
   JSON.stringify(
     Object.entries(values)
@@ -124,10 +175,14 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   const [customerName, setCustomerName] = useState('');
   const [contactEmail, setContactEmail] = useState(profile?.email ?? '');
   const [contactPhone, setContactPhone] = useState(profile?.phoneNumber ?? '');
-  const [street, setStreet] = useState(profile?.address ?? '');
-  const [city, setCity] = useState(profile?.brandCity ?? '');
-  const [stateRegion, setStateRegion] = useState(profile?.brandState ?? '');
-  const [country, setCountry] = useState(profile?.brandCountry ?? 'Nigeria');
+  const [street, setStreet] = useState((profile as any)?.address ?? profile?.address ?? '');
+  const [city, setCity] = useState((profile as any)?.city ?? profile?.brandCity ?? '');
+  const [stateRegion, setStateRegion] = useState((profile as any)?.state ?? profile?.brandState ?? '');
+  const [country, setCountry] = useState((profile as any)?.country ?? profile?.brandCountry ?? 'Nigeria');
+  const [countries, setCountries] = useState<CountryOption[]>([]);
+  const [states, setStates] = useState<StateOption[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
   const [rushSelected, setRushSelected] = useState(false);
   const [measurementConfirmed, setMeasurementConfirmed] = useState(false);
   const [measurementRecencyConfirmed, setMeasurementRecencyConfirmed] = useState(false);
@@ -139,6 +194,20 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   const [displayChartFamily, setDisplayChartFamily] = useState<CustomOrderChartFamily>('UK');
   const [pricingChartFamily, setPricingChartFamily] = useState<CustomOrderChartFamily>('HYBRID_UK_NIGERIA');
   const [noDirectMatchAcknowledged, setNoDirectMatchAcknowledged] = useState(false);
+
+  /*
+    Which delivery fields failed validation, keyed by field.
+
+    The toast was the entire error report: it named a section rather than a
+    field, and on a form this long the offending input was usually off screen,
+    so the reader was told something was wrong and left to hunt for it. This
+    map drives the flag under each field, the scroll and the focus together, so
+    one failed submit puts the first broken field in front of them with its own
+    reason attached.
+  */
+  const [deliveryFieldErrors, setDeliveryFieldErrors] = useState<
+    Partial<Record<DeliveryFieldKey, string>>
+  >({});
 
   const createKeyRef = useRef(createIdempotencyKey());
   const configurationId = configurationIdOverride ?? searchParams.get('configurationId');
@@ -152,6 +221,122 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   useEffect(() => {
     setCustomerName([profile?.firstName, profile?.lastName].filter(Boolean).join(' ').trim());
   }, [profile?.firstName, profile?.lastName]);
+
+  /*
+    Seed the contact and delivery fields when the profile ARRIVES, not only at mount.
+
+    These were useState(profile?.phoneNumber ?? "") - an initial value read
+    exactly once, on the first render. The composer routinely mounts before the
+    Redux profile is hydrated, so the initialiser read undefined and the field
+    stayed empty for the rest of the session. customerName already had a
+    corrective effect right above this one; the contact fields did not, which is
+    why somebody with a phone number or address on file was still asked to type it here.
+
+    Seeding happens exactly ONCE, the first render at which a profile exists,
+    and the ref is what makes that true. Without it this runs on every render
+    where the profile reference changes - which for a selector returning a fresh
+    object is every render - and "fill it if it is empty" then becomes "refuse to
+    let it be empty": clear the phone field to retype it and the old value snaps
+    straight back under your cursor. After the one seed these fields belong to
+    the reader, including when the reader wants them blank.
+  */
+  const contactSeededRef = useRef(false);
+  useEffect(() => {
+    if (contactSeededRef.current || !profile) return;
+    contactSeededRef.current = true;
+    setContactEmail((current: string) => current.trim() || profile.email || '');
+    setContactPhone((current: string) => current.trim() || profile.phoneNumber || '');
+    setStreet((current: string) => current.trim() || (profile as any)?.address || profile.address || '');
+    setCountry((current: string) => current.trim() || (profile as any)?.country || profile.brandCountry || 'Nigeria');
+    setStateRegion((current: string) => current.trim() || (profile as any)?.state || profile.brandState || '');
+    setCity((current: string) => current.trim() || (profile as any)?.city || profile.brandCity || '');
+  }, [profile]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingLocations(true);
+    void locationService.getCountries().then((data) => {
+      if (cancelled) return;
+      setCountries(data);
+      setLoadingLocations(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!country) {
+      setStates([]);
+      return;
+    }
+    setLoadingLocations(true);
+    const iso2 = countries.find((c) => c.name === country)?.iso2;
+    void locationService.getStates(country, iso2).then((data) => {
+      if (cancelled) return;
+      setStates(data);
+      setLoadingLocations(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [country, countries]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!country || !stateRegion) {
+      setCities([]);
+      return;
+    }
+    setLoadingLocations(true);
+    void locationService.getCities(country, stateRegion).then((data) => {
+      if (cancelled) return;
+      setCities(data);
+      setLoadingLocations(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [country, stateRegion]);
+
+  const withCurrent = useCallback(
+    (options: { value: string; label: string }[], current: string) => {
+      const trimmed = current.trim();
+      if (!trimmed || options.some((option) => option.value === trimmed)) {
+        return options;
+      }
+      return [{ value: trimmed, label: trimmed }, ...options];
+    },
+    [],
+  );
+
+  const countryOptions = useMemo(
+    () =>
+      withCurrent(
+        countries.map((entry) => ({ value: entry.name, label: entry.name })),
+        country,
+      ),
+    [countries, country, withCurrent],
+  );
+
+  const stateOptions = useMemo(
+    () =>
+      withCurrent(
+        states.map((entry) => ({ value: entry.name, label: entry.name })),
+        stateRegion,
+      ),
+    [states, stateRegion, withCurrent],
+  );
+
+  const cityOptions = useMemo(
+    () =>
+      withCurrent(
+        cities.map((entry) => ({ value: entry, label: entry })),
+        city,
+      ),
+    [cities, city, withCurrent],
+  );
 
   const applySavedAddress = useCallback((address: CustomOrderSavedAddress) => {
     setCustomerName(address.customerName);
@@ -312,7 +497,10 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   );
 
   const contactInfo = useMemo(
-    () => ({ email: contactEmail, phone: contactPhone }),
+    () => ({
+      email: contactEmail,
+      phone: normalizePhoneToE164(contactPhone) ?? contactPhone.trim(),
+    }),
     [contactEmail, contactPhone],
   );
 
@@ -329,11 +517,6 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   const hasPrefilledMeasurements = useMemo(
     () => Object.keys(measurementPayload).length > 0,
     [measurementPayload],
-  );
-
-  const liveRecommendation = useMemo(
-    () => deriveSizeRecommendation(measurementPayload, displayChartFamily),
-    [displayChartFamily, measurementPayload],
   );
 
   const currentMeasurementSignature = useMemo(
@@ -391,7 +574,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       id: editingAddressId ?? undefined,
       customerName: customerName.trim(),
       contactEmail: contactEmail.trim(),
-      contactPhone: contactPhone.trim(),
+      contactPhone: normalizePhoneToE164(contactPhone) ?? contactPhone.trim(),
       street: street.trim(),
       city: city.trim(),
       state: stateRegion.trim(),
@@ -504,6 +687,99 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
     }
   };
 
+  const collectDeliveryFieldErrors = useCallback(() => {
+    const errors: Partial<Record<DeliveryFieldKey, string>> = {};
+    const requiredText: Array<[DeliveryFieldKey, string]> = [
+      ['customerName', customerName],
+      ['contactEmail', contactEmail],
+      ['street', street],
+      ['city', city],
+      ['stateRegion', stateRegion],
+      ['country', country],
+    ];
+    for (const [field, value] of requiredText) {
+      if (!value.trim()) {
+        errors[field] = DELIVERY_FIELD_LABELS[field] + ' is required';
+      }
+    }
+    // Phone has its own two failures - absent, and present but unusable - and
+    // they are not the same message to somebody staring at the field.
+    if (isEmptyPhone(contactPhone)) errors.contactPhone = PHONE_REQUIRED_MESSAGE;
+    else if (!isValidPhone(contactPhone)) errors.contactPhone = PHONE_INVALID_MESSAGE;
+    return errors;
+  }, [customerName, contactEmail, contactPhone, street, city, stateRegion, country]);
+
+  const revealFirstDeliveryError = useCallback(
+    (errors: Partial<Record<DeliveryFieldKey, string>>) => {
+      const first = DELIVERY_FIELD_ORDER.find((field) => errors[field]);
+      if (!first) return;
+      // A field inside a collapsed form cannot be scrolled to, so open it
+      // first. Harmless when it is already open.
+      setShowAddressForm(true);
+      // One frame, so the form is in the document before we look for it.
+      window.requestAnimationFrame(() => {
+        const element = document.getElementById(deliveryFieldDomId(first));
+        if (!element) return;
+        // Feature-checked, because scrolling is the optional half of this. It
+        // is absent in jsdom and in some embedded webviews, and an exception
+        // here would take the focus call down with it - leaving the reader with
+        // a flagged field and no cursor in it, which is the worse failure.
+        if (typeof element.scrollIntoView === 'function') {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        // preventScroll, or focus fights the smooth scroll and jumps.
+        (element as HTMLInputElement).focus({ preventScroll: true });
+      });
+    },
+    [],
+  );
+
+  const clearDeliveryFieldError = useCallback((field: DeliveryFieldKey) => {
+    setDeliveryFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }, []);
+
+  const renderDeliveryField = (
+    field: DeliveryFieldKey,
+    value: string,
+    onChange: (next: string) => void,
+    options?: { wide?: boolean; inputMode?: 'tel' },
+  ) => {
+    const error = deliveryFieldErrors[field];
+    const domId = deliveryFieldDomId(field);
+    return (
+      <label className={options?.wide ? 'block md:col-span-2' : 'block'}>
+        <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          {DELIVERY_FIELD_LABELS[field]}
+        </span>
+        <input
+          id={domId}
+          value={value}
+          onChange={(event) => {
+            onChange(event.target.value);
+            clearDeliveryFieldError(field);
+          }}
+          inputMode={options?.inputMode}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? domId + '-error' : undefined}
+          className={error ? inputErrorClassName : inputClassName}
+        />
+        {error ? (
+          <span
+            id={domId + '-error'}
+            className="mt-2 block text-xs font-medium text-rose-600 dark:text-rose-300"
+          >
+            {error}
+          </span>
+        ) : null}
+      </label>
+    );
+  };
+
   const handleCreateOrder = async () => {
     // Guard against double-submit: state updates are async so we gate at
     // the top of the handler before setSubmitting(true) is reached.
@@ -529,8 +805,21 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
       toast.error('Review and confirm that these measurements are current within the last 14 days.');
       return;
     }
-    if (!customerName.trim() || !contactEmail.trim() || !contactPhone.trim() || !street.trim() || !city.trim() || !stateRegion.trim() || !country.trim()) {
-      toast.error('Complete the delivery and contact information first.');
+    const deliveryErrors = collectDeliveryFieldErrors();
+    setDeliveryFieldErrors(deliveryErrors);
+    const deliveryErrorCount = Object.keys(deliveryErrors).length;
+    if (deliveryErrorCount > 0) {
+      // One problem gets named outright; several get a count, because the flags
+      // under the fields are now the detailed report and the toast only has to
+      // say how much is left.
+      toast.error(
+        deliveryErrorCount === 1
+          ? String(Object.values(deliveryErrors)[0])
+          : 'Complete the delivery and contact information first. ' +
+            deliveryErrorCount +
+            ' fields need attention.',
+      );
+      revealFirstDeliveryError(deliveryErrors);
       return;
     }
 
@@ -698,8 +987,8 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
 
   if (!configuration) {
     return (
-      <div className={embedded ? 'w-full px-2 py-2' : 'mx-auto max-w-3xl px-4 py-10'}>
-        <div className="rounded-3xl border border-black/10 bg-white/80 p-8 dark:border-white/10 dark:bg-white/5">
+      <div className={embedded ? 'w-full px-2 py-2' : 'mx-auto max-w-3xl px-3 py-6 sm:px-4 sm:py-10'}>
+        <div className="rounded-3xl border border-black/10 bg-white/80 p-5 sm:p-8 dark:border-white/10 dark:bg-white/5">
           <div className="text-lg font-semibold text-slate-900 dark:text-white">Custom order configuration unavailable</div>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
             Open this page from a product or design custom-order button so the locked configuration can be loaded.
@@ -723,7 +1012,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   }
 
   return (
-    <div className={embedded ? 'w-full px-2 py-2' : 'mx-auto max-w-6xl px-4 py-10'}>
+    <div className={embedded ? 'w-full px-2 py-2' : 'mx-auto max-w-6xl px-3 py-6 sm:px-4 sm:py-10'}>
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600 dark:text-emerald-300">Custom Order</div>
@@ -741,38 +1030,53 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
             }
             navigate(-1);
           }}
-          className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200"
+          className="flex items-center gap-1.5 rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-black/5 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5 transition-colors"
         >
-          Back
+          <span>←</span>
+          <span>Back</span>
         </button>
-      </div>
-      <div className="mb-6 rounded-3xl border border-emerald-200/80 bg-emerald-50/80 p-5 text-sm text-emerald-950 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
-        <p className="font-semibold">Payment split notice</p>
-        <p className="mt-2">
-          Customers pay the full quoted total at checkout. WEAZ retains the platform commission, and the brand receives the net settlement in milestone releases after production and delivery conditions are met.
-        </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
-          <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
+          <section className="rounded-3xl border border-black/10 bg-white/80 p-4 sm:p-6 dark:border-white/10 dark:bg-white/5">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Measurement profile</div>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
               Only the measurement points this brand requested are shown here. Any new values you confirm will be saved back to your profile so you do not need to type them again next time.
             </p>
-            <div className="mt-3 grid gap-3 md:grid-cols-3">
-              <UniversalSelect label="Length unit" value={lengthUnit} onChange={(value) => handleLengthUnitChange(value as 'CM' | 'IN')} options={[{ value: 'CM', label: 'Centimeters (cm)' }, { value: 'IN', label: 'Inches (in)' }]} />
-              <UniversalSelect label="Display chart" value={displayChartFamily} onChange={(value) => setDisplayChartFamily(value as CustomOrderChartFamily)} options={DISPLAY_CHART_OPTIONS} />
-              <UniversalSelect label="Pricing chart" value={pricingChartFamily} onChange={(value) => setPricingChartFamily(value as CustomOrderChartFamily)} options={PRICING_CHART_OPTIONS} />
-            </div>
-            <div className="mt-4 rounded-2xl border border-indigo-300/50 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100">
-              <div className="font-semibold">Live size recommendation</div>
-              <p className="mt-1">
-                {liveRecommendation.computedSize
-                  ? `${displayChartFamily} display resolves to ${liveRecommendation.computedSize}.`
-                  : 'Chart sizing is optional here. Add bust/chest, waist, and hip values if you want a live size recommendation too.'}
-              </p>
-              {liveRecommendation.conversionGuidance ? <p className="mt-1">{liveRecommendation.conversionGuidance}</p> : null}
+            <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3">
+              <UniversalSelect
+                size="sm"
+                label="Length unit"
+                value={lengthUnit}
+                onChange={(value) => handleLengthUnitChange(value as 'CM' | 'IN')}
+                options={[
+                  { value: 'CM', label: 'Centimeters (cm)' },
+                  { value: 'IN', label: 'Inches (in)' },
+                ]}
+                optionAllowWrap
+                selectedAllowWrap
+              />
+              <UniversalSelect
+                size="sm"
+                label="Display chart"
+                value={displayChartFamily}
+                onChange={(value) => setDisplayChartFamily(value as CustomOrderChartFamily)}
+                options={DISPLAY_CHART_OPTIONS}
+                optionAllowWrap
+                selectedAllowWrap
+              />
+              <div className="col-span-2 md:col-span-1">
+                <UniversalSelect
+                  size="sm"
+                  label="Pricing chart"
+                  value={pricingChartFamily}
+                  onChange={(value) => setPricingChartFamily(value as CustomOrderChartFamily)}
+                  options={PRICING_CHART_OPTIONS}
+                  optionAllowWrap
+                  selectedAllowWrap
+                />
+              </div>
             </div>
             {hasPrefilledMeasurements ? (
               <div className="mt-4 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">
@@ -813,7 +1117,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
                 </label>
               ))}
             </div>
-            <label className="mt-5 flex items-start gap-3 rounded-2xl border border-black/10 px-4 py-3 text-sm dark:border-white/10">
+            <label className="mt-5 flex items-start gap-3 rounded-2xl bg-black/[0.03] px-4 py-3 text-sm dark:bg-white/[0.04]">
               <input type="checkbox" checked={measurementConfirmed} onChange={(event) => setMeasurementConfirmed(event.target.checked)} />
               <span className="text-slate-700 dark:text-slate-200">I confirm these measurement values are the exact snapshot I want used for pricing, checkout, and brand production review.</span>
             </label>
@@ -825,19 +1129,28 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
             ) : null}
           </section>
 
-          <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
+          <section className="rounded-3xl border border-black/10 bg-white/80 p-4 sm:p-6 dark:border-white/10 dark:bg-white/5">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Delivery details</div>
-            <div className="mt-4 rounded-2xl border border-black/10 bg-black/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.03]">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900 dark:text-white">Saved delivery addresses</div>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Your most recently used address is selected first. Add a new one only when you need another saved delivery profile.</p>
+            {/*
+              The saved-address card only exists to let someone pick an address
+              they saved earlier. With nothing saved there is nothing to pick, so
+              it rendered as a header, a line of apology, and an "Add new address"
+              button that opened a form already open below it. Hidden entirely in
+              that state: every path that leaves the list empty (first visit,
+              deleting the last one, cancelling with none saved) also opens the
+              form, so the first address is still one screen away.
+            */}
+            {savedAddresses.length > 0 ? (
+              <div className="mt-4 rounded-2xl bg-black/[0.03] p-3 sm:p-4 dark:bg-white/[0.04]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900 dark:text-white">Saved delivery addresses</div>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Your most recently used address is selected first. Add a new one only when you need another saved delivery profile.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={handleStartNewAddress} className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-black">Add new address</button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={handleStartNewAddress} className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-black">Add new address</button>
-                </div>
-              </div>
-              {savedAddresses.length > 0 ? (
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   {savedAddresses.map((address) => {
                     const isActive = editingAddressId === address.id;
@@ -850,7 +1163,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
                             <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{address.contactPhone} · {address.contactEmail}</div>
                           </button>
                           <div className="relative">
-                            <button type="button" onClick={() => setOpenAddressMenuId((current) => (current === address.id ? null : address.id))} className="rounded-full border border-black/10 px-2 py-1 text-xs font-semibold text-slate-600 dark:border-white/10 dark:text-slate-300" aria-label="Open address actions">...</button>
+                            <button type="button" onClick={() => setOpenAddressMenuId((current) => (current === address.id ? null : address.id))} className="min-h-[36px] min-w-[36px] rounded-full border border-black/10 px-3 py-2 text-xs font-semibold text-slate-600 dark:border-white/10 dark:text-slate-300" aria-label="Open address actions">...</button>
                             {openAddressMenuId === address.id ? (
                               <div className="absolute right-0 top-10 z-10 w-36 rounded-2xl border border-black/10 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-slate-950">
                                 <button type="button" onClick={() => applySavedAddress(address)} className="w-full rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5">Use address</button>
@@ -864,10 +1177,10 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
                     );
                   })}
                 </div>
-              ) : <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">No saved delivery addresses yet. Add a new address to continue with delivery details.</p>}
-            </div>
+              </div>
+            ) : null}
             {showAddressForm ? (
-              <div className="mt-5 rounded-2xl border border-black/10 bg-black/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="mt-5 rounded-2xl bg-black/[0.03] p-3 sm:p-4 dark:bg-white/[0.04]">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-slate-900 dark:text-white">{editingAddressId ? 'Edit saved address' : 'Add new delivery address'}</div>
@@ -878,13 +1191,94 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
                   ) : null}
                 </div>
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
-                  <label className="block md:col-span-2"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Customer name</span><input value={customerName} onChange={(event) => setCustomerName(event.target.value)} className={inputClassName} /></label>
-                  <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Email</span><input value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} className={inputClassName} /></label>
-                  <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Phone</span><input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} className={inputClassName} /></label>
-                  <label className="block md:col-span-2"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Street</span><input value={street} onChange={(event) => setStreet(event.target.value)} className={inputClassName} /></label>
-                  <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">City</span><input value={city} onChange={(event) => setCity(event.target.value)} className={inputClassName} /></label>
-                  <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">State</span><input value={stateRegion} onChange={(event) => setStateRegion(event.target.value)} className={inputClassName} /></label>
-                  <label className="block md:col-span-2"><span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Country</span><input value={country} onChange={(event) => setCountry(event.target.value)} className={inputClassName} /></label>
+                  {renderDeliveryField('customerName', customerName, setCustomerName, { wide: true })}
+                  {renderDeliveryField('contactEmail', contactEmail, setContactEmail)}
+                  {renderDeliveryField('contactPhone', contactPhone, (next) => setContactPhone(sanitizePhoneInput(next)), { inputMode: 'tel' })}
+                  {renderDeliveryField('street', street, setStreet, { wide: true })}
+                  <div id={deliveryFieldDomId('country')} tabIndex={-1} className="md:col-span-2">
+                    <UniversalSelect
+                      label={LOCATION_FIELD_LABELS.country}
+                      value={country}
+                      onChange={(next) => {
+                        setCountry(next);
+                        clearDeliveryFieldError('country');
+                        setStateRegion('');
+                        setCity('');
+                      }}
+                      options={countryOptions}
+                      placeholder={loadingLocations && countries.length === 0 ? 'Loading…' : 'Select country'}
+                      searchable
+                      searchPlaceholder="Search countries…"
+                      emptyMessage="No matching country found"
+                      menuLayer="modal"
+                      className="w-full"
+                      optionAllowWrap
+                      selectedAllowWrap
+                    />
+                    {deliveryFieldErrors['country'] ? (
+                      <span
+                        id={deliveryFieldDomId('country') + '-error'}
+                        className="mt-2 block text-xs font-medium text-rose-600 dark:text-rose-300"
+                      >
+                        {deliveryFieldErrors['country']}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div id={deliveryFieldDomId('stateRegion')} tabIndex={-1}>
+                    <LocationCascadeSelect
+                      label={LOCATION_FIELD_LABELS.state}
+                      value={stateRegion}
+                      onChange={(next) => {
+                        setStateRegion(next);
+                        clearDeliveryFieldError('stateRegion');
+                        setCity('');
+                      }}
+                      options={stateOptions}
+                      parentValue={country}
+                      parentPlaceholder="Select country first"
+                      loading={loadingLocations}
+                      placeholder="Select state / province"
+                      searchPlaceholder="Search states or provinces…"
+                      emptyMessage="No matching state or province found"
+                      fallbackHint="We couldn't load the list for this country — type your state or province."
+                      menuLayer="modal"
+                    />
+                    {deliveryFieldErrors['stateRegion'] ? (
+                      <span
+                        id={deliveryFieldDomId('stateRegion') + '-error'}
+                        className="mt-2 block text-xs font-medium text-rose-600 dark:text-rose-300"
+                      >
+                        {deliveryFieldErrors['stateRegion']}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div id={deliveryFieldDomId('city')} tabIndex={-1}>
+                    <LocationCascadeSelect
+                      label={LOCATION_FIELD_LABELS.city}
+                      value={city}
+                      onChange={(next) => {
+                        setCity(next);
+                        clearDeliveryFieldError('city');
+                      }}
+                      options={cityOptions}
+                      parentValue={stateRegion}
+                      parentPlaceholder="Select state first"
+                      loading={loadingLocations}
+                      placeholder="Select city / LGA"
+                      searchPlaceholder="Search cities or LGAs…"
+                      emptyMessage="No matching city or LGA found"
+                      fallbackHint="We couldn't load the list for this state — type your city or LGA."
+                      menuLayer="modal"
+                    />
+                    {deliveryFieldErrors['city'] ? (
+                      <span
+                        id={deliveryFieldDomId('city') + '-error'}
+                        className="mt-2 block text-xs font-medium text-rose-600 dark:text-rose-300"
+                      >
+                        {deliveryFieldErrors['city']}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-wrap justify-end gap-2">
                   {savedAddresses.length > 0 ? (
@@ -902,7 +1296,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
+          <section className="rounded-3xl border border-black/10 bg-white/80 p-4 sm:p-6 dark:border-white/10 dark:bg-white/5">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Policy and delivery guidance</div>
             <dl className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
               <div className="flex items-start justify-between gap-4"><dt>Brand</dt><dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.brand?.name ?? 'Brand'}</dd></div>
@@ -913,13 +1307,13 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
               <div className="flex items-start justify-between gap-4"><dt>Defect policy</dt><dd className="text-right font-medium text-slate-900 dark:text-white">{configuration.defectPolicy}</dd></div>
             </dl>
             {configuration.buyerInstructionText ? <div className="mt-5 rounded-2xl bg-black/[0.04] p-4 text-sm text-slate-600 dark:bg-white/[0.04] dark:text-slate-300"><div className="mb-1 font-semibold text-slate-900 dark:text-white">Buyer instructions</div><p>{configuration.buyerInstructionText}</p></div> : null}
-            <label className="mt-5 flex items-center gap-3 rounded-2xl border border-black/10 px-4 py-3 text-sm dark:border-white/10">
+            <label className="mt-5 flex items-center gap-3 rounded-2xl bg-black/[0.03] px-4 py-3 text-sm dark:bg-white/[0.04]">
               <input type="checkbox" checked={rushSelected} disabled={!configuration.rushEnabled} onChange={(event) => setRushSelected(event.target.checked)} />
               <span className="text-slate-700 dark:text-slate-200">Rush production {configuration.rushEnabled ? `(extra ${formatCurrency(Number(configuration.rushFee ?? 0))})` : '(not available)'}</span>
             </label>
           </section>
 
-          <section className="rounded-3xl border border-black/10 bg-white/80 p-6 dark:border-white/10 dark:bg-white/5">
+          <section className="rounded-3xl border border-black/10 bg-white/80 p-4 sm:p-6 dark:border-white/10 dark:bg-white/5">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Bag preview</div>
             <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
               <div className="flex items-center justify-between"><span>Base production charge</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(Number(configuration.baseProductionCharge))}</span></div>

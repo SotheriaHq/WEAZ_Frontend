@@ -22,7 +22,7 @@ export type RequestEmailChangePayload = {
 };
 
 export type DeleteAccountPayload = {
-  confirmationWord: string;
+  email: string;
   currentPassword: string;
 };
 
@@ -43,6 +43,9 @@ export type MessageResponse = {
 
 export type GoogleAuthPayload = {
   idToken: string;
+  // 'LOGIN' from the login screen (never creates an account), 'SIGNUP' from the
+  // signup screen. Backend infers it from `type` when omitted.
+  intent?: 'LOGIN' | 'SIGNUP';
   type?: AuthUserType;
   brandFullName?: string;
   legalAcceptances?: LegalAcceptancePayload[];

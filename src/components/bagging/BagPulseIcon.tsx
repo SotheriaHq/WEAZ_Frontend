@@ -39,9 +39,21 @@ export const BagPulseIcon = memo(function BagPulseIcon({
   const resolvedStatus = disabled ? 'disabled' : status;
 
   return (
+    /*
+      The glyph is sized from `size`, never inherited.
+
+      `.bag-pulse-core` declared no font-size, so the emoji rendered at whatever
+      the surrounding card happened to set — 11px inside a 28px chip on the
+      market panels. Deriving it here keeps the emoji proportional to the icon
+      at every call site.
+    */
     <span
       className={`bag-pulse-icon ${contextClass[context]} ${statusClass[resolvedStatus]} ${className}`}
-      style={{ width: size, height: size }}
+      style={{
+        width: size,
+        height: size,
+        ['--bag-glyph-size' as string]: `${Math.round(size * 0.6)}px`,
+      }}
       aria-hidden="true"
     >
       <span className="bag-pulse-ring" />

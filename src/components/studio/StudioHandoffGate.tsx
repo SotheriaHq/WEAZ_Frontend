@@ -254,13 +254,26 @@ export const StudioHandoffGate: React.FC<StudioHandoffGateProps> = ({ children }
           : 'py-8'
       }`}
     >
+      {/*
+        While it is still WORKING, this is a spinner and nothing else. The
+        native shell already covers this frame with its own loading overlay, so
+        the title + sentence that used to live here were a second narration the
+        user could only see flicker past. A FAILURE still speaks: that is an
+        error state with something to act on, not a wait.
+      */}
       <div className="w-full max-w-sm px-2 text-center">
         <div
-          className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[color:rgba(var(--brand-primary-rgb),0.22)] border-t-[color:var(--brand-primary)]"
-          aria-hidden="true"
+          className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[color:rgba(var(--brand-primary-rgb),0.22)] border-t-[color:var(--brand-primary)]"
+          role={status === 'failed' ? undefined : 'progressbar'}
+          aria-label={status === 'failed' ? undefined : 'Loading Studio'}
+          aria-hidden={status === 'failed' ? true : undefined}
         />
-        <div className="text-base font-semibold">{status === 'failed' ? 'Studio session failed' : 'Studio'}</div>
-        <p className="mt-2 text-sm text-[color:var(--text-secondary)]">{message}</p>
+        {status === 'failed' ? (
+          <>
+            <div className="mt-4 text-base font-semibold">Studio session failed</div>
+            <p className="mt-2 text-sm text-[color:var(--text-secondary)]">{message}</p>
+          </>
+        ) : null}
       </div>
     </div>
   );

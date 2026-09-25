@@ -3,7 +3,33 @@ const LOCAL_PROGRESS_KEY_PREFIX = 'store-progress:';
 const LEGACY_STORE_OPEN_PENDING_KEY = 'store-open-pending-at';
 const STORE_OPEN_PENDING_KEY_PREFIX = 'store-open-pending-at:';
 const STORE_OPEN_PENDING_WINDOW_MS = 45_000;
+const BRAND_SETTLEMENT_NOTE_KEY_PREFIX = 'brand-settlement-note-seen:';
 const ANONYMOUS_SCOPE_KEY = 'anonymous';
+
+const SOCIAL_LINK_FIELDS = ['instagram', 'tiktok', 'twitter'] as const;
+export type StoreSocialLinkField = (typeof SOCIAL_LINK_FIELDS)[number];
+
+export const sanitizeSingleSocialLink = <
+  T extends Record<StoreSocialLinkField, string | undefined | null>,
+>(
+  data: T,
+): Pick<T, StoreSocialLinkField> => {
+  const filled = SOCIAL_LINK_FIELDS.filter((field) => String(data[field] ?? '').trim());
+  if (filled.length <= 1) {
+    return {
+      instagram: String(data.instagram ?? '').trim(),
+      tiktok: String(data.tiktok ?? '').trim(),
+      twitter: String(data.twitter ?? '').trim(),
+    } as Pick<T, StoreSocialLinkField>;
+  }
+
+  const keep = filled[0];
+  return {
+    instagram: keep === 'instagram' ? String(data.instagram ?? '').trim() : '',
+    tiktok: keep === 'tiktok' ? String(data.tiktok ?? '').trim() : '',
+    twitter: keep === 'twitter' ? String(data.twitter ?? '').trim() : '',
+  } as Pick<T, StoreSocialLinkField>;
+};
 
 type BrandProfileCompletenessSource = {
   type?: string | null;
@@ -194,4 +220,24 @@ export const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
+
+export const hasSeenBrandSettlementNote = (userId?: string | null): boolean => {
+  if (typeof window === 'undefined') return true;
+  const key = resolveScopedKey(BRAND_SETTLEMENT_NOTE_KEY_PREFIX, userId);
+  try {
+    return localStorage.getItem(key) === '1';
+  } catch {
+    return true;
+  }
+};
+
+export const markBrandSettlementNoteSeen = (userId?: string | null): void => {
+  if (typeof window === 'undefined') return;
+  const key = resolveScopedKey(BRAND_SETTLEMENT_NOTE_KEY_PREFIX, userId);
+  try {
+    localStorage.setItem(key, '1');
+  } catch {
+    // Ignore local storage errors.
+  }
+};
 

@@ -1,17 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { useQueryClient } from '@tanstack/react-query';
 
 import type { RootState } from '@/store';
 import { setUser } from '@/features/userSlice';
 import { brandApi } from '@/api/BrandApi';
 import type { BrandProfileDto } from '@/types/profile';
 import { invalidateStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
+import { fetchBrandProfileQuery } from '@/query/queries';
 import { getActiveBrandId, hasActiveBrandMembership } from '@/lib/brandAccess';
 
 import EditProfileModal from '@/components/profile/EditProfileModal';
 
-const BRAND_SETUP_DISMISS_KEY = 'threadly.brandProfileSetup.dismissedUntil';
+const BRAND_SETUP_DISMISS_KEY = 'wiez.brandProfileSetup.dismissedUntil';
 
 function clearModalSearchParams(searchParams: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(searchParams);
@@ -40,6 +42,7 @@ function sanitizeNextPath(path: string): string | null {
 export const GlobalModalRouter: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const user = useSelector((state: RootState) => state.user.profile);
   const [searchParams, setSearchParams] = useSearchParams();
   const modal = searchParams.get('modal');
@@ -49,7 +52,19 @@ export const GlobalModalRouter: React.FC = () => {
     [searchParams],
   );
 
-  const isBrandSetupOpen = modal === 'brand-setup';
+  // Kill reopen-on-refresh: an auto-prompt modal (modalOrigin=prompt) present at
+  // MOUNT means the user hard-refreshed while the nudge was open. These are
+  // ephemeral and must never survive a reload. Captured once via lazy initial
+  // state so it suppresses the very first render (no flash) but never suppresses
+  // an in-session prompt opened later. Paired with the session-scoped catalog
+  // auto-prompt, this guarantees the nudge shows at most once per session.
+  const [suppressCarriedInPromptModal] = useState(
+    () =>
+      searchParams.get('modal') === 'brand-setup' &&
+      searchParams.get('modalOrigin') === 'prompt',
+  );
+
+  const isBrandSetupOpen = modal === 'brand-setup' && !suppressCarriedInPromptModal;
   const showSkip = modalOrigin === 'prompt';
 
   const [brandProfile, setBrandProfile] = useState<BrandProfileDto | null>(null);
@@ -57,6 +72,13 @@ export const GlobalModalRouter: React.FC = () => {
   const clearCurrentModalParams = useCallback(() => {
     setSearchParams((prev) => clearModalSearchParams(prev), { replace: true });
   }, [setSearchParams]);
+
+  // Clean the carried-in auto-prompt param out of the URL after suppressing it.
+  useEffect(() => {
+    if (suppressCarriedInPromptModal) {
+      setSearchParams((prev) => clearModalSearchParams(prev), { replace: true });
+    }
+  }, [suppressCarriedInPromptModal, setSearchParams]);
 
   // Lazily fetch brand profile when the brand setup modal opens.
   useEffect(() => {
@@ -98,7 +120,7 @@ export const GlobalModalRouter: React.FC = () => {
     clearCurrentModalParams();
   }, [clearCurrentModalParams, showSkip]);
 
-  if (!modal) return null;
+  if (!modal || suppressCarriedInPromptModal) return null;
 
   if (modal === 'brand-setup') {
     if (!user || !hasActiveBrandMembership(user)) {
@@ -117,6 +139,18 @@ export const GlobalModalRouter: React.FC = () => {
           dispatch(setUser(updatedUser));
           invalidateStoreSetupStatusCache();
           localStorage.removeItem(BRAND_SETUP_DISMISS_KEY);
+          try {
+            // Refresh the cached brand profile BEFORE closing. Catalog's
+            // setup-completeness check reads this cache; leaving it stale
+            // made the auto-prompt re-open this modal right after save.
+            await fetchBrandProfileQuery(
+              queryClient,
+              getActiveBrandId(updatedUser) ?? updatedUser.id,
+              { forceRefresh: true },
+            );
+          } catch {
+            // Non-fatal — the modal must still close after a successful save.
+          }
           closeModal();
           if (nextPath) {
             navigate(nextPath, { replace: true });

@@ -37,9 +37,10 @@ vi.mock('@/components/ImageWithFallback', () => ({
   default: ({ alt }: { alt: string }) => <div role="img" aria-label={alt} />,
 }));
 
-vi.mock('@/components/loaders/VLoader', () => ({
+vi.mock('@/components/loaders/MuseLoader', () => ({
   __esModule: true,
-  default: () => <div>Loading</div>,
+  MuseLoader: () => <div>Loading</div>,
+  MuseProgress: () => <div>Loading</div>,
 }));
 
 vi.mock('sonner', () => ({

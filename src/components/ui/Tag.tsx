@@ -5,7 +5,8 @@ type Size = 'xs' | 'sm' | 'md';
 type Color = 'purple' | 'blue' | 'green' | 'orange' | 'red' | 'gray';
 
 interface TagProps {
-  label?: string;
+  /** Plain string, or a node (e.g. FitText) for scale-to-fit labels. */
+  label?: React.ReactNode;
   size?: Size;
   color?: Color;
   leftIcon?: React.ReactNode;

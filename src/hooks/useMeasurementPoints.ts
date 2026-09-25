@@ -4,7 +4,7 @@ import type { MeasurementPoint, MeasurementPointCategory } from '@/types/sizing'
 import { getWithTTL, setWithTTL } from '@/utils/sizing';
 
 const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour fallback cache
-const MEASUREMENT_POINTS_UPDATED_EVENT = 'threadly:measurement-points-updated';
+const MEASUREMENT_POINTS_UPDATED_EVENT = 'wiez:measurement-points-updated';
 
 export function useMeasurementPoints(filter?: {
   gender?: 'MEN' | 'WOMEN' | 'UNISEX';

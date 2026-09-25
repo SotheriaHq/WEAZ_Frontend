@@ -85,3 +85,31 @@ export const FILTER_TAG_SUGGESTIONS: Record<string, string[]> = {
   fitted: ["fitted-style", "body-skimming", "tailored"],
   relaxed: ["relaxed-fit", "comfortable", "easy-style"],
 };
+
+/**
+ * A general starter pool of popular hashtags shown before the creator has
+ * picked any filters. Ensures the "Popular hashtags" list is useful even on a
+ * fresh database where `/tags/trending` only returns a handful of used tags.
+ */
+export const DEFAULT_HASHTAG_SUGGESTIONS: string[] = [
+  "streetwear",
+  "luxury",
+  "office-style",
+  "corporate-style",
+  "work-outfit",
+  "street-style",
+  "casual-style",
+  "daily-wear",
+  "luxury-style",
+  "statement-piece",
+  "african-fashion",
+  "modern-african",
+  "evening-wear",
+  "minimalist-fashion",
+  "vintage-style",
+  "bridal",
+  "party-wear",
+  "resort-wear",
+  "handmade",
+  "readytowear",
+];

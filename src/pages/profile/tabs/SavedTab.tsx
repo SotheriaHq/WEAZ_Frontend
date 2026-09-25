@@ -1,18 +1,25 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, Bookmark } from 'lucide-react';
+import React, { useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, ArrowRight } from 'lucide-react';
 import { apiClient } from '@/api/httpClient';
-import MediaRenderer from '@/components/media/MediaRenderer';
+import ContentTile from '@/components/catalog/ContentTile';
 import { buildCollectionRoute, buildDesignRoute, buildProductRoute } from '@/utils/catalogRoutes';
+import useCachedResource from '@/hooks/useCachedResource';
+import useClipTarget, { type ClipTargetType } from '@/features/clipping/useClipTarget';
+import { CLIPPED_EMOJI, UNCLIP_LABEL } from '@/constants/clipping';
+import { formatPrice } from '@/utils/helpers';
 
 interface SavedItem {
   id: string;
-  targetType: 'DESIGN' | 'PRODUCT' | 'COLLECTION' | 'COLLECTION_MEDIA';
+  targetType: ClipTargetType;
   targetId: string;
   designId?: string;
   productId?: string;
   collectionId?: string;
   legacyCollectionId?: string;
+  /** Present on COLLECTION_MEDIA rows: the exact frame that was clipped. */
+  mediaId?: string;
   title: string;
   thumbnail?: string;
   price?: number;
@@ -64,6 +71,7 @@ const toSavedItems = (raw: unknown): SavedItem[] => {
         productId: item.productId ? String(item.productId) : undefined,
         collectionId: item.collectionId ? String(item.collectionId) : undefined,
         legacyCollectionId: item.legacyCollectionId ? String(item.legacyCollectionId) : undefined,
+        mediaId: item.mediaId ? String(item.mediaId) : undefined,
         title: String(item.title ?? 'Untitled'),
         thumbnail: typeof item.thumbnail === 'string' ? item.thumbnail : undefined,
         price: typeof item.price === 'number' ? item.price : undefined,
@@ -80,45 +88,98 @@ const toSavedItems = (raw: unknown): SavedItem[] => {
     .filter((item): item is SavedItem => Boolean(item));
 };
 
-const formatPrice = (value?: number): string | null => {
-  if (typeof value !== 'number' || Number.isNaN(value)) return null;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value);
+const brandLabel = (brand: SavedItem['brand']): string =>
+  [brand.firstName, brand.lastName].filter(Boolean).join(' ') || brand.username || 'Unknown';
+
+/**
+ * Where opening a clipped item should land.
+ *
+ * Every row here is a real destination, which was not true before: a
+ * COLLECTION_MEDIA row is one FRAME of a design, so it has to carry
+ * `openMedia` or the viewer opens the cover instead of the piece the shopper
+ * actually clipped. Returns null only when the row has no id to open at all.
+ */
+const routeForSavedItem = (item: SavedItem): string | null => {
+  if (item.targetType === 'COLLECTION_MEDIA') {
+    const designId = item.collectionId ?? item.designId;
+    if (!designId) return null;
+    return buildDesignRoute({
+      designId,
+      legacyCollectionId: item.legacyCollectionId ?? designId,
+      query: { openMedia: item.mediaId ?? item.targetId },
+    });
+  }
+  if (item.targetType === 'DESIGN') {
+    return buildDesignRoute({
+      designId: item.designId ?? item.targetId,
+      legacyCollectionId: item.legacyCollectionId ?? item.collectionId,
+    });
+  }
+  if (item.targetType === 'PRODUCT') {
+    return buildProductRoute({ productId: item.productId ?? item.targetId });
+  }
+  return item.targetId ? buildCollectionRoute({ collectionId: item.targetId }) : null;
 };
 
 export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
-  const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const { toggleClip } = useClipTarget();
 
-  useEffect(() => {
-    const fetchSavedItems = async () => {
-      if (!isOwner) {
-        setSavedItems([]);
-        setLoading(false);
-        return;
+  // Cached fetch: on revisit within the retention window, clipped items paint
+  // instantly (no skeleton) and revalidate silently. See useCachedResource.
+  const {
+    data: savedItems = [],
+    loading,
+    error: fetchError,
+    refetch,
+  } = useCachedResource<SavedItem[]>({
+    queryKey: ['saved', 'me'],
+    queryFn: async ({ signal }) => {
+      const response = await apiClient.get('/saved/me', { signal });
+      return toSavedItems(response.data);
+    },
+    enabled: isOwner,
+  });
+  const error = fetchError ? 'Failed to load your clips' : null;
+
+  /**
+   * Closing the viewer comes back HERE.
+   *
+   * `DesignDetailsPage` falls back to `/runway` when nobody tells it where the
+   * reader came from, so opening a clip and pressing back dropped the shopper
+   * into the feed with their tab, their scroll position and their place in the
+   * list all gone. That is the broken flow.
+   */
+  const openItem = useCallback(
+    (item: SavedItem) => {
+      const to = routeForSavedItem(item);
+      if (!to) return;
+      const returnTo = `${location.pathname}${location.search}` || '/profile';
+      navigate(to, { state: { returnTo } });
+    },
+    [location.pathname, location.search, navigate],
+  );
+
+  const unclip = useCallback(
+    async (item: SavedItem) => {
+      // Drop it from the visible list first — the grid IS the confirmation.
+      queryClient.setQueryData<SavedItem[]>(['saved', 'me'], (current) =>
+        Array.isArray(current) ? current.filter((row) => row.id !== item.id) : current,
+      );
+      const result = await toggleClip({
+        targetType: item.targetType,
+        targetId: item.targetId,
+        clipped: true,
+      });
+      if (result === null) {
+        // The server refused; put the row back rather than leave a hole.
+        await refetch();
       }
-
-      try {
-        setLoading(true);
-        const response = await apiClient.get('/saved/me');
-        setSavedItems(toSavedItems(response.data));
-        setError(null);
-      } catch (err) {
-        setSavedItems([]);
-        setError('Failed to load saved items');
-        console.error('Error fetching saved items:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void fetchSavedItems();
-  }, [isOwner]);
+    },
+    [queryClient, refetch, toggleClip],
+  );
 
   if (!isOwner) {
     return null;
@@ -126,16 +187,12 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {[...Array(4)].map((_, idx) => (
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+        {[...Array(6)].map((_, idx) => (
           <div
             key={idx}
-            className="rounded-3xl border border-gray-200/70 bg-white/70 p-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/5 animate-pulse"
-          >
-            <div className="mb-3 aspect-[4/5] rounded-2xl bg-gray-200 dark:bg-gray-700" />
-            <div className="mb-2 h-4 rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="h-3 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
-          </div>
+            className="aspect-[4/5] animate-pulse rounded-2xl bg-gray-200 dark:bg-white/10"
+          />
         ))}
       </div>
     );
@@ -147,7 +204,7 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/40">
           <AlertTriangle className="h-6 w-6" />
         </div>
-        <p className="text-sm font-semibold">Error Loading Saved Items</p>
+        <p className="text-sm font-semibold">Your clips could not load</p>
         <p className="mt-1 text-xs opacity-90">{error}</p>
       </div>
     );
@@ -157,14 +214,16 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
     return (
       <section className="glass-panel min-h-[340px] rounded-[2rem] border border-gray-200/70 bg-white/70 p-8 text-center backdrop-blur-md dark:border-white/10 dark:bg-white/5 sm:p-12">
         <div className="mx-auto flex h-full max-w-lg flex-col items-center justify-center">
-          <div className="mb-4 text-6xl">🗂️</div>
-          <h3 className="text-2xl font-bold text-gray-900 dark:text-white">No saved items yet</h3>
+          <div className="mb-4 text-6xl" aria-hidden="true">
+            {CLIPPED_EMOJI}
+          </div>
+          <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Nothing clipped yet</h3>
           <p className="mt-3 text-sm text-gray-500 dark:text-gray-400 sm:text-base">
-            Save designs, products, and collections to revisit them later.
+            Clip a design, a product or a collection and it waits for you here.
           </p>
           <button
             type="button"
-            onClick={() => navigate('/market')}
+            onClick={() => navigate('/runway')}
             className="mt-6 inline-flex items-center gap-2 rounded-full border border-gray-200/80 bg-white/70 px-6 py-2.5 text-sm font-semibold text-gray-800 transition hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
           >
             Explore Trends
@@ -176,91 +235,36 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
   }
 
   return (
-    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {savedItems.map((item) => {
-        const brandName =
-          [item.brand.firstName, item.brand.lastName].filter(Boolean).join(' ') ||
-          item.brand.username ||
-          'Unknown';
-        const price = formatPrice(item.price);
-
-        return (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => {
-              if (item.targetType === 'COLLECTION_MEDIA') {
-                const designId = item.collectionId;
-                if (designId) {
-                  navigate(buildDesignRoute({ designId, legacyCollectionId: designId }));
-                }
-                return;
-              }
-              if (item.targetType === 'DESIGN') {
-                const designId = item.designId ?? item.targetId;
-                navigate(
-                  buildDesignRoute({
-                    designId,
-                    legacyCollectionId: item.legacyCollectionId ?? item.collectionId,
-                  }),
-                );
-                return;
-              }
-              if (item.targetType === 'PRODUCT') {
-                navigate(buildProductRoute({ productId: item.productId ?? item.targetId }));
-                return;
-              }
-              if (item.targetId) {
-                navigate(buildCollectionRoute({ collectionId: item.targetId }));
-              }
-            }}
-            className="group overflow-hidden rounded-3xl border border-gray-200/70 bg-white/70 p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
-          >
-            <div className="relative mb-3 aspect-[4/5] overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800">
-              {item.thumbnail ? (
-                <MediaRenderer
-                  kind="image"
-                  src={item.thumbnail}
-                  alt={item.title}
-                  fit="cover"
-                  className="h-full w-full"
-                  mediaClassName="transition-transform duration-300 group-hover:scale-105"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-                  No preview
-                </div>
-              )}
-
-              <span className="absolute right-2.5 top-2.5 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/60 bg-black/35 text-white backdrop-blur-sm">
-                <Bookmark className="h-4 w-4" />
-              </span>
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white sm:text-base">
-                  {item.title}
-                </h3>
-                {price ? (
-                  <span className="shrink-0 text-sm font-bold text-gray-900 dark:text-white">{price}</span>
-                ) : null}
-              </div>
-
-              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-semibold text-gray-700 dark:bg-white/10 dark:text-gray-200">
-                  {(item.brand.firstName?.charAt(0) ||
-                    item.brand.lastName?.charAt(0) ||
-                    item.brand.username?.charAt(0) ||
-                    '?')
-                    .toUpperCase()}
-                </span>
-                <span className="line-clamp-1">{brandName}</span>
-              </div>
-            </div>
-          </button>
-        );
-      })}
+    <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+      {savedItems.map((item, index) => (
+        <ContentTile
+          key={item.id}
+          title={item.title}
+          subtitle={brandLabel(item.brand)}
+          priceLabel={typeof item.price === 'number' ? formatPrice(item.price) : null}
+          mediaUrl={item.thumbnail ?? null}
+          mediaAlt={item.title}
+          priority={index < 2}
+          onOpen={() => openItem(item)}
+          actions={
+            /* The bookmark here used to be decoration — a badge that looked
+               like a control and did nothing. It unclips now, which is the one
+               thing a shopper wants from this grid. */
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                void unclip(item);
+              }}
+              aria-label={`${UNCLIP_LABEL} ${item.title}`}
+              title={UNCLIP_LABEL}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/60 bg-black/45 text-base leading-none text-white backdrop-blur-sm transition hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
+              <span aria-hidden="true">{CLIPPED_EMOJI}</span>
+            </button>
+          }
+        />
+      ))}
     </section>
   );
 };

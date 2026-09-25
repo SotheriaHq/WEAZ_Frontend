@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
@@ -12,6 +13,7 @@ import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { unwrapApiResponse } from '@/types/auth';
 import type { CollectionDto } from '@/types/profile';
 import { useDropdownManager } from '@/context/DropdownManagerContext';
+import { useCachedResource } from '@/hooks/useCachedResource';
 import {
   DeleteProductModal,
   ArchiveProductModal,
@@ -24,12 +26,27 @@ import {
 } from './modals';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import ImageWithFallback from '@/components/ImageWithFallback';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { Select } from '@/components/ui/Select';
 import StoreEmptyState, { type EmptyStateType } from '@/components/designs/StoreEmptyState';
 import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
 import { PRODUCT_STUDIO_SYNC_EVENT } from '@/utils/productStudioEvents';
+import {
+  readPublishTasks,
+  subscribePublishTasks,
+  removePublishTask,
+  updatePublishTask,
+  getPublishTaskDesignId,
+  type PublishTask,
+} from '@/utils/publishTracker';
+import {
+  runProductPublishJob,
+  isProductPublishJobRunning,
+  getRetryableProductPublishJob,
+  clearRetryableProductPublishJob,
+} from '@/features/products/productPublishJob';
+import { ProductPublishFillerCard } from '@/components/studio/store/ProductPublishFillerCard';
 import {
   getProductStockState,
   isCustomOrderOnlyProduct,
@@ -204,6 +221,31 @@ const resolveProductStatus = (product: BackendProduct): StudioStatus => {
   return product.isActive ? 'ACTIVE' : 'DRAFT';
 };
 
+// Maps a resolved product status to the studio filter tab that displays it. A
+// go-live product reroutes to ?status=in_review, but the backend decides its
+// real publicationStatus (IN_REVIEW or auto-PUBLISHED) — this lets the panel
+// auto-correct to the tab where the new product actually lands.
+const statusToFilterTab = (status: StudioStatus): ProductStatusFilter | null => {
+  switch (status) {
+    case 'ACTIVE':
+      return 'active';
+    case 'DRAFT':
+      return 'draft';
+    case 'IN_REVIEW':
+      return 'in_review';
+    case 'CHANGES_REQUESTED':
+      return 'changes_requested';
+    case 'REJECTED':
+      return 'rejected';
+    case 'ARCHIVED':
+      return 'archived';
+    case 'DELETED':
+      return 'deleted';
+    default:
+      return null; // FAILED / unknown — leave the current tab as-is
+  }
+};
+
 const hasRenderableProductMedia = (product: BackendProduct | null | undefined): boolean => {
   if (!product) return false;
   if (typeof product.thumbnail === 'string' && product.thumbnail.trim().length > 0) return true;
@@ -307,6 +349,106 @@ const getCollectionPreviewSources = (
   return out;
 };
 
+/**
+ * Collection actions: a "+" menu on phones, the inline pair from `sm` up.
+ *
+ * Both branches render the same two commands and both are always in the DOM as
+ * real buttons — the phone branch is not a reduced feature set, only a reduced
+ * footprint. `sm` (640px) keeps every tablet, portrait iPad included, on the
+ * inline layout the client asked to leave alone.
+ */
+const CollectionActionsControl: React.FC<{
+  onCreate: () => void;
+  onManage: () => void;
+  onAddProduct: () => void;
+  addProductLabel: string;
+}> = ({ onCreate, onManage, onAddProduct, addProductLabel }) => {
+  const [open, setOpen] = useState(false);
+
+  const items: Array<{ key: string; marker: string; label: string; onSelect: () => void }> = [
+    { key: 'create', marker: '🗂️', label: 'Create collection', onSelect: onCreate },
+    { key: 'manage', marker: '📁', label: 'Manage collections', onSelect: onManage },
+  ];
+
+  /**
+   * On phones the "+" is the single place new things are made.
+   *
+   * Adding a product had its own gradient button up in the toolbar, competing
+   * with the search field and the filter control for a row that was already
+   * full. It is the same kind of action as the two below it — "make a new
+   * thing" — so it belongs in the same menu, and it goes first because it is
+   * the one brands reach for most.
+   */
+  const phoneItems = [
+    { key: 'add-product', marker: '➕', label: addProductLabel, onSelect: onAddProduct },
+    ...items,
+  ];
+
+  return (
+    <>
+      {/* Phones */}
+      <div className="relative sm:hidden">
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label="Collection actions"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-lg font-semibold leading-none text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+        >
+          <span aria-hidden="true">+</span>
+        </button>
+
+        {open ? (
+          <>
+            {/* Tap-away layer. A menu opened by touch has no blur to close it. */}
+            <button
+              type="button"
+              aria-label="Close collection actions"
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 z-40 cursor-default"
+            />
+            <div
+              role="menu"
+              className="absolute right-0 z-50 mt-2 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-white/10 dark:bg-[#15151b]"
+            >
+              {phoneItems.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    item.onSelect();
+                  }}
+                  className="flex min-h-11 w-full items-center gap-2.5 px-3.5 text-left text-xs font-semibold text-gray-800 transition-colors hover:bg-purple-50 dark:text-gray-100 dark:hover:bg-white/5"
+                >
+                  <span aria-hidden="true">{item.marker}</span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : null}
+      </div>
+
+      {/* Tablet and up — unchanged */}
+      <div className="hidden items-center gap-2 sm:flex">
+        {items.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={item.onSelect}
+            className="min-h-9 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+};
+
 const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   layoutMode = false,
   onToggleLayoutMode,
@@ -315,11 +457,31 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const user = useSelector((state: RootState) => state.user.profile);
   const dropdownManager = useDropdownManager();
   const isEmbeddedMobile = useEmbeddedSurface() === 'mobile-app';
 
-  const [filterStatus, setFilterStatus] = useState<ProductStatusFilter>('all');
+  // Live "creating product" filler cards (parity with the design catalog).
+  const productPublishScope = useMemo(() => ({ ownerId: user?.id }), [user?.id]);
+  const [productPublishTasks, setProductPublishTasks] = useState<PublishTask[]>([]);
+  useEffect(() => {
+    const sync = () =>
+      setProductPublishTasks(readPublishTasks(productPublishScope, 'product'));
+    sync();
+    return subscribePublishTasks(sync);
+  }, [productPublishScope]);
+
+  const [filterStatus, setFilterStatus] = useState<ProductStatusFilter>(() => {
+    // Notification deep links preselect a status tab (?status=in_review etc.).
+    try {
+      const requested = new URLSearchParams(window.location.search).get('status');
+      const known = PRODUCT_FILTER_OPTIONS.some((opt) => opt.value === requested);
+      return known ? (requested as ProductStatusFilter) : 'all';
+    } catch {
+      return 'all';
+    }
+  });
   const [filterCollection, setFilterCollection] = useState<'all' | string>('all');
   const [filterStock, setFilterStock] = useState('all');
   const [productSortBy, setProductSortBy] = useState<ProductSortBy>('newest');
@@ -327,9 +489,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
 
   const [products, setProducts] = useState<BackendProduct[]>([]);
+  // NOTE: `loading` and `collectionsLoading` come from useCachedResource below
+  // (true only when no cached data exists) — never re-add useState loaders here.
   const [collections, setCollections] = useState<CollectionOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [collectionsLoading, setCollectionsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
   const [total, setTotal] = useState(0);
@@ -351,6 +513,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   
   const listRef = useRef<HTMLDivElement | null>(null);
   const [listMinHeight, setListMinHeight] = useState<number | undefined>(undefined);
+  const statusTabsRef = useRef<HTMLDivElement | null>(null);
   const createdProductHydrationAttemptsRef = useRef(0);
   const galleryTouchRef = useRef({ startX: 0, startY: 0 });
   const productMenuTriggerRefs = useRef<
@@ -385,7 +548,6 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   } | null>(null);
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [activeCollectionProducts, setActiveCollectionProducts] = useState<BackendProduct[]>([]);
-  const [activeCollectionProductsLoading, setActiveCollectionProductsLoading] = useState(false);
   const [activeCollectionProductsPage, setActiveCollectionProductsPage] = useState(1);
   const [activeCollectionProductsLimit, setActiveCollectionProductsLimit] = useState(8);
   const [activeCollectionProductsTotal, setActiveCollectionProductsTotal] = useState(0);
@@ -484,11 +646,6 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     );
   }, [draftCollections]);
 
-  const showDraftCollectionsInProductArea =
-    !loading &&
-    filterStatus === 'draft' &&
-    filteredProducts.length === 0 &&
-    storeDraftCollections.length > 0;
   const primaryProductActionLabel = products.length === 0 ? 'Create Product' : 'Add Product';
 
   const visibleCollections = useMemo(
@@ -711,23 +868,23 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     return () => window.clearInterval(timer);
   }, [hoveredCollectionId, previewSourcesByCollectionId]);
 
-  useEffect(() => {
-    let mounted = true;
+  // Cache-first collections list: revisits paint instantly (no skeleton);
+  // local state stays the render source so the draft-merge effect and other
+  // in-place mutations keep working unchanged.
+  const storeCollectionsQueryKey = useMemo(
+    () => ['store', 'panel', 'collections', user?.id ?? 'anon'] as const,
+    [user?.id],
+  );
 
-    const run = async () => {
-      if (!user?.id) {
-        setCollections([]);
-        setCollectionsLoading(false);
-        return;
-      }
-
-      try {
-        setCollectionsLoading(true);
-        const collectionsRes = await brandApi.getCollections(user.id, {
+  const { data: cachedStoreCollections, loading: collectionsQueryLoading } =
+    useCachedResource<CollectionOption[]>({
+      queryKey: storeCollectionsQueryKey,
+      enabled: Boolean(user?.id),
+      queryFn: async () => {
+        const collectionsRes = await brandApi.getCollections(user!.id, {
           visibility: 'all',
           scope: 'store',
         });
-        if (!mounted) return;
         const mappedCollections: CollectionOption[] = (collectionsRes || [])
           .map((c: CollectionDto) => ({
             id: String(c.id),
@@ -747,20 +904,29 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             updatedAt: typeof c.updatedAt === 'string' ? c.updatedAt : undefined,
             createdAt: typeof c.createdAt === 'string' ? c.createdAt : undefined,
           }));
-        setCollections(mappedCollections.filter((collection) => !isSystemStoreCollection(collection)));
-      } catch {
-        if (!mounted) return;
-        setCollections([]);
-      } finally {
-        if (mounted) setCollectionsLoading(false);
-      }
-    };
+        return mappedCollections.filter((collection) => !isSystemStoreCollection(collection));
+      },
+    });
+  const collectionsLoading = Boolean(user?.id) && collectionsQueryLoading;
 
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [user?.id]);
+  useEffect(() => {
+    if (cachedStoreCollections) {
+      setCollections(cachedStoreCollections);
+    } else if (!user?.id) {
+      setCollections([]);
+    }
+  }, [cachedStoreCollections, user?.id]);
+
+  const updateStoreCollections = useCallback(
+    (updater: (current: CollectionOption[]) => CollectionOption[]) => {
+      setCollections((current) => {
+        const next = updater(current);
+        queryClient.setQueryData(storeCollectionsQueryKey, next);
+        return next;
+      });
+    },
+    [queryClient, storeCollectionsQueryKey],
+  );
 
   useEffect(() => {
     if (!Array.isArray(draftCollections) || draftCollections.length === 0) return;
@@ -803,136 +969,217 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   }, [draftCollections]);
 
   const currentPageCursor = page > 1 ? cursorByPage[page] : undefined;
+  const storeProductsQueryKey = useMemo(
+    () =>
+      [
+        'store',
+        'panel',
+        'products',
+        user?.id ?? 'anon',
+        page,
+        limit,
+        productSortBy,
+        currentPageCursor ?? null,
+        searchQuery.trim(),
+        filterCollection,
+        filterStatus,
+      ] as const,
+    [
+      currentPageCursor,
+      filterCollection,
+      filterStatus,
+      limit,
+      page,
+      productSortBy,
+      searchQuery,
+      user?.id,
+    ],
+  );
+
+  // Cache-first products list: revisits paint instantly from the shared query
+  // cache (skeleton only on true first load / new filter combinations).
+  // Local `products` state stays the render source so optimistic mutations
+  // (delete filtering, sync-event refresh) keep working unchanged.
+  const productsQueryEnabled = outletView === 'products' && Boolean(user?.id);
+  const {
+    data: productsPage,
+    loading: productsQueryLoading,
+    error: productsQueryError,
+    refetch: refetchProducts,
+  } = useCachedResource<{
+    items: BackendProduct[];
+    total: number;
+    nextCursor: string | null;
+  }>({
+    queryKey: storeProductsQueryKey,
+    enabled: productsQueryEnabled,
+    queryFn: async ({ signal }) => {
+      const productsRes = await apiClient.get<Partial<ProductsResponse>>(`/brands/${user!.id}/products`, {
+        signal,
+        params: {
+          page,
+          limit,
+          sortBy: productSortBy,
+          cursor: currentPageCursor ?? undefined,
+          search: searchQuery.trim() ? searchQuery.trim() : undefined,
+          collectionId: filterCollection !== 'all' ? filterCollection : undefined,
+          isActive:
+            filterStatus === 'active'
+              ? true
+              : filterStatus === 'draft'
+                ? false
+                : undefined,
+          isFeatured: filterStatus === 'featured' ? true : undefined,
+          includeDeleted: filterStatus === 'deleted' ? true : undefined,
+          onlyDeleted: filterStatus === 'deleted' ? true : undefined,
+        },
+      });
+      const productsPayload = unwrapApiResponse<Partial<ProductsResponse>>(productsRes.data);
+      const items = Array.isArray(productsPayload?.items)
+        ? (productsPayload.items as BackendProduct[])
+        : [];
+      return {
+        items,
+        total: typeof productsPayload?.total === 'number' ? productsPayload.total : items.length,
+        nextCursor:
+          typeof productsPayload?.nextCursor === 'string' && productsPayload.nextCursor.length > 0
+            ? productsPayload.nextCursor
+            : null,
+      };
+    },
+  });
+  const loading = productsQueryEnabled && productsQueryLoading;
 
   useEffect(() => {
-    let mounted = true;
+    if (!productsPage) return;
+    setProducts(productsPage.items);
+    setTotal(productsPage.total);
+    const nextCursor = productsPage.nextCursor;
+    if (nextCursor) {
+      setCursorByPage((prev) =>
+        prev[page + 1] === nextCursor ? prev : { ...prev, [page + 1]: nextCursor },
+      );
+    }
+  }, [productsPage, page]);
 
-    const run = async () => {
-      if (outletView !== 'products') {
-        if (mounted) setLoading(false);
-        return;
-      }
+  useEffect(() => {
+    if (!productsQueryError) return;
+    const message =
+      (productsQueryError as any)?.response?.data?.message ?? 'Failed to load products';
+    toast.error(typeof message === 'string' ? message : 'Failed to load products');
+  }, [productsQueryError]);
 
-      if (!user?.id) {
-        setLoading(false);
-        return;
-      }
+  const showDraftCollectionsInProductArea =
+    !loading &&
+    filterStatus === 'draft' &&
+    filteredProducts.length === 0 &&
+    storeDraftCollections.length > 0;
 
-      try {
-        setLoading(true);
-
-        const productsRes = await apiClient.get<Partial<ProductsResponse>>(`/brands/${user.id}/products`, {
+  const activeCollectionProductsQueryEnabled =
+    outletView === 'collections' && Boolean(user?.id && activeCollectionId);
+  const {
+    data: activeCollectionProductsPageData,
+    loading: activeCollectionProductsLoading,
+    error: activeCollectionProductsError,
+  } = useCachedResource<{
+    items: BackendProduct[];
+    total: number;
+  }>({
+    queryKey: [
+      'store',
+      'panel',
+      'collectionProducts',
+      user?.id ?? 'anon',
+      activeCollectionId ?? 'none',
+      activeCollectionProductsPage,
+      activeCollectionProductsLimit,
+    ],
+    enabled: activeCollectionProductsQueryEnabled,
+    queryFn: async ({ signal }) => {
+      const response = await apiClient.get<Partial<ProductsResponse>>(
+        `/brands/${user!.id}/products`,
+        {
+          signal,
           params: {
-            page,
-            limit,
-            sortBy: productSortBy,
-            cursor: currentPageCursor ?? undefined,
-            search: searchQuery.trim() ? searchQuery.trim() : undefined,
-            collectionId: filterCollection !== 'all' ? filterCollection : undefined,
-            isActive:
-              filterStatus === 'active'
-                ? true
-                : filterStatus === 'draft'
-                  ? false
-                  : undefined,
-            isFeatured: filterStatus === 'featured' ? true : undefined,
-            includeDeleted: filterStatus === 'deleted' ? true : undefined,
-            onlyDeleted: filterStatus === 'deleted' ? true : undefined,
+            page: activeCollectionProductsPage,
+            limit: activeCollectionProductsLimit,
+            sortBy: 'newest',
+            collectionId: activeCollectionId,
+            includeDeleted: false,
           },
-        });
-
-        if (!mounted) return;
-
-        const productsPayload = unwrapApiResponse<Partial<ProductsResponse>>(productsRes.data);
-        const items = Array.isArray(productsPayload?.items)
-          ? (productsPayload.items as BackendProduct[])
-          : [];
-        setProducts(items);
-        setTotal(typeof productsPayload?.total === 'number' ? productsPayload.total : items.length);
-
-        const nextCursor = productsPayload?.nextCursor;
-        if (typeof nextCursor === 'string' && nextCursor.length > 0) {
-          setCursorByPage((prev) => ({ ...prev, [page + 1]: nextCursor }));
-        }
-      } catch (e) {
-        const message = (e as any)?.response?.data?.message ?? 'Failed to load products';
-        toast.error(typeof message === 'string' ? message : 'Failed to load products');
-        if (!mounted) return;
-        setProducts([]);
-        setTotal(0);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [currentPageCursor, filterCollection, filterStatus, limit, outletView, page, productSortBy, searchQuery, user?.id]);
+        },
+      );
+      const payload = unwrapApiResponse<Partial<ProductsResponse>>(response.data);
+      const items = Array.isArray(payload?.items) ? (payload.items as BackendProduct[]) : [];
+      return {
+        items,
+        total: typeof payload?.total === 'number' ? payload.total : items.length,
+      };
+    },
+  });
 
   useEffect(() => {
-    let mounted = true;
+    if (!activeCollectionProductsQueryEnabled) {
+      setActiveCollectionProducts([]);
+      setActiveCollectionProductsTotal(0);
+      return;
+    }
+    if (!activeCollectionProductsPageData) return;
+    setActiveCollectionProducts(activeCollectionProductsPageData.items);
+    setActiveCollectionProductsTotal(activeCollectionProductsPageData.total);
+  }, [activeCollectionProductsPageData, activeCollectionProductsQueryEnabled]);
 
-    const run = async () => {
-      if (!user?.id || !activeCollectionId || outletView !== 'collections') {
-        if (mounted) {
-          setActiveCollectionProducts([]);
-          setActiveCollectionProductsTotal(0);
-        }
-        return;
-      }
+  useEffect(() => {
+    if (!activeCollectionProductsError) return;
+    setActiveCollectionProducts([]);
+    setActiveCollectionProductsTotal(0);
+    toast.error('Failed to load products for this collection.');
+  }, [activeCollectionProductsError]);
 
-      try {
-        setActiveCollectionProductsLoading(true);
-        const response = await apiClient.get<Partial<ProductsResponse>>(
-          `/brands/${user.id}/products`,
-          {
-            params: {
-              page: activeCollectionProductsPage,
-              limit: activeCollectionProductsLimit,
-              sortBy: 'newest',
-              collectionId: activeCollectionId,
-              includeDeleted: false,
-            },
-          },
-        );
-
-        if (!mounted) return;
-        const payload = unwrapApiResponse<Partial<ProductsResponse>>(response.data);
-        const items = Array.isArray(payload?.items) ? (payload.items as BackendProduct[]) : [];
-        setActiveCollectionProducts(items);
-        setActiveCollectionProductsTotal(
-          typeof payload?.total === 'number' ? payload.total : items.length,
-        );
-      } catch {
-        if (!mounted) return;
-        setActiveCollectionProducts([]);
-        setActiveCollectionProductsTotal(0);
-        toast.error('Failed to load products for this collection.');
-      } finally {
-        if (mounted) setActiveCollectionProductsLoading(false);
-      }
-    };
-
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [
-    activeCollectionId,
-    activeCollectionProductsLimit,
-    activeCollectionProductsPage,
-    outletView,
-    user?.id,
-  ]);
-
+  /**
+   * Holds the grid's height only while a filter change is in flight.
+   *
+   * Switching status refetches, and for that moment the grid has no children —
+   * so without this the container collapses to nothing, the page scrolls up to
+   * follow it, and the results drop back in below where you were looking. That
+   * is the "screen shakes when you swipe between tabs" report.
+   *
+   * The height is frozen at the value it had when loading STARTED and released
+   * as soon as the new results are painted. The previous version re-measured on
+   * every `filteredProducts.length` change while the floor was still applied,
+   * so the floor could only ever ratchet upward: after visiting a busy tab, a
+   * tab with three products kept the tall tab's height and left a screen of
+   * blank underneath it.
+   */
   useEffect(() => {
     if (outletView !== 'products') return;
+    if (!loading) {
+      setListMinHeight(undefined);
+      return;
+    }
     if (!listRef.current) return;
     const height = listRef.current.getBoundingClientRect().height;
     if (height > 0) setListMinHeight(height);
-  }, [filteredProducts.length, loading, outletView]);
+  }, [loading, outletView]);
+
+  /**
+   * Keeps the selected status tab visible without moving the page.
+   *
+   * `block: 'nearest'` is the load-bearing part: the default (`'start'`) lets
+   * the browser scroll every ancestor — the document included — to satisfy the
+   * request, so selecting a tab near the end of the strip would yank the whole
+   * screen. `'nearest'` leaves an already-visible axis alone, so only the strip
+   * moves.
+   */
+  useEffect(() => {
+    if (outletView !== 'products') return;
+    const strip = statusTabsRef.current;
+    if (!strip) return;
+    const active = strip.querySelector<HTMLElement>(
+      `[data-status-tab="${filterStatus}"]`,
+    );
+    active?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [filterStatus, outletView]);
 
   // Click-outside handler for expandable search (matches CatalogShopTab pattern)
   useEffect(() => {
@@ -1030,13 +1277,25 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     if (typeof window === 'undefined') return;
     if (loading || products.length === 0) return;
 
-    const draft = products.find((p) => resolveProductStatus(p) === 'DRAFT');
+    const now = Date.now();
+    // Don't nag about a draft the user is still creating / just submitted. A
+    // freshly-created product briefly exists as a DRAFT while the background
+    // publish job uploads media and flips it live; prompting "Continue your
+    // draft?" the instant they land on the store is the phantom prompt users hit
+    // right after "Create Product". Only remind about genuinely-abandoned drafts.
+    const FRESH_DRAFT_GRACE_MS = 10 * 60 * 1000;
+    const draftAge = (p: BackendProduct) => {
+      const ts = new Date(p.createdAt || 0).getTime();
+      return Number.isFinite(ts) && ts > 0 ? now - ts : Number.POSITIVE_INFINITY;
+    };
+    const draft = products.find(
+      (p) => resolveProductStatus(p) === 'DRAFT' && draftAge(p) >= FRESH_DRAFT_GRACE_MS,
+    );
     if (!draft) return;
 
     const key = `draft-reminder:${draft.id}`;
     const lastRaw = localStorage.getItem(key);
     const lastShown = lastRaw ? Number(lastRaw) : 0;
-    const now = Date.now();
     const intervalMs = 48 * 60 * 60 * 1000;
 
     if (!lastShown || now - lastShown >= intervalMs) {
@@ -1044,49 +1303,131 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     }
   }, [loading, outletView, products]);
 
+  // Revalidate through the shared cache — the sync effect above applies the
+  // fresh page to local state.
   const refresh = useCallback(async () => {
     if (!user?.id) return;
-    const productsRes = await apiClient.get<Partial<ProductsResponse>>(`/brands/${user.id}/products`, {
-      params: {
-        page,
-        limit,
-        sortBy: productSortBy,
-        cursor: currentPageCursor ?? undefined,
-        search: searchQuery.trim() ? searchQuery.trim() : undefined,
-        collectionId: filterCollection !== 'all' ? filterCollection : undefined,
-        isActive:
-          filterStatus === 'active'
-            ? true
-            : filterStatus === 'draft'
-              ? false
-              : undefined,
-        isFeatured: filterStatus === 'featured' ? true : undefined,
-        includeDeleted: filterStatus === 'deleted' ? true : undefined,
-        onlyDeleted: filterStatus === 'deleted' ? true : undefined,
-      },
+    await refetchProducts();
+  }, [refetchProducts, user?.id]);
+
+  // Filler cards for in-flight/failed product creation. Hide once the real
+  // product row has been fetched (reconciled by id) or the task is terminal.
+  const productIdSet = useMemo(
+    () => new Set(products.map((p) => p.id)),
+    [products],
+  );
+  const visibleProductFillers = useMemo(() => {
+    return productPublishTasks.filter((task) => {
+      const productId = getPublishTaskDesignId(task);
+      // The real product row takes over ONLY once it is actually in the list —
+      // keep the (100% / "In review") filler until then so the reroute never
+      // shows a blank gap between "upload done" and "card fetched". The
+      // tab-correction effect switches to the product's real tab, where this
+      // reconcile then dissolves the filler.
+      //
+      // A FAILED task is the exception: the create step succeeded, so the row
+      // IS in the list — as a stranded DRAFT. Reconciling it away used to hide
+      // the failure completely, leaving the owner with a silent draft and no
+      // hint that go-live never happened. Keep the retry/remove affordance.
+      if (productId && productIdSet.has(productId) && task.status !== 'failed') {
+        return false; // reconciled
+      }
+      const kind = task.kind ?? 'publish';
+      if (filterStatus === 'draft') return kind === 'draft';
+      if (filterStatus === 'in_review') return kind === 'publish';
+      if (filterStatus === 'all') return true;
+      return false; // active/archived/deleted/etc. never show fillers
     });
+  }, [productPublishTasks, productIdSet, filterStatus]);
 
-    const productsPayload = unwrapApiResponse<Partial<ProductsResponse>>(productsRes.data);
-    const items = Array.isArray(productsPayload?.items)
-      ? (productsPayload.items as BackendProduct[])
-      : [];
-    setProducts(items);
-    setTotal(typeof productsPayload?.total === 'number' ? productsPayload.total : items.length);
-
-    const nextCursor = productsPayload?.nextCursor;
-    if (typeof nextCursor === 'string' && nextCursor.length > 0) {
-      setCursorByPage((prev) => ({ ...prev, [page + 1]: nextCursor }));
+  /**
+   * Products whose failure card is already on screen.
+   *
+   * A failed publish leaves BOTH a stranded draft row (create succeeded) and a
+   * failure filler (upload did not) — and the rule above deliberately keeps the
+   * filler so the failure stays visible and retryable. The cost was two cards
+   * for one product: a red "failed" card, and a second card with no image whose
+   * text panel is fully populated, which reads as a mysterious half-created
+   * duplicate.
+   *
+   * The filler is the one that carries Retry and Remove, so the filler is the
+   * one that stays. Hiding the row here is a display decision only — the draft
+   * still exists, and it reappears the moment the task is retried or removed.
+   */
+  const failedFillerProductIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const task of visibleProductFillers) {
+      if (task.status !== 'failed') continue;
+      const productId = getPublishTaskDesignId(task);
+      if (productId) ids.add(productId);
     }
-  }, [
-    currentPageCursor,
-    filterCollection,
-    filterStatus,
-    limit,
-    page,
-    productSortBy,
-    searchQuery,
-    user?.id,
-  ]);
+    return ids;
+  }, [visibleProductFillers]);
+
+  const handleRetryProductPublish = useCallback(
+    (task: PublishTask) => {
+      const productId = getPublishTaskDesignId(task);
+      const input = getRetryableProductPublishJob(task.id);
+
+      /**
+       * Retry means RETRY — finish the upload that failed.
+       *
+       * This used to see that a product id existed (create succeeded, upload
+       * failed) and respond by discarding the retained job and navigating to
+       * the product's edit screen. The retained job is the only place the File
+       * blobs live, so that threw away the images and dropped the brand onto an
+       * edit screen for a product with no media and a disabled continue button
+       * — guaranteed, in exactly the situation Retry exists to handle.
+       *
+       * With the files still in memory the right move is to resume: upload into
+       * the product that already exists (no duplicate), then finalise.
+       */
+      if (input) {
+        if (isProductPublishJobRunning(task.id)) {
+          toast.info('Already retrying.');
+          return;
+        }
+        updatePublishTask(
+          task.id,
+          { status: 'uploading', progress: 1, message: 'Retrying…', error: undefined },
+          productPublishScope,
+        );
+        void runProductPublishJob({ ...input, existingProductId: productId ?? null });
+        return;
+      }
+
+      // No files to resume with — a different device, or a reloaded tab. The
+      // edit screen is then the only way forward, and the product is real.
+      if (productId) {
+        clearRetryableProductPublishJob(task.id);
+        removePublishTask(task.id, productPublishScope);
+        navigate(`/studio/store/products/${productId}/edit`);
+        toast.info('Add the product images here to finish publishing.');
+        return;
+      }
+
+      toast.error(
+        "This upload can't be retried on this device. Remove it and create the product again.",
+      );
+    },
+    [navigate, productPublishScope],
+  );
+
+  const handleRemoveProductFiller = useCallback(
+    (task: PublishTask) => {
+      const productId = getPublishTaskDesignId(task);
+      clearRetryableProductPublishJob(task.id);
+      removePublishTask(task.id, productPublishScope);
+      if (productId) {
+        // Best-effort: delete the stranded draft product left by a failed job.
+        void productApi
+          .deleteProduct(productId)
+          .then(() => refresh())
+          .catch(() => {});
+      }
+    },
+    [productPublishScope, refresh],
+  );
 
   useEffect(() => {
     if (outletView !== 'products') return;
@@ -1143,6 +1484,63 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
     return () => window.clearTimeout(timer);
   }, [location.search, navigate, outletView, products, recentCreatedProductId, refresh]);
+
+  // Same media hydration, for the ASYNC create path. That reroute lands on
+  // /studio/store?status=in_review and never sets ?createdProductId=, so the
+  // retry above could not see it: the publish job fires exactly ONE refresh on
+  // completion, and whenever that response beat the new product's media rows
+  // the card painted broken and stayed broken until a manual reload.
+  const publishedMediaAttemptsRef = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (outletView !== 'products') return;
+
+    const pendingProductId = productPublishTasks
+      .filter((task) => task.status === 'published' || task.status === 'saved')
+      .map((task) => getPublishTaskDesignId(task))
+      .find((productId) => {
+        if (!productId) return false;
+        if ((publishedMediaAttemptsRef.current.get(productId) ?? 0) >= 12) return false;
+        const row = products.find((product) => product.id === productId) ?? null;
+        return !hasRenderableProductMedia(row);
+      });
+
+    if (!pendingProductId) return;
+
+    const timer = window.setTimeout(() => {
+      publishedMediaAttemptsRef.current.set(
+        pendingProductId,
+        (publishedMediaAttemptsRef.current.get(pendingProductId) ?? 0) + 1,
+      );
+      void refresh().catch(() => undefined);
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [outletView, productPublishTasks, products, refresh]);
+
+  // Land on the product's REAL tab. Go-live reroutes to ?status=in_review, but
+  // the backend resolves the new product to IN_REVIEW or auto-PUBLISHED. The
+  // in_review/draft owner query returns every status, so once the just-created
+  // product row is loaded, switch to the tab that actually shows it — once per
+  // product, and only away from the two reroute-target tabs (never fights a
+  // manual tab change the user makes later).
+  const tabCorrectedProductIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (outletView !== 'products') return;
+    if (filterStatus !== 'in_review' && filterStatus !== 'draft') return;
+    for (const task of productPublishTasks) {
+      if (task.status !== 'published' && task.status !== 'saved') continue;
+      const pid = getPublishTaskDesignId(task);
+      if (!pid || tabCorrectedProductIdsRef.current.has(pid)) continue;
+      const created = products.find((product) => product.id === pid);
+      if (!created) continue;
+      tabCorrectedProductIdsRef.current.add(pid);
+      const targetTab = statusToFilterTab(resolveProductStatus(created));
+      if (targetTab && targetTab !== filterStatus) {
+        setFilterStatus(targetTab);
+      }
+      break;
+    }
+  }, [outletView, filterStatus, productPublishTasks, products]);
 
   const handleDuplicate = async (productId: string) => {
     try {
@@ -1474,7 +1872,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         toast.error('Unable to archive collection.');
         return;
       }
-      setCollections((prev) =>
+      updateStoreCollections((prev) =>
         prev.map((item) =>
           item.id === collection.id ? { ...item, status: 'ARCHIVED', isAvailableInStore: false } : item,
         ),
@@ -1496,7 +1894,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         toast.error('Unable to unarchive collection.');
         return;
       }
-      setCollections((prev) =>
+      updateStoreCollections((prev) =>
         prev.map((item) =>
           item.id === collection.id ? { ...item, status: item.status === 'ARCHIVED' ? 'DRAFT' : item.status } : item,
         ),
@@ -1518,7 +1916,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         toast.error('Unable to delete collection.');
         return;
       }
-      setCollections((prev) => prev.filter((item) => item.id !== collection.id));
+      updateStoreCollections((prev) => prev.filter((item) => item.id !== collection.id));
       toast.success('Collection deleted. Products are unchanged.');
     } catch (error) {
       const message = (error as any)?.response?.data?.message ?? 'Unable to delete collection.';
@@ -1565,7 +1963,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         toast.success('Collection duplicated.');
         return;
       }
-      setCollections((prev) => [mapped, ...prev.filter((item) => item.id !== mapped.id)]);
+      updateStoreCollections((prev) => [mapped, ...prev.filter((item) => item.id !== mapped.id)]);
       toast.success('Collection duplicated.');
     } catch (error) {
       const message = (error as any)?.response?.data?.message ?? 'Unable to duplicate collection.';
@@ -1618,7 +2016,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         }
       });
 
-      setCollections((prev) => prev.filter((collection) => !deletedIds.has(collection.id)));
+      updateStoreCollections((prev) => prev.filter((collection) => !deletedIds.has(collection.id)));
       if (activeCollectionId && deletedIds.has(activeCollectionId)) {
         handleCloseActiveCollectionView();
       }
@@ -1779,27 +2177,26 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         <div className="space-y-3 p-3 sm:p-4 lg:p-6 lg:space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white sm:text-lg">Collections Quick Access</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white sm:text-lg">Collections Quick Access</h3>
+              <p className="hidden text-xs text-gray-500 dark:text-gray-400 sm:block sm:text-sm">
                 Slow carousel preview with cover images always visible.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => navigate('/studio/store/collections/new')}
-                className="rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
-              >
-                Create collection
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/studio/store?view=collections')}
-                className="rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
-              >
-                Manage collections
-              </button>
-            </div>
+            {/*
+              Phones get a "+" that opens the two actions; tablets and desktop
+              keep both buttons inline. Two full-width word pills next to a
+              heading left the collections header wrapping onto three lines on a
+              narrow screen, before any collection was even visible.
+
+              Breakpoint is `sm` (640px), so iPad — portrait included — stays on
+              the inline pair exactly as it is today.
+            */}
+            <CollectionActionsControl
+              onCreate={() => navigate('/studio/store/collections/new')}
+              onManage={() => navigate('/studio/store?view=collections')}
+              onAddProduct={() => navigate('/studio/store/products/new')}
+              addProductLabel={primaryProductActionLabel}
+            />
           </div>
 
           {collectionsLoading ? (
@@ -1838,7 +2235,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         setHoveredCollectionId((prev) => (prev === collection.id ? null : prev));
                         setHoverPreviewFrame((prev) => ({ ...prev, [collection.id]: 0 }));
                       }}
-                      className="group relative h-28 w-40 shrink-0 snap-start overflow-hidden rounded-xl border border-gray-200 bg-gray-100 text-left shadow-sm transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-zinc-900/80 sm:h-36 sm:w-52 lg:h-44 lg:w-64"
+                      className="group relative h-24 w-36 shrink-0 snap-start overflow-hidden rounded-xl border border-gray-200 bg-gray-100 text-left shadow-sm transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-white/10 dark:bg-zinc-900/80 sm:h-36 sm:w-52 lg:h-44 lg:w-64"
                     >
                       {/* Opacity-based crossfade stack — fills entire card */}
                       {previewSources.length > 0 ? (
@@ -1885,24 +2282,34 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           )}
                         </>
                       ) : (
-                        <ImageWithFallback
-                          src={activePreview.src}
-                          fileId={activePreview.fileId}
-                          alt={activePreview.alt}
-                          fit="cover"
-                          rounded="none"
-                          containerClassName="h-full w-full relative z-10"
-                          className="h-full w-full"
-                          fallbackName={collection.name}
-                        />
+                        <>
+                          <ImageWithFallback
+                            src={activePreview.src}
+                            fileId={activePreview.fileId}
+                            alt={activePreview.alt}
+                            fit="cover"
+                            rounded="none"
+                            containerClassName="h-full w-full relative z-10"
+                            className="h-full w-full"
+                            fallbackName={collection.name}
+                          />
+                          {!activePreview.src && !activePreview.fileId && (
+                            <div className="pointer-events-none absolute inset-x-0 top-1/3 z-20 flex -translate-y-1/2 items-center justify-center gap-1 px-2">
+                              <span className="text-sm" aria-hidden="true">📷</span>
+                              <span className="text-[10px] font-semibold text-white/90 drop-shadow-sm">
+                                No cover yet
+                              </span>
+                            </div>
+                          )}
+                        </>
                       )}
 
                       {/* Frosted Glass Text Component - Bottom Overlay */}
-                      <div className="absolute bottom-0 left-0 right-0 z-30 border-t border-white/20 bg-white/60 p-2 backdrop-blur-md transition-transform duration-300 dark:border-white/10 dark:bg-black/60 sm:p-3">
+                      <div className="absolute bottom-0 left-0 right-0 z-30 border-t border-white/20 bg-white/60 p-1.5 backdrop-blur-md transition-transform duration-300 dark:border-white/10 dark:bg-black/60 sm:p-3">
                         <p className="line-clamp-1 text-xs font-bold text-gray-900 drop-shadow-sm dark:text-white sm:text-sm">
                           {collection.name}
                         </p>
-                        <p className="mt-0.5 text-[10px] font-medium text-gray-700 dark:text-gray-300 sm:text-xs">
+                        <p className="mt-0.5 hidden text-[10px] font-medium text-gray-700 dark:text-gray-300 sm:block sm:text-xs">
                           {collection.itemCount ?? 0} items
                         </p>
                       </div>
@@ -1966,28 +2373,55 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   />
                 )}
               </div>
+              {/*
+                The bolt sits next to the search, not on a row of its own.
+
+                It used to own a whole strip below the toolbar — one 36pt button
+                and an empty 800px rail — which cost a full row of vertical space
+                on a phone to show a single icon. It is a toolbar control like
+                the two beside it, so it lives in the toolbar; the actions it
+                reveals still expand underneath.
+              */}
+              <button
+                type="button"
+                onClick={() => setShowQuickActions((v) => !v)}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border shadow-sm transition-all sm:h-11 sm:w-11 ${
+                  showQuickActions
+                    ? 'border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300'
+                    : 'border-gray-200 bg-white/80 text-gray-700 hover:bg-purple-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10'
+                }`}
+                aria-expanded={showQuickActions}
+                aria-label={showQuickActions ? 'Hide quick actions' : 'Show quick actions'}
+                title={showQuickActions ? 'Hide quick actions' : 'Show quick actions'}
+              >
+                <span aria-hidden="true" className="text-base">⚡</span>
+              </button>
+              {/* Add Product moved to the collections "+" on phones; the inline
+                  button is still the fastest route on a wider screen. */}
               <button
                 type="button"
                 onClick={() => navigate('/studio/store/products/new')}
-                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-purple-500/40 active:scale-95 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
+                className="hidden items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-purple-500/40 active:scale-95 sm:inline-flex sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
                 aria-label={primaryProductActionLabel}
                 title={primaryProductActionLabel}
               >
                 <span aria-hidden="true">➕</span>
-                <span className="hidden min-[380px]:inline">{primaryProductActionLabel}</span>
+                <span>{primaryProductActionLabel}</span>
               </button>
+              {/* Status now lives in the tab strip below, so this control is
+                  only the three refinements it still owns. */}
               <button
                 type="button"
                 onClick={() => setShowFiltersMenu((v) => !v)}
-                className={`flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm transition-all sm:h-11 sm:w-11 lg:hidden ${
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border shadow-sm transition-all sm:h-11 sm:w-11 lg:hidden ${
                   showFiltersMenu
                     ? 'border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300'
                     : 'border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10'
                 }`}
-                aria-label={showFiltersMenu ? 'Hide filters menu' : 'Show filters menu'}
-                title={showFiltersMenu ? 'Hide filters menu' : 'Show filters menu'}
+                aria-label={showFiltersMenu ? 'Hide refine menu' : 'Refine results'}
+                title={showFiltersMenu ? 'Hide refine menu' : 'Refine results'}
               >
-                ☰
+                ⚙️
               </button>
             </div>
           </div>
@@ -1995,26 +2429,11 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           {showFiltersMenu && (
             <div
               ref={filtersMenuRef}
-              className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4.25rem)] z-50 max-h-[min(70vh,26rem)] overflow-y-auto rounded-xl border border-gray-200/90 bg-white/98 p-2.5 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#12121a]/98 sm:absolute sm:inset-x-auto sm:right-4 sm:top-[64px] sm:w-[min(92vw,520px)] sm:p-3 lg:hidden"
+              className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4.25rem)] z-50 max-h-[min(70vh,26rem)] overflow-y-auto rounded-xl border border-gray-200/90 bg-white/[0.98] p-2.5 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#12121a]/[0.98] sm:absolute sm:inset-x-auto sm:right-4 sm:top-[64px] sm:w-[min(92vw,520px)] sm:p-3 lg:hidden"
             >
-              <div className="mb-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
-                {PRODUCT_FILTER_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setFilterStatus(opt.value)}
-                    className={`flex min-h-8 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium transition-all duration-200 sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs ${
-                      filterStatus === opt.value
-                        ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md shadow-purple-500/30'
-                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/10'
-                    }`}
-                  >
-                    <span>{opt.icon}</span>
-                    <span className="max-w-[7rem] truncate">{opt.label}</span>
-                  </button>
-                ))}
-              </div>
-
+              {/* Status used to be repeated here as a chip grid. It is the tab
+                  strip's job now, and having it in two places meant the visible
+                  tab and the menu chip could look like separate controls. */}
               <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-3">
                 <FilterDropdown
                   value={filterCollection}
@@ -2045,8 +2464,65 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           )}
         </div>
 
+        {/*
+          ═══ STATUS TABS (phone / tablet) ═══
+
+          What this replaces: the only way to change status on a phone was to
+          open the ☰ menu, which meant the current status was invisible until
+          you opened something. Tabs put the whole set on screen and the
+          selected one is simply the one that is highlighted.
+
+          Everything here is chosen so that changing tab does not move the page:
+
+          • The strip scrolls horizontally on its own axis (`overflow-x-auto`)
+            and is `snap-x`, so the tabs move and nothing else does.
+          • Labels never wrap and the row height is fixed, so the strip is the
+            same height on every tab regardless of label length.
+          • The active pill is a background on the button itself rather than a
+            separately positioned indicator, so there is no measure-then-move
+            step that could land a frame late and read as a jump.
+          • The selected tab is scrolled into view along the strip's own
+            inline axis with `block: 'nearest'` — `nearest` is what stops the
+            browser from scrolling the PAGE to satisfy the request, which is
+            the classic version of "it shook the screen".
+          • The results grid below keeps its measured `minHeight` across the
+            change (see `listMinHeight`), so a tab with fewer products cannot
+            collapse the container and yank the viewport up.
+        */}
+        <div className="border-t border-gray-200/80 bg-white/[0.92] backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 lg:hidden">
+          <div
+            ref={statusTabsRef}
+            role="tablist"
+            aria-label="Filter products by status"
+            className="scrollbar-hide flex snap-x snap-mandatory items-stretch gap-1 overflow-x-auto overscroll-x-contain px-3 py-2 sm:gap-1.5 sm:px-4"
+          >
+            {PRODUCT_FILTER_OPTIONS.map((opt) => {
+              const selected = filterStatus === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="tab"
+                  id={`product-status-tab-${opt.value}`}
+                  aria-selected={selected}
+                  data-status-tab={opt.value}
+                  onClick={() => setFilterStatus(opt.value)}
+                  className={`flex h-9 shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs font-semibold transition-colors duration-200 ${
+                    selected
+                      ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md shadow-purple-500/25'
+                      : 'bg-gray-100/80 text-gray-600 hover:text-gray-900 dark:bg-white/5 dark:text-gray-300 dark:hover:text-white'
+                  }`}
+                >
+                  <span aria-hidden="true">{opt.icon}</span>
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Desktop status filter buttons */}
-        <div className="hidden border-t border-gray-200/80 bg-white/92 px-5 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 lg:sticky lg:top-24 lg:z-20 lg:block">
+        <div className="hidden border-t border-gray-200/80 bg-white/[0.92] px-5 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 lg:sticky lg:top-24 lg:z-20 lg:block">
           <div className="flex flex-wrap items-center gap-2">
             {PRODUCT_FILTER_OPTIONS.map((opt) => (
               <button
@@ -2065,102 +2541,6 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             ))}
           </div>
         </div>
-
-        {/* Quick Actions */}
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide px-5 pb-4 pt-4">
-          <button
-            type="button"
-            onClick={() => setShowQuickActions((v) => !v)}
-            className={`flex-shrink-0 h-9 w-9 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 hover:bg-purple-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center shadow-sm ${
-              showQuickActions
-                ? 'text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-500/10'
-                : 'text-gray-700 dark:text-gray-200'
-            }`}
-            aria-label={showQuickActions ? 'Hide quick actions' : 'Show quick actions'}
-          >
-            <span className="text-sm">⚡</span>
-          </button>
-          <div
-            className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ease-out ${
-              showQuickActions ? 'max-w-[calc(100vw-7rem)] opacity-100 sm:max-w-[800px]' : 'max-w-0 opacity-0'
-            }`}
-          >
-            <button
-              type="button"
-              onClick={() => navigate('/studio/store/collections/new')}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors whitespace-nowrap"
-            >
-              📦 Add Collection
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate(buildDesignRoute({ mode: 'create' }))}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors whitespace-nowrap"
-            >
-              🎨 Create Look
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-white/5 px-3 py-2 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors whitespace-nowrap"
-            >
-              📥 Import
-            </button>
-            {onToggleLayoutMode && (
-              <button
-                type="button"
-                onClick={onToggleLayoutMode}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
-                  layoutMode
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10'
-                }`}
-              >
-                🎯 {layoutMode ? 'Exit Layout' : 'Layout Mode'}
-              </button>
-            )}
-          </div>
-
-          {/* ─── Draft Collections: inline scroll-out ─── */}
-          {(storeDraftCollections.length > 0 || draftCollectionsLoading) && (
-            <>
-              <div className="h-5 w-px bg-gray-200 dark:bg-white/10 mx-1" />
-              <button
-                type="button"
-                onClick={() => setShowDrafts((v) => !v)}
-                className={`flex-shrink-0 h-9 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 hover:bg-amber-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1.5 px-2.5 shadow-sm ${
-                  showDrafts
-                    ? 'text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10'
-                    : 'text-gray-700 dark:text-gray-200'
-                }`}
-                aria-label={showDrafts ? 'Hide draft collections' : 'Show draft collections'}
-              >
-                <span className="text-sm">📝</span>
-                <span className="text-[10px] font-bold tabular-nums">{storeDraftCollections.length}</span>
-              </button>
-              <div
-                className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ease-out ${
-                  showDrafts ? 'max-w-[calc(100vw-7rem)] opacity-100 sm:max-w-[600px]' : 'max-w-0 opacity-0'
-                }`}
-              >
-                {draftCollectionsLoading ? (
-                  <div className="h-9 w-32 rounded-lg bg-gray-100 dark:bg-white/5 animate-pulse" />
-                ) : (
-                  storeDraftCollections.map((draft: any) => (
-                    <button
-                      key={draft.id}
-                      type="button"
-                      onClick={() => navigate(`/studio/store/collections/new?collectionId=${draft.id}`)}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors whitespace-nowrap"
-                    >
-                      📝 {draft.title?.trim() || 'Untitled Draft'}
-                    </button>
-                  ))
-                )}
-              </div>
-            </>
-          )}
-        </div>
-
       </div>
       )}
 
@@ -2411,16 +2791,26 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                               )}
                             </>
                           ) : (
-                            <ImageWithFallback
-                              src={activePreview.src}
-                              fileId={activePreview.fileId}
-                              alt={activePreview.alt}
-                              fit="cover"
-                              rounded="none"
-                              containerClassName="h-full w-full relative z-10"
-                              className="h-full w-full"
-                              fallbackName={collection.name}
-                            />
+                            <>
+                              <ImageWithFallback
+                                src={activePreview.src}
+                                fileId={activePreview.fileId}
+                                alt={activePreview.alt}
+                                fit="cover"
+                                rounded="none"
+                                containerClassName="h-full w-full relative z-10"
+                                className="h-full w-full"
+                                fallbackName={collection.name}
+                              />
+                              {!activePreview.src && !activePreview.fileId && (
+                                <div className="pointer-events-none absolute inset-x-0 top-1/3 z-20 flex -translate-y-1/2 flex-col items-center gap-1 px-4 text-center">
+                                  <span className="text-xl" aria-hidden="true">📷</span>
+                                  <span className="text-[11px] font-semibold text-white/90 drop-shadow-sm">
+                                    No cover yet — add products or a cover image
+                                  </span>
+                                </div>
+                              )}
+                            </>
                           )}
 
                           {/* Menu host — Top Right */}
@@ -2553,9 +2943,10 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     key={product.id}
                     type="button"
                     onClick={() => navigateToStudioProductDetails(product.id)}
-                    className="overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-zinc-900/70"
+                    className="overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-zinc-900/70 lg:rounded-xl"
                   >
-                    <div className="aspect-[4/5] bg-gray-100 dark:bg-white/5">
+                    {/* Same cover proportion as the catalog card above. */}
+                    <div className="aspect-[100/158] bg-gray-100 dark:bg-white/5 lg:aspect-[4/5]">
                       <ImageWithFallback
                         src={product.thumbnail || product.images?.[0] || product.media?.[0]?.url || null}
                         fileId={product.media?.find((media) => media.isPrimary)?.id || null}
@@ -2596,7 +2987,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     type="button"
                     onClick={() => setCollectionPage((prev) => Math.max(1, prev - 1))}
                     disabled={collectionPage === 1}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                    className="min-h-10 rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 sm:min-h-0"
                   >
                     Prev
                   </button>
@@ -2609,7 +3000,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       setCollectionPage((prev) => Math.min(managedCollectionsPages, prev + 1))
                     }
                     disabled={collectionPage === managedCollectionsPages}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                    className="min-h-10 rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 sm:min-h-0"
                   >
                     Next
                   </button>
@@ -2639,7 +3030,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     type="button"
                     onClick={() => setActiveCollectionProductsPage((prev) => Math.max(1, prev - 1))}
                     disabled={activeCollectionProductsPage === 1 || activeCollectionProductsLoading}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                    className="min-h-10 rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 sm:min-h-0"
                   >
                     Prev
                   </button>
@@ -2657,7 +3048,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       activeCollectionProductsPage === activeCollectionProductsPages ||
                       activeCollectionProductsLoading
                     }
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                    className="min-h-10 rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 sm:min-h-0"
                   >
                     Next
                   </button>
@@ -2682,6 +3073,103 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       {/* Products - with CSS containment for smooth tab transitions */}
       {outletView === 'products' && !inlineProduct && (
       <div className="rounded-xl border border-gray-200 bg-white/90 shadow-lg dark:border-white/10 dark:bg-white/5 sm:rounded-2xl">
+        {/*
+          Quick Actions — the drawer the ⚡ in the toolbar opens.
+
+          It lives INSIDE the results card, above the grid, rather than as its
+          own strip between two panels. Create-a-collection, create-a-look and
+          layout mode all act on the catalog you are looking at, so they belong
+          in the same container as the catalog; floating between panels made
+          them read as chrome belonging to neither, and cost a band of vertical
+          space on a phone.
+
+          Collapsed it is genuinely zero-height (max-height and opacity animate
+          together on one element), so a closed drawer costs nothing instead of
+          leaving an empty padded strip.
+        */}
+        <div
+          aria-hidden={!showQuickActions}
+          className={`overflow-hidden transition-all duration-300 ease-out ${
+            showQuickActions ? 'max-h-24 opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          <div
+            className="scrollbar-hide flex items-center gap-2 overflow-x-auto px-5 pb-4 pt-4"
+          >
+            <button
+              type="button"
+              onClick={() => navigate('/studio/store/collections/new')}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors whitespace-nowrap"
+            >
+              📦 Add Collection
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(buildDesignRoute({ mode: 'create' }))}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors whitespace-nowrap"
+            >
+              🎨 Create Look
+            </button>
+            {/* Import action hidden until the bulk-import feature is implemented
+                (button previously rendered with no handler — read as broken). */}
+            {onToggleLayoutMode && (
+              <button
+                type="button"
+                onClick={onToggleLayoutMode}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap ${
+                  layoutMode
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10'
+                }`}
+              >
+                🎯 {layoutMode ? 'Exit Layout' : 'Layout Mode'}
+              </button>
+            )}
+
+            {/* ─── Draft Collections: inline scroll-out ─── */}
+            {(storeDraftCollections.length > 0 || draftCollectionsLoading) && (
+              <>
+                <div className="h-5 w-px bg-gray-200 dark:bg-white/10 mx-1" />
+              <button
+                type="button"
+                onClick={() => setShowDrafts((v) => !v)}
+                className={`flex-shrink-0 h-9 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 hover:bg-amber-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1.5 px-2.5 shadow-sm ${
+                  showDrafts
+                    ? 'text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10'
+                    : 'text-gray-700 dark:text-gray-200'
+                }`}
+                aria-label={showDrafts ? 'Hide draft collections' : 'Show draft collections'}
+              >
+                <span className="text-sm">📝</span>
+                <span className="text-[10px] font-bold tabular-nums">{storeDraftCollections.length}</span>
+              </button>
+              <div
+                className={`flex items-center gap-2 transition-all duration-300 ease-out ${
+                  showDrafts
+                    ? 'max-w-[calc(100vw-7rem)] overflow-x-auto scrollbar-hide opacity-100 sm:max-w-[600px]'
+                    : 'max-w-0 overflow-hidden opacity-0'
+                }`}
+              >
+                {draftCollectionsLoading ? (
+                  <div className="h-9 w-32 rounded-lg bg-gray-100 dark:bg-white/5 animate-pulse" />
+                ) : (
+                  storeDraftCollections.map((draft: any) => (
+                    <button
+                      key={draft.id}
+                      type="button"
+                      onClick={() => navigate(`/studio/store/collections/new?collectionId=${draft.id}`)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors whitespace-nowrap"
+                    >
+                      📝 {draft.title?.trim() || 'Untitled Draft'}
+                    </button>
+                  ))
+                )}
+              </div>
+              </>
+            )}
+          </div>
+        </div>
+
         {/* Inline filter dropdowns */}
         <div className="hidden lg:flex items-center gap-3 px-4 pt-4 sm:px-6 sm:pt-5">
           <FilterDropdown
@@ -2719,8 +3207,29 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             }}
             className={`transition-opacity duration-300 ease-out ${loading ? 'opacity-50' : 'opacity-100'}`}
           >
-            <div className="grid grid-cols-2 gap-2 transition-all duration-300 min-[520px]:grid-cols-3 lg:grid-cols-4">
-            {filteredProducts.map((product) => {
+            {/*
+              Two columns at the native catalog's proportions.
+
+              The native catalog card (`CollectionCard`) is laid out as two
+              columns with a 12pt gutter and a cover of `width * 1.58`. Studio
+              was two columns with an 8px gutter and a 5:6 cover — a visibly
+              shorter, wider card — so the same product looked like a different
+              object depending on which screen a brand was on. `gap-3` is 12px
+              and `aspect-[100/158]` is the same 1.58, so the two now scale
+              together at any phone width.
+            */}
+            <div className="grid grid-cols-2 gap-3 transition-all duration-300 min-[520px]:grid-cols-3 lg:grid-cols-4">
+            {visibleProductFillers.map((task) => (
+              <ProductPublishFillerCard
+                key={task.id}
+                task={task}
+                onRetry={handleRetryProductPublish}
+                onRemove={handleRemoveProductFiller}
+              />
+            ))}
+            {filteredProducts
+              .filter((product) => !failedFillerProductIds.has(product.id))
+              .map((product) => {
               const collectionLabel =
                 product.collection?.title ||
                 collections.find((c) => c.id === product.collectionId)?.name ||
@@ -2736,7 +3245,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 <div
                   key={product.id}
                   className={[
-                    'group relative aspect-[5/6] overflow-hidden rounded-xl shadow-sm transition-all duration-300 ease-out',
+                    // Native parity below `lg`; the desktop grid keeps 5:6,
+                    // where four columns of a tall card would be unusable.
+                    'group relative aspect-[100/158] overflow-hidden rounded-2xl shadow-sm transition-all duration-300 ease-out lg:aspect-[5/6] lg:rounded-xl',
                     selectedProducts.includes(product.id)
                       ? 'ring-2 ring-purple-500 border-purple-300 dark:border-purple-500/30'
                       : 'hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30',
@@ -2757,7 +3268,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       toggleSelect(product.id);
                     }}
                     onClick={(e) => e.stopPropagation()}
-                    className="absolute left-2 top-2 z-20 h-4 w-4 rounded border-gray-300 bg-white/90 text-purple-600 focus:ring-purple-500/30 dark:border-zinc-600 dark:bg-zinc-800/90 cursor-pointer"
+                    className="absolute left-2 top-2 z-20 h-5 w-5 rounded border-gray-300 bg-white/90 text-purple-600 focus:ring-purple-500/30 dark:border-zinc-600 dark:bg-zinc-800/90 cursor-pointer sm:h-4 sm:w-4"
                   />
                   
                   {/* Actions menu button (replaces star) */}
@@ -2774,7 +3285,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           dropdownManager.openId === menuId ? null : menuId,
                         );
                       }}
-                      className={`flex h-7 w-7 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm shadow-sm transition-all duration-200 ${
+                      className={`flex h-9 w-9 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm shadow-sm transition-all duration-200 sm:h-7 sm:w-7 ${
                         dropdownManager.openId === `product-menu-${product.id}`
                           ? 'text-white bg-purple-600/80'
                           : 'text-white hover:bg-black/60'
@@ -2806,34 +3317,18 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     />
                   )}
 
-                  {/* Quick action icons - always visible */}
-                  {!product.deletedAt && (
-                    <div className="absolute bottom-[5.25rem] right-2 z-30 flex items-center gap-1 sm:bottom-[5.75rem] sm:gap-1.5">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleProductAction('edit', product);
-                        }}
-                        title="Edit product"
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-purple-600 sm:h-8 sm:w-8"
-                      >
-                        <span className="text-sm">✏️</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleProductAction('delete', product);
-                        }}
-                        title="Delete product"
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-red-500 sm:h-8 sm:w-8"
-                      >
-                        <span className="text-sm">🗑️</span>
-                      </button>
-                    </div>
-                  )}
-                  
+                  {/*
+                    Edit and delete now live in the copy panel (see below).
+
+                    They used to float on the photograph, pinned to a
+                    `bottom-[5.25rem]` offset measured against the panel's
+                    height — two dark circles sitting on the garment, and an
+                    offset that had to be re-guessed whenever the panel's
+                    contents changed. Inside the panel they sit in the card's
+                    one text surface, and their position follows the layout
+                    instead of being hand-tuned against it.
+                  */}
+
                   {/* Layout mode drag handle */}
                   {layoutMode && (
                     <div className="absolute bottom-4 right-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 dark:bg-zinc-800/90 text-gray-500 dark:text-zinc-400 shadow-lg">
@@ -2968,6 +3463,36 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                                 : `🟢 ${product.totalStock} in stock`}
                         </span>
                         
+                        {/* Edit / delete, at the bottom-right of the text area. */}
+                        {!product.deletedAt && (
+                          <span className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleProductAction('edit', product);
+                              }}
+                              title="Edit product"
+                              aria-label="Edit product"
+                              className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+                            >
+                              <span className="text-xs">✏️</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleProductAction('delete', product);
+                              }}
+                              title="Delete product"
+                              aria-label="Delete product"
+                              className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-rose-500/80 hover:text-white"
+                            >
+                              <span className="text-xs">🗑️</span>
+                            </button>
+                          </span>
+                        )}
+
                         {/* Creation time */}
                         {product.createdAt && (
                           <span 
@@ -3024,14 +3549,15 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               </div>
             )}
             {/* Filter empty — products exist but none match the filter */}
-            {!loading && filteredProducts.length === 0 && products.length > 0 && !showDraftCollectionsInProductArea && (
+            {!loading && filteredProducts.length === 0 && products.length > 0 && !showDraftCollectionsInProductArea && visibleProductFillers.length === 0 && (
               <div className="col-span-full py-16 text-center text-gray-500 dark:text-gray-400">
                 No products match this filter.
               </div>
             )}
             {/* Absolute empty — no products at all. Rendered here so it sits inside
-                the same card container rather than creating a second orphan box. */}
-            {!loading && products.length === 0 && !showDraftCollectionsInProductArea && (() => {
+                the same card container rather than creating a second orphan box.
+                Suppressed while a creation filler card is showing. */}
+            {!loading && products.length === 0 && !showDraftCollectionsInProductArea && visibleProductFillers.length === 0 && (() => {
               const getEmptyStateType = (): EmptyStateType => {
                 switch (filterStatus) {
                   case 'archived': return 'no-archived';
@@ -3341,7 +3867,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 )}
                 {collectionGalleryLoading ? (
                   <div className="flex h-[50vh] w-full items-center justify-center">
-                    <VLoader size={42} phase="loading" showLabel={false} />
+                    <MuseLoader size={42} />
                   </div>
                 ) : !selectedCollectionGalleryImage ? (
                   <div className="flex h-[40vh] w-full items-center justify-center">

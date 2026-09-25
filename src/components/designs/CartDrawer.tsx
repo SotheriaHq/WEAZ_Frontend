@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { X, Minus, Plus, Trash2, ShoppingBag, Lock, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingBag, Lock, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { AppDispatch, RootState } from '@/store';
 import {
@@ -24,7 +24,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
-import CheckoutPage from '@/pages/checkout/CheckoutPage';
 import {
   customOrdersBuyerApi,
   type CustomOrderCheckoutBagLine,
@@ -33,8 +32,17 @@ import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { MY_BAG_EMOJI } from '@/constants/bagging';
 
-const PROMO_CODES_UNAVAILABLE_MESSAGE =
-  'Promo codes are not available during MVP checkout. Final totals are calculated securely by WEAZ at payment time.';
+/**
+ * Lazy so the checkout tree (payment flow, card fields, APIs) stays out of the
+ * landing-page chunk graph — CartDrawer mounts globally on every page.
+ */
+const CheckoutPage = lazy(() => import('@/pages/checkout/CheckoutPage'));
+
+/*
+  No promo code notice here either — see `CheckoutPage`. A banner explaining
+  that a feature does not exist is still that feature taking up space, and this
+  drawer has less of it than anywhere else in the product.
+*/
 
 // Small component to handle signed URL resolution for cart thumbnails
 const CartItemThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
@@ -57,11 +65,13 @@ const CartItemThumbnail: React.FC<{ src: string; alt: string }> = ({ src, alt })
 /**
  * CartDrawer Component
  * 
- * A slide-in drawer displaying the shopping cart with:
+ * A slide-in drawer displaying the shopping bag with:
  * - Product list with quantity controls
- * - Promo code input with validation
- * - Order summary with discounts
+ * - Order summary, totalled by the server
  * - Checkout CTA with payment methods
+ *
+ * No promo codes and no discounts: neither has ever existed here, and the list
+ * above claimed both long after the input was removed.
  * 
  * Design: Glassmorphism with gradient blur backdrop
  */
@@ -305,16 +315,24 @@ const CartDrawer: React.FC = () => {
               }`}
               role="dialog"
               aria-modal="true"
-              aria-label="Shopping Bag"
+              aria-label="My Bag"
             >
               {/* Glass panel */}
-              <div className="h-full bg-white/98 dark:bg-gray-950/98 backdrop-blur-2xl border-l border-white/30 dark:border-white/10 shadow-2xl flex flex-col">
+              <div className="h-full bg-white/[0.98] dark:bg-gray-950/[0.98] backdrop-blur-2xl border-l border-white/30 dark:border-white/10 shadow-2xl flex flex-col">
               {drawerView === 'checkout' ? (
                 <div className="h-full overflow-y-auto">
-                  <CheckoutPage
-                    embedded
-                    onClose={() => setDrawerView('bag')}
-                  />
+                  <Suspense
+                    fallback={
+                      <div className="h-full flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+                        Loading checkout…
+                      </div>
+                    }
+                  >
+                    <CheckoutPage
+                      embedded
+                      onClose={() => setDrawerView('bag')}
+                    />
+                  </Suspense>
                 </div>
               ) : (
               <>
@@ -331,10 +349,12 @@ const CartDrawer: React.FC = () => {
                   )}
                 </div>
                 <button
+                  type="button"
                   onClick={() => dispatch(closeCartDrawer())}
-                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors"
+                  aria-label="Close bag"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition-colors border border-black/10 dark:border-white/10 shadow-sm"
                 >
-                  <X size={16} className="text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm leading-none select-none font-bold">✖️</span>
                 </button>
               </div>
 
@@ -640,16 +660,6 @@ const CartDrawer: React.FC = () => {
               {/* Footer - only show when cart has items */}
               {hasBagItems && (
                 <div className="border-t border-gray-200/60 dark:border-gray-800/60 bg-white/40 dark:bg-gray-950/40 backdrop-blur-2xl px-3 py-1.5">
-                  {/* Promo Code Section */}
-                  <div className="mb-1.5">
-                    <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[10px] leading-relaxed text-amber-800 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
-                      <div className="flex gap-1.5">
-                        <span aria-hidden="true">🎟️</span>
-                        <span>{PROMO_CODES_UNAVAILABLE_MESSAGE}</span>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Order Summary */}
                   <div className="space-y-0.5 mb-1.5">
                     <div className="flex items-center justify-between text-xs">

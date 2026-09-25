@@ -5,6 +5,7 @@ import CatalogEntityCard from './CatalogEntityCard';
 import { useSelector } from 'react-redux';
 import { apiClient } from '@/api/httpClient';
 import { toast } from 'sonner';
+import { CLIP_ADDED_TOAST, CLIP_ERROR_TOAST, CLIP_REMOVED_TOAST } from '@/constants/clipping';
 import type { RootState } from '@/store';
 import { resolveCatalogEntityType } from '@/utils/catalogEntity';
 import { mapCatalogTargetForLegacyApi } from '@/utils/catalogTarget';
@@ -14,6 +15,8 @@ import { queryKeys } from '@/query/queryKeys';
 
 interface CollectionsGridProps {
   collections: CollectionDto[];
+  /** Tighter typography for catalog visibility tabs on mobile browsers. */
+  compactCards?: boolean;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   onRestore?: (id: string) => void;
@@ -23,6 +26,15 @@ interface CollectionsGridProps {
   isDeleted?: boolean;
   onRetryPublish?: (id: string) => void;
   onDismiss?: (id: string) => void;
+  /** Transiently ring + scroll to a specific card (e.g. from a notification). */
+  highlightId?: string | null;
+  /**
+   * The review status this grid is already filtered to. Cards matching it drop
+   * their status chip rather than repeating the tab heading on every tile.
+   */
+  impliedStatus?: string | null;
+  /** Entity kind this grid is already known to hold; matching cards drop their chip. */
+  impliedEntityLabel?: string | null;
 }
 
 const areSavedMapsEqual = (left: Record<string, boolean>, right: Record<string, boolean>) => {
@@ -34,6 +46,9 @@ const areSavedMapsEqual = (left: Record<string, boolean>, right: Record<string, 
 
 const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
   collections,
+  compactCards = false,
+  impliedStatus = null,
+  impliedEntityLabel = null,
   onEdit,
   onDelete,
   onRestore,
@@ -43,8 +58,15 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
   isDeleted,
   onRetryPublish,
   onDismiss,
+  highlightId,
 }) => {
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  const highlightRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (highlightId && highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlightId]);
   const queryClient = useQueryClient();
   const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
@@ -118,9 +140,9 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
         queryKeys.saved.batch('COLLECTION', collectionIdsRef.current),
         (current) => ({ ...(current ?? {}), [collectionId]: !isSaved }),
       );
-      toast.success(isSaved ? 'Removed from saved.' : 'Saved for later.');
+      toast.success(isSaved ? CLIP_REMOVED_TOAST : CLIP_ADDED_TOAST);
     } catch {
-      toast.error('Unable to update saved items.');
+      toast.error(CLIP_ERROR_TOAST);
     } finally {
       setSavingIds((prev) => {
         const next = new Set(prev);
@@ -135,7 +157,9 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
     1280: 3,
     1024: 3,
     768: 2,
-    640: 1,
+    640: 2,
+    480: 2,
+    0: 2,
   };
 
   if (!collections || collections.length === 0) {
@@ -145,13 +169,26 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
   return (
     <Masonry
       breakpointCols={breakpointColumns}
-      className="flex -ml-6 w-auto"
-      columnClassName="pl-6 space-y-6 bg-clip-padding"
+      className="catalog-masonry-grid flex w-full -ml-3 sm:-ml-6"
+      columnClassName="catalog-masonry-column pl-3 sm:pl-6 bg-clip-padding"
     >
-      {collections.map((collection) => (
-        <div key={collection.id} className="w-full">
+      {collections.map((collection) => {
+        const isHighlighted = Boolean(highlightId) && collection.id === highlightId;
+        return (
+        <div
+          key={collection.id}
+          ref={isHighlighted ? highlightRef : undefined}
+          className={`catalog-masonry-item mb-3 sm:mb-6 w-full rounded-xl transition-shadow ${
+            isHighlighted
+              ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-white dark:ring-offset-[#0a0a0a]'
+              : ''
+          }`}
+        >
           <CatalogEntityCard
             collection={collection}
+            compact={compactCards}
+            impliedStatus={impliedStatus}
+            impliedEntityLabel={impliedEntityLabel}
             onClick={onCollectionClick}
             onEdit={onEdit} 
             onDelete={onDelete}
@@ -166,7 +203,8 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
             saveBusy={savingIds.has(collection.id)}
           />
         </div>
-      ))}
+        );
+      })}
     </Masonry>
   );
 };

@@ -33,6 +33,7 @@ export interface AuthUserDto {
   email: string;
   firstName: string;
   lastName: string;
+  gender?: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'UNSPECIFIED' | null;
   role: AuthRole;
   type: AuthUserType;
   themePreference: ThemePreference;

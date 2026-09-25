@@ -23,12 +23,33 @@ import { resolveCatalogEntityType } from '../utils/catalogEntity';
 import { filterV1GarmentCategories } from '../utils/v1Taxonomy';
 import { WEB_UPLOAD_POLICIES, assertValidUploadFile } from '../utils/uploadValidation';
 
+/**
+ * What `requestPayout` returns instead of a payout.
+ *
+ * A session alone cannot move money off the platform: the request is
+ * validated, a time-limited code is emailed to the account, and the payout is
+ * created only when that code comes back.
+ */
+export interface PayoutChallenge {
+  challengeRequired: true;
+  /** What the code authorises. The server will not accept any other figure. */
+  amount: number;
+  expiresInSeconds: number;
+  maxAttempts: number;
+  resendAfterSeconds: number;
+  /** Masked, e.g. `br***@example.com` — enough to recognise the inbox. */
+  emailHint: string;
+  message: string;
+}
+
 export interface UpdateBrandProfilePayload {
   brandFullName?: string;
   brandDescription: string;
   brandCountry?: string;
   brandState?: string;
   brandCity?: string;
+  /** Exact street address. '' clears it; `undefined` leaves it untouched. */
+  brandStreetAddress?: string;
   brandTags?: string[];
   socialInstagram?: string;
   socialFacebook?: string;
@@ -74,6 +95,78 @@ const collectionDetailPending = new Map<string, Promise<any>>();
 type SignedUrlResolveOptions = {
   forceRefresh?: boolean;
 };
+
+// ── Public-URL micro-batching ────────────────────────────────────────────
+// A screen full of cards resolves many fileIds in the same tick; instead of
+// one API round trip PER image (~300-400ms each before the image download can
+// even start), collect ids for a short window and resolve them in ONE
+// POST /uploads/public-urls call. Falls back to the per-id endpoint when the
+// batch endpoint is unavailable (older deployed API).
+const PUBLIC_URL_BATCH_WINDOW_MS = 25;
+const PUBLIC_URL_BATCH_MAX = 50;
+const PUBLIC_URL_BATCH_FAILED = Symbol('public-url-batch-failed');
+type PublicUrlBatchResult = string | null | typeof PUBLIC_URL_BATCH_FAILED;
+let publicUrlBatchQueue: Array<{
+  fileId: string;
+  resolve: (url: PublicUrlBatchResult) => void;
+}> = [];
+let publicUrlBatchTimer: number | null = null;
+let publicUrlBatchEndpointUnavailable = false;
+
+const flushPublicUrlBatch = async () => {
+  publicUrlBatchTimer = null;
+  const queue = publicUrlBatchQueue;
+  publicUrlBatchQueue = [];
+  if (queue.length === 0) return;
+  const ids = Array.from(new Set(queue.map((entry) => entry.fileId)));
+  try {
+    const response = await apiClient.post('/uploads/public-urls', { fileIds: ids });
+    const payload = unwrapApiResponse<{
+      items?: Array<{ fileId?: string; url?: string | null }>;
+    }>(response.data);
+    const items =
+      (payload as { items?: Array<{ fileId?: string; url?: string | null }> })?.items ??
+      (response.data as { items?: Array<{ fileId?: string; url?: string | null }> })?.items ??
+      [];
+    const byId = new Map<string, string | null>();
+    for (const item of items) {
+      if (item && typeof item.fileId === 'string') {
+        byId.set(item.fileId, typeof item.url === 'string' ? item.url : null);
+      }
+    }
+    queue.forEach((entry) => {
+      entry.resolve(byId.has(entry.fileId) ? (byId.get(entry.fileId) as string | null) : null);
+    });
+  } catch (error) {
+    const status =
+      error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { status?: number } }).response?.status
+        : undefined;
+    if (status === 404 || status === 405) {
+      // Older API without the batch endpoint — stop batching this session.
+      publicUrlBatchEndpointUnavailable = true;
+    }
+    queue.forEach((entry) => entry.resolve(PUBLIC_URL_BATCH_FAILED));
+  }
+};
+
+const requestPublicUrlBatched = (fileId: string): Promise<PublicUrlBatchResult> =>
+  new Promise((resolve) => {
+    publicUrlBatchQueue.push({ fileId, resolve });
+    if (publicUrlBatchQueue.length >= PUBLIC_URL_BATCH_MAX) {
+      if (publicUrlBatchTimer !== null) {
+        window.clearTimeout(publicUrlBatchTimer);
+        publicUrlBatchTimer = null;
+      }
+      void flushPublicUrlBatch();
+      return;
+    }
+    if (publicUrlBatchTimer === null) {
+      publicUrlBatchTimer = window.setTimeout(() => {
+        void flushPublicUrlBatch();
+      }, PUBLIC_URL_BATCH_WINDOW_MS);
+    }
+  });
 
 const getPublicUrlCacheKey = (fileId: string) => `public:${fileId}`;
 const getPrivateSignedUrlCacheKey = (fileId: string) => `private:${fileId}`;
@@ -1619,7 +1712,26 @@ export const brandApi = {
 
     const request = (async (): Promise<string | null> => {
       try {
-        // Try public endpoint first (no auth required)
+        // Batched resolution first — one round trip for the whole screen.
+        if (!publicUrlBatchEndpointUnavailable && !forceRefresh) {
+          const batched = await requestPublicUrlBatched(cacheKey);
+          if (batched !== PUBLIC_URL_BATCH_FAILED) {
+            if (typeof batched === 'string' && batched) {
+              signedUrlCache.set(publicCacheKey, {
+                url: batched,
+                expiresAt: getSignedUrlCacheExpiresAt(batched),
+              });
+              return batched;
+            }
+            // Batch answered authoritatively: file not publicly resolvable.
+            signedUrlMissingCache.set(
+              publicCacheKey,
+              Date.now() + MISSING_SIGNED_URL_TTL_MS,
+            );
+            return null;
+          }
+          // Batch transport failed — fall through to the per-id endpoint.
+        }
         const response = await apiClient.get(`/uploads/public-url/${cacheKey}`);
         const payload = unwrapApiResponse<{ url?: string }>(response.data);
         const directUrl =
@@ -1731,8 +1843,47 @@ export const brandApi = {
   },
 
   /**
+   * Resolve a storage key via public endpoint, then authenticated owner/admin
+   * endpoint. Public-first keeps market rails guest-friendly; auth fallback
+   * covers content-review drafts that public-url-by-key used to 400 on.
+   */
+  async resolveSignedUrlForStorageKey(
+    s3Key: string,
+    cacheKey: string,
+  ): Promise<string | null> {
+    const key = String(s3Key ?? '').trim().replace(/^\/+/, '');
+    if (!key) return null;
+
+    const tryEndpoints = [
+      '/uploads/public-url-by-key',
+      '/uploads/signed-url-by-key',
+    ] as const;
+
+    for (const path of tryEndpoints) {
+      try {
+        const response = await apiClient.get(path, { params: { key } });
+        const payload = unwrapApiResponse<{ url?: string }>(response.data);
+        const signedUrl =
+          (payload as { url?: string })?.url ??
+          (response.data as { url?: string })?.url ??
+          null;
+        if (typeof signedUrl === 'string' && signedUrl.length > 0) {
+          signedUrlCache.set(cacheKey, {
+            url: signedUrl,
+            expiresAt: Date.now() + SIGNED_URL_TTL_MS,
+          });
+          return signedUrl;
+        }
+      } catch {
+        // try next endpoint
+      }
+    }
+    return null;
+  },
+
+  /**
    * Resolve a raw unsigned S3 URL into a signed/accessible URL.
-   * Extracts the S3 key from the URL and calls the public-url-by-key endpoint.
+   * Extracts the S3 key from the URL and calls public then authenticated key signers.
    * Returns null if signing fails so private/raw bucket URLs are not rendered.
    */
   async getSignedS3Url(
@@ -1763,24 +1914,7 @@ export const brandApi = {
         // Extract the S3 key from the URL (supports malformed legacy URL snapshots).
         const s3Key = extractS3KeyFromMaybeMalformedUrl(cacheKey);
         if (!s3Key) return null;
-
-        // Use the key-based signing endpoint (query param, not path param)
-        const response = await apiClient.get('/uploads/public-url-by-key', {
-          params: { key: s3Key },
-        });
-        const payload = unwrapApiResponse<{ url?: string }>(response.data);
-        const signedUrl =
-          (payload as { url?: string })?.url ??
-          (response.data as { url?: string })?.url ??
-          null;
-        if (typeof signedUrl === 'string' && signedUrl.length > 0) {
-          signedUrlCache.set(cacheKey, {
-            url: signedUrl,
-            expiresAt: Date.now() + SIGNED_URL_TTL_MS,
-          });
-          return signedUrl;
-        }
-        return null;
+        return this.resolveSignedUrlForStorageKey(s3Key, cacheKey);
       } catch {
         return null;
       } finally {
@@ -1815,22 +1949,7 @@ export const brandApi = {
 
     const request = (async (): Promise<string | null> => {
       try {
-        const response = await apiClient.get('/uploads/public-url-by-key', {
-          params: { key: normalizedKey },
-        });
-        const payload = unwrapApiResponse<{ url?: string }>(response.data);
-        const signedUrl =
-          (payload as { url?: string })?.url ??
-          (response.data as { url?: string })?.url ??
-          null;
-        if (typeof signedUrl === 'string' && signedUrl.length > 0) {
-          signedUrlCache.set(normalizedKey, {
-            url: signedUrl,
-            expiresAt: Date.now() + SIGNED_URL_TTL_MS,
-          });
-          return signedUrl;
-        }
-        return null;
+        return this.resolveSignedUrlForStorageKey(normalizedKey, normalizedKey);
       } catch {
         return null;
       } finally {
@@ -2056,60 +2175,64 @@ export const brandApi = {
   // ============================================
 
   async getPayouts(brandId: string) {
-    try {
-      const response = await apiClient.get(`/brands/${brandId}/payouts`);
-      return unwrapApiResponse<any>(response.data);
-    } catch (error) {
-      console.error('Error fetching payouts:', error);
-      return null;
-    }
+    const response = await apiClient.get(`/brands/${brandId}/payouts`);
+    return unwrapApiResponse<any>(response.data);
   },
 
   async getPayoutOverview(brandId: string) {
-    try {
-      const response = await apiClient.get(`/brands/${brandId}/payouts/overview`);
-      return unwrapApiResponse<any>(response.data);
-    } catch (error) {
-      console.error('Error fetching payout overview:', error);
-      return null;
-    }
+    const response = await apiClient.get(`/brands/${brandId}/payouts/overview`);
+    return unwrapApiResponse<any>(response.data);
   },
 
   async getIncomingTransactions(brandId: string, params?: { page?: number; limit?: number }) {
-    try {
-      const query = new URLSearchParams();
-      if (params?.page) query.append('page', String(params.page));
-      if (params?.limit) query.append('limit', String(params.limit));
-      const suffix = query.toString();
-      const response = await apiClient.get(`/brands/${brandId}/payouts/incoming${suffix ? `?${suffix}` : ''}`);
-      return unwrapApiResponse<any>(response.data);
-    } catch (error) {
-      console.error('Error fetching incoming transactions:', error);
-      return null;
-    }
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', String(params.page));
+    if (params?.limit) query.append('limit', String(params.limit));
+    const suffix = query.toString();
+    const response = await apiClient.get(`/brands/${brandId}/payouts/incoming${suffix ? `?${suffix}` : ''}`);
+    return unwrapApiResponse<any>(response.data);
   },
 
   async getHeldFunds(brandId: string, params?: { page?: number; limit?: number }) {
-    try {
-      const query = new URLSearchParams();
-      if (params?.page) query.append('page', String(params.page));
-      if (params?.limit) query.append('limit', String(params.limit));
-      const suffix = query.toString();
-      const response = await apiClient.get(`/brands/${brandId}/payouts/held-funds${suffix ? `?${suffix}` : ''}`);
-      return unwrapApiResponse<any>(response.data);
-    } catch (error) {
-      console.error('Error fetching held funds:', error);
-      return null;
-    }
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', String(params.page));
+    if (params?.limit) query.append('limit', String(params.limit));
+    const suffix = query.toString();
+    const response = await apiClient.get(`/brands/${brandId}/payouts/held-funds${suffix ? `?${suffix}` : ''}`);
+    return unwrapApiResponse<any>(response.data);
   },
 
-  async requestPayout(brandId: string, amount: number) {
+  /**
+   * Start a payout. This creates NOTHING — it validates the request and emails
+   * a confirmation code. The payout exists only once `confirmPayoutRequest`
+   * spends that code.
+   */
+  async requestPayout(brandId: string, amount: number): Promise<PayoutChallenge> {
     try {
       const response = await apiClient.post(`/brands/${brandId}/payouts/request`, { amount });
-      return unwrapApiResponse<any>(response.data);
+      return unwrapApiResponse<PayoutChallenge>(response.data);
     } catch (error) {
       console.error('Error requesting payout:', error);
       throw error; // Re-throw to handle in UI
+    }
+  },
+
+  /**
+   * Spend the emailed code and create the payout.
+   *
+   * No amount is sent. The server takes it from the code, so a client cannot
+   * confirm one figure and submit another.
+   */
+  async confirmPayoutRequest(brandId: string, code: string) {
+    try {
+      const response = await apiClient.post(
+        `/brands/${brandId}/payouts/request/confirm`,
+        { code },
+      );
+      return unwrapApiResponse<any>(response.data);
+    } catch (error) {
+      console.error('Error confirming payout:', error);
+      throw error;
     }
   },
 };

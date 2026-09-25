@@ -210,7 +210,7 @@ const CollectionsSettings: React.FC = () => {
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           placeholder="Search by user or collection"
           aria-label="Search access requests"
-          className="threadly-search-input flex-1 min-w-0"
+          className="wiez-search-input flex-1 min-w-0"
         />
         <div className="flex items-center gap-2" aria-label="Pagination size selector">
           <label htmlFor="pageSize" className="text-sm text-gray-600 dark:text-gray-300">Per page</label>

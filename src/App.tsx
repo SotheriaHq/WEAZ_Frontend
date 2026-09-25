@@ -17,7 +17,9 @@ import { BrandPatchProvider } from './context/BrandPatchContext';
 import { ProfileLayout } from './components/catalog/ProfileLayout';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
+import { NoticeModalHost } from '@/components/ui/NoticeModal';
 import ErrorPage from './pages/ErrorPage';
+import SeoHead from './components/seo/SeoHead';
 import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
 import OrderConfirmation from './pages/checkout/OrderConfirmation';
 import PaymentReturnPage from './pages/checkout/PaymentReturnPage';
@@ -35,11 +37,7 @@ import StudioScaffold from './components/studio/StudioScaffold';
 import StudioHandoffGate from './components/studio/StudioHandoffGate';
 import RequireStoreSetup from './components/store/RequireStoreSetup';
 import { BagFlowProvider } from './features/bagging/BagFlowProvider';
-import {
-  ProductAliasRedirect,
-  ProfileAliasRedirect,
-  StorefrontAliasRedirect,
-} from './pages/redirects/PublicAliasRedirects';
+import { ProfileAliasRedirect } from './pages/redirects/PublicAliasRedirects';
 import VerifiedBadgeMeaningPage from './pages/ui/VerifiedBadgeMeaningPage';
 import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
@@ -48,10 +46,16 @@ import { setViewportWidth } from '@/features/uiSlice';
 import RequireAdmin from './components/admin/RequireAdmin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { useNotificationsBootstrap } from '@/hooks/useNotifications';
+import { useStudioNativeNavBridge } from '@/hooks/useStudioNativeNavBridge';
 import { ThemeBackendSync } from '@/components/theme/ThemeBackendSync';
+import { useVerificationStateSync } from '@/hooks/useVerificationStateSync';
 import ScrollRestoreProvider from '@/components/ScrollRestoreProvider';
+import MobileExitGuard from '@/components/navigation/MobileExitGuard';
+import { isNewBuildAvailable } from '@/utils/buildVersionGuard';
+import { GenderPrompt } from '@/components/profile/GenderPrompt';
 
-const Market = lazy(() => import('./pages/Market'));
+const Runway = lazy(() => import('./pages/Runway'));
 const CartDrawer = lazy(() => import('./components/designs/CartDrawer'));
 const WishlistDrawer = lazy(() => import('./components/designs/WishlistDrawer'));
 const GlobalModalRouter = lazy(() =>
@@ -67,6 +71,8 @@ const CreateDesignPage = lazy(() => import('./pages/catalog/CreateDesign'));
 const DesignDetailsPage = lazy(() => import('./pages/catalog/DesignDetailsPage'));
 const CollectionRouter = lazy(() => import('./pages/catalog/CollectionRouter'));
 const ProductDetailsPage = lazy(() => import('./pages/catalog/ProductDetailsPage'));
+const BrandCanonicalPage = lazy(() => import('./pages/redirects/BrandCanonicalPage'));
+const ProductCanonicalPage = lazy(() => import('./pages/redirects/ProductCanonicalPage'));
 const SizeChartsPage = lazy(() => import('./pages/size-charts/SizeChartsPage'));
 const StudioHome = lazy(() => import('./pages/studio/StudioHome'));
 const EditProduct = lazy(() => import('./pages/studio/products/EditProduct'));
@@ -82,18 +88,18 @@ const BrandStaffPage = lazy(() => import('./pages/studio/BrandStaffPage'));
 const BrandStaffInvitePage = lazy(() => import('./pages/studio/BrandStaffInvitePage'));
 const MyOrders = lazy(() => import('./pages/orders/MyOrders'));
 const MyReviewsPage = lazy(() => import('./pages/account/MyReviewsPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const OrderDetail = lazy(() => import('./pages/orders/OrderDetail'));
 const CheckoutPage = lazy(() => import('./pages/checkout/CheckoutPage'));
 const CustomOrderComposerPage = lazy(() => import('./pages/custom-orders/CustomOrderComposerPage'));
 const CustomOrderCheckoutResumePage = lazy(() => import('./pages/custom-orders/CustomOrderCheckoutResumePage'));
 const MessagingManagementPage = lazy(() => import('./pages/messages/MessagingManagementPage'));
+const DiagnosticsPage = lazy(() => import('./pages/DiagnosticsPage'));
 
 // Admin pages — lazy loaded for code splitting
 const AdminScaffold = lazy(() => import('./components/admin/AdminScaffold'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
-const AdminBrandsPage = lazy(() => import('./pages/admin/AdminBrandsPage'));
-const AdminVerificationQueuePage = lazy(() => import('./pages/admin/AdminVerificationQueuePage'));
 const AdminBrandVerificationReviewPage = lazy(() => import('./pages/admin/AdminBrandVerificationReviewPage'));
 const AdminContentManagementPage = lazy(() => import('./pages/admin/AdminContentManagementPage'));
 const AdminTaxonomyPage = lazy(() => import('./pages/admin/AdminTaxonomyPage'));
@@ -113,6 +119,7 @@ const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'));
 const AdminForceResetPasswordPage = lazy(() => import('./pages/admin/AdminForceResetPasswordPage'));
 const AdminResetPasswordPage = lazy(() => import('./pages/admin/AdminResetPasswordPage'));
 const AdminCustomOrdersPage = lazy(() => import('./pages/admin/AdminCustomOrdersPage'));
+const AdminCustomOrderDetailPage = lazy(() => import('./pages/admin/AdminCustomOrderDetailPage'));
 const AdminMessagingPage = lazy(() => import('./pages/admin/AdminMessagingPage'));
 
 // Password reset pages — lazy loaded
@@ -151,14 +158,15 @@ const StudioRouteFallback: React.FC = () => {
         isEmbeddedMobile ? 'min-h-[calc(100dvh-8rem)]' : 'min-h-[420px]'
       }`}
     >
-      <div className="w-full max-w-sm">
-        <div
-          className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[color:rgba(var(--brand-primary-rgb),0.22)] border-t-[color:var(--brand-primary)]"
-          aria-hidden="true"
-        />
-        <div className="text-base font-semibold">Studio</div>
-        <p className="mt-2 text-sm text-[color:var(--text-secondary)]">Loading workspace</p>
-      </div>
+      {/* A spinner and nothing else. This used to add "Studio" + "Loading
+          workspace" underneath — the third narrated loading screen for one
+          Studio navigation, after the native shell's staged copy and the
+          handoff gate's own caption. */}
+      <div
+        className="h-8 w-8 animate-spin rounded-full border-2 border-[color:rgba(var(--brand-primary-rgb),0.22)] border-t-[color:var(--brand-primary)]"
+        role="progressbar"
+        aria-label="Loading"
+      />
     </div>
   );
 };
@@ -238,6 +246,23 @@ const RequireAdminPermission: React.FC<{
  * Contains global overlays like CartDrawer and WishlistDrawer
  * that need Router context (useNavigate)
  */
+/**
+ * Applies a detected new deploy (see utils/buildVersionGuard) on the next
+ * route navigation — a full document reload picks up the fresh build before
+ * the user can hit a dead lazy chunk. Never fires mid-screen.
+ */
+const BuildVersionReload: React.FC<{ pathname: string }> = ({ pathname }) => {
+  const lastPathRef = React.useRef(pathname);
+  useEffect(() => {
+    if (pathname === lastPathRef.current) return;
+    lastPathRef.current = pathname;
+    if (isNewBuildAvailable()) {
+      window.location.reload();
+    }
+  }, [pathname]);
+  return null;
+};
+
 const ViewportSync: React.FC<{ watchKey?: string }> = ({ watchKey }) => {
   const dispatch = useDispatch<AppDispatch>();
 
@@ -276,6 +301,24 @@ const RootLayout: React.FC = () => {
   const location = useLocation();
   const embeddedSurface = useEmbeddedSurface();
   const isEmbeddedMobile = embeddedSurface === 'mobile-app';
+
+  // The ONE notification bootstrap for the whole app.
+  //
+  // This used to live in `Layout` (labelled "mount global notifications
+  // bootstrap once") and again in `AdminScaffold` — but `StudioScaffold` does
+  // not render `Layout`, it composes `Navbar`/`Sidebar` directly. So for the
+  // entire time a brand was inside /studio/* there was NO socket subscription,
+  // no unread fetch and no polling fallback: an admin could request changes on
+  // a product and the brand sat in Studio seeing nothing, with the bell badge
+  // frozen at whatever it was when they entered (0 on a direct load).
+  //
+  // Mounting it at the root instead of per-shell is what makes "every
+  // authenticated surface receives notifications" true by construction rather
+  // than by remembering to add a line to each new shell.
+  useNotificationsBootstrap();
+  // Lets the native Studio dock switch sections with a client-side route change
+  // instead of `location.assign` (a full document reload). See the hook.
+  useStudioNativeNavBridge();
   const [showRouteIntentProgress, setShowRouteIntentProgress] = useState(false);
   const routeIntentTimeoutRef = useRef<number | null>(null);
 
@@ -336,12 +379,16 @@ const RootLayout: React.FC = () => {
   return (
     <BagFlowProvider>
       <>
+        <SeoHead />
         {showRouteIntentProgress && (
           <div className="pointer-events-none fixed inset-x-0 top-0 z-[2147483646] h-0.5 overflow-hidden">
             <div className="h-full w-full animate-pulse bg-gradient-to-r from-fuchsia-500 via-indigo-500 to-cyan-500" />
           </div>
         )}
         <ViewportSync watchKey={location.pathname} />
+        <BuildVersionReload pathname={location.pathname} />
+        {/* Native app webview owns its own back behavior — guard browser only. */}
+        {!isEmbeddedMobile ? <MobileExitGuard /> : null}
         {!isEmbeddedMobile ? (
           <Suspense fallback={null}>
             <CartDrawer />
@@ -352,6 +399,7 @@ const RootLayout: React.FC = () => {
         <Suspense fallback={<AppRouteFallback />}>
           <Outlet />
         </Suspense>
+        <GenderPrompt />
       </>
     </BagFlowProvider>
   );
@@ -396,21 +444,33 @@ const StudioRedirect: React.FC<{ to: string; preserveCurrentQuery?: boolean }> =
   return <Navigate to={`${pathname}${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`} replace />;
 };
 
-const DesignCreateAliasRedirect: React.FC = () => {
+const LegacyProfileDesignCreateRedirect: React.FC = () => {
   const location = useLocation();
-  return <Navigate to={`/profile/collections/create${location.search}${location.hash}`} replace />;
+  return <Navigate to={`/designs/create${location.search}${location.hash}`} replace />;
 };
 
-const DesignEditAliasRedirect: React.FC = () => {
+const LegacyProfileDesignEditRedirect: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const location = useLocation();
   return (
     <Navigate
-      to={id ? `/profile/collections/edit/${encodeURIComponent(id)}${location.search}${location.hash}` : '/profile/collections/create'}
+      to={
+        id
+          ? `/designs/${encodeURIComponent(id)}/edit${location.search}${location.hash}`
+          : '/designs/create'
+      }
       replace
     />
   );
 };
+
+const designEditorRoute = (
+  <RequireAuthenticated>
+    <RequireBrand>
+      <Layout>{withRouteFallback(<CreateDesignPage />)}</Layout>
+    </RequireBrand>
+  </RequireAuthenticated>
+);
 
 const ProductEditAliasRedirect: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -444,8 +504,8 @@ const profileChildren = [
     path: 'collections',
     element: <RequireBrand />,
     children: [
-      { path: 'create', element: withRouteFallback(<CreateDesignPage />) },
-      { path: 'edit/:id', element: withRouteFallback(<CreateDesignPage />) },
+      { path: 'create', element: <LegacyProfileDesignCreateRedirect /> },
+      { path: 'edit/:id', element: <LegacyProfileDesignEditRedirect /> },
     ],
   },
   { path: 'success', element: <Success /> },
@@ -463,11 +523,16 @@ const router = createBrowserRouter([
         path: '/',
         element: <Layout />,
         children: [
-          { index: true, element: withRouteFallback(<Market mode="designs" />) },
-          { path: 'market', element: withRouteFallback(<Market mode="designs" />) },
-          { path: 'market-place', element: withRouteFallback(<MarketPlace />) },
+          // Runway = design feed UI (backend Design). Market = commerce discover.
+          { index: true, element: withRouteFallback(<Runway mode="designs" />) },
+          { path: 'runway', element: withRouteFallback(<Runway mode="designs" />) },
+          // MARKET (commerce discover) is the primary Market surface.
+          { path: 'market', element: withRouteFallback(<MarketPlace />) },
+          // Legacy alias kept so old /market-place links still open Market.
+          { path: 'market-place', element: <Navigate to="/market" replace /> },
           { path: 'market/sections/:sectionKey', element: withRouteFallback(<MarketSectionPage />) },
           { path: 'search', element: withRouteFallback(<SearchResultsPage />) },
+          { path: 'diagnostics', element: withRouteFallback(<DiagnosticsPage />) },
           { path: 'subscriptions', element: <SubscriptionsPlaceholder /> },
           { path: 'history', element: <HistoryPlaceholder /> },
           { path: 'watch-later', element: <WatchLaterPlaceholder /> },
@@ -490,11 +555,11 @@ const router = createBrowserRouter([
       },
       {
         path: '/designs/create',
-        element: <DesignCreateAliasRedirect />,
+        element: designEditorRoute,
       },
       {
         path: '/designs/:id/edit',
-        element: <DesignEditAliasRedirect />,
+        element: designEditorRoute,
       },
       {
         path: '/designs/:id',
@@ -748,7 +813,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/brand/:slug',
-        element: <Layout><StorefrontAliasRedirect /></Layout>,
+        element: <Layout>{withRouteFallback(<BrandCanonicalPage />)}</Layout>,
       },
       {
         path: '/verify-email',
@@ -784,6 +849,10 @@ const router = createBrowserRouter([
           { path: '/bag/payment-return', element: <Layout><PaymentReturnPage /></Layout> },
           { path: '/bag/confirmation', element: <Layout><OrderConfirmation /></Layout> },
           { path: '/orders', element: <Layout><MyOrders /></Layout> },
+          // Declared in seoPaths.ts long before it existed. Until now the bell
+          // dropdown was the only way to read a notification, and it is hidden
+          // below 640px — so this is the reachable surface on a phone.
+          { path: '/notifications', element: <Layout>{withRouteFallback(<NotificationsPage />)}</Layout> },
           { path: '/account/reviews', element: <Layout><MyReviewsPage /></Layout> },
           { path: '/messages', element: <Layout><MessagingManagementPage /></Layout> },
           {
@@ -847,7 +916,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/p/:slug',
-        element: <Layout><ProductAliasRedirect /></Layout>,
+        element: <Layout>{withRouteFallback(<ProductCanonicalPage />)}</Layout>,
       },
       {
         path: '/admin/reset-password',
@@ -880,10 +949,11 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <AdminDashboard /> },
           { path: 'custom-orders', element: <RequireAdminPermission permission="MODERATION_READ"><AdminCustomOrdersPage /></RequireAdminPermission> },
-          { path: 'custom-orders/:orderId', element: <RequireAdminPermission permission="MODERATION_READ"><AdminCustomOrdersPage /></RequireAdminPermission> },
-          { path: 'users', element: <RequireAdminPermission permission="USERS_READ"><AdminUsersPage /></RequireAdminPermission> },
-          { path: 'brands', element: <RequireAdminPermission permission="BRANDS_READ"><AdminBrandsPage /></RequireAdminPermission> },
-          { path: 'verification', element: <RequireAdminPermission permission="BRANDS_VERIFY"><AdminVerificationQueuePage /></RequireAdminPermission> },
+          { path: 'custom-orders/:orderId', element: <RequireAdminPermission permission="MODERATION_READ"><AdminCustomOrderDetailPage /></RequireAdminPermission> },
+          { path: 'users', element: <RequireAdminPermission permission={['USERS_READ', 'BRANDS_READ', 'BRANDS_VERIFY']}><AdminUsersPage /></RequireAdminPermission> },
+          // Brands + Verification are now tabs inside the unified Users console.
+          { path: 'brands', element: <Navigate to="/admin/users?tab=brands" replace /> },
+          { path: 'verification', element: <Navigate to="/admin/users?tab=in-review" replace /> },
           { path: 'brands/:id/verification-review', element: <RequireAdminPermission permission="BRANDS_VERIFY"><AdminBrandVerificationReviewPage /></RequireAdminPermission> },
           { path: 'content', element: <RequireAdminPermission permission={['PRODUCTS_READ', 'COLLECTIONS_READ', 'CONTENT_REVIEW_READ']}><AdminContentManagementPage /></RequireAdminPermission> },
           { path: 'content-review', element: <Navigate to="/admin/content?tab=review" replace /> },
@@ -919,13 +989,70 @@ const router = createBrowserRouter([
   },
 ]);
 
+/**
+ * Idle-time warmup of the route chunks reachable from the persistent chrome
+ * (navbar search emoji, bottom dock). React Router v7 wraps navigations in
+ * startTransition, and a suspending React.lazy chunk inside a transition
+ * keeps the OLD screen on screen (no Suspense fallback) until the chunk
+ * finishes downloading — on cold mobile caches that reads as a 10-20s dead
+ * tap. Warming these chunks makes those navigations instant. Vite dedupes
+ * the dynamic imports against the lazy() declarations above.
+ */
+const HotRouteChunkPrefetch: React.FC = () => {
+  useEffect(() => {
+    let cancelled = false;
+    const warm = () => {
+      if (cancelled) return;
+      void import('./pages/SearchResultsPage');
+      void import('./pages/MarketPlace');
+      void import('./pages/catalog/Catalog');
+    };
+    const canIdle = typeof window.requestIdleCallback === 'function';
+    const idleId = canIdle
+      ? window.requestIdleCallback(warm, { timeout: 4000 })
+      : window.setTimeout(warm, 2500);
+    return () => {
+      cancelled = true;
+      if (canIdle && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      } else {
+        window.clearTimeout(idleId);
+      }
+    };
+  }, []);
+  return null;
+};
+
+/**
+ * Pulls a fresh auth profile when an admin approves/rejects this brand's
+ * verification, so the verified badge and studio state flip without a reload.
+ */
+const VerificationStateSync: React.FC = () => {
+  useVerificationStateSync();
+  return null;
+};
+
 const App: React.FC = () => (
   <AuthProvider>
     <ThemeBackendSync />
+    <VerificationStateSync />
+    <HotRouteChunkPrefetch />
     <ScrollRestoreProvider>
       <DropdownManagerProvider>
         <BrandPatchProvider>
-          <Toaster position="top-center" richColors closeButton />
+          {/* 5s, not sonner's default 4s. Failure toasts carry the whole
+              explanation ("Product description is required to publish") and
+              four seconds is not enough to read a sentence, notice which field
+              it names, and react — the reported symptom was a submit that
+              "failed with no message". `closeButton` still lets anyone dismiss
+              early. */}
+          <Toaster
+            position="top-center"
+            richColors
+            closeButton
+            duration={5000}
+          />
+          <NoticeModalHost />
           <RouterProvider router={router} />
         </BrandPatchProvider>
       </DropdownManagerProvider>
