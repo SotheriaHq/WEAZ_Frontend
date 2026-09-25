@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import DesignViewModal from '@/components/designs/DesignViewModal';
@@ -8,7 +8,6 @@ import useCachedResource from '@/hooks/useCachedResource';
 import { fetchCollectionDetailQuery } from '@/query/queries';
 import { toDesignMarketItem } from '@/utils/designMarketItem';
 import { isLocalPublishTaskId } from '@/utils/publishTracker';
-import { queryKeys } from '@/query/queryKeys';
 
 const DesignDetailsPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -80,28 +79,29 @@ const DesignDetailsPage: React.FC = () => {
   );
 
   /*
-    Hand the detail we already have to the viewer's cache.
+    DO NOT seed the viewer's media cache from this page.
 
-    `DesignViewModal` builds its carousel by fetching the design AGAIN, under
-    `brand.collectionDetail`, and falls back to a single image when that fetch
-    comes back empty or throws — which is exactly what a reader sees as "the
-    modal opened but there is only the front image, none of the others". This
-    page has the full `medias` array in hand by then, under a different key. So
-    give it to the keys the viewer reads instead of making it ask twice: the
-    carousel is then populated from the same payload that rendered the page, and
-    a design reachable only through the legacy fallback above still gets all of
-    its frames.
+    A previous attempt here wrote this page's payload into
+    `queryKeys.design.detail(...)` and `queryKeys.brand.collectionDetail(...)`,
+    meaning to save the viewer a second fetch. It broke the carousel instead,
+    and this is the shape of the trap:
+
+    `fetchCollectionDetailQuery` SHORT-CIRCUITS on `design.detail(collectionId)`
+    and returns whatever it finds there without fetching. `DesignViewModal`
+    builds its media list by calling it with `item.collectionId` — the
+    COLLECTION the design belongs to, which is what carries every frame. This
+    page fetched by the ROUTE id. Writing the route id's payload under the
+    collection's key handed the viewer the wrong media set, so the carousel
+    collapsed to the cover and the arrows (gated on `mediaItems.length > 1`)
+    disappeared with it.
+
+    `design` is also a PERSISTED query root, so that write reached localStorage
+    and survived reloads — a wrong answer that could not be cleared by
+    refreshing.
+
+    The viewer owns its own media fetch. Leave it alone: one extra request is
+    worth far less than the carousel.
   */
-  useEffect(() => {
-    if (!detail) return;
-    const cacheIds = new Set<string>();
-    if (id) cacheIds.add(id);
-    if (item?.collectionId) cacheIds.add(item.collectionId);
-    cacheIds.forEach((cacheId) => {
-      queryClient.setQueryData(queryKeys.brand.collectionDetail(cacheId, 'design'), detail);
-      queryClient.setQueryData(queryKeys.design.detail(cacheId), detail);
-    });
-  }, [detail, id, item?.collectionId, queryClient]);
 
   const error = useMemo(() => {
     if (!id) return 'Design reference is missing.';

@@ -261,6 +261,21 @@ export function useCollectionDetailQuery(
   });
 }
 
+/**
+ * Does this cached design payload carry its frames?
+ *
+ * The backend mapper emits both `medias` and `media`; a payload that has
+ * neither is not one the viewer can build a carousel from.
+ */
+const designDetailHasMedia = (detail: unknown): boolean => {
+  if (!detail || typeof detail !== 'object') return false;
+  const source = detail as { medias?: unknown; media?: unknown };
+  return (
+    (Array.isArray(source.medias) && source.medias.length > 0) ||
+    (Array.isArray(source.media) && source.media.length > 0)
+  );
+};
+
 export async function fetchCollectionDetailQuery(
   queryClient: QueryClient,
   collectionId?: string | null,
@@ -271,7 +286,21 @@ export async function fetchCollectionDetailQuery(
   const key = queryKeys.brand.collectionDetail(collectionId, scope);
   if (scope === 'design' && !options?.forceRefresh) {
     const designDetail = queryClient.getQueryData(queryKeys.design.detail(collectionId));
-    if (typeof designDetail !== 'undefined') {
+    /*
+      Only take the cached answer if it can actually answer.
+
+      This short-circuit is read by the content viewer to build its carousel,
+      and `getQueryData` ignores staleness entirely — so a payload written here
+      by anyone, for any reason, is served forever, and `design` is a PERSISTED
+      root so it survives reloads too. A page that wrote a thinner payload
+      under this key once collapsed every carousel to its cover image and could
+      not be cleared by refreshing.
+
+      A cached detail with no frames buys nothing anyway: the caller either
+      wants the media or is about to ask again. Falling through costs one
+      request and cannot be wrong.
+    */
+    if (designDetailHasMedia(designDetail)) {
       queryClient.setQueryData(key, designDetail);
       return designDetail;
     }
