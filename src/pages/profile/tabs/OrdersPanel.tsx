@@ -505,21 +505,22 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <BackLink label="Back to orders" onClick={onBack} variant="pill" />
-        <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+      {/* One row. See the custom-order header for why the pill went. */}
+      <div className="flex items-center gap-2">
+        <BackLink label="Orders" onClick={onBack} className="shrink-0" />
+        <div className="ml-auto shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400 sm:text-sm">
           Standard order
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-[28px] border border-gray-200/80 bg-white/70 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
-        <div className="grid gap-4 p-3 sm:gap-6 sm:p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <section className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white/70 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03] sm:rounded-[28px]">
+        <div className="grid gap-3 p-3 sm:gap-6 sm:p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           <CustomOrderMediaPreview
             src={firstItem?.thumbnail ?? null}
             sources={standardMediaUrls}
             title={firstItem?.name || 'Order item'}
             emoji="🛍️"
-            className="min-h-[240px] lg:min-h-[320px]"
+            className="h-36 sm:h-auto sm:min-h-[240px] lg:min-h-[320px]"
           />
 
           <div className="space-y-4">
@@ -1167,23 +1168,40 @@ export const BuyerCustomOrderDetailView: React.FC<{
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {ConfirmDialog}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <BackLink label="Back to orders" onClick={onBack} variant="pill" />
-        <div className="flex flex-wrap items-center gap-2.5">
-          <CustomOrderTag />
-          <OrderConversationButton order={{ customOrderId: order.id }} brandName={brandName} />
+      {/*
+        One row on a phone, not three.
+
+        This was a `flex-wrap` of a pill button, a chip and a full-width
+        conversation button. At 360px each took its own line, so the first three
+        rows of an order — before a single fact about it — were chrome. The back
+        control is a text link now (going back is not a decision, so it does not
+        need a border and a fill), the chip sits beside it, and the conversation
+        button is `sm` and pinned right.
+      */}
+      <div className="flex items-center gap-2">
+        <BackLink label="Orders" onClick={onBack} className="shrink-0" />
+        <CustomOrderTag />
+        <div className="ml-auto shrink-0">
+          <OrderConversationButton
+            order={{ customOrderId: order.id }}
+            brandName={brandName}
+            size="sm"
+          />
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-[2rem] border border-black/10 bg-white/90 shadow-[0_30px_120px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04]">
-        <div className="grid gap-4 p-3 sm:gap-6 sm:p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <section className="overflow-hidden rounded-2xl border border-black/10 bg-white/90 shadow-[0_30px_120px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] sm:rounded-[2rem]">
+        <div className="grid gap-3 p-3 sm:gap-6 sm:p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+          {/* A 240px-tall block of artwork pushed every fact on this screen
+              below the fold on a phone. A band is enough to recognise the piece;
+              the full image is one tap away. */}
           <CustomOrderMediaPreview
             src={mediaUrl}
             sources={sourceMediaUrls}
             title={title}
-            className="min-h-[240px] lg:min-h-[320px]"
+            className="h-36 sm:h-auto sm:min-h-[240px] lg:min-h-[320px]"
           />
           <div>
             <BuyerCustomStageFiller
@@ -1192,29 +1210,35 @@ export const BuyerCustomOrderDetailView: React.FC<{
               statusLabel={paymentPending ? paymentStatusLabel : null}
               progressIndex={paymentPending ? -1 : null}
             />
-            <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
-              <div className="max-w-3xl">
-                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+            {/* The code, the title and the total share a row on a phone
+                instead of taking three. The total is the one number a buyer
+                opens this screen for, so it stays beside the name rather than
+                being pushed under it by a 180px minimum. */}
+            <div className="mt-3 flex items-start justify-between gap-3 sm:mt-4 sm:gap-4">
+              <div className="min-w-0 max-w-3xl">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400 sm:text-xs">
                   {formatCustomOrderCode(order.id)}
                 </div>
-                <h2 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">
+                <h2 className="mt-1.5 text-xl font-bold text-slate-900 dark:text-white sm:mt-2 sm:text-2xl lg:text-3xl">
                   {title}
                 </h2>
-                  <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                    {headline}. {description}
-                  </p>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300 sm:mt-3">
+                  {headline}. {description}
+                </p>
               </div>
-              <div className="min-w-[180px] rounded-2xl border border-black/10 bg-white/80 p-4 text-right dark:border-white/10 dark:bg-white/5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  Locked total
+              <div className="shrink-0 rounded-xl border border-black/10 bg-white/80 p-2.5 text-right dark:border-white/10 dark:bg-white/5 sm:min-w-[180px] sm:rounded-2xl sm:p-4">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400 sm:text-[11px]">
+                  Total
                 </div>
-                <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+                <div className="mt-1 text-base font-bold text-slate-900 dark:text-white sm:mt-2 sm:text-2xl">
                   {grandTotal}
                 </div>
               </div>
             </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {/* Two up on a phone. These were one per row, so four facts cost
+                four screens of scrolling to read eight short words. */}
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-6 sm:gap-3 xl:grid-cols-4">
               <CustomOrderMetricCard
                 label="Brand"
                 value={textValue(brandName, 'Brand')}
