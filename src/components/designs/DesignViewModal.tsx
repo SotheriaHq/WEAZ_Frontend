@@ -8,7 +8,7 @@ import type { RootState } from '@/store';
 import type { MarketItem } from '@/types/market';
 import { CommentsApi } from '@/api/CommentsApi';
 import { messagingApi } from '@/api/MessagingApi';
-import { apiClient } from '@/api/httpClient';
+import useClipTarget from '@/features/clipping/useClipTarget';
 import { brandApi } from '@/api/BrandApi';
 import DesignCommentsPanel from '@/components/designs/DesignCommentsPanel';
 import MediaRenderer from '@/components/media/MediaRenderer';
@@ -35,11 +35,8 @@ import {
 } from '@/lib/baggingAccess';
 import { BAG_IT_LABEL } from '@/constants/bagging';
 import {
-  CLIP_ADDED_TOAST,
   CLIP_EMOJI,
-  CLIP_ERROR_TOAST,
   CLIP_OWN_CONTENT_TOAST,
-  CLIP_REMOVED_TOAST,
   CLIPPED_EMOJI,
   clipActionHint,
   clipActionLabel,
@@ -142,6 +139,7 @@ const DesignViewModal: React.FC<Props> = ({
   const metaSwipeStartYRef = React.useRef<number | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { toggleClip } = useClipTarget();
   const bagFlow = useBagFlow();
   const itemId = item?.id ?? null;
   const itemCollectionId = item?.collectionId ?? null;
@@ -549,40 +547,35 @@ const DesignViewModal: React.FC<Props> = ({
     }
   };
 
+  /*
+    Clipping goes through the one writer, like every other surface.
+
+    This used to call `/saved` itself and write ONLY
+    `queryKeys.saved.status(...)` — the per-target flag. So the control here
+    flipped and the toast fired, but the shopper's Clips tab was never told
+    anything had changed: they clipped a design in the viewer, walked to their
+    profile, and the tab showed the list it had cached before the clip.
+
+    `useClipTarget` writes the flag AND invalidates `saved.me`. The query
+    client's `refetchOnMount` returns 'always' for an invalidated query
+    (`query/queryClient.ts`), which is precisely what makes the tab correct on
+    arrival even when the shopper reroutes the instant they clip.
+  */
   const handleToggleSave = async () => {
-    if (!isAuth) {
-      toast.info('Please sign in to save items.');
-      return;
-    }
     if (isOwnBrandContent) {
-      toast.info('Brands cannot save their own products.');
+      toast.info(CLIP_OWN_CONTENT_TOAST);
       return;
     }
     if (!activeMediaId || saveBusy) return;
 
     try {
       setSaveBusy(true);
-      if (isSaved) {
-        await apiClient.delete('/saved', {
-          data: { targetType: 'COLLECTION_MEDIA', targetId: activeMediaId },
-        });
-        setIsSaved(false);
-        queryClient.setQueryData(
-          queryKeys.saved.status('COLLECTION_MEDIA', activeMediaId),
-          false,
-        );
-        toast.success(CLIP_REMOVED_TOAST);
-      } else {
-        await apiClient.post('/saved', { targetType: 'COLLECTION_MEDIA', targetId: activeMediaId });
-        setIsSaved(true);
-        queryClient.setQueryData(
-          queryKeys.saved.status('COLLECTION_MEDIA', activeMediaId),
-          true,
-        );
-        toast.success(CLIP_ADDED_TOAST);
-      }
-    } catch {
-      toast.error(CLIP_ERROR_TOAST);
+      await toggleClip({
+        targetType: 'COLLECTION_MEDIA',
+        targetId: activeMediaId,
+        clipped: isSaved,
+        isAuthenticated: isAuth,
+      });
     } finally {
       setSaveBusy(false);
     }

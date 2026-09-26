@@ -7,7 +7,7 @@ import ThreadButton from '@/components/ui/ThreadButton';
 import InlineTextInput from '@/components/ui/CommentInput';
 import type { MarketItem } from '@/types/market';
 import MediaRenderer from '@/components/media/MediaRenderer';
-import { Link, Tag } from 'lucide-react';
+import { Tag } from 'lucide-react';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { getAvatarFallback, resolveProfileImageSource } from '@/utils/profileImage';
 import { useBrandPatchState } from '@/context/BrandPatchContext';
@@ -24,7 +24,13 @@ import {
   isBrandAccountBlockedFromBagging,
 } from '@/lib/baggingAccess';
 import { BAG_IT_LABEL } from '@/constants/bagging';
-import { CLIP_OWN_CONTENT_TOAST, clipActionHint } from '@/constants/clipping';
+import {
+  CLIP_EMOJI,
+  CLIP_OWN_CONTENT_TOAST,
+  CLIPPED_EMOJI,
+  clipActionHint,
+  clipActionLabel,
+} from '@/constants/clipping';
 import useClipTarget from '@/features/clipping/useClipTarget';
 import { useSavedStatusQuery } from '@/query/queries';
 import { formatPrice } from '@/utils/helpers';
@@ -426,17 +432,30 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               parentCollectionId={item.collectionId}
             />
 
+            {/*
+              Clip, not share.
+
+              A share control on a card is the wrong offer: a shopper scrolling
+              the runway is deciding what to KEEP, and deciding what to pass on
+              is something they do once they have opened a piece and looked at
+              it — which is where Share lives, in the viewer's action row. This
+              button was also dead: its onClick was an empty handler with a
+              `// Handle share action` note, so every card in the feed carried a
+              link glyph and a count that did nothing at all.
+            */}
             <button
-              className="flex flex-col items-center text-white hover:scale-110 transition-transform"
-              onClick={(e) => {
-                e.stopPropagation();
-                // Handle share action
-              }}
-              aria-label="Share"
-              title="Share collection"
+              className="flex flex-col items-center text-white transition-transform hover:scale-110 disabled:opacity-60"
+              onClick={handleToggleSave}
+              disabled={resolvedSaveBusy}
+              aria-label={clipActionHint(resolvedSaved)}
+              title={clipActionHint(resolvedSaved)}
             >
-              <Link className="h-3.5 w-3.5 sm:h-5 sm:w-5" aria-hidden="true" />
-              <span className="text-[8px] font-bold mt-0.5 drop-shadow sm:text-xs sm:mt-1">{item.collectionCollabCount ?? 0}</span>
+              <span aria-hidden="true" className="text-base leading-none drop-shadow sm:text-xl">
+                {resolvedSaved ? CLIPPED_EMOJI : CLIP_EMOJI}
+              </span>
+              <span className="mt-0.5 text-[8px] font-bold drop-shadow sm:mt-1 sm:text-xs">
+                {clipActionLabel(resolvedSaved)}
+              </span>
             </button>
           </div>
         </div>
