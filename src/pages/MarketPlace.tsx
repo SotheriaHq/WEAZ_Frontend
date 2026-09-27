@@ -8,13 +8,14 @@ import { apiClient } from '@/api/httpClient';
 import { marketApi, type MarketSection, type MarketSectionItem, type MarketSignalEvent } from '@/api/MarketApi';
 import { unwrapApiResponse, type ApiSuccessPayload } from '@/types/auth';
 import type { AppDispatch, RootState } from '@/store';
-import ImageWithFallback from '@/components/ImageWithFallback';
 import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreProductCard';
 import ContentTile from '@/components/catalog/ContentTile';
 import ProductCardSkeleton from '@/components/designs/ProductCardSkeleton';
 import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 import { fetchWishlist } from '@/features/wishlistSlice';
 import FeaturedSection from '@/components/FeaturedSection';
+import MarketTrendingHero from '@/components/market/MarketTrendingHero';
+import MarketTrendingTodayModal from '@/components/market/MarketTrendingTodayModal';
 import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
 import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
@@ -47,6 +48,8 @@ const MARQUEE_PX_PER_S = 40;
 const CARD_WIDTH = 352;
 const FRESH_DROP_DAY_MS = 24 * 60 * 60 * 1000;
 const FRESH_DROP_MAX_AGE_MS = 7 * FRESH_DROP_DAY_MS;
+/** How many pieces one day's trending list can hold. */
+const TRENDING_TODAY_LIMIT = 15;
 const SYSTEM_FRESH_DROPS_LIMIT = 20;
 const ADMIN_FRESH_DROPS_LIMIT = 10;
 
@@ -484,7 +487,7 @@ const MarketPlace: React.FC = () => {
   );
   const [selectedFilter, setSelectedFilter] = useState<string>('FOR_YOU');
   const [visibleCount, setVisibleCount] = useState(18);
-  const [heroIndex, setHeroIndex] = useState(0);
+  const [trendingTodayOpen, setTrendingTodayOpen] = useState(false);
   const [marketClockMs, setMarketClockMs] = useState<number>(() => Date.now());
   const [hiddenTargetIds, setHiddenTargetIds] = useState<Set<string>>(() => new Set());
   const { anonymousSessionId, flushMarketSignals, trackMarketSignal } = useMarketSignals('MARKET_HOME');
@@ -838,15 +841,22 @@ const MarketPlace: React.FC = () => {
 
   const freshDropsForDisplay = sectionProductsByKey.get('fresh-drops') ?? freshDrops;
 
-  const heroProducts = useMemo(() => recencySortedProducts.slice(0, 3), [recencySortedProducts]);
+  /*
+    What is trending TODAY, and the same list the hero, its "Up next" rows and
+    its "See all" sheet all draw from.
 
-  useEffect(() => {
-    if (heroProducts.length === 0) return;
-    const interval = window.setInterval(() => {
-      setHeroIndex((prev) => (prev + 1) % heroProducts.length);
-    }, 4500);
-    return () => window.clearInterval(interval);
-  }, [heroProducts.length]);
+    `selectDailyBatch` is the existing primitive for "the set for this UTC day"
+    — Fresh Drops already uses it — so trending rotates on the same clock as
+    the rest of the page instead of inventing a second notion of a day.
+
+    Fifteen rather than three: the hero shows one and lists three, and "See
+    all" has to have somewhere to go. A shorter day simply yields a shorter
+    list.
+  */
+  const trendingToday = useMemo(
+    () => selectDailyBatch(recencySortedProducts, TRENDING_TODAY_LIMIT, utcDayIndex),
+    [recencySortedProducts, utcDayIndex],
+  );
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -883,127 +893,25 @@ const MarketPlace: React.FC = () => {
     setVisibleCount(18);
   }, [selectedFilter]);
 
-  const activeHero = heroProducts[heroIndex] ?? null;
-
   return (
     <div
-      className={`mx-auto w-full max-w-[1440px] px-4 py-4 transition-opacity sm:px-6 lg:px-8 ${
+      /*
+        The top gap is set here, once. `py-4` gave the same 16px above the
+        first thing on the page as between the rails below it, so the hero
+        looked stuck to the navbar while the page beneath it breathed. A
+        heading needs more room above than the content it heads, and the
+        bottom stays where it was.
+      */
+      className={`mx-auto w-full max-w-[1440px] px-4 pb-4 pt-6 transition-opacity sm:px-6 sm:pt-8 lg:px-8 ${
         refreshing ? 'opacity-95' : 'opacity-100'
       }`}
     >
       <div className="space-y-6">
-        <section>
-          {/*
-            An explicit, capped height — the hero no longer sizes itself.
-
-            The row had only `min-h` floors, so its real height came from
-            whatever the content stretched to, and on a desktop the single
-            feature image grew until it owned most of the first screen. A market
-            page whose first screenful is one product buries the nine rails that
-            are the actual point of it.
-
-            Fixed heights make the hero a banner instead of a page: roughly 40%
-            shorter than it was rendering, and predictable at every width. The
-            right-hand column now carries three tiles rather than two, so the
-            same area shows more of the catalogue at a sensible size instead of
-            two very tall slabs.
-          */}
-          <div className="grid h-[13rem] grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] sm:h-[16rem] lg:h-[22rem] lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <div className="h-full min-h-0">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeHero?.id ?? 'hero-empty'}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.25 }}
-                  className="relative h-full overflow-hidden rounded-2xl"
-                >
-                  {activeHero ? (
-                    <>
-                      <div className="absolute inset-0">
-                        <ImageWithFallback
-                          src={activeHero.thumbnail || activeHero.images[0] || null}
-                          alt={activeHero.name}
-                          fit="cover"
-                          rounded="none"
-                          containerClassName="h-full w-full"
-                          className="h-full w-full"
-                          maxHeightClassName="max-h-full"
-                          fallbackName={activeHero.name}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                      </div>
-                      <div className="relative flex h-full min-h-0 flex-col justify-end p-2 text-white sm:p-3">
-                        <span className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-semibold backdrop-blur sm:mb-2 sm:gap-2 sm:px-2.5 sm:text-[11px]">
-                          🔥 Trending now
-                        </span>
-                        <h1 className="max-w-xl text-sm font-black leading-tight sm:text-2xl">
-                          {activeHero.name}
-                        </h1>
-                        <p className="mt-0.5 line-clamp-2 text-[10px] text-white/80 sm:mt-1 sm:text-sm">
-                          {activeHero.brand?.name || 'WIEZ Brand'} · Smooth picks from recent brand drops.
-                        </p>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 sm:mt-3 sm:gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenProduct(activeHero, { source: 'market_hero' })}
-                            className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-gray-900 transition-transform hover:scale-[1.02] sm:px-4 sm:py-1.5 sm:text-xs dark:bg-white/5 dark:text-white"
-                          >
-                            👀 View product
-                          </button>
-                          <span className="rounded-full bg-black/40 px-2 py-1 text-[10px] font-semibold sm:px-3 sm:py-1.5 sm:text-xs">
-                            {new Intl.NumberFormat('en-NG', {
-                              style: 'currency',
-                              currency: 'NGN',
-                              maximumFractionDigits: 0,
-                            }).format(activeHero.effectivePrice || activeHero.price || 0)}
-                          </span>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex h-full min-h-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-300">
-                      No featured products yet.
-                    </div>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            <div className="grid h-full min-h-0 grid-cols-1 grid-rows-2 gap-2 sm:gap-3 lg:grid-cols-1 lg:grid-rows-3">
-              {heroProducts.slice(0, 3).map((product, secondaryIndex) => (
-                <button
-                  key={product.id}
-                  type="button"
-                  onClick={() => handleOpenProduct(product, { source: 'market_hero_secondary' })}
-                  className={`group relative min-h-0 overflow-hidden rounded-lg bg-gray-100 text-left ring-1 ring-gray-200/70 dark:bg-white/5 dark:ring-white/10 sm:rounded-xl lg:h-full ${
-                    // Below `lg` the column is two rows, so a third tile would
-                    // overflow it.
-                    secondaryIndex === 2 ? 'hidden lg:block' : ''
-                  }`}
-                >
-                  <ImageWithFallback
-                    src={product.thumbnail || product.images[0] || null}
-                    alt={product.name}
-                    fit="cover"
-                    rounded="none"
-                    containerClassName="absolute inset-0 h-full w-full"
-                    className="h-full w-full transition-transform duration-500 group-hover:scale-105"
-                    maxHeightClassName="max-h-full"
-                    fallbackName={product.name}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                  <div className="absolute inset-x-0 bottom-0 p-1.5 text-white sm:p-4">
-                    <p className="text-[8px] font-semibold uppercase tracking-wide text-white/70 sm:text-xs">{product.brand?.name}</p>
-                    <p className="mt-0.5 line-clamp-1 text-[10px] font-bold sm:mt-1 sm:line-clamp-2 sm:text-sm">{product.name}</p>
-                    <p className="mt-0.5 text-[8px] font-semibold text-white/80 sm:mt-3 sm:text-xs">✨ Tap to preview</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
+        <MarketTrendingHero
+          products={trendingToday}
+          onOpenProduct={handleOpenProduct}
+          onSeeAll={() => setTrendingTodayOpen(true)}
+        />
 
         <FeaturedSection
           filterType="PRODUCT"
@@ -1258,6 +1166,13 @@ const MarketPlace: React.FC = () => {
       </AnimatePresence>
 
       <FeaturedGalleryModal open={galleryOpen} onClose={() => setGalleryOpen(false)} />
+
+      <MarketTrendingTodayModal
+        open={trendingTodayOpen}
+        products={trendingToday}
+        onClose={() => setTrendingTodayOpen(false)}
+        onOpenProduct={handleOpenProduct}
+      />
     </div>
   );
 };
