@@ -3,39 +3,22 @@ import { useRouteError, isRouteErrorResponse, useNavigate } from 'react-router-d
 import { motion } from 'framer-motion';
 import { Home, RefreshCcw, AlertTriangle, WifiOff, ServerCrash, ShieldX } from 'lucide-react';
 import { captureClientException } from '@/observability/sentry';
-
-const STALE_BUNDLE_RELOAD_KEY = 'wiez:error-page-auto-recovered';
+import {
+  STALE_BUNDLE_SESSION_KEYS,
+  recoverFromStaleBundle,
+  shouldRecoverFromStaleBundle,
+} from '@/utils/staleBundle';
 
 /**
  * Stale-deploy render crashes: React.lazy resolving a mixed-version chunk
  * throws "Cannot read properties of undefined (reading 'default')" (Sentry
  * 2026-07-11, /studio/store on release V2026.07.09). A fresh cache-busted
  * document fixes it — showing users a dead error page does not.
+ *
+ * The detection and the reload live in `@/utils/staleBundle`, because this
+ * file, `main.tsx` and `RootErrorBoundary` all need to agree about them and
+ * the copies here and in `main.tsx` had already drifted.
  */
-const isLikelyStaleBundleError = (value: unknown): boolean => {
-  const message =
-    value instanceof Error
-      ? value.message || ''
-      : typeof value === 'string'
-        ? value
-        : value && typeof value === 'object' && 'message' in value
-          ? String((value as { message?: unknown }).message ?? '')
-          : String(value ?? '');
-  if (!message) return false;
-  return (
-    message.includes("reading 'default'") ||
-    message.includes('Failed to fetch dynamically imported module') ||
-    message.includes('Importing a module script failed') ||
-    message.includes('error loading dynamically imported module') ||
-    message.includes('Loading chunk') ||
-    message.includes('ChunkLoadError') ||
-    // SPA fallback HTML served for a hashed .js URL (deploy race / poisoned cache).
-    message.includes('Failed to load module script') ||
-    message.includes('MIME type of "text/html"') ||
-    message.includes("MIME type of 'text/html'") ||
-    message.includes('Expected a JavaScript-or-Wasm module script')
-  );
-};
 
 /**
  * ErrorPage - Premium error boundary page
@@ -55,23 +38,11 @@ const ErrorPage: React.FC = () => {
   // Auto-recover ONCE per session from stale-bundle render crashes with a
   // cache-busted reload instead of stranding the user on this page.
   const [recovering] = useState<boolean>(() => {
-    if (isRouteErrorResponse(error) || !isLikelyStaleBundleError(error)) {
+    // A 404/401 from a loader is a real answer, not a broken bundle.
+    if (isRouteErrorResponse(error) || !shouldRecoverFromStaleBundle(error)) {
       return false;
     }
-    try {
-      if (sessionStorage.getItem(STALE_BUNDLE_RELOAD_KEY) === '1') return false;
-      sessionStorage.setItem(STALE_BUNDLE_RELOAD_KEY, '1');
-    } catch {
-      return false;
-    }
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set('_r', String(Date.now()));
-      window.location.replace(url.toString());
-    } catch {
-      window.location.reload();
-    }
-    return true;
+    return recoverFromStaleBundle(STALE_BUNDLE_SESSION_KEYS.router);
   });
 
   useEffect(() => {

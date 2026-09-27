@@ -1,5 +1,10 @@
 import React from 'react';
 import { captureClientException } from '../observability/sentry';
+import {
+  STALE_BUNDLE_SESSION_KEYS,
+  recoverFromStaleBundle,
+  shouldRecoverFromStaleBundle,
+} from '@/utils/staleBundle';
 
 type RootErrorBoundaryProps = {
   children: React.ReactNode;
@@ -7,6 +12,7 @@ type RootErrorBoundaryProps = {
 
 type RootErrorBoundaryState = {
   error: Error | null;
+  recovering: boolean;
 };
 
 const showBootFailure = (message: string) => {
@@ -66,20 +72,50 @@ export class RootErrorBoundary extends React.Component<
   RootErrorBoundaryProps,
   RootErrorBoundaryState
 > {
-  state: RootErrorBoundaryState = { error: null };
+  state: RootErrorBoundaryState = { error: null, recovering: false };
 
+  /*
+    A half-replaced deploy is recovered, not reported.
+
+    This boundary catches everything that fails OUTSIDE the router — the
+    providers, the shell, the first chunk of the app itself — and it used to
+    render "WIEZ could not start" with a Reload button for ALL of it. After a
+    deploy, that is a dead-end screen for a fault that a reload cures, and it
+    is the one the user sees flash before they refresh by hand.
+
+    The reload is started here, in `getDerivedStateFromError`, rather than in
+    `componentDidCatch`: this runs BEFORE the error UI is committed, so there
+    is nothing to flash. The failing render is replaced by a blank surface in
+    the brand's ground while the new document loads.
+  */
   static getDerivedStateFromError(error: Error): RootErrorBoundaryState {
-    return { error };
+    if (shouldRecoverFromStaleBundle(error)) {
+      if (recoverFromStaleBundle(STALE_BUNDLE_SESSION_KEYS.root)) {
+        return { error, recovering: true };
+      }
+    }
+    return { error, recovering: false };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     captureClientException(error, {
       componentStack: errorInfo.componentStack ?? 'unknown',
+      boundary: this.state.recovering
+        ? 'root-boundary-auto-recovery'
+        : 'root-boundary',
     });
-    showBootFailure(error.message || 'Unexpected startup error');
+    // Only narrate a failure the user is going to be left looking at.
+    if (!this.state.recovering) {
+      showBootFailure(error.message || 'Unexpected startup error');
+    }
   }
 
   render() {
+    if (this.state.recovering) {
+      // Reload is in flight — a blank surface beats flashing an error page.
+      return <div className="min-h-[100dvh] bg-white dark:bg-[#0a0a0a]" aria-busy="true" />;
+    }
+
     if (this.state.error) {
       return (
         <div className="flex min-h-[100dvh] items-center justify-center bg-white px-6 text-center dark:bg-[#0a0a0a]">

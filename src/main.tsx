@@ -16,6 +16,7 @@ import { QueryProvider } from './query/QueryProvider';
 import RootErrorBoundary, { removeBootSplash } from './components/RootErrorBoundary';
 import { initClientDiagnostics } from './utils/clientDiagnostics';
 import { initBuildVersionGuard } from './utils/buildVersionGuard';
+import { STALE_BUNDLE_SESSION_KEYS, isStaleBundleError } from './utils/staleBundle';
 import { initSentry } from './observability/sentry';
 
 initSentry();
@@ -25,30 +26,13 @@ const STALE_CHUNK_RELOAD_KEY = 'vite:preloadError:reloadedAt';
 initClientDiagnostics();
 initBuildVersionGuard();
 
-const isStaleChunkLoadError = (value: unknown): boolean => {
-  const message =
-    typeof value === 'string'
-      ? value
-      : value instanceof Error
-        ? value.message
-        : value && typeof value === 'object' && 'message' in value
-          ? String((value as { message?: unknown }).message ?? '')
-          : String(value ?? '');
-
-  return (
-    message.includes('Failed to fetch dynamically imported module') ||
-    message.includes('Importing a module script failed') ||
-    message.includes('error loading dynamically imported module') ||
-    message.includes('Loading chunk') ||
-    message.includes('ChunkLoadError') ||
-    // SPA fallback HTML served for a hashed .js URL (deploy race / poisoned cache).
-    message.includes('Failed to load module script') ||
-    message.includes('MIME type of "text/html"') ||
-    message.includes("MIME type of 'text/html'") ||
-    message.includes('Expected a JavaScript-or-Wasm module script')
-  );
-};
-
+/**
+ * Time-based rather than once-per-session, because these fire for LOADS, not
+ * renders: a page can legitimately try several chunks while a deploy lands,
+ * and each should get its reload attempt once the previous one has had time
+ * to commit. The boundaries use the once-per-session keys instead, since a
+ * render that fails twice is a real bug worth showing.
+ */
 const reloadForStaleChunks = (): boolean => {
   const last = Number(sessionStorage.getItem(STALE_CHUNK_RELOAD_KEY) || 0);
   if (Date.now() - last <= 10_000) {
@@ -73,7 +57,7 @@ window.addEventListener('vite:preloadError', (event) => {
 });
 
 window.addEventListener('unhandledrejection', (event) => {
-  if (isStaleChunkLoadError(event.reason)) {
+  if (isStaleBundleError(event.reason)) {
     event.preventDefault();
     reloadForStaleChunks();
   }
@@ -82,12 +66,18 @@ window.addEventListener('unhandledrejection', (event) => {
 const BootSplashCleanup: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useEffect(() => {
     removeBootSplash();
-    // Booted cleanly — re-arm the ErrorPage stale-bundle auto-recovery for a
-    // future stale deploy.
-    try {
-      sessionStorage.removeItem('wiez:error-page-auto-recovered');
-    } catch {
-      // ignore
+    /*
+      Booted cleanly — re-arm the stale-bundle auto-recovery for a future
+      deploy. Both boundaries, because either can be the one that catches it:
+      the router's for a lazy route, the root's for anything that fails
+      before or outside the router.
+    */
+    for (const key of Object.values(STALE_BUNDLE_SESSION_KEYS)) {
+      try {
+        sessionStorage.removeItem(key);
+      } catch {
+        // ignore
+      }
     }
   }, []);
   return <>{children}</>;
