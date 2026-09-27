@@ -597,6 +597,48 @@ const DesignViewModal: React.FC<Props> = ({
   const showMediaNav = mediaItems.length > 1;
   const isVideoMedia = activeMedia?.type === 'POST_VIDEO';
 
+  const stepMedia = React.useCallback(
+    (delta: number) => {
+      setActiveMediaIndex(
+        (prev) => (prev + delta + mediaItems.length) % mediaItems.length,
+      );
+    },
+    [mediaItems.length],
+  );
+
+  /*
+    Left and right walk the images.
+
+    A viewer that shows "1 / 5" and answers nothing when you press the key that
+    obviously means "next" reads as broken, and it is the one input a person on
+    a keyboard reaches for first.
+
+    Bound to the window rather than to the dialog because focus after opening
+    sits wherever the trigger left it, and a handler on a container only fires
+    once something inside it is focused — which is exactly the case where the
+    keys appeared dead.
+
+    A text field keeps its own arrows: moving the caret in the comment box must
+    not flip the image out from under what is being written about.
+  */
+  React.useEffect(() => {
+    if (!open || !showMediaNav) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+
+      event.preventDefault();
+      stepMedia(event.key === 'ArrowRight' ? 1 : -1);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, showMediaNav, stepMedia]);
+
   // Shared bag-button semantics (identical on desktop + mobile).
   const bagDisabled =
     openingCustomComposer ||
@@ -746,9 +788,7 @@ const DesignViewModal: React.FC<Props> = ({
                     className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setActiveMediaIndex(
-                        (prev) => (prev - 1 + mediaItems.length) % mediaItems.length,
-                      );
+                      stepMedia(-1);
                     }}
                   >
                     <span aria-hidden="true" className="text-lg">‹</span>
@@ -759,7 +799,7 @@ const DesignViewModal: React.FC<Props> = ({
                     className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setActiveMediaIndex((prev) => (prev + 1) % mediaItems.length);
+                      stepMedia(1);
                     }}
                   >
                     <span aria-hidden="true" className="text-lg">›</span>
@@ -1089,20 +1129,37 @@ const DesignViewModal: React.FC<Props> = ({
           </button>
 
           <div className="grid md:grid-cols-[minmax(0,58%)_minmax(0,42%)] h-[min(92vh,860px)]">
-            <div className={CONTENT_DISPLAY_FRAME_CLASS}>
-              <MediaRenderer
-                kind={activeMedia?.type === 'POST_VIDEO' ? 'video' : 'image'}
-                src={activeMedia?.url || ''}
-                fit="contain" // Override MediaRenderer's default cover constraints
-                className={CONTENT_DISPLAY_RENDERER_CLASS}
-                mediaClassName={CONTENT_DISPLAY_MEDIA_CLASS}
-                maxHeightClassName="" // remove max-h
-                allowScroll={true}
-                controls={true}
-              />
+            {/*
+              The controls sit OUTSIDE the scroller, over it.
+
+              They used to be absolute children of the frame itself — and that
+              frame is `overflow-y-auto` holding an `object-cover` image at
+              `h-auto min-h-full`, so its content is routinely taller than the
+              box. An absolute child of a scroll container is positioned
+              against the CONTENT, not the visible window: `top-1/2` put the
+              arrows halfway down an image you can only see the top of, and
+              `bottom-3` put the counter below the fold. The controls were
+              real, and reachable only by scrolling to them.
+
+              So the scroller keeps the media, and this wrapper — which does
+              not scroll — carries the overlay.
+            */}
+            <div className="relative h-full min-w-0">
+              <div className={CONTENT_DISPLAY_FRAME_CLASS}>
+                <MediaRenderer
+                  kind={activeMedia?.type === 'POST_VIDEO' ? 'video' : 'image'}
+                  src={activeMedia?.url || ''}
+                  fit="contain" // Override MediaRenderer's default cover constraints
+                  className={CONTENT_DISPLAY_RENDERER_CLASS}
+                  mediaClassName={CONTENT_DISPLAY_MEDIA_CLASS}
+                  maxHeightClassName="" // remove max-h
+                  allowScroll={true}
+                  controls={true}
+                />
+              </div>
 
               {loadingMedia ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/25">
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/25">
                   <MuseLoader size={30} />
                 </div>
               ) : null}
@@ -1112,10 +1169,10 @@ const DesignViewModal: React.FC<Props> = ({
                   <button
                     type="button"
                     aria-label="Previous image"
-                    className="absolute left-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/45 text-white flex items-center justify-center hover:bg-black/60"
+                    className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white transition hover:bg-black/60"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setActiveMediaIndex((prev) => (prev - 1 + mediaItems.length) % mediaItems.length);
+                      stepMedia(-1);
                     }}
                   >
                     <span aria-hidden="true" className="text-lg">‹</span>
@@ -1123,15 +1180,15 @@ const DesignViewModal: React.FC<Props> = ({
                   <button
                     type="button"
                     aria-label="Next image"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/45 text-white flex items-center justify-center hover:bg-black/60"
+                    className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white transition hover:bg-black/60"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setActiveMediaIndex((prev) => (prev + 1) % mediaItems.length);
+                      stepMedia(1);
                     }}
                   >
                     <span aria-hidden="true" className="text-lg">›</span>
                   </button>
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
+                  <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
                     {activeMediaIndex + 1} / {mediaItems.length}
                   </div>
                 </>
