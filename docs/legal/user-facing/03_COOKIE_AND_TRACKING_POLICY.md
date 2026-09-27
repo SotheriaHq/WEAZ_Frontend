@@ -33,57 +33,23 @@ When we refer to "Cookies and Storage Technologies," we encompass five distinct 
 
 The table below provides a complete, field-by-field register of every cookie, local storage key, and device cache utilized across the WIEZ application ecosystem:
 
-```
-                            EXHAUSTIVE STORAGE & COOKIE DIRECTORY
-┌──────────────────────────────┬───────────────────┬──────────────┬──────────────┬────────────────────────────────────────────────────────┐
-│ Technical Key / Identifier   │ Storage Mechanism │ Surface      │ TTL / Life   │ Exact Technical Purpose & Legal Classification         │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `refreshToken`               │ HttpOnly Cookie   │ Web Browser  │ 30 Days      │ **Strictly Necessary**: Rotated JWT session token.     │
-│                              │ (SameSite=Strict) │ / API        │ (Rolling)    │ Protected against XSS; required for auth renewal.      │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `accessToken`                │ HttpOnly Cookie / │ Web Browser  │ 15 Minutes   │ **Strictly Necessary**: Short-lived Bearer credential   │
-│                              │ Request Header    │ / API        │              │ validating individual REST and GraphQL API calls.      │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `WIEZ_ACCESS_TOKEN`          │ Hardware Keychain │ Mobile       │ Until Logout │ **Strictly Necessary**: iOS Keychain / Android KeyStore│
-│                              │ (SecureStore)     │ (iOS/Android)│              │ encrypted access token on physical mobile devices.     │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `WIEZ_REFRESH_TOKEN`         │ Hardware Keychain │ Mobile       │ Until Logout │ **Strictly Necessary**: Hardware-isolated refresh token │
-│                              │ (SecureStore)     │ (iOS/Android)│              │ used for seamless native mobile session renewal.       │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `WIEZ_USER`                  │ Hardware Keychain │ Mobile       │ Until Logout │ **Strictly Necessary**: Versioned (v1) snapshot of     │
-│                              │ (SecureStore)     │ (iOS/Android)│              │ authenticated user identity (role, status, email).     │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `wiez.market.`               │ `localStorage`    │ Web Browser  │ 365 Days     │ **First-Party Analytics**: Anonymous UUID client ID    │
-│ `anonymousSessionId.v1`      │                   │              │ (Persistent) │ grouping discovery signals before user logs in.        │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `wiez.market.`               │ `localStorage` /  │ Web / Mobile │ 24 Hours /   │ **First-Party Analytics**: Client queue buffering      │
-│ `signalQueue.v1`             │ `AsyncStorage`    │              │ 5s Flush     │ dwell time, reel views, and bookmark events.           │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `wiez.market.`               │ `localStorage` /  │ Web / Mobile │ 30 Seconds   │ **Performance & Integrity**: Suppresses duplicate     │
-│ `signalRecent.v1`            │ Memory Map        │              │ (Window)     │ noisy impression events (e.g. repeated scroll passes). │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `wiez.bag.v1`                │ `localStorage`    │ Web Browser  │ Persistent   │ **Functional / Commerce**: Multi-vendor shopping cart  │
-│                              │                   │              │              │ snapshot (variants, quantities, custom notes).         │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `wiez.tailor.`               │ `sessionStorage` /│ Web Browser  │ Session /    │ **Functional / Bespoke**: Temporary snapshot of 38 ISO │
-│ `measurementDraft.v1`        │ `localStorage`    │              │ 30 Days      │ 8559 body measurements & SVG silhouette model.         │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `wiez.brand.`                │ `localStorage` /  │ Web / Mobile │ Persistent   │ **Functional / Merchant**: Active Brand Studio         │
-│ `activeContext.v1`           │ `SecureStore`     │              │              │ workspace identifier for designers managing stores.    │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `wiez.ui.theme.v1`           │ `localStorage`    │ Web Browser  │ Persistent   │ **Preferences**: Dark Mode / Light Mode interface      │
-│                              │                   │              │              │ display state selection.                               │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `wiez.legal.`                │ `localStorage`    │ Web Browser  │ Persistent   │ **Legal Compliance**: Cryptographic audit hash of      │
-│ `acceptance.v1`              │                   │              │              │ accepted Terms, Privacy, and Cookie Policy versions.   │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `tanstack-query-cache`       │ `AsyncStorage` /  │ Web / Mobile │ 24 Hours     │ **Performance & Speed**: Client cache for Runway feed  │
-│                              │ Memory Cache      │              │              │ lookbooks, catalog grids, and designer profiles.       │
-├──────────────────────────────┼───────────────────┼──────────────┼──────────────┼────────────────────────────────────────────────────────┤
-│ `s3_presigned_url_cache`     │ `localStorage` /  │ Web / Mobile │ 15 Minutes   │ **Performance & Cache**: Short-lived cache of signed   │
-│                              │ Memory Cache      │              │              │ AWS S3 image URLs to avoid repeated auth calls.        │
-└──────────────────────────────┴───────────────────┴──────────────┴──────────────┴────────────────────────────────────────────────────────┘
-```
+| Technical Key / Identifier | Storage Mechanism | Surface | TTL / Life | Exact Technical Purpose & Legal Classification |
+| --- | --- | --- | --- | --- |
+| `refreshToken` | HttpOnly Cookie (SameSite=Strict) | Web Browser / API | 30 Days (Rolling) | **Strictly Necessary**: Rotated JWT session token. Protected against XSS; required for auth renewal. |
+| `accessToken` | HttpOnly Cookie / Request Header | Web Browser / API | 15 Minutes | **Strictly Necessary**: Short-lived Bearer credential validating individual REST and GraphQL API calls. |
+| `WIEZ_ACCESS_TOKEN` | Hardware Keychain (SecureStore) | Mobile (iOS/Android) | Until Logout | **Strictly Necessary**: iOS Keychain / Android KeyStore encrypted access token on physical mobile devices. |
+| `WIEZ_REFRESH_TOKEN` | Hardware Keychain (SecureStore) | Mobile (iOS/Android) | Until Logout | **Strictly Necessary**: Hardware-isolated refresh token used for seamless native mobile session renewal. |
+| `WIEZ_USER` | Hardware Keychain (SecureStore) | Mobile (iOS/Android) | Until Logout | **Strictly Necessary**: Versioned (v1) snapshot of authenticated user identity (role, status, email). |
+| `wiez.market.` `anonymousSessionId.v1` | `localStorage` | Web Browser | 365 Days (Persistent) | **First-Party Analytics**: Anonymous UUID client ID grouping discovery signals before user logs in. |
+| `wiez.market.` `signalQueue.v1` | `localStorage` / `AsyncStorage` | Web / Mobile | 24 Hours / 5s Flush | **First-Party Analytics**: Client queue buffering dwell time, reel views, and bookmark events. |
+| `wiez.market.` `signalRecent.v1` | `localStorage` / Memory Map | Web / Mobile | 30 Seconds (Window) | **Performance & Integrity**: Suppresses duplicate noisy impression events (e.g. repeated scroll passes). |
+| `wiez.bag.v1` | `localStorage` | Web Browser | Persistent | **Functional / Commerce**: Multi-vendor shopping cart snapshot (variants, quantities, custom notes). |
+| `wiez.tailor.` `measurementDraft.v1` | `sessionStorage` / `localStorage` | Web Browser | Session / 30 Days | **Functional / Bespoke**: Temporary snapshot of 38 ISO 8559 body measurements & SVG silhouette model. |
+| `wiez.brand.` `activeContext.v1` | `localStorage` / `SecureStore` | Web / Mobile | Persistent | **Functional / Merchant**: Active Brand Studio workspace identifier for designers managing stores. |
+| `wiez.ui.theme.v1` | `localStorage` | Web Browser | Persistent | **Preferences**: Dark Mode / Light Mode interface display state selection. |
+| `wiez.legal.` `acceptance.v1` | `localStorage` | Web Browser | Persistent | **Legal Compliance**: Cryptographic audit hash of accepted Terms, Privacy, and Cookie Policy versions. |
+| `tanstack-query-cache` | `AsyncStorage` / Memory Cache | Web / Mobile | 24 Hours | **Performance & Speed**: Client cache for Runway feed lookbooks, catalog grids, and designer profiles. |
+| `s3_presigned_url_cache` | `localStorage` / Memory Cache | Web / Mobile | 15 Minutes | **Performance & Cache**: Short-lived cache of signed AWS S3 image URLs to avoid repeated auth calls. |
 
 ---
 
@@ -130,21 +96,12 @@ To ensure instant navigation and smooth 60fps media scrolling across fashion loo
 
 WIEZ utilizes a proprietary, client-side first-party telemetry system (`fthreadly/src/services/marketSignalQueue.ts`) to optimize the Runway discovery feed and catalog ranking:
 
-```
-                     MARKETPLACE SIGNAL PROCESSING ARCHITECTURE
- ┌─────────────────────────┐         ┌─────────────────────────┐
- │   CLIENT-SIDE CAPTURE   │         │   DE-DUPLICATION WINDOW │
- │ • Lookbook dwell time   │ ──────> │ • 30-second deduplication│
- │ • Reel completion rate  │         │ • Noisy signal filter   │
- │ • Zoom & save actions   │         └────────────┬────────────┘
- └─────────────────────────┘                      │
-                                                  ▼
- ┌─────────────────────────┐         ┌─────────────────────────┐
- │   BACKEND INGESTION     │         │   LOCAL BUFFER QUEUE    │
- │ • Runway recommendations│ <────── │ • Up to 100 queued items │
- │ • Zero 3rd-party synd.  │         │ • 5s batch flush (max 25)│
- └─────────────────────────┘         └─────────────────────────┘
-```
+A signal passes through four stages before it reaches us:
+
+1. **Client-side capture**: lookbook dwell time, reel completion rate, and zoom and save actions.
+2. **De-duplication window**: a 30-second window collapses repeats, and a noisy-signal filter discards the rest.
+3. **Local buffer queue**: up to 100 items are held on your device and flushed in batches of at most 25 every 5 seconds.
+4. **Backend ingestion**: the batch is used to rank your Runway recommendations. There is **zero third-party syndication** of these signals.
 
 ### 4.1. Granular Signal Event Types
 Our systems log the following specific user engagement events:
@@ -190,24 +147,14 @@ When you complete checkout via Paystack, Flutterwave, or Stripe:
 
 ## 7. Storage Lifespans and Expiration Schedules
 
-```
-                              STORAGE LIFESPAN DIRECTORY
-┌──────────────────────────────────────┬─────────────────────────────────────────────────────────────┐
-│ Classification                       │ Expiration / Retention Behavior                             │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **Session Storage**                  │ Terminated immediately upon closing browser tab or process. │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **Pre-Signed Image URL Caches**      │ Automatically invalidated after fifteen (15) minutes.       │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **Market Signal Telemetry Queue**    │ Flushed every 5 seconds; stale entries purge after 24 hours.│
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **Authentication Refresh Tokens**    │ Persist for thirty (30) rolling days from last active use.  │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **Commerce Cart & Theme State**      │ Persists in `localStorage` until manually cleared or logout.│
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **Mobile Hardware Keychains**        │ Persists until explicit logout, account deletion, or purge. │
-└──────────────────────────────────────┴─────────────────────────────────────────────────────────────┘
-```
+| Classification | Expiration / Retention Behavior |
+| --- | --- |
+| **Session Storage** | Terminated immediately upon closing browser tab or process. |
+| **Pre-Signed Image URL Caches** | Automatically invalidated after fifteen (15) minutes. |
+| **Market Signal Telemetry Queue** | Flushed every 5 seconds; stale entries purge after 24 hours. |
+| **Authentication Refresh Tokens** | Persist for thirty (30) rolling days from last active use. |
+| **Commerce Cart & Theme State** | Persists in `localStorage` until manually cleared or logout. |
+| **Mobile Hardware Keychains** | Persists until explicit logout, account deletion, or purge. |
 
 ---
 
@@ -215,27 +162,13 @@ When you complete checkout via Paystack, Flutterwave, or Stripe:
 
 You maintain full control over cookies and client storage through your browser and device settings:
 
-```
-                            STORAGE & COOKIE CONTROLS
-┌──────────────────────────────────────┬─────────────────────────────────────────────────────────────┐
-│ Control Surface                      │ Management Instructions                                     │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **1. Google Chrome**                 │ Settings > Privacy and security > Third-party cookies >     │
-│                                      │ See all site data and permissions > Search "wiez.com".      │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **2. Apple Safari (macOS & iOS)**    │ macOS: Safari > Settings > Privacy > Manage Website Data.   │
-│                                      │ iOS: Settings > Safari > Advanced > Website Data.           │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **3. Mozilla Firefox**               │ Settings > Privacy & Security > Cookies and Site Data >     │
-│                                      │ Manage Data > Search "wiez.com".                            │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **4. Mobile Device App Caches**      │ iOS: Settings > General > iPhone Storage > WIEZ > Offload.  │
-│                                      │ Android: Settings > Apps > WIEZ > Storage > Clear Cache.    │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **5. In-App Discovery Signal Reset** │ You can reset your local signal queue and anonymous session │
-│                                      │ identifier at any time via Settings > Privacy > Reset Feed. │
-└──────────────────────────────────────┴─────────────────────────────────────────────────────────────┘
-```
+| Control Surface | Management Instructions |
+| --- | --- |
+| **1. Google Chrome** | Settings > Privacy and security > Third-party cookies > See all site data and permissions > Search "wiez.com". |
+| **2. Apple Safari (macOS & iOS)** | macOS: Safari > Settings > Privacy > Manage Website Data. iOS: Settings > Safari > Advanced > Website Data. |
+| **3. Mozilla Firefox** | Settings > Privacy & Security > Cookies and Site Data > Manage Data > Search "wiez.com". |
+| **4. Mobile Device App Caches** | iOS: Settings > General > iPhone Storage > WIEZ > Offload. Android: Settings > Apps > WIEZ > Storage > Clear Cache. |
+| **5. In-App Discovery Signal Reset** | You can reset your local signal queue and anonymous session identifier at any time via Settings > Privacy > Reset Feed. |
 
 *Note: Blocking strictly necessary cookies or local storage will prevent login, bag checkout, bespoke measurement saving, and Brand Studio operations from working.*
 
@@ -285,5 +218,8 @@ If you have questions regarding our storage practices, cryptographic security, o
 
 * **Data Protection Officer (DPO)**: `privacy@wiez.com`
 * **Technical Security Team**: `security@wiez.com`
-* **Mailing Address**: Data Protection Office, WIEZ Platforms Limited, Lagos State, Nigeria.
+* **Mailing Address**:  
+  Data Protection Office, WIEZ Platforms Limited  
+  12B Admiralty Way, Lekki Phase 1,  
+  Lagos, Nigeria.
 

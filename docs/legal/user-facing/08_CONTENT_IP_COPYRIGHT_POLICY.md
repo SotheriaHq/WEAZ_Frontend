@@ -37,6 +37,12 @@ This operational license enables WIEZ to:
 ### 2.3. Termination of License
 Upon deleting a design, product listing, or store collection from your WIEZ account, this license terminates with respect to future public displays, subject to reasonable processing latencies (up to 48 hours for CDN edge cache purging) and statutory archival requirements (e.g., preservation of order invoice records, dispute evidence, and tax documentation).
 
+### 2.4. Moral Rights (Droit Moral) Acknowledgment
+Pursuant to **Section 12 of the Nigerian Copyright Act 2022** and international copyright conventions (Berne Convention Article 6bis):
+* **Inalienable Attribution**: WIEZ acknowledges and respects the moral rights of fashion creators to be identified as the author of their original works (the right of paternity/attribution). WIEZ attributes designer showcases to their respective brand profiles and handles;
+* **Protection of Integrity**: WIEZ warrants that it will not distort, mutilate, modify, or derogatory treat any creator's original design in any manner that is prejudicial to the creator's honor, reputation, or artistic integrity.
+
+
 ---
 
 ## 3. Mandatory Rights-Cleared Content Standards
@@ -123,15 +129,9 @@ Upon receiving a valid Counter-Notification:
 
 In accordance with global statutory standards, WIEZ enforces a strict **Three-Strike Repeat Infringer Policy**:
 
-```
-[ Strike 1: Formal Warning & Listing Takedown ]
-       │
-       ▼ (Subsequent Valid IP Complaint)
-[ Strike 2: 14-Day Storefront Freeze & Payout Audit ]
-       │
-       ▼ (Third Valid IP Complaint within 12 Months)
-[ Strike 3: Permanent Account Termination & Merchant Bar ]
-```
+1. **Strike 1 — formal warning and listing takedown.**
+2. **Strike 2 — a 14-day storefront freeze and a payout audit**, on a subsequent valid IP complaint.
+3. **Strike 3 — permanent account termination and a merchant bar**, on a third valid IP complaint within 12 months.
 
 * **Strike 1 (First Valid Infringement)**: Immediate removal of infringing listing; mandatory written warning issued to account owner; educational compliance reminder.
 * **Strike 2 (Second Valid Infringement within 12 months)**: Immediate listing removal; **14-day suspension** of Brand storefront and new listing capabilities; mandatory audit of all active product catalog items.

@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { BRAND_ASPECT } from '@/brand/assetSizes';
 import { BRAND_ASSETS, PRODUCT_NAME } from '@/brand/identity';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -31,8 +32,16 @@ type WiezWordmarkProps = {
   labelled?: boolean;
 };
 
-/** From the artwork's own viewBox (792 x 531). */
-const WORDMARK_ASPECT_RATIO = 792 / 531;
+/**
+ * Measured from the file, not remembered.
+ *
+ * This was `792 / 531` — the viewBox of the SVG the wordmark used to be — while
+ * the PNG it actually renders is 720 x 461. With a width and a height both set,
+ * the browser does not letterbox the difference, it STRETCHES to the box: the
+ * name came out 4.5% narrow, which a reader sees as the letters losing their
+ * spacing rather than as a scaling bug.
+ */
+const WORDMARK_ASPECT_RATIO = BRAND_ASPECT.wordmark;
 
 const WiezWordmark: React.FC<WiezWordmarkProps> = ({
   height = 28,

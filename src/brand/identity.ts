@@ -7,8 +7,9 @@
  * constants with zero consumers. Export names now match the mobile and backend
  * identity modules exactly, so a value can be grepped across all three repos.
  *
- * Sibling: `wiezOrbArtwork.ts` holds the mark's geometry. Nothing else in the
- * app may declare a brand name, a brand colour, or a path into /brand.
+ * Sibling: `assetSizes.ts` holds the artwork's real pixel dimensions, emitted
+ * by the same script that writes the files. Nothing else in the app may
+ * declare a brand name, a brand colour, or a path into /brand.
  */
 
 /** The product name. There is no former name to surface anywhere. */

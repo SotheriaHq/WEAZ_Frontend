@@ -20,26 +20,16 @@ By submitting a digital storefront application, completing KYC merchant onboardi
 
 To preserve marketplace security, combat fraud, and comply with Central Bank of Nigeria (CBN) regulations and the Special Control Unit Against Money Laundering (SCUML) under the Money Laundering (Prevention and Prohibition) Act 2022, all Brands must undergo mandatory identity and capability verification before publishing storefronts or receiving escrow disbursements.
 
-```
-[ Step 1: Digital Application & Profile Setup ]
-       │
-       ▼
-[ Step 2: 5-Point Document & Workshop Submission ]
-  ├─ 1. Workshop Photo 1 (Production facility / machinery)
-  ├─ 2. Workshop Photo 2 (Raw materials / cutting tables)
-  ├─ 3. Government ID / NIN (`verificationNinKey`)
-  ├─ 4. Business Registration / CAC (`verificationCacKey`)
-  ├─ 5. Physical Workshop Address & Production Volume
-       │
-       ▼
-[ Step 3: WIEZ Merchant Verification Review (24–72h SLA) ]
-       │
-  ┌────┴────────────────────────┐
-  ▼                             ▼
-[ APPROVED ]             [ REJECTED ]
-Storefront Goes Live     Written Reason Provided;
-Payouts Enabled          7-Day Resubmission Window
-```
+1. **Digital application and profile setup.**
+2. **Five-point document and workshop submission**:
+    1. Workshop photo 1 (production facility or machinery);
+    2. Workshop photo 2 (raw materials or cutting tables);
+    3. Government ID / NIN (`verificationNinKey`);
+    4. Business registration / CAC certificate (`verificationCacKey`);
+    5. Physical workshop address and production volume.
+3. **WIEZ merchant verification review**, within a 24–72 hour SLA, closing one of two ways:
+    * **Approved**: your storefront goes live and payouts are enabled;
+    * **Rejected**: you receive a written reason and a 7-day resubmission window.
 
 ### 2.1. Required Verification Artifacts
 1. **Production Workshop Photography (2 Keys)**: Two clear, timestamped photographs demonstrating physical manufacturing capacity (sewing machines, cutting tables, tailoring equipment, and work-in-progress inventory);
@@ -58,8 +48,14 @@ Payouts Enabled          7-Day Resubmission Window
 ## 3. Brand Account Governance, Staff Permissions, and Liability
 
 1. **Authority Warranty**: The individual registering the Brand account represents and warrants that they possess full legal authority to enter into commercial contracts on behalf of the Brand entity;
-2. **Staff Role Delegations**: Brand owners may delegate administrative, catalog management, and customer support permissions to team members via the Brand Workspace. The Brand owner remains strictly liable for all actions, communications, listings, and contractual commitments executed by delegated staff;
+2. **Staff Role Delegations**: Brand owners may delegate administrative, catalog management, and customer support permissions to team members via the Brand Workspace (`BrandMember` roles). The Brand owner remains strictly liable for all actions, communications, listings, and contractual commitments executed by delegated staff;
 3. **Security of Credentials**: Brands must enforce multi-factor authentication (MFA) across all staff accounts. WIEZ is not liable for unauthorized payouts or catalog alterations resulting from compromised merchant credentials.
+
+### 3.1. Staff Account Lifecycle and Access Revocation
+* **Staff Departures & Revocation**: When a staff member leaves the Brand's employment, the Brand owner must immediately revoke their access via the Brand Studio Workspace. WIEZ is not responsible for actions taken by former employees prior to explicit access revocation.
+* **Continuity of In-Flight Custom Orders**: Active client chats, bespoke cutting commitments, and orders handled by a departed staff member remain binding legal obligations of the Brand entity.
+* **Account Deletion of Staff**: If a team member requests personal account deletion, their personal data is pseudonymized while the Brand's historical order records and chat transcripts are preserved under the Brand's workspace for dispute defense.
+
 
 ---
 
@@ -88,17 +84,12 @@ Brands shall not list, manufacture, or distribute:
 
 WIEZ operates a transparent transaction fee structure designed to maintain platform infrastructure, global payment processing, escrow protection, and marketplace marketing:
 
-```
-[ Buyer Gross Order Total ]
-       │
-       ├─► Pass-Through Third-Party Shipping Carrier Fee (0% WIEZ Commission)
-       │
-       ├─► Standard Platform Commission (8% – 12% on Item Merchandise Value)
-       │
-       ├─► Gateway Payment Processing Fee (Paystack / Flutterwave / Stripe)
-       │
-       └─► Net Merchant Settlement (Allocated to Brand Escrow Balance)
-```
+The buyer's gross order total is allocated in this order:
+
+1. **Third-party shipping carrier fee**: passed through in full. WIEZ takes no commission on shipping.
+2. **Standard platform commission**: 8%–12% of item merchandise value.
+3. **Gateway payment processing fee**: Paystack, Flutterwave, or Stripe.
+4. **Net merchant settlement**: the remainder, allocated to your Brand escrow balance.
 
 ### 5.1. Standard Commission Rates
 * **Ready-to-Wear Market Products**: **8% to 10%** of gross merchandise value;
@@ -190,21 +181,18 @@ To protect platform integrity, escrow safeguards, and commercial trust:
 
 WIEZ enforces a calibrated 5-level merchant disciplinary framework:
 
-```
-[ Level 1: Formal Compliance Warning & Catalog Correction Notice ]
-       │
-       ▼ (Repeated SLA Violations / High Dispute Ratio)
-[ Level 2: Marketplace Search Throttling & Temporary Listing Freeze ]
-       │
-       ▼ (Severe Non-Fulfillment / Fit Defect Rate > 5%)
-[ Level 3: 14-Day Storefront Suspension & Escrow Audit ]
-       │
-       ▼ (Counterfeit / Off-Platform Solicitation / IP Strike 3)
-[ Level 4: Indefinite Merchant Debarment & Payout Freeze ]
-       │
-       ▼ (Gross Fraud / Criminal Misconduct)
-[ Level 5: Permanent Platform Expulsion & Law Enforcement Referral ]
-```
+1. **Level 1 — formal compliance warning and catalog correction notice.**
+2. **Level 2 — marketplace search throttling and a temporary listing freeze**, after repeated SLA violations or a high dispute ratio.
+3. **Level 3 — a 14-day storefront suspension and an escrow audit**, after severe non-fulfillment or a fit defect rate above 5%.
+4. **Level 4 — indefinite merchant debarment and a payout freeze**, after counterfeit goods, off-platform solicitation, or a third IP strike.
+5. **Level 5 — permanent platform expulsion and referral to law enforcement**, after gross fraud or criminal misconduct.
+
+### 13.1. Buyer Protection and Order Handling During Suspension
+If a Brand's storefront is suspended or debarred (Levels 3, 4, or 5):
+* **Fulfillment of In-Flight Orders**: If active orders are already in production or transit, the Brand remains obligated to complete delivery. WIEZ will disburse net settlements only upon verified delivery and buyer inspection expiry.
+* **Non-Fulfillable Orders & Escrow Refunds**: If a suspended Brand cannot fulfill pending orders within SLA timelines, WIEZ will immediately cancel the pending orders and refund 100% of escrow funds to affected buyers.
+* **Indemnity for Unfulfilled Orders**: The Brand shall indemnify WIEZ for any payment gateway chargeback costs, gateway dispute processing fees, or buyer remediation costs incurred due to merchant suspension.
+
 
 ---
 

@@ -20,7 +20,8 @@ For all users accessing the Services globally, the designated legal data control
 * **Corporate Entity**: WIEZ Platforms Limited
 * **Data Protection Office**: `privacy@wiez.com`
 * **Legal Department**: `legal@wiez.com`
-* **Registered Address**: Lagos State, Federal Republic of Nigeria
+* **Registered Address**: 12B Admiralty Way, Lekki Phase 1, Lagos, Federal Republic of Nigeria
+
 
 ### 1.3. Fundamental Privacy Principles
 WIEZ adheres to strict global data governance principles:
@@ -35,42 +36,16 @@ WIEZ adheres to strict global data governance principles:
 
 We collect information directly from you, automatically through your platform usage, and from verified third-party technical integrations.
 
-```
-                             DATA CATEGORIZATION TAXONOMY
-┌──────────────────────────────────────┬─────────────────────────────────────────────────────────────┐
-│ Category                             │ Technical Fields & Data Elements                            │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **1. Account & Identity Data**       │ First name, last name, @username handle, email address,     │
-│                                      │ password hash (bcrypt), normalized E.164 phone number,      │
-│                                      │ avatar image, banner image, country, state, city/LGA.       │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **2. Bespoke Body Measurements**     │ Up to 38 distinct ISO 8559 tailoring points (bust, waist,   │
-│    *(High-Trust Tailoring Data)*     │ hips, inseam, torso length, shoulder span, neck), SVG      │
-│                                      │ silhouette coordinate maps, and fitting notes.              │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **3. Brand Studio Verification (KYC)**│ Corporate registration certificates (CAC documents), Tax   │
-│    *(Strictly Isolated Storage)*     │ IDs (TIN), director government IDs (Passport/NIN/License),  │
-│                                      │ utility bills, and bank payout account details.             │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **4. Commerce & Transactional Data** │ Multi-vendor bag items, order timestamps, shipping address, │
-│                                      │ recipient contact numbers, bespoke cutting milestone logs,  │
-│                                      │ return requests, and customer support tickets.              │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **5. Financial & Escrow Tokens**     │ Payment gateway transaction references, masked last-4 card  │
-│    *(PCI-DSS Compliant)*             │ digits, card brand, tokenized authorization hashes, escrow  │
-│                                      │ pending balances, and settlement ledger payout IDs.         │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **6. Social Runway & UGC Media**     │ Design showcase photos, video lookbooks, styling tags,      │
-│                                      │ captions, likes, bookmarks/saves, comments, and reviews.    │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **7. In-App Communications**         │ Buyer-designer custom tailoring chat messages, attachment   │
-│                                      │ images, alteration requests, and dispute evidence files.    │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **8. Technical & Telemetry Signals** │ IP address, device model, operating system, browser user-   │
-│                                      │ agent, screen DPI, network type (Wi-Fi/4G/5G), push tokens, │
-│                                      │ session cookies, and dwell-time interaction logs.           │
-└──────────────────────────────────────┴─────────────────────────────────────────────────────────────┘
-```
+| Category | Technical Fields & Data Elements |
+| --- | --- |
+| **1. Account & Identity Data** | First name, last name, @username handle, email address, password hash (bcrypt), normalized E.164 phone number, avatar image, banner image, country, state, city/LGA. |
+| **2. Bespoke Body Measurements** *(High-Trust Tailoring Data)* | Up to 38 distinct ISO 8559 tailoring points (bust, waist, hips, inseam, torso length, shoulder span, neck), SVG silhouette coordinate maps, and fitting notes. |
+| **3. Brand Studio Verification (KYC)** *(Strictly Isolated Storage)* | Corporate registration certificates (CAC documents), Tax IDs (TIN), director government IDs (Passport/NIN/License), utility bills, and bank payout account details. |
+| **4. Commerce & Transactional Data** | Multi-vendor bag items, order timestamps, shipping address, recipient contact numbers, bespoke cutting milestone logs, return requests, and customer support tickets. |
+| **5. Financial & Escrow Tokens** *(PCI-DSS Compliant)* | Payment gateway transaction references, masked last-4 card digits, card brand, tokenized authorization hashes, escrow pending balances, and settlement ledger payout IDs. |
+| **6. Social Runway & UGC Media** | Design showcase photos, video lookbooks, styling tags, captions, likes, bookmarks/saves, comments, and reviews. |
+| **7. In-App Communications** | Buyer-designer custom tailoring chat messages, attachment images, alteration requests, and dispute evidence files. |
+| **8. Technical & Telemetry Signals** | IP address, device model, operating system, browser user-agent, screen DPI, network type (Wi-Fi/4G/5G), push tokens, session cookies, and dwell-time interaction logs. |
 
 ---
 
@@ -145,30 +120,14 @@ To protect Brand owners from identity theft, our public backend APIs (`GET /bran
 
 We process your personal information only when authorized by law:
 
-```
-                            LEGAL BASES & PROCESSING MATRIX
-┌──────────────────────────────────────┬──────────────────────┬──────────────────────────────────────┐
-│ Purpose of Processing                │ Applicable Data      │ Legal Basis                          │
-├──────────────────────────────────────┼──────────────────────┼──────────────────────────────────────┤
-│ 1. Processing Market Bag Orders      │ Identity, Address,   │ **Performance of a Contract**        │
-│    and Custom Tailoring Contracts    │ Measurements, Tokens │ (Fulfilling the purchase agreement)  │
-├──────────────────────────────────────┼──────────────────────┼──────────────────────────────────────┤
-│ 2. Runway Feed Personalization and   │ Dwell Time, Likes,   │ **Legitimate Interests**             │
-│    Visual Recommendation Ranking     │ Saves, Search Logs   │ (Improving user experience)          │
-├──────────────────────────────────────┼──────────────────────┼──────────────────────────────────────┤
-│ 3. Brand Verification & AML Screening│ CAC, TIN, Gov IDs,   │ **Compliance with Legal Obligation** │
-│                                      │ Bank Details         │ (Tax, corporate, and AML compliance) │
-├──────────────────────────────────────┼──────────────────────┼──────────────────────────────────────┤
-│ 4. Tailoring Fit Dispute Forensics   │ Measurement Profiles,│ **Performance of a Contract** &      │
-│                                      │ Inspection Photos    │ **Legitimate Interests** (Fairness)  │
-├──────────────────────────────────────┼──────────────────────┼──────────────────────────────────────┤
-│ 5. Direct Shopper-Brand Chat         │ Chat Text, Images,   │ **Performance of a Contract**        │
-│                                      │ Fitting Notes        │ (Order coordination)                 │
-├──────────────────────────────────────┼──────────────────────┼──────────────────────────────────────┤
-│ 6. Push & Transactional Alerting     │ Push Tokens, Email,  │ **Performance of a Contract** &      │
-│                                      │ Phone Number         │ **Consent** (Marketing preferences)  │
-└──────────────────────────────────────┴──────────────────────┴──────────────────────────────────────┘
-```
+| Purpose of Processing | Applicable Data | Legal Basis |
+| --- | --- | --- |
+| 1. Processing Market Bag Orders and Custom Tailoring Contracts | Identity, Address, Measurements, Tokens | **Performance of a Contract** (Fulfilling the purchase agreement) |
+| 2. Runway Feed Personalization and Visual Recommendation Ranking | Dwell Time, Likes, Saves, Search Logs | **Legitimate Interests** (Improving user experience) |
+| 3. Brand Verification & AML Screening | CAC, TIN, Gov IDs, Bank Details | **Compliance with Legal Obligation** (Tax, corporate, and AML compliance) |
+| 4. Tailoring Fit Dispute Forensics | Measurement Profiles, Inspection Photos | **Performance of a Contract** & **Legitimate Interests** (Fairness) |
+| 5. Direct Shopper-Brand Chat | Chat Text, Images, Fitting Notes | **Performance of a Contract** (Order coordination) |
+| 6. Push & Transactional Alerting | Push Tokens, Email, Phone Number | **Performance of a Contract** & **Consent** (Marketing preferences) |
 
 ### 7.1. Legitimate Interests Balancing Assessment
 Where WIEZ relies on **Legitimate Interests** as the legal basis for processing (particularly for Runway feed personalization, dwell time telemetry, and marketplace signal analytics), we have conducted and documented a balancing assessment confirming that:
@@ -203,27 +162,14 @@ WIEZ engages trusted third-party technical providers to operate infrastructure s
 
 WIEZ deploys multi-layered technical and organizational security controls:
 
-```
-                            SECURITY ARCHITECTURE OVERVIEW
-┌──────────────────────────────────────┬─────────────────────────────────────────────────────────────┐
-│ Layer                                │ Technical Implementation & Standard                         │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **1. In-Transit Encryption**         │ TLS 1.3 / HTTPS across all web domains and mobile APIs.     │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **2. At-Rest Encryption**            │ AES-256 bit Server-Side Encryption across databases & S3.   │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **3. Credential Hashing**            │ Cryptographic `bcrypt` with individual salt rounds.         │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **4. Mobile Device Security**        │ JWT tokens stored in **iOS Keychain** & **Android KeyStore**│
-│                                      │ via hardware-isolated `expo-secure-store`.                  │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **5. Media Access Controls**         │ Private attachments and KYC files protected via HMAC-SHA256 │
-│                                      │ pre-signed temporary URLs expiring within minutes.          │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ **6. Legal Acceptance Audit Trail**  │ Cryptographically logged `LegalAcceptance` database rows     │
-│                                      │ recording document key, version, timestamp, IP, & device.   │
-└──────────────────────────────────────┴─────────────────────────────────────────────────────────────┘
-```
+| Layer | Technical Implementation & Standard |
+| --- | --- |
+| **1. In-Transit Encryption** | TLS 1.3 / HTTPS across all web domains and mobile APIs. |
+| **2. At-Rest Encryption** | AES-256 bit Server-Side Encryption across databases & S3. |
+| **3. Credential Hashing** | Cryptographic `bcrypt` with individual salt rounds. |
+| **4. Mobile Device Security** | JWT tokens stored in **iOS Keychain** & **Android KeyStore** via hardware-isolated `expo-secure-store`. |
+| **5. Media Access Controls** | Private attachments and KYC files protected via HMAC-SHA256 pre-signed temporary URLs expiring within minutes. |
+| **6. Legal Acceptance Audit Trail** | Cryptographically logged `LegalAcceptance` database rows recording document key, version, timestamp, IP, & device. |
 
 ---
 
@@ -292,39 +238,16 @@ When you request account deletion via Settings (`/settings/delete-account`):
 
 You possess the following statutory rights under applicable global data protection frameworks (GDPR Article 12–22, NDPA 2023 Part VI, CCPA/CPRA). Rights requests may be submitted to `privacy@wiez.com`:
 
-```
-                            COMPLETE GLOBAL USER PRIVACY RIGHTS
-┌──────────────────────────────────────┬─────────────────────────────────────────────────────────────┐
-│ 1. Right to Access & Portability     │ Obtain a complete, structured, machine-readable copy        │
-│    [GDPR Art. 15 / Art. 20]          │ (JSON/CSV) of your personal data and measurement history.   │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ 2. Right to Rectification            │ Correct inaccurate body measurements, addresses, or profile │
-│    [GDPR Art. 16]                    │ details directly via your Settings dashboard.               │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ 3. Right to Erasure ("Right to       │ Initiate account deactivation and identifier                │
-│    Be Forgotten") [GDPR Art. 17]     │ pseudonymization via Settings > Delete Account.             │
-│                                      │ Note: Retention of tax/audit records as per §11.1 applies. │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ 4. Right to Restriction of           │ Request that WIEZ pauses processing of your personal data   │
-│    Processing [GDPR Art. 18]         │ (e.g., while accuracy or objection is being contested).     │
-│                                      │ Submit request to privacy@wiez.com.                         │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ 5. Right to Object [GDPR Art. 21]    │ Object to processing based on Legitimate Interests (e.g.,   │
-│                                      │ Runway feed personalization). Where your interests override  │
-│                                      │ WIEZ's, processing will be halted for that specific purpose.│
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ 6. Right to Withdraw Consent         │ Where processing is based on your consent (e.g., marketing  │
-│    [GDPR Art. 7(3)]                  │ emails, optional analytics), you may withdraw consent at    │
-│                                      │ any time via Settings > Notifications without penalty.      │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ 7. Profile & Location Visibility     │ Switch between Public Profile (UNLOCKED) and Private        │
-│    Controls                          │ Profile (LOCKED), and independently toggle "Show my         │
-│                                      │ username" and "Show my location" in Settings > Privacy.     │
-├──────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
-│ 8. Cookie & Signal Queue Reset       │ Reset your anonymized session ID and local market signal    │
-│                                      │ queue at any time via Settings > Privacy > Reset Feed.      │
-└──────────────────────────────────────┴─────────────────────────────────────────────────────────────┘
-```
+| Your right | What it covers and how to use it |
+| --- | --- |
+| 1. Right to Access & Portability [GDPR Art. 15 / Art. 20] | Obtain a complete, structured, machine-readable copy (JSON/CSV) of your personal data and measurement history. |
+| 2. Right to Rectification [GDPR Art. 16] | Correct inaccurate body measurements, addresses, or profile details directly via your Settings dashboard. |
+| 3. Right to Erasure ("Right to Be Forgotten") [GDPR Art. 17] | Initiate account deactivation and identifier pseudonymization via Settings > Delete Account. Note: Retention of tax/audit records as per §11.1 applies. |
+| 4. Right to Restriction of Processing [GDPR Art. 18] | Request that WIEZ pauses processing of your personal data (e.g., while accuracy or objection is being contested). Submit request to privacy@wiez.com. |
+| 5. Right to Object [GDPR Art. 21] | Object to processing based on Legitimate Interests (e.g., Runway feed personalization). Where your interests override WIEZ's, processing will be halted for that specific purpose. |
+| 6. Right to Withdraw Consent [GDPR Art. 7(3)] | Where processing is based on your consent (e.g., marketing emails, optional analytics), you may withdraw consent at any time via Settings > Notifications without penalty. |
+| 7. Profile & Location Visibility Controls | Switch between Public Profile (UNLOCKED) and Private Profile (LOCKED), and independently toggle "Show my username" and "Show my location" in Settings > Privacy. |
+| 8. Cookie & Signal Queue Reset | Reset your anonymized session ID and local market signal queue at any time via Settings > Privacy > Reset Feed. |
 
 **Response Timeline**: WIEZ will acknowledge all privacy rights requests within **72 hours** and fulfill them within **30 days** (extendable by a further 60 days for complex requests, with written notice).
 
@@ -345,8 +268,13 @@ For users residing in the Federal Republic of Nigeria:
 
 For users residing in the European Economic Area (EEA) or United Kingdom:
 * **Legal Ground**: Processing is justified under GDPR Article 6(1)(b) (Contract), Article 6(1)(c) (Legal Obligation), and Article 6(1)(f) (Legitimate Interests).
-* **International Data Transfers**: When data is transferred outside the EEA/UK, WIEZ utilizes **Standard Contractual Clauses (SCCs)** approved by the European Commission to ensure adequate safeguards.
 * **Supervisory Complaint**: You have the right to lodge a complaint with your local EU Data Protection Authority or the UK Information Commissioner’s Office (ICO).
+
+### 14A. International Data Transfer Safeguards (SCCs & UK IDTA)
+Because WIEZ operates a global fashion ecosystem with cloud infrastructure across multiple jurisdictions:
+* **Module 2 Controller-to-Processor SCCs**: Where personal data originating in the EEA is transferred to infrastructure or processors outside the EEA (such as Nigeria or the United States), WIEZ executes **Standard Contractual Clauses (SCCs)** pursuant to European Commission Implementing Decision (EU) 2021/914 (Module 2: Controller-to-Processor).
+* **UK International Data Transfer Addendum**: For transfers originating in the United Kingdom, WIEZ incorporates the UK ICO International Data Transfer Addendum to the EU Commission SCCs (Version B1.0).
+* **Technical Safeguards**: All cross-border data transfers are encrypted in transit using TLS 1.3 and encrypted at rest with AES-256 GCM. Primary European database replicas and media caches are hosted in secure AWS European regions (EU-West-1 Ireland). Users may request an unredacted copy of our standard SCC terms by emailing `privacy@wiez.com`.
 
 ---
 
@@ -360,9 +288,16 @@ For residents of California and US states with comprehensive privacy legislation
 
 ---
 
-## 16. Protection of Children and Minors
+## 16. Protection of Children and Minors (COPPA, UK AADC, and NDPA 2023)
 
-WIEZ is not directed to children under **13 years of age**. We do not knowingly collect personal data, body measurements, or payment details from children under 13. If we discover that an account has been registered by a minor under 13 without verifiable parental consent, we will immediately terminate the account and pseudonymize all associated records.
+WIEZ takes special precautions to protect the privacy and safety of children and underage users:
+* **Strict Under-13 Prohibition**: WIEZ is strictly not directed to children under **13 years of age**. We do not knowingly collect personal data, body measurements, or payment details from children under 13.
+* **Minors Aged 13 to 17 (Age-Appropriate Safeguards)**:
+  - **No Behavioral Profiling**: WIEZ does not subject accounts registered by minors (aged 13–17) to behavioral discovery profiling or predictive commercial targeting.
+  - **Private-by-Default Controls**: Accounts identified as minors have location sharing and public contact details disabled by default.
+  - **No Commercial Data Exploitation**: Body measurements collected for tailoring items for minors are strictly restricted to the commissioned designer and are never surfaced on public feeds.
+* **Parental Verification and Access**: Parents or legal guardians may review, edit, or request the immediate deletion of their child's personal data by contacting `privacy@wiez.com`.
+* **Immediate Removal**: If we learn that an account has been registered by a child under 13 without verifiable parental consent, we will immediately terminate the account and permanently pseudonymize all associated records.
 
 ---
 
@@ -382,5 +317,9 @@ If you have questions, data portability requests, or privacy compliance inquirie
 * **Data Protection Officer (DPO)**: `privacy@wiez.com`
 * **Legal & Regulatory Affairs**: `legal@wiez.com`
 * **Security & Vulnerability Reports**: `security@wiez.com`
-* **Mailing Address**: Data Protection Office, WIEZ Platforms Limited, Lagos State, Nigeria.
+* **Mailing Address**:  
+  Data Protection Office, WIEZ Platforms Limited  
+  12B Admiralty Way, Lekki Phase 1,  
+  Lagos, Nigeria.
+
 

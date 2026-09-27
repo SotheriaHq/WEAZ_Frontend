@@ -2,6 +2,7 @@ import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { messagingApi } from '@/api/MessagingApi';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 
 interface PendingFile {
   fileId: string;
@@ -379,10 +380,13 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
           aria-busy={sending}
         >
           {sending ? (
-            <span
-              className="h-[1.1em] w-[1.1em] animate-spin rounded-full border-2 border-white/40 border-t-white motion-reduce:animate-none"
-              aria-hidden="true"
-            />
+            /* `current` because the button is a violet gradient: the system ink
+               would be the same colour as the ground it sits on. The button
+               already says "Sending message" and carries aria-busy, so the
+               loader is hidden rather than announcing a second time. */
+            <span aria-hidden="true" className="inline-flex text-white">
+              <MuseLoader size={16} tone="current" />
+            </span>
           ) : (
             <span className="text-sm sm:text-base leading-none" aria-hidden="true">📨</span>
           )}

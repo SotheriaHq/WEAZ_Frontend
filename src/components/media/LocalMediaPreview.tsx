@@ -1,5 +1,6 @@
 import React from 'react';
 import MediaRenderer, { type MediaKind } from './MediaRenderer';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { cn } from '@/lib/utils';
 import { addClientDiagnostic } from '@/utils/clientDiagnostics';
 import {
@@ -56,9 +57,9 @@ const PreviewFallback: React.FC<{
       role="img"
       aria-label={label}
     >
-      {loading && (
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
-      )}
+      {/* The wrapper is role="img" with its own label, so this one does not
+          announce itself a second time. */}
+      {loading && <MuseLoader size={24} />}
       <span className="px-4">{label}</span>
     </div>
   </div>

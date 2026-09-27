@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { BRAND_ASPECT } from '@/brand/assetSizes';
 import { BRAND_ASSETS } from '@/brand/identity';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -44,8 +45,15 @@ import { useTheme } from '@/context/ThemeContext';
  * `MuseProgress` requires a real one.
  */
 
-/** From the mark's own artwork (538 x 498). */
-const MARK_ASPECT_RATIO = 538 / 498;
+/**
+ * The loader mark's file is square, so the loader's box is square.
+ *
+ * It used to be the ARTWORK's ratio (538 x 498), which is not the file's: the
+ * mask is `contain`-fitted, so the extra 8% of width became an empty gutter
+ * down each side. Inside a button that is a gap between the spinner and its
+ * label that no spacing rule put there.
+ */
+const MARK_ASPECT_RATIO = BRAND_ASPECT.loaderMark;
 
 /**
  * A 192px raster, not a vector.
@@ -93,12 +101,31 @@ const LAYER_CLASS = 'pointer-events-none absolute inset-0 h-full w-full';
  */
 const EMPTY_OPACITY = 0.2;
 
+/**
+ * Which ink the mark is cut out of.
+ *
+ * `brand` is the system violet, and it is right on a page, a card or a quiet
+ * button. It is wrong on anything the brand colour is already painting: inside
+ * a filled primary button the mark came out violet on violet, which at 16px is
+ * a smudge rather than a loader.
+ *
+ * `current` inherits the text colour, so the loader is whatever the thing it
+ * sits in is already legible in — white on a purple button, gold on the auth
+ * sheet — without any caller naming a colour.
+ */
+export type MuseLoaderTone = 'brand' | 'current';
+
+const inkFor = (tone: MuseLoaderTone) =>
+  tone === 'current' ? 'currentColor' : 'var(--wiez-ring)';
+
 type MuseLoaderProps = {
   /** Rendered height in px. Width follows the mark's aspect. */
   size?: number;
   className?: string;
   /** Announced to screen readers. Defaults to a plain "Loading". */
   label?: string;
+  /** `current` on filled or coloured grounds; see `MuseLoaderTone`. */
+  tone?: MuseLoaderTone;
 };
 
 /**
@@ -109,9 +136,11 @@ export const MuseLoader: React.FC<MuseLoaderProps> = ({
   size = 32,
   className = '',
   label = 'Loading',
+  tone = 'brand',
 }) => {
   const src = useMaskSource();
   const mask = maskStyle(src);
+  const ink = inkFor(tone);
 
   return (
     <span
@@ -125,13 +154,13 @@ export const MuseLoader: React.FC<MuseLoaderProps> = ({
       <span
         aria-hidden="true"
         className={LAYER_CLASS}
-        style={{ ...mask, background: 'var(--wiez-ring)', opacity: EMPTY_OPACITY }}
+        style={{ ...mask, background: ink, opacity: EMPTY_OPACITY }}
       />
-      {/* The level. Solid system colour, clipped to a height. */}
+      {/* The level. Solid ink, clipped to a height. */}
       <span
         aria-hidden="true"
         className={`${LAYER_CLASS} motion-safe:animate-wiez-rise motion-reduce:animate-wiez-breathe`}
-        style={{ ...mask, background: 'var(--wiez-ring)' }}
+        style={{ ...mask, background: ink }}
       />
     </span>
   );
@@ -143,6 +172,10 @@ type MuseProgressProps = {
   size?: number;
   className?: string;
   label?: string;
+  /** `current` on filled or coloured grounds; see `MuseLoaderTone`. */
+  tone?: MuseLoaderTone;
+  /** False hides the number where the surrounding UI already shows it. */
+  showValue?: boolean;
 };
 
 /**
@@ -154,9 +187,12 @@ export const MuseProgress: React.FC<MuseProgressProps> = ({
   size = 64,
   className = '',
   label = 'Uploading',
+  tone = 'brand',
+  showValue = true,
 }) => {
   const src = useMaskSource();
   const mask = maskStyle(src);
+  const ink = inkFor(tone);
   const clamped = Number.isFinite(progress) ? Math.min(100, Math.max(0, progress)) : 0;
 
   return (
@@ -175,22 +211,27 @@ export const MuseProgress: React.FC<MuseProgressProps> = ({
         <span
           aria-hidden="true"
           className={LAYER_CLASS}
-          style={{ ...mask, background: 'var(--wiez-ring)', opacity: EMPTY_OPACITY }}
+          style={{ ...mask, background: ink, opacity: EMPTY_OPACITY }}
         />
         <span
           aria-hidden="true"
           className={`${LAYER_CLASS} transition-[clip-path] duration-300 ease-out`}
           style={{
             ...mask,
-            background: 'var(--wiez-ring)',
+            background: ink,
             // Filled from the bottom, so the level rises as the number climbs.
             clipPath: `inset(${100 - clamped}% 0 0 0)`,
           }}
         />
       </span>
-      <span className="mt-2 text-sm font-semibold tabular-nums text-[color:var(--wiez-ring)]">
-        {Math.round(clamped)}%
-      </span>
+      {showValue ? (
+        <span
+          className="mt-2 text-sm font-semibold tabular-nums"
+          style={{ color: tone === 'current' ? undefined : 'var(--wiez-ring)' }}
+        >
+          {Math.round(clamped)}%
+        </span>
+      ) : null}
     </span>
   );
 };

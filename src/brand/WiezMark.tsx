@@ -1,18 +1,17 @@
 import React from 'react';
 
+import { BRAND_ASPECT } from '@/brand/assetSizes';
 import { BRAND_ASSETS, LOGO_ACCESSIBILITY_LABEL } from '@/brand/identity';
 import { useTheme } from '@/context/ThemeContext';
 
 /**
  * The full WIEZ mark — the W, the muse and the orb.
  *
- * Deliberately NOT the small-scale mark. The figure's face turns to mush below
- * roughly 96px, so anything in page chrome uses `WiezOrb` instead; this is for
- * splash, auth heroes and empty states where the artwork has room.
- *
- * Referenced as a file rather than inlined: at 290 KB it would be two thirds of
- * a vendor chunk to serve a logo that appears on a handful of screens. One
- * cached request instead.
+ * Referenced as a file rather than inlined. It used to have an inline sibling,
+ * `WiezOrb`, holding 2,853 traced paths of a logo the brand has since
+ * replaced — and it stayed in the repo with no callers, because nothing tied
+ * the artwork committed here to the artwork on screen. One cached request
+ * instead, and one generated file (`assetSizes.ts`) that says how big it is.
  *
  * Theme-paired rather than tinted. The mark is full-colour artwork now, and no
  * CSS filter turns a light-ground violet ramp into a dark-ground one — the
@@ -28,13 +27,15 @@ type WiezMarkProps = {
 };
 
 /**
- * Measured from the artwork's own viewBox (461 x 430).
+ * Taken from the generated file, which is SQUARE.
  *
- * The mark is the full lockup — the W, the muse and the orb. It was briefly the
- * figure alone, which is what the LOADER wanted; the brand's mark is the whole
- * thing, and rendering only part of it read as a cropped logo.
+ * The mark is written onto a square canvas so one file serves a favicon, an
+ * app icon and this; the artwork sits centred inside it. The literal here said
+ * `461 / 430` — the old SVG's viewBox — so the element came out 7% wider than
+ * the file and stretched it. The artwork keeps its own proportions; what
+ * changes is that the box around it is now the box the file actually has.
  */
-const MARK_ASPECT_RATIO = 461 / 430;
+const MARK_ASPECT_RATIO = BRAND_ASPECT.mark;
 
 const WiezMark: React.FC<WiezMarkProps> = ({ height = 132, className = '', title }) => {
   const { resolvedTheme } = useTheme();

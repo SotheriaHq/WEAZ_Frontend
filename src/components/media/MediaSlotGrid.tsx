@@ -22,6 +22,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Plus, Star, X } from 'lucide-react';
 import MediaRenderer from './MediaRenderer';
 import LocalMediaPreview from './LocalMediaPreview';
+import { MuseProgress } from '@/components/loaders/MuseLoader';
 import useLongPressSlotDrag, {
   longPressSlotDragTileClass,
 } from '@/hooks/useLongPressSlotDrag';
@@ -317,11 +318,19 @@ export const MediaSlotGrid: React.FC<MediaSlotGridProps> = ({
                 )}
 
                 {isUploading ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60">
-                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-purple-400 border-t-transparent" />
-                    <span className="text-xs font-semibold text-white">
-                      {Math.round(item.progress ?? 0)}%
-                    </span>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-white">
+                    {/*
+                      The percentage was already known here and drawn beside an
+                      indeterminate spinner, so the two disagreed: one said
+                      "something is happening", the other said how much. The
+                      mark fills to the real figure instead.
+                    */}
+                    <MuseProgress
+                      progress={item.progress ?? 0}
+                      size={28}
+                      tone="current"
+                      label="Uploading"
+                    />
                   </div>
                 ) : null}
 

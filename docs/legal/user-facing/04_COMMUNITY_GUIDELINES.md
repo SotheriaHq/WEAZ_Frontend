@@ -398,4 +398,5 @@ WIEZ reserves the right to update and refine these Guidelines as the platform gr
 | **Security & Technical Vulnerabilities** | `security@wiez.com` |
 | **Legal & Regulatory Affairs** | `legal@wiez.com` |
 | **Data Protection Officer** | `privacy@wiez.com` |
-| **Corporate Entity** | WIEZ Platforms Limited, Lagos State, Nigeria |
+| **Corporate Entity & Address** | WIEZ Platforms Limited, 12B Admiralty Way, Lekki Phase 1, Lagos, Nigeria |
+

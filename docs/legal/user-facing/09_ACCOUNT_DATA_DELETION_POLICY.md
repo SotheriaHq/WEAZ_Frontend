@@ -58,21 +58,14 @@ To protect marketplace integrity, prevent escrow abandonment, and comply with co
 
 Under Nigerian corporate law (CAMA 2020), anti-money laundering statutes (SCUML), and international financial audit standards, e-commerce platforms must preserve unbroken transaction ledgers. To balance statutory retention duties with user privacy rights, WIEZ utilizes **irreversible cryptographic pseudonymization** rather than raw database row deletion.
 
-```
-[ Active User Account ]
-       │
-       ▼ (User Initiates Deletion & Passes Security Checks)
-[ Immediate Token Revocation: RefreshTokens Purged, Biometric Keys Invalidated ]
-       │
-       ▼ (Database Transaction: `deleteOwnAccount()`)
-[ Email Replaced: `deleted+{timestamp}-{uuid}@wiez.local` ]
-[ Username Replaced: `deleted_{timestamp}` ]
-[ Password Hash Nullified / Credential Status: DEACTIVATED ]
-[ User Profile PII (Phone, Addresses, Avatars, Sizing Profiles) Purged ]
-       │
-       ▼
-[ Irreversibly Anonymized Node in Historical Financial Ledger ]
-```
+1. **An active user account.**
+2. **Immediate token revocation**, once you initiate deletion and pass the security checks: refresh tokens are purged and biometric keys are invalidated.
+3. **Identifier replacement**, in a single database transaction (`deleteOwnAccount()`):
+    * email replaced with `deleted+{timestamp}-{uuid}@wiez.local`;
+    * username replaced with `deleted_{timestamp}`;
+    * password hash nullified and credential status set to `DEACTIVATED`;
+    * profile PII purged — phone, addresses, avatars, and sizing profiles.
+4. **An irreversibly anonymized node** remains in the historical financial ledger.
 
 ### 4.1. What Is Immediately and Irreversibly Erased:
 1. **Direct Profile Identifiers**: First name, last name, phone number, physical residential addresses, avatar photography, profile biography, and social links;
@@ -126,8 +119,15 @@ Upon processing a deletion request, WIEZ automatically propagates deletion instr
 
 ## 8. Grace Period and Reactivation
 
-* **Irreversibility**: Once the deletion workflow completes and cryptographic pseudonymization occurs, **the action is permanent and irreversible**. WIEZ technical support cannot restore deleted profiles, saved wishlists, measurement cards, or discount credits;
+### 8.1. 30-Day Soft Deactivation & Reactivation Window
+* **30-Day Cooling-Off Period**: When you submit an account closure request, your account enters an immediate **30-day soft deactivation status**. During this window, your profile and listings are completely hidden from public view and sessions are terminated;
+* **Submitting a Reactivation Request**: If you change your mind within thirty (30) calendar days, you may log in and submit an **Account Reactivation Request (`AccountReactivationRequest`)** or email `privacy@wiez.com` from your registered email address to restore your account, active bag, and saved fitting cards without loss of data;
+* **Permanent Pseudonymization**: If no reactivation request is submitted within thirty (30) days, the system executes final, irreversible cryptographic pseudonymization as detailed in Section 4.
+
+### 8.2. Irreversibility & Re-Registration
+* **Post-Grace Permanence**: Once the 30-day window expires and cryptographic pseudonymization occurs, **the action is permanent and irreversible**. WIEZ technical support cannot restore deleted profiles, saved wishlists, measurement cards, or discount credits;
 * **Re-registration**: Users may register a new account on WIEZ at any time using their original email address or phone number. However, the newly created account will be completely unlinked from the historical, pseudonymized profile and will start with a fresh user ID and clean history.
+
 
 ---
 

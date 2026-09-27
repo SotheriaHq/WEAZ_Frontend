@@ -1,10 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { MuseLoader, MuseProgress } from '@/components/loaders/MuseLoader';
-import WiezOrb from '@/brand/WiezOrb';
+import WiezMark from '@/brand/WiezMark';
+import WiezWordmark from '@/brand/WiezWordmark';
+import { BRAND_ASPECT, BRAND_ASSET_SIZES } from '@/brand/assetSizes';
 import { BRAND_ASSETS, PRODUCT_NAME } from '@/brand/identity';
-import { WIEZ_ORB_TONES } from '@/brand/wiezOrbArtwork';
 
 /**
  * The rules here are the ones the consolidation exists to hold.
@@ -42,12 +46,20 @@ describe('the loading system', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
   });
 
-  it("keeps the mark's own proportions at every size", () => {
+  it("matches the loader mark file's own box, not the artwork's", () => {
     const { container } = render(<MuseLoader size={48} />);
     const box = container.firstElementChild as HTMLElement;
-    // A square box would squash a 461x430 lockup.
+    /*
+      The file is square — `fit()` writes the artwork onto a square canvas so
+      one raster serves the loader, the favicon and the app icon.
+
+      This asserted `538 / 498`, the ARTWORK's ratio, which made the element 8%
+      wider than the image inside it. With a `contain` mask that surplus is an
+      empty gutter down each side, so a spinner in a button sat away from its
+      label for no reason any stylesheet could explain.
+    */
     expect(box.style.height).toBe('48px');
-    expect(box.style.width).toBe(`${Math.round(48 * (538 / 498))}px`);
+    expect(box.style.width).toBe(`${Math.round(48 * BRAND_ASPECT.loaderMark)}px`);
   });
 
   it('is an empty vessel filling with the system colour', () => {
@@ -104,24 +116,55 @@ describe('the loading system', () => {
   });
 });
 
-describe('the brand mark', () => {
-  it('paints every path from a theme token, never a literal', () => {
-    const { container } = render(<WiezOrb size={32} />);
-    const fills = [...container.querySelectorAll('path')].map((p) => p.getAttribute('fill'));
+/**
+ * The PNG header: 8 signature bytes, a 4-byte chunk length, "IHDR", then the
+ * dimensions. Enough to read a size without a decoder.
+ */
+const pngSize = (publicPath: string) => {
+  const bytes = readFileSync(resolve(process.cwd(), 'public', publicPath.replace(/^\//, '')));
+  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+};
 
-    expect(fills).toHaveLength(WIEZ_ORB_TONES.length);
-    // A literal here is how the mark stopped being able to follow the theme —
-    // the old asset was flat black and had to be `invert(1)`-ed on dark.
-    for (const fill of fills) {
-      expect(fill).toMatch(/^var\(--wiez-t[0-7]\)$/);
-    }
+describe('the brand lockup', () => {
+  /*
+    The bug this describes: every one of these components sets BOTH a width and
+    a height on an <img>, so the ratio it computes is not a hint — the browser
+    stretches the file to that box. Three of them carried a hand-typed ratio
+    left over from artwork that had since been replaced, and the wordmark's was
+    792/531 against a file that is 720/461. The name rendered 4.5% narrow,
+    which reads as the letters having lost their spacing.
+
+    So the geometry is generated from the files themselves, and these assert
+    that the generated numbers still describe the files on disk.
+  */
+  it('describes the artwork that is actually on disk', () => {
+    expect(pngSize(BRAND_ASSETS.wordmarkLight)).toEqual(BRAND_ASSET_SIZES.wordmark);
+    expect(pngSize(BRAND_ASSETS.markLight)).toEqual(BRAND_ASSET_SIZES.mark);
+    expect(pngSize(BRAND_ASSETS.loaderMarkLight)).toEqual(BRAND_ASSET_SIZES.loaderMark);
+  });
+
+  it('lays the name out at the file’s own ratio', () => {
+    const { container } = render(<WiezWordmark height={28} />);
+    const image = container.querySelector('img') as HTMLImageElement;
+
+    expect(image.getAttribute('height')).toBe('28');
+    expect(image.getAttribute('width')).toBe(`${Math.round(28 * BRAND_ASPECT.wordmark)}`);
+    expect(image).toHaveAttribute('alt', PRODUCT_NAME);
+  });
+
+  it('lays the mark out at the file’s own ratio', () => {
+    const { container } = render(<WiezMark height={64} />);
+    const image = container.querySelector('img') as HTMLImageElement;
+
+    expect(image.getAttribute('height')).toBe('64');
+    expect(image.getAttribute('width')).toBe(`${Math.round(64 * BRAND_ASPECT.mark)}`);
   });
 
   it('is decorative unless it is the only thing naming the brand', () => {
-    const { container, rerender } = render(<WiezOrb size={32} />);
-    expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    const { container, rerender } = render(<WiezMark height={32} />);
+    expect(container.querySelector('img')).toHaveAttribute('aria-hidden', 'true');
 
-    rerender(<WiezOrb size={32} title={PRODUCT_NAME} />);
+    rerender(<WiezMark height={32} title={PRODUCT_NAME} />);
     expect(screen.getByRole('img')).toHaveAccessibleName(PRODUCT_NAME);
   });
 });

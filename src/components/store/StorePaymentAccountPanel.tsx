@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import { PAYOUT_ACCOUNT_ANCHOR_ID } from '@/lib/payoutAccountIssue';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import type { RootState } from '@/store';
 import {
@@ -65,11 +66,17 @@ const metaCardClassName =
 const inputClassName =
   'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-black/40 dark:text-white';
 
+/**
+ * The mark, in whatever ink the row it sits in is already using.
+ *
+ * `tone="current"` throughout this panel: these appear inside filled buttons
+ * and inside tinted status chips, where the system violet is either the ground
+ * itself or a third colour competing with the chip's own.
+ */
 const InlineSpinner: React.FC<{ className?: string }> = ({ className = '' }) => (
-  <span
-    className={`inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent ${className}`}
-    aria-hidden="true"
-  />
+  <span className={`inline-flex ${className}`} aria-hidden="true">
+    <MuseLoader size={14} tone="current" />
+  </span>
 );
 
 const BANK_MARK_EXCLUDED_TOKENS = new Set([
@@ -880,7 +887,7 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
           </p>
           {verificationState.status === 'verifying' ? (
             <div className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs text-blue-800 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
-              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent dark:border-blue-300 dark:border-t-transparent" />
+              <InlineSpinner />
               Verifying account details...
             </div>
           ) : null}

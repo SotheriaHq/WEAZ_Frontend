@@ -33,43 +33,38 @@ WIEZ offers two distinct fashion shopping experiences, each governed by specific
 | **Ready-to-Wear (Market)** | Pre-manufactured physical apparel, fixed sizing variants | Ships in **1 to 3 business days** | 100% refund prior to dispatch; eligible for 72-hour return window |
 | **Custom Bespoke (Studio)** | Made-to-measure garments tailored to individual body measurements | **7 to 30 business days** based on milestone agreement | Cancellation permitted before fabric cutting; non-returnable unless fit tolerance (±0.75 in) or material defect occurs |
 
+### 3A. Pre-Order and Collection Drop Purchases
+* **Pre-Order Nature**: Brands may offer upcoming seasonal collection drops on a pre-order basis with estimated ship dates exceeding standard timelines.
+* **Escrow Safeguards**: Pre-order payments are held securely in platform escrow and are **not** disbursed to the Brand until physical fulfillment and carrier tracking are active.
+* **Buyer Cancellation Rights**: You may cancel a pre-order for a 100% refund at any time prior to the Brand commencing active production or fabric sourcing. If a Brand exceeds the stated pre-order fulfillment window by more than fourteen (14) calendar days, you may cancel immediately for a full refund.
+
 ---
 
 ## 4. Escrow Buyer Protection Engine
 
 To guarantee total peace of mind, all consumer transactions on WIEZ are backed by our automated **Escrow Buyer Protection Engine**:
 
-```
-[ Buyer Payment Authorized ]
-       │
-       ▼
-[ 100% Funds Secured in Neutral Banking Escrow ]
-       │
-       ▼
-[ Brand Ships Garment with Integrated Carrier Tracking ]
-       │
-       ▼
-[ Carrier Confirms Delivery to Buyer Address ]
-       │
-       ▼
-[ 72-HOUR BUYER INSPECTION WINDOW COMMENCES ]
-       │
-  ┌────┴────────────────────────┐
-  ▼                             ▼
-[ No Issues / Buyer Confirms ] [ Issue Reported Within 72h ]
-Funds Released to Brand        Escrow Frozen; Dispute Desk Intervenes
-```
+1. **Your payment is authorized.**
+2. **100% of the funds are secured** in a neutral banking escrow account.
+3. **The Brand ships your garment** with integrated carrier tracking.
+4. **The carrier confirms delivery** to your address.
+5. **Your 72-hour inspection window opens**, and closes one of two ways:
+    * **No issues, or you confirm the order**: the funds are released to the Brand;
+    * **You report an issue within 72 hours**: escrow is frozen and our Dispute Desk steps in.
 
 * **No Direct Merchant Payout on Checkout**: Sellers **never** receive immediate direct access to your card or payment funds at checkout. Funds remain locked in neutral escrow until you receive and inspect your items.
 
 ---
 
-## 5. Mandatory 72-Hour Buyer Inspection Window
+## 5. Mandatory 72-Hour Inspection Window & 7-Day Administrative Auto-Release
 
-Upon verified carrier delivery to your designated shipping address, a **72-hour inspection window** automatically commences:
-1. **Inspection Duty**: You must examine delivered garments for manufacturing defects, damaged zippers/seams, incorrect color/size variants, or bespoke fit discrepancies;
-2. **Reporting an Issue**: If an issue exists, you must tap **"Report an Issue / Dispute"** in the WIEZ app or email `disputes@wiez.com` **before the 72-hour window expires**, attaching clear photographs of the defect;
-3. **Automated Fund Release**: If no issue is reported within the 72-hour window, the order is deemed fully accepted, and escrow funds are automatically released to the seller. Post-release disputes are subject to standard merchant warranties.
+Upon verified carrier delivery to your designated shipping address, our dual-tier inspection and auto-release mechanics protect both buyer dispute rights and merchant settlement certainty:
+
+1. **72-Hour Buyer Inspection Window**: You have seventy-two (72) hours from the verified carrier drop-off timestamp to inspect your garment, try on bespoke fits, and verify fabric/craftsmanship.
+2. **Filing a Dispute**: If an issue exists, you must tap **"Report an Issue / Dispute"** in the order screen or email `disputes@wiez.com` before the 72-hour window expires, attaching clear photographic evidence. This immediately freezes escrow disbursement.
+3. **Buyer Early Confirmation**: If you are delighted with the delivered item, you may tap **"Confirm Delivery & Accept Fit"** at any time to release escrow funds immediately to the designer.
+4. **Administrative 7-Day Maximum Auto-Release (`DEFAULT_SEED_AUTO_RELEASE_DAYS = 7`)**: To ensure merchant cashflow certainty when buyers fail to open the app or confirm delivery, platform settlement engines automatically finalize and release funds to the seller seven (7) calendar days following verified carrier delivery, provided no dispute has been lodged during the initial inspection period. Once released, claims must be directed to merchant warranty support.
+
 
 ---
 
@@ -96,21 +91,11 @@ Buyers are entitled to return items and receive a 100% refund (including origina
 4. **Non-Delivery**: The carrier fails to deliver the package within the guaranteed shipping SLA and tracking is lost.
 
 ### 7.2. Step-by-Step Return Process
-```
-[ Step 1: Tap 'Request Return' in Order History within 72h of Delivery ]
-       │
-       ▼
-[ Step 2: Upload 3 Clear Photos Demonstrating Defect or Size Discrepancy ]
-       │
-       ▼
-[ Step 3: WIEZ Issues Prepaid Return Shipping Label / Courier Pickup ]
-       │
-       ▼
-[ Step 4: Seller Receives Returned Item in Original Unworn Condition ]
-       │
-       ▼
-[ Step 5: 100% Refund Credited to Original Card/Bank within 5–10 Business Days ]
-```
+1. **Tap "Request return"** in Order History, within 72 hours of delivery.
+2. **Upload three clear photos** showing the defect or the size discrepancy.
+3. **WIEZ issues a prepaid return shipping label** or arranges a courier pickup.
+4. **The seller receives the item back** in its original, unworn condition.
+5. **Your full refund is credited** to the original card or bank account within 5–10 business days.
 
 ### 7.3. Non-Returnable Items
 For health, hygiene, and customized production reasons, the following items are non-returnable unless defective:

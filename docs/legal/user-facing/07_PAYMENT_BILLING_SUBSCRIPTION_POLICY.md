@@ -30,6 +30,12 @@ WIEZ operates on a **zero-knowledge cardholder architecture**:
 * All card entry forms are rendered in secure, sandboxed iframes or mobile WebBrowser SDK containers hosted directly by our PCI-DSS Level 1 certified gateways;
 * WIEZ retains only non-sensitive tokenized authorization references (`SavedPaymentMethod`), issuing bank identifiers, card brand labels, and masked display strings (e.g., `**** **** **** 4242`).
 
+### 2A. Payment Failure, Retry, and Order Expiration Logic
+* **Automated Gateway Retry Safeguards**: If an initial card authorization attempt fails due to transient issuer timeouts or 3D-Secure dropouts, our checkout engine permits up to three (3) re-authorization attempts within the active session.
+* **Virtual Account & USSD Expiration**: For virtual bank transfer and USSD checkouts, dedicated payment accounts remain valid for exactly **thirty (30) minutes**. If payment confirmation is not received via webhook within this 30-minute window, the checkout session automatically expires and reserved inventory is released back to the merchant's catalog.
+* **Duplicate Charge Protection**: In the rare event a buyer's account is debited after an order session has expired, our automated webhook reconciliation system detects the orphan payment and issues an automatic reversal within twenty-four (24) hours.
+
+
 ---
 
 ## 3. Supported Payment Methods and Payment Channel Workflows
@@ -63,19 +69,20 @@ To protect buyers and sellers from intra-session foreign exchange volatility:
 
 To eliminate commercial fraud and guarantee buyer protection, WIEZ deploys an automated dual-track escrow engine (`StandardOrderEscrowService` and `CustomOrderFinanceSyncService`):
 
-```
-[ Buyer Completes Checkout ] ──► [ Funds Locked in Escrow Bank Account ]
-                                            │
-        ┌───────────────────────────────────┴───────────────────────────────────┐
-        ▼                                                                       ▼
-[ Ready-to-Wear Standard Orders ]                           [ Bespoke Custom Commissions ]
-  • 100% funds held in escrow                                 • 60% Upfront Material Deposit
-  • Carrier delivery confirmed                                  released upon sketch/measurement
-  • 72-Hour Buyer Inspection Window                             milestone approval
-  • Auto-release to Brand payout                              • 40% Final Balance held in escrow
-    balance upon window expiry                                • Released upon delivery + 72h
-                                                                fit inspection expiry
-```
+Completing checkout locks the funds in our escrow bank account. What happens next depends on what was bought.
+
+**Ready-to-wear standard orders**
+
+* 100% of the funds are held in escrow;
+* carrier delivery is confirmed;
+* the 72-hour buyer inspection window runs;
+* the balance is released automatically to the Brand's payout balance when that window expires.
+
+**Bespoke custom commissions**
+
+* a 60% upfront material deposit is released on approval of the sketch and measurement milestone;
+* the 40% final balance stays in escrow;
+* it is released on delivery, once the 72-hour fit inspection window expires.
 
 ### 5.1. Standard Ready-to-Wear Orders
 * 100% of order funds remain in neutral banking escrow throughout fulfillment;
@@ -112,9 +119,12 @@ Brands manage accrued earnings via the WIEZ Brand Dashboard:
 * **Ready-to-Wear Orders**: Buyers may cancel an order for an immediate 100% refund at any point **prior to carrier dispatch**;
 * **Custom Bespoke Orders**: Once the 60% production milestone is approved and fabric cutting commences, the 60% material deposit becomes non-refundable. If cancelled prior to shipment, the remaining 40% escrow balance is refunded to the buyer.
 
-### 8.2. Refund Processing SLAs
-* Approved refunds are credited directly back to the original payment source (card, bank account, or wallet);
-* **Processing Timelines**: In-app authorization occurs within **24 hours**; interbank settlement credit typically appears on the cardholder's statement within **5 to 10 business days**, depending on the issuing bank.
+### 8.2. Multi-Stage Refund Processing Timelines
+Refunds follow a rigorous multi-stage banking settlement cycle:
+* **Stage 1 (WIEZ Platform Authorization — within 24 hours)**: The WIEZ Dispute & Escrow Desk reviews the case and issues a cryptographically signed refund authorization payload to the payment gateway within twenty-four (24) hours of dispute resolution;
+* **Stage 2 (Gateway & Settlement Processing — 24 to 48 hours)**: The payment provider (Paystack, Flutterwave, or Stripe) processes the reversal through the interbank switching network (`DEFAULT_SEED_SETTLEMENT_DELAY_HOURS = 48`);
+* **Stage 3 (Cardholder Bank Statement Credit — 5 to 10 business days)**: Depending on the cardholder's issuing bank and card scheme (Visa, Mastercard, Verve), the credit reflection typically appears on the account statement within five (5) to ten (10) banking days from gateway transmission.
+
 
 ---
 

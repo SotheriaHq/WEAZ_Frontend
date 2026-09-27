@@ -18,6 +18,7 @@ import { ProfileLayout } from './components/catalog/ProfileLayout';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
 import { NoticeModalHost } from '@/components/ui/NoticeModal';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import ErrorPage from './pages/ErrorPage';
 import SeoHead from './components/seo/SeoHead';
 import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
@@ -165,11 +166,7 @@ const StudioRouteFallback: React.FC = () => {
           workspace" underneath — the third narrated loading screen for one
           Studio navigation, after the native shell's staged copy and the
           handoff gate's own caption. */}
-      <div
-        className="h-8 w-8 animate-spin rounded-full border-2 border-[color:rgba(var(--brand-primary-rgb),0.22)] border-t-[color:var(--brand-primary)]"
-        role="progressbar"
-        aria-label="Loading"
-      />
+      <MuseLoader size={40} label="Loading" />
     </div>
   );
 };

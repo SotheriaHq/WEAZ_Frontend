@@ -50,6 +50,12 @@ To publish products, receive custom orders, and disburse payouts, Brands must un
 ### 2.4. Credential Confidentiality
 You are responsible for safeguarding your password, session tokens, and authentication devices. You must notify WIEZ immediately at `security@wiez.com` of any unauthorized access or security breach. WIEZ shall not be liable for losses caused by compromised credentials.
 
+### 2.5. Username, Handle, and Store Name Allocation
+* **No Username Squatting**: You may not register handles, brand names, or store URLs with the intent of squatting, reserving, holding for ransom, or reselling the handle to third parties.
+* **Trademark Reclamation**: Registered trademark owners who discover an unauthorized third party using their protected name as a WIEZ handle or store alias may file a claim at `copyright@wiez.com`. WIEZ reserves the right to reassign or reclaim handles that infringe registered trademarks or confuse consumers.
+* **Inactive Handles**: WIEZ reserves the right to reclaim usernames or store handles that remain inactive for more than six (6) consecutive months without login activity or active listings.
+
+
 ---
 
 ## 3. User Content and Intellectual Property Licenses
@@ -69,6 +75,11 @@ For all User Content uploaded, you represent and warrant that:
 * Your content does not infringe, misappropriate, or violate any patent, copyright, trademark, trade dress, trade secret, or privacy right of any third party.
 * Your content does not contain defamatory, obscene, pornographic, hateful, or unlawful material.
 
+### 3.4. Generative AI Training Safeguards
+* **No Foundational Model Harvesting**: WIEZ will **not** license, sell, or syndicate your original design sketches, bespoke tailoring patterns, or private customer measurements to third-party artificial intelligence providers for the purpose of training general foundation models without your explicit affirmative opt-in.
+* **Internal Platform Optimization**: Platform machine learning models may process visual features and catalog tags solely for internal categorization, duplicate detection, search ranking, and Runway feed recommendation.
+
+
 ---
 
 ## 4. Platform Rules, Content Restrictions, and Prohibited Conduct
@@ -80,6 +91,12 @@ You agree not to engage in, attempt, or encourage any of the following activitie
 * **Off-Platform Circumvention**: Soliciting shoppers or brands met on WIEZ to complete payments or tailoring contracts outside the Platform to evade platform fees, escrow protection, or verification.
 * **Manipulation & Fraud**: Posting fake, incentivized, or coercive reviews; fabricating sales velocity; creating duplicate accounts to exploit promotional discounts; or executing chargeback fraud.
 * **Platform Disruption**: Uploading viruses, Trojan horses, malware, or exploiting rate limits or API endpoints.
+
+### 4.1.1. Anti-Circumvention and Liquidated Damages
+Because off-platform transactions deprive users of escrow safety and deprive WIEZ of operating revenues necessary to maintain platform infrastructure, you agree that if you intentionally solicit or redirect an order off-platform:
+* WIEZ may immediately freeze pending merchant balances and suspend all studio capabilities.
+* You agree to pay WIEZ liquidated damages equal to the greater of **One Hundred Thousand Nigerian Naira (₦100,000)** or **thirty percent (30%) of the total gross value** of the circumvented transactions, which represents a reasonable pre-estimate of WIEZ's investigative and administrative damages.
+
 
 ### 4.2. Enforcement and Sanctions
 WIEZ reserves the right, with or without prior notice, to investigate violations and:
@@ -195,6 +212,11 @@ If a Shopper initiates an unauthorized payment dispute or credit card chargeback
 * **No Cancellation Post-Cutting**: Because bespoke fabrics are cut to personal specifications, custom orders cannot be cancelled once the Brand updates the order stage to "Production/Cutting Started".
 * Custom bespoke orders are non-refundable unless the Brand fails to deliver the garment or fails to correct an established sizing deviation exceeding the ±0.75-inch fit tolerance.
 
+### 9.3. EU Consumer Statutory Right of Withdrawal & Custom Goods Exemption
+* **Standard Digital & Ready-to-Wear Services**: For consumers resident in the European Union or United Kingdom, you generally possess a statutory right to withdraw from a distance purchase within fourteen (14) days without giving any reason.
+* **Statutory Bespoke Exemption**: Pursuant to **Article 16(c) of Directive 2011/83/EU on Consumer Rights** (and equivalent UK consumer contracts regulations), the statutory 14-day right of withdrawal **does NOT apply to goods made to the consumer’s specifications or clearly personalized**. All custom bespoke orders manufactured through the WIEZ Custom Tailoring Engine fall squarely within this statutory exemption once fabric cutting has commenced.
+
+
 ---
 
 ## 10. Reviews, Ratings, and Feedback Integrity
@@ -261,6 +283,10 @@ WIEZ disclaims all warranties regarding the quality, craftsmanship, durability, 
 
 ### 13.3. Service Continuity
 WIEZ does not warrant that the Platform will be uninterrupted, error-free, secure, or free from viruses or software vulnerabilities.
+
+### 13.4. Textile Allergen, Chemical, and Dye Sensitivity Disclaimer
+* Independent Brands sell apparel manufactured from diverse natural, synthetic, and artisanal textiles (including traditional hand-dyed African wax prints, adire, silk, wool, and synthetic polymers) that may utilize reactive dyes, metallic hardware, or finishing treatments.
+* **Buyer Assumption of Risk**: WIEZ has no role in fabric sourcing or chemical finishing. Shoppers with known skin sensitivities, contact dermatitis, or allergies to specific textile dyes, nickel hardware, or fabrics assume sole responsibility for reviewing garment composition details and consulting the Brand prior to wearing. WIEZ expressly disclaims all liability for allergic reactions, skin irritations, or color bleeding.
 
 ---
 
@@ -397,5 +423,6 @@ If you have any questions, compliance inquiries, or concerns regarding these Ter
 * **Dispute & Settlement Resolution**: `disputes@wiez.com`
 * **Intellectual Property & Takedowns**: `copyright@wiez.com`
 * **Security & Vulnerabilities**: `security@wiez.com`
-* **Corporate Entity**: WIEZ Platforms Limited, Lagos, Nigeria.
+* **Corporate Entity & Address**: WIEZ Platforms Limited, 12B Admiralty Way, Lekki Phase 1, Lagos, Nigeria.
+
 
