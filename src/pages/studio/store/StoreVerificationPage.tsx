@@ -13,6 +13,7 @@ import {
 } from '@/components/studio/verification/verificationShared';
 import type { VerificationInfoItem, VerificationStatusResponse } from '@/types/verification';
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
+import VisitSchedulePanel from '@/components/studio/verification/VisitSchedulePanel';
 import { showNotice } from '@/components/ui/NoticeModal';
 
 /**
@@ -375,6 +376,10 @@ export default function StoreVerificationPage() {
         </div>
       </div>
 
+      {/* The visit — the last step. Renders nothing until documents pass,
+          so it costs the page no space before then. */}
+      <VisitSchedulePanel />
+
       {/* Store-readiness gate.
           A verified badge needs an APPROVED verification AND an open store, so
           verifying before the store is finished produces an approval that
@@ -383,7 +388,11 @@ export default function StoreVerificationPage() {
       {storePending.length > 0 &&
       status?.verificationStatus !== 'APPROVED' &&
       status?.verificationStatus !== 'PENDING' &&
-      status?.verificationStatus !== 'IN_REVIEW' ? (
+      status?.verificationStatus !== 'IN_REVIEW' &&
+      // A brand mid-visit has already been through document review; telling
+      // them to finish their store now would read as the application having
+      // silently reset.
+      status?.verificationStatus !== 'PHYSICAL_PENDING' ? (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
           <p className="text-xs font-bold uppercase tracking-widest text-amber-800 dark:text-amber-300">
             ⚠️ Finish your store first

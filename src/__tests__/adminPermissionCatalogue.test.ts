@@ -128,6 +128,33 @@ describe('canAccessAdminPath', () => {
     expect(canAccessAdminPath('/admin/audit', admin('AUDIT_READ'))).toBe(true);
   });
 
+  /*
+    The verification AGENT.
+
+    The whole point of splitting these permissions off `brands.verify` is an
+    account that can carry out visits and nothing else. If `/admin/verification`
+    matched the visits path first, that account would be locked out of its own
+    queue — and if the visits path were left ungated, anyone in the console
+    could record a verdict. Longest-prefix matching is what keeps both true, so
+    it is worth pinning.
+  */
+  it('lets a verification agent reach their queue and nothing else', () => {
+    const agent = admin('VERIFICATION_PHYSICAL_READ');
+    expect(canAccessAdminPath('/admin/verification/visits', agent)).toBe(true);
+    expect(canAccessAdminPath('/admin/verification/visits/abc', agent)).toBe(true);
+    // No brand console, no users, no audit.
+    expect(canAccessAdminPath('/admin/users', agent)).toBe(false);
+    expect(canAccessAdminPath('/admin/verification', agent)).toBe(false);
+    expect(canAccessAdminPath('/admin/audit', agent)).toBe(false);
+  });
+
+  it('does not let a document reviewer record a visit outcome by route alone', () => {
+    // `brands.verify` opens the review console but not the visits queue.
+    expect(
+      canAccessAdminPath('/admin/verification/visits', admin('BRANDS_VERIFY')),
+    ).toBe(false);
+  });
+
   it('accepts any one of an either/or set', () => {
     expect(canAccessAdminPath('/admin/users', admin('BRANDS_VERIFY'))).toBe(true);
   });

@@ -160,6 +160,10 @@ export const verificationStatusLabel = (status?: string) => {
       return 'In review';
     case 'ADDITIONAL_INFO_REQUESTED':
       return 'More information needed';
+    // Documents accepted; the visit is what is left. Deliberately not
+    // "Approved" — nothing is verified until somebody has been and looked.
+    case 'PHYSICAL_PENDING':
+      return 'Visit pending';
     case 'APPROVED':
       return 'Approved';
     case 'REJECTED':
@@ -191,6 +195,7 @@ export const verificationStatusTone = (status?: string) => {
       return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300';
     case 'PENDING':
     case 'IN_REVIEW':
+    case 'PHYSICAL_PENDING':
       return 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300';
     default:
       return 'border-gray-200 bg-gray-50 text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300';
@@ -210,6 +215,15 @@ export const getVerificationCallToAction = (
   if (status.verificationStatus === 'APPROVED') {
     return {
       primaryLabel: 'Review badge details',
+      primaryTo: '/studio/verification',
+    };
+  }
+
+  // Mid-visit there is nothing to re-submit; the action lives in the visit
+  // panel on this same page.
+  if (status.verificationStatus === 'PHYSICAL_PENDING') {
+    return {
+      primaryLabel: 'View visit status',
       primaryTo: '/studio/verification',
     };
   }

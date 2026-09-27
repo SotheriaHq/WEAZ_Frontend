@@ -104,6 +104,9 @@ const AdminBrandVerificationReviewPage = lazy(() => import('./pages/admin/AdminB
 const AdminContentManagementPage = lazy(() => import('./pages/admin/AdminContentManagementPage'));
 const AdminTaxonomyPage = lazy(() => import('./pages/admin/AdminTaxonomyPage'));
 const AdminTagsPage = lazy(() => import('./pages/admin/AdminTagsPage'));
+const AdminVerificationVisitsPage = lazy(
+  () => import('./pages/admin/AdminVerificationVisitsPage'),
+);
 const AdminFinancePage = lazy(() => import('./pages/admin/AdminFinancePage'));
 const AdminSettlementPoliciesPage = lazy(() => import('./pages/admin/AdminSettlementPoliciesPage'));
 const AdminPayoutsPage = lazy(() => import('./pages/admin/AdminPayoutsPage'));
@@ -961,6 +964,25 @@ const router = createBrowserRouter([
           { path: 'collections', element: <Navigate to="/admin/content?tab=collections" replace /> },
           { path: 'taxonomy', element: <RequireAdminPermission permission="TAXONOMY_READ"><AdminTaxonomyPage /></RequireAdminPermission> },
           { path: 'tags', element: <RequireAdminPermission permission="TAGS_READ"><AdminTagsPage /></RequireAdminPermission> },
+          {
+            /* The visit queue. Behind its OWN permission, not `brands.verify`
+               — the point of the agent role is an account that can do this and
+               nothing else in the brand console. */
+            path: 'verification/visits',
+            element: (
+              <RequireAdminPermission permission="VERIFICATION_PHYSICAL_READ">
+                <AdminVerificationVisitsPage />
+              </RequireAdminPermission>
+            ),
+          },
+          {
+            path: 'verification/visits/:id',
+            element: (
+              <RequireAdminPermission permission="VERIFICATION_PHYSICAL_READ">
+                <AdminVerificationVisitsPage />
+              </RequireAdminPermission>
+            ),
+          },
           { path: 'measurements', element: <Navigate to="/admin/taxonomy?tab=measurements" replace /> },
           { path: 'orders', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminOrdersPage /></RequireAdminPermission> },
           { path: 'finance', element: <RequireAdminPermission permission="PAYOUTS_READ"><AdminFinancePage /></RequireAdminPermission> },

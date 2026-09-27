@@ -1,6 +1,9 @@
 import type { CatalogEntityType } from '@/constants/catalogDomain';
 import type { ContentPublicationStatus } from '@/utils/contentIntegrity';
 import type { ProfilePhotoViewState } from './profilePhoto';
+// One definition of the verification states, so a new one cannot be added
+// to the domain type and silently missed here.
+import type { VerificationStatusValue } from './verification';
 
 // Collection Types
 export interface CollectionDto {
@@ -112,7 +115,7 @@ export interface BrandProfileDto {
   cacNumber?: string | null;
   tin?: string | null;
   verified?: boolean;
-  verificationStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'IN_REVIEW' | 'ADDITIONAL_INFO_REQUESTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  verificationStatus?: VerificationStatusValue;
   verificationBadgeVisible?: boolean;
   verifiedExplanationUrl?: string | null;
   averageRating?: number;

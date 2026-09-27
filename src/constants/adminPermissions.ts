@@ -117,6 +117,44 @@ const CATALOGUE = [
     description: 'Review verification submissions and decide the outcome.',
   },
   {
+    key: 'VERIFICATION_PHYSICAL_READ',
+    code: 'verification.physical.read',
+    group: 'Brands & stores',
+    label: 'View verification visits',
+    description:
+      'Open the visit queue and read a visit. The floor for a verification agent.',
+  },
+  {
+    key: 'VERIFICATION_PHYSICAL_CLAIM',
+    code: 'verification.physical.claim',
+    group: 'Brands & stores',
+    label: 'Claim a verification visit',
+    description: 'Take an unassigned visit off the queue.',
+  },
+  {
+    key: 'VERIFICATION_PHYSICAL_ASSIGN',
+    code: 'verification.physical.assign',
+    group: 'Brands & stores',
+    label: 'Assign verification visits',
+    description: 'Hand a visit to another agent.',
+    superAdminOnly: true,
+  },
+  {
+    key: 'VERIFICATION_PHYSICAL_SCHEDULE',
+    code: 'verification.physical.schedule',
+    group: 'Brands & stores',
+    label: 'Schedule verification visits',
+    description: 'Offer the brand times, and answer a reschedule request.',
+  },
+  {
+    key: 'VERIFICATION_PHYSICAL_DECIDE',
+    code: 'verification.physical.decide',
+    group: 'Brands & stores',
+    label: 'Record a visit outcome',
+    description:
+      'Attach evidence from a visit and record whether it passed. Passing is what grants the badge.',
+  },
+  {
     key: 'BRANDS_SUSPEND',
     code: 'brands.suspend',
     group: 'Brands & stores',

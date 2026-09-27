@@ -3,6 +3,12 @@ export type VerificationStatusValue =
   | 'PENDING'
   | 'IN_REVIEW'
   | 'ADDITIONAL_INFO_REQUESTED'
+  /**
+   * Documents accepted; the physical visit is what is left. Deliberately NOT
+   * folded into APPROVED — nothing is verified until somebody has been and
+   * looked, and every gate that reads this union treats the two differently.
+   */
+  | 'PHYSICAL_PENDING'
   | 'APPROVED'
   | 'REJECTED'
   | 'CANCELLED';

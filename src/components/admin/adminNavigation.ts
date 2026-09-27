@@ -41,6 +41,17 @@ export const ADMIN_ROUTE_ACCESS: AdminRouteAccess[] = [
     permissions: ['USERS_READ', 'BRANDS_READ', 'BRANDS_VERIFY'],
   },
   {
+    /* More specific than `/admin/verification`, and matched first by longest
+       prefix — so a pure verification AGENT, who holds none of the brand
+       console permissions, can still reach their own queue. */
+    prefix: '/admin/verification/visits',
+    permissions: [
+      'VERIFICATION_PHYSICAL_READ',
+      'VERIFICATION_PHYSICAL_CLAIM',
+      'VERIFICATION_PHYSICAL_DECIDE',
+    ],
+  },
+  {
     prefix: '/admin/verification',
     permissions: ['USERS_READ', 'BRANDS_READ', 'BRANDS_VERIFY'],
   },
@@ -95,6 +106,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   },
   { key: 'taxonomy', label: 'Taxonomy', path: '/admin/taxonomy', emoji: '🧬' },
   { key: 'tags', label: 'Hashtag moderation', path: '/admin/tags', emoji: '🏷️' },
+  {
+    key: 'verification-visits',
+    label: 'Verification visits',
+    path: '/admin/verification/visits',
+    emoji: '📍',
+  },
   { key: 'finance', label: 'Finance', path: '/admin/finance', emoji: '🏦' },
   { key: 'payouts', label: 'Payouts', path: '/admin/payouts', emoji: '💰' },
   { key: 'disputes', label: 'Disputes', path: '/admin/disputes', emoji: '⚖️' },

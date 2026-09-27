@@ -420,6 +420,53 @@ export function determineNotificationRoute(notification: NormalizedNotification)
 
     // Fallback: type-specific routing for edge cases
     switch (type) {
+        /*
+          The visit.
+
+          Every one of these carries an explicit `targetUrl` from the server
+          (the brand's is `/studio/verification`, the agent's is the visit in
+          the console), and the fallback chain above already prefers it. These
+          cases exist so that a payload written without one still lands
+          somewhere a reader can act, rather than on the notifications settings
+          screen — which is the page they just tapped from.
+        */
+        case 'VERIFICATION_PHYSICAL_REQUIRED':
+        case 'VERIFICATION_VISIT_PROPOSED':
+        case 'VERIFICATION_VISIT_RESCHEDULE_ACCEPTED':
+        case 'VERIFICATION_VISIT_RESCHEDULE_DECLINED':
+        case 'VERIFICATION_VISIT_DECLINED':
+        case 'VERIFICATION_PHYSICAL_PASSED':
+        case 'VERIFICATION_PHYSICAL_FAILED':
+            return '/studio/verification';
+
+        case 'VERIFICATION_VISIT_ASSIGNED':
+        case 'VERIFICATION_VISIT_CONFIRMED':
+        case 'VERIFICATION_VISIT_RESCHEDULE_REQUESTED':
+        case 'VERIFICATION_VISIT_OVERDUE': {
+            const visitId =
+                typeof payload?.physicalVerificationId === 'string'
+                    ? payload.physicalVerificationId
+                    : null;
+            return visitId
+                ? `/admin/verification/visits/${visitId}`
+                : '/admin/verification/visits';
+        }
+
+        /* Sent to whichever side owes a reply, so it reads `owes` to decide. */
+        case 'VERIFICATION_VISIT_RESPONSE_DUE':
+        case 'VERIFICATION_VISIT_REMINDER': {
+            const visitId =
+                typeof payload?.physicalVerificationId === 'string'
+                    ? payload.physicalVerificationId
+                    : null;
+            if (payload?.owes === 'AGENT') {
+                return visitId
+                    ? `/admin/verification/visits/${visitId}`
+                    : '/admin/verification/visits';
+            }
+            return '/studio/verification';
+        }
+
         case 'BAG_ITEM_ADDED':
         case 'BAG_CHECKOUT_REMINDER':
             return '/bag';
