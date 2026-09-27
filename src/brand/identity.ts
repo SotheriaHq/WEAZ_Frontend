@@ -53,17 +53,25 @@ export const BRAND_COLORS = {
  *
  * The mark is theme-paired rather than tinted: it is full-colour artwork, so
  * there is no filter that adapts it. Pick with the resolved theme.
+ *
+ * Everything here is GENERATED. `brand/wiez-mark.png` and
+ * `brand/wiez-wordmark.png` at the workspace root are the only masters; run
+ * `python scripts/build-brand-assets.py` after changing one. The `-light` and
+ * `-dark` files are currently the same artwork — the gold outline carries it
+ * on dark grounds and the violet fill carries it on light ones — and the pair
+ * is kept so a future ground-specific ramp has somewhere to go without another
+ * round of renaming.
  */
 export const BRAND_ASSETS = {
   /**
    * The drawn name, with the muse as the "I" — so this ALREADY contains the
    * mark. Anywhere the name is shown, this is the whole lockup.
    */
-  wordmarkLight: '/brand/wiez-wordmark-light.svg',
-  wordmarkDark: '/brand/wiez-wordmark-dark.svg',
+  wordmarkLight: '/brand/wiez-wordmark-light.png',
+  wordmarkDark: '/brand/wiez-wordmark-dark.png',
   /** The symbol alone, for chrome with no room for lettering. */
-  markLight: '/brand/wiez-mark-light.svg',
-  markDark: '/brand/wiez-mark-dark.svg',
+  markLight: '/brand/wiez-mark-light.png',
+  markDark: '/brand/wiez-mark-dark.png',
   /**
    * The same mark as a 192px raster, for the loader.
    *
@@ -74,8 +82,8 @@ export const BRAND_ASSETS = {
   loaderMarkLight: '/brand/wiez-loader-mark-light.png',
   loaderMarkDark: '/brand/wiez-loader-mark-dark.png',
   /** For grounds that are not known ahead of time — over imagery, over video. */
-  markNeutral: '/brand/wiez-mark.svg',
-  favicon: '/brand/wiez-favicon.svg',
+  markNeutral: '/brand/wiez-mark.png',
+  favicon: '/brand/wiez-favicon-48.png',
   /** Social cards have no theme, so this is a raster on the brand ground. */
   openGraph: '/brand/wiez-og.png',
 } as const;

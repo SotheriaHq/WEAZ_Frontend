@@ -55,43 +55,31 @@
   } catch (_e) {}
 
   /*
-   * The gauge violet, per ground.
+   * Fill the vessel.
    *
-   * These are two different colours on purpose, not a light and dark shade of
-   * one. #6015e2 sits at 1.9:1 against the night ground — the same reason the
-   * old logo vanished on the dark theme — so the night gauge uses the
-   * dark-ground violet instead. Kept in step with --wiez-ring in index.css.
+   * This drove an element with id `boot-splash-ring` — a conic-gradient ring
+   * from an older splash that no longer exists in index.html. So every call
+   * bailed on the first line, the interval below cleared itself on its first
+   * tick, and the gauge sat frozen at its initial 8% for the whole boot. That
+   * is the "grey logo with a sliver at the bottom" this was reported as: not a
+   * styling problem, a dead id.
+   *
+   * The mark is now a MASK over a flat fill (see `.boot-splash-vessel` in
+   * index.html), so progress is simply how much of it is uncovered from the
+   * bottom. The colour lives in the stylesheet, which means the theme swap is
+   * a CSS rule rather than something this file has to know about.
    */
-  var RING_DAY = '96,21,226';
-  var RING_NIGHT = '175,135,244';
-
   function paintProgress() {
-    var ring = document.getElementById('boot-splash-ring');
-    if (!ring) return false;
-    var degrees = progress * 3.6;
-    /* theme-init.js has already stamped this before first paint. Inline style
-       beats the stylesheet, so the theme has to be read here too. */
-    var isNight = document.documentElement.classList.contains('dark');
-    var rgb = isNight ? RING_NIGHT : RING_DAY;
-    ring.style.background =
-      'conic-gradient(from -38deg, rgba(' +
-      rgb +
-      ',0.96) 0deg ' +
-      degrees +
-      'deg, rgba(' +
-      rgb +
-      ',0.3) ' +
-      degrees +
-      'deg ' +
-      Math.min(360, degrees + 18) +
-      'deg, rgba(' +
-      rgb +
-      ',0.1) 0deg)';
+    var fill = document.getElementById('boot-splash-fill');
+    if (!fill) return false;
+    var remaining = Math.max(0, Math.min(100, 100 - progress));
+    fill.style.clipPath = 'inset(' + remaining + '% 0 0 0)';
+    fill.style.webkitClipPath = 'inset(' + remaining + '% 0 0 0)';
     return true;
   }
 
   var progressTimer = window.setInterval(function () {
-    if (!document.getElementById('boot-splash-ring')) {
+    if (!document.getElementById('boot-splash-fill')) {
       window.clearInterval(progressTimer);
       return;
     }

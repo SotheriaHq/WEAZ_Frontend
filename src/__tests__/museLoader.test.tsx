@@ -47,22 +47,48 @@ describe('the loading system', () => {
     const box = container.firstElementChild as HTMLElement;
     // A square box would squash a 461x430 lockup.
     expect(box.style.height).toBe('48px');
-    expect(box.style.width).toBe(`${Math.round(48 * (461 / 430))}px`);
+    expect(box.style.width).toBe(`${Math.round(48 * (538 / 498))}px`);
   });
 
-  it('is the whole logo filling, not a ring around one piece of it', () => {
+  it('is an empty vessel filling with the system colour', () => {
     const { container } = render(<MuseLoader size={48} />);
 
     // No ring. The previous shape orbited an arc around the orb, which read as
     // a loading widget that happened to contain part of the brand.
     expect(container.querySelector('circle')).toBeNull();
 
-    // Two stacked copies of the mark: a dim track and a lit fill.
-    const layers = [...container.querySelectorAll('img')];
+    /*
+      No <img> either, and that is the whole point of the change.
+
+      Painting the ARTWORK and uncovering it bottom-up reads as a picture
+      downloading over a slow connection — a grey logo is what a half-loaded
+      image looks like. The mark is a MASK now, cut out of a flat fill, so the
+      empty state is a silhouette holding nothing rather than a broken logo.
+    */
+    expect(container.querySelector('img')).toBeNull();
+
+    const layers = [...container.querySelectorAll('span > span')] as HTMLElement[];
     expect(layers).toHaveLength(2);
     for (const layer of layers) {
-      expect(layer.getAttribute('src')).toMatch(/wiez-loader-mark-/);
+      // jsdom keeps the prefixed property; either is proof of the mask.
+      const mask =
+        layer.style.getPropertyValue('mask-image') ||
+        layer.style.getPropertyValue('-webkit-mask-image');
+      expect(mask).toMatch(/wiez-loader-mark-/);
     }
+
+    /*
+      Empty and full are the SAME ink at two strengths, not two colours.
+
+      That is what makes a part-filled mark legible: the eye compares one
+      colour against itself across a hard edge, so "some filled, some empty" is
+      obvious without reading a number. A track in a different hue reads as a
+      shadow behind a logo instead of as an empty vessel.
+    */
+    expect(layers[0].style.background).toContain('--wiez-ring');
+    expect(layers[1].style.background).toContain('--wiez-ring');
+    expect(Number(layers[0].style.opacity)).toBeLessThan(0.5);
+    expect(layers[1].style.opacity).toBe('');
     expect(layers[1].className).toMatch(/animate-wiez-rise/);
 
     // The previous loader's entire brand content was the character U+1F9F5.
@@ -71,7 +97,8 @@ describe('the loading system', () => {
 
   it('fills the mark from the bottom in proportion to real progress', () => {
     const { container } = render(<MuseProgress progress={30} size={64} />);
-    const fill = [...container.querySelectorAll('img')][1] as HTMLElement;
+    const layers = [...container.querySelectorAll('span > span > span')] as HTMLElement[];
+    const fill = layers[1];
     // 30% full means 70% clipped off the top.
     expect(fill.style.clipPath).toBe('inset(70% 0 0 0)');
   });
