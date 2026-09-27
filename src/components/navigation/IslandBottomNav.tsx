@@ -190,6 +190,25 @@ const MIN_ITEM_WIDTH_PX = 58;
 const ITEM_GAP_PX = 4;
 
 /**
+ * Movement past this is not a tap.
+ *
+ * Comfortably under the platform slop (~10px). A steady finger still counts
+ * as a press. A finger that travels — scrolling the page, or sweeping the
+ * dock looking for another section — must not activate the chip it started on.
+ * Mobile browsers still synthesize a `click` after that movement.
+ */
+export const ISLAND_PRESS_SLOP_PX = 8;
+
+export const islandPointerMovedPastSlop = (
+  originX: number,
+  originY: number,
+  x: number,
+  y: number,
+): boolean =>
+  Math.abs(x - originX) > ISLAND_PRESS_SLOP_PX ||
+  Math.abs(y - originY) > ISLAND_PRESS_SLOP_PX;
+
+/**
  * The most chips the row will ever show, however much width there is.
  *
  * Width is not the only constraint, and on the wide end it stops being the
@@ -331,26 +350,23 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
   }, [itemMatchesLocation, items, optimisticActiveKey]);
 
   /**
-   * Press-time feedback that a scroll can take back.
+   * Press-time feedback that a drag can take back.
    *
-   * The optimistic highlight used to be applied on `pointerdown`/`touchstart`
-   * and never withdrawn. The dock scrolls horizontally, so starting a swipe
-   * necessarily puts a finger down on some item — that item lit up, the gesture
-   * turned out to be a scroll, no `click` ever followed, and the highlight
-   * stayed on a tab the user never chose. The indicator effectively tracked
-   * wherever a finger had last rested.
+   * Touch-down lights the chip immediately. The row itself does not scroll —
+   * anything that does not fit is in More — but a finger still starts on a
+   * chip when the reader is scrolling the page, or sweeping the dock because
+   * the section they want is not in view. That sweep is not a choice.
    *
-   * A press is now only a CANDIDATE. It lights up immediately (feedback still
-   * arrives on touch, not on release) but is withdrawn the moment the gesture
-   * proves to be a drag or a scroll. `click` only fires for a real tap, so the
-   * committed state still comes from the route change as before.
+   * Withdrawing the highlight is not enough. Mobile browsers fire `click`
+   * after a short drag, and that click was opening the chip under the finger.
+   * A move past the slop, or the browser cancelling the pointer, suppresses
+   * that click. A still finger still selects on click.
    */
   const pendingPressRef = useRef<{ key: string; x: number; y: number } | null>(null);
-  // Comfortably below the platform tap slop (~10px on both iOS and Android),
-  // so a steady finger is never mistaken for a drag.
-  const DRAG_SLOP_PX = 8;
+  const pressMovedPastSlopRef = useRef(false);
 
-  const cancelPendingPress = useCallback(() => {
+  const withdrawCandidate = useCallback((movedPastSlop: boolean) => {
+    if (movedPastSlop) pressMovedPastSlopRef.current = true;
     if (!pendingPressRef.current) return;
     const cancelledKey = pendingPressRef.current.key;
     pendingPressRef.current = null;
@@ -360,6 +376,7 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
   const beginPress = useCallback(
     (item: IslandBottomNavItem, event: React.PointerEvent<HTMLButtonElement>) => {
       if (item.disabled) return;
+      pressMovedPastSlopRef.current = false;
       pendingPressRef.current = {
         key: item.key,
         x: event.clientX,
@@ -374,12 +391,11 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
     (event: React.PointerEvent<HTMLDivElement>) => {
       const pending = pendingPressRef.current;
       if (!pending) return;
-      const movedFar =
-        Math.abs(event.clientX - pending.x) > DRAG_SLOP_PX ||
-        Math.abs(event.clientY - pending.y) > DRAG_SLOP_PX;
-      if (movedFar) cancelPendingPress();
+      if (islandPointerMovedPastSlop(pending.x, pending.y, event.clientX, event.clientY)) {
+        withdrawCandidate(true);
+      }
     },
-    [cancelPendingPress],
+    [withdrawCandidate],
   );
 
   /**
@@ -454,6 +470,11 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
     );
 
   const chooseItem = (item: IslandBottomNavItem) => {
+    if (pressMovedPastSlopRef.current) {
+      pressMovedPastSlopRef.current = false;
+      pendingPressRef.current = null;
+      return;
+    }
     pendingPressRef.current = null;
     setMoreOpen(false);
     // Re-tapping the current tab must not stack another history entry
@@ -543,8 +564,8 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
           <div
             ref={rowRef}
             onPointerMove={trackPress}
-            onPointerCancel={cancelPendingPress}
-            onPointerLeave={cancelPendingPress}
+            onPointerCancel={() => withdrawCandidate(true)}
+            onPointerLeave={() => withdrawCandidate(false)}
             className="flex h-full items-center gap-1"
           >
             {visibleItems.map((item) => {

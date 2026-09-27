@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  islandPointerMovedPastSlop,
   resolveIslandCapacity,
   splitIslandItems,
   type IslandBottomNavItem,
@@ -25,6 +26,18 @@ const rowWidthFor = (viewport: number, cap: number) =>
 
 const MAIN_DOCK_CAP = 420;
 const STUDIO_DOCK_CAP = 560;
+
+describe('islandPointerMovedPastSlop', () => {
+  it('keeps a steady finger as a press', () => {
+    expect(islandPointerMovedPastSlop(40, 80, 44, 84)).toBe(false);
+    expect(islandPointerMovedPastSlop(40, 80, 48, 80)).toBe(false);
+  });
+
+  it('treats a sweep in either axis as a scroll, not a choice', () => {
+    expect(islandPointerMovedPastSlop(40, 80, 52, 80)).toBe(true);
+    expect(islandPointerMovedPastSlop(40, 80, 40, 92)).toBe(true);
+  });
+});
 
 describe('resolveIslandCapacity', () => {
   it('shows nothing beyond the slot cap, however wide the row', () => {
