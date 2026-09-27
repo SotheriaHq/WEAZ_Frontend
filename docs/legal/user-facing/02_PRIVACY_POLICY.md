@@ -105,7 +105,7 @@ To protect Brand owners from identity theft, our public backend APIs (`GET /bran
 ## 6. Financial Data, Payment Processing, and Escrow Mechanics
 
 ### 6.1. PCI-DSS Tokenized Payment Intake
-* WIEZ integrates with PCI-DSS Level 1 certified payment processors (including Paystack, Flutterwave, Stripe, and authorized card networks).
+* WIEZ integrates with PCI-DSS Level 1 certified payment processors (including Paystack and the authorized card networks it settles through).
 * **Zero Raw Card Storage**: WIEZ never receives, processes, or stores your full 16-digit primary account number (PAN), CVV, or card PIN.
 * **Tokenized References**: Our payment gateways provide WIEZ with cryptographic authorization tokens, card brands (e.g., Visa, Mastercard), expiration years, and masked last-4 digits to display saved cards in your checkout drawer.
 
@@ -143,18 +143,22 @@ Where WIEZ relies on **Legitimate Interests** as the legal basis for processing 
 WIEZ engages trusted third-party technical providers to operate infrastructure services under binding Data Processing Agreements (DPAs):
 
 ### 8.1. Infrastructure & Hosting Sub-Processors
-* **Amazon Web Services (AWS)**: Cloud infrastructure, relational database clustering, and encrypted object storage (S3).
-* **Railway Corporation**: Application server container orchestration and backend API execution.
-* **Cloudflare, Inc.**: Content Delivery Network (CDN), DDoS mitigation, SSL/TLS edge termination, and media caching.
+* **Amazon Web Services (AWS)**: Cloud compute, the managed PostgreSQL database, and encrypted object storage (S3) for all uploaded media and verification documents.
+* **Cloudflare, Inc.**: Content Delivery Network (CDN), DDoS mitigation, SSL/TLS edge termination, media caching, and hosting for our web application.
 
 ### 8.2. Payment & Financial Gateways
-* **Paystack Payments Limited**: Primary payment gateway processing for Nigerian and African card/bank transactions.
-* **Flutterwave Inc.**: Secondary payment processing and cross-border settlement rails.
-* **Stripe, Inc.**: International payment processing and global card tokenization.
+* **Paystack Payments Limited** (a Stripe company): our payment gateway, processing card, bank transfer and USSD payments, and holding the saved-card authorizations described in Section 6.1.
+
+We do not currently route your payment data to any other gateway. If we enable an additional processor, this Policy will name it before your data reaches it.
 
 ### 8.3. Communications & Notifications
-* **Twilio Inc.**: Automated SMS delivery for phone verification (E.164 normalization).
-* **Expo / Firebase Cloud Messaging (Google LLC)**: Native mobile push notification routing.
+* **Resend**: transactional email delivery — verification links, order updates, and security notices. Receives your email address and the content of those messages.
+* **Expo (Expo Application Services) / Apple Push Notification service / Firebase Cloud Messaging (Google LLC)**: native mobile push notification routing. Receives your device push token and the notification text.
+
+We do not send SMS messages and we use no SMS provider. Phone numbers are stored for contact and delivery purposes only.
+
+### 8.4. Reliability & Error Monitoring
+* **Sentry**: application error and performance monitoring, so faults can be diagnosed. Configured NOT to attach personal data to reports (`sendDefaultPii` is disabled); it receives technical diagnostics such as stack traces, request routes, and device or browser type.
 
 ---
 

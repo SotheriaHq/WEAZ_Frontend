@@ -35,21 +35,26 @@ The table below provides a complete, field-by-field register of every cookie, lo
 
 | Technical Key / Identifier | Storage Mechanism | Surface | TTL / Life | Exact Technical Purpose & Legal Classification |
 | --- | --- | --- | --- | --- |
-| `refreshToken` | HttpOnly Cookie (SameSite=Strict) | Web Browser / API | 30 Days (Rolling) | **Strictly Necessary**: Rotated JWT session token. Protected against XSS; required for auth renewal. |
-| `accessToken` | HttpOnly Cookie / Request Header | Web Browser / API | 15 Minutes | **Strictly Necessary**: Short-lived Bearer credential validating individual REST and GraphQL API calls. |
-| `WIEZ_ACCESS_TOKEN` | Hardware Keychain (SecureStore) | Mobile (iOS/Android) | Until Logout | **Strictly Necessary**: iOS Keychain / Android KeyStore encrypted access token on physical mobile devices. |
+| `refreshToken` | HttpOnly Cookie (SameSite=Strict, Path=/) | Web Browser / API | 7 Days (Rolling) | **Strictly Necessary**: Rotated session token. Protected against XSS; required for auth renewal. |
+| `accessToken` | HttpOnly Cookie, also presented as a Bearer header | Web Browser / API | 8 Hours | **Strictly Necessary**: Short-lived credential validating individual REST API calls. |
+| `WIEZ_ACCESS_TOKEN` | Hardware Keychain (SecureStore) on mobile; `localStorage` on web | Mobile (iOS/Android) / Web Browser | Until Logout | **Strictly Necessary**: Access token held for session bootstrap. On mobile this is the iOS Keychain / Android KeyStore. |
 | `WIEZ_REFRESH_TOKEN` | Hardware Keychain (SecureStore) | Mobile (iOS/Android) | Until Logout | **Strictly Necessary**: Hardware-isolated refresh token used for seamless native mobile session renewal. |
-| `WIEZ_USER` | Hardware Keychain (SecureStore) | Mobile (iOS/Android) | Until Logout | **Strictly Necessary**: Versioned (v1) snapshot of authenticated user identity (role, status, email). |
-| `wiez.market.` `anonymousSessionId.v1` | `localStorage` | Web Browser | 365 Days (Persistent) | **First-Party Analytics**: Anonymous UUID client ID grouping discovery signals before user logs in. |
-| `wiez.market.` `signalQueue.v1` | `localStorage` / `AsyncStorage` | Web / Mobile | 24 Hours / 5s Flush | **First-Party Analytics**: Client queue buffering dwell time, reel views, and bookmark events. |
+| `WIEZ_USER` | Hardware Keychain (SecureStore) on mobile; `localStorage` on web | Mobile (iOS/Android) / Web Browser | Until Logout | **Strictly Necessary**: Snapshot of authenticated user identity (role, status, email) so the interface can render before the network replies. |
+| `wiez.market.` `anonymousSessionId.v1` | `localStorage` | Web Browser | Persistent | **First-Party Analytics**: Anonymous client ID grouping discovery signals before you log in. |
+| `wiez.market.` `signalQueue.v1` | `localStorage` / `AsyncStorage` | Web / Mobile | 24 Hours / 5s Flush | **First-Party Analytics**: Client queue buffering discovery events, capped at 100 entries and flushed in batches of at most 25. |
 | `wiez.market.` `signalRecent.v1` | `localStorage` / Memory Map | Web / Mobile | 30 Seconds (Window) | **Performance & Integrity**: Suppresses duplicate noisy impression events (e.g. repeated scroll passes). |
-| `wiez.bag.v1` | `localStorage` | Web Browser | Persistent | **Functional / Commerce**: Multi-vendor shopping cart snapshot (variants, quantities, custom notes). |
-| `wiez.tailor.` `measurementDraft.v1` | `sessionStorage` / `localStorage` | Web Browser | Session / 30 Days | **Functional / Bespoke**: Temporary snapshot of 38 ISO 8559 body measurements & SVG silhouette model. |
-| `wiez.brand.` `activeContext.v1` | `localStorage` / `SecureStore` | Web / Mobile | Persistent | **Functional / Merchant**: Active Brand Studio workspace identifier for designers managing stores. |
-| `wiez.ui.theme.v1` | `localStorage` | Web Browser | Persistent | **Preferences**: Dark Mode / Light Mode interface display state selection. |
-| `wiez.legal.` `acceptance.v1` | `localStorage` | Web Browser | Persistent | **Legal Compliance**: Cryptographic audit hash of accepted Terms, Privacy, and Cookie Policy versions. |
-| `tanstack-query-cache` | `AsyncStorage` / Memory Cache | Web / Mobile | 24 Hours | **Performance & Speed**: Client cache for Runway feed lookbooks, catalog grids, and designer profiles. |
-| `s3_presigned_url_cache` | `localStorage` / Memory Cache | Web / Mobile | 15 Minutes | **Performance & Cache**: Short-lived cache of signed AWS S3 image URLs to avoid repeated auth calls. |
+| `wiez.market.` `signalIdentity.v1`, `signalLastClearedAt.v1` | `localStorage` | Web Browser | Persistent | **First-Party Analytics**: Binds the queue to the current account and records when you last reset your feed signals. |
+| `wiez.pendingBagAction.v1` | `sessionStorage` | Web Browser | Until the tab closes | **Functional / Commerce**: Remembers an add-to-bag you started before signing in, so it completes afterwards. Bag CONTENTS are held on our servers, not in your browser. |
+| `wiez.activeBrandId` | `localStorage` | Web Browser | Persistent | **Functional / Merchant**: Active Brand Studio workspace identifier for designers managing several stores. |
+| `vite-ui-theme` (web) / `wiez.theme.mode` (mobile) | `localStorage` / `AsyncStorage` | Web / Mobile | Persistent | **Preferences**: Dark Mode / Light Mode interface display state selection. |
+| `wiez.profile.` `sizeCategory.v1` | `localStorage` / `AsyncStorage` | Web / Mobile | Persistent | **Preferences**: Which size chart category to show you first. |
+| `wiez.device.id.v1` | Hardware Keychain (SecureStore) | Mobile (iOS/Android) | Until reinstall | **Strictly Necessary**: Stable device identifier used to register and de-duplicate push notification tokens. |
+| `WIEZ_QUERY_CACHE_V1` | `localStorage` / Memory Cache | Web / Mobile | Until logout or eviction | **Performance & Speed**: Client cache for Runway feed lookbooks, catalog grids, and designer profiles, including the signed image URLs they contain. |
+
+Additional short-lived operational keys are written under the same `wiez.`
+prefix (for example draft-publishing queues, checkout retry queues, and search
+history on mobile). They hold no data beyond what is described in the
+categories above, and **Section 8** clears all of them.
 
 ---
 
@@ -64,19 +69,18 @@ These cookies and storage elements are technically mandatory for the platform to
   * **CSRF Shield**: Because it is flagged `SameSite=Strict`, browsers will not attach the cookie to cross-site requests originating from external websites.
 * **Mobile Hardware Security (`WIEZ_ACCESS_TOKEN` / `WIEZ_REFRESH_TOKEN`)**:
   * On iOS and Android physical hardware, session keys are stored in encrypted hardware enclaves via `expo-secure-store`. Tokens are inaccessible to other mobile apps installed on the device.
-* **Legal Acceptance Signatures (`wiez.legal.acceptance.v1`)**:
-  * Caches proof of accepted policy versions to verify compliance during checkout, store publishing, and custom design commissioning.
+* **Legal Acceptance Signatures (`LegalAcceptance`)**:
+  * Proof of the policy versions you accepted is recorded on our servers, not in your browser, and is checked during checkout, store publishing, and custom design commissioning.
 
 ### 3.2. Category 2: Functional, Commerce & Custom Tailoring Storage
 Functional storage preserves your operational progress across page navigation, tab reloads, and network dropouts:
 
-* **Multi-Vendor Cart Persistence (`wiez.bag.v1`)**:
-  * Stores items from multiple independent fashion brands in a unified client-side bag structure.
-  * Preserves selected garment sizes, color variants, custom fabric notes, and brand identifiers.
-* **Bespoke Measurement Drafts (`wiez.tailor.measurementDraft.v1`)**:
-  * Temporarily buffers up to 38 distinct ISO 8559 measurement points and interactive SVG silhouette visualizer parameters.
-  * Prevents loss of complex sizing configurations while you browse complementary accessories or consult with a designer.
-* **Brand Studio Workspace Switching (`wiez.brand.activeContext.v1`)**:
+* **Multi-Vendor Bag (`wiez.pendingBagAction.v1`)**:
+  * Your bag itself - items from multiple independent brands, with sizes, colour variants, custom fabric notes and brand identifiers - is held on our servers and follows your account across devices. It is not stored in your browser.
+  * The browser holds one thing: an add-to-bag you began before signing in, kept in `sessionStorage` until the tab closes so the action completes once you are signed in.
+* **Bespoke Measurement Drafts**:
+  * Your measurement points and silhouette parameters are saved to your account, so a sizing configuration survives closing the tab and is available on your other devices. No draft copy is kept in browser storage.
+* **Brand Studio Workspace Switching (`wiez.activeBrandId`)**:
   * Preserves the active brand profile context for fashion designers who manage multiple brand entities or toggle between shopper and merchant modes.
 
 ### 3.3. Category 3: Performance, 60fps Scrolling, and Asset Caching
@@ -106,8 +110,13 @@ A signal passes through four stages before it reaches us:
 ### 4.1. Granular Signal Event Types
 Our systems log the following specific user engagement events:
 * **Impression Signals**: `IMPRESSION`, `ITEM_IMPRESSION`, `SECTION_VIEW`, `MARKET_SECTION_VIEW`, `SUGGESTION_ITEM_VIEW`.
-* **Engagement Signals**: `ITEM_VIEW`, `VIEW`, `LIKE`, `BOOKMARK`, `SHARE`, `ZOOM_INTERACTION`, `DWELL_TIME`.
-* **Commerce Signals**: `ADD_TO_BAG`, `REMOVE_FROM_BAG`, `BEGIN_CHECKOUT`, `APPLY_FILTER`, `SEARCH_QUERY`.
+* **Engagement Signals**: `IMPRESSION`, `VIEW`, `ITEM_IMPRESSION`, `ITEM_VIEW`, `ITEM_CLICK`, `CLICK`, `OPEN`, `LIKE`, `SAVE`, `SHARE`, `COMMENT`, `THREAD`, `PROFILE_TAP`, and the dwell bands `DWELL_SHORT`, `DWELL_MEDIUM`, `DWELL_LONG`.
+* **Commerce Signals**: `PRODUCT_VIEW`, `ADD_TO_CART`, `WISHLIST`, `PURCHASE`.
+* **Negative Signals**: `HIDE`, `NOT_INTERESTED`, `SCROLL_SKIP` — recorded so we can show you less of what you do not want.
+* **Section & Suggestion Signals**: `SECTION_VIEW`, `MARKET_SECTION_VIEW`, `SUGGESTION_BLOCK_VIEW`, `SUGGESTION_ITEM_VIEW` and their corresponding click and scroll variants.
+
+Dwell time is recorded as one of three BANDS rather than as a duration, so the
+exact number of seconds you spent on an item is never stored.
 
 ### 4.2. Buffer Management, Compaction, and Backoff
 * **Client-Side Queue Storage (`wiez.market.signalQueue.v1`)**: Buffered in `localStorage` / `AsyncStorage` with a hard limit of 100 events to protect device memory.
@@ -138,7 +147,7 @@ When a mobile designer opens merchant tools, financial dashboards, or advanced l
 WIEZ maintains a strict anti-surveillance standard: **We do not deploy third-party advertising retargeting pixels, tracking beacons, or cross-site tracking scripts**. We do not participate in cross-site ad networks.
 
 ### 6.2. Payment Gateway Sandboxes (PCI-DSS Level 1)
-When you complete checkout via Paystack, Flutterwave, or Stripe:
+When you complete checkout via Paystack:
 * Payment forms and 3D Secure / OTP verification modals are rendered within isolated, PCI-DSS Level 1 compliant iframes.
 * Payment providers may deploy strictly necessary fraud-prevention and session cookies within their own domain sandboxes.
 * WIEZ has no technical access to, does not read, and does not store the internal security cookies of payment gateways.
@@ -152,7 +161,7 @@ When you complete checkout via Paystack, Flutterwave, or Stripe:
 | **Session Storage** | Terminated immediately upon closing browser tab or process. |
 | **Pre-Signed Image URL Caches** | Automatically invalidated after fifteen (15) minutes. |
 | **Market Signal Telemetry Queue** | Flushed every 5 seconds; stale entries purge after 24 hours. |
-| **Authentication Refresh Tokens** | Persist for thirty (30) rolling days from last active use. |
+| **Authentication Refresh Tokens** | Persist for seven (7) rolling days from last active use. |
 | **Commerce Cart & Theme State** | Persists in `localStorage` until manually cleared or logout. |
 | **Mobile Hardware Keychains** | Persists until explicit logout, account deletion, or purge. |
 
@@ -186,14 +195,14 @@ You maintain full control over cookies and client storage through your browser a
 WIEZ's storage and cookie architecture is designed to minimize consent friction while respecting your legal rights:
 
 **Strictly Necessary Storage (No Consent Required)**:
-Storage items classified as strictly necessary under ePrivacy Directive Article 5(3) — specifically, authentication tokens (`refreshToken`, `accessToken`, `WIEZ_ACCESS_TOKEN`, `WIEZ_REFRESH_TOKEN`, `WIEZ_USER`), the legal acceptance signature (`wiez.legal.acceptance.v1`), and the shopping bag persistence key (`wiez.bag.v1`) — are deployed on a strictly-necessary exemption basis. These items cannot be opted out of without losing access to core platform functionality (login, checkout, and bespoke tailoring), and do not require prior consent under applicable law.
+Storage items classified as strictly necessary under ePrivacy Directive Article 5(3) — specifically, authentication tokens (`refreshToken`, `accessToken`, `WIEZ_ACCESS_TOKEN`, `WIEZ_REFRESH_TOKEN`, `WIEZ_USER`) and the pending bag action (`wiez.pendingBagAction.v1`) — are deployed on a strictly-necessary exemption basis. These items cannot be opted out of without losing access to core platform functionality (login, checkout, and bespoke tailoring), and do not require prior consent under applicable law.
 
 **Functional and Analytics Storage (Consent-Managed)**:
 The market signal telemetry keys (`wiez.market.anonymousSessionId.v1`, `wiez.market.signalQueue.v1`, `wiez.market.signalRecent.v1`) and the TanStack query cache are deployed for platform performance and feed personalization. For users in jurisdictions where prior consent is required for non-essential storage (EU, UK, Nigeria):
 * On first access, WIEZ presents a **Cookie and Privacy Consent Notice** explaining these storage mechanisms and requesting your consent before activating them.
 * You may accept, decline, or customise your consent preferences at any time by accessing **Settings > Privacy > Cookie Preferences** within the WIEZ application.
 * Declining analytics and personalization storage will disable Runway feed personalization (feed will fall back to chronological content) but will not prevent purchase, checkout, or bespoke tailoring functions.
-* Your consent choice is recorded in `wiez.legal.acceptance.v1` locally and in the WIEZ `LegalAcceptance` database for audit purposes.
+* Your consent choice is recorded in the WIEZ `LegalAcceptance` database for audit purposes.
 
 ### 9.3. Do Not Track (DNT) Signal Policy
 

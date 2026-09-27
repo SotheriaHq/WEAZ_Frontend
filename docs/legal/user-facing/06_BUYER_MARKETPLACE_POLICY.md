@@ -12,7 +12,7 @@ Buyer Dispute & Escrow Desk: `disputes@wiez.com`
 
 This Buyer Marketplace Policy ("Policy") governs all consumer interactions, garment purchases, custom bespoke commissions, delivery confirmations, return requests, and dispute proceedings initiated by clients and buyers ("Buyers", "you", or "your") across the WIEZ ecosystem (including `wiez.com`, iOS and Android mobile apps, and direct messaging channels).
 
-By browsing the Runway, adding garments to your shopping bag (`wiez.bag.v1`), commissioning bespoke designs, or completing checkout, you agree to comply with this Policy, the [Terms and Conditions](file:///c:/Users/UTL_ADMIN/Desktop/Shawn/threadly/docs/legal/user-facing/01_TERMS_AND_CONDITIONS.md), and the [Community Guidelines](file:///c:/Users/UTL_ADMIN/Desktop/Shawn/threadly/docs/legal/user-facing/04_COMMUNITY_GUIDELINES.md).
+By browsing the Runway, adding garments to your shopping bag, commissioning bespoke designs, or completing checkout, you agree to comply with this Policy, the [Terms and Conditions](file:///c:/Users/UTL_ADMIN/Desktop/Shawn/threadly/docs/legal/user-facing/01_TERMS_AND_CONDITIONS.md), and the [Community Guidelines](file:///c:/Users/UTL_ADMIN/Desktop/Shawn/threadly/docs/legal/user-facing/04_COMMUNITY_GUIDELINES.md).
 
 ---
 

@@ -176,7 +176,7 @@ Where a custom order includes brand-sourced textiles, minor artisanal dye-lot va
 ## 8. Payments, Escrow Settlements, and Financial Ledger Architecture
 
 ### 8.1. Payment Collection
-WIEZ integrates with PCI-DSS compliant third-party payment processors (including Paystack, Flutterwave, Stripe, and authorized card networks). By submitting an order, you authorize WIEZ to charge your designated card, bank account, or digital wallet for the full transaction sum.
+WIEZ integrates with PCI-DSS compliant third-party payment processors (including Paystack and the authorized card networks it settles through). By submitting an order, you authorize WIEZ to charge your designated card, bank account, or digital wallet for the full transaction sum.
 
 ### 8.2. Settlement Escrow Ledger
 To safeguard marketplace integrity:
@@ -310,9 +310,9 @@ WIEZ shall not be in breach of these Terms, nor liable for any delay or failure 
 * Government-declared public health emergencies, epidemics, or pandemics.
 * War, civil war, armed conflict, riot, civil unrest, terrorism, or threat of terrorism.
 * National or international trade embargoes, sanctions, or regulatory interventions disrupting the Platform's commercial operations.
-* Widespread internet infrastructure failures, undersea cable breaks, or major cloud provider outages affecting WIEZ's hosting infrastructure (AWS, Railway, Cloudflare).
+* Widespread internet infrastructure failures, undersea cable breaks, or major cloud provider outages affecting WIEZ's hosting infrastructure (AWS, Cloudflare).
 * Labor disputes, strikes, or industrial actions by third parties outside WIEZ's control.
-* Acts or omissions of payment providers (Paystack, Flutterwave, Stripe) beyond WIEZ's control.
+* Acts or omissions of payment providers (Paystack) beyond WIEZ's control.
 
 ### 14A.2. Obligations During Force Majeure
 In the event of a Force Majeure Event:

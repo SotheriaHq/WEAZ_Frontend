@@ -88,7 +88,7 @@ The buyer's gross order total is allocated in this order:
 
 1. **Third-party shipping carrier fee**: passed through in full. WIEZ takes no commission on shipping.
 2. **Standard platform commission**: 8%–12% of item merchandise value.
-3. **Gateway payment processing fee**: Paystack, Flutterwave, or Stripe.
+3. **Gateway payment processing fee**: charged by Paystack.
 4. **Net merchant settlement**: the remainder, allocated to your Brand escrow balance.
 
 ### 5.1. Standard Commission Rates
@@ -117,7 +117,7 @@ For made-to-measure custom apparel, funds are disbursed in milestone allocations
 ### 6.3. Payout Disbursements & Minimum Threshold
 * **Minimum Payout Amount**: **₦5,000 NGN** (or USD/EUR equivalent);
 * **Disbursement Frequency**: Brands may initiate automated payout requests daily or weekly once available funds exceed the minimum threshold;
-* **Settlement Currencies**: Payouts are disbursed in Nigerian Naira (NGN) via direct NIP bank transfer, or in USD/EUR/GBP via Flutterwave and Stripe for international merchant accounts.
+* **Settlement Currencies**: Payouts are disbursed in Nigerian Naira (NGN) via direct NIP bank transfer, International merchant payouts in USD, EUR or GBP are not currently available; we will update these Terms before enabling them.
 
 ---
 

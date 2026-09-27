@@ -111,7 +111,7 @@ The following statutory retention periods apply:
 ## 7. Third-Party Service Providers and Sub-Processor Erasure
 
 Upon processing a deletion request, WIEZ automatically propagates deletion instructions to our authorized infrastructure and payment sub-processors:
-* **Payment Gateways (Paystack, Flutterwave, Stripe)**: Tokenized customer profiles are detached from WIEZ merchant accounts. Note that payment processors maintain their own independent statutory banking retention obligations under CBN, PCI-DSS, and FinCEN regulations;
+* **Payment Gateways (Paystack)**: Tokenized customer profiles are detached from WIEZ merchant accounts. Note that payment processors maintain their own independent statutory banking retention obligations under CBN, PCI-DSS, and FinCEN regulations;
 * **Media Storage (Amazon Web Services S3 / CloudFront)**: Profile images, private measurement snapshots, and custom order sketches are permanently deleted from S3 buckets, with CDN edge cache invalidation completed within 48 hours;
 * **Transactional Email & Push (Resend / AWS SES / Firebase)**: Marketing suppression lists are updated to permanently prevent any subsequent promotional emails or push notifications.
 

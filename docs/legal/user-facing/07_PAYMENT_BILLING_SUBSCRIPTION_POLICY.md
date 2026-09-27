@@ -20,9 +20,9 @@ In accordance with our platform architecture, **all buyers and brands must accep
 
 WIEZ partners with internationally regulated, PCI-DSS Level 1 certified payment processors to facilitate secure, encrypted monetary transactions:
 
-* **Paystack (A Stripe Company)**: Primary payment gateway for Nigerian and West African transactions (Debit/Credit Cards, Direct Bank Transfer, USSD, Apple Pay);
-* **Flutterwave**: Pan-African and cross-border currency processing (Mobile Money, Virtual Accounts, International Cards);
-* **Stripe**: International card payments (Visa, Mastercard, American Express) and global multi-currency settlements.
+* **Paystack (a Stripe company)**: our payment gateway for all transactions — debit and credit cards, direct bank transfer, and USSD.
+
+Paystack is currently the only gateway processing live payments on WIEZ. Where these Policies refer to "your payment provider", they mean Paystack. We will update this section before routing payments through any additional processor.
 
 ### 2.1. Zero Raw Cardholder Data Storage (PCI-DSS Compliance)
 WIEZ operates on a **zero-knowledge cardholder architecture**:
@@ -98,7 +98,7 @@ Completing checkout locks the funds in our escrow bank account. What happens nex
 
 Brands manage accrued earnings via the WIEZ Brand Dashboard:
 1. **Minimum Payout Threshold**: The minimum requestable payout amount is **₦5,000 NGN** (or foreign currency equivalent);
-2. **Payout Methods**: Direct automated clearing house (ACH/NIP) bank transfer to verified Nigerian bank accounts; international wire or Stripe Connect transfers for global brands;
+2. **Payout Methods**: Direct automated clearing house (ACH/NIP) bank transfer to verified Nigerian bank accounts; international payouts for global brands are not currently supported;
 3. **Processing Timelines**: Payout requests initiated before 12:00 PM WAT on business days are processed within **24 to 48 banking hours**;
 4. **Pre-Payout Verification**: Brands must possess `APPROVED` KYC verification status and valid tax information before payout requests are disbursed.
 
@@ -107,7 +107,7 @@ Brands manage accrued earnings via the WIEZ Brand Dashboard:
 ## 7. Platform Commission, Transaction Fees, and Taxes
 
 1. **Platform Commission**: WIEZ assesses a platform commission of **8% to 10%** on ready-to-wear products and **10% to 12%** on custom bespoke commissions, deducted automatically upon escrow settlement;
-2. **Payment Gateway Processing Surcharges**: Standard merchant processing fees levied by Paystack, Flutterwave, or Stripe are deducted from the gross transaction value;
+2. **Payment Gateway Processing Surcharges**: Standard merchant processing fees levied by Paystack, or by any additional gateway we may add, are passed througe are deducted from the gross transaction value;
 3. **Logistics Pass-Through**: Third-party courier and delivery fees collected from buyers pass through 100% to the designated logistics provider without platform commission deduction;
 4. **Tax Obligations**: Brands operate as independent merchants of record and remain solely responsible for calculating, reporting, and remitting applicable corporate income and business taxes to relevant statutory authorities.
 
@@ -122,7 +122,7 @@ Brands manage accrued earnings via the WIEZ Brand Dashboard:
 ### 8.2. Multi-Stage Refund Processing Timelines
 Refunds follow a rigorous multi-stage banking settlement cycle:
 * **Stage 1 (WIEZ Platform Authorization — within 24 hours)**: The WIEZ Dispute & Escrow Desk reviews the case and issues a cryptographically signed refund authorization payload to the payment gateway within twenty-four (24) hours of dispute resolution;
-* **Stage 2 (Gateway & Settlement Processing — 24 to 48 hours)**: The payment provider (Paystack, Flutterwave, or Stripe) processes the reversal through the interbank switching network (`DEFAULT_SEED_SETTLEMENT_DELAY_HOURS = 48`);
+* **Stage 2 (Gateway & Settlement Processing — 24 to 48 hours)**: The payment provider (Paystacke) processes the reversal through the interbank switching network (`DEFAULT_SEED_SETTLEMENT_DELAY_HOURS = 48`);
 * **Stage 3 (Cardholder Bank Statement Credit — 5 to 10 business days)**: Depending on the cardholder's issuing bank and card scheme (Visa, Mastercard, Verve), the credit reflection typically appears on the account statement within five (5) to ten (10) banking days from gateway transmission.
 
 
@@ -146,7 +146,7 @@ Refunds follow a rigorous multi-stage banking settlement cycle:
 
 ## 11. Security, Webhook Verification, and Idempotency
 
-1. **Cryptographic Webhook Signatures**: All communication between external payment gateways (Paystack/Flutterwave/Stripe) and WIEZ backend servers is authenticated via HMAC-SHA512 cryptographic signature verification to prevent spoofing;
+1. **Cryptographic Webhook Signatures**: All communication between external payment gateways (Paystack) and WIEZ backend servers is authenticated via HMAC-SHA512 cryptographic signature verification to prevent spoofing;
 2. **Idempotency Safeguards**: All checkout initializations and payment capture requests utilize unique UUID v4 idempotency keys (`IdempotencyKey`) to prevent double-charging in the event of network dropouts, app restarts, or duplicate button taps.
 
 ---
