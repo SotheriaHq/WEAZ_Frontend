@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { PaystackPaymentData, ShippingAddress } from '@/api/StoreApi';
 import type {
   CardValidationSessionSummary,
@@ -9,6 +9,7 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import SavedCardFace from '@/components/payments/SavedCardFace';
+import SaveCardForm from '@/components/payments/SaveCardForm';
 import {
   detectCardBrand,
   formatCardNumberInput,
@@ -30,6 +31,8 @@ interface PaymentDetailsSectionProps {
   savedCardMutatingId?: string | null;
   onSetDefaultSavedCard?: (savedCardId: string) => Promise<void> | void;
   onRemoveSavedCard?: (savedCardId: string) => Promise<void> | void;
+  /** Re-read the list after the buyer saves a card here. */
+  onRefreshSavedCards?: () => Promise<void> | void;
   cardValidationSession?: CardValidationSessionSummary | null;
   cardValidationLoading?: boolean;
   onStartNewCardCheckout?: () => Promise<void> | void;
@@ -65,6 +68,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
   savedCardMutatingId = null,
   onSetDefaultSavedCard,
   onRemoveSavedCard,
+  onRefreshSavedCards,
   cardValidationSession = null,
   cardValidationLoading = false,
   onStartNewCardCheckout,
@@ -72,6 +76,8 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
   paymentLegalAcceptances = [],
   compact = false,
 }) => {
+  /* Collapsed by default so the panel opens at its resting height. */
+  const [saveCardOpen, setSaveCardOpen] = useState(false);
   const updateField = <K extends keyof PaystackPaymentData>(
     field: K,
     value: PaystackPaymentData[K],
@@ -287,10 +293,48 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
               <div className={infoCardClassName}>
                 <p className="font-semibold text-slate-900 dark:text-white">No saved cards yet</p>
                 <p className="mt-1">
-                  Complete one successful card payment and WIEZ will show it here for faster reuse.
+                  Save one below so it is waiting for you next time, or complete a
+                  card payment and WIEZ will remember it.
                 </p>
               </div>
             )}
+
+            {/*
+              Save a card for next time.
+
+              The number is read in the browser for its brand and last four and
+              goes no further — see SaveCardForm. This is a NAME the buyer will
+              recognise on their next checkout, not a token: Paystack only
+              returns something chargeable once a payment has completed in its
+              own window, so the copy says "saved" rather than implying the next
+              checkout will be one tap.
+
+              Collapsed by default, and the row it opens from keeps its height,
+              so opening it grows the panel downward instead of shifting what is
+              above it.
+            */}
+            <div className="rounded-2xl bg-black/[0.03] p-4 dark:bg-white/[0.04]">
+              {saveCardOpen ? (
+                <SaveCardForm
+                  onCancel={() => setSaveCardOpen(false)}
+                  onSaved={() => {
+                    setSaveCardOpen(false);
+                    onRefreshSavedCards?.();
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSaveCardOpen(true)}
+                  className="flex h-11 w-full items-center justify-between text-left"
+                >
+                  <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                    Save a card for next time
+                  </span>
+                  <span aria-hidden className="text-slate-400">+</span>
+                </button>
+              )}
+            </div>
 
             <button
               type="button"

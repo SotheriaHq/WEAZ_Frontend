@@ -1767,6 +1767,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                             savedCardMutatingId={savedCardMutatingId}
                             onSetDefaultSavedCard={handleSetDefaultSavedCard}
                             onRemoveSavedCard={handleRemoveSavedCard}
+                            onRefreshSavedCards={async () => {
+                              await refreshSavedCards();
+                            }}
                             cardValidationSession={cardValidationSession}
                             cardValidationLoading={cardValidationLoading}
                             onStartNewCardCheckout={handlePlaceOrder}
