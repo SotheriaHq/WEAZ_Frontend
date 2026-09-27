@@ -390,6 +390,22 @@ export const EndUserProfile: React.FC = () => {
     setActiveTab(derivedTab);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabParam]);
+
+  /*
+    `?tab=fits` opens the fittings sheet, not just this page.
+
+    The "update your custom size/fits profile" reminder used to link at
+    `/profile`, which left its subject one more tap away and gave no sign of
+    which tap. `fits` is not a tab in the strip — `derivedTab` ignores it and
+    falls through to the default — so this is the only thing it does.
+
+    Deps are the param and ownership alone: ownership resolves after the
+    profile loads, so the sheet opens once the answer is known, and closing it
+    cannot reopen it while the URL stays put.
+  */
+  useEffect(() => {
+    if (tabParam === 'fits' && isOwner) setIsSizeFitOpen(true);
+  }, [tabParam, isOwner]);
   const hasAvatarImage = Boolean(
     avatarPreviewUrl ||
       profile?.profileImage ||
