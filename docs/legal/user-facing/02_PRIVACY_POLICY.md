@@ -38,7 +38,7 @@ We collect information directly from you, automatically through your platform us
 
 | Category | Technical Fields & Data Elements |
 | --- | --- |
-| **1. Account & Identity Data** | First name, last name, @username handle, email address, password hash (bcrypt), normalized E.164 phone number, avatar image, banner image, country, state, city/LGA. |
+| **1. Account & Identity Data** | First name, last name, @username handle, email address, password hash (Argon2id), normalized E.164 phone number, avatar image, banner image, country, state, city/LGA. |
 | **2. Bespoke Body Measurements** *(High-Trust Tailoring Data)* | Up to 38 distinct ISO 8559 tailoring points (bust, waist, hips, inseam, torso length, shoulder span, neck), SVG silhouette coordinate maps, and fitting notes. |
 | **3. Brand Studio Verification (KYC)** *(Strictly Isolated Storage)* | Corporate registration certificates (CAC documents), Tax IDs (TIN), director government IDs (Passport/NIN/License), utility bills, and bank payout account details. |
 | **4. Commerce & Transactional Data** | Multi-vendor bag items, order timestamps, shipping address, recipient contact numbers, bespoke cutting milestone logs, return requests, and customer support tickets. |
@@ -166,7 +166,7 @@ WIEZ deploys multi-layered technical and organizational security controls:
 | --- | --- |
 | **1. In-Transit Encryption** | TLS 1.3 / HTTPS across all web domains and mobile APIs. |
 | **2. At-Rest Encryption** | AES-256 bit Server-Side Encryption across databases & S3. |
-| **3. Credential Hashing** | Cryptographic `bcrypt` with individual salt rounds. |
+| **3. Credential Hashing** | **Argon2id**, the memory-hard algorithm recommended by OWASP, with a per-credential salt. Applied to account passwords, one-time verification codes, and payout authorization codes alike. |
 | **4. Mobile Device Security** | JWT tokens stored in **iOS Keychain** & **Android KeyStore** via hardware-isolated `expo-secure-store`. |
 | **5. Media Access Controls** | Private attachments and KYC files protected via HMAC-SHA256 pre-signed temporary URLs expiring within minutes. |
 | **6. Legal Acceptance Audit Trail** | Cryptographically logged `LegalAcceptance` database rows recording document key, version, timestamp, IP, & device. |

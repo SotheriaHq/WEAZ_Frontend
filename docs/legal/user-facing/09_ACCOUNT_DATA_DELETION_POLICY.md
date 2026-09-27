@@ -70,7 +70,7 @@ Under Nigerian corporate law (CAMA 2020), anti-money laundering statutes (SCUML)
 ### 4.1. What Is Immediately and Irreversibly Erased:
 1. **Direct Profile Identifiers**: First name, last name, phone number, physical residential addresses, avatar photography, profile biography, and social links;
 2. **Sizing & Biometric Measurement Profiles**: All stored custom body measurements, fitting notes, sizing preferences, and 3D silhouette records;
-3. **Authentication Credentials**: Password hashes (bcrypt salts), trusted device biometric tokens, SMS OTP bindings, and OAuth identity links;
+3. **Authentication Credentials**: Password hashes (Argon2id), trusted device biometric tokens, SMS OTP bindings, and OAuth identity links;
 4. **Marketing & Telemetry**: Notification preferences, push tokens (FCM/APNS), and active market signal tracking queues.
 
 ### 4.2. What Is Pseudonymized:
