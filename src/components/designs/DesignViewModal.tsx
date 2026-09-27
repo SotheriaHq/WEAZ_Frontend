@@ -440,6 +440,53 @@ const DesignViewModal: React.FC<Props> = ({
     void ensureStatus(brandId);
   }, [brandId, canPatchBrand, ensureStatus, open]);
 
+  const stepMedia = React.useCallback(
+    (delta: number) => {
+      setActiveMediaIndex(
+        (prev) => (prev + delta + mediaItems.length) % mediaItems.length,
+      );
+    },
+    [mediaItems.length],
+  );
+
+  /*
+    Left and right walk the images.
+
+    A viewer that shows "1 / 5" and answers nothing when you press the key that
+    obviously means "next" reads as broken, and it is the one input a person on
+    a keyboard reaches for first.
+
+    Bound to the window rather than to the dialog because focus after opening
+    sits wherever the trigger left it, and a handler on a container only fires
+    once something inside it is focused — which is exactly the case where the
+    keys appeared dead.
+
+    A text field keeps its own arrows: moving the caret in the comment box must
+    not flip the image out from under what is being written about.
+
+    These two sit ABOVE the `!open` return with every other hook. Below it they
+    ran only while the modal was open, so opening it rendered two hooks more
+    than the closed render had — React #310, which is the crash this file
+    shipped with for one commit.
+  */
+  React.useEffect(() => {
+    if (!open || mediaItems.length < 2) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+
+      event.preventDefault();
+      stepMedia(event.key === 'ArrowRight' ? 1 : -1);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, mediaItems.length, stepMedia]);
+
   if (!open || !item) return null;
 
   const baseBand = (() => {
@@ -596,48 +643,6 @@ const DesignViewModal: React.FC<Props> = ({
 
   const showMediaNav = mediaItems.length > 1;
   const isVideoMedia = activeMedia?.type === 'POST_VIDEO';
-
-  const stepMedia = React.useCallback(
-    (delta: number) => {
-      setActiveMediaIndex(
-        (prev) => (prev + delta + mediaItems.length) % mediaItems.length,
-      );
-    },
-    [mediaItems.length],
-  );
-
-  /*
-    Left and right walk the images.
-
-    A viewer that shows "1 / 5" and answers nothing when you press the key that
-    obviously means "next" reads as broken, and it is the one input a person on
-    a keyboard reaches for first.
-
-    Bound to the window rather than to the dialog because focus after opening
-    sits wherever the trigger left it, and a handler on a container only fires
-    once something inside it is focused — which is exactly the case where the
-    keys appeared dead.
-
-    A text field keeps its own arrows: moving the caret in the comment box must
-    not flip the image out from under what is being written about.
-  */
-  React.useEffect(() => {
-    if (!open || !showMediaNav) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-
-      const target = event.target as HTMLElement | null;
-      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
-
-      event.preventDefault();
-      stepMedia(event.key === 'ArrowRight' ? 1 : -1);
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, showMediaNav, stepMedia]);
 
   // Shared bag-button semantics (identical on desktop + mobile).
   const bagDisabled =

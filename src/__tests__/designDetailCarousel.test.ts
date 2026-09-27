@@ -137,6 +137,25 @@ describe('the content viewer controls', () => {
     }
   });
 
+  it('calls every hook above the early return', () => {
+    /*
+      `DesignViewModal` returns null while it is closed. A hook placed BELOW
+      that return runs only while the modal is open, so opening it renders more
+      hooks than the closed render did — React #310, "Rendered more hooks than
+      during the previous render", which crashes the whole page rather than the
+      modal.
+
+      `react-hooks/rules-of-hooks` catches this too, and is the faster signal;
+      this exists because the rule only helps if someone runs the linter.
+    */
+    const guard = source.indexOf('if (!open || !item) return null;');
+    expect(guard).toBeGreaterThan(-1);
+
+    const after = source.slice(guard);
+    expect(after).not.toMatch(/\bReact\.use[A-Z]\w*\(/);
+    expect(after).not.toMatch(/^\s*const .*= use[A-Z]\w*\(/m);
+  });
+
   it('walks the frames with the arrow keys, except while typing', () => {
     expect(source).toMatch(/window\.addEventListener\('keydown'/);
     expect(source).toContain("event.key !== 'ArrowLeft' && event.key !== 'ArrowRight'");
