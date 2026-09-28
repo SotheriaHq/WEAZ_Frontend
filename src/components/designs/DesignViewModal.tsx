@@ -37,7 +37,6 @@ import { BAG_IT_LABEL } from '@/constants/bagging';
 import {
   CLIP_EMOJI,
   CLIP_OWN_CONTENT_TOAST,
-  CLIPPED_EMOJI,
   clipActionHint,
   clipActionLabel,
 } from '@/constants/clipping';
@@ -99,6 +98,16 @@ const ACTION_TILE_CLASS =
   'flex h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-center transition-colors';
 const ACTION_TILE_NEUTRAL_CLASS =
   'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/[0.08] dark:text-slate-200 dark:hover:bg-white/[0.14]';
+/**
+ * A toggle that is ON is FILLED. The glyph never changes.
+ *
+ * The clip control used to swap its emoji between two silhouettes, so the shape
+ * the eye tracks moved on every press and the shopper had to know both symbols
+ * to read one state. The mark now says what the button does and the fill says
+ * whether it is on — the same grammar as every other toggle here.
+ */
+const ACTION_TILE_ACTIVE_CLASS =
+  'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400';
 const ACTION_TILE_LABEL_CLASS = 'w-full truncate text-[9px] font-bold leading-none';
 
 const DesignViewModal: React.FC<Props> = ({
@@ -775,6 +784,9 @@ const DesignViewModal: React.FC<Props> = ({
   if (isMobile) {
     const mobileActionBtn =
       'inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10';
+    // Clipped is the same pill, filled — see ACTION_TILE_ACTIVE_CLASS.
+    const mobileActionBtnActive =
+      'inline-flex items-center gap-1 rounded-full border border-indigo-600 bg-indigo-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-indigo-700 dark:border-indigo-500 dark:bg-indigo-500 dark:text-white dark:hover:bg-indigo-400';
 
     return (
       <OverlayPortal>
@@ -983,10 +995,11 @@ const DesignViewModal: React.FC<Props> = ({
                           type="button"
                           onClick={handleToggleSave}
                           disabled={saveBusy}
+                          aria-pressed={isSaved}
                           title={isOwnBrandContent ? CLIP_OWN_CONTENT_TOAST : clipActionHint(isSaved)}
-                          className={`${mobileActionBtn} disabled:opacity-50`}
+                          className={`${isSaved ? mobileActionBtnActive : mobileActionBtn} disabled:opacity-50`}
                         >
-                          <span aria-hidden="true">{isSaved ? CLIPPED_EMOJI : CLIP_EMOJI}</span>
+                          <span aria-hidden="true">{CLIP_EMOJI}</span>
                           {clipActionLabel(isSaved)}
                         </button>
                         <button
@@ -1210,8 +1223,18 @@ const DesignViewModal: React.FC<Props> = ({
 
               So the scroller keeps the media, and this wrapper — which does
               not scroll — carries the overlay.
+
+              `min-h-0` is load-bearing, and its absence is what stopped the
+              media scrolling at all when this wrapper was introduced. A grid
+              item's automatic minimum size is its CONTENT, and only a scroll
+              container gets that minimum reduced to zero. The frame used to be
+              the grid item, so it did; this wrapper is not a scroll container,
+              so the row grew to the full height of an `object-cover` image at
+              `min-h-full` — the frame, at 100% of a parent now as tall as its
+              own content, had nothing left to scroll. `overflow-hidden` keeps
+              the media clipped to the wrapper rather than to the dialog.
             */}
-            <div className="relative h-full min-w-0">
+            <div className="relative h-full min-h-0 min-w-0 overflow-hidden">
               <div className={CONTENT_DISPLAY_FRAME_CLASS}>
                 <MediaRenderer
                   kind={activeMedia?.type === 'POST_VIDEO' ? 'video' : 'image'}
@@ -1414,11 +1437,12 @@ const DesignViewModal: React.FC<Props> = ({
                     type="button"
                     onClick={handleToggleSave}
                     disabled={saveBusy}
+                    aria-pressed={isSaved}
                     title={isOwnBrandContent ? CLIP_OWN_CONTENT_TOAST : clipActionHint(isSaved)}
-                    className={`${ACTION_TILE_CLASS} ${ACTION_TILE_NEUTRAL_CLASS} disabled:opacity-50`}
+                    className={`${ACTION_TILE_CLASS} ${isSaved ? ACTION_TILE_ACTIVE_CLASS : ACTION_TILE_NEUTRAL_CLASS} disabled:opacity-50`}
                   >
                     <span aria-hidden="true" className="text-base leading-none">
-                      {isSaved ? CLIPPED_EMOJI : CLIP_EMOJI}
+                      {CLIP_EMOJI}
                     </span>
                     <span className={ACTION_TILE_LABEL_CLASS}>{clipActionLabel(isSaved)}</span>
                   </button>

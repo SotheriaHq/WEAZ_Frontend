@@ -7,7 +7,7 @@ import ContentTile from '@/components/catalog/ContentTile';
 import { buildCollectionRoute, buildDesignRoute, buildProductRoute } from '@/utils/catalogRoutes';
 import useCachedResource from '@/hooks/useCachedResource';
 import useClipTarget, { type ClipTargetType } from '@/features/clipping/useClipTarget';
-import { CLIPPED_EMOJI, UNCLIP_LABEL } from '@/constants/clipping';
+import { CLIP_EMOJI, UNCLIP_LABEL } from '@/constants/clipping';
 import { formatPrice } from '@/utils/helpers';
 
 interface SavedItem {
@@ -215,7 +215,7 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
       <section className="glass-panel min-h-[340px] rounded-[2rem] border border-gray-200/70 bg-white/70 p-8 text-center backdrop-blur-md dark:border-white/10 dark:bg-white/5 sm:p-12">
         <div className="mx-auto flex h-full max-w-lg flex-col items-center justify-center">
           <div className="mb-4 text-6xl" aria-hidden="true">
-            {CLIPPED_EMOJI}
+            {CLIP_EMOJI}
           </div>
           <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Nothing clipped yet</h3>
           <p className="mt-3 text-sm text-gray-500 dark:text-gray-400 sm:text-base">
@@ -260,7 +260,7 @@ export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
               title={UNCLIP_LABEL}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/60 bg-black/45 text-base leading-none text-white backdrop-blur-sm transition hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
-              <span aria-hidden="true">{CLIPPED_EMOJI}</span>
+              <span aria-hidden="true">{CLIP_EMOJI}</span>
             </button>
           }
         />

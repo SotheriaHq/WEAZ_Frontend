@@ -27,7 +27,6 @@ import { BAG_IT_LABEL } from '@/constants/bagging';
 import {
   CLIP_EMOJI,
   CLIP_OWN_CONTENT_TOAST,
-  CLIPPED_EMOJI,
   clipActionHint,
   clipActionLabel,
 } from '@/constants/clipping';
@@ -447,11 +446,22 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               className="flex flex-col items-center text-white transition-transform hover:scale-110 disabled:opacity-60"
               onClick={handleToggleSave}
               disabled={resolvedSaveBusy}
+              aria-pressed={resolvedSaved}
               aria-label={clipActionHint(resolvedSaved)}
               title={clipActionHint(resolvedSaved)}
             >
-              <span aria-hidden="true" className="text-base leading-none drop-shadow sm:text-xl">
-                {resolvedSaved ? CLIPPED_EMOJI : CLIP_EMOJI}
+              {/*
+                One glyph; the disc behind it carries the state. A second
+                silhouette moved the shape the eye tracks on every press, so
+                the control had to be read twice to be understood once.
+              */}
+              <span
+                aria-hidden="true"
+                className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-base leading-none drop-shadow transition-colors sm:h-9 sm:w-9 sm:text-xl ${
+                  resolvedSaved ? 'bg-indigo-600 shadow-lg shadow-indigo-900/40' : 'bg-black/30 backdrop-blur-sm'
+                }`}
+              >
+                {CLIP_EMOJI}
               </span>
               <span className="mt-0.5 text-[8px] font-bold drop-shadow sm:mt-1 sm:text-xs">
                 {clipActionLabel(resolvedSaved)}

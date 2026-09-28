@@ -3,6 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { featuredApi, type PublicFeaturedItem } from '@/api/FeaturedApi';
 import { unwrapApiResponse } from '@/types/auth';
 import MediaRenderer from '@/components/media/MediaRenderer';
+import {
+  MARKET_SECTION_LINK_CLASS,
+  MARKET_SECTION_TITLE_CLASS,
+} from '@/components/market/marketSectionType';
 import useCachedResource from '@/hooks/useCachedResource';
 
 interface FeaturedSectionProps {
@@ -90,12 +94,12 @@ const FeaturedSection: React.FC<FeaturedSectionProps> = ({
       <section className="space-y-3">
         <div className="flex items-center gap-2">
           <span className="text-lg">⭐</span>
-          <h2 className="text-xl font-black text-gray-900 dark:text-white">Featured</h2>
+          <h2 className={MARKET_SECTION_TITLE_CLASS}>Featured</h2>
           <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
             {items.length} {items.length === 1 ? 'item' : 'items'}
           </span>
           {onSeeAll && (
-            <button type="button" onClick={onSeeAll} className="ml-auto text-xs font-semibold text-amber-700 hover:underline dark:text-amber-300">
+            <button type="button" onClick={onSeeAll} className={`ml-auto ${MARKET_SECTION_LINK_CLASS}`}>
               See all →
             </button>
           )}
@@ -172,14 +176,14 @@ const FeaturedSection: React.FC<FeaturedSectionProps> = ({
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <span className="text-lg">⭐</span>
-          <h2 className="text-xl font-black text-gray-900 dark:text-white">Featured</h2>
+          <h2 className={MARKET_SECTION_TITLE_CLASS}>Featured</h2>
           <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
             {items.length} items
           </span>
         </div>
         <div className="flex items-center gap-2">
           {onSeeAll && (
-            <button type="button" onClick={onSeeAll} className="text-xs font-semibold text-amber-700 hover:underline dark:text-amber-300">
+            <button type="button" onClick={onSeeAll} className={MARKET_SECTION_LINK_CLASS}>
               See all →
             </button>
           )}

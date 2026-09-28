@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import ImageWithFallback from '@/components/ImageWithFallback';
-import { CLIPPED_EMOJI, CLIP_EMOJI, clipActionLabel } from '@/constants/clipping';
+import { CLIP_EMOJI, clipActionLabel } from '@/constants/clipping';
+import { MARKET_SECTION_LINK_CLASS } from '@/components/market/marketSectionType';
 import { useClipTarget } from '@/features/clipping/useClipTarget';
 import { useSavedStatusQuery } from '@/query/queries';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
@@ -95,9 +96,12 @@ const ClipButton: React.FC<{ product: StoreProduct }> = ({ product }) => {
       aria-pressed={clipped}
       aria-label={clipActionLabel(clipped)}
       title={clipActionLabel(clipped)}
-      className="absolute right-3 top-3 z-20 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/35 text-base backdrop-blur-md transition hover:scale-105 hover:bg-black/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-95"
+      className={`absolute right-3 top-3 z-20 inline-flex h-9 w-9 items-center justify-center rounded-full text-base backdrop-blur-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-95 ${
+        // One glyph, two surfaces: filled is clipped.
+        clipped ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-black/35 hover:bg-black/50'
+      }`}
     >
-      <span aria-hidden="true">{clipped ? CLIPPED_EMOJI : CLIP_EMOJI}</span>
+      <span aria-hidden="true">{CLIP_EMOJI}</span>
     </button>
   );
 };
@@ -332,7 +336,7 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
             <button
               type="button"
               onClick={onSeeAll}
-              className="rounded-full text-xs font-semibold text-[color:var(--brand-primary)] underline decoration-transparent underline-offset-4 transition hover:decoration-current"
+              className={MARKET_SECTION_LINK_CLASS}
             >
               See all
             </button>

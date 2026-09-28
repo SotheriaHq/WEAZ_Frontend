@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDispatch, useSelector } from 'react-redux';
 import { SavedTab } from './tabs/SavedTab';
-import { CLIPPED_EMOJI, CLIPS_TAB_LABEL } from '@/constants/clipping';
+import { CLIP_EMOJI, CLIPS_TAB_LABEL } from '@/constants/clipping';
 import { PatchesTab } from './tabs/PatchesTab';
 import { OrdersPanel, type OrdersPanelSelection } from './tabs/OrdersPanel';
 import { apiClient } from '@/api/httpClient';
@@ -1327,7 +1327,7 @@ export const EndUserProfile: React.FC = () => {
   ];
 
   const TAB_ICONS: Record<string, string> = {
-    [CLIPS_TAB_LABEL]: CLIPPED_EMOJI,
+    [CLIPS_TAB_LABEL]: CLIP_EMOJI,
     Patches: '🪡',
     Orders: '📦',
   };

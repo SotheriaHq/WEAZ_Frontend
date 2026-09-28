@@ -15,6 +15,10 @@ import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 import { fetchWishlist } from '@/features/wishlistSlice';
 import FeaturedSection from '@/components/FeaturedSection';
 import MarketTrendingHero from '@/components/market/MarketTrendingHero';
+import {
+  MARKET_SECTION_HEADER_CLASS,
+  MARKET_SECTION_TITLE_CLASS,
+} from '@/components/market/marketSectionType';
 import MarketTrendingTodayModal from '@/components/market/MarketTrendingTodayModal';
 import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
 import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
@@ -145,8 +149,8 @@ const ProductCarousel: React.FC<{
         }
       `}</style>
 
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
+      <div className={MARKET_SECTION_HEADER_CLASS}>
+        <h2 className={MARKET_SECTION_TITLE_CLASS}>{title}</h2>
         {useMarquee ? (
           <button
             type="button"
@@ -946,7 +950,7 @@ const MarketPlace: React.FC = () => {
             {/* Heading + search row — on small screens header is compact, search hidden */}
             <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-stretch sm:gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
-                <h2 className="text-base font-black text-gray-900 dark:text-white sm:text-xl">Explore the Market</h2>
+                <h2 className={MARKET_SECTION_TITLE_CLASS}>Explore the Market</h2>
               </div>
               <div className="hidden w-full flex-col gap-3 sm:flex lg:w-auto lg:min-w-[480px] lg:flex-row">
                 <SearchBarWithSuggestions

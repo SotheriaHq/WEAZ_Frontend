@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { CLIP_ADDED_TOAST, CLIP_ERROR_TOAST, CLIP_REMOVED_TOAST } from '@/constants/clipping';
 import type { RootState } from '@/store';
 import { resolveCatalogEntityType } from '@/utils/catalogEntity';
-import { mapCatalogTargetForLegacyApi } from '@/utils/catalogTarget';
+import { mapCatalogTargetForLegacyApi, toSavedItemRequest } from '@/utils/catalogTarget';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSavedBatchStatusQuery } from '@/query/queries';
 import { queryKeys } from '@/query/queryKeys';
@@ -130,10 +130,11 @@ const CollectionsGridComponent: React.FC<CollectionsGridProps> = ({
         collectionId,
         legacyCollectionId: entityType === 'DESIGN' ? collectionId : undefined,
       });
+      const savedRequest = toSavedItemRequest(savedTarget);
       if (isSaved) {
-        await apiClient.delete('/saved', { data: savedTarget });
+        await apiClient.delete('/saved', { data: savedRequest });
       } else {
-        await apiClient.post('/saved', savedTarget);
+        await apiClient.post('/saved', savedRequest);
       }
       setSavedMap((prev) => ({ ...prev, [collectionId]: !isSaved }));
       queryClient.setQueryData<Record<string, boolean>>(

@@ -22,17 +22,22 @@
  * control never needs a notice on top of them — a filled mark is the message.
  */
 
-/** Paperclip: the invitation. */
-export const CLIP_EMOJI = String.fromCodePoint(0x1f4ce);
 /**
- * Bookmark ribbon: kept.
+ * The paperclip, in BOTH states.
  *
- * A different SILHOUETTE, not the same shape in another tint — a tint alone is
- * swallowed over a photograph and says nothing to anyone who cannot separate
- * the two colours. (Scissors would have been the obvious partner to a clip, but
- * ✂️ is already the custom-order mark in `constants/bagging.ts`.)
+ * There used to be a second glyph — a bookmark ribbon for "kept" — on the
+ * theory that a different silhouette reads over a photograph where a tint
+ * would not. It does read, but it reads as a different CONTROL: the shape the
+ * eye tracks changed on every press, so a shopper had to learn two symbols to
+ * understand one button, and neither one told them which state they were in.
+ *
+ * One mark, and the SURFACE carries the state: a clipped control is filled in
+ * the brand colour, an unclipped one is not. The icon answers "what does this
+ * do", the fill answers "is it on" — the grammar every other toggle here uses,
+ * and it survives a photograph and greyscale for the same reason a second
+ * shape did.
  */
-export const CLIPPED_EMOJI = String.fromCodePoint(0x1f516);
+export const CLIP_EMOJI = String.fromCodePoint(0x1f4ce);
 
 export const CLIP_LABEL = 'Clip';
 export const CLIPPED_LABEL = 'Clipped';

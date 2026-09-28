@@ -15,7 +15,7 @@ import { CLIP_ADDED_TOAST, CLIP_ERROR_TOAST, CLIP_REMOVED_TOAST } from '@/consta
 import type { RootState } from '@/store';
 
 import { getCatalogEntityCardCopy, resolveCatalogEntityCardBranch } from './catalogEntityCardModel';
-import { mapCatalogTargetForLegacyApi } from '@/utils/catalogTarget';
+import { mapCatalogTargetForLegacyApi, toSavedItemRequest } from '@/utils/catalogTarget';
 import { getCompactPublishTaskStatusLabel, isLocalPublishTaskId } from '@/utils/publishTracker';
 import { getContentStatusLabel, getContentStatusTone } from '@/utils/contentIntegrity';
 import ContentReviewDecisionModal from '@/components/content-integrity/ContentReviewDecisionModal';
@@ -339,11 +339,11 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
     try {
       setSaveBusyLocal(true);
       if (isSavedLocal) {
-        await apiClient.delete('/saved', { data: savedTarget });
+        await apiClient.delete('/saved', { data: toSavedItemRequest(savedTarget) });
         setIsSavedLocal(false);
         toast.success(CLIP_REMOVED_TOAST);
       } else {
-        await apiClient.post('/saved', savedTarget);
+        await apiClient.post('/saved', toSavedItemRequest(savedTarget));
         setIsSavedLocal(true);
         toast.success(CLIP_ADDED_TOAST);
       }

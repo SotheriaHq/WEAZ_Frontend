@@ -124,6 +124,29 @@ describe('the content viewer controls', () => {
     expect(closes).toBeGreaterThan(opens);
   });
 
+  it('lets the media scroll inside the wrapper that carries the overlay', () => {
+    /*
+      Taking the arrows out of the scroller put a NON-scrolling wrapper between
+      the grid and the frame, and that wrapper silently switched the scroll off.
+      A grid item's automatic minimum size is its content, and only a scroll
+      container has that minimum reduced to zero — the frame used to be the grid
+      item, so it did. The wrapper does not, so the row grew to the full height
+      of the image and the frame, at 100% of a parent as tall as its own
+      content, had nothing left to scroll.
+
+      Read the wrapper as the div immediately before the frame's opening tag.
+    */
+    const frame = source.indexOf('className={CONTENT_DISPLAY_FRAME_CLASS}');
+    expect(frame).toBeGreaterThan(-1);
+
+    const before = source.slice(0, frame);
+    const wrapper = before.lastIndexOf('<div className="');
+    const wrapperClass = /^<div className="([^"]*)"/.exec(before.slice(wrapper))?.[1] ?? '';
+
+    expect(wrapperClass).toMatch(/\bmin-h-0\b/);
+    expect(wrapperClass).toMatch(/\bh-full\b/);
+  });
+
   it('stacks every overlay control above the media', () => {
     // Without an explicit stacking index an overlay can sit under the media it
     // is drawn on top of — a click that silently does nothing.
