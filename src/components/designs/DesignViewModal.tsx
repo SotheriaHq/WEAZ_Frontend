@@ -301,6 +301,27 @@ const DesignViewModal: React.FC<Props> = ({
           })
           .filter((m: ModalMedia | null): m is ModalMedia => Boolean(m));
 
+        /*
+          Show the frames NOW, resolve their URLs after.
+
+          This used to `await Promise.all(...)` before calling `setMediaItems`,
+          so every angle waited on the slowest signed-URL request. On a phone
+          on 3G that is the whole carousel held hostage: the counter said
+          "1 / 5" only once the last request landed, and any request that
+          failed left its frame permanently blank — there was no second
+          attempt, because hydration ran once per open.
+
+          Seeding first means the carousel is navigable immediately; each frame
+          fills in as its URL arrives, and `resolveActiveMediaUrl` below picks
+          up whatever this pass could not get.
+        */
+        if (!mounted) return;
+        if (parsed.length > 0) {
+          setMediaItems(parsed);
+          const seedIdx = parsed.findIndex((m) => m.id === itemId);
+          setActiveMediaIndex(seedIdx >= 0 ? seedIdx : 0);
+        }
+
         const hydrated = await Promise.all(
           parsed.map(async (m) => {
             if (!m.fileId) return m;
@@ -439,6 +460,47 @@ const DesignViewModal: React.FC<Props> = ({
     if (!open || !canPatchBrand || !brandId) return;
     void ensureStatus(brandId);
   }, [brandId, canPatchBrand, ensureStatus, open]);
+
+  /*
+    Whatever the opening pass could not resolve, resolve when it is looked at.
+
+    A frame whose signed URL failed - a 3G timeout, or a private file an
+    anonymous shopper cannot sign for - used to stay blank for the life of the
+    modal, because hydration ran once. Swiping onto it showed a skeleton and
+    nothing ever changed that. Resolving on demand means the second look works
+    even when the first pass did not, and costs one request only for frames
+    that are actually reached.
+  */
+  React.useEffect(() => {
+    if (!open) return;
+
+    const target = mediaItems[activeMediaIndex];
+    if (!target?.fileId) return;
+    if (target.url && /^https?:\/\//i.test(target.url)) return;
+
+    let cancelled = false;
+    const fileId = String(target.fileId);
+
+    void (async () => {
+      let resolved: string | null = null;
+      try {
+        resolved = await brandApi.getSignedFileUrl(fileId);
+      } catch {
+        resolved = null;
+      }
+      if (cancelled || !resolved) return;
+
+      setMediaItems((current) =>
+        current.map((media) =>
+          media.fileId === fileId && !media.url ? { ...media, url: resolved } : media,
+        ),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, activeMediaIndex, mediaItems]);
 
   const stepMedia = React.useCallback(
     (delta: number) => {

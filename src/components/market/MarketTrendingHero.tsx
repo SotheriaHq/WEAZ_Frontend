@@ -203,10 +203,18 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)] lg:gap-4">
+      {/*
+        The height lives on the GRID, and both columns take it.
+
+        It used to sit on the hero card alone, so the right column was free to
+        grow past it — three rows plus a header against a fixed 24rem picture,
+        and the bottom edges did not line up. Now the row defines the height
+        once and "Up next" divides whatever is left after its own header.
+      */}
+      <div className="grid gap-3 lg:h-[24rem] lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)] lg:gap-4">
         {/* ── The piece ───────────────────────────────────────────────── */}
         <div
-          className="group relative h-[15rem] overflow-hidden rounded-3xl bg-[#1b1022] sm:h-[19rem] lg:h-[24rem]"
+          className="group relative h-[15rem] overflow-hidden rounded-3xl bg-[#1b1022] sm:h-[19rem] lg:h-full"
           onMouseEnter={() => setSteering(true)}
           onFocusCapture={() => setSteering(true)}
         >
