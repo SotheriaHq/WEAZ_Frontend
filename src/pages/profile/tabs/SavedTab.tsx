@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowRight } from 'lucide-react';
 import { apiClient } from '@/api/httpClient';
 import ContentTile from '@/components/catalog/ContentTile';
-import { buildCollectionRoute, buildDesignRoute, buildProductRoute } from '@/utils/catalogRoutes';
+import { routeForSavedItem } from '@/utils/savedItemRoute';
 import useCachedResource from '@/hooks/useCachedResource';
 import useClipTarget, { type ClipTargetType } from '@/features/clipping/useClipTarget';
 import { CLIP_EMOJI, UNCLIP_LABEL } from '@/constants/clipping';
@@ -20,6 +20,16 @@ interface SavedItem {
   legacyCollectionId?: string;
   /** Present on COLLECTION_MEDIA rows: the exact frame that was clipped. */
   mediaId?: string;
+  /**
+   * COLLECTION rows only: which KIND of collection this is.
+   *
+   * A clipped design is stored as a COLLECTION row, so `targetType` alone
+   * cannot tell a design clip from a store collection. The API sends the
+   * collection's own `domain` / `isAvailableInStore` so the clip can open the
+   * right screen without the client probing for it.
+   */
+  domain?: string;
+  isAvailableInStore?: boolean;
   title: string;
   thumbnail?: string;
   price?: number;
@@ -72,6 +82,8 @@ const toSavedItems = (raw: unknown): SavedItem[] => {
         collectionId: item.collectionId ? String(item.collectionId) : undefined,
         legacyCollectionId: item.legacyCollectionId ? String(item.legacyCollectionId) : undefined,
         mediaId: item.mediaId ? String(item.mediaId) : undefined,
+        domain: typeof item.domain === 'string' ? item.domain.toUpperCase() : undefined,
+        isAvailableInStore: item.isAvailableInStore === true,
         title: String(item.title ?? 'Untitled'),
         thumbnail: typeof item.thumbnail === 'string' ? item.thumbnail : undefined,
         price: typeof item.price === 'number' ? item.price : undefined,
@@ -90,36 +102,6 @@ const toSavedItems = (raw: unknown): SavedItem[] => {
 
 const brandLabel = (brand: SavedItem['brand']): string =>
   [brand.firstName, brand.lastName].filter(Boolean).join(' ') || brand.username || 'Unknown';
-
-/**
- * Where opening a clipped item should land.
- *
- * Every row here is a real destination, which was not true before: a
- * COLLECTION_MEDIA row is one FRAME of a design, so it has to carry
- * `openMedia` or the viewer opens the cover instead of the piece the shopper
- * actually clipped. Returns null only when the row has no id to open at all.
- */
-const routeForSavedItem = (item: SavedItem): string | null => {
-  if (item.targetType === 'COLLECTION_MEDIA') {
-    const designId = item.collectionId ?? item.designId;
-    if (!designId) return null;
-    return buildDesignRoute({
-      designId,
-      legacyCollectionId: item.legacyCollectionId ?? designId,
-      query: { openMedia: item.mediaId ?? item.targetId },
-    });
-  }
-  if (item.targetType === 'DESIGN') {
-    return buildDesignRoute({
-      designId: item.designId ?? item.targetId,
-      legacyCollectionId: item.legacyCollectionId ?? item.collectionId,
-    });
-  }
-  if (item.targetType === 'PRODUCT') {
-    return buildProductRoute({ productId: item.productId ?? item.targetId });
-  }
-  return item.targetId ? buildCollectionRoute({ collectionId: item.targetId }) : null;
-};
 
 export const SavedTab: React.FC<SavedTabProps> = ({ isOwner }) => {
   const navigate = useNavigate();

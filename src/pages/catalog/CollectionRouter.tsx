@@ -6,7 +6,15 @@
  * and renders the appropriate view.
  *
  * - Store collections → renders `InlineStoreCollectionView` with product drill-down
- * - Design collections → redirects to `/market?openDesign=<id>` (modal view)
+ * - Everything else → `/designs/:id`, the design content view
+ *
+ * The design branch used to send people to `/market?openDesign=<id>`. Nothing
+ * reads that parameter on `/market`: `openDesign` is handled by `Runway`, and
+ * `/market` is `MarketPlace`. So opening a clipped design landed the shopper on
+ * the Market listing with a dead query string — a different screen, none of the
+ * piece they asked for. `/designs/:id` is the content view, and it already
+ * accepts a legacy collection id (see `DesignDetailsPage`, which falls back to
+ * `fetchCollectionDetailQuery`), so there is no id translation to do here.
  */
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -54,18 +62,11 @@ const CollectionRouter: React.FC = () => {
 
   useEffect(() => {
     if (!id || loading || !routeKind || routeKind === 'store') return;
-
-    if (routeKind === 'design-page') {
-      navigate(`/designs/${encodeURIComponent(id)}${location.search}${location.hash}`, {
-        replace: true,
-      });
-      return;
-    }
-
-    const params = new URLSearchParams(location.search);
-    params.set('openDesign', id);
-    const query = params.toString();
-    navigate(`/market${query ? `?${query}` : ''}${location.hash}`, { replace: true });
+    // `design-page` and `design-modal` now land in the same place, which is the
+    // point: the only question this route has to answer is store or not.
+    navigate(`/designs/${encodeURIComponent(id)}${location.search}${location.hash}`, {
+      replace: true,
+    });
   }, [id, loading, location.hash, location.search, navigate, routeKind]);
 
   if (!id) return null;
