@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 import type { CustomOrderProgressStage } from '@/api/CustomOrderApi';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import Tabs from '@/components/Tabs';
@@ -396,6 +396,155 @@ export const CustomOrderKeyValueList: React.FC<{ items: Array<{ label: string; v
     ))}
   </dl>
 );
+
+/**
+ * One collapsible band of an order page.
+ *
+ * An order detail is thirty or forty facts and every one of them matters to
+ * somebody — which is why laying them all out flat makes the page unreadable to
+ * everybody. The header carries the section's name, its description, and the one
+ * value worth seeing while it is shut, so an admin can scan the page closed and
+ * open only the band they came for.
+ *
+ * `defaultOpen` is the initial state, not a mode: the sections an admin needs on
+ * arrival (buyer, transaction, dates) open themselves, the audit material does
+ * not. The row is a real `button` with `aria-expanded`, so it is keyboard and
+ * screen-reader operable without a roving tabindex.
+ */
+export const CustomOrderSection: React.FC<{
+  title: string;
+  description: string;
+  /** Stays visible when the section is shut — the one fact worth a glance. */
+  summary?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}> = ({ title, description, summary, defaultOpen = false, children }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  const bodyId = useId();
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-black/10 bg-white/80 dark:border-white/10 dark:bg-white/5">
+      <h3>
+        <button
+          type="button"
+          onClick={() => setOpen((previous) => !previous)}
+          aria-expanded={open}
+          aria-controls={bodyId}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-black/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-0 dark:hover:bg-white/[0.03]"
+        >
+          <span
+            aria-hidden="true"
+            className={`shrink-0 text-xs text-slate-400 transition-transform duration-300 motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}
+          >
+            ▶
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold text-slate-900 dark:text-white">
+              {title}
+            </span>
+            <span className="mt-0.5 block text-[11px] font-medium leading-snug text-slate-500 dark:text-slate-400">
+              {description}
+            </span>
+          </span>
+          {summary ? (
+            <span className="shrink-0 text-right text-[12px] font-semibold text-slate-700 dark:text-slate-200">
+              {summary}
+            </span>
+          ) : null}
+        </button>
+      </h3>
+      <div
+        id={bodyId}
+        className="grid transition-all duration-300 ease-out motion-reduce:transition-none"
+        style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
+      >
+        <div className="overflow-hidden">
+          <div className="border-t border-black/5 px-4 py-4 dark:border-white/10">{children}</div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const shortenReference = (value: string) =>
+  value.length > 14 ? `${value.slice(0, 8)}…${value.slice(-4)}` : value;
+
+/**
+ * Technical ids, presented as references instead of as data.
+ *
+ * A chart-version uuid is not a fact an admin reads — it is a string they carry
+ * to a log search or a support thread. So it is shown shortened, in a mono face
+ * that marks it as machine text, with the whole value one click away on the
+ * clipboard and in the `title`. Rendering them raw beside money lines, which is
+ * what the JSON dump did, asked an admin to tell the two apart by eye.
+ */
+export const CustomOrderReferenceList: React.FC<{
+  items: Array<{ label: string; value?: string | null; hint?: string }>;
+}> = ({ items }) => {
+  const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
+  const present = items.filter((item) => Boolean(item.value && String(item.value).trim()));
+
+  useEffect(() => {
+    if (!copiedLabel) return;
+    const timer = window.setTimeout(() => setCopiedLabel(null), 1600);
+    return () => window.clearTimeout(timer);
+  }, [copiedLabel]);
+
+  if (present.length === 0) {
+    return (
+      <div className="text-sm text-slate-500 dark:text-slate-400">
+        No technical references are recorded on this order.
+      </div>
+    );
+  }
+
+  const copy = async (label: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedLabel(label);
+    } catch {
+      // Clipboard is blocked (insecure context or denied permission) — the full
+      // value is already in the title attribute, so there is nothing to recover.
+    }
+  };
+
+  return (
+    <dl className="grid gap-1.5 sm:grid-cols-2">
+      {present.map((item) => {
+        const value = String(item.value);
+        return (
+          <div
+            key={item.label}
+            className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-black/[0.06] bg-black/[0.02] px-3 py-2 dark:border-white/[0.06] dark:bg-white/[0.03]"
+          >
+            <dt
+              className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400"
+              title={item.hint}
+            >
+              {item.label}
+            </dt>
+            <dd className="flex shrink-0 items-center gap-1.5">
+              <span
+                className="font-mono text-[11px] font-medium text-slate-700 dark:text-slate-200"
+                title={value}
+              >
+                {shortenReference(value)}
+              </span>
+              <button
+                type="button"
+                onClick={() => void copy(item.label, value)}
+                aria-label={`Copy ${item.label}`}
+                className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-black/[0.05] hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-400 dark:hover:bg-white/[0.08] dark:hover:text-white"
+              >
+                {copiedLabel === item.label ? '✓' : '⧉'}
+              </button>
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
+  );
+};
 
 export const CustomOrderJsonBreakdown: React.FC<{ data?: Record<string, unknown> | null }> = ({ data }) => {
   if (!data || Object.keys(data).length === 0) {

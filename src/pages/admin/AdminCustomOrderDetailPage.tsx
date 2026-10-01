@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
+import ImageWithFallback from '@/components/ImageWithFallback';
 import BackLink from '@/components/ui/BackLink';
 import { useReturnTo } from '@/hooks/useReturnTo';
 import UniversalSelect from '@/components/forms/UniversalSelect';
@@ -15,9 +16,16 @@ import {
   CustomOrderKeyValueList,
   CustomOrderMediaPreview,
   CustomOrderMetricCard,
+  CustomOrderReferenceList,
+  CustomOrderSection,
   formatDateTime,
   getRelativeDeadlineText,
 } from '@/components/custom-orders/CustomOrderUi';
+import {
+  formatMeasurementValue,
+  humanizeCustomOrderToken,
+} from '@/components/custom-orders/customOrderFormatting';
+import { formatMeasurementLabel } from '@/utils/measurementLabels';
 import {
   customOrdersAdminApi,
   type CustomOrderDetail,
@@ -87,6 +95,108 @@ const shortRef = (value?: string | null) => {
   }
   return raw.length > 24 ? `${raw.slice(0, 20)}…` : raw;
 };
+
+const NOT_RECORDED = 'Not recorded';
+
+const textOrFallback = (value?: string | null, fallback = NOT_RECORDED) => {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  return raw.length > 0 ? raw : fallback;
+};
+
+/** Two letters for the buyer tile when there is no profile photo. */
+const initialsOf = (name?: string | null) => {
+  const parts = String(name ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return '👤';
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+};
+
+/**
+ * The delivery address as lines, from whatever the checkout stored.
+ *
+ * It is a free-form JSON column, so read the keys the checkout writes
+ * (`ShippingAddress` in `StoreApi`) and fall back to printing any remaining
+ * string values rather than dropping an address an older order spelled
+ * differently.
+ */
+const formatAddressLines = (address?: Record<string, unknown> | null): string[] => {
+  if (!address || typeof address !== 'object') return [];
+  const read = (key: string) => {
+    const value = (address as Record<string, unknown>)[key];
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+  };
+
+  const recipient = [read('firstName'), read('lastName')].filter(Boolean).join(' ');
+  const street = [read('street'), read('apartment')].filter(Boolean).join(', ');
+  const locality = [read('city'), read('state'), read('postalCode')].filter(Boolean).join(', ');
+  const known = [recipient, street, locality, read('country'), read('phone')].filter(
+    (line): line is string => Boolean(line && line.length > 0),
+  );
+  if (known.length > 0) return known;
+
+  return Object.values(address)
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .map((value) => value.trim());
+};
+
+/**
+ * The pricing engine's own numbers, read as money lines instead of as JSON.
+ *
+ * `internalPriceBreakdownJson` mixes three unrelated kinds of value — currency
+ * amounts, enum tokens, and uuids — and the old screen rendered all of them as
+ * identical grey cards, so a chart-version id looked exactly like a fabric
+ * charge. These tables name each key, say what it means, and leave the uuids to
+ * the references section where they belong.
+ */
+const PRICING_LINES: Array<{
+  key: string;
+  label: string;
+  kind: 'money' | 'number' | 'flag';
+  hint: string;
+}> = [
+  { key: 'baseProductionCharge', label: 'Base production charge', kind: 'money', hint: 'Labour the brand quoted, before fabric, rush and delivery.' },
+  { key: 'fabricCostPerYard', label: 'Fabric cost per yard', kind: 'money', hint: 'Rate locked at checkout.' },
+  { key: 'computedYards', label: 'Computed yards', kind: 'number', hint: 'Yardage the matched fabric rule derived from the measurements.' },
+  { key: 'fabricComponentTotal', label: 'Fabric total', kind: 'money', hint: 'Computed yards × cost per yard.' },
+  { key: 'rushFee', label: 'Rush fee', kind: 'money', hint: 'Only charged when the buyer selected rush production.' },
+  { key: 'deliveryFee', label: 'Delivery fee', kind: 'money', hint: 'Shipping charged at checkout.' },
+  { key: 'subtotalBeforeDelivery', label: 'Subtotal before delivery', kind: 'money', hint: 'Production + fabric + rush.' },
+  { key: 'grandTotal', label: 'Engine grand total', kind: 'money', hint: 'What the engine computed. It should match the buyer paid total.' },
+  { key: 'matchedRulePriority', label: 'Matched rule priority', kind: 'number', hint: 'Which fabric rule won the match.' },
+  { key: 'matchedRuleFallback', label: 'Used fallback rule', kind: 'flag', hint: 'Yes means no rule matched and the fallback priced the order.' },
+];
+
+const CHART_LOCK_LINES: Array<{ key: string; label: string }> = [
+  { key: 'pricingChartFamily', label: 'Pricing chart family' },
+  { key: 'displayChartFamily', label: 'Display chart family' },
+  { key: 'resolverPolicy', label: 'Resolver policy' },
+  { key: 'computedSize', label: 'Computed size' },
+  { key: 'noDirectMatch', label: 'No direct size match' },
+  { key: 'conversionGuidance', label: 'Conversion guidance' },
+  { key: 'quoteStatus', label: 'Quote status' },
+];
+
+/** Keys the designed tables already explain — the rest still gets shown raw. */
+const EXPLAINED_BREAKDOWN_KEYS = new Set<string>([
+  ...PRICING_LINES.map((line) => line.key),
+  'chartLock',
+  'exceptionDecision',
+  'requiredMeasurementSnapshot',
+  'measurementAttachmentMeta',
+  'noDirectMatchAcknowledged',
+]);
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+const renderFlag = (value: unknown) => (value === true ? 'Yes' : value === false ? 'No' : '—');
 
 const AdminCustomOrderDetailPage: React.FC = () => {
   const navigate = useNavigate();
@@ -232,6 +342,62 @@ const AdminCustomOrderDetailPage: React.FC = () => {
     return selectedSource?.primaryMediaUrl ? [selectedSource.primaryMediaUrl] : [];
   }, [selectedSource]);
 
+  const buyer = selected?.buyer ?? null;
+  const payment = selected?.payment ?? null;
+  const lifecycle = selected?.lifecycle ?? null;
+  const currency = selected?.buyerPriceSummary?.currency || 'NGN';
+
+  const buyerName = textOrFallback(buyer?.name, 'Unidentified buyer');
+  const addressLines = useMemo(
+    () => formatAddressLines(selected?.shippingAddress as Record<string, unknown> | null),
+    [selected?.shippingAddress],
+  );
+
+  // The delivery contact the shopper typed is only worth a line of its own when
+  // it DIFFERS from the account — otherwise it is the same fact twice.
+  const checkoutContactDiffers = useMemo(() => {
+    const snapshot = buyer?.checkoutContact;
+    if (!snapshot) return false;
+    const same = (a?: string | null, b?: string | null) =>
+      String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
+    return (
+      (Boolean(snapshot.name) && !same(snapshot.name, buyer?.name)) ||
+      (Boolean(snapshot.email) && !same(snapshot.email, buyer?.email)) ||
+      (Boolean(snapshot.phone) && !same(snapshot.phone, buyer?.phone))
+    );
+  }, [buyer?.checkoutContact, buyer?.email, buyer?.name, buyer?.phone]);
+
+  const breakdown = useMemo(
+    () => asRecord(selected?.internalPriceBreakdown),
+    [selected?.internalPriceBreakdown],
+  );
+  const chartLockRecord = useMemo(
+    () => asRecord(selected?.chartLock ?? breakdown.chartLock),
+    [breakdown.chartLock, selected?.chartLock],
+  );
+  const unexplainedBreakdown = useMemo(() => {
+    const entries = Object.entries(breakdown).filter(
+      ([key]) => !EXPLAINED_BREAKDOWN_KEYS.has(key),
+    );
+    return entries.length > 0 ? Object.fromEntries(entries) : null;
+  }, [breakdown]);
+
+  const measurementRows = useMemo(() => {
+    const snapshot = asRecord(selected?.measurementSnapshot);
+    return Object.entries(snapshot)
+      .filter(([, value]) => value !== null && value !== undefined)
+      .map(([key, value]) => ({
+        label: formatMeasurementLabel(key),
+        value: formatMeasurementValue(value as number | string),
+      }));
+  }, [selected?.measurementSnapshot]);
+
+  const requiredMeasurementKeys = useMemo(() => {
+    const meta = asRecord(breakdown.measurementAttachmentMeta);
+    const keys = meta.requiredMeasurementKeys;
+    return Array.isArray(keys) ? keys.filter((key): key is string => typeof key === 'string') : [];
+  }, [breakdown.measurementAttachmentMeta]);
+
   if (!orderId) {
     return null;
   }
@@ -298,7 +464,10 @@ const AdminCustomOrderDetailPage: React.FC = () => {
                   {selectedSource?.title || 'Custom order'}
                 </h1>
                 <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  Order {shortRef(selected.id)} • {selectedSource?.brandName || 'Brand'}
+                  Order {shortRef(selected.id)} • {selectedSource?.brandName || 'Brand'} • Buyer{' '}
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">
+                    {buyerName}
+                  </span>
                 </div>
                 <div className="mt-1.5 text-sm text-slate-600 dark:text-slate-300">
                   Buyer total {formatCurrency(selected.buyerPriceSummary?.grandTotal, selected.buyerPriceSummary?.currency || 'NGN')} • Disputes {selected.disputes.length} • Issues {selected.issues.length}
@@ -315,27 +484,288 @@ const AdminCustomOrderDetailPage: React.FC = () => {
               ) : null}
             </div>
 
-            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              <CustomOrderMetricCard label="Measurement confirmed" value={formatDateTime(selected.measurementConfirmedAt)} helper="Buyer-approved snapshot" />
+            {/* What an admin needs before scrolling: who, when it is due to
+                conclude, and whether the money landed. */}
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              <CustomOrderMetricCard
+                label="Buyer"
+                value={buyerName}
+                helper={textOrFallback(buyer?.email, 'No email on file')}
+              />
+              <CustomOrderMetricCard
+                label={lifecycle?.completedAt ? 'Concluded' : 'Expected conclusion'}
+                value={formatDateTime(lifecycle?.expectedConclusionAt)}
+                helper={
+                  lifecycle?.completedAt
+                    ? 'Order completed'
+                    : getRelativeDeadlineText(lifecycle?.expectedConclusionAt)
+                }
+              />
               <CustomOrderMetricCard label="Production deadline" value={formatDateTime(selected.promisedProductionAt)} helper={getRelativeDeadlineText(selected.promisedProductionAt)} />
               <CustomOrderMetricCard label="Delivery deadline" value={formatDateTime(selected.promisedDeliveryAt)} helper={getRelativeDeadlineText(selected.promisedDeliveryAt)} />
             </div>
           </section>
+
+          {/* Buyer and delivery — open, never collapsed. This is the question the
+              page is opened to answer. */}
+          <div className="grid gap-3 md:grid-cols-2">
+            <section className="rounded-2xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
+              <CustomOrderFieldTitle
+                title="Buyer"
+                description="The account that placed this order. Name, email and phone come from the shopper's profile and fall back to what they typed at checkout."
+              />
+              <div className="mt-3 flex items-start gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-900 text-sm font-bold text-white dark:bg-white dark:text-slate-900">
+                  {buyer?.profileImage ? (
+                    <ImageWithFallback
+                      src={buyer.profileImage}
+                      alt={buyerName}
+                      fallbackName={buyerName}
+                      fit="cover"
+                      rounded="none"
+                      className="h-full w-full object-cover"
+                      containerClassName="h-full w-full"
+                    />
+                  ) : (
+                    <span aria-hidden="true">{initialsOf(buyer?.name)}</span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-base font-bold text-slate-900 dark:text-white">
+                    {buyerName}
+                  </div>
+                  <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                    {buyer?.username ? `@${buyer.username}` : 'No username on file'}
+                  </div>
+                </div>
+                {buyer?.accountStatus ? <CustomOrderBadge value={buyer.accountStatus} /> : null}
+              </div>
+              <div className="mt-3">
+                <CustomOrderKeyValueList
+                  items={[
+                    { label: 'Email', value: textOrFallback(buyer?.email) },
+                    { label: 'Phone', value: textOrFallback(buyer?.phone) },
+                    { label: 'Location', value: textOrFallback(buyer?.location) },
+                    { label: 'Buyer since', value: formatDateTime(buyer?.joinedAt) },
+                    { label: 'Buyer reference', value: shortRef(buyer?.id ?? selected.buyerId) ?? '—' },
+                  ]}
+                />
+              </div>
+              {selected.anonymizedAt ? (
+                <p className="mt-2 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                  This order was anonymized on {formatDateTime(selected.anonymizedAt)} — buyer
+                  details may have been cleared by the retention job.
+                </p>
+              ) : null}
+            </section>
+
+            <section className="rounded-2xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
+              <CustomOrderFieldTitle
+                title="Delivery"
+                description="Where this order ships and the contact the buyer gave at checkout. Shown only when it differs from the account on file."
+              />
+              <div className="mt-3 space-y-1 text-[13px] text-slate-700 dark:text-slate-200">
+                {addressLines.length === 0 ? (
+                  <div className="text-sm text-slate-500 dark:text-slate-400">
+                    No delivery address was stored on this order.
+                  </div>
+                ) : (
+                  addressLines.map((line) => (
+                    <div key={line} className="break-words">
+                      {line}
+                    </div>
+                  ))
+                )}
+              </div>
+              {checkoutContactDiffers ? (
+                <div className="mt-3 border-t border-black/5 pt-3 dark:border-white/10">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                    Checkout contact
+                  </div>
+                  <div className="mt-2">
+                    <CustomOrderKeyValueList
+                      items={[
+                        { label: 'Name', value: textOrFallback(buyer?.checkoutContact?.name, '—') },
+                        { label: 'Email', value: textOrFallback(buyer?.checkoutContact?.email, '—') },
+                        { label: 'Phone', value: textOrFallback(buyer?.checkoutContact?.phone, '—') },
+                      ]}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          </div>
+
+          <CustomOrderSection
+            title="Transaction"
+            description="The payment behind this order: what was charged, when it was posted, and whether it cleared."
+            defaultOpen
+            summary={
+              <span className="inline-flex items-center gap-2">
+                <CustomOrderBadge value={payment?.status ?? selected.paymentStatus} type="payment" />
+                <span className="tabular-nums">
+                  {formatCurrency(
+                    payment?.amount ?? selected.buyerPriceSummary?.grandTotal,
+                    payment?.currency || currency,
+                  )}
+                </span>
+              </span>
+            }
+          >
+            <div className="grid gap-3 md:grid-cols-2">
+              <CustomOrderKeyValueList
+                items={[
+                  {
+                    label: 'Amount charged',
+                    value: formatCurrency(
+                      payment?.amount ?? selected.buyerPriceSummary?.grandTotal,
+                      payment?.currency || currency,
+                    ),
+                  },
+                  {
+                    label: 'Status',
+                    value: <CustomOrderBadge value={payment?.status ?? selected.paymentStatus} type="payment" />,
+                  },
+                  {
+                    label: 'Method',
+                    value: payment?.method ? humanizeCustomOrderToken(payment.method) : NOT_RECORDED,
+                  },
+                  {
+                    label: 'Provider',
+                    value: payment?.provider ? humanizeCustomOrderToken(payment.provider) : NOT_RECORDED,
+                  },
+                ]}
+              />
+              <CustomOrderKeyValueList
+                items={[
+                  { label: 'Posted on', value: formatDateTime(payment?.postedAt ?? selected.createdAt) },
+                  {
+                    label: 'Cleared on',
+                    value: payment?.confirmedAt ? formatDateTime(payment.confirmedAt) : 'Not cleared',
+                  },
+                  { label: 'Last verified', value: formatDateTime(payment?.lastVerifiedAt) },
+                  {
+                    label: 'Reference',
+                    value: shortRef(payment?.reference ?? selected.paymentReference) ?? NOT_RECORDED,
+                  },
+                ]}
+              />
+            </div>
+
+            {payment?.failureMessage ? (
+              <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] font-medium text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                Last attempt failed: {payment.failureMessage}
+              </p>
+            ) : null}
+
+            {payment?.attempts && payment.attempts.length > 1 ? (
+              <div className="mt-4 border-t border-black/5 pt-3 dark:border-white/10">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                  All attempts ({payment.attemptCount ?? payment.attempts.length})
+                </div>
+                <ul className="mt-2 space-y-1.5">
+                  {payment.attempts.map((attempt) => (
+                    <li
+                      key={attempt.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-black/[0.06] px-3 py-2 text-[12px] dark:border-white/[0.06]"
+                    >
+                      <span className="font-medium text-slate-700 dark:text-slate-200">
+                        {formatDateTime(attempt.createdAt)}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <CustomOrderBadge value={attempt.status} type="payment" />
+                        <span className="tabular-nums font-semibold text-slate-900 dark:text-white">
+                          {formatCurrency(attempt.amount, attempt.currency || currency)}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </CustomOrderSection>
+
+          <CustomOrderSection
+            title="Dates and milestones"
+            description="Every date this order carries, in the order they happen — from the day it was placed to the day it is expected to conclude."
+            defaultOpen
+            summary={
+              lifecycle?.completedAt
+                ? 'Concluded'
+                : getRelativeDeadlineText(lifecycle?.expectedConclusionAt)
+            }
+          >
+            <div className="grid gap-3 md:grid-cols-2">
+              <CustomOrderKeyValueList
+                items={[
+                  { label: 'Order placed', value: formatDateTime(lifecycle?.placedAt ?? selected.createdAt) },
+                  { label: 'Measurements confirmed', value: formatDateTime(selected.measurementConfirmedAt) },
+                  { label: 'Accepted by brand', value: formatDateTime(lifecycle?.acceptedAt ?? selected.acceptedAt) },
+                  { label: 'Rejected by brand', value: formatDateTime(lifecycle?.rejectedAt) },
+                  { label: 'Stage entered', value: formatDateTime(lifecycle?.stageEnteredAt) },
+                  { label: 'Last brand update', value: formatDateTime(lifecycle?.lastBrandProgressUpdateAt) },
+                ]}
+              />
+              <CustomOrderKeyValueList
+                items={[
+                  { label: 'Promised production', value: formatDateTime(selected.promisedProductionAt) },
+                  { label: 'Promised dispatch', value: formatDateTime(selected.promisedDispatchAt) },
+                  { label: 'Promised delivery', value: formatDateTime(selected.promisedDeliveryAt) },
+                  { label: 'Delivered', value: formatDateTime(lifecycle?.deliveredAt) },
+                  { label: 'Buyer accepted', value: formatDateTime(selected.buyerAcceptedAt) },
+                  {
+                    label: lifecycle?.completedAt ? 'Concluded' : 'Expected conclusion',
+                    value: formatDateTime(lifecycle?.expectedConclusionAt),
+                  },
+                ]}
+              />
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-3">
+              <CustomOrderMetricCard
+                label="Production lead"
+                value={
+                  selected.leadTimes?.productionLeadDays != null
+                    ? `${selected.leadTimes.productionLeadDays} days`
+                    : '—'
+                }
+                helper="Locked at checkout"
+              />
+              <CustomOrderMetricCard
+                label="Delivery window"
+                value={
+                  selected.leadTimes?.deliveryMinDays != null
+                    ? `${selected.leadTimes.deliveryMinDays}–${selected.leadTimes.deliveryMaxDays ?? selected.leadTimes.deliveryMinDays} days`
+                    : '—'
+                }
+                helper="Quoted range"
+              />
+              <CustomOrderMetricCard
+                label="Rush"
+                value={selected.leadTimes?.rushSelected ? 'Yes' : 'No'}
+                helper={selected.leadTimes?.rushSelected ? 'Buyer paid to expedite' : 'Standard timeline'}
+              />
+            </div>
+            {lifecycle?.issueReportedAt ? (
+              <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-medium text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                Buyer reported an issue on {formatDateTime(lifecycle.issueReportedAt)}.
+              </p>
+            ) : null}
+          </CustomOrderSection>
 
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-2xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
               <div className="mb-2">
                 <CustomOrderFieldTitle
                   title="Order snapshot"
-                  description="High-level order context: source, brand, deadlines, and measurement retention state. No technical IDs are shown here."
+                  description="What was ordered and how long the buyer's measurements are kept. Dates live in their own section; technical ids live in references."
                 />
               </div>
               <CustomOrderKeyValueList
                 items={[
-                  { label: 'Source type', value: selectedSource?.type ?? 'Unknown' },
+                  { label: 'Source type', value: selectedSource?.type ? humanizeCustomOrderToken(selectedSource.type) : 'Unknown' },
+                  { label: 'Source', value: selectedSource?.title ?? 'Custom order' },
                   { label: 'Brand', value: selectedSource?.brandName ?? 'Brand' },
-                  { label: 'Buyer total', value: formatCurrency(selected.buyerPriceSummary?.grandTotal, selected.buyerPriceSummary?.currency || 'NGN') },
-                  { label: 'Promised dispatch', value: formatDateTime(selected.promisedDispatchAt) },
+                  { label: 'Buyer total', value: formatCurrency(selected.buyerPriceSummary?.grandTotal, currency) },
                   { label: 'Acceptance window', value: formatDateTime(selected.buyerAcceptanceWindowEndsAt) },
                   { label: 'Retention until', value: formatDateTime(selected.measurementRetentionUntil) },
                   { label: 'Anonymized at', value: formatDateTime(selected.anonymizedAt) },
@@ -352,24 +782,151 @@ const AdminCustomOrderDetailPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
-            <div className="mb-2">
-              <CustomOrderFieldTitle
-                title="Internal price breakdown"
-                description="Technical pricing snapshot used for audit (chart lock, fabric rule, and engine outputs). Prefer the buyer payment breakdown above for readable money lines."
-              />
-            </div>
-            <CustomOrderJsonBreakdown data={selected.internalPriceBreakdown as Record<string, unknown> | null | undefined} />
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-2xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
-              <div className="mb-2">
-                <CustomOrderFieldTitle
-                  title="Payout allocations"
-                  description="How buyer payment is split for the brand: production advance vs final completion hold. Status shows whether each tranche is still held, payout-eligible, or paid out."
-                />
+          <CustomOrderSection
+            title="Measurements on file"
+            description="The buyer-approved measurement snapshot this order was priced and cut from. Cleared by the retention job unless a hold is active."
+            summary={
+              measurementRows.length > 0
+                ? `${measurementRows.length} point${measurementRows.length === 1 ? '' : 's'}`
+                : 'None stored'
+            }
+          >
+            {measurementRows.length === 0 ? (
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                No measurement values are stored on this order
+                {selected.anonymizedAt ? ' — it has been anonymized.' : '.'}
               </div>
+            ) : (
+              <>
+                <dl className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {measurementRows.map((row) => (
+                    <div
+                      key={row.label}
+                      className="rounded-xl border border-black/[0.06] bg-black/[0.02] px-3 py-2 dark:border-white/[0.06] dark:bg-white/[0.03]"
+                    >
+                      <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                        {row.label}
+                      </dt>
+                      <dd className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">
+                        {row.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                {requiredMeasurementKeys.length > 0 ? (
+                  <div className="mt-3 border-t border-black/5 pt-3 dark:border-white/10">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                      Required by the configuration ({requiredMeasurementKeys.length})
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {requiredMeasurementKeys.map((key) => (
+                        <span
+                          key={key}
+                          className="rounded-full border border-black/10 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200"
+                        >
+                          {formatMeasurementLabel(key)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </CustomOrderSection>
+
+          <CustomOrderSection
+            title="Pricing engine and size lock"
+            description="What the engine computed and which chart it was locked to. Audit material — the buyer payment breakdown above is the money that was actually charged."
+            summary={selected.quoteStatus ? humanizeCustomOrderToken(selected.quoteStatus) : undefined}
+          >
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                  Engine output
+                </div>
+                <div className="mt-2">
+                  <CustomOrderKeyValueList
+                    items={PRICING_LINES.filter((line) => breakdown[line.key] !== undefined).map(
+                      (line) => ({
+                        label: line.label,
+                        value:
+                          line.kind === 'money'
+                            ? formatCurrency(Number(breakdown[line.key] ?? 0), currency)
+                            : line.kind === 'flag'
+                              ? renderFlag(breakdown[line.key])
+                              : String(breakdown[line.key]),
+                      }),
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                  Size chart lock
+                </div>
+                <div className="mt-2">
+                  <CustomOrderKeyValueList
+                    items={CHART_LOCK_LINES.filter(
+                      (line) => chartLockRecord[line.key] !== undefined && chartLockRecord[line.key] !== null,
+                    ).map((line) => {
+                      const raw = chartLockRecord[line.key];
+                      return {
+                        label: line.label,
+                        value:
+                          typeof raw === 'boolean'
+                            ? renderFlag(raw)
+                            : humanizeCustomOrderToken(String(raw)),
+                      };
+                    })}
+                  />
+                </div>
+                {breakdown.noDirectMatchAcknowledged === true ? (
+                  <p className="mt-2 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                    The buyer acknowledged that no chart size matched exactly.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            {selected.exceptionDecision ? (
+              <div className="mt-4 border-t border-black/5 pt-3 dark:border-white/10">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                  Exception decision
+                </div>
+                <div className="mt-2">
+                  <CustomOrderJsonBreakdown
+                    data={selected.exceptionDecision as Record<string, unknown>}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {unexplainedBreakdown ? (
+              <div className="mt-4 border-t border-black/5 pt-3 dark:border-white/10">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                  Other stored values
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  Keys the pricing snapshot carries that this screen does not name yet — shown raw so
+                  nothing is lost on audit.
+                </p>
+                <div className="mt-2">
+                  <CustomOrderJsonBreakdown data={unexplainedBreakdown} />
+                </div>
+              </div>
+            ) : null}
+          </CustomOrderSection>
+
+          <CustomOrderSection
+            title="Payout allocations"
+            description="How buyer payment is split for the brand: production advance vs final completion hold. Status shows whether each tranche is still held, payout-eligible, or paid out."
+            summary={
+              ledgerAllocations.length > 0
+                ? `${ledgerAllocations.length} tranche${ledgerAllocations.length === 1 ? '' : 's'}`
+                : 'None yet'
+            }
+          >
               <div className="space-y-2">
                 {ledgerAllocations.length === 0 ? (
                   <div className="text-sm text-slate-500 dark:text-slate-400">No ledger allocations linked to this order yet.</div>
@@ -402,8 +959,15 @@ const AdminCustomOrderDetailPage: React.FC = () => {
                   })
                 )}
               </div>
-            </div>
+          </CustomOrderSection>
 
+          <CustomOrderSection
+            title="Admin actions"
+            description="Everything an admin can do to this order — nudge the brand, raise a risk flag, block anonymization, escalate a refund, or cancel and refund outright. Opens by itself while the order needs attention."
+            defaultOpen={needsAttention}
+            summary={needsAttention ? 'Action needed' : undefined}
+          >
+            <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-2xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
               <div className="mb-2">
                 <CustomOrderFieldTitle
@@ -468,9 +1032,7 @@ const AdminCustomOrderDetailPage: React.FC = () => {
                 </button>
               </div>
             </div>
-          </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-2xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
               <CustomOrderFieldTitle
                 title="Remind brand"
@@ -558,9 +1120,9 @@ const AdminCustomOrderDetailPage: React.FC = () => {
                 Flag risk
               </button>
             </div>
-          </div>
+            </div>
 
-          <div className="rounded-2xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
+          <div className="mt-3 rounded-2xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
             <CustomOrderFieldTitle
               title="Super admin cancellation"
               description="Only for paid orders. Cancels the order and starts the full refund workflow. Irreversible money path — use when production cannot continue and the buyer must be refunded."
@@ -590,7 +1152,7 @@ const AdminCustomOrderDetailPage: React.FC = () => {
             ) : null}
           </div>
 
-          <div className="rounded-2xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
+          <div className="mt-3 rounded-2xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
             <CustomOrderFieldTitle
               title="Escalate refund review"
               description="Moves the order into refund-review handling for deeper investigation without immediately cancelling. Use when money may need to reverse but you still need more evidence."
@@ -614,6 +1176,28 @@ const AdminCustomOrderDetailPage: React.FC = () => {
               Escalate refund review
             </button>
           </div>
+          </CustomOrderSection>
+
+          <CustomOrderSection
+            title="Technical references"
+            description="The ids this order hangs off, for log searches and support threads. Shortened for reading — click to copy the full value."
+          >
+            <CustomOrderReferenceList
+              items={[
+                { label: 'Order', value: selected.references?.orderId ?? selected.id, hint: 'Custom order id.' },
+                { label: 'Checkout session', value: selected.references?.checkoutSessionId, hint: 'Unified checkout session that produced this order.' },
+                { label: 'Checkout intent', value: selected.references?.checkoutIntentId, hint: 'Priced intent locked before payment.' },
+                { label: 'Configuration', value: selected.references?.configurationId, hint: 'The brand configuration this order was placed against.' },
+                { label: 'Configuration version', value: selected.references?.configurationVersionId ?? selected.configurationVersionId, hint: 'Exact version the price was locked to.' },
+                { label: 'Chart version', value: selected.references?.chartVersionId, hint: 'Size chart version used to resolve the measurements.' },
+                { label: 'Fabric rule', value: selected.references?.matchedFabricRuleId, hint: 'Fabric rule that produced the yardage.' },
+                { label: 'Payment reference', value: selected.references?.paymentReference ?? selected.paymentReference, hint: 'Provider reference for the charge.' },
+                { label: 'Idempotency key', value: selected.references?.idempotencyKey, hint: 'Submission key that prevents duplicate orders.' },
+                { label: 'Brand', value: selected.references?.brandId ?? selected.brandId, hint: 'Brand account id.' },
+                { label: 'Buyer', value: selected.references?.buyerId ?? selected.buyerId, hint: 'Buyer account id.' },
+              ]}
+            />
+          </CustomOrderSection>
 
           <OrderMessagesPanel
             contextType="CUSTOM_ORDER"

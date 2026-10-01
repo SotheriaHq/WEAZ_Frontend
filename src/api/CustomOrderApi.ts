@@ -381,6 +381,79 @@ export interface CustomOrderDisputeListItem {
   };
 }
 
+/**
+ * The shopper behind a custom order, as the admin console reads them.
+ *
+ * `name`/`email`/`phone` are already resolved server-side: the account profile
+ * wins, the checkout snapshot fills the gaps. `checkoutContact` is that snapshot
+ * untouched, so a delivery phone that differs from the profile stays visible.
+ */
+export interface CustomOrderBuyerIdentity {
+  id?: string | null;
+  name?: string | null;
+  username?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  accountStatus?: string | null;
+  joinedAt?: string | null;
+  profileImage?: string | null;
+  profileImageId?: string | null;
+  checkoutContact?: {
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  };
+}
+
+export interface CustomOrderPaymentAttemptSummary {
+  id: string;
+  reference?: string | null;
+  status?: string | null;
+  provider?: string | null;
+  amount?: number | null;
+  currency?: string | null;
+  confirmedAt?: string | null;
+  lastVerifiedAt?: string | null;
+  failureMessage?: string | null;
+  createdAt?: string | null;
+}
+
+export interface CustomOrderPaymentSummary {
+  status?: string | null;
+  method?: string | null;
+  reference?: string | null;
+  provider?: string | null;
+  amount?: number | null;
+  currency?: string | null;
+  /** When the transaction was first posted. */
+  postedAt?: string | null;
+  /** When it cleared. Null means it never did. */
+  confirmedAt?: string | null;
+  lastVerifiedAt?: string | null;
+  failureMessage?: string | null;
+  attemptCount?: number;
+  attempts?: CustomOrderPaymentAttemptSummary[];
+}
+
+export interface CustomOrderLifecycleDates {
+  placedAt?: string | null;
+  measurementConfirmedAt?: string | null;
+  acceptedAt?: string | null;
+  rejectedAt?: string | null;
+  promisedProductionAt?: string | null;
+  promisedDispatchAt?: string | null;
+  promisedDeliveryAt?: string | null;
+  deliveredAt?: string | null;
+  issueReportedAt?: string | null;
+  buyerAcceptedAt?: string | null;
+  completedAt?: string | null;
+  /** Completion if it happened, otherwise the date it is still expected by. */
+  expectedConclusionAt?: string | null;
+  stageEnteredAt?: string | null;
+  lastBrandProgressUpdateAt?: string | null;
+}
+
 export interface CustomOrderDetail {
   id: string;
   status: CustomOrderStatus;
@@ -448,6 +521,20 @@ export interface CustomOrderDetail {
   hasUnreadAdminNotice?: boolean;
   brandId?: string;
   buyerId?: string;
+  /** Admin detail only: who placed the order (account first, checkout snapshot second). */
+  buyer?: CustomOrderBuyerIdentity;
+  /** Admin detail only: the transaction behind the order, not just its enum. */
+  payment?: CustomOrderPaymentSummary;
+  /** Admin detail only: every lifecycle date in one block. */
+  lifecycle?: CustomOrderLifecycleDates;
+  leadTimes?: {
+    productionLeadDays?: number | null;
+    deliveryMinDays?: number | null;
+    deliveryMaxDays?: number | null;
+    rushSelected?: boolean;
+  };
+  /** Admin detail only: the technical ids, grouped instead of scattered. */
+  references?: Record<string, string | null>;
   progressEvents: CustomOrderProgressEvent[];
   extensionRequests: CustomOrderExtensionRequest[];
   issues: CustomOrderIssue[];
