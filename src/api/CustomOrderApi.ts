@@ -58,7 +58,9 @@ export type CustomOrderExtensionResponseStatus =
   | 'ACCEPTED'
   | 'COUNTERED'
   | 'REJECTED'
-  | 'EXPIRED';
+  | 'EXPIRED'
+  /** The stage it was buying time for was reached before it was answered. */
+  | 'VOIDED';
 
 export type CustomOrderExtensionTargetType = 'PRODUCTION' | 'DELIVERY' | 'BOTH';
 export type CustomOrderChartFamily =
@@ -241,6 +243,27 @@ export interface CustomOrderProgressEvent {
   adminEscalatedAt?: string | null;
 }
 
+/**
+ * The extension budget, resolved server-side.
+ *
+ * Policy is two approved extensions of at most three days each, six days in
+ * total, and none at all on an order the shopper paid a rush fee on. No client
+ * re-derives any of that — `maxRequestableDays` is the only number a request
+ * form needs, and `rushBlocked` is why the form may not be offered at all.
+ */
+export interface CustomOrderExtensionPolicy {
+  approvedExtensionCount: number;
+  totalExtensionDaysGranted: number;
+  remainingExtensions: number;
+  remainingDays: number;
+  maxRequestableDays: number;
+  exhausted: boolean;
+  maxDaysPerRequest: number;
+  maxApprovedExtensions: number;
+  maxTotalDays: number;
+  rushBlocked: boolean;
+}
+
 export interface CustomOrderExtensionRequest {
   id: string;
   targetType: CustomOrderExtensionTargetType;
@@ -248,6 +271,18 @@ export interface CustomOrderExtensionRequest {
   reason: string;
   buyerResponseStatus: CustomOrderExtensionResponseStatus;
   buyerCounterDays?: number | null;
+  /** Optional comment the shopper left when answering. */
+  buyerNote?: string | null;
+  /** Optional comment the brand left when answering a counter. */
+  brandNote?: string | null;
+  /** When the shopper must answer by. Past it, the request expires. */
+  respondByAt?: string | null;
+  /** Days actually granted — the counter value when a counter was accepted. */
+  appliedExtraDays?: number | null;
+  expiredAt?: string | null;
+  voidedAt?: string | null;
+  /** 1 for the order's first request, 2 for the second. */
+  sequence?: number | null;
   resolvedAt?: string | null;
   createdAt: string;
 }
@@ -541,6 +576,34 @@ export interface CustomOrderDetail {
   disputes: CustomOrderDispute[];
   ledgerAllocations?: CustomOrderLedgerAllocation[];
   timelineEvents: CustomOrderTimelineEvent[];
+  /** The shopper's half of the read-only admin notice channel. */
+  buyerAdminNoticeAt?: string | null;
+  buyerAdminNoticeAckAt?: string | null;
+  hasUnreadBuyerAdminNotice?: boolean;
+  /** What the brand committed to before any extension moved the dates. */
+  originalPromisedProductionAt?: string | null;
+  originalPromisedDispatchAt?: string | null;
+  originalPromisedDeliveryAt?: string | null;
+  extensionPolicy?: CustomOrderExtensionPolicy;
+  /** An admin is steering this order until `adminInterventionResolvedAt`. */
+  adminInterventionAt?: string | null;
+  adminInterventionReason?: string | null;
+  adminInterventionResolvedAt?: string | null;
+  /** Admin detail only: the same intervention, pre-resolved into `isOpen`. */
+  intervention?: {
+    openedAt?: string | null;
+    reason?: string | null;
+    resolvedAt?: string | null;
+    resolvedById?: string | null;
+    isOpen?: boolean;
+  };
+  /** Admin detail only: who has been written to and whether they have read it. */
+  notices?: {
+    buyerNoticeAt?: string | null;
+    buyerNoticeAckAt?: string | null;
+    brandNoticeAt?: string | null;
+    brandNoticeAckAt?: string | null;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -1141,8 +1204,16 @@ export const customOrdersBuyerApi = {
   async respondToExtension(orderId: string, requestId: string, payload: {
     response: CustomOrderExtensionResponseStatus;
     counterDays?: number;
+    /** Optional on both accept and reject — never required to say no. */
+    note?: string;
   }) {
     const response = await apiClient.post(`/custom-orders/${orderId}/extension-requests/${requestId}/respond`, payload);
+    return unwrapApiResponse<CustomOrderDetail>(response.data);
+  },
+
+  /** Mark admin notices on this order as seen. Read-only channel: no replies. */
+  async ackAdminNotices(orderId: string) {
+    const response = await apiClient.post(`/custom-orders/${orderId}/admin-notices/ack`);
     return unwrapApiResponse<CustomOrderDetail>(response.data);
   },
 
@@ -1248,6 +1319,25 @@ export const customOrdersBrandApi = {
 };
 
 export const customOrdersAdminApi = {
+  /**
+   * A private, read-only note to one side of the order (or the same note to
+   * each). Deliberately not a message in the shared buyer-brand thread: an
+   * intervention usually needs a different sentence for each party.
+   */
+  async sendNotice(orderId: string, payload: {
+    audience: 'BUYER' | 'BRAND' | 'BOTH';
+    message: string;
+  }) {
+    const response = await apiClient.post(`/admin/custom-orders/${orderId}/notices`, payload);
+    return unwrapApiResponse<{ customOrderId: string; audience: string }>(response.data);
+  },
+
+  /** Close the intervention once the order has actually been steered. */
+  async resolveIntervention(orderId: string, payload: { note?: string } = {}) {
+    const response = await apiClient.post(`/admin/custom-orders/${orderId}/resolve-intervention`, payload);
+    return unwrapApiResponse<Record<string, unknown>>(response.data);
+  },
+
   async getSummary() {
     const response = await apiClient.get('/admin/custom-orders/summary');
     return unwrapApiResponse<Record<string, unknown>>(response.data);

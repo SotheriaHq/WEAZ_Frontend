@@ -39,8 +39,8 @@ const FILES = [
   ['ACCOUNT_DELETION_POLICY', 'account-deletion', 'Account and Data Deletion Policy', '09_ACCOUNT_DATA_DELETION_POLICY.md', 'Self-service account closure, soft deactivation, cryptographic pseudonymization, and statutory financial retention schedules.'],
 ];
 
-const ver = '2026.08.22-v1.0';
-const eff = 'August 22, 2026';
+const ver = '2026.10.01-v1.1';
+const eff = 'October 1, 2026';
 
 const frontendOut = path.join(frontendRoot, 'src', 'pages', 'legal', 'legalDocuments.ts');
 const mobileOut = path.join(workspaceRoot, 'threadly-mobile', 'src', 'legal', 'legalDocuments.ts');

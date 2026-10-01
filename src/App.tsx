@@ -498,6 +498,30 @@ const LegacyBuyerCustomOrdersRedirect: React.FC = () => {
   return <Navigate to="/profile?tab=orders" replace />;
 };
 
+/**
+ * An extension notification deep-links to the REQUEST, not just the order, so
+ * the shopper arrives looking at the decision. The request id is carried into
+ * the profile panel, which scrolls it into view.
+ */
+const BuyerExtensionRequestRedirect: React.FC = () => {
+  const { orderId, requestId } = useParams<{
+    orderId?: string;
+    requestId?: string;
+  }>();
+  if (!orderId) return <Navigate to="/profile?tab=orders" replace />;
+  const base = `/profile?tab=orders&kind=custom&orderId=${encodeURIComponent(orderId)}`;
+  return (
+    <Navigate
+      to={
+        requestId
+          ? `${base}&extensionRequestId=${encodeURIComponent(requestId)}`
+          : base
+      }
+      replace
+    />
+  );
+};
+
 const profileChildren = [
   { index: true, element: withRouteFallback(<Profile />) },
   {
@@ -878,6 +902,10 @@ const router = createBrowserRouter([
           { path: '/custom-orders', element: <LegacyBuyerCustomOrdersRedirect /> },
           { path: '/custom-orders/new', element: <Layout><CustomOrderComposerPage /></Layout> },
           { path: '/custom-orders/resume/:token', element: <Layout><CustomOrderCheckoutResumePage /></Layout> },
+          {
+            path: '/custom-orders/:orderId/extensions/:requestId',
+            element: <BuyerExtensionRequestRedirect />,
+          },
           { path: '/custom-orders/:orderId', element: <LegacyBuyerCustomOrdersRedirect /> },
           { path: '/orders/:orderId', element: <Layout><OrderDetail /></Layout> },
         ],

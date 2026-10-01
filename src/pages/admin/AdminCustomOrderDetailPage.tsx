@@ -25,6 +25,7 @@ import {
   formatMeasurementValue,
   humanizeCustomOrderToken,
 } from '@/components/custom-orders/customOrderFormatting';
+import { ExtensionHistoryList } from '@/components/custom-orders/ExtensionDecisionPanel';
 import { formatMeasurementLabel } from '@/utils/measurementLabels';
 import {
   customOrdersAdminApi,
@@ -97,6 +98,9 @@ const shortRef = (value?: string | null) => {
 };
 
 const NOT_RECORDED = 'Not recorded';
+
+/** Who a private admin notice goes to. Never both parties in one thread. */
+type NoticeAudience = 'BUYER' | 'BRAND' | 'BOTH';
 
 const textOrFallback = (value?: string | null, fallback = NOT_RECORDED) => {
   const raw = typeof value === 'string' ? value.trim() : '';
@@ -218,6 +222,9 @@ const AdminCustomOrderDetailPage: React.FC = () => {
   const [refundNote, setRefundNote] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [cancelNote, setCancelNote] = useState('');
+  const [noticeAudience, setNoticeAudience] = useState<NoticeAudience>('BUYER');
+  const [noticeMessage, setNoticeMessage] = useState('');
+  const [interventionNote, setInterventionNote] = useState('');
   const [retentionHoldType, setRetentionHoldType] = useState<CustomOrderRetentionHoldType>('SUPPORT');
   const [retentionHoldReason, setRetentionHoldReason] = useState('');
   const [retentionHoldUntil, setRetentionHoldUntil] = useState('');
@@ -335,6 +342,14 @@ const AdminCustomOrderDetailPage: React.FC = () => {
   };
 
   const needsAttention = Boolean(selected?.adminAttentionRequiredAt);
+  /**
+   * Attention says "look at this"; an intervention says "somebody owns this
+   * until it is settled". A rejected or unanswered extension raises both.
+   */
+  const interventionOpen = Boolean(
+    selected?.intervention?.isOpen ??
+      (selected?.adminInterventionAt && !selected?.adminInterventionResolvedAt),
+  );
 
   const sourceMediaUrls = useMemo(() => {
     const urls = selectedSource?.mediaUrls?.filter(Boolean) as string[] | undefined;
@@ -916,6 +931,206 @@ const AdminCustomOrderDetailPage: React.FC = () => {
                 </div>
               </div>
             ) : null}
+          </CustomOrderSection>
+
+          <CustomOrderSection
+            title="Delays and extensions"
+            description="Every request for more time on this order, what the shopper said, and what the original promise was before any of it moved. Rush orders can never be extended."
+            defaultOpen={Boolean(selected.extensionRequests.length) || interventionOpen}
+            summary={
+              selected.extensionPolicy
+                ? selected.extensionPolicy.rushBlocked
+                  ? 'Rush — no extensions'
+                  : `${selected.extensionPolicy.totalExtensionDaysGranted}/${selected.extensionPolicy.maxTotalDays} days granted`
+                : undefined
+            }
+          >
+            <div className="grid gap-3 md:grid-cols-2">
+              <CustomOrderKeyValueList
+                items={[
+                  {
+                    label: 'Extensions granted',
+                    value: selected.extensionPolicy
+                      ? `${selected.extensionPolicy.approvedExtensionCount} of ${selected.extensionPolicy.maxApprovedExtensions}`
+                      : '—',
+                  },
+                  {
+                    label: 'Days granted',
+                    value: selected.extensionPolicy
+                      ? `${selected.extensionPolicy.totalExtensionDaysGranted} of ${selected.extensionPolicy.maxTotalDays}`
+                      : '—',
+                  },
+                  {
+                    label: 'Can still ask for',
+                    value: selected.extensionPolicy?.rushBlocked
+                      ? 'Nothing — rush order'
+                      : `${selected.extensionPolicy?.maxRequestableDays ?? 0} day(s)`,
+                  },
+                ]}
+              />
+              <CustomOrderKeyValueList
+                items={[
+                  {
+                    label: 'Originally promised production',
+                    value: formatDateTime(selected.originalPromisedProductionAt),
+                  },
+                  {
+                    label: 'Originally promised delivery',
+                    value: formatDateTime(selected.originalPromisedDeliveryAt),
+                  },
+                  {
+                    label: 'Current promised delivery',
+                    value: formatDateTime(selected.promisedDeliveryAt),
+                  },
+                ]}
+              />
+            </div>
+
+            <div className="mt-4 border-t border-black/5 pt-3 dark:border-white/10">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                Requests ({selected.extensionRequests.length})
+              </div>
+              <div className="mt-2">
+                <ExtensionHistoryList requests={selected.extensionRequests} />
+              </div>
+            </div>
+          </CustomOrderSection>
+
+          <CustomOrderSection
+            title="Intervention and private notices"
+            description="Write privately to one side of this order, or each of them. The recipient reads and acknowledges — there is no reply path, and neither party sees the other's note."
+            defaultOpen={interventionOpen}
+            summary={interventionOpen ? 'Open' : 'None open'}
+          >
+            {interventionOpen ? (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-500/20 dark:bg-rose-500/10">
+                <div className="text-sm font-bold text-rose-800 dark:text-rose-200">
+                  An intervention is open on this order
+                </div>
+                <div className="mt-1 text-[12px] text-rose-700/90 dark:text-rose-200/80">
+                  {selected.intervention?.reason
+                    ? humanizeCustomOrderToken(selected.intervention.reason)
+                    : 'Admin review'}{' '}
+                  · opened {formatDateTime(selected.intervention?.openedAt)}
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    setPendingAction({
+                      title: 'Close this intervention?',
+                      description:
+                        'Use this once the delay has actually been settled with both sides. Any open dispute stays open — a dispute is closed on the dispute.',
+                      confirmLabel: 'Close intervention',
+                      execute: () =>
+                        runAction(
+                          () =>
+                            customOrdersAdminApi.resolveIntervention(selected.id, {
+                              note: interventionNote.trim() || undefined,
+                            }),
+                          'Intervention closed',
+                        ),
+                    })
+                  }
+                  className="mt-3 rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  Close intervention
+                </button>
+                <textarea
+                  value={interventionNote}
+                  onChange={(event) => setInterventionNote(event.target.value)}
+                  rows={2}
+                  placeholder="Closing note (optional, internal)"
+                  className="mt-3 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                />
+              </div>
+            ) : (
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                No intervention is open on this order.
+              </div>
+            )}
+
+            <div className="mt-4 border-t border-black/5 pt-3 dark:border-white/10">
+              <CustomOrderFieldTitle
+                title="Send a private notice"
+                description="Goes to the chosen party only, as a read-only note on their order screen plus a notification. Choosing both sends the SAME sentence to each — send two notices when the wording needs to differ."
+              />
+              <div className="mt-3 grid gap-3 md:grid-cols-[200px_minmax(0,1fr)]">
+                <UniversalSelect
+                  value={noticeAudience}
+                  onChange={(value) => setNoticeAudience(value as NoticeAudience)}
+                  options={[
+                    { value: 'BUYER', label: 'The shopper' },
+                    { value: 'BRAND', label: 'The brand' },
+                    { value: 'BOTH', label: 'Both, same wording' },
+                  ]}
+                />
+                <textarea
+                  value={noticeMessage}
+                  onChange={(event) => setNoticeMessage(event.target.value)}
+                  rows={3}
+                  maxLength={1000}
+                  placeholder="What should they know? They cannot reply to this."
+                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={busy || noticeMessage.trim().length < 3}
+                onClick={() =>
+                  setPendingAction({
+                    title: 'Send this notice?',
+                    description:
+                      noticeAudience === 'BOTH'
+                        ? 'Both the shopper and the brand receive this exact message. They cannot reply to it.'
+                        : `Only ${noticeAudience === 'BUYER' ? 'the shopper' : 'the brand'} receives this. They cannot reply to it.`,
+                    confirmLabel: 'Send notice',
+                    execute: () =>
+                      runAction(
+                        () =>
+                          customOrdersAdminApi.sendNotice(selected.id, {
+                            audience: noticeAudience,
+                            message: noticeMessage.trim(),
+                          }),
+                        'Notice sent',
+                        { clearsAttention: false },
+                      ).then((didSucceed) => {
+                        if (didSucceed) setNoticeMessage('');
+                        return didSucceed;
+                      }),
+                  })
+                }
+                className="mt-3 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-black"
+              >
+                Send notice
+              </button>
+              <div className="mt-3">
+                <CustomOrderKeyValueList
+                  items={[
+                    {
+                      label: 'Shopper last written to',
+                      value: formatDateTime(selected.notices?.buyerNoticeAt),
+                    },
+                    {
+                      label: 'Shopper read it',
+                      value: selected.notices?.buyerNoticeAckAt
+                        ? formatDateTime(selected.notices.buyerNoticeAckAt)
+                        : 'Not yet',
+                    },
+                    {
+                      label: 'Brand last written to',
+                      value: formatDateTime(selected.notices?.brandNoticeAt),
+                    },
+                    {
+                      label: 'Brand read it',
+                      value: selected.notices?.brandNoticeAckAt
+                        ? formatDateTime(selected.notices.brandNoticeAckAt)
+                        : 'Not yet',
+                    },
+                  ]}
+                />
+              </div>
+            </div>
           </CustomOrderSection>
 
           <CustomOrderSection

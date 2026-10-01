@@ -2,6 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import AdminNoticePanel, {
+  selectBuyerAdminNotices,
+} from '@/components/custom-orders/AdminNoticePanel';
+import ExtensionDecisionPanel, {
+  ExtensionHistoryList,
+} from '@/components/custom-orders/ExtensionDecisionPanel';
 import { toast } from 'sonner';
 import {
   confirmMyOrderDelivery,
@@ -16,7 +22,6 @@ import { paymentApi } from '@/api/PaymentApi';
 import {
   customOrdersBuyerApi,
   type CustomOrderDetail,
-  type CustomOrderExtensionResponseStatus,
   type CustomOrderIssueType,
   type CustomOrderListItem,
   type CustomOrderPaymentAttempt,
@@ -706,9 +711,15 @@ export const BuyerCustomOrderDetailView: React.FC<{
   const [issueType, setIssueType] = useState<CustomOrderIssueType>('OTHER');
   const [issueDescription, setIssueDescription] = useState('');
   const [deliveryNote, setDeliveryNote] = useState('');
-  const [extensionResponse, setExtensionResponse] =
-    useState<CustomOrderExtensionResponseStatus>('ACCEPTED');
-  const [counterDays, setCounterDays] = useState('');
+  const [noticeBusy, setNoticeBusy] = useState(false);
+  /**
+   * The extension notification deep-links with the request id, so the decision
+   * is scrolled into view rather than left for the shopper to find.
+   */
+  const focusExtensionRequestId = useMemo(
+    () => new URLSearchParams(location.search).get('extensionRequestId'),
+    [location.search],
+  );
   const { confirm, ConfirmDialog } = useConfirm();
   const mountedRef = useRef(true);
   const refreshPaymentAttempts = useCallback(async () => {
@@ -1017,19 +1028,43 @@ export const BuyerCustomOrderDetailView: React.FC<{
     );
   };
 
-  const handleRespondToExtension = async () => {
+  const handleRespondToExtension = async (
+    decision: 'ACCEPTED' | 'REJECTED',
+    note: string,
+  ) => {
     if (!latestOpenExtension || !order) return;
-    const counterValue =
-      extensionResponse === 'COUNTERED' ? Number(counterDays) : undefined;
     await wrapMutation(
       () =>
         customOrdersBuyerApi.respondToExtension(order.id, latestOpenExtension.id, {
-          response: extensionResponse,
-          counterDays: counterValue,
+          response: decision,
+          note: note || undefined,
         }),
-      'Extension response saved',
+      decision === 'ACCEPTED'
+        ? 'Extra time granted. Your delivery date has moved.'
+        : 'Declined. WIEZ is reviewing the order with the maker.',
     );
   };
+
+  // Read-only channel: the shopper marks notices seen, and never replies here.
+  const handleAckAdminNotices = async () => {
+    if (!order) return;
+    setNoticeBusy(true);
+    try {
+      const refreshed = await customOrdersBuyerApi.ackAdminNotices(order.id);
+      if (mountedRef.current) setOrder(refreshed);
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message || 'Unable to update notices',
+      );
+    } finally {
+      if (mountedRef.current) setNoticeBusy(false);
+    }
+  };
+
+  const buyerAdminNotices = useMemo(
+    () => selectBuyerAdminNotices(order?.timelineEvents),
+    [order?.timelineEvents],
+  );
 
   const effectiveStage = getBuyerFacingProgressStage(
     order?.currentProgressStage ?? previewOrder?.currentProgressStage,
@@ -1191,6 +1226,34 @@ export const BuyerCustomOrderDetailView: React.FC<{
           />
         </div>
       </div>
+
+      {/*
+        An open request for more time is the first thing on the screen, above the
+        artwork. It is the only thing here that is waiting on the shopper, and the
+        version of this that lived at the bottom of "Support and actions" read as
+        a setting — shoppers tapped the notification and reported that there was
+        nothing to respond to.
+      */}
+      {latestOpenExtension ? (
+        <ExtensionDecisionPanel
+          request={latestOpenExtension}
+          brandName={brandName}
+          busy={busy}
+          onRespond={handleRespondToExtension}
+          autoOpen={focusExtensionRequestId === latestOpenExtension.id}
+        />
+      ) : null}
+
+      <AdminNoticePanel
+        notices={buyerAdminNotices}
+        hasUnread={Boolean(order.hasUnreadBuyerAdminNotice)}
+        busy={noticeBusy}
+        interventionReason={order.adminInterventionReason}
+        interventionOpen={Boolean(
+          order.adminInterventionAt && !order.adminInterventionResolvedAt,
+        )}
+        onAcknowledge={() => void handleAckAdminNotices()}
+      />
 
       <section className="overflow-hidden rounded-2xl border border-black/10 bg-white/90 shadow-[0_30px_120px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] sm:rounded-[2rem]">
         <div className="grid gap-3 p-3 sm:gap-6 sm:p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -1518,58 +1581,20 @@ export const BuyerCustomOrderDetailView: React.FC<{
               <div className="text-sm font-semibold text-gray-900 dark:text-white">Conversation and extension</div>
               <OrderConversationButton order={{ customOrderId: order.id }} brandName={brandName} size="sm" />
             </div>
-            <div className="mt-4 space-y-3">
-              {order.extensionRequests.length === 0 ? (
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  No extension requests have been raised on this order.
-                </div>
-              ) : (
-                order.extensionRequests.map((request) => (
-                  <div
-                    key={request.id}
-                    className="rounded-2xl border border-gray-200/80 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.03]"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {humanizeCustomOrderToken(request.targetType)} +{request.requestedExtraDays} day(s)
-                      </div>
-                      <CustomOrderBadge value={request.buyerResponseStatus} type="payment" />
-                    </div>
-                    <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">{request.reason}</div>
-                  </div>
-                ))
-              )}
+            {/*
+              The decision itself is a banner at the top of the order, not here.
+              What belongs in this card is the record: what was asked, what was
+              granted, and what either side said about it.
+            */}
+            <div className="mt-4">
+              <ExtensionHistoryList requests={order.extensionRequests} />
             </div>
-            {latestOpenExtension ? (
-              <div className="mt-4 space-y-3 rounded-2xl border border-gray-200/80 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-                <UniversalSelect
-                  value={extensionResponse}
-                  onChange={(value) =>
-                    setExtensionResponse(value as CustomOrderExtensionResponseStatus)
-                  }
-                  options={[
-                    { value: 'ACCEPTED', label: 'Accept' },
-                    { value: 'COUNTERED', label: 'Counter' },
-                    { value: 'REJECTED', label: 'Reject' },
-                  ]}
-                />
-                {extensionResponse === 'COUNTERED' ? (
-                  <input
-                    value={counterDays}
-                    onChange={(event) => setCounterDays(event.target.value)}
-                    placeholder="Counter days"
-                    className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
-                  />
-                ) : null}
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={handleRespondToExtension}
-                  className="rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-slate-950"
-                >
-                  Send response
-                </button>
-              </div>
+            {order.extensionPolicy ? (
+              <p className="mt-3 text-[12px] text-gray-500 dark:text-gray-400">
+                {order.extensionPolicy.rushBlocked
+                  ? 'You paid for rush production on this order, so the maker cannot ask you for extra time.'
+                  : `A maker may ask for up to ${order.extensionPolicy.maxDaysPerRequest} extra days at a time, ${order.extensionPolicy.maxApprovedExtensions} times, and no more than ${order.extensionPolicy.maxTotalDays} days in total.`}
+              </p>
             ) : null}
           </div>
           <div>

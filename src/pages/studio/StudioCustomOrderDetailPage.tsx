@@ -588,6 +588,40 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     }
   };
 
+  const extensionPolicy = order?.extensionPolicy ?? null;
+  const outstandingExtension = useMemo(
+    () =>
+      order?.extensionRequests.find(
+        (entry) =>
+          entry.buyerResponseStatus === 'OPEN' ||
+          entry.buyerResponseStatus === 'COUNTERED',
+      ) ?? null,
+    [order?.extensionRequests],
+  );
+
+  /**
+   * Why the request form is not available, in the brand's terms. Null means it
+   * is. Checked here as well as server-side so a brand is not asked to write a
+   * reason only to be refused on submit.
+   */
+  const extensionBlockedReason = useMemo(() => {
+    if (!order) return null;
+    if (extensionPolicy?.rushBlocked) {
+      return 'This shopper paid for rush production, so extra time cannot be requested on this order. If you cannot meet the date, contact WIEZ.';
+    }
+    if (outstandingExtension) {
+      return outstandingExtension.buyerResponseStatus === 'COUNTERED'
+        ? 'The shopper countered your request with a different number of days. Answer that before asking again.'
+        : 'Your request is with the shopper. You will be notified as soon as they answer.';
+    }
+    if (extensionPolicy?.exhausted) {
+      return extensionPolicy.remainingExtensions <= 0
+        ? `You have already used both extension requests on this order (${extensionPolicy.totalExtensionDaysGranted} days granted). Contact WIEZ if you still cannot meet the date.`
+        : `This order has no extension days left (${extensionPolicy.totalExtensionDaysGranted} of ${extensionPolicy.maxTotalDays} used). Contact WIEZ if you still cannot meet the date.`;
+    }
+    return null;
+  }, [extensionPolicy, order, outstandingExtension]);
+
   const handleCreateExtensionRequest = async () => {
     if (!brandId || !order) return;
     const requestedExtraDays = Number(extensionDays);
@@ -1093,31 +1127,58 @@ const StudioCustomOrderDetailPage: React.FC = () => {
             <div>
               <div className="text-lg font-semibold text-slate-900 dark:text-white">⏳ Request extension</div>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Ask the buyer for more production time.
+                Ask the shopper for more production time. They can accept or
+                decline, and declining brings WIEZ in to resolve the delay.
               </p>
-              <div className="mt-4 space-y-3">
-                <input
-                  value={extensionDays}
-                  onChange={(event) => setExtensionDays(event.target.value)}
-                  placeholder="Extra days (e.g. 3)"
-                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
-                />
-                <textarea
-                  value={extensionReason}
-                  onChange={(event) => setExtensionReason(event.target.value)}
-                  rows={2}
-                  placeholder="Why is the extension needed?"
-                  className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleCreateExtensionRequest()}
-                  disabled={busy}
-                  className="rounded-full bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  Request extension
-                </button>
-              </div>
+
+              {/*
+                Say what is possible BEFORE the form, so a brand is not told no
+                by a refusal after writing a reason. Three states: a rush order
+                can never be extended, the allowance can be spent, and a request
+                already in flight is waiting on the shopper.
+              */}
+              {extensionBlockedReason ? (
+                <div className="mt-4 rounded-2xl border border-black/10 bg-black/[0.02] px-4 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
+                  {extensionBlockedReason}
+                </div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {extensionPolicy ? (
+                    <p className="text-[12px] font-medium text-slate-500 dark:text-slate-400">
+                      You can ask for up to {extensionPolicy.maxRequestableDays}{' '}
+                      day{extensionPolicy.maxRequestableDays === 1 ? '' : 's'} on
+                      this order
+                      {extensionPolicy.approvedExtensionCount > 0
+                        ? ` — ${extensionPolicy.totalExtensionDaysGranted} of ${extensionPolicy.maxTotalDays} days already granted.`
+                        : `. Limit: ${extensionPolicy.maxApprovedExtensions} requests, ${extensionPolicy.maxTotalDays} days in total.`}
+                    </p>
+                  ) : null}
+                  <input
+                    value={extensionDays}
+                    onChange={(event) => setExtensionDays(event.target.value)}
+                    type="number"
+                    min={1}
+                    max={extensionPolicy?.maxRequestableDays ?? 3}
+                    placeholder="Extra days (e.g. 3)"
+                    className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                  />
+                  <textarea
+                    value={extensionReason}
+                    onChange={(event) => setExtensionReason(event.target.value)}
+                    rows={2}
+                    placeholder="Why is the extension needed? The shopper reads this."
+                    className="w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-slate-950"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateExtensionRequest()}
+                    disabled={busy}
+                    className="rounded-full bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    Request extension
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="border-t border-black/[0.06] pt-5 dark:border-white/[0.06]">
