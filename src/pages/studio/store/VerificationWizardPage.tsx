@@ -1494,6 +1494,31 @@ export default function VerificationWizardPage() {
             </p>
           </section>
 
+          {/*
+            Stated at verification as well as at store setup, because this is
+            the point at which a brand is committing to trade — and a refund
+            recovery discovered later, in a balance that has gone negative, is
+            the kind of surprise that ends a partnership.
+          */}
+          <section className="rounded-2xl border border-amber-300/60 bg-amber-50 p-5 dark:border-amber-500/30 dark:bg-amber-500/10">
+            <p className="text-xs font-bold uppercase tracking-widest text-amber-900 dark:text-amber-200 mb-2">
+              💳 Refunds and your balance
+            </p>
+            <p className="text-xs leading-relaxed text-amber-900/90 dark:text-amber-100/90">
+              WIEZ refunds a shopper immediately when one is owed — they never
+              wait for you to be in funds. Where that order had already been
+              released to you, the amount becomes a balance you owe: your account
+              can go negative, payouts pause until it clears, and we recover it
+              from your next orders, oldest first. You are notified each time, and
+              while a balance is outstanding you must confirm it before accepting
+              a new custom order. Full terms:{' '}
+              <a href="/seller-terms" className="font-semibold underline underline-offset-2">
+                Seller Terms §8.2
+              </a>
+              .
+            </p>
+          </section>
+
           <div className="flex flex-wrap justify-end gap-3 border-t border-outline-variant/20 pt-4">
             <Button variant="ghost" onClick={() => setShowSubmitPreview(false)}>
               Back to editing

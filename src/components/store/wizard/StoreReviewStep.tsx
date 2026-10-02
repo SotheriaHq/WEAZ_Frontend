@@ -438,6 +438,35 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
               <div className="border-t border-[color:var(--border-default)] dark:border-gray-800 pt-6 space-y-4">
                 <BrandSettlementNoteFlag userId={user?.id} />
 
+                {/*
+                  The refund rule, said once before signing rather than found
+                  later in a balance that has gone negative. It is a material
+                  commercial term — WIEZ pays a refunded shopper straight away and
+                  recovers it from the brand's next earnings — and the one thing
+                  a seller should not meet for the first time as a surprise.
+                */}
+                <div className="rounded-xl border border-amber-300/70 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+                  <div className="text-sm font-bold text-amber-900 dark:text-amber-100">
+                    How refunds work on WIEZ
+                  </div>
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-amber-900/90 dark:text-amber-100/90">
+                    When a shopper is owed a refund, WIEZ pays them immediately —
+                    they never wait for you to be in funds. If that order had
+                    already been released to you, the amount becomes a balance you
+                    owe us: your account can go negative, payouts pause until it
+                    clears, and we recover it from your next orders, oldest first.
+                    You will be told every time, and you will have to confirm it
+                    before accepting a new custom order while a balance is
+                    outstanding.{' '}
+                    <a
+                      href="/seller-terms"
+                      className="font-semibold underline underline-offset-2"
+                    >
+                      Seller Terms §8.2
+                    </a>
+                  </p>
+                </div>
+
                 <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl bg-[color:var(--surface-secondary)] dark:bg-[#1a1a1a] border border-[color:var(--border-default)] dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700 transition-colors">
                   <input
                     type="checkbox"
