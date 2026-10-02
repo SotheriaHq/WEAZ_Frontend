@@ -563,6 +563,45 @@ export const CustomOrderJsonBreakdown: React.FC<{ data?: Record<string, unknown>
   );
 };
 
+/**
+ * Measurements as tiles, the way the native order screen draws them.
+ *
+ * A two-column table of thirty-eight rows is a spreadsheet; on a phone it is a
+ * spreadsheet you scroll past. The native app renders them as a grid of small
+ * labelled tiles, and the responsive web should not be a different product at
+ * the same width — so this is the shared rendering, three up on a phone and
+ * wider only when there is room.
+ */
+export const CustomOrderMeasurementTiles: React.FC<{
+  rows: Array<{ label: string; value: React.ReactNode }>;
+}> = ({ rows }) => {
+  if (rows.length === 0) {
+    return (
+      <div className="text-sm text-slate-500 dark:text-slate-400">
+        No measurement values are stored on this order.
+      </div>
+    );
+  }
+
+  return (
+    <dl className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+      {rows.map((row) => (
+        <div
+          key={row.label}
+          className="rounded-xl border border-black/[0.06] bg-black/[0.02] px-2.5 py-2 text-center dark:border-white/[0.06] dark:bg-white/[0.03]"
+        >
+          <dt className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+            {row.label}
+          </dt>
+          <dd className="mt-0.5 text-sm font-bold text-slate-900 dark:text-white">
+            {row.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+};
+
 export const CustomOrderDataTable: React.FC<{
   title?: string;
   rows: Array<{ label: string; value: React.ReactNode }>;

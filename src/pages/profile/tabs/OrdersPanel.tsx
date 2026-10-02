@@ -33,6 +33,7 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import {
   CustomOrderBadge,
   CustomOrderDataTable,
+  CustomOrderMeasurementTiles,
   CustomOrderMediaPreview,
   CustomOrderMetricCard,
   formatDateTime,
@@ -832,6 +833,24 @@ export const BuyerCustomOrderDetailView: React.FC<{
     [order?.disputes],
   );
   /**
+   * Is the delivery promise still ahead of us? Mirrors the native order screen
+   * exactly — same three verdicts, same precedence.
+   */
+  const deliveryTrack = useMemo((): {
+    label: string;
+    tone: 'primary' | 'danger' | 'muted' | 'success';
+  } => {
+    if (!order?.promisedDeliveryAt) return { label: 'Not scheduled', tone: 'muted' };
+    if (String(order.status).toUpperCase().includes('COMPLET')) {
+      return { label: 'Delivered', tone: 'success' };
+    }
+    const due = new Date(order.promisedDeliveryAt).getTime();
+    if (Number.isNaN(due)) return { label: 'Not scheduled', tone: 'muted' };
+    if (due < Date.now()) return { label: 'Overdue', tone: 'danger' };
+    return { label: 'On track', tone: 'primary' };
+  }, [order?.promisedDeliveryAt, order?.status]);
+
+  /**
    * The shopper's own open delay complaint, which is the only kind they can
    * close themselves. A delivery-class dispute is about a garment they have and
    * is settled by WIEZ, not withdrawn.
@@ -1556,8 +1575,46 @@ export const BuyerCustomOrderDetailView: React.FC<{
 
         <section className="rounded-[28px] border border-gray-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03]">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white">Measurements</h3>
+          {/* Tiles, not a table — the same rendering the native order screen
+              uses, so the responsive web is not a different product at the
+              same width. */}
           <div className="mt-4">
-            <CustomOrderDataTable rows={measurementRows} />
+            <CustomOrderMeasurementTiles rows={measurementRows} />
+          </div>
+
+          {/*
+            The delivery promise with a verdict on it, as native shows it. A date
+            on its own makes the reader do the arithmetic, and "on track" that
+            keeps saying "on track" after the date has passed is worse than
+            saying nothing.
+          */}
+          <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-black/[0.06] bg-black/[0.02] px-4 py-3 dark:border-white/[0.06] dark:bg-white/[0.03]">
+            <div className="min-w-0">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                Delivery promise
+              </div>
+              <div className="mt-0.5 text-sm font-bold text-slate-900 dark:text-white">
+                {formatDateTime(order.promisedDeliveryAt)}
+              </div>
+              {order.originalPromisedDeliveryAt ? (
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Originally {formatDateTime(order.originalPromisedDeliveryAt)}
+                </div>
+              ) : null}
+            </div>
+            <span
+              className={`shrink-0 text-[11px] font-bold ${
+                deliveryTrack.tone === 'danger'
+                  ? 'text-rose-600 dark:text-rose-300'
+                  : deliveryTrack.tone === 'success'
+                    ? 'text-emerald-600 dark:text-emerald-300'
+                    : deliveryTrack.tone === 'muted'
+                      ? 'text-slate-500 dark:text-slate-400'
+                      : 'text-indigo-600 dark:text-indigo-300'
+              }`}
+            >
+              {deliveryTrack.label}
+            </span>
           </div>
         </section>
       </div>
