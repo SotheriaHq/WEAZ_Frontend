@@ -264,6 +264,28 @@ export interface CustomOrderExtensionPolicy {
   rushBlocked: boolean;
 }
 
+/**
+ * The API's answer to "can this shopper report that their order is late?".
+ *
+ * `reason` is a stable code so the client can say WHY not — "not late yet" and
+ * "we are already looking at it" are different sentences, and both are better
+ * than a disabled button with no explanation.
+ */
+export interface CustomOrderDelayEligibility {
+  eligible: boolean;
+  /** Which promise was missed: the production date or the delivery date. */
+  basis: 'PRODUCTION' | 'DELIVERY' | null;
+  /** When the control unlocks, during the grace period. */
+  availableAt?: string | null;
+  reason:
+    | 'ELIGIBLE'
+    | 'NOT_LATE_YET'
+    | 'WITHIN_GRACE'
+    | 'NO_PROMISE_RECORDED'
+    | 'NOT_A_LIVE_ORDER'
+    | 'ALREADY_DISPUTED';
+}
+
 export interface CustomOrderExtensionRequest {
   id: string;
   targetType: CustomOrderExtensionTargetType;
@@ -585,6 +607,13 @@ export interface CustomOrderDetail {
   originalPromisedDispatchAt?: string | null;
   originalPromisedDeliveryAt?: string | null;
   extensionPolicy?: CustomOrderExtensionPolicy;
+  /**
+   * Whether the shopper may escalate this order for lateness, decided by the
+   * API. The client renders the verdict and the copy; it never recomputes the
+   * grace period or the precedence, or it will eventually disagree with the
+   * endpoint and offer a button that fails.
+   */
+  delayDispute?: CustomOrderDelayEligibility;
   /** An admin is steering this order until `adminInterventionResolvedAt`. */
   adminInterventionAt?: string | null;
   adminInterventionReason?: string | null;
@@ -1208,6 +1237,18 @@ export const customOrdersBuyerApi = {
     note?: string;
   }) {
     const response = await apiClient.post(`/custom-orders/${orderId}/extension-requests/${requestId}/respond`, payload);
+    return unwrapApiResponse<CustomOrderDetail>(response.data);
+  },
+
+  /**
+   * End a delay dispute the shopper raised — "it arrived, I'll take it late".
+   * Their own delay-class disputes only, and only before an admin takes over.
+   */
+  async closeDelayDispute(orderId: string, disputeId: string, note?: string) {
+    const response = await apiClient.post(
+      `/custom-orders/${orderId}/disputes/${disputeId}/close`,
+      { note },
+    );
     return unwrapApiResponse<CustomOrderDetail>(response.data);
   },
 

@@ -5,6 +5,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import AdminNoticePanel, {
   selectBuyerAdminNotices,
 } from '@/components/custom-orders/AdminNoticePanel';
+import DelayDisputePanel from '@/components/custom-orders/DelayDisputePanel';
 import ExtensionDecisionPanel, {
   ExtensionHistoryList,
 } from '@/components/custom-orders/ExtensionDecisionPanel';
@@ -830,6 +831,22 @@ export const BuyerCustomOrderDetailView: React.FC<{
       null,
     [order?.disputes],
   );
+  /**
+   * The shopper's own open delay complaint, which is the only kind they can
+   * close themselves. A delivery-class dispute is about a garment they have and
+   * is settled by WIEZ, not withdrawn.
+   */
+  const openDelayDispute = useMemo(
+    () =>
+      order?.disputes.find(
+        (entry) =>
+          (entry.reasonType === 'UNREASONABLE_DELAY' ||
+            entry.reasonType === 'NON_DELIVERY') &&
+          entry.status !== 'CLOSED' &&
+          entry.status !== 'RESOLVED',
+      ) ?? null,
+    [order?.disputes],
+  );
   const acceptanceWindowOpen = useMemo(
     () =>
       order?.buyerAcceptanceWindowEndsAt
@@ -1045,6 +1062,36 @@ export const BuyerCustomOrderDetailView: React.FC<{
     );
   };
 
+  /**
+   * Report that the order is late. No photographs: there is nothing to
+   * photograph, which is precisely why this was impossible before.
+   */
+  const handleReportDelay = async (description: string) => {
+    if (!order) return;
+    await wrapMutation(
+      () =>
+        customOrdersBuyerApi.reportIssue(order.id, {
+          issueType:
+            order.delayDispute?.basis === 'DELIVERY'
+              ? 'NON_DELIVERY'
+              : 'UNREASONABLE_DELAY',
+          description,
+          evidenceJson: {},
+        }),
+      'Reported. WIEZ is reviewing this order with your maker.',
+    );
+  };
+
+  /** "It arrived — I'll take it late." The shopper ends their own report. */
+  const handleCloseDelayDispute = async (disputeId: string, note: string) => {
+    if (!order) return;
+    await wrapMutation(
+      () =>
+        customOrdersBuyerApi.closeDelayDispute(order.id, disputeId, note || undefined),
+      'Closed. Thanks for letting us know.',
+    );
+  };
+
   // Read-only channel: the shopper marks notices seen, and never replies here.
   const handleAckAdminNotices = async () => {
     if (!order) return;
@@ -1243,6 +1290,21 @@ export const BuyerCustomOrderDetailView: React.FC<{
           autoOpen={focusExtensionRequestId === latestOpenExtension.id}
         />
       ) : null}
+
+      {/*
+        Lateness, directly under the extension decision. Both are about the same
+        thing — time — and both are things only this shopper can act on.
+      */}
+      <DelayDisputePanel
+        eligibility={order.delayDispute}
+        openDispute={openDelayDispute}
+        interventionOpen={Boolean(
+          order.adminInterventionAt && !order.adminInterventionResolvedAt,
+        )}
+        busy={busy}
+        onReport={handleReportDelay}
+        onClose={handleCloseDelayDispute}
+      />
 
       <AdminNoticePanel
         notices={buyerAdminNotices}

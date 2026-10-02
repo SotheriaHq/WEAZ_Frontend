@@ -182,6 +182,36 @@ export default {
         'ui-md': ['1rem',     { lineHeight: '1.5',  letterSpacing: '0'        }],
         'ui-sm': ['0.875rem', { lineHeight: '1.5',  letterSpacing: '0.005em'  }],
         'ui-xs': ['0.75rem',  { lineHeight: '1.5',  letterSpacing: '0.01em'   }],
+
+        /*
+          Tracking on the DEFAULT steps, because those are the ones in use.
+          -------------------------------------------------------------------
+          The two scales above were tuned with real optical tracking and then
+          referenced by nothing: `grep -rl "text-display-\|text-ui-" src` returns
+          zero files. Every heading in the app is a plain `text-2xl font-bold`,
+          and Tailwind's built-in steps carry no letter-spacing at all — so Plus
+          Jakarta Sans is set at its default sidebearing at every size, which at
+          24px and up reads loose and soft. That is the flatness.
+
+          Redefining the built-in steps fixes it everywhere at once without
+          touching a single call site. Sizes and line-heights are Tailwind's own
+          values, unchanged, so nothing reflows: the ONLY difference is tracking,
+          tightening as type gets larger and opening slightly for small text,
+          which is the same curve the scales above already describe.
+        */
+        xs:   ['0.75rem',  { lineHeight: '1rem',    letterSpacing: '0.01em'   }],
+        sm:   ['0.875rem', { lineHeight: '1.25rem', letterSpacing: '0.005em'  }],
+        base: ['1rem',     { lineHeight: '1.5rem',  letterSpacing: '0'        }],
+        lg:   ['1.125rem', { lineHeight: '1.75rem', letterSpacing: '-0.005em' }],
+        xl:   ['1.25rem',  { lineHeight: '1.75rem', letterSpacing: '-0.01em'  }],
+        '2xl':['1.5rem',   { lineHeight: '2rem',    letterSpacing: '-0.015em' }],
+        '3xl':['1.875rem', { lineHeight: '2.25rem', letterSpacing: '-0.02em'  }],
+        '4xl':['2.25rem',  { lineHeight: '2.5rem',  letterSpacing: '-0.025em' }],
+        '5xl':['3rem',     { lineHeight: '1',       letterSpacing: '-0.03em'  }],
+        '6xl':['3.75rem',  { lineHeight: '1',       letterSpacing: '-0.03em'  }],
+        '7xl':['4.5rem',   { lineHeight: '1',       letterSpacing: '-0.035em' }],
+        '8xl':['6rem',     { lineHeight: '1',       letterSpacing: '-0.035em' }],
+        '9xl':['8rem',     { lineHeight: '1',       letterSpacing: '-0.04em'  }],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
