@@ -823,6 +823,29 @@ html {
 
 /* Frosted-glass (glassmorphism) design tokens */
 @layer components {
+  /*
+    Money.
+
+    Amounts were set in whatever heading class happened to be nearby, so a
+    price carried the same weight and spacing as the card title above it and
+    read as a label rather than as the figure the row exists to state. Three
+    things fix it, and the first is the one that matters most:
+
+      - `tabular-nums` fixes every digit to one advance width. Plus Jakarta's
+        default figures are proportional, so a column of prices never aligns
+        however carefully the rows are laid out.
+      - 800 lifts the amount clear of the 700 title beside it.
+      - Slightly negative tracking closes the digit run so a five-figure sum
+        reads as one number rather than five glyphs.
+
+    Mirrors the native `money` type tier exactly — same intent, same result.
+  */
+  .money {
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
   /* Global focus reset — removes focus borders/rings across shared controls. */
   :where(
       input,

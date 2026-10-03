@@ -546,7 +546,7 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
 
               <div className="text-right">
                 <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
-                <p className="text-3xl font-black text-gray-900 dark:text-white">
+                <p className="money text-3xl text-gray-900 dark:text-white">
                   {formatCurrency(Number(order.totalAmount), order.currency || 'NGN')}
                 </p>
               </div>
@@ -840,15 +840,45 @@ export const BuyerCustomOrderDetailView: React.FC<{
     label: string;
     tone: 'primary' | 'danger' | 'muted' | 'success';
   } => {
-    if (!order?.promisedDeliveryAt) return { label: 'Not scheduled', tone: 'muted' };
-    if (String(order.status).toUpperCase().includes('COMPLET')) {
-      return { label: 'Delivered', tone: 'success' };
+    /*
+      Read the API's verdict; do not recompute it.
+
+      This used to measure `promisedDeliveryAt` against the clock here. That
+      date is only written at payment confirmation, so for every order accepted
+      by another path the panel said "Not scheduled" — on orders that were in
+      fact weeks overdue — while the dispute gate, reading the same null, hid
+      the report control. The API now derives both from the brand's published
+      lead times, and this renders that one answer.
+    */
+    const schedule = order?.schedule;
+    if (!schedule) return { label: 'Not scheduled', tone: 'muted' };
+
+    switch (schedule.state) {
+      case 'OVERDUE': {
+        const days = Math.max(1, schedule.daysOverdue);
+        return { label: `${days} day${days === 1 ? '' : 's'} late`, tone: 'danger' };
+      }
+      case 'DUE_SOON': {
+        const days = schedule.daysRemaining ?? 0;
+        return {
+          label: days <= 0 ? 'Due today' : `${days} day${days === 1 ? '' : 's'} left`,
+          tone: 'danger',
+        };
+      }
+      case 'ON_TRACK': {
+        const days = schedule.daysRemaining;
+        return days == null
+          ? { label: 'On track', tone: 'primary' }
+          : { label: `${days} day${days === 1 ? '' : 's'} left`, tone: 'primary' };
+      }
+      case 'DELIVERED':
+        return { label: 'Delivered', tone: 'success' };
+      case 'CLOSED':
+        return { label: 'Closed', tone: 'muted' };
+      default:
+        return { label: 'Not scheduled', tone: 'muted' };
     }
-    const due = new Date(order.promisedDeliveryAt).getTime();
-    if (Number.isNaN(due)) return { label: 'Not scheduled', tone: 'muted' };
-    if (due < Date.now()) return { label: 'Overdue', tone: 'danger' };
-    return { label: 'On track', tone: 'primary' };
-  }, [order?.promisedDeliveryAt, order?.status]);
+  }, [order?.schedule]);
 
   /**
    * The shopper's own open delay complaint, which is the only kind they can
@@ -2209,7 +2239,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                           <p className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
                             {firstItem?.name || 'Order'}
                           </p>
-                          <p className="shrink-0 text-sm font-bold text-gray-900 dark:text-white">
+                          <p className="money shrink-0 text-sm text-gray-900 dark:text-white">
                             {formatCurrency(order.totalAmount, order.currency)}
                           </p>
                         </div>
@@ -2294,7 +2324,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                         <div className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
                           {order.sourceTitle}
                         </div>
-                        <div className="shrink-0 text-sm font-bold text-gray-900 dark:text-white">
+                        <div className="money shrink-0 text-sm text-gray-900 dark:text-white">
                           {formatCurrency(order.buyerPriceSummary.grandTotal, order.buyerPriceSummary.currency)}
                         </div>
                       </div>

@@ -271,6 +271,30 @@ export interface CustomOrderExtensionPolicy {
  * "we are already looking at it" are different sentences, and both are better
  * than a disabled button with no explanation.
  */
+/**
+ * When an order is due, and how late it is — resolved by the API.
+ *
+ * `promisedDeliveryAt` is only written at payment confirmation, so computing
+ * lateness from it on the client means every order accepted by another path
+ * reads as having no deadline at all. The API derives the dates from the
+ * brand's published lead times when no promise was recorded, and this carries
+ * that answer. The same object backs the dispute gate, so what the screen says
+ * and what the button does cannot drift apart.
+ */
+export interface CustomOrderSchedule {
+  expectedProductionAt: string | null;
+  expectedDeliveryAt: string | null;
+  /** True when the date the countdown measures against was derived. */
+  estimated: boolean;
+  productionEstimated: boolean;
+  deliveryEstimated: boolean;
+  state: 'NOT_STARTED' | 'ON_TRACK' | 'DUE_SOON' | 'OVERDUE' | 'DELIVERED' | 'CLOSED';
+  /** Whole days until due. Negative once the date has passed. */
+  daysRemaining: number | null;
+  daysOverdue: number;
+  extensionDaysGranted: number;
+}
+
 export interface CustomOrderDelayEligibility {
   eligible: boolean;
   /** Which promise was missed: the production date or the delivery date. */
@@ -614,6 +638,8 @@ export interface CustomOrderDetail {
    * endpoint and offer a button that fails.
    */
   delayDispute?: CustomOrderDelayEligibility;
+  /** When this order is due, resolved by the API. See `CustomOrderSchedule`. */
+  schedule?: CustomOrderSchedule;
   /** An admin is steering this order until `adminInterventionResolvedAt`. */
   adminInterventionAt?: string | null;
   adminInterventionReason?: string | null;
