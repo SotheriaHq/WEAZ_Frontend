@@ -493,6 +493,38 @@ const StudioCustomOrderDetailPage: React.FC = () => {
       !lockedStatuses.has(order.status),
   );
 
+  /**
+   * Why the production controls are locked, in words a maker can act on.
+   *
+   * Both selects correctly refuse to open once an order reaches a locked status
+   * — but a disabled select gives no feedback at all when you tap it, and the
+   * helper underneath only said the update was "not available in current
+   * state". A brand whose order had gone into dispute tapped the dropdowns,
+   * got nothing, and reasonably concluded the page was broken.
+   *
+   * The lock is right; the silence is the defect. Name the cause.
+   */
+  const productionLockReason = useMemo((): string | null => {
+    if (!order) return null;
+    if (openDisputeCount > 0) {
+      return 'This order is in dispute. Production and lifecycle updates are frozen while WIEZ reviews it — reply in the Notices tab and the controls unlock when the dispute is resolved.';
+    }
+    switch (order.status) {
+      case 'DELIVERY_ISSUE_REPORTED':
+        return 'The buyer has reported a problem with what arrived. Production updates are frozen until that is resolved.';
+      case 'REFUND_IN_PROGRESS':
+        return 'A refund is being processed on this order, so its production state can no longer change.';
+      case 'CANCELLED_BY_BUYER_PRE_ACCEPTANCE':
+      case 'REJECTED_BY_BRAND':
+        return 'This order never entered production, so there is nothing to update.';
+      case 'COMPLETED':
+      case 'CLOSED':
+        return 'This order is finished. Its production record is kept as it was.';
+      default:
+        return null;
+    }
+  }, [order, openDisputeCount]);
+
   const measurementMetaRows = useMemo(() => {
     if (!measurementMeta) return [];
     return [
@@ -1404,6 +1436,20 @@ const StudioCustomOrderDetailPage: React.FC = () => {
               System sets order placed and order received automatically. Brand updates begin from fabric and piece gathering.
             </p>
 
+            {/*
+              Above the controls, not beneath them. Someone who cannot use a
+              dropdown needs to know that before they tap it, not after.
+            */}
+            {productionLockReason ? (
+              <div
+                role="status"
+                className="mt-4 rounded-2xl border border-amber-300/70 bg-amber-50/90 p-4 text-sm leading-6 text-amber-950 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100"
+              >
+                <div className="font-semibold">🔒 Updates are locked</div>
+                <p className="mt-1">{productionLockReason}</p>
+              </div>
+            ) : null}
+
             <div className="mt-5">
               <UniversalSelect
                 label="Production status"
@@ -1413,7 +1459,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                   value: option.value,
                   label: option.label,
                 }))}
-                placeholder={canUpdateProgressStage ? 'Select the next production stage' : 'Stage updates not available in current state'}
+                placeholder={canUpdateProgressStage ? 'Select the next production stage' : 'Locked while this order is in dispute'}
                 disabled={!canUpdateProgressStage || busy}
               />
               <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
@@ -1421,7 +1467,8 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                   ? selectedStage
                     ? brandManagedStageOptions.find((option) => option.value === selectedStage)?.helper
                     : 'Choose the next production stage. Changes save immediately.'
-                  : 'Stage updates are not available for this order in its current state.'}
+                  : (productionLockReason ??
+                    'Stage updates are not available for this order in its current state.')}
               </p>
             </div>
 
@@ -1446,7 +1493,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                   ? selectedLifecycleStatus
                     ? availableLifecycleOptions.find((option) => option.value === selectedLifecycleStatus)?.helper
                     : 'Choose the next dispatch or delivery lifecycle update. Changes save immediately.'
-                  : 'Lifecycle updates unlock only when the order has moved into dispatch, transit, delivered, or completed states.'}
+                  : (productionLockReason ?? 'Lifecycle updates unlock only when the order has moved into dispatch, transit, delivered, or completed states.')}
               </p>
             </div>
           </aside>
