@@ -85,6 +85,12 @@ export interface PaymentInitResult {
   exchangeRateSnapshotId?: string;
   channel?: string;
   providerAccessCode?: string;
+  /**
+   * Issuer challenge (3-D Secure) URL. The API has always sent this; the client
+   * type omitted it, so the only launch shape the web app could act on was an
+   * inline access code — and a saved-card charge never has one.
+   */
+  authorizationUrl?: string;
   callbackUrl?: string;
   bankAccount?: {
     bankName: string;
@@ -171,6 +177,7 @@ export interface PaymentAttemptSummary {
   exchangeRateSnapshotId?: string;
   channel?: string;
   providerAccessCode?: string;
+  authorizationUrl?: string;
   callbackUrl?: string;
   bankAccount?: PaymentInitResult['bankAccount'];
   paymentData?: Record<string, any>;

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { productApi } from '@/api/ProductApi';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import MediaRenderer from '@/components/media/MediaRenderer';
 
 interface PermanentDeleteProductModalProps {
@@ -106,7 +106,7 @@ const PermanentDeleteProductModal: React.FC<PermanentDeleteProductModalProps> = 
           >
             {loading ? (
               <>
-                <VLoader size={16} phase="loading" showLabel={false} />
+                <MuseLoader size={16} />
                 Deleting...
               </>
             ) : (

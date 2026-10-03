@@ -63,8 +63,9 @@ vi.mock('@/components/ui/Modal', () => ({
   }) => (open ? <div><div>{title}</div>{children}</div> : null),
 }));
 
-vi.mock('@/components/loaders/VLoader', () => ({
-  default: () => <div>Loading</div>,
+vi.mock('@/components/loaders/MuseLoader', () => ({
+  MuseLoader: () => <div>Loading</div>,
+  MuseProgress: () => <div>Loading</div>,
 }));
 
 vi.mock('sonner', () => ({

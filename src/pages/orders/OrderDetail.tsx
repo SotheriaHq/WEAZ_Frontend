@@ -5,8 +5,10 @@ import { toast } from 'sonner';
 
 import ReviewComposerModal from '@/components/reviews/ReviewComposerModal';
 import { useReviewRuntimeFlags } from '@/hooks/useReviewRuntimeFlags';
+import useCachedResource from '@/hooks/useCachedResource';
 import ImageWithFallback from '@/components/ImageWithFallback';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
+import { queryClient } from '@/query/queryClient';
 
 const formatCurrency = (amount: number, currency: string) =>
   new Intl.NumberFormat('en-NG', {
@@ -111,8 +113,24 @@ const OrderDetail: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { flags, isLoading: reviewFlagsLoading } = useReviewRuntimeFlags();
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
+  const orderQueryKey = ['orders', 'detail', orderId] as const;
+  const {
+    data: order = null,
+    loading,
+    error: orderError,
+  } = useCachedResource<Order | null>({
+    queryKey: orderQueryKey,
+    queryFn: async () => {
+      if (!orderId) return null;
+      const access = await resolveOrderAccess(orderId);
+      if (access.destination !== `/orders/${orderId}`) {
+        navigate(access.destination, { replace: true });
+        return null;
+      }
+      return (await getMyOrder(orderId)) as Order;
+    },
+    enabled: Boolean(orderId),
+  });
   const [activeReviewItem, setActiveReviewItem] = useState<any | null>(null);
   const [confirmingDelivery, setConfirmingDelivery] = useState(false);
 
@@ -129,36 +147,13 @@ const OrderDetail: React.FC = () => {
   }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
-    let active = true;
-
-    const fetchOrder = async () => {
-      if (!orderId) return;
-      setLoading(true);
-      try {
-        const access = await resolveOrderAccess(orderId);
-        if (!active) return;
-        if (access.destination !== `/orders/${orderId}`) {
-          navigate(access.destination, { replace: true });
-          return;
-        }
-
-        const data = await getMyOrder(orderId);
-        if (!active) return;
-        setOrder(data as any);
-      } catch (error: any) {
-        toast.error(error?.response?.data?.message || 'Order not found');
-        navigate('/profile?tab=orders');
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
-    void fetchOrder();
-
-    return () => {
-      active = false;
-    };
-  }, [navigate, orderId]);
+    if (!orderError) return;
+    const message =
+      (orderError as { response?: { data?: { message?: string } } }).response?.data?.message ||
+      'Order not found';
+    toast.error(message);
+    navigate('/profile?tab=orders');
+  }, [navigate, orderError]);
 
   // Buyer can confirm delivery once the brand has shipped (new flow) or marked delivered (legacy)
   const canConfirmDelivery =
@@ -239,7 +234,7 @@ const OrderDetail: React.FC = () => {
     setConfirmingDelivery(true);
     try {
       const updated = await confirmMyOrderDelivery(orderId);
-      setOrder(updated as any);
+      queryClient.setQueryData(orderQueryKey, updated);
       toast.success('Delivery confirmed');
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to confirm delivery');
@@ -251,7 +246,7 @@ const OrderDetail: React.FC = () => {
   if (loading) {
     return (
       <div className="mx-auto flex max-w-4xl justify-center px-4 py-10">
-        <VLoader size={56} phase="loading" />
+        <MuseLoader size={56} />
       </div>
     );
   }
@@ -327,7 +322,15 @@ const OrderDetail: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {/*
+              Four facts, two columns, on a phone.
+
+              Each pill is a short label over a short value — a shape that fits
+              a half-width column comfortably. Stacking them one per row spent
+              four rows of a 360px screen on four words, and pushed the order
+              status the shopper came to read below the fold.
+            */}
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
               <InfoPill label="Brand" value={order.brand?.name || 'Brand'} />
               <InfoPill label="Order ID" value={`#${order.id.slice(0, 8).toUpperCase()}`} mono />
               <InfoPill label="Placed" value={formatDateTime(order.createdAt) || 'Recorded'} />
@@ -677,12 +680,12 @@ const OrderDetail: React.FC = () => {
         onSaved={async () => {
           if (!orderId) return;
           const data = await getMyOrder(orderId);
-          setOrder(data as any);
+          queryClient.setQueryData(orderQueryKey, data);
         }}
         onDeleted={async () => {
           if (!orderId) return;
           const data = await getMyOrder(orderId);
-          setOrder(data as any);
+          queryClient.setQueryData(orderQueryKey, data);
         }}
       />
     </div>
@@ -694,11 +697,11 @@ const InfoPill: React.FC<{ label: string; value: string; mono?: boolean }> = ({
   value,
   mono = false,
 }) => (
-  <div className="rounded-2xl border border-gray-200 bg-gray-50/80 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
-    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
+  <div className="min-w-0 rounded-2xl border border-gray-200 bg-gray-50/80 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03] sm:px-4 sm:py-3">
+    <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400 dark:text-gray-500 sm:text-[11px] sm:tracking-[0.16em]">
       {label}
     </p>
-    <p className={`mt-1 text-sm font-semibold text-gray-900 dark:text-white ${mono ? 'font-mono' : ''}`}>
+    <p className={`mt-0.5 break-words text-[13px] font-semibold text-gray-900 dark:text-white sm:mt-1 sm:text-sm ${mono ? 'font-mono' : ''}`}>
       {value}
     </p>
   </div>

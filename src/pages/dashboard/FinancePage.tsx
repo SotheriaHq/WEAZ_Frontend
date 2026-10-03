@@ -1,11 +1,20 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
-import { brandApi } from '@/api/BrandApi';
+import {
+  PAYOUT_ACCOUNT_SETTINGS_PATH,
+  resolvePayoutAccountIssue,
+} from '@/lib/payoutAccountIssue';
+import { brandApi, type PayoutChallenge } from '@/api/BrandApi';
+import PayoutConfirmDialog from '@/components/payouts/PayoutConfirmDialog';
+import { showNotice } from '@/components/ui/NoticeModal';
 import { customOrdersBrandApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
 import { getStoreStatus } from '@/api/StoreApi';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import Modal from '@/components/ui/Modal';
+import { useCachedResource } from '@/hooks/useCachedResource';
+import { queryKeys } from '@/query/queryKeys';
 import type { RootState } from '@/store';
 
 const STATUS_THEME: Record<string, string> = {
@@ -154,7 +163,7 @@ const buildSellerReceiptStates = (transaction: IncomingTransaction) => {
     },
     {
       label: 'Escrow recorded',
-      detail: 'WEAZ recorded the funds and prepared them for the release workflow.',
+      detail: 'WIEZ recorded the funds and prepared them for the release workflow.',
       complete: true,
     },
     {
@@ -173,17 +182,23 @@ const buildSellerReceiptStates = (transaction: IncomingTransaction) => {
   ];
 };
 
+type FinancePageData = {
+  brandId: string;
+  overview: FinanceOverview | null;
+  payouts: any[];
+  incomingTransactions: IncomingTransaction[];
+  heldFunds: HeldFundsItem[];
+};
+
+const toArrayOrItems = <T,>(value: any): T[] =>
+  Array.isArray(value?.items) ? value.items : Array.isArray(value) ? value : [];
+
 const FinancePage: React.FC = () => {
+  const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
-  const requestRef = useRef(0);
-  const mountedRef = useRef(true);
-  const [brandId, setBrandId] = useState<string | null>(null);
-  const [payouts, setPayouts] = useState<any[]>([]);
-  const [incomingTransactions, setIncomingTransactions] = useState<IncomingTransaction[]>([]);
-  const [heldFunds, setHeldFunds] = useState<HeldFundsItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
-  const [overview, setOverview] = useState<FinanceOverview | null>(null);
+  /** The live payout challenge, or null when no payout is awaiting a code. */
+  const [payoutChallenge, setPayoutChallenge] = useState<PayoutChallenge | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<IncomingTransaction | null>(null);
   const [selectedHeldFund, setSelectedHeldFund] = useState<HeldFundsItem | null>(null);
   const [selectedHeldStandardOrder, setSelectedHeldStandardOrder] = useState<any | null>(null);
@@ -191,16 +206,12 @@ const FinancePage: React.FC = () => {
   const [heldDetailLoading, setHeldDetailLoading] = useState(false);
   const [heldDetailError, setHeldDetailError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
-    if (!user?.id) return;
-
-    const requestId = requestRef.current + 1;
-    requestRef.current = requestId;
-    setLoading(true);
-    try {
+  // Cache-first screen data: cached revisits paint instantly (no loader flash)
+  // while a silent background revalidation runs when stale.
+  const financeResource = useCachedResource<FinancePageData>({
+    queryKey: queryKeys.brand.finance(user?.id),
+    queryFn: async () => {
       const storeStatus = await getStoreStatus();
-      if (!mountedRef.current || requestRef.current !== requestId) return;
-      setBrandId(storeStatus.brandId);
 
       const [overviewData, payoutsData, incomingData, heldFundsData] = await Promise.all([
         brandApi.getPayoutOverview(storeStatus.brandId),
@@ -208,10 +219,10 @@ const FinancePage: React.FC = () => {
         brandApi.getIncomingTransactions(storeStatus.brandId, { page: 1, limit: 20 }),
         brandApi.getHeldFunds(storeStatus.brandId, { page: 1, limit: 20 }),
       ]);
-      if (!mountedRef.current || requestRef.current !== requestId) return;
 
-      setOverview(
-        overviewData
+      return {
+        brandId: storeStatus.brandId,
+        overview: overviewData
           ? {
               currency: overviewData.currency || 'NGN',
               availableBalance: Number(overviewData.availableBalance || 0),
@@ -225,49 +236,28 @@ const FinancePage: React.FC = () => {
               negativeBalance: Boolean(overviewData.negativeBalance),
             }
           : null,
-      );
+        payouts: toArrayOrItems(payoutsData),
+        incomingTransactions: toArrayOrItems<IncomingTransaction>(incomingData),
+        heldFunds: toArrayOrItems<HeldFundsItem>(heldFundsData),
+      };
+    },
+    enabled: Boolean(user?.id),
+  });
 
-      setPayouts(
-        Array.isArray(payoutsData?.items)
-          ? payoutsData.items
-          : Array.isArray(payoutsData)
-            ? payoutsData
-            : [],
-      );
-
-      setIncomingTransactions(
-        Array.isArray(incomingData?.items)
-          ? incomingData.items
-          : Array.isArray(incomingData)
-            ? incomingData
-            : [],
-      );
-
-      setHeldFunds(
-        Array.isArray(heldFundsData?.items)
-          ? heldFundsData.items
-          : Array.isArray(heldFundsData)
-            ? heldFundsData
-            : [],
-      );
-    } catch (error) {
-      if (!mountedRef.current || requestRef.current !== requestId) return;
-      console.error('Failed to fetch finance data', error);
-      toast.error('Failed to load finance data');
-    } finally {
-      if (mountedRef.current && requestRef.current === requestId) {
-        setLoading(false);
-      }
-    }
-  }, [user?.id]);
+  const loading = financeResource.loading;
+  const brandId = financeResource.data?.brandId ?? null;
+  const overview = financeResource.data?.overview ?? null;
+  const payouts = financeResource.data?.payouts ?? [];
+  const incomingTransactions = financeResource.data?.incomingTransactions ?? [];
+  const heldFunds = financeResource.data?.heldFunds ?? [];
+  const financeError = financeResource.error;
+  const refetchFinance = financeResource.refetch;
 
   useEffect(() => {
-    mountedRef.current = true;
-    void fetchData();
-    return () => {
-      mountedRef.current = false;
-    };
-  }, [fetchData]);
+    if (!financeError) return;
+    console.error('Failed to fetch finance data', financeError);
+    toast.error('Failed to load finance data');
+  }, [financeError]);
 
   const availableBalance = overview?.availableBalance ?? 0;
   const currency = overview?.currency || 'NGN';
@@ -563,10 +553,44 @@ const FinancePage: React.FC = () => {
 
     setRequesting(true);
     try {
-      await brandApi.requestPayout(brandId, availableBalance);
-      toast.success('Payout requested successfully');
-      void fetchData();
+      /*
+        This no longer creates the payout. It validates the request and emails
+        a code; the dialog below spends it. A session that can press this button
+        should not, on its own, be able to move money off the platform.
+      */
+      const challenge = await brandApi.requestPayout(brandId, availableBalance);
+      setPayoutChallenge(challenge);
+      toast.success(`Confirmation code sent to ${challenge.emailHint}`);
     } catch (error: any) {
+      /*
+        A payout that fails because of the payout account is not news, it is a
+        task. The brand is one screen away from fixing it.
+
+        A notice, not a toast. The toast carried the fix as a small button in a
+        corner that disappears on its own — and many people never press a
+        button inside a toast at all, because toasts read as announcements, not
+        as things you act on. The brand read the sentence, it went away, and
+        they were left with a payout button that "does nothing". A dialog stays
+        until it is answered, and its primary button IS the fix.
+
+        The detail line answers the question a refused payout actually raises —
+        "is my money gone?" — which the message alone does not.
+      */
+      const issue = resolvePayoutAccountIssue(error);
+      if (issue) {
+        showNotice({
+          tone: 'action',
+          emoji: '🏦',
+          title: issue.title,
+          message: issue.message,
+          detail: `Your ${formatCurrency(availableBalance)} stays in your available balance while you do this. Nothing is lost.`,
+          action: {
+            label: issue.ctaLabel,
+            onSelect: () => navigate(PAYOUT_ACCOUNT_SETTINGS_PATH),
+          },
+        });
+        return;
+      }
       toast.error(error?.response?.data?.message || 'Failed to request payout');
     } finally {
       setRequesting(false);
@@ -710,7 +734,7 @@ const FinancePage: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center">
-                    <VLoader size={32} phase="loading" showLabel={false} />
+                    <MuseLoader size={32} />
                   </td>
                 </tr>
               ) : displayHeldFunds.length === 0 ? (
@@ -820,7 +844,7 @@ const FinancePage: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center">
-                    <VLoader size={32} phase="loading" showLabel={false} />
+                    <MuseLoader size={32} />
                   </td>
                 </tr>
               ) : incomingTransactions.length === 0 ? (
@@ -932,7 +956,7 @@ const FinancePage: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-12 text-center">
-                    <VLoader size={32} phase="loading" showLabel={false} />
+                    <MuseLoader size={32} />
                   </td>
                 </tr>
               ) : payouts.length === 0 ? (
@@ -1025,7 +1049,7 @@ const FinancePage: React.FC = () => {
             {heldDetailLoading ? (
               <div className="rounded-2xl border border-gray-200/80 bg-gray-50/80 dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="flex items-center justify-center py-10">
-                  <VLoader size={34} phase="loading" showLabel={false} />
+                  <MuseLoader size={34} />
                 </div>
               </div>
             ) : null}
@@ -1045,7 +1069,7 @@ const FinancePage: React.FC = () => {
                 />
                 <FinanceReceiptList
                   title="Escrow allocation"
-                  subtitle="This shows how the captured order value is split between WEAZ commission, brand release, and the remaining held amount."
+                  subtitle="This shows how the captured order value is split between WIEZ commission, brand release, and the remaining held amount."
                   rows={heldEscrowAllocationRows}
                   footerNote="Gross tracked in escrow = platform commission + released net + still held net."
                 />
@@ -1210,6 +1234,34 @@ const FinancePage: React.FC = () => {
           </div>
         ) : null}
       </Modal>
+
+      <PayoutConfirmDialog
+        open={Boolean(payoutChallenge)}
+        brandId={brandId ?? ''}
+        challenge={payoutChallenge}
+        onCancel={() => setPayoutChallenge(null)}
+        onConfirmed={() => {
+          setPayoutChallenge(null);
+          void refetchFinance();
+        }}
+        /*
+          Resending re-runs the request, which re-validates the payout from
+          scratch: the balance or the payout account may have changed in the
+          ten minutes the first code was alive, and a fresh code for a payout
+          that can no longer happen would be a lie.
+        */
+        onResend={async () => {
+          if (!brandId) return null;
+          try {
+            return await brandApi.requestPayout(brandId, availableBalance);
+          } catch (error: any) {
+            toast.error(
+              error?.response?.data?.message || 'Could not send a new code.',
+            );
+            return null;
+          }
+        }}
+      />
     </div>
   );
 };

@@ -97,9 +97,9 @@ const AdminResetPasswordPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-[#faf8ff] via-[#f5f0ff] to-[#ede9f7]">
-      <div className="w-full max-w-md p-6 rounded-2xl border border-purple-200/40 bg-white/90 shadow-sm space-y-4">
-        <h1 className="text-xl font-bold text-gray-900">🔑 Admin Reset Password</h1>
+    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-[#faf8ff] via-[#f5f0ff] to-[#ede9f7] dark:from-[#0d0b12] dark:via-[#0a0a0e] dark:to-[#0a0a0a]">
+      <div className="w-full max-w-md p-6 rounded-2xl border border-purple-200/40 bg-white/90 shadow-sm space-y-4 dark:border-purple-500/30">
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">🔑 Admin Reset Password</h1>
 
         {showRequestForm ? (
           <form onSubmit={requestReset} className="space-y-3">
@@ -123,17 +123,17 @@ const AdminResetPasswordPage: React.FC = () => {
           </form>
         ) : showCheckEmailState ? (
           <div className="space-y-4 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl dark:bg-green-500/20">
               📧
             </div>
             <div className="space-y-2">
-              <h2 className="text-lg font-semibold text-gray-900">Check your inbox</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Check your inbox</h2>
               <p className="text-sm text-gray-600">
                 If that admin account exists, we sent a reset link to {email.trim()}.
               </p>
             </div>
             <p className="text-xs text-gray-500">{message}</p>
-            <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-4 text-left">
+            <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-4 text-left dark:bg-white/5">
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                 Next steps
               </p>
@@ -143,7 +143,7 @@ const AdminResetPasswordPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setManualTokenEntry(true)}
-                className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-300"
               >
                 Enter reset token manually
               </button>
@@ -162,16 +162,16 @@ const AdminResetPasswordPage: React.FC = () => {
           </div>
         ) : showSuccessState ? (
           <div className="space-y-4 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl dark:bg-green-500/20">
               ✅
             </div>
             <div className="space-y-2">
-              <h2 className="text-lg font-semibold text-gray-900">Password reset successful</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Password reset successful</h2>
               <p className="text-sm text-gray-600">
                 Your admin password has been updated. You can now sign in with the new password.
               </p>
             </div>
-            <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-4 text-left">
+            <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-4 text-left dark:bg-white/5">
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                 Recommended next step
               </p>

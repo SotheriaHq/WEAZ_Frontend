@@ -70,6 +70,9 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
   const socketRef = useRef<Socket | null>(null);
   const threadSubs = useRef<SubscriptionMap<ThreadHandler>>({});
   const commentSubs = useRef<SubscriptionMap<CommentHandler>>({});
+  // Every room ever requested this session; re-emitted on each (re)connect
+  // because the server forgets memberships on disconnect.
+  const desiredRooms = useRef<Set<string>>(new Set());
   const pendingJoins = useRef<Set<string>>(new Set());
   const pendingJoinTimeouts = useRef<Map<string, number>>(new Map());
   const pendingJoinListeners = useRef<Map<string, PendingJoinListeners>>(new Map());
@@ -116,6 +119,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
         socketRef.current = null;
       }
       clearAllPendingJoins();
+      desiredRooms.current.clear();
       threadSubs.current = {};
       commentSubs.current = {};
       setSocketConnected(false);
@@ -125,14 +129,28 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
       return;
     }
 
+    // Drop any other user's room from a previous session on this tab.
+    for (const room of [...desiredRooms.current]) {
+      if (room.startsWith('USER:') && room !== `USER:${userId}`) {
+        desiredRooms.current.delete(room);
+      }
+    }
+
     const url = buildUrl();
+    // Reconnection must survive mobile-browser life: tabs get backgrounded,
+    // radios drop, servers restart. The previous config (3 attempts, 500ms
+    // apart, then a permanent "degraded" latch that disabled reconnection)
+    // meant ANY blip killed realtime for the rest of the session — approval
+    // status updates, notifications, everything.
     const s = io(url, {
       withCredentials: true,
       transports: ['polling', 'websocket'],
       autoConnect: true,
-      timeout: 3000,
-      reconnectionAttempts: 3,
-      reconnectionDelay: 500,
+      timeout: 10000,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 15000,
+      randomizationFactor: 0.5,
     });
     socketRef.current = s;
     const onConnect = () => {
@@ -140,36 +158,53 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
       failureCountRef.current = 0;
       degradedRef.current = false;
       setDegraded(false);
+      // Server-side room membership is lost on every disconnect; rejoin all
+      // rooms components still care about, then let listeners catch up on
+      // anything missed while offline.
+      clearAllPendingJoins();
+      for (const room of desiredRooms.current) {
+        s.emit('join', { room });
+      }
       window.dispatchEvent(new CustomEvent('ws:restored'));
     };
     const onDisconnect = () => {
       setSocketConnected(false);
       clearAllPendingJoins();
-      threadSubs.current = {};
-      commentSubs.current = {};
     };
     s.on('connect', onConnect);
     s.on('disconnect', onDisconnect);
 
     const onConnErr = () => {
-      if (degradedRef.current) return;
       failureCountRef.current += 1;
-      if (failureCountRef.current >= 3) {
+      // Degraded is a UI signal only; reconnection keeps running with
+      // exponential backoff, and connectivity events below nudge it.
+      if (failureCountRef.current >= 5 && !degradedRef.current) {
         degradedRef.current = true;
         setDegraded(true);
-        try {
-          (s.io as any).opts.reconnection = false;
-        } catch {
-          // Ignore socket adapter errors.
-        }
-        s.disconnect();
       }
     };
     s.on('connect_error', onConnErr);
     s.on('reconnect_error', onConnErr);
     s.on('reconnect_failed', onConnErr);
     s.on('error', onConnErr);
+
+    // When the network returns or the tab becomes visible again, reconnect
+    // immediately instead of waiting out the backoff window.
+    const nudgeReconnect = () => {
+      const current = socketRef.current;
+      if (current && !current.connected) {
+        current.connect();
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') nudgeReconnect();
+    };
+    window.addEventListener('online', nudgeReconnect);
+    document.addEventListener('visibilitychange', onVisibility);
+
     return () => {
+      window.removeEventListener('online', nudgeReconnect);
+      document.removeEventListener('visibilitychange', onVisibility);
       s.off('connect', onConnect);
       s.off('connect_error', onConnErr);
       s.off('reconnect_error', onConnErr);
@@ -199,8 +234,11 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     } else if (type === 'COLLECTION' || type === 'COLLECTION_MEDIA' || type === 'COMMENT') {
       if (!uuidRe.test(id)) return; // discard malformed
     }
+    // Record intent even while disconnected: the connect handler flushes
+    // desired rooms, so a join requested during an outage still lands.
+    desiredRooms.current.add(room);
     const s = socketRef.current;
-    if (!s) return;
+    if (!s || !s.connected) return;
     if (pendingJoins.current.has(room)) return;
 
     pendingJoins.current.add(room);
@@ -236,7 +274,10 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
   const joinUser = useCallback((userId: string) => safeJoin(`USER:${userId}`), [safeJoin]);
   const joinComment = useCallback((commentId: string) => safeJoin(`COMMENT:${commentId}`), [safeJoin]);
 
-  // Generic event router
+  // Generic event router.
+  // Keyed to `socketConnected` for the same reason as the on* subscribers above:
+  // this effect used to run once, before the socket existed, bail on the null
+  // check, and never re-run — so comment/thread fan-out was dead on arrival.
   useEffect(() => {
     const s = socketRef.current;
     if (!s) return;
@@ -285,7 +326,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
         s.off(ev);
       }
     };
-  }, [dispatch]);
+  }, [dispatch, socketConnected]);
 
   const onThread = useCallback((contentType: string, contentId: string, handler: ThreadHandler) => {
     const room = `${contentType}:${contentId}`;
@@ -312,26 +353,41 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     };
   }, [safeJoin]);
 
+  // These three read socketRef at call time and no-op when it is still null.
+  // Child effects run BEFORE the provider's own socket effect on first mount, so
+  // with empty dep arrays their identity never changed and a consumer that
+  // subscribed on mount silently never attached a listener for the whole
+  // session. Keying them to `socketConnected` makes the identity change once the
+  // socket exists, which re-runs consumer effects and lands the subscription.
   const onNotification = useCallback((handler: (payload: any) => void) => {
     const s = socketRef.current;
     if (!s) return () => void 0;
     s.on('notification.created', handler);
     return () => { s.off('notification.created', handler); };
-  }, []);
+    // socketConnected is the intentional resubscribe trigger; the rule cannot
+    // see the socketRef read that makes it load-bearing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socketConnected]);
 
   const onNotificationDeleted = useCallback((handler: (payload: any) => void) => {
     const s = socketRef.current;
     if (!s) return () => void 0;
     s.on('notification.deleted', handler);
     return () => { s.off('notification.deleted', handler); };
-  }, []);
+    // socketConnected is the intentional resubscribe trigger; the rule cannot
+    // see the socketRef read that makes it load-bearing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socketConnected]);
 
   const onMessageEvent = useCallback((event: string, handler: (payload: any) => void) => {
     const s = socketRef.current;
     if (!s) return () => void 0;
     s.on(event, handler);
     return () => { s.off(event, handler); };
-  }, []);
+    // socketConnected is the intentional resubscribe trigger; the rule cannot
+    // see the socketRef read that makes it load-bearing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socketConnected]);
 
   const value = React.useMemo<RealtimeContextValue>(() => ({
     joinCollection,

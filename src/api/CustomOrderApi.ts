@@ -58,7 +58,9 @@ export type CustomOrderExtensionResponseStatus =
   | 'ACCEPTED'
   | 'COUNTERED'
   | 'REJECTED'
-  | 'EXPIRED';
+  | 'EXPIRED'
+  /** The stage it was buying time for was reached before it was answered. */
+  | 'VOIDED';
 
 export type CustomOrderExtensionTargetType = 'PRODUCTION' | 'DELIVERY' | 'BOTH';
 export type CustomOrderChartFamily =
@@ -188,15 +190,24 @@ export interface CustomOrderListItem {
   sourceType: CustomOrderSourceType;
   sourceId: string;
   sourceTitle: string;
+  sourceBrandName?: string | null;
   sourcePrimaryMediaUrl?: string | null;
+  currency?: string;
   brand: {
     name: string;
+    id?: string;
+    ownerId?: string;
   };
   buyer?: {
     name?: string | null;
     email?: string | null;
     phone?: string | null;
   };
+  /** Sticky "needs admin attention" signal (set by ops cron, cleared by any admin action). */
+  adminAttentionRequiredAt?: string | null;
+  adminAttentionReason?: string | null;
+  /** Read-only brand signal: an admin reminder/dispute notice is unacknowledged (📣 badge). */
+  hasUnreadAdminNotice?: boolean;
   delivery?: {
     city?: string | null;
     state?: string | null;
@@ -232,6 +243,73 @@ export interface CustomOrderProgressEvent {
   adminEscalatedAt?: string | null;
 }
 
+/**
+ * The extension budget, resolved server-side.
+ *
+ * Policy is two approved extensions of at most three days each, six days in
+ * total, and none at all on an order the shopper paid a rush fee on. No client
+ * re-derives any of that — `maxRequestableDays` is the only number a request
+ * form needs, and `rushBlocked` is why the form may not be offered at all.
+ */
+export interface CustomOrderExtensionPolicy {
+  approvedExtensionCount: number;
+  totalExtensionDaysGranted: number;
+  remainingExtensions: number;
+  remainingDays: number;
+  maxRequestableDays: number;
+  exhausted: boolean;
+  maxDaysPerRequest: number;
+  maxApprovedExtensions: number;
+  maxTotalDays: number;
+  rushBlocked: boolean;
+}
+
+/**
+ * The API's answer to "can this shopper report that their order is late?".
+ *
+ * `reason` is a stable code so the client can say WHY not — "not late yet" and
+ * "we are already looking at it" are different sentences, and both are better
+ * than a disabled button with no explanation.
+ */
+/**
+ * When an order is due, and how late it is — resolved by the API.
+ *
+ * `promisedDeliveryAt` is only written at payment confirmation, so computing
+ * lateness from it on the client means every order accepted by another path
+ * reads as having no deadline at all. The API derives the dates from the
+ * brand's published lead times when no promise was recorded, and this carries
+ * that answer. The same object backs the dispute gate, so what the screen says
+ * and what the button does cannot drift apart.
+ */
+export interface CustomOrderSchedule {
+  expectedProductionAt: string | null;
+  expectedDeliveryAt: string | null;
+  /** True when the date the countdown measures against was derived. */
+  estimated: boolean;
+  productionEstimated: boolean;
+  deliveryEstimated: boolean;
+  state: 'NOT_STARTED' | 'ON_TRACK' | 'DUE_SOON' | 'OVERDUE' | 'DELIVERED' | 'CLOSED';
+  /** Whole days until due. Negative once the date has passed. */
+  daysRemaining: number | null;
+  daysOverdue: number;
+  extensionDaysGranted: number;
+}
+
+export interface CustomOrderDelayEligibility {
+  eligible: boolean;
+  /** Which promise was missed: the production date or the delivery date. */
+  basis: 'PRODUCTION' | 'DELIVERY' | null;
+  /** When the control unlocks, during the grace period. */
+  availableAt?: string | null;
+  reason:
+    | 'ELIGIBLE'
+    | 'NOT_LATE_YET'
+    | 'WITHIN_GRACE'
+    | 'NO_PROMISE_RECORDED'
+    | 'NOT_A_LIVE_ORDER'
+    | 'ALREADY_DISPUTED';
+}
+
 export interface CustomOrderExtensionRequest {
   id: string;
   targetType: CustomOrderExtensionTargetType;
@@ -239,6 +317,18 @@ export interface CustomOrderExtensionRequest {
   reason: string;
   buyerResponseStatus: CustomOrderExtensionResponseStatus;
   buyerCounterDays?: number | null;
+  /** Optional comment the shopper left when answering. */
+  buyerNote?: string | null;
+  /** Optional comment the brand left when answering a counter. */
+  brandNote?: string | null;
+  /** When the shopper must answer by. Past it, the request expires. */
+  respondByAt?: string | null;
+  /** Days actually granted — the counter value when a counter was accepted. */
+  appliedExtraDays?: number | null;
+  expiredAt?: string | null;
+  voidedAt?: string | null;
+  /** 1 for the order's first request, 2 for the second. */
+  sequence?: number | null;
   resolvedAt?: string | null;
   createdAt: string;
 }
@@ -254,6 +344,13 @@ export interface CustomOrderIssue {
 export interface CustomOrderDispute {
   id: string;
   status: CustomOrderDisputeStatus | string;
+  reasonType?: CustomOrderIssueType | string;
+  /** Buyer's opening statement (read-only to the brand). */
+  buyerStatement?: string | null;
+  /** The brand's single response, once submitted (read-only afterward). */
+  brandResponse?: string | null;
+  /** Deadline by which the brand may still submit its response, if set. */
+  brandRespondByAt?: string | null;
   resolution?: CustomOrderDisputeResolution | string | null;
   adminNotes?: string | null;
   assignedAdminId?: string | null;
@@ -365,6 +462,79 @@ export interface CustomOrderDisputeListItem {
   };
 }
 
+/**
+ * The shopper behind a custom order, as the admin console reads them.
+ *
+ * `name`/`email`/`phone` are already resolved server-side: the account profile
+ * wins, the checkout snapshot fills the gaps. `checkoutContact` is that snapshot
+ * untouched, so a delivery phone that differs from the profile stays visible.
+ */
+export interface CustomOrderBuyerIdentity {
+  id?: string | null;
+  name?: string | null;
+  username?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  accountStatus?: string | null;
+  joinedAt?: string | null;
+  profileImage?: string | null;
+  profileImageId?: string | null;
+  checkoutContact?: {
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  };
+}
+
+export interface CustomOrderPaymentAttemptSummary {
+  id: string;
+  reference?: string | null;
+  status?: string | null;
+  provider?: string | null;
+  amount?: number | null;
+  currency?: string | null;
+  confirmedAt?: string | null;
+  lastVerifiedAt?: string | null;
+  failureMessage?: string | null;
+  createdAt?: string | null;
+}
+
+export interface CustomOrderPaymentSummary {
+  status?: string | null;
+  method?: string | null;
+  reference?: string | null;
+  provider?: string | null;
+  amount?: number | null;
+  currency?: string | null;
+  /** When the transaction was first posted. */
+  postedAt?: string | null;
+  /** When it cleared. Null means it never did. */
+  confirmedAt?: string | null;
+  lastVerifiedAt?: string | null;
+  failureMessage?: string | null;
+  attemptCount?: number;
+  attempts?: CustomOrderPaymentAttemptSummary[];
+}
+
+export interface CustomOrderLifecycleDates {
+  placedAt?: string | null;
+  measurementConfirmedAt?: string | null;
+  acceptedAt?: string | null;
+  rejectedAt?: string | null;
+  promisedProductionAt?: string | null;
+  promisedDispatchAt?: string | null;
+  promisedDeliveryAt?: string | null;
+  deliveredAt?: string | null;
+  issueReportedAt?: string | null;
+  buyerAcceptedAt?: string | null;
+  completedAt?: string | null;
+  /** Completion if it happened, otherwise the date it is still expected by. */
+  expectedConclusionAt?: string | null;
+  stageEnteredAt?: string | null;
+  lastBrandProgressUpdateAt?: string | null;
+}
+
 export interface CustomOrderDetail {
   id: string;
   status: CustomOrderStatus;
@@ -376,6 +546,8 @@ export interface CustomOrderDetail {
     title: string;
     slug?: string | null;
     primaryMediaUrl?: string | null;
+    /** All renderable angles the designer posted (falls back to the cover). */
+    mediaUrls?: string[] | null;
     brandName?: string | null;
   };
   configurationVersionId: string;
@@ -386,6 +558,8 @@ export interface CustomOrderDetail {
     shippingFee?: number;
     rushFee?: number;
     fabricCharge?: number;
+    /** Labor/production only (excludes fabric + rush). */
+    productionCharge?: number;
   };
   internalPriceBreakdown?: Record<string, unknown>;
   quoteStatus?: CustomOrderQuoteStatus;
@@ -419,12 +593,72 @@ export interface CustomOrderDetail {
   retentionHoldUntil?: string | null;
   retentionHoldSetById?: string | null;
   retentionHoldSetAt?: string | null;
+  /** Sticky "needs admin attention" signal — drives the detail-page danger banner. */
+  adminAttentionRequiredAt?: string | null;
+  adminAttentionReason?: string | null;
+  /** Read-only admin-notice state for the brand's studio detail (reminder/dispute). */
+  brandAdminNoticeAt?: string | null;
+  brandAdminNoticeAckAt?: string | null;
+  hasUnreadAdminNotice?: boolean;
+  brandId?: string;
+  buyerId?: string;
+  /** Admin detail only: who placed the order (account first, checkout snapshot second). */
+  buyer?: CustomOrderBuyerIdentity;
+  /** Admin detail only: the transaction behind the order, not just its enum. */
+  payment?: CustomOrderPaymentSummary;
+  /** Admin detail only: every lifecycle date in one block. */
+  lifecycle?: CustomOrderLifecycleDates;
+  leadTimes?: {
+    productionLeadDays?: number | null;
+    deliveryMinDays?: number | null;
+    deliveryMaxDays?: number | null;
+    rushSelected?: boolean;
+  };
+  /** Admin detail only: the technical ids, grouped instead of scattered. */
+  references?: Record<string, string | null>;
   progressEvents: CustomOrderProgressEvent[];
   extensionRequests: CustomOrderExtensionRequest[];
   issues: CustomOrderIssue[];
   disputes: CustomOrderDispute[];
   ledgerAllocations?: CustomOrderLedgerAllocation[];
   timelineEvents: CustomOrderTimelineEvent[];
+  /** The shopper's half of the read-only admin notice channel. */
+  buyerAdminNoticeAt?: string | null;
+  buyerAdminNoticeAckAt?: string | null;
+  hasUnreadBuyerAdminNotice?: boolean;
+  /** What the brand committed to before any extension moved the dates. */
+  originalPromisedProductionAt?: string | null;
+  originalPromisedDispatchAt?: string | null;
+  originalPromisedDeliveryAt?: string | null;
+  extensionPolicy?: CustomOrderExtensionPolicy;
+  /**
+   * Whether the shopper may escalate this order for lateness, decided by the
+   * API. The client renders the verdict and the copy; it never recomputes the
+   * grace period or the precedence, or it will eventually disagree with the
+   * endpoint and offer a button that fails.
+   */
+  delayDispute?: CustomOrderDelayEligibility;
+  /** When this order is due, resolved by the API. See `CustomOrderSchedule`. */
+  schedule?: CustomOrderSchedule;
+  /** An admin is steering this order until `adminInterventionResolvedAt`. */
+  adminInterventionAt?: string | null;
+  adminInterventionReason?: string | null;
+  adminInterventionResolvedAt?: string | null;
+  /** Admin detail only: the same intervention, pre-resolved into `isOpen`. */
+  intervention?: {
+    openedAt?: string | null;
+    reason?: string | null;
+    resolvedAt?: string | null;
+    resolvedById?: string | null;
+    isOpen?: boolean;
+  };
+  /** Admin detail only: who has been written to and whether they have read it. */
+  notices?: {
+    buyerNoticeAt?: string | null;
+    buyerNoticeAckAt?: string | null;
+    brandNoticeAt?: string | null;
+    brandNoticeAckAt?: string | null;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -587,9 +821,13 @@ export interface CustomOrderPaymentAttempt {
 
 export interface PaginatedCustomOrders<T> {
   items: T[];
-  page: number;
+  page?: number;
   limit: number;
   total: number;
+  /** Server count of orders needing admin attention under the same filters. */
+  attentionTotal?: number;
+  /** Keyset cursor for the next page (prefer over deep OFFSET). */
+  nextCursor?: string | null;
 }
 
 export interface CustomOrderRiskDashboard {
@@ -854,6 +1092,10 @@ export const customOrderConfigurationsApi = {
     page?: number;
     limit?: number;
     isActive?: boolean;
+    /** Required for non-owner callers; brand owners may omit to list own brand. */
+    brandId?: string;
+    sourceType?: 'PRODUCT' | 'DESIGN';
+    sourceId?: string;
   }) {
     const response = await apiClient.get('/custom-order-configurations', withParams(params));
     return hydrateConfigurationPage(
@@ -1017,8 +1259,28 @@ export const customOrdersBuyerApi = {
   async respondToExtension(orderId: string, requestId: string, payload: {
     response: CustomOrderExtensionResponseStatus;
     counterDays?: number;
+    /** Optional on both accept and reject — never required to say no. */
+    note?: string;
   }) {
     const response = await apiClient.post(`/custom-orders/${orderId}/extension-requests/${requestId}/respond`, payload);
+    return unwrapApiResponse<CustomOrderDetail>(response.data);
+  },
+
+  /**
+   * End a delay dispute the shopper raised — "it arrived, I'll take it late".
+   * Their own delay-class disputes only, and only before an admin takes over.
+   */
+  async closeDelayDispute(orderId: string, disputeId: string, note?: string) {
+    const response = await apiClient.post(
+      `/custom-orders/${orderId}/disputes/${disputeId}/close`,
+      { note },
+    );
+    return unwrapApiResponse<CustomOrderDetail>(response.data);
+  },
+
+  /** Mark admin notices on this order as seen. Read-only channel: no replies. */
+  async ackAdminNotices(orderId: string) {
+    const response = await apiClient.post(`/custom-orders/${orderId}/admin-notices/ack`);
     return unwrapApiResponse<CustomOrderDetail>(response.data);
   },
 
@@ -1093,9 +1355,56 @@ export const customOrdersBrandApi = {
     );
     return unwrapApiResponse<CustomOrderDetail>(response.data);
   },
+
+  /** Mark all admin notices (reminders/dispute alerts) on this order as seen. Read-only ack. */
+  async ackAdminNotices(brandId: string, orderId: string) {
+    const response = await apiClient.post(
+      `/brands/${brandId}/custom-orders/${orderId}/admin-notices/ack`,
+    );
+    return unwrapApiResponse<{ customOrderId: string; acknowledged: boolean }>(
+      response.data,
+    );
+  },
+
+  /** Submit the brand's single, one-time response to an admin-adjudicated dispute. */
+  async respondToDispute(
+    brandId: string,
+    orderId: string,
+    disputeId: string,
+    payload: { response: string },
+  ) {
+    const response = await apiClient.post(
+      `/brands/${brandId}/custom-orders/${orderId}/disputes/${disputeId}/respond`,
+      payload,
+    );
+    return unwrapApiResponse<{
+      disputeId: string;
+      status: CustomOrderDisputeStatus | string;
+      brandResponse: string | null;
+    }>(response.data);
+  },
 };
 
 export const customOrdersAdminApi = {
+  /**
+   * A private, read-only note to one side of the order (or the same note to
+   * each). Deliberately not a message in the shared buyer-brand thread: an
+   * intervention usually needs a different sentence for each party.
+   */
+  async sendNotice(orderId: string, payload: {
+    audience: 'BUYER' | 'BRAND' | 'BOTH';
+    message: string;
+  }) {
+    const response = await apiClient.post(`/admin/custom-orders/${orderId}/notices`, payload);
+    return unwrapApiResponse<{ customOrderId: string; audience: string }>(response.data);
+  },
+
+  /** Close the intervention once the order has actually been steered. */
+  async resolveIntervention(orderId: string, payload: { note?: string } = {}) {
+    const response = await apiClient.post(`/admin/custom-orders/${orderId}/resolve-intervention`, payload);
+    return unwrapApiResponse<Record<string, unknown>>(response.data);
+  },
+
   async getSummary() {
     const response = await apiClient.get('/admin/custom-orders/summary');
     return unwrapApiResponse<Record<string, unknown>>(response.data);
@@ -1106,7 +1415,20 @@ export const customOrdersAdminApi = {
     return unwrapApiResponse<CustomOrderRiskDashboard>(response.data);
   },
 
-  async list(params?: { page?: number; limit?: number; status?: CustomOrderStatus; stage?: CustomOrderProgressStage; brandId?: string; q?: string }) {
+  async list(params?: {
+    page?: number;
+    limit?: number;
+    status?: CustomOrderStatus;
+    stage?: CustomOrderProgressStage;
+    brandId?: string;
+    q?: string;
+    /** Server-side needs-review filter (dashboard deep-link). */
+    attention?: boolean | 1 | 0;
+    /** Server-side sort: attention | newest | oldest | amount. */
+    sort?: 'attention' | 'newest' | 'oldest' | 'amount';
+    /** Keyset cursor from a prior response's nextCursor. */
+    cursor?: string;
+  }) {
     const response = await apiClient.get('/admin/custom-orders', withParams(params));
     return unwrapApiResponse<PaginatedCustomOrders<CustomOrderListItem>>(response.data);
   },

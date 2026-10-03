@@ -1,23 +1,25 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import { useOptionalReturnTo } from '@/hooks/useReturnTo';
 import { 
   Heart, 
   ChevronDown, 
   Truck, 
-  ShieldCheck,
-  ChevronRight,
-  Check,
-  X,
+  ShieldCheck, 
+  ChevronRight, 
+  Check, 
+  X, 
   Ruler,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
 import { addToWishlist, checkWishlistStatus, removeFromWishlist } from '@/features/wishlistSlice';
-import { productApi } from '@/api/ProductApi';
-import type { ProductDto } from '@/api/ProductApi';
+import { apiClient } from '@/api/httpClient';
+import { normalizeProductDto, type ProductDto } from '@/api/ProductApi';
+import useCachedResource from '@/hooks/useCachedResource';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { formatPrice } from '@/utils/helpers';
 import useSignedFileUrl from '@/hooks/useSignedFileUrl';
@@ -39,6 +41,7 @@ import {
   isStrictlyOutOfStockProduct,
 } from '@/lib/productAvailability';
 import { resolveVariantColorPresentation } from '@/utils/variantColors';
+import { CustomOrderIndicator } from '@/components/custom-orders/CustomOrderIndicator';
 
 const findMappedColorValue = (
   map: Record<string, string> | undefined,
@@ -157,19 +160,44 @@ function ProductDetailsSkeleton() {
   );
 }
 
-export default function ProductDetailsPage() {
-  const { id } = useParams<{ id: string }>();
+type ProductDetailsPageProps = {
+  resolvedProductId?: string;
+};
+
+export default function ProductDetailsPage({ resolvedProductId }: ProductDetailsPageProps = {}) {
+  const { id: routeProductId } = useParams<{ id: string }>();
+  const id = resolvedProductId ?? routeProductId;
   const navigate = useNavigate();
   const location = useLocation();
+  // Declared with the other hooks, above the loading/error early returns.
+  const returnTarget = useOptionalReturnTo();
   const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((s: RootState) => s.user.profile);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const wishlistedIds = useSelector((s: RootState) => s.wishlist.wishlistedIds);
   const { addStandard, bagProduct, beginCustomFlow, getPulseStatus, loadingByProductId } = useBagging();
-  const [product, setProduct] = useState<ProductDto | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
+  const initializedProductIdRef = useRef<string | null>(null);
+
+  const {
+    data: product = null,
+    loading,
+    error: fetchError,
+  } = useCachedResource<ProductDto | null>({
+    queryKey: ['products', 'detail', id],
+    queryFn: async ({ signal }) => {
+      const response = await apiClient.get(`/products/${id}`, {
+        params: { includeDeleted: false },
+        signal,
+      });
+      const raw = response.data?.data ?? response.data;
+      const normalized = normalizeProductDto(raw as ProductDto | null);
+      if (!normalized) throw new Error('Product not found');
+      return normalized;
+    },
+    enabled: Boolean(id),
+  });
+  const error = fetchError ? 'Failed to load product' : null;
+
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string>('');
@@ -182,34 +210,16 @@ export default function ProductDetailsPage() {
   const [startingCustomOrder, setStartingCustomOrder] = useState(false);
   const [customOrderComposerOpen, setCustomOrderComposerOpen] = useState(false);
   
-  // Fetch product
   useEffect(() => {
-    if (!id) return;
-    const loadProduct = async () => {
-      try {
-        setLoading(true);
-        const data = await productApi.getProduct(id, { includeDeleted: false });
-        if (data) {
-          setProduct(data);
-          // Auto-select first available options if any
-          const variants = data.variants || [];
-          const inStock = variants.find(v => v.stock > 0) || variants[0];
-          if (inStock) {
-             if (inStock.size) setSelectedSize(inStock.size);
-             if (inStock.color) setSelectedColor(inStock.color);
-          }
-        } else {
-           setError('Product not found');
-        }
-      } catch (err) {
-        console.error(err);
-        setError('Failed to load product');
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadProduct();
-  }, [id]);
+    if (!product?.id || initializedProductIdRef.current === product.id) return;
+    initializedProductIdRef.current = product.id;
+    const variants = product.variants || [];
+    const inStock = variants.find((v) => v.stock > 0) || variants[0];
+    if (inStock) {
+      if (inStock.size) setSelectedSize(inStock.size);
+      if (inStock.color) setSelectedColor(inStock.color);
+    }
+  }, [product]);
 
   // Derived media list
   const mediaList = useMemo(() => {
@@ -686,7 +696,7 @@ export default function ProductDetailsPage() {
                   >
                     {savingMeasurements ? (
                       <>
-                        <VLoader size={16} phase="loading" showLabel={false} /> Saving...
+                        <MuseLoader size={16} /> Saving...
                       </>
                     ) : (
                       <>
@@ -714,6 +724,19 @@ export default function ProductDetailsPage() {
       </AnimatePresence>
 
       <main className={`flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-8 lg:px-12 py-8 lg:py-10 ${isStudioStoreView ? 'rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg' : ''}`}>
+        {/* Shown only when something sent the reader here (a notification, for
+            instance) — otherwise every visitor would get a way "back" to a
+            screen they never came from. */}
+        {returnTarget ? (
+          <button
+            type="button"
+            onClick={() => navigate(returnTarget.to)}
+            className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-black/5 px-3.5 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-black/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+          >
+            {returnTarget.label}
+          </button>
+        ) : null}
+
         <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           {isStudioStoreView ? (
             <>
@@ -824,9 +847,15 @@ export default function ProductDetailsPage() {
                       {product.brand?.name ? `${product.brand.name} drop` : 'Limited release'}
                     </p>
                     {isCustomAvailable ? (
-                      <span className="mt-2 inline-flex items-center rounded-full border border-purple-500/30 bg-purple-500/10 px-2.5 py-1 text-[11px] font-semibold text-purple-700 dark:text-purple-200">
-                        ✂️ Custom Available
-                      </span>
+                      <div className="mt-2 inline-flex items-center gap-2">
+                        <CustomOrderIndicator
+                          pointsCount={customOrderAvailability.configuration?.requiredMeasurementKeys?.length}
+                          size="sm"
+                        />
+                        <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">
+                          Custom Available
+                        </span>
+                      </div>
                     ) : null}
                   </div>
                   <button
@@ -853,9 +882,13 @@ export default function ProductDetailsPage() {
                     <div className="font-semibold">
                       {isCustomOrderOnly
                         ? 'Custom'
-                        : currentVariant?.stock ?? product.totalStock ?? product.stock ?? 0}
+                        : isOwnProduct
+                          ? (currentVariant?.stock ?? product.totalStock ?? product.stock ?? 0)
+                          : isOutOfStock
+                            ? 'Out of stock'
+                            : 'In stock'}
                     </div>
-                    <div>{isCustomOrderOnly ? 'Mode' : 'Stock'}</div>
+                    <div>{isCustomOrderOnly ? 'Mode' : isOwnProduct ? 'Stock' : 'Status'}</div>
                   </div>
                 </div>
 
@@ -925,7 +958,17 @@ export default function ProductDetailsPage() {
 
                     {availableSizes.length > 0 ? (
                       <div className="space-y-2">
-                        <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Size</div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Size</div>
+                          <button
+                            type="button"
+                            onClick={() => navigate('/size-charts')}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 transition-colors"
+                          >
+                            <span aria-hidden="true">📏</span>
+                            <span>Size Guide</span>
+                          </button>
+                        </div>
                         <div className="flex flex-wrap gap-2">
                           {availableSizes.map((size) => {
                             const isActive = selectedSize === size;

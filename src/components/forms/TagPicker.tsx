@@ -118,7 +118,7 @@ const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom 
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search or add tag"
-          className="threadly-search-input flex-1 min-w-0"
+          className="wiez-search-input flex-1 min-w-0"
         />
         {allowCustom && (
           <button

@@ -51,7 +51,7 @@ export const CollectionMetaPanel: React.FC<MetaPanelProps> = ({
         <div>
           <h1 className="text-xl font-semibold leading-tight">{title}</h1>
           {visibility && (
-            <span className={`inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full border ${visibility === 'PUBLIC' ? 'text-emerald-700 border-emerald-300/60 bg-emerald-50' : 'text-amber-700 border-amber-300/60 bg-amber-50'} dark:border-white/10 dark:bg-white/10`}>{visibility === 'PUBLIC' ? 'Public' : 'Private'}</span>
+            <span className={`inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full border ${visibility === 'PUBLIC' ? 'text-emerald-700 border-emerald-300/60 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/40' : 'text-amber-700 border-amber-300/60 bg-amber-50 dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/40'} dark:border-white/10 dark:bg-white/10`}>{visibility === 'PUBLIC' ? 'Public' : 'Private'}</span>
           )}
         </div>
         {isOwner && (

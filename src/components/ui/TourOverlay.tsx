@@ -233,7 +233,7 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
       <AnimatePresence>
         {isActive && (
           <motion.div
-            key="threadly-tour-root"
+            key="wiez-tour-root"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -257,7 +257,7 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
               aria-hidden="true"
             >
               <defs>
-                <mask id="threadly-tour-spotlight-mask">
+                <mask id="wiez-tour-spotlight-mask">
                   <rect width="100%" height="100%" fill="white" />
                   {spotlightRect && (
                     <rect
@@ -282,7 +282,7 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
                 width="100%"
                 height="100%"
                 fill="rgba(0,0,0,0.72)"
-                mask="url(#threadly-tour-spotlight-mask)"
+                mask="url(#wiez-tour-spotlight-mask)"
               />
 
               {/* Glowing border ring around spotlight */}

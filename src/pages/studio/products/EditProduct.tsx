@@ -13,21 +13,21 @@ import {
   ChevronRight,
   Plus,
   CheckCircle,
-  Video,
   X,
 
 } from "lucide-react";
-import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
-import VLoader from "@/components/loaders/VLoader";
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
-import { useUploadLimits } from "@/context/UploadLimitsContext";
 
 import { toast } from "sonner";
 import MediaRenderer from "@/components/media/MediaRenderer";
 import {
   productApi,
   type ProductCreateDto,
+  type ProductDto,
   type Category,
   type ProductVariant,
 } from "@/api/ProductApi";
@@ -56,10 +56,18 @@ import {
   validateMedia,
 } from "./mediaUtils";
 import { getTagColor } from "@/utils/tagColors";
+import {
+  needsResubmission,
+  normalizeContentReviewStatus,
+  primaryActionLabel,
+  reviewStateHint,
+} from "@/utils/contentReviewActions";
 import FilterSelector, {
   type FilterSelection,
 } from "@/components/categories/FilterSelector";
 import SizingConfigurator from "@/components/sizing/SizingConfigurator";
+import HashtagPickerModal from "@/components/tags/HashtagPickerModal";
+import ReviewFeedbackBanner from "@/components/content-review/ReviewFeedbackBanner";
 import { PriceChangePreviewModal } from "@/components/collections/PriceChangePreviewModal";
 import {
   getProductPriceChangePreview,
@@ -68,7 +76,10 @@ import {
   type CollectionPriceImpact,
 } from "@/api/StoreApi";
 import { emitProductStudioSync } from "@/utils/productStudioEvents";
+import { createPublishTask } from "@/utils/publishTracker";
+import { runProductPublishJob } from "@/features/products/productPublishJob";
 import { TourOverlay, type TourStep } from "@/components/ui/TourOverlay";
+import { useOneTimeTour } from "@/hooks/useOneTimeTour";
 import StudioPageSkeleton from "@/components/studio/StudioPageSkeleton";
 import {
   isBrandProfileComplete,
@@ -79,6 +90,8 @@ import {
   getStoreProcessingTimeLabel,
 } from "@/utils/storeProcessing";
 import { preprocessImageFile } from "@/utils/imagePreprocess";
+import { WEB_UPLOAD_POLICIES } from "@/utils/uploadValidation";
+import { getNormalizedImageFile } from "@/api/UploadApi";
 import {
   CREATOR_AUDIENCE_OPTIONS,
   CREATOR_METADATA_HELP,
@@ -96,6 +109,28 @@ import {
   toBackendMediaViewSlot,
   type MediaViewSlot,
 } from "@/utils/contentIntegrity";
+import { queryKeys } from "@/query/queryKeys";
+import useCachedResource from "@/hooks/useCachedResource";
+import MediaSlotGrid, {
+  type MediaSlotGridItem,
+} from "@/components/media/MediaSlotGrid";
+import {
+  PRODUCT_PUBLISH_FIELD_ANCHOR,
+  PRODUCT_PUBLISH_FIELD_LABEL,
+  PRODUCT_PUBLISH_FIELD_STEP,
+  fieldsForStep,
+  validateProductForPublish,
+  type ProductPublishField,
+} from "./productPublishValidation";
+
+// The media grid only renders the first 6 view-slots (one per allowed image).
+// Every media item must map to one of these, uniquely — otherwise an item lands
+// on a non-rendered slot (or collides with another) and silently disappears,
+// which reads to users as a lost/duplicated image on drag-and-drop.
+const RENDERABLE_MEDIA_SLOTS: MediaViewSlot[] = MEDIA_VIEW_SLOT_OPTIONS.slice(
+  0,
+  6,
+).map((option) => option.value);
 
 function toSkuToken(input: string): string {
   const cleaned = input
@@ -136,6 +171,41 @@ function buildBaseSku(opts: { brandInitials: string; title?: string }): string {
   return `${prefix}-${shortTitle}-${randomSkuSuffix(5)}`;
 }
 
+// ── Variant color-group identity (UI only) ──────────────────────────────────
+// The editor groups size rows under a color. Grouping used to key purely on the
+// color STRING, so two not-yet-named colors both collapsed into one group (and
+// every keystroke re-grouped, dropping focus). A stable per-group id fixes both.
+let colorGroupIdSeq = 0;
+const nextColorGroupId = (): string =>
+  `cg_${Date.now().toString(36)}_${(colorGroupIdSeq++).toString(36)}`;
+
+/** Backfill a stable colorGroupId onto loaded variants — one per distinct color,
+ *  and a unique group for each blank color so unnamed colors never merge. */
+const withColorGroupIds = (variants: ProductVariant[]): ProductVariant[] => {
+  const byColor = new Map<string, string>();
+  return variants.map((v) => {
+    if (v.colorGroupId && v.colorGroupId.trim()) return v;
+    const color = (v.color ?? "").trim().toLowerCase();
+    if (!color) return { ...v, colorGroupId: nextColorGroupId() };
+    let gid = byColor.get(color);
+    if (!gid) {
+      gid = nextColorGroupId();
+      byColor.set(color, gid);
+    }
+    return { ...v, colorGroupId: gid };
+  });
+};
+
+const variantMatchesGroup = (
+  v: ProductVariant,
+  group: { colorGroupId?: string; color: string },
+): boolean => {
+  if (group.colorGroupId) return v.colorGroupId === group.colorGroupId;
+  return (
+    (v.color ?? "").trim().toLowerCase() === group.color.trim().toLowerCase()
+  );
+};
+
 function buildVariantSku(
   baseSku: string,
   variant: { size?: string; color?: string },
@@ -168,6 +238,8 @@ const PRODUCT_VARIANT_SIZE_ALIAS_MAP: Record<string, string> = {
 };
 
 const MIN_PUBLISH_VARIANT_COUNT = 5;
+
+const MAX_PRODUCT_TAGS = 20;
 
 const PRODUCT_VARIANT_SIZE_LABELS = PRODUCT_VARIANT_SIZE_OPTIONS.join(", ");
 
@@ -352,6 +424,25 @@ type ProductMediaPreview = {
   viewSlot?: MediaViewSlot | string | null;
 };
 
+type TaxonomyCategoryOption = {
+  id: string;
+  name: string;
+  types: { id: string; name: string }[];
+};
+
+type ProductEditorSupportData = {
+  categories: Category[];
+  collectionCategoryById: Record<string, string>;
+  taxonomyCategories: TaxonomyCategoryOption[];
+  categoryTypes: CategoryTypeOption[];
+};
+
+type ProductEditorPolicyDefaults = {
+  shippingRegions: string[];
+  processingTime: string;
+  customOrderLeadTime: string;
+};
+
 const defaultFormState: FormState = {
   title: "",
   description: "",
@@ -441,7 +532,6 @@ const createCustomOrderConfigurationWithBasis = async (
 const EditProduct: React.FC = () => {
   const navigate = useNavigate();
   const { id: productId } = useParams<{ id: string }>();
-  const { getLimitMB } = useUploadLimits();
   const location = useLocation();
   const returnTo = useMemo(
     () => new URLSearchParams(location.search).get("returnTo"),
@@ -456,6 +546,7 @@ const EditProduct: React.FC = () => {
     [location.search],
   );
   const user = useSelector((state: RootState) => state.user.profile);
+  const queryClient = useQueryClient();
 
   const isEditMode = Boolean(productId);
   const isCollectionContext = returnContext === "collection";
@@ -483,24 +574,149 @@ const EditProduct: React.FC = () => {
     !isEditMode && user?.type === "BRAND" && user?.isEmailVerified === false;
   const requiresCatalogProfileSetup =
     !isEditMode && user?.type === "BRAND" && !isBrandProfileComplete(user);
+  const productDetailQueryKey = useMemo(
+    () => queryKeys.store.product(productId, { includeDeleted }),
+    [includeDeleted, productId],
+  );
+  const cachedProductDetail = productId
+    ? queryClient.getQueryData<ProductDto | null>(productDetailQueryKey)
+    : undefined;
+  const defaultShippingRegion =
+    normalizeShippingRegionCode(defaultFormState.customsRegion) ??
+    defaultFormState.customsRegion;
+  const productEditorSupportQueryKey = useMemo(
+    () => ['product-editor', 'support-data', user?.id ?? 'anon'] as const,
+    [user?.id],
+  );
+  const storePolicyDefaultsQueryKey = useMemo(
+    () => ['product-editor', 'store-policy-defaults', user?.id ?? 'anon'] as const,
+    [user?.id],
+  );
+
+  const { data: productEditorSupportData, loading: categoriesLoading } =
+    useCachedResource<ProductEditorSupportData>({
+      queryKey: productEditorSupportQueryKey,
+      queryFn: async () => {
+        const [collectionsResult, categoryTypesResult, categoriesWithSubResult] =
+          await Promise.allSettled([
+            user?.id
+              ? brandApi.getCollections(user.id, { visibility: "all", scope: "store" })
+              : Promise.resolve(null),
+            brandApi.getCategoryTypes(undefined, true),
+            brandApi.getCategoriesWithSubCategories(true),
+          ]);
+
+        const collections =
+          collectionsResult.status === "fulfilled" ? collectionsResult.value : null;
+        const mappedCollections: Category[] = user?.id
+          ? (collections || [])
+              .filter((c: any) => Boolean(c?.isAvailableInStore))
+              .map((c: any) => ({
+                id: String(c.id),
+                name: String(c.title || c.name || "Untitled collection"),
+                slug: String(c.id),
+              }))
+          : [];
+
+        const categoryByCollection: Record<string, string> = {};
+        (collections || []).forEach((c: any) => {
+          if (c?.id && c?.categoryId) {
+            categoryByCollection[String(c.id)] = String(c.categoryId);
+          }
+        });
+
+        const categoriesWithSub =
+          categoriesWithSubResult.status === "fulfilled"
+            ? categoriesWithSubResult.value
+            : null;
+        const taxonomyCategories: TaxonomyCategoryOption[] = Array.isArray(categoriesWithSub)
+          ? categoriesWithSub.map((c: any) => ({
+              id: String(c.id),
+              name: String(c.name || ""),
+              types: (c.types || []).map((t: any) => ({
+                id: String(t.id),
+                name: String(t.name || ""),
+              })),
+            }))
+          : [];
+
+        let resolvedTypes =
+          categoryTypesResult.status === "fulfilled" &&
+          Array.isArray(categoryTypesResult.value)
+            ? categoryTypesResult.value
+            : [];
+        if (resolvedTypes.length === 0 && Array.isArray(categoriesWithSub)) {
+          resolvedTypes = categoriesWithSub
+            .flatMap((category: any) => category.types ?? [])
+            .filter((type: any) => Boolean(type?.id) && Boolean(type?.name));
+        }
+
+        return {
+          categories: mappedCollections,
+          collectionCategoryById: categoryByCollection,
+          taxonomyCategories,
+          categoryTypes: resolvedTypes,
+        };
+      },
+      staleTime: 30 * 60 * 1000,
+      gcTime: 60 * 60 * 1000,
+    });
+
+  const { data: storePolicyDefaults, loading: shippingRegionsLoading } =
+    useCachedResource<ProductEditorPolicyDefaults>({
+      queryKey: storePolicyDefaultsQueryKey,
+      enabled: Boolean(user?.id),
+      queryFn: async () => {
+        try {
+          const policies = await getStorePolicies();
+          const fromPolicy = normalizeShippingRegionCodes(
+            policies.shippingRegions || [],
+          );
+          return {
+            shippingRegions: fromPolicy.length > 0 ? fromPolicy : [defaultShippingRegion],
+            processingTime: policies.processingTime || '',
+            customOrderLeadTime:
+              policies.shippingRules?.customOrderSettings?.leadTime || '',
+          };
+        } catch (error) {
+          console.error("Failed to load store shipping regions", error);
+          return {
+            shippingRegions: [defaultShippingRegion],
+            processingTime: '',
+            customOrderLeadTime: '',
+          };
+        }
+      },
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+    });
 
   // State
   const [form, setForm] = useState<FormState>(defaultFormState);
   const [contentStatus, setContentStatus] = useState<string | null>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [reviewSearchParams] = useSearchParams();
+  // Reviewer note carried on the notification deep link — display fallback
+  // only; the banner itself is gated on the server-side review state.
+  const reviewNoteParam = reviewSearchParams.get('reviewNote')?.trim() || '';
+  const [categories, setCategories] = useState<Category[]>(
+    () => productEditorSupportData?.categories ?? [],
+  );
   const [collectionCategoryById, setCollectionCategoryById] = useState<
     Record<string, string>
-  >({});
-  const [categoryTypes, setCategoryTypes] = useState<CategoryTypeOption[]>([]);
-  const [loading, setLoading] = useState(isEditMode);
+  >(() => productEditorSupportData?.collectionCategoryById ?? {});
+  const [categoryTypes, setCategoryTypes] = useState<CategoryTypeOption[]>(
+    () => productEditorSupportData?.categoryTypes ?? [],
+  );
+  const [loading, setLoading] = useState(
+    () => isEditMode && cachedProductDetail === undefined,
+  );
   const [saving, setSaving] = useState(false);
   const [shippingRegions, setShippingRegions] = useState<string[]>([
-    defaultFormState.customsRegion,
+    ...(storePolicyDefaults?.shippingRegions ?? [defaultShippingRegion]),
   ]);
   const [savedShippingRegions, setSavedShippingRegions] = useState<string[]>([
-    defaultFormState.customsRegion,
+    ...(storePolicyDefaults?.shippingRegions ?? [defaultShippingRegion]),
   ]);
-  const [shippingRegionsLoading, setShippingRegionsLoading] = useState(true);
   const [storeProcessingTime, setStoreProcessingTime] = useState('');
   const [storeCustomOrderLeadTime, setStoreCustomOrderLeadTime] = useState('');
   const [saveAction, setSaveAction] = useState<"draft" | "publish" | null>(
@@ -508,9 +724,21 @@ const EditProduct: React.FC = () => {
   );
   const [submitLocked, setSubmitLocked] = useState(false);
   const submitLockRef = useRef(false);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Warn before tab close/refresh with unsaved edits — protects long forms
+  // (incl. custom-order settings that attach on save).
+  useEffect(() => {
+    if (!hasChanges) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasChanges]);
   const [tagInput, setTagInput] = useState("");
+  const [showTagPicker, setShowTagPicker] = useState(false);
   const [showDiscardPrompt, setShowDiscardPrompt] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<{
     pricing: boolean;
@@ -523,32 +751,24 @@ const EditProduct: React.FC = () => {
     fulfillment: true,
     additional: true,
   });
-  const [isTourActive, setIsTourActive] = useState(false);
-
+  // 3-step wizard: 1 = Details (media + basics), 2 = Operations
+  // (pricing/variants/inventory/sizing/fulfillment/additional), 3 = Review.
+  // Steps are toggled by visibility only — every section stays mounted so no
+  // state, ref, preview, or drag-drop handler is ever lost between steps.
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
+  const wizardTopRef = useRef<HTMLDivElement | null>(null);
   // Auto-start the tour the first time a user opens the create-product page.
-  // Persisted in localStorage so it never shows again after the first visit.
-  useEffect(() => {
-    if (isEditMode) return;
-    if (localStorage.getItem('threadly_tour_product_create')) return;
-    const timer = window.setTimeout(() => setIsTourActive(true), 800);
-    return () => clearTimeout(timer);
-  }, [isEditMode]);
-
-  const handleTourClose = useCallback(() => {
-    setIsTourActive(false);
-    localStorage.setItem('threadly_tour_product_create', '1');
-  }, []);
+  // The seen-flag is persisted the moment it is shown (not only on close), so
+  // ignoring it or navigating away is as permanent as pressing "Skip tour".
+  const { isActive: isTourActive, close: handleTourClose } = useOneTimeTour(
+    'wiez_tour_product_create',
+    { enabled: !isEditMode },
+  );
   const { confirm, ConfirmDialog: ConfirmModal } = useConfirm();
 
-  // Taxonomy state (standalone category/sub-category/filters)
-  type TaxonomyCategoryOption = {
-    id: string;
-    name: string;
-    types: { id: string; name: string }[];
-  };
   const [taxonomyCategories, setTaxonomyCategories] = useState<
     TaxonomyCategoryOption[]
-  >([]);
+  >(() => productEditorSupportData?.taxonomyCategories ?? []);
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({});
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
 
@@ -556,6 +776,7 @@ const EditProduct: React.FC = () => {
   const [mediaUrls, setMediaUrls] = useState<ProductMediaPreview[]>([]);
 
   const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
+  const quickAddSizeInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const pendingUploadSlotRef = useRef<MediaViewSlot | null>(null);
   const [pendingMediaFiles, setPendingMediaFiles] = useState<
     Array<{
@@ -583,8 +804,56 @@ const EditProduct: React.FC = () => {
   // Custom order: on new product, hidden by default. On edit, shown if a
   // configuration already exists (resolved via the editor's own load logic).
   const [showCustomOrderForm, setShowCustomOrderForm] = useState(false);
+  const customOrderSectionRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * What the custom-order setup is still waiting for, reported as it is typed.
+   *
+   * Drives the warning on the summary card, so the incomplete state is visible
+   * BEFORE "Go live" is pressed rather than only as a toast afterwards.
+   */
+  const [customOrderMissingFields, setCustomOrderMissingFields] = useState<string[]>([]);
   const customOrderEditorRef =
     useRef<CustomOrderConfigurationEditorHandle | null>(null);
+
+  /**
+   * If custom orders are on, the setup section is open. Always.
+   *
+   * `showCustomOrderForm` started `false` and was only ever set by the checkbox
+   * `onChange`, so opening a SAVED product that already has custom orders
+   * enabled left the section closed — and with it the editor unmounted and
+   * `customOrderEditorRef.current` null. Pressing "Go live" then found no
+   * draft, and the whole gate collapsed into one toast: no field errors,
+   * no focus, and the section it was talking about not even on screen. That is
+   * the "why didn't it tell me which field, why didn't it take me there"
+   * report — there was nothing mounted to ask.
+   *
+   * Keeping the section bound to the setting means the editor is always there
+   * to be validated, which is what makes everything below possible.
+   */
+  useEffect(() => {
+    if (form.customOrderEnabled) setShowCustomOrderForm(true);
+  }, [form.customOrderEnabled]);
+
+  /**
+   * Takes the brand to the custom-order setup and marks up what is missing.
+   *
+   * Order matters: `buildConfigurationDraft()` (non-silent) is what populates
+   * the inline field errors and focuses the first one, so it runs first and the
+   * scroll only fills in for the case where nothing could be focused.
+   */
+  const revealCustomOrderProblems = useCallback(() => {
+    setShowCustomOrderForm(true);
+    const handle = customOrderEditorRef.current;
+    // Not mounted yet (the section was closed until a moment ago) — the scroll
+    // still lands the brand on the section, which is the important half.
+    handle?.buildConfigurationDraft();
+    requestAnimationFrame(() => {
+      customOrderSectionRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  }, []);
   const [pendingStatusOverride, setPendingStatusOverride] = useState<
     FormState["status"] | null
   >(null);
@@ -600,20 +869,24 @@ const EditProduct: React.FC = () => {
     () => getMissingRequiredMediaSlots(mediaUrls),
     [mediaUrls],
   );
-  const productMediaSlotOptions = useMemo(
-    () =>
-      MEDIA_VIEW_SLOT_OPTIONS.slice(0, maxMediaCount).map((option) => ({
-        value: option.value,
-        label: option.required ? `${option.label} *` : option.label,
-      })),
-    [maxMediaCount],
-  );
+
+  // Assign every media item a UNIQUE, rendered slot. If an item's stored slot is
+  // not one of the 6 rendered slots, or is already taken by an earlier item, it
+  // spills to the next free rendered slot instead of overwriting (Map collision)
+  // and vanishing. This keeps what the user sees consistent with drag/drop, which
+  // identifies items by the slot they are actually DISPLAYED in.
   const mediaBySlot = useMemo(() => {
-    const next = new Map<MediaViewSlot, ProductMediaPreview>();
+    const bySlot = new Map<MediaViewSlot, ProductMediaPreview>();
+    const used = new Set<MediaViewSlot>();
     mediaUrls.forEach((item, index) => {
-      next.set(normalizeMediaViewSlot(item.viewSlot, index), item);
+      let slot = normalizeMediaViewSlot(item.viewSlot, index);
+      if (!RENDERABLE_MEDIA_SLOTS.includes(slot) || used.has(slot)) {
+        slot = RENDERABLE_MEDIA_SLOTS.find((candidate) => !used.has(candidate)) ?? slot;
+      }
+      used.add(slot);
+      bySlot.set(slot, item);
     });
-    return next;
+    return bySlot;
   }, [mediaUrls]);
 
   const buildStructuredMediaPayload = useCallback(
@@ -654,6 +927,14 @@ const EditProduct: React.FC = () => {
     );
   }, [form.variants]);
 
+  /** Fallback base price so drafts priced only at variant level don't render ₦0 on catalog cards. */
+  const minVariantPrice = useMemo(() => {
+    const prices = form.variants
+      .map((v) => (typeof v.price === "number" && v.price > 0 ? v.price : null))
+      .filter((p): p is number => p !== null);
+    return prices.length ? Math.min(...prices) : 0;
+  }, [form.variants]);
+
   const variantKeyCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const v of form.variants) {
@@ -670,11 +951,6 @@ const EditProduct: React.FC = () => {
     }
     return false;
   }, [variantKeyCounts]);
-
-  const normalizedShippingRegions = useMemo(
-    () => normalizeShippingRegionCodes(shippingRegions),
-    [shippingRegions],
-  );
 
   const selectedFilterValueIds = useMemo(
     () =>
@@ -693,6 +969,114 @@ const EditProduct: React.FC = () => {
         ),
       ),
     [filterSelection],
+  );
+
+  // Live publish readiness — one evaluation of the backend contract, reused for
+  // the stepper fillers, the Continue/Submit gates, the inline field errors and
+  // the "still needed" summary. Before this, the wizard checked title + cover
+  // and let the server discover the other eleven rules mid-submit.
+  const publishErrors = useMemo(
+    () =>
+      validateProductForPublish({
+        title: form.title,
+        description: form.description,
+        taxonomyCategoryId: form.taxonomyCategoryId,
+        categoryTypeId: form.categoryTypeId,
+        gender: form.gender,
+        tags: form.tags,
+        price: form.price,
+        minVariantPrice,
+        variantCount: form.variants.length,
+        hasDuplicateVariants,
+        mediaCount: mediaUrls.length,
+        hasCover: hasPrimaryMedia,
+        missingMediaSlots:
+          missingRequiredProductMediaSlots.map(getMediaViewSlotLabel),
+        styleDetailCount: selectedFilterValueIds.length,
+        trackInventory: form.trackInventory,
+        stock: form.stock,
+        customOrderEnabled: form.customOrderEnabled,
+      }),
+    [
+      form.title,
+      form.description,
+      form.taxonomyCategoryId,
+      form.categoryTypeId,
+      form.gender,
+      form.tags,
+      form.price,
+      form.variants.length,
+      form.trackInventory,
+      form.stock,
+      form.customOrderEnabled,
+      minVariantPrice,
+      hasDuplicateVariants,
+      mediaUrls.length,
+      hasPrimaryMedia,
+      missingRequiredProductMediaSlots,
+      selectedFilterValueIds.length,
+    ],
+  );
+
+  const step1Missing = useMemo(
+    () => fieldsForStep(publishErrors, 1),
+    [publishErrors],
+  );
+  const step2Missing = useMemo(
+    () => fieldsForStep(publishErrors, 2),
+    [publishErrors],
+  );
+  const step1Complete = step1Missing.length === 0;
+  const step2Complete = step2Missing.length === 0;
+
+  // A blank new product should not open covered in red. Errors surface once a
+  // field has been touched, or immediately when editing an existing product —
+  // there, an empty required field is a real defect the brand has to fix, not
+  // a form they have not filled in yet.
+  const [touchedPublishFields, setTouchedPublishFields] = useState<
+    Set<ProductPublishField>
+  >(() => new Set());
+  const markPublishFieldTouched = useCallback((field: ProductPublishField) => {
+    setTouchedPublishFields((prev) => {
+      if (prev.has(field)) return prev;
+      const next = new Set(prev);
+      next.add(field);
+      return next;
+    });
+  }, []);
+  const fieldError = useCallback(
+    (field: ProductPublishField): string | undefined =>
+      isEditMode || touchedPublishFields.has(field)
+        ? publishErrors[field]
+        : undefined,
+    [isEditMode, publishErrors, touchedPublishFields],
+  );
+
+  /** Jump to the field behind a "still needed" chip and reveal its error. */
+  const focusPublishField = useCallback(
+    (field: ProductPublishField) => {
+      markPublishFieldTouched(field);
+      const targetStep = PRODUCT_PUBLISH_FIELD_STEP[field];
+      setWizardStep(targetStep);
+      const anchorId = PRODUCT_PUBLISH_FIELD_ANCHOR[field];
+      // One frame so the step's container is visible before we measure it —
+      // steps are toggled with `hidden`, and a hidden element has no position.
+      requestAnimationFrame(() => {
+        const node = document.getElementById(anchorId);
+        if (!node) return;
+        node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const focusable = node.matches('input, textarea, select')
+          ? node
+          : node.querySelector<HTMLElement>('input, textarea, button, [tabindex]');
+        focusable?.focus({ preventScroll: true });
+      });
+    },
+    [markPublishFieldTouched],
+  );
+
+  const normalizedShippingRegions = useMemo(
+    () => normalizeShippingRegionCodes(shippingRegions),
+    [shippingRegions],
   );
 
   const hasShippingRegionPolicyChanges = useMemo(
@@ -735,13 +1119,17 @@ const EditProduct: React.FC = () => {
   }, []);
 
   const syncShippingRegions = useCallback(async (
-    options?: { persistPolicy?: boolean },
+    options?: { persistPolicy?: boolean; requireRegions?: boolean },
   ): Promise<string | undefined> => {
     if (!form.isPhysicalProduct) {
       return undefined;
     }
 
+    // Drafts must not require shipping countries — only go-live does.
     if (normalizedShippingRegions.length === 0) {
+      if (options?.requireRegions === false) {
+        return undefined;
+      }
       throw new Error("MISSING_SHIPPING_REGION");
     }
 
@@ -799,143 +1187,24 @@ const EditProduct: React.FC = () => {
   // =====================
 
   useEffect(() => {
-    let mounted = true;
+    if (!storePolicyDefaults) return;
+    setShippingRegions(storePolicyDefaults.shippingRegions);
+    setSavedShippingRegions(storePolicyDefaults.shippingRegions);
+    setStoreProcessingTime(storePolicyDefaults.processingTime);
+    setStoreCustomOrderLeadTime(storePolicyDefaults.customOrderLeadTime);
+    setForm((prev) => ({
+      ...prev,
+      customsRegion: storePolicyDefaults.shippingRegions[0] ?? prev.customsRegion,
+    }));
+  }, [storePolicyDefaults]);
 
-    const loadStoreShippingRegions = async () => {
-      try {
-        setShippingRegionsLoading(true);
-        const policies = await getStorePolicies();
-        if (!mounted) return;
-
-        const fromPolicy = normalizeShippingRegionCodes(
-          policies.shippingRegions || [],
-        );
-        const fallbackRegion =
-          normalizeShippingRegionCode(defaultFormState.customsRegion) ??
-          defaultFormState.customsRegion;
-        const resolved = fromPolicy.length > 0 ? fromPolicy : [fallbackRegion];
-
-        setShippingRegions(resolved);
-        setSavedShippingRegions(resolved);
-        setStoreProcessingTime(policies.processingTime || '');
-        setStoreCustomOrderLeadTime(
-          policies.shippingRules?.customOrderSettings?.leadTime || '',
-        );
-        setForm((prev) => ({
-          ...prev,
-          customsRegion: resolved[0] ?? prev.customsRegion,
-        }));
-      } catch (error) {
-        console.error("Failed to load store shipping regions", error);
-        if (!mounted) return;
-        const fallbackRegion =
-          normalizeShippingRegionCode(defaultFormState.customsRegion) ??
-          defaultFormState.customsRegion;
-        setShippingRegions([fallbackRegion]);
-        setSavedShippingRegions([fallbackRegion]);
-        setStoreProcessingTime('');
-        setStoreCustomOrderLeadTime('');
-        setForm((prev) => ({
-          ...prev,
-          customsRegion: fallbackRegion,
-        }));
-      } finally {
-        if (mounted) setShippingRegionsLoading(false);
-      }
-    };
-
-    void loadStoreShippingRegions();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // Load collections (optional for products; standalone products are allowed)
   useEffect(() => {
-    let mounted = true;
-    const loadCollections = async () => {
-      try {
-        // Run all three API calls in parallel to minimize total load time.
-        // getCategoriesWithSubCategories is shared so it's only called once.
-        const [collectionsResult, categoryTypesResult, categoriesWithSubResult] =
-          await Promise.allSettled([
-            user?.id
-              ? brandApi.getCollections(user.id, { visibility: "all", scope: "store" })
-              : Promise.resolve(null),
-            brandApi.getCategoryTypes(undefined, true),
-            brandApi.getCategoriesWithSubCategories(true),
-          ]);
-
-        if (!mounted) return;
-
-        // Process collections
-        if (user?.id) {
-          const collections =
-            collectionsResult.status === "fulfilled" ? collectionsResult.value : null;
-          const mapped: Category[] = (collections || [])
-            .filter((c: any) => Boolean(c?.isAvailableInStore))
-            .map((c: any) => ({
-              id: String(c.id),
-              name: String(c.title || c.name || "Untitled collection"),
-              slug: String(c.id),
-            }));
-          setCategories(mapped);
-          const categoryByCollection: Record<string, string> = {};
-          (collections || []).forEach((c: any) => {
-            if (c?.id && c?.categoryId) {
-              categoryByCollection[String(c.id)] = String(c.categoryId);
-            }
-          });
-          setCollectionCategoryById(categoryByCollection);
-        } else {
-          setCategories([]);
-        }
-
-        // Process taxonomy categories (from shared fetch)
-        const categoriesWithSub =
-          categoriesWithSubResult.status === "fulfilled"
-            ? categoriesWithSubResult.value
-            : null;
-        if (Array.isArray(categoriesWithSub)) {
-          setTaxonomyCategories(
-            categoriesWithSub.map((c: any) => ({
-              id: String(c.id),
-              name: String(c.name || ""),
-              types: (c.types || []).map((t: any) => ({
-                id: String(t.id),
-                name: String(t.name || ""),
-              })),
-            })),
-          );
-        }
-
-        // Process category types (with fallback to shared categories result)
-        let resolvedTypes =
-          categoryTypesResult.status === "fulfilled" &&
-          Array.isArray(categoryTypesResult.value)
-            ? categoryTypesResult.value
-            : [];
-        if (resolvedTypes.length === 0 && Array.isArray(categoriesWithSub)) {
-          resolvedTypes = categoriesWithSub
-            .flatMap((category: any) => category.types ?? [])
-            .filter((type: any) => Boolean(type?.id) && Boolean(type?.name));
-        }
-        setCategoryTypes(resolvedTypes);
-      } catch (error) {
-        console.error("Failed to load collections", error);
-        if (mounted) {
-          setCategories([]);
-          setCollectionCategoryById({});
-        }
-      } finally {
-        if (mounted) setCategoriesLoading(false);
-      }
-    };
-    void loadCollections();
-    return () => {
-      mounted = false;
-    };
-  }, [user?.id]);
+    if (!productEditorSupportData) return;
+    setCategories(productEditorSupportData.categories);
+    setCollectionCategoryById(productEditorSupportData.collectionCategoryById);
+    setTaxonomyCategories(productEditorSupportData.taxonomyCategories);
+    setCategoryTypes(productEditorSupportData.categoryTypes);
+  }, [productEditorSupportData]);
 
   // Load product if editing
   useEffect(() => {
@@ -947,11 +1216,16 @@ const EditProduct: React.FC = () => {
     let mounted = true;
     const loadProduct = async () => {
       try {
-        setLoading(true);
-        const product = await productApi.getProduct(
-          productId,
-          includeDeleted ? { includeDeleted: true } : undefined,
-        );
+        const cached = queryClient.getQueryData<ProductDto | null>(productDetailQueryKey);
+        setLoading(cached === undefined);
+        const product = await queryClient.fetchQuery({
+          queryKey: productDetailQueryKey,
+          queryFn: () =>
+            productApi.getProduct(
+              productId,
+              includeDeleted ? { includeDeleted: true } : undefined,
+            ),
+        });
         if (!product || !mounted) return;
         const resolvedStatus = (() => {
           const rawStatus = String((product as any).status || "").toUpperCase();
@@ -1022,7 +1296,7 @@ const EditProduct: React.FC = () => {
           mediaIds: product.mediaIds || [],
           variants:
             product.variants && product.variants.length
-              ? product.variants
+              ? withColorGroupIds(product.variants)
               : (() => {
                   const sizeStock = (product as any).sizeStock as
                     | Record<string, number>
@@ -1100,7 +1374,7 @@ const EditProduct: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [includeDeleted, isEditMode, productId, navigate]);
+  }, [includeDeleted, isEditMode, productDetailQueryKey, productId, navigate, queryClient]);
 
   const effectiveCollectionId = useMemo(
     () => (isCollectionFlow ? collectionContextId || form.categoryId : form.categoryId),
@@ -1312,33 +1586,49 @@ const EditProduct: React.FC = () => {
     [updateForm],
   );
 
-  const addVariant = useCallback(() => {
+  // "+ Add Color" — always a brand-new, independent color group (its own stable
+  // id), so a second unnamed color does NOT merge into the first empty one.
+  const addColorGroup = useCallback(() => {
     const next: ProductVariant = {
       size: "",
       color: "",
       sku: "",
       price: undefined,
       stock: 0,
+      colorGroupId: nextColorGroupId(),
     };
     updateForm("variants", [...form.variants, next]);
   }, [form.variants, updateForm]);
 
-  const addVariantForColor = useCallback(
-    (color: string) => {
+  const addSizeToGroup = useCallback(
+    (group: { colorGroupId?: string; color: string }) => {
       const next: ProductVariant = {
         size: "",
-        color,
+        color: group.color,
         sku: "",
         price: undefined,
         stock: 0,
+        colorGroupId: group.colorGroupId ?? nextColorGroupId(),
       };
       updateForm("variants", [...form.variants, next]);
     },
     [form.variants, updateForm],
   );
 
-  const addMultipleSizesForColor = useCallback(
-    (color: string, sizesStr: string) => {
+  const setGroupColor = useCallback(
+    (group: { colorGroupId?: string; color: string }, newColor: string) => {
+      // Update every size row in this group at once, keyed by the stable group
+      // id — grouping no longer shifts mid-type, so the field keeps focus.
+      const next = form.variants.map((v) =>
+        variantMatchesGroup(v, group) ? { ...v, color: newColor } : v,
+      );
+      updateForm("variants", next);
+    },
+    [form.variants, updateForm],
+  );
+
+  const addMultipleSizesForGroup = useCallback(
+    (group: { colorGroupId?: string; color: string }, sizesStr: string) => {
       const rawSizes = sizesStr
         .split(",")
         .map((s) => s.trim())
@@ -1354,20 +1644,22 @@ const EditProduct: React.FC = () => {
       const sizes = rawSizes
         .map((size) => normalizeProductVariantSize(size))
         .filter((size): size is string => Boolean(size));
-      const existing = form.variants.filter(
-        (v) => (v.color ?? "").trim().toLowerCase() === color.trim().toLowerCase(),
+      const existing = form.variants.filter((v) =>
+        variantMatchesGroup(v, group),
       );
       const existingSizes = new Set(
         existing.map((v) => (v.size ?? "").trim().toLowerCase()),
       );
+      const groupId = group.colorGroupId ?? nextColorGroupId();
       const newVariants = sizes
         .filter((s) => !existingSizes.has(s.toLowerCase()))
         .map((size) => ({
           size,
-          color,
+          color: group.color,
           sku: "",
           price: undefined as number | undefined,
           stock: 0,
+          colorGroupId: groupId,
         }));
       if (newVariants.length === 0) {
         toast.warning("All sizes already exist for this color");
@@ -1397,38 +1689,41 @@ const EditProduct: React.FC = () => {
   );
 
   const removeColorGroup = useCallback(
-    (color: string) => {
-      const next = form.variants.filter(
-        (v) =>
-          (v.color ?? "").trim().toLowerCase() !== color.trim().toLowerCase(),
-      );
+    (group: { colorGroupId?: string; color: string }) => {
+      const next = form.variants.filter((v) => !variantMatchesGroup(v, group));
       updateForm("variants", next);
     },
     [form.variants, updateForm],
   );
 
-  /** Group variants by color for the grouped editor view */
+  /**
+   * Group variants into color cards for the editor. Keyed by the stable
+   * colorGroupId (falling back to color string for any legacy variant) so
+   * multiple unnamed colors stay as separate cards and renaming a color never
+   * re-shuffles the cards mid-keystroke.
+   */
   const variantColorGroups = useMemo(() => {
     const groups: Array<{
       stableKey: string;
+      colorGroupId?: string;
       color: string;
       variants: Array<{ variant: ProductVariant; originalIndex: number }>;
     }> = [];
-    const colorMap = new Map<string, typeof groups[number]>();
+    const keyMap = new Map<string, (typeof groups)[number]>();
     form.variants.forEach((v, idx) => {
-      const colorKey = (v.color ?? "").trim().toLowerCase() || "__no_color__";
-      let group = colorMap.get(colorKey);
+      const colorGroupId = v.colorGroupId?.trim() || undefined;
+      const key = colorGroupId
+        ? `id:${colorGroupId}`
+        : (v.color ?? "").trim().toLowerCase() || `__idx_${idx}`;
+      let group = keyMap.get(key);
       if (!group) {
-        const stableId =
-          typeof v.id === "string" && v.id.trim().length > 0
-            ? v.id
-            : String(idx);
         group = {
-          stableKey: `group-${stableId}`,
+          stableKey: key,
+          colorGroupId,
           color: v.color ?? "",
           variants: [],
         };
-        colorMap.set(colorKey, group);
+        keyMap.set(key, group);
         groups.push(group);
       }
       group.variants.push({ variant: v, originalIndex: idx });
@@ -1442,10 +1737,37 @@ const EditProduct: React.FC = () => {
     const cleaned = raw.replace(/#/g, "").trim();
     if (!cleaned) return;
     if (!form.tags.includes(cleaned)) {
+      if (form.tags.length >= MAX_PRODUCT_TAGS) {
+        toast.error(`You can add up to ${MAX_PRODUCT_TAGS} hashtags`);
+        return;
+      }
       updateForm("tags", [...form.tags, cleaned]);
     }
     setTagInput("");
   }, [tagInput, form.tags, updateForm]);
+
+  const handleToggleTagFromPicker = useCallback(
+    (tag: string) => {
+      const cleaned = tag.replace(/#/g, "").trim();
+      if (!cleaned) return;
+      const existing = form.tags.find(
+        (t) => t.toLowerCase() === cleaned.toLowerCase(),
+      );
+      if (existing) {
+        updateForm(
+          "tags",
+          form.tags.filter((t) => t !== existing),
+        );
+        return;
+      }
+      if (form.tags.length >= MAX_PRODUCT_TAGS) {
+        toast.error(`You can add up to ${MAX_PRODUCT_TAGS} hashtags`);
+        return;
+      }
+      updateForm("tags", [...form.tags, cleaned]);
+    },
+    [form.tags, updateForm],
+  );
 
   const handleRemoveTag = useCallback(
     (tagToRemove: string) => {
@@ -1474,6 +1796,15 @@ const EditProduct: React.FC = () => {
     [],
   );
 
+  const goToStep = useCallback((next: 1 | 2 | 3) => {
+    setWizardStep(next);
+    // Scroll the wizard back to the top so each step opens from its start,
+    // without jumping the page around during the transition.
+    requestAnimationFrame(() => {
+      wizardTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
   const tourSteps = useMemo<TourStep[]>(
     () => [
       {
@@ -1496,11 +1827,16 @@ const EditProduct: React.FC = () => {
         description:
           'Set the selling price, an optional compare-at price, and decide whether to go live now or keep this as a draft.',
         emoji: '💳',
-        onEnter: () =>
+        onEnter: () => {
+          // Pricing now lives in Operations (step 2) — reveal it before the
+          // tour measures the target, otherwise the spotlight has nothing to
+          // anchor to (the section is display:none on step 1).
+          setWizardStep(2);
           setCollapsedSections((prev) =>
             prev.pricing ? { ...prev, pricing: false } : prev,
-          ),
-        enterDelay: 350,
+          );
+        },
+        enterDelay: 400,
       },
     ],
     [],
@@ -1508,12 +1844,28 @@ const EditProduct: React.FC = () => {
 
   const notifyProductStudioSync = useCallback(
     (reason: string, syncedProductId?: string) => {
+      const targetProductId = syncedProductId || productId || undefined;
       emitProductStudioSync({
-        productId: syncedProductId || productId || undefined,
+        productId: targetProductId,
         reason,
       });
+      // The Store panel only hears the window event while it is mounted. A
+      // cover/media change made here and then a reroute back to the Store would
+      // otherwise paint STALE cached data (global refetchOnMount is off), which
+      // is why the old cover stuck until a manual browser refresh. Invalidate
+      // AND refetch (`refetchType: 'all'` reaches the now-inactive list query)
+      // so the fresh cover is in cache before the panel remounts.
+      void queryClient.invalidateQueries({
+        queryKey: ['store', 'panel'],
+        refetchType: 'all',
+      });
+      if (targetProductId) {
+        void queryClient.invalidateQueries({
+          queryKey: ['store', 'product', targetProductId],
+        });
+      }
     },
-    [productId],
+    [productId, queryClient],
   );
 
   const rollbackCreatedProduct = useCallback(
@@ -1606,7 +1958,7 @@ const EditProduct: React.FC = () => {
             ? `Supported sizes: ${PRODUCT_VARIANT_SIZE_LABELS}`
             : null,
           !form.title.trim() ? 'Please enter a product title' : null,
-          !form.description.trim() ? 'Please enter a product description' : null,
+          // Description is optional — do not block go-live/draft when empty.
           !form.taxonomyCategoryId ? 'Choose what this item is.' : null,
           !form.categoryTypeId ? 'Choose a garment type.' : null,
           !form.gender ? 'Choose who this item is for.' : null,
@@ -1706,7 +2058,12 @@ const EditProduct: React.FC = () => {
         : undefined;
 
       if (shouldValidatePublish && form.customOrderEnabled && !pendingCustomOrderDraft) {
-        toast.error('Save the custom-order setup before this product goes live.');
+        // Open it, validate it, mark the fields, and scroll there — rather than
+        // naming a section the brand cannot see and leaving them to find it.
+        revealCustomOrderProblems();
+        toast.error(
+          'Custom orders are enabled, so this setup has to be complete before the product goes live. The fields that still need you are highlighted below.',
+        );
         return;
       }
 
@@ -1717,7 +2074,8 @@ const EditProduct: React.FC = () => {
         }
         const resolvedCustomsRegion = await syncShippingRegions({
           // Collection flow should not block on store policy updates.
-          persistPolicy: !isCollectionContext,
+          persistPolicy: !isCollectionContext && !effectiveDraft,
+          requireRegions: !effectiveDraft,
         });
         const ensuredSku =
           form.sku?.trim() ||
@@ -1758,7 +2116,7 @@ const EditProduct: React.FC = () => {
           price: effectiveDraft
             ? form.price > 0
               ? form.price
-              : 0
+              : minVariantPrice
             : form.price,
           compareAtPrice:
             form.onSale && form.compareAtPrice > 0
@@ -1822,6 +2180,7 @@ const EditProduct: React.FC = () => {
           }
 
           const updated = await productApi.updateProduct(productId, payload);
+          queryClient.setQueryData(productDetailQueryKey, updated);
           setContentStatus(
             String((updated as any).publicationStatus || (updated as any).status || finalStatus),
           );
@@ -1836,8 +2195,101 @@ const EditProduct: React.FC = () => {
             return;
           }
         } else {
+          // Ordered pending media uploads — shared by the instant-reroute path
+          // and the legacy inline path below.
+          const pendingUploads = (() => {
+            if (pendingMediaFiles.length === 0)
+              return [] as Array<{
+                file: File;
+                isPrimary: boolean;
+                viewSlot: MediaViewSlot;
+                previewUrl?: string;
+              }>;
+            const pendingById = new Map(
+              pendingMediaFiles.map((p) => [p.tempId, p]),
+            );
+            const orderedPending = mediaUrls
+              .map((m) => pendingById.get(m.id))
+              .filter(Boolean)
+              .map((p) => ({
+                ...(p as {
+                  id: string;
+                  tempId: string;
+                  file: File;
+                  previewUrl: string;
+                  isPrimary: boolean;
+                  viewSlot: MediaViewSlot;
+                }),
+                id:
+                  (p as { id: string }).id ||
+                  (p as { tempId: string }).tempId,
+              }));
+            return normalizePrimary(orderedPending);
+          })();
+
+          // ── New product (go-live OR draft): reroute NOW, finish in a job ──
+          // Parity with design creation — the store shows a live filler card
+          // while create → upload → publish runs in the background instead of
+          // blocking on the button loader. The synchronous inline path below is
+          // kept ONLY for the collection builder, which must hand the new
+          // product id straight back to the collection (async can't do that).
+          if (!isCollectionContext && !isCollectionFlow) {
+            const goingLive = !effectiveDraft;
+            const productTitle =
+              payload.title || form.title.trim() || "New product";
+            // Mint a preview URL that belongs to the publish task. Reusing the
+            // editor's `previewUrl` looked equivalent but was not: this page
+            // revokes every pending preview blob on unmount, and the reroute
+            // below unmounts it immediately — so the store's new card pointed
+            // at a dead blob and rendered broken until a manual refresh.
+            const coverUpload =
+              pendingUploads.find((u) => u.isPrimary) ?? pendingUploads[0];
+            const coverPreviewUrl = coverUpload?.file
+              ? URL.createObjectURL(coverUpload.file)
+              : undefined;
+            const task = createPublishTask({
+              ownerId: user?.id,
+              title: productTitle,
+              visibility: "PUBLIC",
+              coverPreviewUrl,
+              ownsCoverPreview: Boolean(coverPreviewUrl),
+              entity: "product",
+              kind: goingLive ? "publish" : "draft",
+              message: goingLive ? "Uploading…" : "Saving…",
+            });
+            setSaving(false);
+            setHasChanges(false);
+            toast.info(
+              goingLive ? "Submitting for review…" : "Saving draft…",
+            );
+            navigate(
+              goingLive
+                ? "/studio/store?status=in_review"
+                : "/studio/store?status=draft",
+              { state: { publishingProductTaskId: task.id } },
+            );
+            void runProductPublishJob({
+              taskId: task.id,
+              ownerId: user?.id,
+              title: productTitle,
+              payload,
+              finalStatus,
+              pendingUploads: pendingUploads.map((u) => ({
+                file: u.file,
+                isPrimary: u.isPrimary,
+                viewSlot: u.viewSlot,
+              })),
+              pendingCustomOrderDraft,
+              // ack + shipping policy already ran synchronously above.
+              acknowledgeContentPolicy: false,
+              shippingRegionsToPersist: null,
+              publishTaskScope: { ownerId: user?.id },
+            });
+            return;
+          }
+
           const shouldCreateAsDraftForUploads =
-            pendingMediaFiles.length > 0 && finalStatus === "ACTIVE";
+            pendingUploads.length > 0 && finalStatus === "ACTIVE";
           const created = await productApi.createProduct(
             shouldCreateAsDraftForUploads
               ? { ...payload, status: "DRAFT" }
@@ -1846,34 +2298,6 @@ const EditProduct: React.FC = () => {
           createdProductId = created.id;
 
           try {
-            // Build media upload list after product creation.
-            let pendingUploads: Array<{
-              file: File;
-              isPrimary: boolean;
-              viewSlot: MediaViewSlot;
-            }> = [];
-            if (pendingMediaFiles.length > 0) {
-              const pendingById = new Map(
-                pendingMediaFiles.map((p) => [p.tempId, p]),
-              );
-              const orderedPending = mediaUrls
-                .map((m) => pendingById.get(m.id))
-                .filter(Boolean)
-                .map((p) => ({
-                  ...(p as {
-                    id: string;
-                    tempId: string;
-                    file: File;
-                    previewUrl: string;
-                    isPrimary: boolean;
-                    viewSlot: MediaViewSlot;
-                  }),
-                  id:
-                    (p as { id: string }).id || (p as { tempId: string }).tempId,
-                }));
-              pendingUploads = normalizePrimary(orderedPending);
-            }
-
             const [customOrderSaveResult, mediaUploadResult] =
               await Promise.allSettled([
                 pendingCustomOrderDraft
@@ -1927,6 +2351,10 @@ const EditProduct: React.FC = () => {
                 status: finalStatus,
                 media: uploadedMedia,
               });
+              queryClient.setQueryData(
+                queryKeys.store.product(created.id, { includeDeleted: false }),
+                updated,
+              );
               setContentStatus(
                 String((updated as any).publicationStatus || (updated as any).status || finalStatus),
               );
@@ -1982,6 +2410,7 @@ const EditProduct: React.FC = () => {
     },
     [
       form,
+      revealCustomOrderProblems,
       selectedFilterValueIds,
       hasDuplicateVariants,
       isEditMode,
@@ -2003,6 +2432,8 @@ const EditProduct: React.FC = () => {
       syncShippingRegions,
       user,
       buildStructuredMediaPayload,
+      productDetailQueryKey,
+      queryClient,
     ],
   );
 
@@ -2013,6 +2444,13 @@ const EditProduct: React.FC = () => {
         : null;
 
     if (form.customOrderEnabled && !pendingCustomOrderDraft) {
+      // This used to `return` with nothing at all — confirming the price change
+      // simply did nothing and the dialog sat there.
+      setShowPricePreview(false);
+      revealCustomOrderProblems();
+      toast.error(
+        'The custom-order setup is incomplete. The fields that still need you are highlighted below.',
+      );
       return;
     }
 
@@ -2043,7 +2481,8 @@ const EditProduct: React.FC = () => {
       const payloadCategoryTypeId = form.categoryTypeId || undefined;
       const payloadCategoryId = form.taxonomyCategoryId || undefined;
       const resolvedCustomsRegion = await syncShippingRegions({
-        persistPolicy: !isCollectionContext,
+        persistPolicy: !isCollectionContext && !effectiveDraft,
+        requireRegions: !effectiveDraft,
       });
       const normalizedVariants =
         form.variants.length > 0
@@ -2075,7 +2514,11 @@ const EditProduct: React.FC = () => {
         gender: form.gender,
         tags: form.tags,
         filterValueIds: selectedFilterValueIds,
-        price: effectiveDraft ? (form.price > 0 ? form.price : 0) : form.price,
+        price: effectiveDraft
+          ? form.price > 0
+            ? form.price
+            : minVariantPrice
+          : form.price,
         compareAtPrice:
           form.onSale && form.compareAtPrice > 0
             ? form.compareAtPrice
@@ -2139,6 +2582,7 @@ const EditProduct: React.FC = () => {
         }
 
         const updated = await productApi.updateProduct(productId, payload);
+        queryClient.setQueryData(productDetailQueryKey, updated);
         setContentStatus(
           String((updated as any).publicationStatus || (updated as any).status || statusToPersist),
         );
@@ -2194,6 +2638,7 @@ const EditProduct: React.FC = () => {
     }
   }, [
     form,
+    revealCustomOrderProblems,
     selectedFilterValueIds,
     user,
     isCollectionFlow,
@@ -2209,6 +2654,8 @@ const EditProduct: React.FC = () => {
     notifyProductStudioSync,
     rollbackCreatedProduct,
     buildStructuredMediaPayload,
+    productDetailQueryKey,
+    queryClient,
   ]);
 
   const triggerSave = useCallback(
@@ -2284,7 +2731,10 @@ const EditProduct: React.FC = () => {
   const pushMediaPreviews = useCallback(
     (
       files: File[],
-      { makePrimary }: { makePrimary: boolean },
+      {
+        makePrimary,
+        replacingSlot = false,
+      }: { makePrimary: boolean; replacingSlot?: boolean },
     ): Array<{
       id: string;
       tempId: string;
@@ -2295,7 +2745,15 @@ const EditProduct: React.FC = () => {
     }> => {
       if (!files.length) return [];
 
-      const remaining = Math.max(0, maxMediaCount - mediaUrls.length);
+      // A replacement refills the slot it just emptied, so it is net-zero
+      // against the cap. `mediaUrls` here is captured from the render BEFORE
+      // that delete, so without the bonus a replace-at-cap computed `remaining`
+      // as 0, bailed out with the cap toast, and left the slot permanently
+      // empty — the delete had already gone through.
+      const remaining = Math.max(
+        0,
+        maxMediaCount - mediaUrls.length + (replacingSlot ? 1 : 0),
+      );
       const toAdd = files.slice(0, remaining);
       if (toAdd.length === 0) {
         toast.error(`You can upload up to ${maxMediaCount} images`);
@@ -2361,16 +2819,76 @@ const EditProduct: React.FC = () => {
   );
 
   const preprocessProductMediaFiles = useCallback(async (files: File[]) => {
-    const prepResults = await Promise.all(
-      files.map(async (file) => {
-        try {
-          const processed = await preprocessImageFile(file, "detail");
-          return { ok: true as const, file: processed.file, optimized: !processed.skipped };
-        } catch {
-          return { ok: false as const, file };
+    /**
+     * Two limits, not one.
+     *
+     * `maxSizeBytes` is what the API will accept (8MB, matching POST_IMAGE);
+     * `targetSizeBytes` is what we would LIKE the file to be. This function used
+     * a single number for both, so a photo compressed to 2.4MB against a 2MB
+     * target was counted as "could not be prepared" and dropped — even though
+     * uploading it would have worked. That is the size-dependent product upload
+     * failure: it hit exactly the photos that would not squeeze that far.
+     */
+    const policy = WEB_UPLOAD_POLICIES.productMedia;
+    const maxSizeBytes = policy.maxSizeBytes;
+    const targetSizeBytes = policy.preferredSizeBytes ?? maxSizeBytes;
+    const compressionTargetBytes = (file: File) =>
+      Math.max(100 * 1024, Math.min(targetSizeBytes, Math.floor(file.size * 0.1)));
+    const isGif = (file: File) =>
+      file.type.trim().toLowerCase() === 'image/gif' || /\.gif$/i.test(file.name);
+    /*
+     * Derived from the policy rather than a second hardcoded list. The regex
+     * here used to accept `avif`, which the policy no longer does and the server
+     * never did — so an AVIF skipped preprocessing and went straight to a
+     * rejection. Two lists that must agree should not be written twice.
+     */
+    const prepareFile = async (file: File) => {
+        if (isGif(file) && file.size <= maxSizeBytes) {
+          return { ok: true as const, file, optimized: false };
         }
-      }),
-    );
+
+        try {
+          // Aim for the target...
+          const processed = await preprocessImageFile(file, "detail", {
+            maxSizeBytes: targetSizeBytes,
+            targetReductionRatio: 0.9,
+            quality: 0.99,
+            minQuality: 0.9,
+          });
+          // ...but accept anything the API will take.
+          if (processed.file.size <= maxSizeBytes) {
+            return { ok: true as const, file: processed.file, optimized: !processed.skipped };
+          }
+        } catch {
+          // A Safari/HEIC local-decode failure is recovered by the server pass.
+        }
+
+        try {
+          if (!isGif(file)) {
+            const transcoded = await getNormalizedImageFile(file, {
+              maxWidth: 2048,
+              quality: 99,
+              maxBytes: compressionTargetBytes(file),
+            });
+            if (transcoded.size <= maxSizeBytes && transcoded.size < file.size) {
+              return { ok: true as const, file: transcoded, optimized: true };
+            }
+          }
+        } catch {
+          /* Server normalize unavailable — fall through to raw checks. */
+        }
+
+        return { ok: false as const, file };
+    };
+
+    // Two-at-a-time prevents a six-photo iPad selection from exhausting the
+    // browser tab while canvas decoding is in progress.
+    const prepResults: Awaited<ReturnType<typeof prepareFile>>[] = [];
+    for (let index = 0; index < files.length; index += 2) {
+      prepResults.push(
+        ...(await Promise.all(files.slice(index, index + 2).map(prepareFile))),
+      );
+    }
 
     const validFiles = prepResults
       .filter((result) => result.ok)
@@ -2387,26 +2905,30 @@ const EditProduct: React.FC = () => {
     }
 
     if (failedCount > 0) {
+      // Name the limit. "Could not be prepared" gave a brand nothing to act on,
+      // and the reason is always the same one: the file is still too big.
+      const limitMb = Math.round(maxSizeBytes / (1024 * 1024));
       toast.error(
         failedCount === 1
-          ? "1 image could not be prepared"
-          : `${failedCount} images could not be prepared`,
+          ? `1 image is still over ${limitMb}MB after compression — try a smaller photo`
+          : `${failedCount} images are still over ${limitMb}MB after compression — try smaller photos`,
       );
     }
 
     return validFiles;
   }, []);
 
-  const handleMediaFilesSelected: React.ChangeEventHandler<
-    HTMLInputElement
-  > = async (e) => {
-    const selectedFiles = Array.from(e.target.files ?? []).filter((f) =>
-      f.type.startsWith("image/"),
-    );
-    e.target.value = "";
-    if (!selectedFiles.length) return;
+  const processAndUploadFiles = async (
+    selectedFiles: File[],
+    targetSlot?: MediaViewSlot,
+    options?: { replacingSlot?: boolean },
+  ) => {
+    // See `pushMediaPreviews`: every capacity read in this function is captured
+    // from the render before the slot was cleared, so a replacement has to be
+    // told it is one or it gets rejected for exceeding a cap it cannot exceed.
+    const replacingSlot = options?.replacingSlot === true;
 
-    if (!canAddMoreMedia) {
+    if (!canAddMoreMedia && !replacingSlot) {
       toast.error(`You can upload up to ${maxMediaCount} images`);
       return;
     }
@@ -2414,10 +2936,18 @@ const EditProduct: React.FC = () => {
     const files = await preprocessProductMediaFiles(selectedFiles);
     if (!files.length) return;
 
+    if (targetSlot) {
+      pendingUploadSlotRef.current = targetSlot;
+    }
+
     if (isEditMode && productId) {
-      const uploadQueue = files.slice(0, maxMediaCount - mediaUrls.length);
+      const uploadQueue = files.slice(
+        0,
+        Math.max(0, maxMediaCount - mediaUrls.length + (replacingSlot ? 1 : 0)),
+      );
       const queuedPreviews = pushMediaPreviews(uploadQueue, {
         makePrimary: !hasPrimaryMedia,
+        replacingSlot,
       });
       if (!queuedPreviews.length) return;
 
@@ -2456,9 +2986,22 @@ const EditProduct: React.FC = () => {
               ),
             );
 
-            return { ok: true as const };
+            return { ok: true as const, reason: null };
           } catch (err) {
             console.error("Upload failed", err);
+            /**
+             * Keep the server's reason. It is the only one that is specific.
+             *
+             * Every upload failure was collapsed into "Failed to upload N
+             * images", which discarded messages the brand could actually act on
+             * — "Product media already has a FRONT view. Replace or delete that
+             * media before uploading another", "You can upload up to 6 images".
+             * Losing them is why a failed upload looked arbitrary.
+             */
+            const reason =
+              (err as any)?.response?.data?.message ??
+              (err as any)?.response?.data?.error ??
+              null;
             setMediaUrls((prev) => {
               const next = normalizePrimary(
                 prev.filter((item) => item.id !== pending.tempId),
@@ -2471,13 +3014,23 @@ const EditProduct: React.FC = () => {
                 prev.filter((item) => item.tempId !== pending.tempId),
               ),
             );
-            return { ok: false as const };
+            return {
+              ok: false as const,
+              reason: typeof reason === 'string' && reason.trim() ? reason.trim() : null,
+            };
           }
         }),
       );
 
       const successCount = results.filter((result) => result.ok).length;
       const failedCount = results.length - successCount;
+      const failureReasons = Array.from(
+        new Set(
+          results
+            .map((result) => (result.ok ? null : result.reason))
+            .filter((reason): reason is string => Boolean(reason)),
+        ),
+      );
 
       if (successCount > 0) {
         notifyProductStudioSync("product-media-uploaded", productId);
@@ -2488,50 +3041,107 @@ const EditProduct: React.FC = () => {
         );
       }
       if (failedCount > 0) {
+        const summary =
+          failedCount === 1 ? "Failed to upload 1 image" : `Failed to upload ${failedCount} images`;
+        // One distinct reason reads better as the whole message; several get
+        // listed, because they are genuinely different problems.
         toast.error(
-          failedCount === 1
-            ? "Failed to upload 1 image"
-            : `Failed to upload ${failedCount} images`,
+          failureReasons.length === 1
+            ? failureReasons[0]
+            : failureReasons.length > 1
+              ? `${summary}: ${failureReasons.join(' ')}`
+              : summary,
         );
       }
       return;
     }
 
     const makePrimary = !hasPrimaryMedia;
-    pushMediaPreviews(files, { makePrimary });
+    pushMediaPreviews(files, { makePrimary, replacingSlot });
   };
 
-  const handleMediaSlotChange = useCallback(
-    (mediaId: string, slotValue: string) => {
-      const nextSlot = normalizeMediaViewSlot(slotValue);
-      const duplicate = mediaUrls.find(
-        (item, index) =>
-          item.id !== mediaId &&
-          normalizeMediaViewSlot(item.viewSlot, index) === nextSlot,
-      );
-      if (duplicate) {
-        toast.error(`${getMediaViewSlotLabel(nextSlot)} is already assigned.`);
-        return;
-      }
+  const handleMediaFilesSelected: React.ChangeEventHandler<
+    HTMLInputElement
+  > = async (e) => {
+    const selectedFiles = Array.from(e.target.files ?? []).filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    e.target.value = "";
+    if (!selectedFiles.length) return;
+    await processAndUploadFiles(selectedFiles);
+  };
 
-      setMediaUrls((prev) =>
-        normalizePrimary(
+
+
+  const handleSwapMediaSlots = useCallback(
+    (sourceSlot: string, targetSlot: string) => {
+      const sourceSlotNormalized = normalizeMediaViewSlot(sourceSlot) as MediaViewSlot;
+      const targetSlotNormalized = normalizeMediaViewSlot(targetSlot) as MediaViewSlot;
+      if (sourceSlotNormalized === targetSlotNormalized) return;
+
+      // Identify the items by the slot they are actually displayed in, then move
+      // each to the other's slot. A missing side means the target slot is empty,
+      // so we simply move the dragged item there. Reassigning viewSlot by item id
+      // (never touching array order) makes this a true swap — no duplication and
+      // no dependence on fragile index-based fallbacks.
+      const sourceItem = mediaBySlot.get(sourceSlotNormalized);
+      const targetItem = mediaBySlot.get(targetSlotNormalized);
+      if (!sourceItem && !targetItem) return;
+
+      const slotUpdates = new Map<string, MediaViewSlot>();
+      if (sourceItem) slotUpdates.set(sourceItem.id, targetSlotNormalized);
+      if (targetItem) slotUpdates.set(targetItem.id, sourceSlotNormalized);
+
+      setMediaUrls((prev) => {
+        const next = prev.map((item) =>
+          slotUpdates.has(item.id)
+            ? { ...item, viewSlot: slotUpdates.get(item.id) as MediaViewSlot }
+            : item,
+        );
+        const normalized = normalizePrimary(next);
+        syncPersistedMediaIds(normalized);
+        return normalized;
+      });
+
+      // Pending items live in mediaUrls keyed by their tempId, so the same id map
+      // applies here to keep both arrays consistent.
+      setPendingMediaFiles((prev) => {
+        if (!prev.some((item) => slotUpdates.has(item.tempId))) return prev;
+        return normalizePending(
           prev.map((item) =>
-            item.id === mediaId ? { ...item, viewSlot: nextSlot } : item,
+            slotUpdates.has(item.tempId)
+              ? { ...item, viewSlot: slotUpdates.get(item.tempId) as MediaViewSlot }
+              : item,
           ),
-        ),
-      );
-      setPendingMediaFiles((prev) =>
-        normalizePending(
-          prev.map((item) =>
-            item.tempId === mediaId ? { ...item, viewSlot: nextSlot } : item,
-          ),
-        ),
-      );
+        );
+      });
+
       setHasChanges(true);
+      toast.success(
+        `Swapped positions: ${getMediaViewSlotLabel(sourceSlotNormalized)} and ${getMediaViewSlotLabel(targetSlotNormalized)}`,
+      );
     },
-    [mediaUrls, normalizePending],
+    [mediaBySlot, normalizePending, syncPersistedMediaIds],
   );
+
+  /**
+   * Slot map in the shape `MediaSlotGrid` renders. Product media is already
+   * uploaded, so no local `file` is attached — the grid uses the plain remote
+   * renderer for those, and only design creation's pre-upload files take the
+   * local preview path.
+   */
+  const slotGridMedia = useMemo(() => {
+    const grid = new Map<MediaViewSlot, MediaSlotGridItem>();
+    mediaBySlot.forEach((item, slot) => {
+      grid.set(slot, {
+        id: item.id,
+        url: item.url,
+        kind: "image",
+        isCover: Boolean(item.isPrimary),
+      });
+    });
+    return grid;
+  }, [mediaBySlot]);
 
   const handleSetCover = useCallback(
     async (mediaId: string) => {
@@ -2600,6 +3210,42 @@ const EditProduct: React.FC = () => {
       revokeBlobUrl,
       updateForm,
     ],
+  );
+
+  /**
+   * Dropping a photo onto an occupied slot replaces what is there.
+   *
+   * Order matters: this deletes the occupant to free the slot, and a delete in
+   * edit mode is a server delete that cannot be undone. So nothing is removed
+   * until we know there is a usable image to put in its place — this used to
+   * delete first and validate afterwards, which turned every rejected drop into
+   * silent data loss.
+   */
+  const handleDropFilesOnSlot = useCallback(
+    async (targetSlot: MediaViewSlot, files: File[]) => {
+      const images = files.filter((file) => file.type.startsWith("image/"));
+      if (!images.length) return;
+
+      const existing = mediaBySlot.get(targetSlot);
+      // Only a drop onto an EMPTY slot can push us past the cap; a replacement
+      // is net-zero. Checking here means the occupant survives a rejection.
+      if (!existing && !canAddMoreMedia) {
+        toast.error(`You can upload up to ${maxMediaCount} images`);
+        return;
+      }
+
+      if (existing) {
+        await handleDeleteMedia(existing.id);
+      }
+      await processAndUploadFiles(images, targetSlot, {
+        replacingSlot: Boolean(existing),
+      });
+    },
+    // `processAndUploadFiles` is a plain function redefined every render, so it
+    // is deliberately not a dependency — including it would rebuild this on
+    // every keystroke elsewhere in the form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [handleDeleteMedia, mediaBySlot, canAddMoreMedia],
   );
 
   const handleReorderMedia = useCallback(
@@ -2702,6 +3348,40 @@ const EditProduct: React.FC = () => {
     navigateBack();
   }, [hasChanges, navigateBack]);
 
+  /**
+   * Where this product sits in the review lifecycle, from the server's own
+   * status rather than the local form status. `CHANGES_REQUESTED` / `REJECTED`
+   * mean the owner is answering the review team, and the action bar has to say
+   * so — "Save Changes" reads as a metadata edit and left owners believing
+   * their resubmission never went anywhere.
+   *
+   * THESE TWO `useMemo`s MUST STAY ABOVE THE EARLY RETURNS BELOW.
+   *
+   * They used to sit after `if (loading) return <StudioPageSkeleton/>`, which
+   * made the hook count depend on `loading`. In create mode `loading` starts
+   * false, so nothing ever went wrong. In EDIT mode it starts true (see the
+   * `useState` initialiser: `isEditMode && cachedProductDetail === undefined`)
+   * — first render took the early return with N hooks, the product arrived,
+   * `loading` flipped, and the next render ran N+2. React throws #310
+   * ("Rendered more hooks than during the previous render") and the error
+   * boundary paints the 500 screen.
+   *
+   * That is not a corner case: `/studio/store/products/:id/edit` is exactly
+   * where "Retry" on a failed product upload sends the owner
+   * (`StoreProductsPanel.handleRetryProductPublish` — a draft already exists
+   * server-side, so retrying opens it rather than creating a duplicate). So a
+   * brand whose upload died could never reach the screen that would have let
+   * them finish it.
+   */
+  const productReviewStatus = useMemo(
+    () => normalizeContentReviewStatus(contentStatus),
+    [contentStatus],
+  );
+  const productReviewHint = useMemo(
+    () => reviewStateHint(productReviewStatus),
+    [productReviewStatus],
+  );
+
   // =====================
   // Loading State
   // =====================
@@ -2714,30 +3394,6 @@ const EditProduct: React.FC = () => {
     return <Navigate to={catalogProfileSetupRedirect} replace />;
   }
 
-  const createScreenInitializing =
-    !isEditMode && (categoriesLoading || shippingRegionsLoading);
-
-  if (createScreenInitializing) {
-    return (
-      <div className="min-h-[560px] animate-pulse">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
-          <div className="mb-6 h-8 w-64 rounded-xl surface-control-muted" />
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-4 lg:col-span-2">
-              <div className="h-44 rounded-2xl surface-control-muted" />
-              <div className="h-44 rounded-2xl surface-control-muted" />
-              <div className="h-44 rounded-2xl surface-control-muted" />
-            </div>
-            <div className="space-y-4">
-              <div className="h-36 rounded-2xl surface-control-muted" />
-              <div className="h-36 rounded-2xl surface-control-muted" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (loading) {
     return <StudioPageSkeleton variant="form" />;
   }
@@ -2746,11 +3402,74 @@ const EditProduct: React.FC = () => {
   // Render
   // =====================
   const isDraftEditMode = isEditMode && form.status === "DRAFT";
+  const isResubmission = needsResubmission(productReviewStatus);
+
+  // Drafts are allowed to be incomplete — that is what a draft is for. Only
+  // submissions that will actually reach the server's publish validation are
+  // gated: the collection flow saves as DRAFT, and editing an existing product
+  // without forcing a status leaves DRAFT/ARCHIVED products where they are.
+  const submitKeepsCurrentStatus =
+    isEditMode && !isDraftEditMode && !isCollectionContext && !isCollectionFlow;
+  const isDraftOnlySubmit =
+    isCollectionFlow ||
+    (submitKeepsCurrentStatus &&
+      (form.status === "DRAFT" || form.status === "ARCHIVED"));
+  const blockingPublishFields: ProductPublishField[] = isDraftOnlySubmit
+    ? []
+    : [...step1Missing, ...step2Missing];
+  const currentStepMissing =
+    isDraftOnlySubmit || wizardStep === 3
+      ? []
+      : wizardStep === 1
+        ? step1Missing
+        : step2Missing;
+  const canAdvanceFromCurrentStep = currentStepMissing.length === 0;
+
+  /**
+   * Continue is ALWAYS pressable, and answers when it cannot advance.
+   *
+   * It used to be `disabled={!canAdvanceFromCurrentStep}`. On a fresh product
+   * the first blocker is Description — a step-1 field — so the very first thing
+   * a brand meets is a primary button that does nothing at all when pressed.
+   * There is no click event on a disabled button, so no toast, no focus, no
+   * scroll, no cursor feedback on touch (`:disabled` cursor rules mean nothing
+   * to a finger); the only hint was 40% opacity on a purple pill and a `title`
+   * tooltip that phones do not render. Reported exactly as "the button was not
+   * functional, user pressed and pressed, but no effect".
+   *
+   * The gate itself is right — step 2 asks for pricing and variants that only
+   * make sense once step 1 is real. What was wrong is a control that refuses
+   * silently. Now the press reveals the field errors, scrolls to the first
+   * blocker and names it.
+   */
+  const handleContinue = () => {
+    if (canAdvanceFromCurrentStep) {
+      goToStep((wizardStep + 1) as 1 | 2 | 3);
+      return;
+    }
+
+    currentStepMissing.forEach(markPublishFieldTouched);
+    const firstMissing = currentStepMissing[0];
+    if (firstMissing) {
+      focusPublishField(firstMissing);
+      toast.error(
+        `${PRODUCT_PUBLISH_FIELD_LABEL[firstMissing]} is needed before you continue.`,
+      );
+    }
+  };
 
   return (
-    <div className="flex flex-col min-h-full bg-transparent text-theme font-sans">
+    /*
+      `min-h-dvh` so a short step still fills the viewport and the sticky action
+      bar lands at the bottom of the screen rather than floating halfway up it
+      with dead space underneath. `pb-28` on the main column is the sticky
+      footer's own height plus a little air — `pb-48` (192px) was reserving more
+      than twice what the bar occupies, which read as yet more empty space at
+      the end of the form.
+    */
+    <div className="flex min-h-dvh flex-col bg-transparent text-theme font-sans">
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-3 py-3 sm:px-5 sm:py-5">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 py-3 pb-28 sm:px-5 sm:py-5 sm:pb-28 md:pb-16">
         <div className="mb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:mb-6">
           <div className="flex flex-col gap-1">
             <div className="flex items-center text-xs text-theme-secondary gap-2">
@@ -2813,13 +3532,76 @@ const EditProduct: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          {/* LEFT COLUMN: Media (42% approx -> 5 cols) */}
-          <div className="space-y-4 lg:col-span-4">
+        {isEditMode && productId ? (
+          <ReviewFeedbackBanner productId={productId} fallbackNote={reviewNoteParam} />
+        ) : null}
+
+        {/* Wizard progress stepper — jumpable, fillers reflect live completion */}
+        <div ref={wizardTopRef} className="mb-6 sm:mb-8">
+          <div className="mx-auto flex w-full max-w-3xl items-center">
+            {([
+              { n: 1 as const, label: "Details", done: step1Complete },
+              { n: 2 as const, label: "Operations", done: step2Complete },
+              { n: 3 as const, label: "Review", done: false },
+            ]).map((s, i, arr) => {
+              const isActive = wizardStep === s.n;
+              return (
+                <React.Fragment key={s.n}>
+                  <button
+                    type="button"
+                    onClick={() => goToStep(s.n)}
+                    className="flex shrink-0 flex-col items-center gap-1.5"
+                    aria-current={isActive ? "step" : undefined}
+                  >
+                    <span
+                      className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
+                        isActive
+                          ? "bg-purple-600 text-white shadow-md shadow-purple-500/25"
+                          : s.done
+                            ? "bg-purple-600/15 text-purple-600 dark:text-purple-300"
+                            : "surface-control text-theme-secondary"
+                      }`}
+                    >
+                      {s.done && !isActive ? (
+                        <CheckCircle className="h-5 w-5" />
+                      ) : (
+                        s.n
+                      )}
+                    </span>
+                    <span
+                      className={`text-xs font-medium ${
+                        isActive ? "text-theme" : "text-theme-secondary"
+                      }`}
+                    >
+                      {s.label}
+                    </span>
+                  </button>
+                  {i < arr.length - 1 && (
+                    <div className="mx-2 mb-5 h-0.5 flex-1 overflow-hidden rounded-full surface-control">
+                      <div
+                        className={`h-full rounded-full bg-purple-600 transition-all duration-500 ${
+                          s.done ? "w-full" : "w-0"
+                        }`}
+                      />
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* STEP 1 — Details: Media + Basic Information */}
+        <div className={wizardStep === 1 ? "" : "hidden"}>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
+          {/* LEFT COLUMN: Media — sticky rail so it stays in view while the long
+              details column scrolls, instead of leaving a tall empty gap and
+              pushing overall page height down. */}
+          <div className="space-y-4 lg:col-span-5 lg:sticky lg:top-6 lg:self-start">
             {/* Media Gallery */}
             <div
               id="product-media-section"
-              className="surface-card rounded-xl border p-4 shadow-sm sm:p-5 scroll-mt-24"
+              className="scroll-mt-24 space-y-4"
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-theme">
@@ -2843,8 +3625,23 @@ const EditProduct: React.FC = () => {
               {/* Carousel for media (shows one at a time with navigation) */}
               {mediaUrls.length > 0 ? (
                 <div className="relative">
-                  {/* Main carousel view */}
-                  <div className="relative rounded-xl bg-theme-muted aspect-[4/5] overflow-hidden">
+                  {/*
+                    Main preview, sized by the media — the same treatment the
+                    design creation screen uses.
+
+                    This was a fixed `aspect-[4/5]` box with `object-contain`,
+                    so a portrait garment shot — which is most of them — sat
+                    letterboxed inside a ratio it does not have, showing small
+                    with bars down both sides. That is the "just shows all the
+                    contents with a small view of each" report: the grid below
+                    was doing the real work because the preview above it was not
+                    big enough to be one.
+
+                    A min-height that grows with the breakpoint and an 85vh
+                    ceiling lets the photograph decide, exactly as design
+                    creation does, while still never running off the screen.
+                  */}
+                  <div className="relative flex max-h-[85vh] min-h-[300px] w-full items-center justify-center overflow-hidden rounded-xl border border-theme sm:min-h-[440px] lg:min-h-[620px]">
                     {mediaUrls[carouselIndex] && (
                       <>
                         <MediaRenderer
@@ -2852,10 +3649,10 @@ const EditProduct: React.FC = () => {
                           src={mediaUrls[carouselIndex].url}
                           alt="Product"
                           fit="contain"
-                          maxHeightClassName="max-h-full"
+                          maxHeightClassName="max-h-[85vh]"
                           maxWidthClassName="max-w-full"
-                          className="w-full h-full"
-                          mediaClassName="w-full h-full object-contain"
+                          className="flex h-full w-full items-center justify-center"
+                          mediaClassName="h-full w-full object-contain"
                         />
 
                         {/* Slot label overlay */}
@@ -2967,131 +3764,52 @@ const EditProduct: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => mediaFileInputRef.current?.click()}
-                  className="group aspect-[4/5] w-full rounded-2xl border border-dashed border-slate-300/80 dark:border-white/15 bg-gradient-to-br from-white via-sky-50/80 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900 p-5 text-left shadow-[0_20px_50px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:border-sky-400/70 hover:shadow-[0_24px_70px_rgba(56,189,248,0.18)] dark:hover:shadow-[0_24px_70px_rgba(56,189,248,0.12)]"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    const files = Array.from(e.dataTransfer.files).filter((f) =>
+                      f.type.startsWith("image/"),
+                    );
+                    if (files.length > 0) {
+                      await processAndUploadFiles(files);
+                    }
+                  }}
+                  className="group aspect-[4/3] w-full rounded-2xl border-2 border-dashed border-gray-300/80 bg-gray-50/50 hover:bg-purple-50/5 hover:border-purple-500/50 dark:border-white/15 dark:bg-white/[0.02] flex items-center justify-center transition-all cursor-pointer"
                 >
-                  <div className="flex h-full flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 text-sky-700 dark:text-sky-200">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-500/10 text-xl group-hover:bg-sky-500/15 transition-colors">
-                          ✦
-                        </span>
-                        <div>
-                          <p className="text-sm font-semibold">Add your first product images</p>
-                          <p className="text-xs text-theme-secondary">
-                            Clear photos help buyers trust the listing.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-5 space-y-2">
-                        {[
-                          'Front, left, right, and back views',
-                          'One cover image so the product stands out',
-                          'Up to 6 images total',
-                        ].map((item) => (
-                          <div key={item} className="flex items-start gap-2 rounded-xl surface-subtle px-3 py-2 text-sm text-theme-secondary">
-                            <span className="mt-0.5 text-sky-600">•</span>
-                            <span>{item}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="surface-subtle mt-4 flex items-center justify-between rounded-xl px-3 py-2">
-                      <div>
-                        <p className="text-xs font-medium text-theme-secondary">
-                          Tap to upload
-                        </p>
-                        <p className="text-[11px] text-theme-secondary">
-                          Start with images, then add a video if needed.
-                        </p>
-                      </div>
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500 text-white shadow-sm">
-                        <Plus className="h-4 w-4" />
-                      </span>
-                    </div>
+                  <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-white/10 flex items-center justify-center text-purple-600 transition-colors group-hover:bg-purple-200">
+                    <Plus className="w-6 h-6" />
                   </div>
                 </button>
               )}
 
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                {MEDIA_VIEW_SLOT_OPTIONS.slice(0, maxMediaCount).map((slotOption, index) => {
-                  const assigned = mediaBySlot.get(slotOption.value);
-                  const isMissing =
-                    slotOption.required &&
-                    missingRequiredProductMediaSlots.includes(slotOption.value);
-                  return (
-                    <div
-                      key={slotOption.value}
-                      className={`rounded-xl border p-2 ${
-                        isMissing
-                          ? "border-amber-400/50 bg-amber-500/10"
-                          : "border-theme surface-subtle"
-                      }`}
-                    >
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-semibold text-theme">
-                          {slotOption.label}
-                        </span>
-                        {slotOption.required && (
-                          <span className="text-[10px] font-medium text-amber-500">
-                            Required
-                          </span>
-                        )}
-                      </div>
-                      {assigned ? (
-                        <div className="space-y-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCarouselIndex(
-                                Math.max(0, mediaUrls.findIndex((item) => item.id === assigned.id)),
-                              )
-                            }
-                            className="h-20 w-full overflow-hidden rounded-lg bg-black/5 dark:bg-white/5"
-                          >
-                            <MediaRenderer
-                              kind="image"
-                              src={assigned.url}
-                              alt={`${slotOption.label} media`}
-                              fit="cover"
-                              className="h-full w-full"
-                              mediaClassName="h-full w-full object-cover"
-                            />
-                          </button>
-                          <UniversalSelect
-                            value={normalizeMediaViewSlot(assigned.viewSlot, index)}
-                            onChange={(value) => handleMediaSlotChange(assigned.id, value)}
-                            options={productMediaSlotOptions}
-                            className="text-xs"
-                            optionCompact
-                          />
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => openMediaPickerForSlot(slotOption.value)}
-                          disabled={!canAddMoreMedia}
-                          className="flex h-20 w-full items-center justify-center rounded-lg border border-dashed border-theme text-xs font-semibold text-theme-secondary transition hover:text-theme disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Add {slotOption.label}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <MediaSlotGrid
+                className="mt-4"
+                mediaBySlot={slotGridMedia}
+                maxSlots={maxMediaCount}
+                missingRequiredSlots={missingRequiredProductMediaSlots}
+                selectedId={mediaUrls[carouselIndex]?.id ?? null}
+                disabled={saving}
+                canAddMore={canAddMoreMedia}
+                onPickForSlot={(slot) => openMediaPickerForSlot(slot)}
+                onSelect={(item) => {
+                  const idx = mediaUrls.findIndex((media) => media.id === item.id);
+                  if (idx !== -1) setCarouselIndex(idx);
+                }}
+                onDelete={(item) => void handleDeleteMedia(item.id)}
+                onSetCover={(item) => void handleSetCover(item.id)}
+                onSlotDrop={(from, to) => handleSwapMediaSlots(from, to)}
+                onDropFiles={(slot, files) => void handleDropFilesOnSlot(slot, files)}
+              />
 
-              {mediaUrls.length > 0 &&
-                missingRequiredProductMediaSlots.length > 0 && (
+              {publishErrors.media && mediaUrls.length > 0 && (
                 <p className="mt-3 text-xs text-orange-500">
-                  Add {missingRequiredProductMediaSlots.map(getMediaViewSlotLabel).join(", ")} media before going live.
+                  {publishErrors.media}
                 </p>
               )}
 
-              {!hasPrimaryMedia && mediaUrls.length > 0 && (
+              {publishErrors.cover && (
                 <p className="mt-3 text-xs text-orange-500">
-                  Select a cover image before saving.
+                  {publishErrors.cover}
                 </p>
               )}
 
@@ -3104,65 +3822,47 @@ const EditProduct: React.FC = () => {
                 </p>
               </div>
             </div>
-
-            {/* Video Section */}
-            <div className="surface-card rounded-xl border p-4 shadow-sm sm:p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-theme">
-                  Product Video
-                </h3>
-              </div>
-              <div className="rounded-lg border border-dashed border-theme p-6 flex flex-col items-center justify-center text-center surface-interactive-hover transition-colors cursor-pointer">
-                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-white/10 flex items-center justify-center mb-3 text-purple-500">
-                  <Video className="w-4 h-4" />
-                </div>
-                <p className="text-sm text-theme font-medium">
-                  Add Video
-                </p>
-                <p className="text-xs text-theme-secondary mt-1">
-                  MP4, WebM up to {getLimitMB('upload.maxSize.postVideo')}MB
-                </p>
-              </div>
-            </div>
           </div>
 
-          {/* RIGHT COLUMN: Details (58% approx -> 7 cols) */}
-          <div className="space-y-4 lg:col-span-8">
-            {/* Basic Info */}
-            <div className="surface-card rounded-xl border p-4 shadow-sm sm:p-5">
-              <h2 className="text-lg font-medium text-theme mb-6">
-                Basic Information
-              </h2>
+          {/* RIGHT COLUMN: Details — widened to take the space freed by the
+              narrower sticky media rail. */}
+          <div className="space-y-6 lg:col-span-7">
+            {/* Basic Info — same collapsible card language as Create Design */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-base">📝</span>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                  Basic Information
+                </h2>
+              </div>
 
               <div className="space-y-4">
                 <Input
+                  id="product-title-field"
                   label="Product Title"
                   required
                   type="text"
                   value={form.title}
                   onChange={(e) => updateForm("title", e.target.value)}
+                  onBlur={() => markPublishFieldTouched("title")}
+                  error={fieldError("title")}
                   placeholder="Enter product title"
                   data-testid="product-title-input"
                 />
 
-                <div className="surface-subtle rounded-lg border border-gray-200/60 p-3 dark:border-white/10">
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-theme-secondary">
-                      Product Metadata
-                    </p>
-                  </div>
-
-                  <div className="lg:max-h-[340px] lg:overflow-y-auto lg:pr-1 scrollbar-threadly">
-                    <div className="space-y-3">
-                      <div className="space-y-3" id="product-category-section">
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                          <div className="md:col-span-6">
+                <div className="space-y-4" id="product-category-section">
+                        {/* Group 1: Category & Subcategory */}
+                        <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+                          <div className="min-w-0">
                             <UniversalSelect
                               label="What is it?"
+                              required
+                              error={fieldError("taxonomyCategoryId")}
                               value={form.taxonomyCategoryId}
-                              onChange={(value) =>
-                                updateForm("taxonomyCategoryId", value)
-                              }
+                              onChange={(value) => {
+                                markPublishFieldTouched("taxonomyCategoryId");
+                                updateForm("taxonomyCategoryId", value);
+                              }}
                               options={taxonomyCategorySelectOptions}
                               placeholder={
                                 categoriesLoading
@@ -3177,16 +3877,20 @@ const EditProduct: React.FC = () => {
                               emptyMessage="No categories available"
                               optionAllowWrap
                               selectedAllowWrap
+                              menuLayer="modal"
                             />
                           </div>
 
-                          <div className="md:col-span-6">
+                          <div className="min-w-0">
                             <UniversalSelect
                               label="Garment type"
+                              required
+                              error={fieldError("categoryTypeId")}
                               value={form.categoryTypeId}
-                              onChange={(value) =>
-                                updateForm("categoryTypeId", value)
-                              }
+                              onChange={(value) => {
+                                markPublishFieldTouched("categoryTypeId");
+                                updateForm("categoryTypeId", value);
+                              }}
                               options={subCategorySelectOptions}
                               placeholder={
                                 form.taxonomyCategoryId ||
@@ -3209,25 +3913,35 @@ const EditProduct: React.FC = () => {
                               }
                               optionAllowWrap
                               selectedAllowWrap
+                              menuLayer="modal"
                             />
                           </div>
                         </div>
 
-                        <UniversalSelect
-                          label="Who is it for?"
-                          value={form.gender}
-                          onChange={(value) =>
-                            updateForm("gender", value as CreatorAudience)
-                          }
-                          options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
-                            value: option.value,
-                            label: option.label,
-                          }))}
-                          disabled={saving}
-                        />
+                        {/* Group 2: Audience & Collection */}
+                        <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+                          <div className="min-w-0">
+                            <UniversalSelect
+                              label="Who is it for?"
+                              required
+                              error={fieldError("gender")}
+                              value={form.gender}
+                              onChange={(value) => {
+                                markPublishFieldTouched("gender");
+                                updateForm("gender", value as CreatorAudience);
+                              }}
+                              options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
+                                value: option.value,
+                                label: option.label,
+                              }))}
+                              disabled={saving}
+                              optionAllowWrap
+                              selectedAllowWrap
+                              menuLayer="modal"
+                            />
+                          </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                          <div className="md:col-span-8">
+                          <div className="min-w-0">
                             <UniversalSelect
                               label="Collection (optional)"
                               value={
@@ -3251,58 +3965,67 @@ const EditProduct: React.FC = () => {
                               emptyMessage="No collections available"
                               optionAllowWrap
                               selectedAllowWrap
+                              menuLayer="modal"
                             />
-                          </div>
-
-                          <div className="surface-control flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 md:col-span-4">
-                            <p className="text-[11px] text-theme-secondary">
+                            <p className="mt-1.5 text-[11px] text-theme-secondary">
                               {categoriesLoading
                                 ? 'Loading collections…'
                                 : categories.length
-                                  ? 'Collections are optional. Use one only if this product belongs in a store collection.'
-                                  : 'No collections yet. This product can stay standalone.'}
+                                  ? 'Optional. Use only if this product belongs in a store collection.'
+                                  : 'No collections yet — product can stay standalone.'}
+                              {!categoriesLoading && categories.length === 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const suffix = productId
+                                      ? `?productId=${encodeURIComponent(productId)}`
+                                      : '';
+                                    navigate(
+                                      `/studio/store/collections/new${suffix}`,
+                                    );
+                                  }}
+                                  className="ml-1 font-semibold text-purple-600 hover:text-purple-700"
+                                >
+                                  Create collection
+                                </button>
+                              ) : null}
                             </p>
-                            {!categoriesLoading && categories.length === 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const suffix = productId
-                                    ? `?productId=${encodeURIComponent(productId)}`
-                                    : '';
-                                  navigate(
-                                    `/studio/store/collections/new${suffix}`,
-                                  );
-                                }}
-                                className="text-[11px] font-semibold text-purple-600 hover:text-purple-700 transition-colors whitespace-nowrap"
-                              >
-                                Create collection
-                              </button>
-                            ) : null}
                           </div>
                         </div>
                       </div>
 
-                      <div>
-                        <label className="mb-2 flex items-center text-[11px] font-semibold text-theme-secondary">
-                          Style details
-                          <InfoTooltip text={CREATOR_METADATA_HELP.style} />
-                        </label>
+                      <div id="product-style-details-field">
                         <FilterSelector
                           value={filterSelection}
-                          onChange={setFilterSelection}
+                          onChange={(next) => {
+                            markPublishFieldTouched("styleDetails");
+                            setFilterSelection(next);
+                          }}
                           entityType="PRODUCT"
                           onTagSuggestions={setTagSuggestions}
                         />
+                        {fieldError("styleDetails") && (
+                          <p className="mt-1.5 text-xs text-red-500">
+                            {fieldError("styleDetails")}
+                          </p>
+                        )}
+                        {selectedFilterValueIds.length > 8 && (
+                          <p className="mt-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-300">
+                            ⚠️ {selectedFilterValueIds.length} style details selected — fewer,
+                            precise details improve discovery and buyer trust.
+                          </p>
+                        )}
                       </div>
 
-                      <div>
+                      <div id="product-hashtags-field">
                         <label className="text-[11px] font-semibold text-theme-secondary mb-1.5 flex items-center">
-                          Hashtags
+                          Hashtags (up to {MAX_PRODUCT_TAGS})
+                          <span className="text-purple-500 ml-1">*</span>
                           <InfoTooltip text={CREATOR_METADATA_HELP.hashtags} />
                         </label>
                         {tagSuggestions.length > 0 && (
                           <div className="mb-2">
-                            <p className="text-[10px] text-theme-secondary mb-1">
+                            <p className="text-xs text-theme-secondary mb-1.5">
                               Suggested tags from filters:
                             </p>
                             <div className="flex flex-wrap gap-1.5">
@@ -3315,15 +4038,17 @@ const EditProduct: React.FC = () => {
                                     type="button"
                                     onClick={() => {
                                       if (!form.tags.includes(suggestion)) {
+                                        if (form.tags.length >= MAX_PRODUCT_TAGS) {
+                                          toast.error(`You can add up to ${MAX_PRODUCT_TAGS} hashtags`);
+                                          return;
+                                        }
                                         updateForm("tags", [
                                           ...form.tags,
                                           suggestion,
                                         ]);
                                       }
                                     }}
-                                    className="px-2 py-1 rounded-lg text-[10px] font-medium bg-purple-50 dark:bg-purple-500/10
-                                      text-purple-600 dark:text-purple-300 border border-purple-200/60 dark:border-purple-500/20
-                                      hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
+                                    className="tag-badge-outline px-2.5 py-1.5 rounded-full text-[12px] font-medium sm:py-1"
                                   >
                                     + {normalizeHashtagLabel(suggestion)}
                                   </button>
@@ -3331,6 +4056,13 @@ const EditProduct: React.FC = () => {
                             </div>
                           </div>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => setShowTagPicker(true)}
+                          className="mb-2 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1.5 text-[12px] font-semibold text-purple-700 transition hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+                        >
+                          🔎 See more hashtags ({form.tags.length}/{MAX_PRODUCT_TAGS})
+                        </button>
                         <div className="surface-control flex min-h-[42px] items-center gap-2 rounded-lg border border-gray-200/60 px-3 py-2 shadow-sm dark:border-white/10">
                           <input
                             type="text"
@@ -3355,10 +4087,10 @@ const EditProduct: React.FC = () => {
                                 key={tag}
                                 label={normalizeHashtagLabel(tag)}
                                 color={getTagColor(tag, index)}
-                                size="xs"
+                                size="sm"
                                 rightIcon={
                                   <X
-                                    className="w-3 h-3 cursor-pointer"
+                                    className="w-3.5 h-3.5 cursor-pointer"
                                     onClick={() => handleRemoveTag(tag)}
                                   />
                                 }
@@ -3367,40 +4099,60 @@ const EditProduct: React.FC = () => {
                             ))}
                           </div>
                         )}
-                        <p className="text-[11px] text-theme-secondary mt-1">
-                          Add one tag at a time. Use Enter or the Add button.
-                        </p>
+                        {fieldError("tags") ? (
+                          <p className="mt-1 text-xs text-red-500">
+                            {fieldError("tags")}
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-theme-secondary mt-1">
+                            Add one tag at a time. Use Enter or the Add button.
+                          </p>
+                        )}
+                        <HashtagPickerModal
+                          open={showTagPicker}
+                          onClose={() => setShowTagPicker(false)}
+                          selected={form.tags}
+                          onToggle={handleToggleTagFromPicker}
+                          maxTags={MAX_PRODUCT_TAGS}
+                          extraSuggestions={tagSuggestions}
+                        />
                       </div>
 
                       <Textarea
+                        id="product-description-field"
                         label="Description"
+                        required
+                        error={fieldError("description")}
                         rows={4}
                         placeholder="Describe your product..."
                         value={form.description}
                         onChange={(e) =>
                           updateForm("description", e.target.value)
                         }
+                        onBlur={() => markPublishFieldTouched("description")}
                       />
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
 
-            <div className="surface-card overflow-hidden rounded-xl border shadow-sm">
-              <div className="px-4 py-3 flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-theme-secondary">
+        </div>
+        </div>
+        </div>
+
+        {/* STEP 2 — Operations: Pricing, Variants, Inventory & Shipping, Sizing, Fulfillment, Additional Details */}
+        <div className={wizardStep === 2 ? "" : "hidden"}>
+        <div className="mx-auto w-full max-w-4xl">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-base">⚙️</span>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
                   Product Operations
-                </p>
-                <span className="text-[10px] font-medium text-theme-secondary">
-                  Scroll inside panel
-                </span>
+                </h2>
               </div>
-              <div className="space-y-4 p-4 lg:max-h-[440px] lg:overflow-y-auto lg:pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="space-y-4">
                 {/* Pricing */}
                 <div
                   id="product-pricing-section"
-                  className="surface-subtle rounded-xl border p-4 scroll-mt-24"
+                  className="scroll-mt-24 py-2 space-y-4"
                 >
                   <div className="flex items-center justify-between gap-4">
                     <button
@@ -3436,31 +4188,24 @@ const EditProduct: React.FC = () => {
                   </div>
 
                   {!collapsedSections.pricing && (
-                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 items-start">
                       <Input
                         label="Price"
                         required
+                        error={fieldError("price")}
                         type="number"
                         value={form.price || ""}
                         onChange={(e) =>
                           updateForm("price", Number(e.target.value))
                         }
+                        onBlur={() => markPublishFieldTouched("price")}
                         placeholder="0"
                         startIcon={
-                          <span className="text-theme-secondary text-sm">
+                          <span className="text-theme-secondary text-xs">
                             ₦
                           </span>
                         }
                         data-testid="product-price-input"
-                        inputSize="sm"
-                        className="[&_label]:text-xs [&_label]:mb-1"
-                      />
-                      <Input
-                        label="Currency"
-                        type="text"
-                        value={form.currency}
-                        onChange={() => {}}
-                        disabled
                         inputSize="sm"
                         className="[&_label]:text-xs [&_label]:mb-1"
                       />
@@ -3474,7 +4219,7 @@ const EditProduct: React.FC = () => {
                         placeholder="0"
                         disabled={!form.onSale}
                         startIcon={
-                          <span className="text-theme-secondary text-sm">
+                          <span className="text-theme-secondary text-xs">
                             ₦
                           </span>
                         }
@@ -3491,7 +4236,7 @@ const EditProduct: React.FC = () => {
                           }
                           placeholder="0"
                           startIcon={
-                            <span className="text-theme-secondary text-sm">
+                            <span className="text-theme-secondary text-xs">
                               ₦
                             </span>
                           }
@@ -3499,20 +4244,29 @@ const EditProduct: React.FC = () => {
                           className="[&_label]:text-xs [&_label]:mb-1"
                         />
                         {profitMargin.margin > 0 && (
-                          <p className="text-[10px] text-gray-500 mt-1">
+                          <p className="text-[10px] text-gray-500 mt-1 truncate">
                             Margin: {profitMargin.margin}% • Profit:{" "}
                             {formatCurrency(profitMargin.profit, form.currency)}
                           </p>
                         )}
                       </div>
+                      <Input
+                        label="Currency"
+                        type="text"
+                        value={form.currency}
+                        onChange={() => {}}
+                        disabled
+                        inputSize="sm"
+                        className="[&_label]:text-xs [&_label]:mb-1"
+                      />
                     </div>
                   )}
                 </div>
 
                 {/* Variants */}
-                <div className="surface-subtle overflow-hidden rounded-xl border">
+                <div id="product-variants-section" className="scroll-mt-24 space-y-4 py-2">
                   <div
-                    className={`p-4 ${collapsedSections.variants ? "" : "border-b border-theme"}`}
+                    className={`pb-2 ${collapsedSections.variants ? "" : "border-b border-gray-100 dark:border-white/5"}`}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <button
@@ -3520,27 +4274,38 @@ const EditProduct: React.FC = () => {
                         onClick={() => toggleSection("variants")}
                         className="flex items-center gap-2 text-left"
                       >
-                        <h2 className="text-base font-medium text-theme">
-                          Variants
-                        </h2>
-                        {collapsedSections.variants ? (
-                          <ChevronDown className="h-4 w-4 text-[color:var(--text-secondary)]" />
-                        ) : (
-                          <ChevronUp className="h-4 w-4 text-[color:var(--text-secondary)]" />
-                        )}
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            <h2 className="text-base font-medium text-theme">
+                              Variants
+                            </h2>
+                            {collapsedSections.variants ? (
+                              <ChevronDown className="h-4 w-4 text-[color:var(--text-secondary)]" />
+                            ) : (
+                              <ChevronUp className="h-4 w-4 text-[color:var(--text-secondary)]" />
+                            )}
+                          </div>
+                        </div>
                       </button>
                       {!collapsedSections.variants && (
                         <button
                           type="button"
-                          onClick={addVariant}
+                          onClick={addColorGroup}
                           className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-semibold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition"
                         >
-                          + Add Color Group
+                          + Add Color
                         </button>
                       )}
                     </div>
+                    <span className="text-[10px] text-theme-secondary mt-0.5 font-medium tracking-wide">
+                      Supported sizes: XXS, XS, S, M, L, XL, XXL, XXXL, XXXXL
+                    </span>
                     <p
-                      className={`mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                      className={`inline-flex items-center gap-2 rounded-full border font-semibold ${
+                        collapsedSections.variants
+                          ? 'mt-2 px-2 py-0.5 text-[10px]'
+                          : 'mt-3 px-3 py-1 text-[11px]'
+                      } ${
                         form.variants.length >= MIN_PUBLISH_VARIANT_COUNT
                           ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100'
                           : 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100'
@@ -3549,9 +4314,11 @@ const EditProduct: React.FC = () => {
                       <span aria-hidden="true">
                         {form.variants.length >= MIN_PUBLISH_VARIANT_COUNT ? '✅' : 'ℹ️'}
                       </span>
-                      {form.variants.length >= MIN_PUBLISH_VARIANT_COUNT
-                        ? `Go-live ready: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants.`
-                        : `Progress: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants added. Add ${MIN_PUBLISH_VARIANT_COUNT - form.variants.length} more to go live.`}
+                      {collapsedSections.variants
+                        ? `${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} sizes`
+                        : form.variants.length >= MIN_PUBLISH_VARIANT_COUNT
+                          ? `Go-live ready: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants.`
+                          : `Progress: ${form.variants.length}/${MIN_PUBLISH_VARIANT_COUNT} size variants added. Add ${MIN_PUBLISH_VARIANT_COUNT - form.variants.length} more to go live.`}
                     </p>
                   </div>
 
@@ -3566,10 +4333,12 @@ const EditProduct: React.FC = () => {
                     (form.variants.length === 0 ? (
                       <div className="p-6 text-center">
                         <p className="text-theme-secondary text-sm mb-2">
-                          No variants yet
+                          No colors yet
                         </p>
                         <p className="text-theme-secondary text-xs">
-                          Add a color group, then add multiple sizes to it
+                          Tap <span className="font-semibold">+ Add Color</span>{" "}
+                          to name a color (e.g. Green), then add the sizes it
+                          comes in. Add another color for each colorway.
                         </p>
                       </div>
                     ) : (
@@ -3578,97 +4347,126 @@ const EditProduct: React.FC = () => {
                           return (
                             <div
                               key={group.stableKey}
-                              className="surface-card rounded-lg border overflow-hidden"
+                              className="overflow-hidden bg-transparent py-2 border-b border-gray-100 dark:border-white/5 last:border-0"
                             >
-                              {/* Color group header */}
-                              <div className="surface-control px-3 py-2 flex items-center gap-2 justify-between">
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {/* Color group header & Add sizes — compact side-by-side row */}
+                              <div className="py-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-transparent border-b border-gray-100 dark:border-white/5">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
                                   <span className="text-[10px] font-semibold uppercase text-theme-secondary shrink-0">
-                                    Color:
+                                    Color
                                   </span>
                                   <Input
                                     type="text"
                                     value={group.color}
-                                    onChange={(e) => {
-                                      const newColor = e.target.value;
-                                      group.variants.forEach(({ originalIndex }) => {
-                                        updateVariant(originalIndex, {
-                                          color: newColor,
-                                        });
-                                      });
-                                    }}
+                                    onChange={(e) =>
+                                      setGroupColor(group, e.target.value)
+                                    }
                                     placeholder="e.g. Green"
                                     inputSize="sm"
                                     fullWidth={false}
-                                    className="w-28"
+                                    className="w-24 sm:w-28 shrink-0"
                                   />
-                                  <span className="text-[10px] text-gray-400">
+                                  <span className="text-[10px] text-gray-400 shrink-0">
                                     {group.variants.length} size
                                     {group.variants.length !== 1 ? "s" : ""}
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-1.5">
+
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                  <span className="text-[10px] font-semibold uppercase text-theme-secondary shrink-0">
+                                    Add sizes
+                                  </span>
+                                  <div className="flex items-center gap-1 flex-1 min-w-0 rounded-lg border border-gray-200 dark:border-white/10 px-2 py-0.5 bg-white/50 dark:bg-white/[0.03]">
+                                    <input
+                                      ref={(el) => {
+                                        quickAddSizeInputRefs.current[group.stableKey] = el;
+                                      }}
+                                      type="text"
+                                      enterKeyHint="done"
+                                      autoCapitalize="characters"
+                                      placeholder="e.g. S, M, L, XL"
+                                      className="h-7 flex-1 min-w-0 text-xs bg-transparent border-none outline-none text-theme-secondary placeholder:text-gray-400"
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.preventDefault();
+                                          const input = e.currentTarget;
+                                          addMultipleSizesForGroup(
+                                            group,
+                                            input.value,
+                                          );
+                                          input.value = "";
+                                        }
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const input =
+                                          quickAddSizeInputRefs.current[group.stableKey];
+                                        if (!input) return;
+                                        addMultipleSizesForGroup(
+                                          group,
+                                          input.value,
+                                        );
+                                        input.value = "";
+                                        input.focus();
+                                      }}
+                                      className="inline-flex h-6 shrink-0 items-center justify-center rounded bg-purple-600 px-2 text-[10px] font-semibold text-white transition hover:bg-purple-500"
+                                    >
+                                      Add
+                                    </button>
+                                  </div>
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      addVariantForColor(group.color)
-                                    }
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition"
-                                  >
-                                    <Plus className="w-3 h-3" /> Size
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      removeColorGroup(group.color)
-                                    }
-                                    className="inline-flex items-center justify-center h-6 w-6 rounded-full text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition"
-                                    title="Remove all sizes for this color"
+                                    onClick={() => removeColorGroup(group)}
+                                    className="inline-flex items-center justify-center h-6 w-6 rounded-full text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition shrink-0 ml-1"
+                                    title="Remove this color and all its sizes"
                                   >
                                     <X className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
                               </div>
 
-                              {/* Quick-add sizes */}
-                              <div className="px-3 py-1.5 border-b border-theme bg-gray-50/40 dark:bg-white/[0.02]">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[10px] text-gray-500 shrink-0">
-                                    Quick add:
-                                  </span>
-                                  <input
-                                    type="text"
-                                    placeholder="e.g. XXS, XS, S, M, L, XL"
-                                    className="flex-1 text-xs bg-transparent border-none outline-none text-theme-secondary placeholder:text-gray-400"
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        const input = e.currentTarget;
-                                        addMultipleSizesForColor(
-                                          group.color,
-                                          input.value,
-                                        );
-                                        input.value = "";
-                                      }
-                                    }}
-                                  />
-                                  <span className="text-[9px] text-gray-400 shrink-0">
-                                    Enter to add
-                                  </span>
-                                </div>
-                              </div>
-
                               {/* Size rows */}
+                              {group.variants.length > 0 && (
+                                /*
+                                  A grid that fits, instead of a row that does not.
+
+                                  These columns were fixed widths (`w-20`,
+                                  `w-24`, `w-16`) inside a flex row that also
+                                  carried the SKU and a remove button. On a phone
+                                  — which is what the Studio WebView is — that
+                                  totals more than the viewport, so the row
+                                  overflowed and the container scrolled
+                                  sideways. Focusing the Stock input made the
+                                  browser scroll it into view, which pushed Size
+                                  off the left edge with no way back short of a
+                                  refresh. That is the reported bug, and it is
+                                  caused entirely by the widths.
+
+                                  Fractional columns cannot overflow: they divide
+                                  whatever width there is. The SKU is a generated
+                                  placeholder for most rows, so it earns its
+                                  column only from `sm` up.
+                                */
+                                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_auto] items-center gap-2 px-3 pt-1.5 text-[9px] font-semibold uppercase tracking-wide text-gray-400 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,1fr)_auto]">
+                                  <span>Size</span>
+                                  <span>Price (₦)</span>
+                                  <span>Stock</span>
+                                  <span className="hidden sm:block">SKU</span>
+                                  <span className="w-6" />
+                                </div>
+                              )}
                               <div className="divide-y divide-gray-100 dark:divide-white/5">
                                 {group.variants.map(
                                   ({ variant, originalIndex }) => (
                                     <div
                                       key={variant.id || originalIndex}
-                                      className="px-3 py-1.5 flex items-center gap-2 hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors"
+                                      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_auto] items-center gap-2 px-3 py-1.5 transition-colors hover:bg-gray-50/50 dark:hover:bg-white/[0.02] sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,1fr)_auto]"
                                     >
                                       <Input
                                         type="text"
-                                        list="threadly-size-options"
+                                        list="wiez-size-options"
                                         value={variant.size ?? ""}
                                         onChange={(e) =>
                                           updateVariant(originalIndex, {
@@ -3677,8 +4475,7 @@ const EditProduct: React.FC = () => {
                                         }
                                         placeholder="Size"
                                         inputSize="sm"
-                                        fullWidth={false}
-                                        className="w-20"
+                                        className="w-full min-w-0"
                                       />
                                       <Input
                                         type="number"
@@ -3702,8 +4499,7 @@ const EditProduct: React.FC = () => {
                                           </span>
                                         }
                                         inputSize="sm"
-                                        fullWidth={false}
-                                        className="w-24"
+                                        className="w-full min-w-0"
                                       />
                                       <Input
                                         type="number"
@@ -3725,10 +4521,9 @@ const EditProduct: React.FC = () => {
                                         }
                                         placeholder="Stock"
                                         inputSize="sm"
-                                        fullWidth={false}
-                                        className="w-16"
+                                        className="w-full min-w-0"
                                       />
-                                      <span className="text-[9px] text-gray-400 truncate flex-1 min-w-0">
+                                      <span className="hidden min-w-0 truncate text-[9px] text-gray-400 sm:block">
                                         {variant.sku || "auto-SKU"}
                                       </span>
                                       <button
@@ -3745,11 +4540,20 @@ const EditProduct: React.FC = () => {
                                   ),
                                 )}
                               </div>
+
+                              {/* Manual add for a one-off / custom size */}
+                              <button
+                                type="button"
+                                onClick={() => addSizeToGroup(group)}
+                                className="mt-1 inline-flex items-center gap-1 px-3 py-1 text-[10px] font-medium text-purple-600 dark:text-purple-400 hover:underline"
+                              >
+                                <Plus className="w-3 h-3" /> Add size row
+                              </button>
                             </div>
                           );
                         })}
 
-                        <datalist id="threadly-size-options">
+                        <datalist id="wiez-size-options">
                           <option value="XXS" />
                           <option value="XS" />
                           <option value="S" />
@@ -3786,60 +4590,85 @@ const EditProduct: React.FC = () => {
                   onCustomMeasurementKeysChange={(keys) =>
                     updateForm("customMeasurementKeys", keys)
                   }
+                  // Must match what the design form passes, or the two screens
+                  // scope the measurement registry differently again: without
+                  // this the product picker showed the FULL registry while the
+                  // design picker showed an audience-scoped subset.
+                  measurementGender={
+                    form.gender === "MALE"
+                      ? "MEN"
+                      : form.gender === "FEMALE"
+                        ? "WOMEN"
+                        : "UNISEX"
+                  }
                 />
+                {form.variants.length > 0 &&
+                normalizeSizingMode(form.sizingMode) === "NONE" ? (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                    <span aria-hidden="true">ℹ️</span>
+                    <span>
+                      You added {form.variants.length} size variant
+                      {form.variants.length === 1 ? "" : "s"} but the sizing
+                      mode is "No Sizing". Switch it to RTW so buyers get size
+                      guidance that matches your stocked sizes.
+                    </span>
+                  </div>
+                ) : null}
 
-                {/* Custom order toggle — keeps form hidden until brand opts in */}
-                <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-base font-medium text-theme">
-                        Custom Order
-                      </h2>
-                      <p className="mt-0.5 text-xs text-theme-secondary">
-                        Allow buyers to request this product with their own measurements. Custom order does not replace the required stocked size variants.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={form.customOrderEnabled}
-                      onClick={() => {
-                        const nextValue = !form.customOrderEnabled;
+                {/* Custom order toggle */}
+                <div className="py-2">
+                  <label className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/5 cursor-pointer transition-colors hover:border-purple-500/30">
+                    <input
+                      type="checkbox"
+                      checked={form.customOrderEnabled}
+                      onChange={(e) => {
+                        const nextValue = e.target.checked;
                         updateForm("customOrderEnabled", nextValue);
                         setShowCustomOrderForm(nextValue);
                       }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
-                        form.customOrderEnabled
-                          ? 'bg-purple-600'
-                          : 'bg-gray-200 dark:bg-gray-700'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                          form.customOrderEnabled ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
+                      className="w-5 h-5 mt-0.5 rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500 bg-white dark:bg-slate-900"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-semibold text-theme">
+                        Custom Order
+                      </span>
+                      <p className="mt-0.5 text-xs text-theme-secondary leading-relaxed">
+                        Allow buyers to request this product with their own measurements. Custom order does not replace the required stocked size variants.
+                      </p>
+                    </div>
+                  </label>
 
                   {showCustomOrderForm && (
-                    <div className="mt-4">
+                    <div className="mt-4 scroll-mt-24" ref={customOrderSectionRef}>
                       <CustomOrderConfigurationEditor
                         ref={customOrderEditorRef}
                         sourceType="PRODUCT"
                         sourceId={isEditMode ? productId : undefined}
                         sourceTitle={form.title}
                         measurementKeys={form.customMeasurementKeys}
+                        // Filter measurement points by the product's audience,
+                        // exactly like the design creation flow — otherwise the
+                        // product form showed the full (unfiltered) registry while
+                        // designs showed a gendered subset, so the two screens
+                        // rendered different measurement points for the same brand.
+                        measurementGender={
+                          form.gender === "MALE"
+                            ? "MEN"
+                            : form.gender === "FEMALE"
+                              ? "WOMEN"
+                              : "UNISEX"
+                        }
                         defaultBaseCharge={form.price > 0 ? form.price : null}
                         defaultProductionLeadDays={storeDefaultProductionLeadDays}
                         defaultProductionLeadLabel={storeCustomOrderLeadTimeLabel}
                         disabled={saving}
+                        onCompletenessChange={setCustomOrderMissingFields}
                       />
                     </div>
                   )}
                 </div>
 
-                <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
+                <div className="py-2">
                   <button
                     type="button"
                     onClick={() => toggleSection("fulfillment")}
@@ -3858,14 +4687,14 @@ const EditProduct: React.FC = () => {
                   {!collapsedSections.fulfillment && (
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Inventory */}
-                      <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
-                        <div className="flex items-center justify-between mb-4">
+                      <div id="product-inventory-section" className="scroll-mt-24 py-2 space-y-4">
+                        <div className="flex items-center justify-between">
                           <h2 className="text-base font-medium text-theme">
                             Inventory
                           </h2>
                         </div>
                         <div className="space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="grid grid-cols-2 gap-3">
                             <Input
                               label="SKU (Stock Keeping Unit)"
                               type="text"
@@ -3937,8 +4766,8 @@ const EditProduct: React.FC = () => {
                       </div>
 
                       {/* Shipping */}
-                      <div className="rounded-xl bg-white/35 p-4 dark:bg-white/[0.02]">
-                        <h2 className="text-base font-medium text-theme mb-4">
+                      <div className="space-y-4">
+                        <h2 className="text-base font-medium text-theme">
                           Shipping
                         </h2>
                         <div className="space-y-4">
@@ -4000,7 +4829,7 @@ const EditProduct: React.FC = () => {
                                 </span>
                                 .
                               </p>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div className="grid grid-cols-2 gap-2">
                                 {SHIPPING_REGION_OPTIONS.map((opt) => {
                                   const isSelected =
                                     normalizedShippingRegions.includes(opt.code);
@@ -4059,7 +4888,7 @@ const EditProduct: React.FC = () => {
 
                   {!collapsedSections.additional && (
                     <>
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4">
                         <Input
                           label="Materials"
                           type="text"
@@ -4135,25 +4964,361 @@ const EditProduct: React.FC = () => {
                 </div>
               </div>
             </div>
+        </div>
+        </div>
+
+        {/* STEP 3 — Review: read-only summary + publish (numbers reuse the same
+            live form state / profitMargin, so they always match Operations) */}
+        <div className={wizardStep === 3 ? "" : "hidden"}>
+          <div className="mx-auto w-full max-w-4xl space-y-4">
+            <div className="mb-1">
+              <h2 className="text-lg font-semibold text-theme">Review &amp; publish</h2>
+              <p className="text-sm text-theme-secondary">
+                Confirm everything looks right, then publish or save as a draft.
+              </p>
+            </div>
+
+            {/* Media */}
+            <section className="rounded-2xl border border-theme p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                  Media
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => goToStep(1)}
+                  className="text-xs font-medium text-purple-600 hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+              {mediaUrls.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {mediaUrls.map((m) => (
+                    <div
+                      key={m.id}
+                      className="relative h-16 w-16 overflow-hidden rounded-lg border border-theme"
+                    >
+                      {/* MediaRenderer, not a raw <img> — the project's media
+                          invariant (enforced by `threadly/no-raw-media-elements`).
+                          Pre-existing violation; fixed here because these
+                          thumbnails render blob previews and signed URLs, which
+                          is exactly what the shared renderer exists to handle. */}
+                      <MediaRenderer
+                        kind="image"
+                        src={m.url}
+                        alt=""
+                        fit="cover"
+                        className="h-full w-full"
+                        mediaClassName="h-full w-full object-cover"
+                      />
+                      {m.isPrimary && (
+                        <span className="absolute inset-x-0 bottom-0 bg-purple-600/80 text-center text-[10px] text-white">
+                          Cover
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-theme-secondary">No images added yet.</p>
+              )}
+            </section>
+
+            {/* Basic Information */}
+            <section className="rounded-2xl border border-theme p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                  Basic Information
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => goToStep(1)}
+                  className="text-xs font-medium text-purple-600 hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs text-theme-secondary">Title</dt>
+                  <dd className="text-sm text-theme">{form.title || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-theme-secondary">Audience</dt>
+                  <dd className="text-sm text-theme">
+                    {CREATOR_AUDIENCE_OPTIONS.find((o) => o.value === form.gender)
+                      ?.label ?? "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-theme-secondary">Category</dt>
+                  <dd className="text-sm text-theme">
+                    {productEditorSupportData?.taxonomyCategories?.find(
+                      (c) => c.id === form.taxonomyCategoryId,
+                    )?.name ?? "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-theme-secondary">Subcategory</dt>
+                  <dd className="text-sm text-theme">
+                    {productEditorSupportData?.taxonomyCategories
+                      ?.find((c) => c.id === form.taxonomyCategoryId)
+                      ?.types?.find((t) => t.id === form.categoryTypeId)?.name ??
+                      productEditorSupportData?.categoryTypes?.find(
+                        (t) => t.id === form.categoryTypeId,
+                      )?.name ??
+                      "—"}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-theme-secondary">Description</dt>
+                  <dd className="whitespace-pre-wrap text-sm text-theme">
+                    {form.description || "—"}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            {/* Pricing */}
+            <section className="rounded-2xl border border-theme p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                  Pricing
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => goToStep(2)}
+                  className="text-xs font-medium text-purple-600 hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
+                <div>
+                  <dt className="text-xs text-theme-secondary">Price</dt>
+                  <dd className="text-sm text-theme">
+                    {formatCurrency(form.price || minVariantPrice, form.currency)}
+                  </dd>
+                </div>
+                {form.onSale && form.compareAtPrice > 0 && (
+                  <div>
+                    <dt className="text-xs text-theme-secondary">Sale price</dt>
+                    <dd className="text-sm text-theme">
+                      {formatCurrency(form.compareAtPrice, form.currency)}
+                    </dd>
+                  </div>
+                )}
+                <div>
+                  <dt className="text-xs text-theme-secondary">Unit cost</dt>
+                  <dd className="text-sm text-theme">
+                    {form.costPerItem > 0
+                      ? formatCurrency(form.costPerItem, form.currency)
+                      : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-theme-secondary">Margin</dt>
+                  <dd className="text-sm text-theme">
+                    {profitMargin.margin > 0 ? `${profitMargin.margin}%` : "—"}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            {/* Variants */}
+            <section className="rounded-2xl border border-theme p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                  Variants
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => goToStep(2)}
+                  className="text-xs font-medium text-purple-600 hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+              {form.variants.length > 0 ? (
+                <div className="space-y-1">
+                  {form.variants.map((v, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="text-theme">
+                        {[v.color, v.size].filter(Boolean).join(" · ") ||
+                          `Variant ${i + 1}`}
+                      </span>
+                      <span className="text-theme-secondary">
+                        Stock: {Number.isFinite(v.stock) ? v.stock : 0}
+                        {typeof v.price === "number" && v.price > 0
+                          ? ` · ${formatCurrency(v.price, form.currency)}`
+                          : ""}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="pt-1 text-xs text-theme-secondary">
+                    Total stock: {variantTotalStock}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-theme-secondary">No variants added.</p>
+              )}
+            </section>
+
+            {/* Inventory & Fulfillment */}
+            <section className="rounded-2xl border border-theme p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                  Inventory &amp; Fulfillment
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => goToStep(2)}
+                  className="text-xs font-medium text-purple-600 hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+                <div>
+                  <dt className="text-xs text-theme-secondary">Track inventory</dt>
+                  <dd className="text-sm text-theme">
+                    {form.trackInventory ? "On" : "Off"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-theme-secondary">Sizing</dt>
+                  <dd className="text-sm text-theme">
+                    {form.sizingMode === "NONE" ? "None" : form.sizingMode}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-theme-secondary">Custom order</dt>
+                  {/*
+                    "Enabled" alone was a promise the product could not keep: a
+                    product with custom orders on and an incomplete setup cannot
+                    go live, and this row said nothing about it. Now the row
+                    reports the state that actually governs publishing, and
+                    names the first things missing.
+                  */}
+                  <dd className="text-sm text-theme">
+                    {!form.customOrderEnabled ? (
+                      "Off"
+                    ) : customOrderMissingFields.length === 0 ? (
+                      "Enabled"
+                    ) : (
+                      /* The state, not a roll-call. Which fields are missing
+                         is shown by the required mark on each field's own
+                         label in the setup section below — repeating them as a
+                         list here asks the reader to match names to fields. */
+                      <span className="font-semibold text-amber-600 dark:text-amber-400">
+                        Enabled — setup incomplete
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            {/* Additional Details */}
+            <section className="rounded-2xl border border-theme p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                  Additional Details
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => goToStep(2)}
+                  className="text-xs font-medium text-purple-600 hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs text-theme-secondary">SKU</dt>
+                  <dd className="text-sm text-theme">
+                    {form.sku || "Auto-generated"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-theme-secondary">Materials</dt>
+                  <dd className="text-sm text-theme">{form.materials || "—"}</dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-theme-secondary">Tags</dt>
+                  <dd className="text-sm text-theme">
+                    {form.tags.length > 0 ? form.tags.join(", ") : "—"}
+                  </dd>
+                </div>
+              </dl>
+            </section>
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="surface-menu sticky bottom-0 z-20 w-full border-t px-4 py-3 backdrop-blur-xl sm:px-6">
+      <footer className="sticky bottom-0 z-20 w-full px-4 py-2.5 backdrop-blur-md bg-white/80 dark:bg-zinc-900/80 border-t border-gray-200/40 dark:border-white/10 sm:px-6">
+        {/*
+          Why the primary button is inactive — stated once, not enumerated.
+
+          This was a roll-call of every blocking field as a row of chips. It
+          answered "what is missing" in the one place where none of those fields
+          are visible, so reading it meant memorising names and then going to
+          look for them. Each field now carries its own required mark where it
+          lives, which is where the question is actually asked; the footer only
+          has to say that something upstream is unfinished.
+        */}
+        {blockingPublishFields.length > 0 && !isDraftOnlySubmit && (
+          <div className="mx-auto mb-2 max-w-7xl">
+            <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+              {blockingPublishFields.length === 1
+                ? '1 required field is still empty — look for the * marks.'
+                : `${blockingPublishFields.length} required fields are still empty — look for the * marks.`}
+            </span>
+          </div>
+        )}
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs text-theme-secondary">
-            {hasChanges ? (
-              <span className="text-orange-400">Unsaved changes</span>
-            ) : (
-              <>
-                <CheckCircle className="w-3 h-3 text-green-500" />
-                <span>All changes saved</span>
-              </>
-            )}
+            {/* The "changes" concept only means something when editing an entity
+                that already exists (draft or active). For a first-time create
+                there is no saved version to have unsaved changes against — the
+                indicator would just be noise next to "Save as Draft". */}
+            {productReviewHint ? (
+              <span>{productReviewHint}</span>
+            ) : isEditMode &&
+              (hasChanges ? (
+                <span className="text-orange-400">Unsaved changes</span>
+              ) : (
+                <>
+                  <CheckCircle className="w-3 h-3 text-green-500" />
+                  <span>All changes saved</span>
+                </>
+              ))}
           </div>
-          <div className="flex items-center gap-4">
-            {!isEditMode && !isCollectionContext && (
+          <div className="flex w-full flex-wrap items-stretch gap-2 md:w-auto md:items-center md:gap-4">
+            {wizardStep > 1 && (
+              <button
+                type="button"
+                onClick={() => goToStep((wizardStep - 1) as 1 | 2 | 3)}
+                className="surface-control surface-interactive-hover inline-flex min-h-11 flex-1 items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold transition md:min-h-10 md:flex-initial md:px-4 md:text-sm"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back
+              </button>
+            )}
+            {/*
+              Also shown while answering a change request. Previously this was
+              create-only, so an owner whose product came back with requested
+              changes had exactly one control — submit — and no way to park the
+              work in progress. Deliberately NOT extended to live products:
+              draft-saving an ACTIVE product would silently unpublish it.
+            */}
+            {((!isEditMode && !isCollectionContext) ||
+              (isResubmission && !isCollectionContext && !isCollectionFlow)) && (
               <button
                 onClick={() =>
                   void triggerSave(true, {
@@ -4162,11 +5327,11 @@ const EditProduct: React.FC = () => {
                   })
                 }
                 disabled={saving || submitLocked}
-                className="surface-control surface-interactive-hover relative inline-flex min-h-10 items-center justify-center rounded-lg border px-4 py-2 text-sm font-semibold transition disabled:opacity-60"
+                className="surface-control surface-interactive-hover relative inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:opacity-60 md:min-h-10 md:flex-initial md:px-4 md:text-sm"
               >
                 {(saving || submitLocked) && saveAction === "draft" && (
                   <span className="absolute inset-0 flex items-center justify-center">
-                    <VLoader size={16} phase="loading" showLabel={false} />
+                    <MuseLoader size={16} />
                   </span>
                 )}
                 <span className={(saving || submitLocked) && saveAction === "draft" ? "opacity-0" : ""}>
@@ -4183,11 +5348,11 @@ const EditProduct: React.FC = () => {
                   })
                 }
                 disabled={saving || submitLocked}
-                className="surface-control surface-interactive-hover relative inline-flex min-h-10 items-center justify-center rounded-lg border px-4 py-2 text-sm font-semibold transition disabled:opacity-60"
+                className="surface-control surface-interactive-hover relative inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:opacity-60 md:min-h-10 md:flex-initial md:px-4 md:text-sm"
               >
                 {(saving || submitLocked) && saveAction === "draft" && (
                   <span className="absolute inset-0 flex items-center justify-center">
-                    <VLoader size={16} phase="loading" showLabel={false} />
+                    <MuseLoader size={16} />
                   </span>
                 )}
                 <span className={(saving || submitLocked) && saveAction === "draft" ? "opacity-0" : ""}>
@@ -4197,47 +5362,97 @@ const EditProduct: React.FC = () => {
             )}
             <button
               onClick={handleDiscard}
-              className="surface-control surface-interactive-hover inline-flex min-h-10 items-center justify-center rounded-lg border px-4 py-2 text-sm font-semibold transition"
+              className="surface-control surface-interactive-hover inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold transition md:min-h-10 md:flex-initial md:px-4 md:text-sm"
             >
-              {hasChanges
-                ? "Discard Changes"
-                : isCollectionContext
-                  ? "Back to Collection"
+              {isCollectionContext
+                ? "Back to Collection"
+                : isEditMode && hasChanges
+                  ? "Discard Changes"
                   : "Cancel"}
             </button>
-            <button
-              onClick={() =>
-                void triggerSave(false, {
-                  action: "publish",
-                  forceStatus: isCollectionFlow
-                    ? "DRAFT"
-                    : isCollectionContext
-                    ? "ACTIVE"
-                    : isDraftEditMode
+            {wizardStep < 3 ? (
+              <button
+                type="button"
+                onClick={handleContinue}
+                aria-disabled={!canAdvanceFromCurrentStep}
+                title={
+                  canAdvanceFromCurrentStep
+                    ? undefined
+                    : "Complete this step's required fields first"
+                }
+                className={`relative inline-flex min-h-11 flex-1 items-center justify-center gap-1 rounded-lg px-4 py-2 text-xs font-semibold text-white transition-all md:min-h-10 md:flex-initial md:px-6 md:text-sm ${
+                  canAdvanceFromCurrentStep
+                    ? "bg-purple-600 shadow-lg shadow-purple-500/20 hover:bg-purple-500"
+                    : "bg-purple-600/45 shadow-none hover:bg-purple-600/60"
+                }`}
+              >
+                Continue to {wizardStep === 1 ? "Operations" : "Review"}
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                onClick={() =>
+                  void triggerSave(false, {
+                    action: "publish",
+                    forceStatus: isCollectionFlow
+                      ? "DRAFT"
+                      : isCollectionContext
                       ? "ACTIVE"
-                      : undefined,
-                })
-              }
-                disabled={saving || submitLocked}
-              className="relative inline-flex min-h-10 items-center justify-center rounded-lg bg-purple-600 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 disabled:bg-purple-600/50"
-            >
+                      : isDraftEditMode
+                        ? "ACTIVE"
+                        // Answering a change request is a SUBMISSION. Leaving
+                        // this undefined kept the product on its existing
+                        // CHANGES_REQUESTED/REJECTED status, so the owner's
+                        // edits never re-entered the review queue and the
+                        // content sat stuck with nobody waiting on it.
+                        : isResubmission
+                          ? "ACTIVE"
+                          : !isEditMode
+                          // A first-time "Create Product" submit is always a
+                          // submission — it must resolve to IN_REVIEW server-
+                          // side, never fall back to whatever `form.status`
+                          // happens to hold. Drafts are an explicit choice
+                          // ("Save as Draft"), not a submit outcome.
+                          ? "ACTIVE"
+                          : undefined,
+                  })
+                }
+                disabled={
+                  saving || submitLocked || blockingPublishFields.length > 0
+                }
+                title={
+                  blockingPublishFields.length > 0
+                    ? `Still needed: ${blockingPublishFields
+                        .map((field) => PRODUCT_PUBLISH_FIELD_LABEL[field])
+                        .join(", ")}`
+                    : undefined
+                }
+                className="relative inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-purple-600/50 disabled:shadow-none md:min-h-10 md:flex-initial md:px-6 md:text-sm"
+              >
                 {(saving || submitLocked) && saveAction === "publish" && (
-                <span className="absolute inset-0 flex items-center justify-center">
-                  <VLoader size={16} phase="loading" showLabel={false} />
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <MuseLoader size={16} />
+                  </span>
+                )}
+                <span className={(saving || submitLocked) && saveAction === "publish" ? "opacity-0" : ""}>
+                  {isResubmission
+                    ? primaryActionLabel({
+                        status: productReviewStatus,
+                        isEditMode,
+                        entity: "product",
+                      })
+                    : isDraftEditMode
+                      ? "Go live"
+                      : isCollectionContext && isEditMode
+                        ? "Save to Collection"
+                        : isEditMode
+                          ? "Save Changes"
+                          : isCollectionFlow
+                            ? "Add to Collection"
+                            : "Create Product"}
                 </span>
-              )}
-              <span className={(saving || submitLocked) && saveAction === "publish" ? "opacity-0" : ""}>
-                {isDraftEditMode
-                  ? "Go live"
-                  : isCollectionContext && isEditMode
-                    ? "Save to Collection"
-                    : isEditMode
-                      ? "Save Changes"
-                      : isCollectionFlow
-                        ? "Add to Collection"
-                        : "Create Product"}
-              </span>
-            </button>
+              </button>
+            )}
           </div>
         </div>
       </footer>

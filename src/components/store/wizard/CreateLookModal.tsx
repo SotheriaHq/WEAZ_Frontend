@@ -48,7 +48,7 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
   // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [styledBy, setStyledBy] = useState('WEAZ Official');
+  const [styledBy, setStyledBy] = useState('WIEZ Official');
   const [lookImage, setLookImage] = useState<string | null>(null);
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [featured, setFeatured] = useState(true);
@@ -296,9 +296,9 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
                     <select
                       value={styledBy}
                       onChange={(e) => setStyledBy(e.target.value)}
-                      className="select-threadly w-full bg-gray-50 dark:bg-slate-950/50 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all cursor-pointer text-gray-900 dark:text-white"
+                      className="select-wiez w-full bg-gray-50 dark:bg-slate-950/50 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all cursor-pointer text-gray-900 dark:text-white"
                     >
-                      <option>WEAZ Official</option>
+                      <option>WIEZ Official</option>
                       <option>Brand Owner</option>
                       <option>Guest Stylist</option>
                     </select>
@@ -343,13 +343,13 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
                       key={product.id}
                       className="flex items-center gap-4 p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200/50 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/10 transition-all"
                     >
-                      <div className="max-h-12 max-w-12 rounded-lg overflow-y-auto flex-shrink-0">
+                      <div className="max-h-12 max-w-[3rem] rounded-lg overflow-y-auto flex-shrink-0">
                         <MediaRenderer
                           kind="image"
                           src={product.image}
                           alt={product.name}
                           maxHeightClassName="max-h-12"
-                          maxWidthClassName="max-w-12"
+                          maxWidthClassName="max-w-[3rem]"
                           className="rounded-lg"
                           mediaClassName="rounded-lg"
                         />

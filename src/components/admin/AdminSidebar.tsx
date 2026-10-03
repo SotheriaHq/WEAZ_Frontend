@@ -1,48 +1,15 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store';
 import { closeSidebar } from '@/features/uiSlice';
 import IslandBottomNav from '@/components/navigation/IslandBottomNav';
-
-interface NavItem {
-  key: string;
-  label: string;
-  path: string;
-  emoji: string;
-  permission?: string;
-  permissions?: string[];
-  superAdminOnly?: boolean;
-}
-
-const navItems: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', path: '/admin', emoji: '📊' },
-  { key: 'orders', label: 'Orders', path: '/admin/orders', emoji: '🧾', permission: 'PAYOUTS_READ' },
-  { key: 'users', label: 'Users', path: '/admin/users', emoji: '👤', permission: 'USERS_READ' },
-  { key: 'brands', label: 'Brands', path: '/admin/brands', emoji: '🏷️', permission: 'BRANDS_READ' },
-  { key: 'verification', label: 'Verification', path: '/admin/verification', emoji: '🪪', permission: 'BRANDS_VERIFY' },
-  {
-    key: 'content',
-    label: 'Content Management',
-    path: '/admin/content',
-    emoji: '🧰',
-    permissions: ['PRODUCTS_READ', 'COLLECTIONS_READ', 'CONTENT_REVIEW_READ'],
-  },
-  { key: 'taxonomy', label: 'Taxonomy', path: '/admin/taxonomy', emoji: '🧬', permission: 'TAXONOMY_READ' },
-  { key: 'tags', label: 'Hashtag moderation', path: '/admin/tags', emoji: '🏷️', permission: 'TAGS_READ' },
-  { key: 'finance', label: 'Finance', path: '/admin/finance', emoji: '🏦', permission: 'PAYOUTS_READ' },
-  { key: 'settlement-policies', label: 'Settlement Policies', path: '/admin/finance/settlement-policies', emoji: '📑', permission: 'PAYOUTS_READ' },
-  { key: 'payouts', label: 'Payouts', path: '/admin/payouts', emoji: '💰', permission: 'PAYOUTS_READ' },
-  { key: 'disputes', label: 'Disputes', path: '/admin/disputes', emoji: '⚖️', permission: 'DISPUTES_READ' },
-  { key: 'messaging', label: 'Messaging', path: '/admin/messaging', emoji: '💬', permission: 'MESSAGING_READ' },
-  { key: 'moderation', label: 'Moderation', path: '/admin/moderation', emoji: '🛡️', permission: 'MODERATION_READ' },
-  { key: 'reviews', label: 'Reviews', path: '/admin/reviews', emoji: '⭐', permission: 'MODERATION_READ' },
-  { key: 'audit', label: 'Audit', path: '/admin/audit', emoji: '📋', permission: 'AUDIT_READ' },
-  { key: 'settings', label: 'Settings', path: '/admin/settings', emoji: '⚙️', superAdminOnly: true },
-  { key: 'monitoring', label: 'Monitoring', path: '/admin/monitoring', emoji: 'MON', permission: 'ALERTS_READ' },
-  { key: 'market-governance', label: 'Market Governance', path: '/admin/market-governance', emoji: 'MG', permission: 'MARKET_GOVERNANCE_READ' },
-];
+import {
+  ADMIN_NAV_ITEMS,
+  canAccessAdminPath,
+  type AdminNavItem,
+} from '@/components/admin/adminNavigation';
 
 const AdminSidebar: React.FC = () => {
   const navigate = useNavigate();
@@ -50,16 +17,19 @@ const AdminSidebar: React.FC = () => {
   const { hasPermission, isSuperAdmin } = useAdminPermissions();
   const dispatch = useDispatch<AppDispatch>();
 
-  const visibleItems = navItems.filter((item) => {
-    if (item.superAdminOnly && !isSuperAdmin) return false;
-    if (item.permission && !hasPermission(item.permission)) return false;
-    if (item.permissions && !item.permissions.some((code) => hasPermission(code))) {
-      return false;
-    }
-    return true;
-  });
+  const access = useMemo(
+    () => ({ hasPermission, isSuperAdmin }),
+    [hasPermission, isSuperAdmin],
+  );
 
-  const getIsActive = (item: NavItem) => {
+  // Requirements come from the shared route table, so the sidebar cannot offer
+  // a destination the router will bounce the admin straight back out of.
+  const visibleItems = useMemo(
+    () => ADMIN_NAV_ITEMS.filter((item) => canAccessAdminPath(item.path, access)),
+    [access],
+  );
+
+  const getIsActive = (item: AdminNavItem) => {
     const path = item.path.split('?')[0];
     if (item.path === '/admin') {
       return location.pathname === '/admin';
@@ -67,8 +37,8 @@ const AdminSidebar: React.FC = () => {
     return location.pathname.startsWith(path);
   };
 
-  const handleNavigate = (path: string) => {
-    navigate(path);
+  const handleNavigate = (path: string, options?: { replace?: boolean }) => {
+    navigate(path, options);
     dispatch(closeSidebar());
   };
 
@@ -92,7 +62,7 @@ const AdminSidebar: React.FC = () => {
                   className={`group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition-all duration-150 ${
                     isActive
                       ? 'border-l-3 border-purple-500 bg-[linear-gradient(90deg,rgba(217,70,239,0.14),rgba(255,255,255,0.05))] font-semibold text-purple-700 dark:bg-[linear-gradient(90deg,rgba(168,85,247,0.2),rgba(255,255,255,0.03))] dark:text-purple-200'
-                      : 'text-gray-700 hover:bg-white/30 dark:text-gray-300 dark:hover:bg-white/6'
+                      : 'text-gray-700 hover:bg-white/30 dark:text-gray-300 dark:hover:bg-white/[0.06]'
                   }`}
                 >
                   <span className="text-base">{item.emoji}</span>
@@ -114,7 +84,7 @@ const AdminSidebar: React.FC = () => {
           emoji: item.emoji,
           active: getIsActive(item),
         }))}
-        onSelect={(item) => handleNavigate(item.path)}
+        onSelect={(item) => handleNavigate(item.path, { replace: true })}
       />
     </>
   );

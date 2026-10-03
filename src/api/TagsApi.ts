@@ -54,8 +54,18 @@ const extractSuggestions = (payload: any): TagSuggestion[] => {
 
 export const TagsApi = {
   async getSuggestions(limit = 50): Promise<string[]> {
-    const list = await this.getTrending('7d', limit);
-    return list.map((item) => item.name);
+    // Brands must see the FULL approved tag catalog (all seeded/platform tags),
+    // not just recently-used tags. `/tags` (getPopularTags) returns every APPROVED
+    // tag plus the viewer's own pending tags; `/tags/trending` only returns tags
+    // with recent usage, which is why a freshly-seeded catalog showed almost none.
+    try {
+      const catalog = await this.getPopular(limit);
+      if (catalog.length > 0) return catalog.map((item) => item.name);
+    } catch {
+      // fall back to trending (which itself falls back to /tags) below
+    }
+    const trending = await this.getTrending('7d', limit).catch(() => []);
+    return trending.map((item) => item.name);
   },
 
   async search(query: string, limit = 10): Promise<TagSuggestion[]> {

@@ -8,7 +8,6 @@ export interface QrLogoSource {
 export interface ResolvedQrLogo {
   url: string | null;
   status: 'ready' | 'skipped' | 'failed';
-  message?: string;
 }
 
 const exportSafeCache = new Map<string, string>();
@@ -99,10 +98,12 @@ export const resolveQrLogo = async (
       status: 'ready',
     };
   } catch {
-    return {
-      url: null,
-      status: 'failed',
-      message: 'Logo preview was skipped to keep this QR export-safe.',
-    };
+    // Cross-origin logos taint the canvas and make `toDataURL` throw, so a
+    // logo we cannot inline is simply left out. This used to surface as
+    // "Logo preview was skipped to keep this QR export-safe." under the code —
+    // an implementation detail about canvas tainting, shown to someone who
+    // just wanted to share a link. The QR is complete and scannable either
+    // way, so there is nothing here for the reader to act on.
+    return { url: null, status: 'failed' };
   }
 };

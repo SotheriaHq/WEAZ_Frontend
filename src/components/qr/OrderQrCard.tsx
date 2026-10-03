@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import BrandedQRCode from './BrandedQRCode';
@@ -27,7 +27,6 @@ const OrderQrCard: React.FC<OrderQrCardProps> = ({
     (state: RootState) => state.user.profile?.username?.trim() || null,
   );
   const qrRootRef = useRef<HTMLDivElement | null>(null);
-  const [logoMessage, setLogoMessage] = useState<string | null>(null);
   const url = useMemo(() => buildOrderUrl(orderId), [orderId]);
   const fileName = useMemo(
     () => sanitizeQrFilename(`order-${orderId}-qr`),
@@ -63,7 +62,7 @@ const OrderQrCard: React.FC<OrderQrCardProps> = ({
     <section className="rounded-[1.75rem] border border-gray-200/70 bg-white/90 p-4 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/5 sm:p-5">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
         <div className="lg:w-[300px]">
-          <QRExportFrame title={title} subtitle={subtitle} note={logoMessage}>
+          <QRExportFrame title={title} subtitle={subtitle}>
             <BrandedQRCode
               ref={qrRootRef}
               value={url}
@@ -71,7 +70,6 @@ const OrderQrCard: React.FC<OrderQrCardProps> = ({
               previewSize={228}
               exportSize={960}
               username={currentUsername}
-              onLogoMessage={setLogoMessage}
             />
           </QRExportFrame>
         </div>

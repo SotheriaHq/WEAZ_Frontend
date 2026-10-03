@@ -10,9 +10,9 @@ export default function VerificationHistoryPanel({
 }: VerificationHistoryPanelProps) {
   if (!attempts.length) {
     return (
-      <section className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-bold text-gray-900">Attempt history</h2>
-        <p className="mt-3 text-sm text-gray-500">
+      <section className="surface-card rounded-[1.75rem] border p-6 shadow-sm">
+        <h2 className="text-lg font-bold text-theme">Attempt history</h2>
+        <p className="mt-3 text-sm text-theme-secondary">
           No submission history yet. Your first completed attempt will appear here.
         </p>
       </section>
@@ -20,13 +20,13 @@ export default function VerificationHistoryPanel({
   }
 
   return (
-    <section className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-bold text-gray-900">Attempt history</h2>
+    <section className="surface-card rounded-[1.75rem] border p-6 shadow-sm">
+      <h2 className="text-lg font-bold text-theme">Attempt history</h2>
       <div className="mt-5 space-y-4">
         {attempts.map((attempt) => (
           <article
             key={attempt.id}
-            className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4"
+            className="surface-subtle rounded-3xl border px-4 py-4"
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -52,7 +52,7 @@ export default function VerificationHistoryPanel({
               </div>
             </div>
             {attempt.rejectionReasons && attempt.rejectionReasons.length > 0 ? (
-              <ul className="mt-4 space-y-2 text-sm text-rose-700">
+              <ul className="mt-4 space-y-2 text-sm text-rose-700 dark:text-rose-300">
                 {attempt.rejectionReasons.map((reason) => (
                   <li key={`${attempt.id}-${reason.code}-${reason.label}`}>
                     • {reason.label}

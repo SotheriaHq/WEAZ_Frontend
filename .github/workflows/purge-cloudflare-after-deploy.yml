@@ -1,0 +1,86 @@
+# After every frontend push that Cloudflare Pages will build, wait for that
+# commit's Pages deployment to succeed, then purge the weaz.me zone cache.
+#
+# This closes the "deploy race → HTML cached under /assets/*.js" window so
+# every edge POP serves the new build immediately (see INCIDENT 2026-07-10 /
+# 2026-07-31 and scripts/purge-cloudflare-cache.cjs).
+#
+# Required GitHub secrets (repo or org):
+#   CF_API_TOKEN          Token with:
+#                           - Zone.Cache Purge (zone weaz.me)
+#                           - Account.Cloudflare Pages:Read (to wait for deploy)
+#   CF_ZONE_ID            Zone ID for weaz.me
+#   CF_ACCOUNT_ID         Cloudflare account ID
+#   CF_PAGES_PROJECT_NAME Pages project name (Dashboard → Workers & Pages → project)
+#
+# Optional:
+#   CF_PURGE_HOSTS        default weaz.me,www.weaz.me
+#   CF_PURGE_EVERYTHING   "true" for full zone purge (usually unnecessary)
+
+name: Purge Cloudflare After Deploy
+
+on:
+  push:
+    branches:
+      - SIT
+      - main
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA to wait for (defaults to this run SHA)'
+        required: false
+        type: string
+      purge_everything:
+        description: 'Purge entire zone instead of frontend hosts only'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: purge-cloudflare-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  purge:
+    name: Wait for Pages + purge edge
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout (purge script only)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/purge-cloudflare-cache.cjs
+          sparse-checkout-cone-mode: false
+
+      - name: Require Cloudflare secrets
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_PAGES_PROJECT_NAME: ${{ secrets.CF_PAGES_PROJECT_NAME }}
+        run: |
+          missing=0
+          for key in CF_API_TOKEN CF_ZONE_ID CF_ACCOUNT_ID CF_PAGES_PROJECT_NAME; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing secret: $key — add it under Repo Settings → Secrets and variables → Actions"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          echo "All required Cloudflare secrets are present."
+
+      - name: Wait for Pages deploy + purge cache
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_PAGES_PROJECT_NAME: ${{ secrets.CF_PAGES_PROJECT_NAME }}
+          CF_PURGE_HOSTS: ${{ secrets.CF_PURGE_HOSTS }}
+          CF_PURGE_EVERYTHING: ${{ inputs.purge_everything == true && 'true' || secrets.CF_PURGE_EVERYTHING }}
+          CF_WAIT_COMMIT_SHA: ${{ inputs.commit_sha || github.sha }}
+          CF_WAIT_TIMEOUT_SEC: '900'
+          CF_WAIT_POLL_SEC: '15'
+        run: node scripts/purge-cloudflare-cache.cjs

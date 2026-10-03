@@ -110,7 +110,7 @@ const ProductReviewSection: React.FC<ProductReviewSectionProps> = ({ productId }
           Verified buyer feedback
         </h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Reviews come from completed WEAZ orders and are optional for buyers.
+          Reviews come from completed WIEZ orders and are optional for buyers.
         </p>
       </div>
 

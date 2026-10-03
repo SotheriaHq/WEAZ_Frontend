@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { OverlayPortal } from './OverlayPortal';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface ConfirmDialogProps {
@@ -98,7 +98,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <VLoader size={16} phase="loading" showLabel={false} />
+                  <MuseLoader size={16} />
                   Processing...
                 </span>
               ) : confirmText}

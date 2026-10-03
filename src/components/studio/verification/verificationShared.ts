@@ -65,7 +65,7 @@ export const VERIFICATION_STEPS = [
   {
     id: 'identity',
     title: 'Identity',
-    summary: 'Legal name, age, and phone details',
+    summary: 'Owner / CEO / Founder identity details',
   },
   {
     id: 'business',
@@ -160,6 +160,10 @@ export const verificationStatusLabel = (status?: string) => {
       return 'In review';
     case 'ADDITIONAL_INFO_REQUESTED':
       return 'More information needed';
+    // Documents accepted; the visit is what is left. Deliberately not
+    // "Approved" — nothing is verified until somebody has been and looked.
+    case 'PHYSICAL_PENDING':
+      return 'Visit pending';
     case 'APPROVED':
       return 'Approved';
     case 'REJECTED':
@@ -171,19 +175,30 @@ export const verificationStatusLabel = (status?: string) => {
   }
 };
 
+/**
+ * Status tone as a border/fill/text triplet.
+ *
+ * The three have to move together. A pastel border reads correctly against a
+ * pastel fill and wrong against anything else, so the dark half is a matching
+ * set — the hue at low alpha for the fill, a little more for the border, and
+ * the 300-step for text, which is the pairing used everywhere else in the app.
+ * Correcting a border on its own would have left a dark rule around a block
+ * that was still mint, which looks more broken than the loud border did.
+ */
 export const verificationStatusTone = (status?: string) => {
   switch (status) {
     case 'APPROVED':
-      return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+      return 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300';
     case 'REJECTED':
-      return 'border-rose-200 bg-rose-50 text-rose-800';
+      return 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300';
     case 'ADDITIONAL_INFO_REQUESTED':
-      return 'border-amber-200 bg-amber-50 text-amber-800';
+      return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300';
     case 'PENDING':
     case 'IN_REVIEW':
-      return 'border-sky-200 bg-sky-50 text-sky-800';
+    case 'PHYSICAL_PENDING':
+      return 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300';
     default:
-      return 'border-gray-200 bg-gray-50 text-gray-700';
+      return 'border-gray-200 bg-gray-50 text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300';
   }
 };
 
@@ -200,6 +215,15 @@ export const getVerificationCallToAction = (
   if (status.verificationStatus === 'APPROVED') {
     return {
       primaryLabel: 'Review badge details',
+      primaryTo: '/studio/verification',
+    };
+  }
+
+  // Mid-visit there is nothing to re-submit; the action lives in the visit
+  // panel on this same page.
+  if (status.verificationStatus === 'PHYSICAL_PENDING') {
+    return {
+      primaryLabel: 'View visit status',
       primaryTo: '/studio/verification',
     };
   }

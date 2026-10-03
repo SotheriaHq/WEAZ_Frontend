@@ -94,7 +94,7 @@ const ReportContentButton: React.FC<ReportContentButtonProps> = ({
       <Modal open={open} onClose={() => setOpen(false)} title="Report content" size="md" backdropStyle="light">
         <div className="space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            Send this product or design media to WEAZ review. Reports do not remove content automatically.
+            Send this product or design media to WIEZ review. Reports do not remove content automatically.
           </p>
           <UniversalSelect
             label="Reason"
@@ -126,7 +126,7 @@ const ReportContentButton: React.FC<ReportContentButtonProps> = ({
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/8"
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.08]"
             >
               Close
             </button>

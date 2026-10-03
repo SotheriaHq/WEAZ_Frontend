@@ -16,8 +16,17 @@ import { NotificationIcon } from './NotificationIcon';
 import { getActionText, getAriaAction } from '@/types/notificationTypes';
 import { hasValidActor, getActorDisplayName } from '@/utils/notificationAdapter';
 import type { NormalizedNotification } from '@/utils/notificationAdapter';
+import { resolveBagNotificationLinks } from '@/utils/notificationRouting';
 import { trackOnce, createTelemetryEvent } from '@/utils/notificationTelemetry';
 import './NotificationItem.css';
+
+// A `target.preview` is meant to be a short human snippet (e.g. a comment
+// excerpt). Some system notifications reuse it to carry a route path — never
+// show that raw path/URL to the user; it's used only for routing.
+function isRouteyPreview(preview?: string | null): boolean {
+  if (!preview) return false;
+  return preview.startsWith('/') || /^https?:\/\//i.test(preview);
+}
 
 // Utility function for relative time
 function timeAgo(dateString: string): string {
@@ -39,15 +48,51 @@ export interface NotificationItemProps {
   onUsernameClick: (actorId: string) => void;
   onBodyClick: (notification: NormalizedNotification) => void;
   onMarkRead: (id: string) => void;
+  /**
+   * Renders the dismiss control. It lives inside the row rather than in the
+   * caller's markup because the row IS the `<li>` — an outer wrapper would
+   * nest one list item inside another.
+   */
+  onDelete?: (id: string) => void;
+  /**
+   * Opens one of the nouns in the sentence (the bagged item, or its brand).
+   * The caller navigates, because each surface needs to do something slightly
+   * different first — the dropdown has to close itself, the page does not —
+   * and both want to hand the destination a way back.
+   */
+  onOpenEntity?: (to: string, label: string) => void;
 }
 
 export const NotificationItem = React.memo<NotificationItemProps>(
-  ({ notification, onAvatarClick, onUsernameClick, onBodyClick, onMarkRead }) => {
+  ({ notification, onAvatarClick, onUsernameClick, onBodyClick, onMarkRead, onDelete, onOpenEntity }) => {
     const { id, type, isRead, actor, target, message } = notification;
     const displayName = getActorDisplayName(notification);
     const actionText = getActionText(type);
     const ariaAction = getAriaAction(type);
     const hasActor = hasValidActor(notification);
+
+    /*
+      A system notification's `message` is a finished sentence written by the
+      server ("You've successfully bagged X by Y. Check out soon…").
+
+      The actor + action + preview template below is for notifications where a
+      PERSON acted on your content — "@ada commented on Wrap Dress". Running a
+      system row through it prepends the sender and appends the target preview
+      to a sentence that already reads correctly, and then drops the sentence
+      entirely (`message` only renders when there is no `actionText`). That is
+      how a bag confirmation rendered as "WIEZ added to your bag Bag", and an
+      unread-messages digest as "WIEZ you have unread order messages".
+
+      `NotificationsDropdown` already prefers the server sentence when there is
+      no actor, so this is what stops the two surfaces disagreeing about the
+      same notification.
+    */
+    const trimmedMessage = typeof message === 'string' ? message.trim() : '';
+    const isPlaceholderMessage =
+      /^you have a (new )?notification$/i.test(trimmedMessage);
+    const serverSentence =
+      trimmedMessage && !isPlaceholderMessage ? trimmedMessage : '';
+    const useServerSentence = !hasActor && Boolean(serverSentence);
 
     // Memoized mark-read handler
     const handleMarkRead = useCallback(() => {
@@ -90,6 +135,23 @@ export const NotificationItem = React.memo<NotificationItemProps>(
       onBodyClick(notification);
     }, [id, handleMarkRead, onBodyClick, notification]);
 
+    const handleDelete = useCallback((e: React.MouseEvent) => {
+      e.stopPropagation();
+      onDelete?.(id);
+    }, [id, onDelete]);
+
+    const entityLinks = resolveBagNotificationLinks(notification);
+
+    // Opening a noun must not also open the bag behind it.
+    const handleEntityClick = useCallback(
+      (event: React.MouseEvent, link: { to: string; label: string }) => {
+        event.stopPropagation();
+        handleMarkRead();
+        onOpenEntity?.(link.to, link.label);
+      },
+      [handleMarkRead, onOpenEntity],
+    );
+
     // Keyboard handler for accessibility
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -103,7 +165,9 @@ export const NotificationItem = React.memo<NotificationItemProps>(
     }, [id, handleMarkRead, onBodyClick, notification]);
 
     // Construct full aria label
-    const ariaLabel = `${isRead ? 'Read' : 'Unread'} notification from ${displayName}: ${message}. ${timeAgo(notification.createdAt)}`;
+    const ariaLabel = useServerSentence
+      ? `${isRead ? 'Read' : 'Unread'} notification: ${serverSentence} ${timeAgo(notification.createdAt)}`
+      : `${isRead ? 'Read' : 'Unread'} notification from ${displayName}: ${message}. ${timeAgo(notification.createdAt)}`;
 
     return (
       <li
@@ -122,7 +186,7 @@ export const NotificationItem = React.memo<NotificationItemProps>(
           className={`avatar-section ${hasActor ? 'clickable' : 'non-clickable'}`}
           onClick={hasActor ? handleAvatarClick : undefined}
           role={hasActor ? 'button' : 'img'}
-          aria-label={hasActor ? `View profile of ${displayName}` : 'WEAZ notification'}
+          aria-label={hasActor ? `View profile of ${displayName}` : 'WIEZ notification'}
           tabIndex={hasActor ? 0 : -1}
           data-testid="notification-avatar"
         >
@@ -134,34 +198,79 @@ export const NotificationItem = React.memo<NotificationItemProps>(
 
         {/* Content Section */}
         <div className="content-section" data-testid="notification-body">
-          {/* Header with username and action */}
-          <div className="notification-header">
-            {hasActor ? (
-              <span
-                className="username"
-                onClick={handleUsernameClick}
-                role="link"
-                aria-label={`View profile of ${displayName}`}
-                tabIndex={0}
-                data-testid="notification-username"
-              >
-                {displayName}
-              </span>
-            ) : (
-              <span className="username system">{displayName}</span>
-            )}
-            {actionText && (
-              <span className="action-text"> {actionText}</span>
-            )}
-            {target?.preview && (
-              <span className="target-preview"> {target.preview}</span>
-            )}
-          </div>
+          {useServerSentence ? (
+            /* The server wrote the whole sentence — render it as one. */
+            <p className="notification-sentence">{serverSentence}</p>
+          ) : (
+            <>
+              {/* Header with username and action */}
+              <div className="notification-header">
+                {hasActor ? (
+                  <span
+                    className="username"
+                    onClick={handleUsernameClick}
+                    role="link"
+                    aria-label={`View profile of ${displayName}`}
+                    tabIndex={0}
+                    data-testid="notification-username"
+                  >
+                    {displayName}
+                  </span>
+                ) : (
+                  <span className="username system">{displayName}</span>
+                )}
+                {actionText && (
+                  <span className="action-text"> {actionText}</span>
+                )}
+                {target?.preview && !isRouteyPreview(target.preview) && (
+                  <span className="target-preview"> {target.preview}</span>
+                )}
+              </div>
 
-          {/* Preview text if no action text */}
-          {!actionText && message && (
-            <p className="preview-text">{message}</p>
+              {/* Preview text if no action text */}
+              {!actionText && message && (
+                <p className="preview-text">{message}</p>
+              )}
+            </>
           )}
+
+          {/*
+            The row opens the bag, because that is what the notification is
+            about. These two are the nouns in that sentence and are destinations
+            in their own right, so they get their own targets rather than making
+            the reader go to the bag and hunt.
+          */}
+          {onOpenEntity && (entityLinks.content || entityLinks.brand) ? (
+            <p className="notification-entities">
+              {entityLinks.content ? (
+                <button
+                  type="button"
+                  className="notification-entity"
+                  onClick={(event) => handleEntityClick(event, entityLinks.content!)}
+                  aria-label={`Open ${entityLinks.content.label}`}
+                  data-testid="notification-entity-content"
+                >
+                  {entityLinks.content.label}
+                </button>
+              ) : null}
+              {entityLinks.content && entityLinks.brand ? (
+                <span className="notification-entity-separator" aria-hidden="true">
+                  ·
+                </span>
+              ) : null}
+              {entityLinks.brand ? (
+                <button
+                  type="button"
+                  className="notification-entity"
+                  onClick={(event) => handleEntityClick(event, entityLinks.brand!)}
+                  aria-label={`Open ${entityLinks.brand.label}'s catalogue`}
+                  data-testid="notification-entity-brand"
+                >
+                  {entityLinks.brand.label}
+                </button>
+              ) : null}
+            </p>
+          ) : null}
 
           {/* Timestamp */}
           <span className="timestamp" aria-hidden="true">
@@ -178,6 +287,18 @@ export const NotificationItem = React.memo<NotificationItemProps>(
         <div className="icon-section">
           <NotificationIcon type={type} size="sm" />
         </div>
+
+        {onDelete ? (
+          <button
+            type="button"
+            className="notification-dismiss"
+            onClick={handleDelete}
+            aria-label="Delete notification"
+            data-testid="notification-delete"
+          >
+            <span aria-hidden="true">✕</span>
+          </button>
+        ) : null}
       </li>
     );
   },
@@ -185,7 +306,8 @@ export const NotificationItem = React.memo<NotificationItemProps>(
     // Custom comparison - only re-render if these change
     return (
       prevProps.notification.id === nextProps.notification.id &&
-      prevProps.notification.isRead === nextProps.notification.isRead
+      prevProps.notification.isRead === nextProps.notification.isRead &&
+      Boolean(prevProps.onDelete) === Boolean(nextProps.onDelete)
     );
   }
 );

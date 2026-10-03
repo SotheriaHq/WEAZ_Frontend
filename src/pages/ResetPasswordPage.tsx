@@ -7,11 +7,12 @@ import {
   getPasswordPolicyErrorMessage,
 } from '@/lib/passwordPolicy';
 import BrandWordmark from '@/components/brand/BrandWordmark';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import {
   PasswordMatchFeedback,
   PasswordPolicyFeedback,
 } from '@/components/auth/PasswordPolicyFeedback';
-import { COMPANY_NAME } from '@/lib/brand';
+import { PRODUCT_NAME } from '@/brand/identity';
 import '../styles/auth.css';
 
 const ResetPasswordPage: React.FC = () => {
@@ -87,7 +88,7 @@ const ResetPasswordPage: React.FC = () => {
             <BrandWordmark
               logoSize={32}
               logoClassName="drop-shadow-[0_0_12px_rgba(212,175,55,0.45)]"
-              textClassName="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors"
+              
             />
           </Link>
 
@@ -96,10 +97,10 @@ const ResetPasswordPage: React.FC = () => {
               <div className="w-14 h-14 rounded-full bg-red-500/15 flex items-center justify-center mx-auto mb-5">
                 <span className="text-2xl">⚠️</span>
               </div>
-              <h1 className="text-xl sm:text-2xl font-serif font-bold text-white mb-3">
+              <h1 className="text-xl sm:text-2xl font-serif font-bold auth-heading mb-3">
                 Invalid Reset Link
               </h1>
-              <p className="text-sm text-gray-400 mb-6">
+              <p className="text-sm auth-muted mb-6">
                 This password reset link is missing a valid token. Please request a new reset link.
               </p>
               <Link
@@ -111,7 +112,7 @@ const ResetPasswordPage: React.FC = () => {
               <div className="mt-6">
                 <Link
                   to="/login"
-                  className="text-sm text-gray-400 hover:text-[#D4AF37] transition-colors"
+                  className="text-sm auth-muted hover:text-[var(--brand-accent)] transition-colors"
                 >
                   ← Back to Sign In
                 </Link>
@@ -144,7 +145,7 @@ const ResetPasswordPage: React.FC = () => {
           <BrandWordmark
             logoSize={32}
             logoClassName="drop-shadow-[0_0_12px_rgba(212,175,55,0.45)] group-hover:drop-shadow-[0_0_18px_rgba(212,175,55,0.6)] transition-[filter]"
-            textClassName="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors"
+            
           />
         </Link>
 
@@ -159,10 +160,10 @@ const ResetPasswordPage: React.FC = () => {
                   <div className="w-14 h-14 rounded-full bg-[var(--brand-accent)]/15 flex items-center justify-center mx-auto mb-5">
                     <span className="text-2xl">🔐</span>
                   </div>
-                  <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white mb-2">
+                  <h1 className="text-2xl sm:text-3xl font-serif font-bold auth-heading mb-2">
                     Set your new password
                   </h1>
-                  <p className="text-sm text-gray-400">
+                  <p className="text-sm auth-muted">
                     Choose a strong password to secure your account.
                   </p>
                 </div>
@@ -170,7 +171,7 @@ const ResetPasswordPage: React.FC = () => {
                 <form onSubmit={handleSubmit} className="space-y-5">
                   {/* New Password */}
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-300 uppercase tracking-wider ml-1">
+                    <label className="text-xs font-medium auth-label uppercase tracking-wider ml-1">
                       New Password
                     </label>
                     <div className="relative">
@@ -189,19 +190,21 @@ const ResetPasswordPage: React.FC = () => {
                       />
                       <button
                         type="button"
-                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-xs font-semibold text-gray-500 hover:text-white transition-colors"
+                        className="auth-field-toggle absolute inset-y-0 right-0 my-1 mr-1 px-3 flex items-center text-xs font-semibold"
                         onClick={() => setShowPassword((prev) => !prev)}
+                        aria-pressed={showPassword}
+                        aria-label={showPassword ? 'Hide new password' : 'Show new password'}
                       >
                         {showPassword ? 'Hide' : 'Show'}
                       </button>
                     </div>
 
-                    <PasswordPolicyFeedback password={newPassword} tone="dark" />
+                    <PasswordPolicyFeedback password={newPassword} />
                   </div>
 
                   {/* Confirm Password */}
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-300 uppercase tracking-wider ml-1">
+                    <label className="text-xs font-medium auth-label uppercase tracking-wider ml-1">
                       Confirm Password
                     </label>
                     <div className="relative">
@@ -225,8 +228,10 @@ const ResetPasswordPage: React.FC = () => {
                       />
                       <button
                         type="button"
-                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-xs font-semibold text-gray-500 hover:text-white transition-colors"
+                        className="auth-field-toggle absolute inset-y-0 right-0 my-1 mr-1 px-3 flex items-center text-xs font-semibold"
                         onClick={() => setShowConfirmPassword((prev) => !prev)}
+                        aria-pressed={showConfirmPassword}
+                        aria-label={showConfirmPassword ? 'Hide password confirmation' : 'Show password confirmation'}
                       >
                         {showConfirmPassword ? 'Hide' : 'Show'}
                       </button>
@@ -234,14 +239,14 @@ const ResetPasswordPage: React.FC = () => {
                     <PasswordMatchFeedback
                       password={newPassword}
                       confirmPassword={confirmPassword}
-                      tone="dark"
+                     
                     />
                   </div>
 
                   {/* Error */}
                   {error && (
                     <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3">
-                      <p className="text-xs text-red-300">{error}</p>
+                      <p className="text-xs auth-error-text">{error}</p>
                     </div>
                   )}
 
@@ -253,10 +258,10 @@ const ResetPasswordPage: React.FC = () => {
                   >
                     {isLoading ? (
                       <span className="flex items-center justify-center gap-2">
-                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
+                        {/* The button's own text says it; the mark is decoration. */}
+                        <span aria-hidden="true" className="inline-flex">
+                          <MuseLoader size={16} tone="current" />
+                        </span>
                         Resetting...
                       </span>
                     ) : (
@@ -270,11 +275,11 @@ const ResetPasswordPage: React.FC = () => {
                 <div className="w-14 h-14 rounded-full bg-green-500/15 flex items-center justify-center mx-auto mb-5">
                   <span className="text-2xl">✅</span>
                 </div>
-                <h2 className="text-xl sm:text-2xl font-serif font-bold text-white mb-3">
+                <h2 className="text-xl sm:text-2xl font-serif font-bold auth-heading mb-3">
                   Password reset successfully!
                 </h2>
-                <p className="text-sm text-gray-400 leading-relaxed mb-8">
-                  Your password has been updated. You can now sign in to {COMPANY_NAME} with your new password.
+                <p className="text-sm auth-muted leading-relaxed mb-8">
+                  Your password has been updated. You can now sign in to {PRODUCT_NAME} with your new password.
                 </p>
                 <Link
                   to="/login"
@@ -290,7 +295,7 @@ const ResetPasswordPage: React.FC = () => {
               <div className="mt-8 text-center">
                 <Link
                   to="/login"
-                  className="text-sm text-gray-400 hover:text-[#D4AF37] transition-colors"
+                  className="text-sm auth-muted hover:text-[var(--brand-accent)] transition-colors"
                 >
                   ← Back to Sign In
                 </Link>

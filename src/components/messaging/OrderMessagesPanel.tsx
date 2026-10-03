@@ -4,7 +4,8 @@ import { messagingApi, type ThreadMessage } from '@/api/MessagingApi';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
+import { resolveParticipantDisplayName } from '@/utils/participantDisplayName';
 
 type ContextType = 'CUSTOM_ORDER' | 'STANDARD_ORDER' | 'INQUIRY';
 type ActorSurface = 'BUYER' | 'BRAND' | 'ADMIN';
@@ -332,14 +333,25 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
     return () => window.clearTimeout(timer);
   }, [highlightMessageId, messages]);
 
-  const effectiveReadOnly = useMemo(
+  // The thread itself is closed (order concluded / archived / blocked) — a real
+  // "no more messages" state that applies to buyer + brand.
+  const threadConcluded = useMemo(
     () =>
-      readOnly ||
       threadStatus === 'READ_ONLY' ||
       threadStatus === 'ARCHIVED' ||
       threadStatus === 'BLOCKED',
-    [readOnly, threadStatus],
+    [threadStatus],
   );
+
+  const effectiveReadOnly = useMemo(
+    () => readOnly || threadConcluded,
+    [readOnly, threadConcluded],
+  );
+
+  // An admin surface is read-only because the admin only observes the thread —
+  // NOT because the order has concluded. Keep the two reasons distinct so an
+  // active order never shows a misleading "order has concluded" banner.
+  const adminObserving = actorSurface === 'ADMIN' && readOnly && !threadConcluded;
 
   const canSend = useMemo(() => {
     const hasBody = Boolean(input.trim());
@@ -474,16 +486,24 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
         </button>
       </div>
 
-      {effectiveReadOnly ? (
+      {threadConcluded ? (
         <div className="mb-4 rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
-          This message window is closed because the order has concluded. New messages are disabled for both buyer and brand.
+          This conversation is closed because the order has concluded. New messages are disabled for both buyer and brand.
+        </div>
+      ) : adminObserving ? (
+        <div className="mb-4 rounded-2xl border border-sky-300/70 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100">
+          Admin view — you're observing this thread read-only. The buyer and brand manage the conversation; this window updates live as they reply.
+        </div>
+      ) : effectiveReadOnly ? (
+        <div className="mb-4 rounded-2xl border border-slate-300/70 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-white/15 dark:bg-white/5 dark:text-slate-200">
+          This thread is currently read-only.
         </div>
       ) : null}
 
       <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1 scrollbar-hide">
         {loading ? (
           <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
-            <VLoader size={24} phase="loading" showLabel={false} />
+            <MuseLoader size={24} />
             <span>Loading thread…</span>
           </div>
         ) : messages.length === 0 ? (
@@ -492,7 +512,7 @@ const OrderMessagesPanel: React.FC<OrderMessagesPanelProps> = ({
           messages.map((message) => {
             const mine = actorId && message.senderUserId === actorId;
             const sender =
-              message.sender?.firstName || message.sender?.username || roleLabel(message.senderRole);
+              resolveParticipantDisplayName(message.sender, roleLabel(message.senderRole));
 
             return (
               <div

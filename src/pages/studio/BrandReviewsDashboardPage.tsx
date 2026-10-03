@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import { useCachedResource } from '@/hooks/useCachedResource';
+import { queryKeys } from '@/query/queryKeys';
 import reviewApi, {
   type BrandLifecycleBreakdownTargetDto,
   type BrandLifecycleDashboardDto,
@@ -117,6 +119,8 @@ function buildTargetParams(target: BrandLifecycleBreakdownTargetDto | null) {
 }
 
 export default function BrandReviewsDashboardPage() {
+  // Hybrid cache-first dashboard: cached revisits paint instantly; local state
+  // stays the working copy so the report action can update rows optimistically.
   const [dashboard, setDashboard] = useState<BrandLifecycleDashboardDto>(emptyDashboard);
   const [filters, setFilters] = useState<DashboardFilters>({
     status: 'ALL',
@@ -124,8 +128,6 @@ export default function BrandReviewsDashboardPage() {
     rating: 'ALL',
   });
   const [selectedTarget, setSelectedTarget] = useState<BrandLifecycleBreakdownTargetDto | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [reportingReview, setReportingReview] = useState<ReviewDto | null>(null);
   const [reportReason, setReportReason] = useState<ReviewReportReason>('OFF_TOPIC');
   const [reportDetails, setReportDetails] = useState('');
@@ -139,23 +141,25 @@ export default function BrandReviewsDashboardPage() {
     ...buildTargetParams(selectedTarget),
   }), [filters, selectedTarget]);
 
-  const loadDashboard = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await reviewApi.getBrandLifecycleDashboard(query);
-      setDashboard(response);
-    } catch (nextError) {
-      setDashboard(emptyDashboard);
-      setError(nextError instanceof Error ? nextError.message : 'Unable to load review dashboard');
-    } finally {
-      setLoading(false);
-    }
-  }, [query]);
+  const dashboardResource = useCachedResource<BrandLifecycleDashboardDto>({
+    queryKey: queryKeys.brand.reviewsDashboard(query),
+    queryFn: () => reviewApi.getBrandLifecycleDashboard(query),
+  });
+  const loading = dashboardResource.loading;
+  const error = dashboardResource.error
+    ? dashboardResource.error.message || 'Unable to load review dashboard'
+    : null;
+  const loadDashboard = dashboardResource.refetch;
+  const dashboardData = dashboardResource.data;
+  const dashboardErrored = Boolean(dashboardResource.error);
 
   useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
+    if (dashboardData) setDashboard(dashboardData);
+  }, [dashboardData]);
+
+  useEffect(() => {
+    if (dashboardErrored) setDashboard(emptyDashboard);
+  }, [dashboardErrored]);
 
   const activeFilterCount =
     Number(filters.status !== 'ALL') +
@@ -296,7 +300,7 @@ export default function BrandReviewsDashboardPage() {
                   className={`rounded-xl border p-4 text-left transition ${
                     selected
                       ? 'border-purple-400 bg-purple-50 text-purple-900 dark:border-purple-400/50 dark:bg-purple-500/10 dark:text-purple-100'
-                      : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/8'
+                      : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.08]'
                   }`}
                 >
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{target.targetType}</p>
@@ -325,7 +329,7 @@ export default function BrandReviewsDashboardPage() {
         {loading ? (
           <div className="space-y-3 p-4">
             {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="h-16 animate-pulse rounded-lg bg-gray-100 dark:bg-white/8" />
+              <div key={index} className="h-16 animate-pulse rounded-lg bg-gray-100 dark:bg-white/[0.08]" />
             ))}
           </div>
         ) : dashboard.items.length === 0 ? (
@@ -346,7 +350,7 @@ export default function BrandReviewsDashboardPage() {
                   <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-white/8">
+              <tbody className="divide-y divide-gray-100 dark:divide-white/[0.08]">
                 {dashboard.items.map((review) => (
                   <tr key={review.id} className="align-top text-gray-700 dark:text-gray-200">
                     <td className="px-4 py-3">{review.reviewer?.displayName ?? 'Verified buyer'}</td>
@@ -373,7 +377,7 @@ export default function BrandReviewsDashboardPage() {
                         type="button"
                         onClick={() => setReportingReview(review)}
                         disabled={review.status === 'DELETED'}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/8"
+                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.08]"
                       >
                         Report
                       </button>
@@ -417,7 +421,7 @@ export default function BrandReviewsDashboardPage() {
                   setReportDetails('');
                   setReportReason('OFF_TOPIC');
                 }}
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/8"
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.08]"
               >
                 Cancel
               </button>

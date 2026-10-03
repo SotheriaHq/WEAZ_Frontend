@@ -321,21 +321,21 @@ const AdminContentManagementPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <AdminBreadcrumb segments={[{ label: 'Content Management' }]} />
-      <section className="rounded-3xl border border-purple-200/40 bg-gradient-to-br from-white/95 via-[#f8f3ff] to-[#efe6ff] p-5 shadow-md shadow-purple-500/10 dark:border-white/10 dark:from-white/10 dark:via-[#140c1d] dark:to-[#1a1026]">
+      <section className="rounded-2xl border border-slate-100/80 bg-white p-5 shadow-xs dark:border-white/5 dark:bg-slate-900">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white">Content Management</h1>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">Content Management</h1>
+            <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
               Moderate and review products, designs, and store collections in one workspace.
             </p>
           </div>
-          <div className="inline-flex items-center rounded-full border border-gray-200/80 bg-white p-1 text-xs font-semibold dark:border-white/10 dark:bg-white/5">
+          <div className="inline-flex items-center rounded-xl border border-slate-200/60 bg-slate-100/70 p-1 text-xs font-semibold dark:border-white/10 dark:bg-white/5">
             {visibleTabs.map((entry) => (
               <button
                 key={entry.key}
                 type="button"
                 onClick={() => setTab(entry.key)}
-                className={`rounded-full px-3 py-1.5 transition ${tab === entry.key ? 'bg-purple-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}
+                className={`rounded-lg px-3 py-1.5 transition-all duration-150 ${tab === entry.key ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'}`}
               >
                 {entry.emoji} {entry.label}
               </button>
@@ -354,350 +354,376 @@ const AdminContentManagementPage: React.FC = () => {
         <AdminContentReviewPage embedded />
       ) : (
         <>
-      <section className="rounded-2xl border border-gray-200/80 bg-white/85 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
-          <input
-            type="text"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={`Search ${tab}...`}
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-purple-400 dark:border-white/10 dark:bg-black/20 dark:text-white"
-          />
-          <div className="inline-flex items-center rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-700 dark:bg-purple-500/20 dark:text-purple-300">
-            {currentItemsCount} loaded
-          </div>
-        </div>
+      <div className="rounded-2xl border border-slate-100 bg-white shadow-2xs overflow-hidden flex flex-col dark:border-white/5 dark:bg-slate-900">
+        {/* Unified Compact Toolbar */}
+        <div className="border-b border-slate-100 bg-white p-3.5 sm:p-4 flex flex-wrap lg:flex-nowrap gap-3 justify-between items-center dark:border-white/5 dark:bg-slate-900">
+          <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
+            {/* Search input with icon */}
+            <div className="relative w-full sm:w-64 md:w-72 shrink-0">
+              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={`Search ${tab}...`}
+                className="w-full rounded-xl border border-slate-200/70 bg-slate-50/60 py-1.5 pl-9 pr-7 font-hanken-grotesk text-xs text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:border-purple-500/60 focus:bg-white focus:ring-2 focus:ring-purple-500/10 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:bg-slate-900 shadow-2xs"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  aria-label="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
 
-        {/* Designs-specific filters */}
-        {tab === 'designs' && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <UniversalSelect
-              value={designVisibility}
-              onChange={(value) => setDesignVisibility(value as '' | 'PUBLIC' | 'PRIVATE')}
-              options={DESIGN_VISIBILITY_OPTIONS}
-              className="min-w-[150px]"
-              optionCompact
-            />
-            <UniversalSelect
-              value={designStatus}
-              onChange={(value) => setDesignStatus(value as '' | 'PUBLISHED' | 'ARCHIVED' | 'DRAFT')}
-              options={DESIGN_STATUS_OPTIONS}
-              className="min-w-[150px]"
-              optionCompact
-            />
-            <UniversalSelect
-              value={designSortBy}
-              onChange={(value) => setDesignSortBy(value as '' | 'recent' | 'oldest' | 'views' | 'orders')}
-              options={DESIGN_SORT_OPTIONS}
-              className="min-w-[160px]"
-              optionCompact
-            />
-            {(designVisibility || designStatus || designSortBy) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setDesignVisibility('');
-                  setDesignStatus('');
-                  setDesignSortBy('');
-                }}
-                className="rounded-lg px-2 py-1.5 text-xs font-medium text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-500/10"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-        )}
-      </section>
-
-      {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300">
-          {error}
-        </div>
-      )}
-
-      {/* min-h prevents layout height jump when switching between skeleton and table (Fix 8) */}
-      <div className="min-h-[460px]">
-        {loading ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="h-28 animate-pulse rounded-2xl bg-gray-200/70 dark:bg-white/10" />
-            ))}
-          </div>
-        ) : (
-          /* max-h + overflow keeps tables scrolling inline rather than extending the page (Fix 6) */
-          <div className="max-h-[62vh] overflow-x-auto overflow-y-auto rounded-2xl border border-gray-200/80 bg-white/80 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
-            {tab === 'products' && (
-              <table className="w-full min-w-[860px] text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200/80 text-left text-xs uppercase tracking-wide text-gray-500 dark:border-white/10 dark:text-gray-400">
-                    <th className="px-4 py-3">Product</th>
-                    <th className="px-4 py-3">Brand</th>
-                    <th className="px-4 py-3">Orders</th>
-                    <th className="px-4 py-3">Price</th>
-                    <th className="px-4 py-3">Status</th>
-                    {canModerateProducts && <th className="px-4 py-3">Actions</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((product) => (
-                    <tr key={product.id} className="border-b border-gray-100/90 transition-colors hover:bg-gray-50/80 dark:border-white/5 dark:hover:bg-white/5">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <ImageWithFallback
-                            src={productImage(product).src}
-                            fileId={productImage(product).fileId}
-                            alt={product.name}
-                            fit="cover"
-                            rounded="lg"
-                            className="h-12 w-12 object-cover"
-                            containerClassName="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/10"
-                            maxHeightClassName="max-h-12"
-                            fallbackName={product.name}
-                          />
-                          <div>
-                            <p className="font-semibold text-gray-900 dark:text-white">{product.name}</p>
-                            <p className="text-xs text-gray-400 dark:text-gray-500">{product.id.slice(0, 8)}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{product.brand?.name || 'Unknown brand'}</td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{product.orderCount ?? 0}</td>
-                      <td className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-200">
-                        {new Intl.NumberFormat('en-NG', {
-                          style: 'currency',
-                          currency: product.currency || 'NGN',
-                          maximumFractionDigits: 0,
-                        }).format(Number(product.salePrice ?? product.price ?? 0) || 0)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            product.isActive
-                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
-                              : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
-                          }`}
-                        >
-                          {product.isActive ? '🟢 Active' : '🔴 Inactive'}
-                        </span>
-                      </td>
-                      {canModerateProducts && (
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            {product.isActive ? (
-                              <button
-                                type="button"
-                                onClick={() => handleProductAction(product, 'UNPUBLISH')}
-                                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/35"
-                              >
-                                Unpublish
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleProductAction(product, 'REPUBLISH')}
-                                className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/35"
-                              >
-                                Republish
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleProductAction(product, 'HARD_DELETE')}
-                              className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-700/40 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/35"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-
+            {/* Designs-specific inline dropdown filters */}
             {tab === 'designs' && (
-              <table className="w-full min-w-[960px] text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200/80 text-left text-xs uppercase tracking-wide text-gray-500 dark:border-white/10 dark:text-gray-400">
-                    <th className="px-4 py-3">Design</th>
-                    <th className="px-4 py-3">Owner</th>
-                    <th className="px-4 py-3">Visibility</th>
-                    <th className="px-4 py-3">Views</th>
-                    <th className="px-4 py-3">Orders</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Uploaded</th>
-                    {canModerateCollections && <th className="px-4 py-3">Actions</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {designs.map((design) => (
-                    <tr key={design.id} className="border-b border-gray-100/90 transition-colors hover:bg-gray-50/80 dark:border-white/5 dark:hover:bg-white/5">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <ImageWithFallback
-                            src={design.coverImage || null}
-                            fileId={design.coverImageFileId || null}
-                            alt={design.title || 'Design'}
-                            fit="cover"
-                            rounded="lg"
-                            className="h-12 w-12 object-cover"
-                            containerClassName="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/10"
-                            maxHeightClassName="max-h-12"
-                            fallbackName={design.title || 'Design'}
-                          />
-                          <div>
-                            <p className="font-semibold text-gray-900 dark:text-white">{design.title || 'Untitled'}</p>
-                            <p className="text-xs text-gray-400 dark:text-gray-500">{design.id.slice(0, 8)}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{design.owner?.email || design.ownerId}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            design.visibility === 'PUBLIC'
-                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
-                              : 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400'
-                          }`}
-                        >
-                          {design.visibility === 'PUBLIC' ? 'Public' : 'Private'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{design.viewCount ?? 0}</td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{design.orderCount ?? 0}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            design.status === 'PUBLISHED'
-                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300'
-                              : design.status === 'ARCHIVED'
-                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
-                                : 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400'
-                          }`}
-                        >
-                          {design.status}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
-                        {new Date(design.createdAt).toLocaleDateString()}
-                      </td>
-                      {canModerateCollections && (
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            {design.status === 'ARCHIVED' ? (
-                              <button
-                                type="button"
-                                onClick={() => handleContentAction(design, 'design', 'REPUBLISH')}
-                                className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/35"
-                              >
-                                Republish
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleContentAction(design, 'design', 'UNPUBLISH')}
-                                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/35"
-                              >
-                                Unpublish
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleContentAction(design, 'design', 'HARD_DELETE')}
-                              className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-700/40 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/35"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-
-            {tab === 'collections' && (
-              <table className="w-full min-w-[860px] text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200/80 text-left text-xs uppercase tracking-wide text-gray-500 dark:border-white/10 dark:text-gray-400">
-                    <th className="px-4 py-3">Collection</th>
-                    <th className="px-4 py-3">Owner</th>
-                    <th className="px-4 py-3">Orders</th>
-                    <th className="px-4 py-3">Status</th>
-                    {canModerateCollections && <th className="px-4 py-3">Actions</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {collections.map((collection) => (
-                    <tr key={collection.id} className="border-b border-gray-100/90 transition-colors hover:bg-gray-50/80 dark:border-white/5 dark:hover:bg-white/5">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <ImageWithFallback
-                            src={collection.coverImage || null}
-                            alt={collection.title || 'Collection'}
-                            fit="cover"
-                            rounded="lg"
-                            className="h-12 w-12 object-cover"
-                            containerClassName="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/10"
-                            maxHeightClassName="max-h-12"
-                            fallbackName={collection.title || 'Collection'}
-                          />
-                          <div>
-                            <p className="font-semibold text-gray-900 dark:text-white">{collection.title || 'Untitled'}</p>
-                            <p className="text-xs text-gray-400 dark:text-gray-500">{collection.id.slice(0, 8)}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{collection.owner?.email || collection.ownerId}</td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{collection.orderCount ?? 0}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
-                          {collection.status}
-                        </span>
-                      </td>
-                      {canModerateCollections && (
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            {collection.status === 'ARCHIVED' ? (
-                              <button
-                                type="button"
-                                onClick={() => handleContentAction(collection, 'collection', 'REPUBLISH')}
-                                className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/35"
-                              >
-                                Republish
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleContentAction(collection, 'collection', 'UNPUBLISH')}
-                                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/35"
-                              >
-                                Unpublish
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleContentAction(collection, 'collection', 'HARD_DELETE')}
-                              className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-700/40 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/35"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-
-            {!loading && currentItemsCount === 0 && (
-              <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">No {tab} found.</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <UniversalSelect
+                  value={designVisibility}
+                  onChange={(value) => setDesignVisibility(value as '' | 'PUBLIC' | 'PRIVATE')}
+                  options={DESIGN_VISIBILITY_OPTIONS}
+                  size="sm"
+                  fitContent
+                  optionCompact
+                />
+                <UniversalSelect
+                  value={designStatus}
+                  onChange={(value) => setDesignStatus(value as '' | 'PUBLISHED' | 'ARCHIVED' | 'DRAFT')}
+                  options={DESIGN_STATUS_OPTIONS}
+                  size="sm"
+                  fitContent
+                  optionCompact
+                />
+                <UniversalSelect
+                  value={designSortBy}
+                  onChange={(value) => setDesignSortBy(value as '' | 'recent' | 'oldest' | 'views' | 'orders')}
+                  options={DESIGN_SORT_OPTIONS}
+                  size="sm"
+                  fitContent
+                  optionCompact
+                />
+                {(designVisibility || designStatus || designSortBy) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDesignVisibility('');
+                      setDesignStatus('');
+                      setDesignSortBy('');
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-500/10 transition-colors"
+                  >
+                    <span>✕</span> Clear filters
+                  </button>
+                )}
+              </div>
             )}
           </div>
+
+          {/* Item counter badge */}
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-100/80 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-white/5 dark:text-slate-300 shrink-0 ml-auto lg:ml-0">
+            <span className="h-1.5 w-1.5 rounded-full bg-purple-500"></span>
+            <span>{currentItemsCount} {currentItemsCount === 1 ? 'item' : 'items'}</span>
+          </div>
+        </div>
+
+        {error && (
+          <div className="m-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300">
+            {error}
+          </div>
         )}
+
+        {/* Content Table Area */}
+        <div className="min-h-[420px]">
+          {loading ? (
+            <div className="p-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="h-28 animate-pulse rounded-2xl bg-gray-200/70 dark:bg-white/10" />
+              ))}
+            </div>
+          ) : (
+            <div className="max-h-[65vh] overflow-x-auto overflow-y-auto">
+              {tab === 'products' && (
+                <table className="w-full min-w-[860px] text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/40 text-left text-xs uppercase tracking-wider text-slate-500 dark:border-white/5 dark:bg-white/[0.02] dark:text-slate-400">
+                      <th className="px-4 py-3 font-semibold">Product</th>
+                      <th className="px-4 py-3 font-semibold">Brand</th>
+                      <th className="px-4 py-3 font-semibold">Orders</th>
+                      <th className="px-4 py-3 font-semibold">Price</th>
+                      <th className="px-4 py-3 font-semibold">Status</th>
+                      {canModerateProducts && <th className="px-4 py-3 font-semibold">Actions</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((product) => (
+                      <tr key={product.id} className="border-b border-slate-100/70 transition-colors hover:bg-slate-50/50 dark:border-white/[0.03] dark:hover:bg-white/[0.02]">
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <ImageWithFallback
+                              src={productImage(product).src}
+                              fileId={productImage(product).fileId}
+                              alt={product.name}
+                              fit="cover"
+                              rounded="lg"
+                              className="h-12 w-12 object-cover"
+                              containerClassName="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/10"
+                              maxHeightClassName="max-h-12"
+                              fallbackName={product.name}
+                            />
+                            <div>
+                              <p className="font-semibold text-gray-900 dark:text-white">{product.name}</p>
+                              <p className="text-xs text-gray-400 dark:text-gray-500">{product.id.slice(0, 8)}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-gray-600 dark:text-gray-300">{product.brand?.name || 'Unknown brand'}</td>
+                        <td className="px-4 py-3.5 text-gray-600 dark:text-gray-300">{product.orderCount ?? 0}</td>
+                        <td className="px-4 py-3.5 font-semibold text-gray-700 dark:text-gray-200">
+                          {new Intl.NumberFormat('en-NG', {
+                            style: 'currency',
+                            currency: product.currency || 'NGN',
+                            maximumFractionDigits: 0,
+                          }).format(Number(product.salePrice ?? product.price ?? 0) || 0)}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              product.isActive
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                                : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
+                            }`}
+                          >
+                            {product.isActive ? '🟢 Active' : '🔴 Inactive'}
+                          </span>
+                        </td>
+                        {canModerateProducts && (
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center gap-2">
+                              {product.isActive ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleProductAction(product, 'UNPUBLISH')}
+                                  className="rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/35"
+                                >
+                                  Unpublish
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleProductAction(product, 'REPUBLISH')}
+                                  className="rounded-lg border border-emerald-200/80 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/35"
+                                >
+                                  Republish
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleProductAction(product, 'HARD_DELETE')}
+                                className="rounded-lg border border-rose-200/80 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-700/40 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/35"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              {tab === 'designs' && (
+                <table className="w-full min-w-[960px] text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/40 text-left text-xs uppercase tracking-wider text-slate-500 dark:border-white/5 dark:bg-white/[0.02] dark:text-slate-400">
+                      <th className="px-4 py-3 font-semibold">Design</th>
+                      <th className="px-4 py-3 font-semibold">Owner</th>
+                      <th className="px-4 py-3 font-semibold">Visibility</th>
+                      <th className="px-4 py-3 font-semibold">Views</th>
+                      <th className="px-4 py-3 font-semibold">Orders</th>
+                      <th className="px-4 py-3 font-semibold">Status</th>
+                      <th className="px-4 py-3 font-semibold">Uploaded</th>
+                      {canModerateCollections && <th className="px-4 py-3 font-semibold">Actions</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {designs.map((design) => (
+                      <tr key={design.id} className="border-b border-slate-100/70 transition-colors hover:bg-slate-50/50 dark:border-white/[0.03] dark:hover:bg-white/[0.02]">
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <ImageWithFallback
+                              src={design.coverImage || null}
+                              fileId={design.coverImageFileId || null}
+                              alt={design.title || 'Design'}
+                              fit="cover"
+                              rounded="lg"
+                              className="h-12 w-12 object-cover"
+                              containerClassName="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/10"
+                              maxHeightClassName="max-h-12"
+                              fallbackName={design.title || 'Design'}
+                            />
+                            <div>
+                              <p className="font-semibold text-gray-900 dark:text-white">{design.title || 'Untitled'}</p>
+                              <p className="text-xs text-gray-400 dark:text-gray-500">{design.id.slice(0, 8)}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-gray-600 dark:text-gray-300">{design.owner?.email || design.ownerId}</td>
+                        <td className="px-4 py-3.5">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              design.visibility === 'PUBLIC'
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                                : 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400'
+                            }`}
+                          >
+                            {design.visibility === 'PUBLIC' ? 'Public' : 'Private'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-gray-600 dark:text-gray-300">{design.viewCount ?? 0}</td>
+                        <td className="px-4 py-3.5 text-gray-600 dark:text-gray-300">{design.orderCount ?? 0}</td>
+                        <td className="px-4 py-3.5">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              design.status === 'PUBLISHED'
+                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300'
+                                : design.status === 'ARCHIVED'
+                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                                  : 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400'
+                            }`}
+                          >
+                            {design.status}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3.5 text-xs text-gray-500 dark:text-gray-400">
+                          {new Date(design.createdAt).toLocaleDateString()}
+                        </td>
+                        {canModerateCollections && (
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center gap-2">
+                              {design.status === 'ARCHIVED' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleContentAction(design, 'design', 'REPUBLISH')}
+                                  className="rounded-lg border border-emerald-200/80 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/35"
+                                >
+                                  Republish
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleContentAction(design, 'design', 'UNPUBLISH')}
+                                  className="rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/35"
+                                >
+                                  Unpublish
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleContentAction(design, 'design', 'HARD_DELETE')}
+                                className="rounded-lg border border-rose-200/80 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-700/40 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/35"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              {tab === 'collections' && (
+                <table className="w-full min-w-[860px] text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/40 text-left text-xs uppercase tracking-wider text-slate-500 dark:border-white/5 dark:bg-white/[0.02] dark:text-slate-400">
+                      <th className="px-4 py-3 font-semibold">Collection</th>
+                      <th className="px-4 py-3 font-semibold">Owner</th>
+                      <th className="px-4 py-3 font-semibold">Orders</th>
+                      <th className="px-4 py-3 font-semibold">Status</th>
+                      {canModerateCollections && <th className="px-4 py-3 font-semibold">Actions</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {collections.map((collection) => (
+                      <tr key={collection.id} className="border-b border-slate-100/70 transition-colors hover:bg-slate-50/50 dark:border-white/[0.03] dark:hover:bg-white/[0.02]">
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <ImageWithFallback
+                              src={collection.coverImage || null}
+                              alt={collection.title || 'Collection'}
+                              fit="cover"
+                              rounded="lg"
+                              className="h-12 w-12 object-cover"
+                              containerClassName="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/10"
+                              maxHeightClassName="max-h-12"
+                              fallbackName={collection.title || 'Collection'}
+                            />
+                            <div>
+                              <p className="font-semibold text-gray-900 dark:text-white">{collection.title || 'Untitled'}</p>
+                              <p className="text-xs text-gray-400 dark:text-gray-500">{collection.id.slice(0, 8)}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-gray-600 dark:text-gray-300">{collection.owner?.email || collection.ownerId}</td>
+                        <td className="px-4 py-3.5 text-gray-600 dark:text-gray-300">{collection.orderCount ?? 0}</td>
+                        <td className="px-4 py-3.5">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
+                            {collection.status}
+                          </span>
+                        </td>
+                        {canModerateCollections && (
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center gap-2">
+                              {collection.status === 'ARCHIVED' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleContentAction(collection, 'collection', 'REPUBLISH')}
+                                  className="rounded-lg border border-emerald-200/80 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/35"
+                                >
+                                  Republish
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleContentAction(collection, 'collection', 'UNPUBLISH')}
+                                  className="rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/35"
+                                >
+                                  Unpublish
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleContentAction(collection, 'collection', 'HARD_DELETE')}
+                                className="rounded-lg border border-rose-200/80 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-700/40 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/35"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              {!loading && currentItemsCount === 0 && (
+                <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">No {tab} found.</div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {nextCursor && !loading && currentItemsCount > 0 && (

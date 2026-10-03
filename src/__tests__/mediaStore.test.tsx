@@ -24,6 +24,7 @@ describe('useMediaStore', () => {
 
     expect(result.current.items).toHaveLength(2);
     expect(result.current.items.map((item) => item.file)).toEqual([fileA, fileB]);
+    expect(result.current.items.every((item) => item.previewUrl === '')).toBe(true);
     const firstId = result.current.items[0].id;
     act(() => {
       result.current.remove(firstId);

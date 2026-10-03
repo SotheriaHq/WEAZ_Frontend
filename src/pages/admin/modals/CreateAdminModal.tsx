@@ -52,11 +52,21 @@ const CreateAdminModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
       scope="viewport"
       glassBackdrop={true}
       backdropStyle="light"
-      className="border border-white/45 bg-white/72 backdrop-blur-2xl shadow-[0_30px_80px_-28px_rgba(15,23,42,0.55)] dark:border-white/15 dark:bg-slate-900/70"
+      className="border border-white/45 bg-white/[0.72] backdrop-blur-2xl shadow-[0_30px_80px_-28px_rgba(15,23,42,0.55)] dark:border-white/15 dark:bg-slate-900/70"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <p className="text-xs text-slate-600/90 dark:text-slate-300/90">
           A temporary password is generated automatically and sent by email.
+        </p>
+        {/*
+          The account is created with dashboard access and nothing else, so the
+          console it lands on is never empty. Saying so here is the difference
+          between a SuperAdmin knowing to go and grant the rest, and wondering
+          why the new admin reports seeing only one screen.
+        */}
+        <p className="text-xs text-slate-600/90 dark:text-slate-300/90">
+          The account starts with dashboard access only. Grant everything else
+          from Users → Team → Manage.
         </p>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-800 dark:text-slate-200">Email</label>

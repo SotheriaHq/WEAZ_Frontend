@@ -8,6 +8,8 @@ export interface MarketMedia {
   url?: string | null;
   previewUrl?: string | null;
   type: MarketMediaType;
+  width?: number | null;
+  height?: number | null;
   aspectRatio?: number | null;
   createdAt?: string | null;
 }

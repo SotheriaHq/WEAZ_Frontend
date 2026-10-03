@@ -19,16 +19,18 @@ export default function VerificationHero({
   actions,
 }: VerificationHeroProps) {
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+    <section className="relative overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 sm:p-8 shadow-[0_8px_32px_rgba(109,35,249,0.04)]">
+      <div className="absolute -top-32 -right-32 w-80 h-80 bg-primary/5 rounded-full blur-[80px] pointer-events-none"></div>
+      <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-3xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-gray-500 dark:text-gray-400">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-highest text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
             {eyebrow}
-          </p>
-          <h1 className="mt-3 text-3xl font-black tracking-tight text-gray-900 dark:text-white sm:text-4xl">
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-on-surface sm:text-4xl">
             {title}
           </h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-gray-600 dark:text-gray-400 sm:text-base">
+          <p className="mt-3 max-w-2xl text-base leading-relaxed text-on-surface-variant">
             {description}
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -38,8 +40,9 @@ export default function VerificationHero({
         </div>
         {statusLabel ? (
           <div
-            className={`inline-flex shrink-0 items-center rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] ${statusTone ?? 'border-gray-200 bg-white text-gray-700'}`}
+            className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-widest shadow-sm ${statusTone ?? 'border-outline-variant/30 bg-surface-container-low text-on-surface-variant'}`}
           >
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
             {statusLabel}
           </div>
         ) : null}

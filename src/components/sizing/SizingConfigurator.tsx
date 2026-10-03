@@ -19,6 +19,13 @@ interface SizingConfiguratorProps {
   onCustomMeasurementKeysChange: (keys: string[]) => void;
   measurementGender?: 'MEN' | 'WOMEN' | 'UNISEX';
   disabled?: boolean;
+  /**
+   * Hides the RTW size-system select. Designs have no field to persist it —
+   * the design save payload sends `rtwSizeSystem: null` unconditionally — so
+   * rendering the control there would be a dead input. Every other part of
+   * this component is shared by the design and product forms.
+   */
+  showRtwSizeSystem?: boolean;
 }
 
 const SIZE_SYSTEM_OPTIONS = ['ALPHA', 'US', 'UK', 'EU', 'IT', 'FR', 'AU', 'JP', 'KR'];
@@ -40,9 +47,21 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
   onCustomMeasurementKeysChange,
   measurementGender,
   disabled = false,
+  showRtwSizeSystem = true,
 }) => {
+  // UNISEX means "no audience narrowing", so it must send NO gender filter —
+  // matching CustomOrderConfigurationEditor, which is the other picker over the
+  // same registry. Sending { gender: 'UNISEX' } makes the API return only
+  // UNISEX + ungendered points and drops every MEN/WOMEN one, so the two
+  // pickers rendered different sets of measurement points for the same item —
+  // on EditProduct they are both on screen at once. The registry itself is a
+  // single source of truth (GET /measurement-points); only these client filters
+  // had drifted apart.
   const measurementFilter = useMemo(
-    () => (measurementGender ? { gender: measurementGender } : undefined),
+    () =>
+      measurementGender && measurementGender !== 'UNISEX'
+        ? { gender: measurementGender }
+        : undefined,
     [measurementGender],
   );
   const { points, isLoading } = useMeasurementPoints(measurementFilter);
@@ -205,7 +224,7 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
         </Select>
       </div>
 
-      {isRtwSizingMode(sizingMode) && (
+      {showRtwSizeSystem && isRtwSizingMode(sizingMode) && (
         <div>
           <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
             RTW Size System

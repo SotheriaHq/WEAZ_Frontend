@@ -23,6 +23,12 @@ type BrandPatchContextValue = {
   prefetchStatuses: (brandIds: Array<string | null | undefined>) => Promise<void>;
   ensureStatus: (brandId?: string | null, options?: EnsurePatchOptions) => Promise<boolean>;
   toggleStatus: (brandId?: string | null) => Promise<boolean>;
+  /**
+   * Write a known patch value into the shared cache without a network call.
+   * Used by surfaces that mutate patch state through their own API path
+   * (e.g. the profile Patches tab) so every other screen stays in sync.
+   */
+  markPatched: (brandId: string | null | undefined, value: boolean) => void;
   clearCache: () => void;
 };
 
@@ -297,6 +303,19 @@ export const BrandPatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [fetchSingleStatus, isPatchCapable, setBrandLoading],
   );
 
+  const markPatched = useCallback(
+    (brandId: string | null | undefined, value: boolean) => {
+      const normalizedBrandId = normalizeBrandId(brandId);
+      if (!normalizedBrandId) return;
+      setPatchByBrand((prev) => {
+        if (prev[normalizedBrandId] === value) return prev;
+        return { ...prev, [normalizedBrandId]: value };
+      });
+      lastFetchedRef.current[normalizedBrandId] = Date.now();
+    },
+    [],
+  );
+
   const getPatched = useCallback(
     (brandId?: string | null) => {
       const normalizedBrandId = normalizeBrandId(brandId);
@@ -320,6 +339,7 @@ export const BrandPatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       prefetchStatuses,
       ensureStatus,
       toggleStatus,
+      markPatched,
       clearCache,
     }),
     [
@@ -328,6 +348,7 @@ export const BrandPatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       getPatched,
       isLoading,
       isPatchCapable,
+      markPatched,
       prefetchStatuses,
       toggleStatus,
     ],

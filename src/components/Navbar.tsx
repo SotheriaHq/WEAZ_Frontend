@@ -1,8 +1,7 @@
-﻿import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { useSelector, useDispatch } from 'react-redux';
-import { clearUser, setUser } from '../features/userSlice';
-import { resetUnreadCount } from '../features/notificationsSlice';
-import { closeSidebar, toggleSidebar } from '../features/uiSlice';
+import { closeSidebar, selectIsMobile, toggleSidebar } from '../features/uiSlice';
 import {
   openCartDrawer,
   closeCartDrawer,
@@ -10,7 +9,6 @@ import {
   selectCartIsDrawerOpen,
   fetchCart,
   fetchCustomBagCount,
-  resetCartState,
 } from '../features/cartSlice';
 import {
   openWishlistDrawer,
@@ -18,29 +16,27 @@ import {
   fetchWishlist,
   selectWishlistTotal,
   selectWishlistIsDrawerOpen,
-  resetWishlistState,
 } from '../features/wishlistSlice';
 import type { RootState, AppDispatch } from '../store';
-import type { AuthUserDto } from '../types/auth';
 import '../styles/scrollbar-hide.css';
 import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
-import { apiClient, dropStoredAccessToken } from '../api/httpClient';
-import { env } from '../config/env';
 import getProfileOrHomeUrl from '../lib/navigation';
 import { useEffect, useState } from 'react';
 import { useSyncedThemePreference } from '@/hooks/useSyncedThemePreference';
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import ImageWithFallback from './ImageWithFallback';
 import FrostedButton from './ui/FrostedButton';
 import { generateUserUid } from '@/utils/userUid';
 import { resolveProfileImageSource } from '@/utils/profileImage';
 import BrandWordmark from '@/components/brand/BrandWordmark';
-import { COMPANY_NAME } from '@/lib/brand';
-import { hasActiveBrandMembership } from '@/lib/brandAccess';
+import { PRODUCT_NAME } from '@/brand/identity';
+import { hasActiveBrandMembership, resolveAccountDisplayName } from '@/lib/brandAccess';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
 import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
+import CountBadge from '@/components/navigation/CountBadge';
+import { useImmersiveNavHidden } from '@/components/navigation/navbarChrome';
 import { MY_BAG_EMOJI, MY_BAG_LABEL } from '@/constants/bagging';
 import {
   Dropdown as SharedDropdown,
@@ -52,6 +48,21 @@ import {
 
 interface NavbarProps {
   minimal?: boolean;
+  /**
+   * Float the bar over a full-bleed dark stage instead of sitting on its own
+   * surface — the mobile Runway reels.
+   *
+   * The reels stage used to start at `top-16` so the solid bar could own the
+   * first 64px of the screen. That is a band of chrome above the photo on a
+   * surface whose entire point is edge-to-edge media, and it read as the navbar
+   * "pushing the rest of the view down". Native has always overlaid instead.
+   *
+   * Keeps every control (unlike `minimal`, which strips them); only the surface
+   * changes. Foreground is forced light because the stage is dark in BOTH
+   * themes, so the theme-coloured wordmark would otherwise be dark-on-dark in
+   * light mode — the same defect the Runway filter chips had.
+   */
+  immersive?: boolean;
   profileMenuContext?: 'default' | 'studio';
 }
 
@@ -61,11 +72,13 @@ const THEME_MENU_OPTIONS = [
   { value: 'system' as const, label: 'System', icon: '💻' },
 ];
 
-export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuContext = 'default' }) => {
+export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = false, profileMenuContext = 'default' }) => {
+  const { logout } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const navHidden = useImmersiveNavHidden();
   const notificationsButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const { themePreference, setThemePreference } = useSyncedThemePreference();
   const { setLanguage, translate } = useLanguage();
@@ -84,31 +97,58 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
   const storeSetupComplete = useStoreSetupStatus();
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const location = useLocation();
+  /* The search control hides on the search screen; `/search` is the route and
+     the results page keeps the same path with a query string. */
+  const isSearchRoute = location.pathname === '/search';
+  // Phones only (<768px). Tablets and up keep the dropdown — it fits there.
+  const isMobileViewport = useSelector(selectIsMobile);
+
+  /**
+   * Opening notifications is idempotent. Tapping the bell twice, or the bell
+   * and then the menu entry, used to push a second identical history entry, so
+   * Back returned to the same screen and the reader had to press it once per
+   * accidental tap to escape.
+   */
+  const goToNotifications = React.useCallback(() => {
+    if (location.pathname === '/notifications') return;
+    navigate('/notifications', {
+      // Where Back should land. `location.key === 'default'` means this is the
+      // first entry in the session's history, so there is nothing behind it and
+      // the page falls back to a sensible home.
+      state: {
+        notificationsReturnTo:
+          location.key === 'default'
+            ? null
+            : `${location.pathname}${location.search}${location.hash}`,
+      },
+    });
+  }, [location.hash, location.key, location.pathname, location.search, navigate]);
   const userUid = user ? generateUserUid(user.id, user.firstName) : null;
+  // Brand accounts display the brand identity (name + initials), never the
+  // creator's personal name — keeps the fallback initials aligned with the
+  // brand-logo avatar. See resolveAccountDisplayName (Rule 28).
+  const accountDisplayName = resolveAccountDisplayName(user);
 
   const isAdmin = user?.role === 'SuperAdmin' || user?.role === 'Admin';
+  // Declared before the fetch effect below, which depends on it.
+  const hasBrandAccess = hasActiveBrandMembership(user);
 
   React.useEffect(() => {
-    if (isAuthenticated && !isAdmin) {
+    // Brand accounts have no bag and no wishlist, so there is nothing here to
+    // fetch — and fetching it would keep a badge count alive for a surface they
+    // can no longer reach.
+    if (isAuthenticated && !isAdmin && !hasBrandAccess) {
       dispatch(fetchCart());
       dispatch(fetchCustomBagCount());
       dispatch(fetchWishlist({ page: 1, limit: 200 }));
     }
-  }, [dispatch, isAuthenticated, isAdmin]);
+  }, [dispatch, isAuthenticated, isAdmin, hasBrandAccess]);
 
-  React.useEffect(() => {
-    if (!user && typeof window !== 'undefined') {
-      const persisted = localStorage.getItem(env.userStorageKey);
-      if (persisted) {
-        try {
-          const parsed = JSON.parse(persisted) as AuthUserDto;
-          if (parsed?.id) dispatch(setUser(parsed));
-        } catch (error) {
-          void error;
-        }
-      }
-    }
-  }, [dispatch, user]);
+  // AuthContext is the single source of truth for session bootstrap/logout.
+  // Do NOT rehydrate localStorage here — that recreates ghost sessions after
+  // logout/expiry and can show another user's email/uid in the navbar while
+  // the catalog renders a public brand from a QR scan.
 
   useEffect(() => {
     if (!user) {
@@ -134,11 +174,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
     toast.info('Help center coming soon.');
   };
   const profileHomeRoute = user ? getProfileOrHomeUrl(user) : '/profile';
-  const hasBrandAccess = hasActiveBrandMembership(user);
-  const ordersRoute = hasBrandAccess ? '/studio?tab=orders' : '/profile?tab=orders';
   const savedRoute = hasBrandAccess ? '/profile?tab=Content' : profileHomeRoute;
   const isStudioProfileMenu = profileMenuContext === 'studio';
-  const showStudioMenuEntry = !isStudioProfileMenu && hasBrandAccess && storeSetupComplete === true;
+  const showStudioMenuEntry =
+    !isStudioProfileMenu && hasBrandAccess && storeSetupComplete === true;
 
   const renderProfileMenu = () => {
     if (!user) return null;
@@ -165,43 +204,71 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
               <ImageWithFallback
                 src={userAvatar.src}
                 fileId={userAvatar.fileId}
-                alt={`${user.firstName} ${user.lastName}`}
-                fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
+                alt={accountDisplayName}
+                fallbackName={accountDisplayName}
                 fit="cover"
                 className="h-full w-full object-cover"
                 containerClassName="h-full w-full"
                 rounded="xl"
+                keepPreviousOnReload
               />
             </span>
         </DropdownTrigger>
 
         <DropdownMenu
           maxHeight="min(80dvh, 30rem)"
-          className="surface-menu w-[min(13.5rem,calc(100vw-1rem))] !shadow-none !ring-0 outline-none sm:w-[15.5rem]"
+          className="surface-menu w-[min(17rem,calc(100vw-1rem))] !shadow-none !ring-0 outline-none sm:w-[19rem]"
         >
           <div className="flex items-center gap-3 px-3.5 pb-3 pt-3.5">
-            <div className="h-12 w-12 overflow-hidden rounded-xl border border-theme">
+            <div className="h-14 w-14 overflow-hidden rounded-xl border border-theme">
               <ImageWithFallback
                 src={userAvatar.src}
                 fileId={userAvatar.fileId}
-                alt={`${user.firstName} ${user.lastName}`}
-                fallbackName={`${user.firstName || ''} ${user.lastName || ''}`}
+                alt={accountDisplayName}
+                fallbackName={accountDisplayName}
                 fit="cover"
                 className="h-full w-full object-cover"
                 containerClassName="h-full w-full"
                 rounded="xl"
+                keepPreviousOnReload
               />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2">
                 <div className="min-w-0 flex-1 truncate text-base font-semibold text-[color:var(--text-primary)]">
-                  {user.firstName} {user.lastName}
+                  {accountDisplayName}
                 </div>
               </div>
-              <div className="mt-0.5 break-words text-[11px] leading-4 text-[color:var(--text-secondary)]">
-                {user.email}
-                {userUid ? ` · UID ${userUid}` : ''}
-              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void navigator.clipboard.writeText(user.email);
+                  toast.success('Email copied to clipboard!');
+                }}
+                title="Tap to copy email"
+                className="mt-0.5 flex w-full items-center gap-1 overflow-visible whitespace-nowrap text-left text-[11px] font-semibold leading-4 text-[color:var(--text-primary)] transition-colors hover:text-purple-600"
+              >
+                <span>{user.email}</span>
+                <span aria-hidden="true" className="shrink-0">📋</span>
+              </button>
+              {userUid && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void navigator.clipboard.writeText(userUid);
+                    toast.success('UID copied to clipboard!');
+                  }}
+                  title="Tap to copy UID"
+                  className="flex w-full items-center gap-1 overflow-visible whitespace-nowrap text-left text-[11px] font-semibold leading-4 text-[color:var(--text-primary)] transition-colors hover:text-purple-600"
+                >
+                  <span>UID: <span className="font-mono">{userUid}</span></span>
+                  <span aria-hidden="true" className="shrink-0">📋</span>
+                </button>
+              )}
               <div className="mt-2 flex items-center gap-1 rounded-xl surface-control p-1">
                 {THEME_MENU_OPTIONS.map((option) => {
                   const active = themePreference === option.value;
@@ -235,15 +302,36 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
 
           {showStudioMenuEntry ? (
             <DropdownItem
-              leftIcon="🧵"
+              leftIcon="📊"
               onClick={() => {
                 navigate('/studio');
                 setShowProfileMenu(false);
               }}
             >
-              Studio
+              Dashboard
             </DropdownItem>
           ) : null}
+
+          {/*
+            Notifications belongs in this menu in BOTH contexts.
+
+            In Studio (`profileMenuContext="studio"`) and on the Catalogue this
+            menu is the only account surface a brand sees, and it had no
+            notifications entry — so a brand working through their catalogue or
+            studio had no indication that an admin had asked for changes. The
+            count is the live Redux value, the same one the bell badge reads, so
+            the two can never disagree.
+          */}
+          <DropdownItem
+            leftIcon="🔔"
+            meta={unreadCount > 0 ? <CountBadge count={unreadCount} placement="inline" /> : null}
+            onClick={() => {
+              goToNotifications();
+              setShowProfileMenu(false);
+            }}
+          >
+            Notifications
+          </DropdownItem>
 
           <DropdownItem
             leftIcon="👤"
@@ -301,15 +389,17 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
 
           <DropdownDivider />
 
-          <DropdownItem
-            leftIcon="📦"
-            onClick={() => {
-              navigate(ordersRoute);
-              setShowProfileMenu(false);
-            }}
-          >
-            My Orders
-          </DropdownItem>
+          {!hasBrandAccess ? (
+            <DropdownItem
+              leftIcon="📦"
+              onClick={() => {
+                navigate('/profile?tab=orders');
+                setShowProfileMenu(false);
+              }}
+            >
+              My Orders
+            </DropdownItem>
+          ) : null}
 
           <DropdownItem
             leftIcon="⭐"
@@ -338,18 +428,8 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
           <DropdownItem
             leftIcon="↩️"
             tone="danger"
-            onClick={async () => {
-              try {
-                await apiClient.post('/auth/logout');
-              } catch (error) {
-                void error;
-              }
-              dropStoredAccessToken();
-              localStorage.removeItem(env.userStorageKey);
-              dispatch(clearUser());
-              dispatch(resetCartState());
-              dispatch(resetWishlistState());
-              dispatch(resetUnreadCount());
+            onClick={() => {
+              logout();
               setShowProfileMenu(false);
               navigate('/', { replace: true });
             }}
@@ -363,15 +443,29 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
 
   return (
     <nav
-      className={`fixed top-0 left-0 z-layer-nav h-16 w-full px-4 sm:px-5 ${
-        minimal
-          ? 'border-b border-transparent bg-transparent'
-          : isScrolled
-            ? 'threadly-nav-surface-muted'
-            : 'threadly-nav-surface'
+      className={`fixed top-0 left-0 z-layer-nav h-16 w-full px-4 transition-transform duration-200 ease-out sm:px-5 ${
+        /*
+          Immersive only: the bar slides out while the feed under it is being
+          scrolled and comes back when it settles (see `navbarChrome`). A solid
+          bar on an ordinary page must never do this — it would take the site's
+          navigation away on every scroll.
+
+          `-translate-y-full` rather than `display:none` so it animates, and
+          `pointer-events-none` so a hidden bar cannot swallow a tap meant for
+          the media behind it.
+        */
+        immersive && navHidden ? '-translate-y-full pointer-events-none' : 'translate-y-0'
+      } ${
+        immersive
+          ? 'border-b-0 bg-transparent'
+          : minimal
+            ? 'border-b border-transparent bg-transparent'
+            : isScrolled
+              ? 'wiez-nav-surface-muted'
+              : 'wiez-nav-surface'
       }`}
       style={
-        isScrolled && !minimal
+        isScrolled && !minimal && !immersive
           ? {
               backdropFilter: 'blur(18px) saturate(140%)',
               WebkitBackdropFilter: 'blur(18px) saturate(140%)',
@@ -379,7 +473,17 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
           : undefined
       }
     >
-      <div className="flex h-full items-center justify-between gap-4">
+      {/* Readability scrim: over edge-filled media the bar has no surface of
+          its own, so the controls need this to stay legible. Extends past the
+          bar's own height so it fades out rather than ending on a hard edge. */}
+      {immersive ? (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/70 via-black/35 to-transparent"
+          aria-hidden
+        />
+      ) : null}
+
+      <div className={`relative flex h-full items-center justify-between gap-4 ${immersive ? 'text-white [&_.text-theme]:text-white [&_.text-theme-secondary]:text-white/80' : ''}`}>
         <div className="flex shrink-0 items-center">
           {!minimal ? (
             <button
@@ -402,9 +506,9 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
             >
               <BrandWordmark
                 logoSize={32}
-                textClassName="max-w-[200px] truncate text-lg font-bold tracking-tight text-theme"
+                
               />
-              <span className="sr-only">{COMPANY_NAME}</span>
+              <span className="sr-only">{PRODUCT_NAME}</span>
             </div>
           )}
         </div>
@@ -421,7 +525,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
         ) : null}
 
         <div className="flex min-w-[100px] shrink-0 items-center justify-end space-x-2 sm:space-x-3">
-          {!minimal ? (
+          {/* Not on the search screen itself: a control whose only job is to
+              take you where you already are is a dead tap target, and it sat
+              directly above the page's own search field. */}
+          {!minimal && !isSearchRoute ? (
             <button
               type="button"
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)] sm:hidden"
@@ -432,7 +539,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
             </button>
           ) : null}
 
-          {user && !isAdmin ? (
+          {/* Brands sell; they do not shop. Wishlist and Bag are buyer state, and
+              leaving them here gave a seller a route into their own checkout and
+              from there into the buyer orders view — which is not their orders. */}
+          {user && !isAdmin && !hasBrandAccess ? (
             <button
               type="button"
               onClick={() => dispatch(isWishlistOpen ? closeWishlistDrawer() : openWishlistDrawer())}
@@ -440,15 +550,11 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
               aria-label="Wishlist"
             >
               <span aria-hidden="true" className="text-xl">🤍</span>
-              {wishlistTotal > 0 ? (
-                <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
-                  {wishlistTotal > 99 ? '99+' : wishlistTotal}
-                </span>
-              ) : null}
+              <CountBadge count={wishlistTotal} />
             </button>
           ) : null}
 
-          {!isAdmin ? (
+          {!isAdmin && !hasBrandAccess ? (
             <button
               type="button"
               onClick={() => dispatch(isCartOpen ? closeCartDrawer() : openCartDrawer())}
@@ -457,7 +563,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
             >
               <span aria-hidden="true" className="text-xl">{MY_BAG_EMOJI}</span>
               {cartQuantity > 0 ? (
-                <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-purple-600 px-1 text-xs font-bold text-white">
+                <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-xs font-bold text-[color:var(--brand-primary)]">
                   {cartQuantity > 99 ? '99+' : cartQuantity}
                 </span>
               ) : null}
@@ -466,30 +572,50 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, profileMenuCont
 
           {user ? (
             <div className="relative">
+              {/*
+                The bell is visible at EVERY width, unlike the wishlist and bag
+                buttons above it. Those two have a mobile home elsewhere;
+                notifications had none. The bell was `hidden sm:flex`, the island
+                dock has no entry, the profile menu had no entry, and there is no
+                /notifications route — so below 640px a user could not reach
+                their notifications by ANY path. That is why an admin's
+                change-request on a submitted product never surfaced to the brand
+                on a phone: the notification was created and pushed correctly,
+                there was simply nothing on screen able to show it.
+              */}
               <button
                 ref={notificationsButtonRef}
                 type="button"
                 onClick={() => {
                   setShowProfileMenu(false);
                   setShowLanguageDropdown(false);
+                  // On a phone the dropdown was a panel the height of the
+                  // screen — a full page wearing a popover's clothes, and one
+                  // that could not be scrolled past or navigated within. Mobile
+                  // browsers get the real screen instead, matching native,
+                  // where notifications have always been a route.
+                  if (isMobileViewport) {
+                    goToNotifications();
+                    return;
+                  }
                   setShowNotificationsDropdown((value) => !value);
                 }}
-                className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)] sm:flex"
-                aria-label="Notifications"
-                aria-expanded={showNotificationsDropdown}
+                className="relative flex h-10 w-10 items-center justify-center rounded-xl text-xl surface-interactive-hover focus-visible:outline-none active:bg-[color:var(--surface-muted)]"
+                aria-label={
+                  unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
+                }
+                aria-expanded={isMobileViewport ? undefined : showNotificationsDropdown}
               >
                 <span aria-hidden="true" className="text-xl">🔔</span>
-                {unreadCount > 0 ? (
-                  <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                ) : null}
+                <CountBadge count={unreadCount} />
               </button>
-              <NotificationsDropdown
-                open={showNotificationsDropdown}
-                onClose={() => setShowNotificationsDropdown(false)}
-                anchorRef={notificationsButtonRef}
-              />
+              {isMobileViewport ? null : (
+                <NotificationsDropdown
+                  open={showNotificationsDropdown}
+                  onClose={() => setShowNotificationsDropdown(false)}
+                  anchorRef={notificationsButtonRef}
+                />
+              )}
             </div>
           ) : null}
 
