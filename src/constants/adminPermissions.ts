@@ -321,12 +321,53 @@ const CATALOGUE = [
     label: 'View disputes',
     description: 'Open the disputes console and read case history.',
   },
+  /*
+    Split so an account can be a dispute HANDLER and nothing else.
+
+    `disputes.resolve` used to be the only code behind every dispute route, so
+    granting it handed over claiming, deciding and moving money together. These
+    are different jobs: someone can be trusted to broker a late order without
+    also being able to authorise a refund out of the platform.
+  */
+  {
+    key: 'DISPUTES_CLAIM',
+    code: 'disputes.claim',
+    group: 'Disputes',
+    label: 'Claim disputes',
+    description:
+      'Take ownership of an unclaimed dispute. Triage without deciding outcomes.',
+  },
   {
     key: 'DISPUTES_RESOLVE',
     code: 'disputes.resolve',
     group: 'Disputes',
     label: 'Resolve disputes',
-    description: 'Decide a dispute and apply its outcome. Can move money.',
+    description:
+      'Decide the outcome of a dispute you hold. Money movement is granted separately.',
+  },
+  {
+    key: 'DISPUTES_REFUND',
+    code: 'disputes.refund',
+    group: 'Disputes',
+    label: 'Authorise dispute refunds',
+    description:
+      'Settle a dispute with a refund, partial refund, or cancel-and-refund.',
+  },
+  {
+    key: 'DISPUTES_HANDOVER_REQUEST',
+    code: 'disputes.handover.request',
+    group: 'Disputes',
+    label: 'Request a dispute handover',
+    description:
+      'Ask to pass a dispute you hold to a named colleague. Needs approval.',
+  },
+  {
+    key: 'DISPUTES_HANDOVER_APPROVE',
+    code: 'disputes.handover.approve',
+    group: 'Disputes',
+    label: 'Approve dispute handovers',
+    description:
+      'Approve or refuse a handover. SuperAdmin only — releasing an owner is a decision about accountability.',
   },
 
   {

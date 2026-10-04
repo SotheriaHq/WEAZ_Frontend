@@ -188,7 +188,19 @@ const AdminCustomOrdersPage: React.FC = () => {
       setLoading(true);
       const [riskData, ordersData] = await Promise.all([
         customOrdersAdminApi.getRiskDashboard({ days: 30, limit: 6 }),
-        customOrdersAdminApi.list({ limit: 20, q: deferredSearchQuery || undefined, status: statusFilter ? (statusFilter as CustomOrderStatus) : undefined }),
+        customOrdersAdminApi.list({
+          limit: 20,
+          q: deferredSearchQuery || undefined,
+          // `HAS_DISPUTE` is not a status — it is "carries a live dispute,
+          // whatever the status says", which is a separate server-side filter.
+          ...(statusFilter === 'HAS_DISPUTE'
+            ? { disputed: true }
+            : {
+                status: statusFilter
+                  ? (statusFilter as CustomOrderStatus)
+                  : undefined,
+              }),
+        }),
       ]);
 
       if (refreshSequenceRef.current !== sequence) {
@@ -345,7 +357,15 @@ const AdminCustomOrdersPage: React.FC = () => {
               onChange={setStatusFilter}
               options={[
                 { value: '', label: 'All statuses' },
-                { value: 'DISPUTED', label: 'Disputed' },
+                /*
+                  Distinct from the DISPUTED status below it, and deliberately
+                  first. A delay dispute leaves the order IN_PRODUCTION so the
+                  maker keeps working, so `status=DISPUTED` finds only the
+                  subset where the dispute happened to change the status —
+                  missing exactly the overdue orders an admin is looking for.
+                */
+                { value: 'HAS_DISPUTE', label: '🚩 Has an open dispute' },
+                { value: 'DISPUTED', label: 'Disputed (status)' },
                 { value: 'REFUND_IN_PROGRESS', label: 'Refund in progress' },
                 { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pre-production hold' },
                 { value: 'IN_PRODUCTION', label: 'In production' },
@@ -361,9 +381,29 @@ const AdminCustomOrdersPage: React.FC = () => {
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <div className="font-semibold text-slate-900 dark:text-white">{entry.sourceTitle}</div>
-                    <div className="mt-1 flex flex-wrap gap-2">
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
                       <CustomOrderBadge value={entry.status} />
                       <CustomOrderBadge value={entry.currentProgressStage ?? 'ORDER_PLACED'} type="stage" />
+                      {/*
+                        The dispute tag, which the status badge cannot carry: a
+                        delay dispute leaves the order IN_PRODUCTION, so without
+                        this an overdue disputed order looks like any other.
+                      */}
+                      {entry.openDisputes?.length ? (
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                            entry.openDisputes.some((dispute) => dispute.overdue)
+                              ? 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300'
+                              : 'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200'
+                          }`}
+                        >
+                          {entry.openDisputes.some((dispute) => dispute.overdue)
+                            ? '🚩 Dispute — unclaimed'
+                            : entry.openDisputes.some((dispute) => dispute.claimed)
+                              ? '⚖️ In dispute'
+                              : '🚩 Dispute — unclaimed'}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                   <div className="text-xs font-semibold text-slate-900 dark:text-white">{entry.brand.name}</div>

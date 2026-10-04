@@ -208,6 +208,20 @@ export interface CustomOrderListItem {
   adminAttentionReason?: string | null;
   /** Read-only brand signal: an admin reminder/dispute notice is unacknowledged (📣 badge). */
   hasUnreadAdminNotice?: boolean;
+  /**
+   * Live disputes on this order.
+   *
+   * Not derivable from `status`: a delay dispute deliberately leaves the order
+   * IN_PRODUCTION so the maker keeps working, so the status badge alone hides
+   * the disputes that matter most.
+   */
+  openDisputes?: Array<{
+    id: string;
+    reasonType: string;
+    claimed: boolean;
+    /** Unowned past its claim deadline. */
+    overdue: boolean;
+  }>;
   delivery?: {
     city?: string | null;
     state?: string | null;
@@ -293,6 +307,90 @@ export interface CustomOrderSchedule {
   daysRemaining: number | null;
   daysOverdue: number;
   extensionDaysGranted: number;
+}
+
+/* ── The dispute queue ─────────────────────────────────────────────────── */
+
+export type DisputeOwnershipFilter = 'unclaimed' | 'mine' | 'others' | 'overdue';
+
+export interface DisputeQueueRow {
+  id: string;
+  status: CustomOrderDisputeStatus | string;
+  reasonType: string;
+  buyerStatement: string | null;
+  brandResponse: string | null;
+  openedAt: string;
+  resolvedAt: string | null;
+  resolution: CustomOrderDisputeResolution | string | null;
+
+  claimedByAdminId: string | null;
+  claimedAt: string | null;
+  claimDueAt: string | null;
+  /** Past its claim deadline and still owned by nobody. */
+  claimOverdue: boolean;
+  escalatedAt: string | null;
+  escalationCount: number;
+
+  handover: {
+    toAdminId: string | null;
+    requestedAt: string | null;
+    reason: string | null;
+    approvedAt: string | null;
+    rejectedAt: string | null;
+    pending: boolean;
+  } | null;
+
+  proposal: {
+    resolution: string;
+    note: string | null;
+    extraDays: number | null;
+    refundAmount: string | number | null;
+    consentBy: 'BUYER' | 'BRAND' | 'BOTH' | null;
+    respondByAt: string | null;
+    buyerConsentAt: string | null;
+    buyerDeclinedAt: string | null;
+    brandConsentAt: string | null;
+    brandDeclinedAt: string | null;
+  } | null;
+
+  order: {
+    id: string;
+    brandId: string;
+    buyerId: string;
+    status: string;
+    title: string;
+    brandName: string;
+    /** Admin cannot work a dispute without knowing whose order it is. */
+    buyerName: string | null;
+    buyerEmail: string | null;
+    currency: string;
+    amount: number | string | null;
+  } | null;
+}
+
+export interface DisputeResolutionOption {
+  resolution: CustomOrderDisputeResolution | string;
+  label: string;
+  /** Null when the admin may simply decide it. */
+  consentFrom: 'BUYER' | 'BRAND' | 'BOTH' | null;
+  movesMoney: boolean;
+  /** Present when the option exists but is currently unusable, and why. */
+  blockedReason?: string;
+}
+
+export interface DisputeQueueDetail extends DisputeQueueRow {
+  adminNotes: string | null;
+  resolutionOptions: DisputeResolutionOption[];
+  policy: { claimWithinHours: number; consentWithinHours: number };
+}
+
+export interface DisputeQueuePage {
+  items: DisputeQueueRow[];
+  page: number;
+  limit: number;
+  total: number;
+  /** Counts for the queue's own filter chips, so it needs no extra requests. */
+  counts: { unclaimed: number; mine: number; overdue: number };
 }
 
 export interface CustomOrderDelayEligibility {
@@ -1424,6 +1522,13 @@ export const customOrdersAdminApi = {
     q?: string;
     /** Server-side needs-review filter (dashboard deep-link). */
     attention?: boolean | 1 | 0;
+    /**
+     * Orders carrying a live dispute, whatever their status.
+     *
+     * Not the same as `status: 'DISPUTED'` — a delay dispute leaves the order
+     * IN_PRODUCTION on purpose, so the status filter misses it entirely.
+     */
+    disputed?: boolean;
     /** Server-side sort: attention | newest | oldest | amount. */
     sort?: 'attention' | 'newest' | 'oldest' | 'amount';
     /** Keyset cursor from a prior response's nextCursor. */
@@ -1456,6 +1561,88 @@ export const customOrdersAdminApi = {
   async listDisputes(params?: { page?: number; limit?: number; status?: CustomOrderDisputeStatus | string }) {
     const response = await apiClient.get('/admin/custom-order-disputes', withParams(params));
     return unwrapApiResponse<PaginatedCustomOrders<CustomOrderDisputeListItem>>(response.data);
+  },
+
+  /*
+    ── The dispute queue ───────────────────────────────────────────────────
+
+    `listDisputes` above has existed for a while and had NO caller anywhere in
+    this app, which is why a shopper rejecting an extension produced a dispute
+    nobody could see: the Disputes page reads the unrelated generic `Dispute`
+    table. These are the calls behind a queue that shows the disputes the
+    platform actually raises, and takes them to an outcome.
+  */
+
+  async getDisputeQueue(params?: {
+    page?: number;
+    limit?: number;
+    status?: CustomOrderDisputeStatus | string;
+    ownership?: DisputeOwnershipFilter;
+    reasonType?: string;
+    search?: string;
+  }) {
+    const response = await apiClient.get('/admin/dispute-queue', withParams(params));
+    return unwrapApiResponse<DisputeQueuePage>(response.data);
+  },
+
+  async getQueuedDispute(disputeId: string) {
+    const response = await apiClient.get(`/admin/dispute-queue/${disputeId}`);
+    return unwrapApiResponse<DisputeQueueDetail>(response.data);
+  },
+
+  /** Take ownership. Fails cleanly if another admin got there first. */
+  async claimDispute(disputeId: string) {
+    const response = await apiClient.post(`/admin/dispute-queue/${disputeId}/claim`);
+    return unwrapApiResponse<DisputeQueueDetail>(response.data);
+  },
+
+  /**
+   * Ask to hand a dispute on. A successor and a reason are both required —
+   * there is no way to simply put a case down, and a SuperAdmin has to agree.
+   */
+  async requestDisputeHandover(
+    disputeId: string,
+    payload: { successorAdminId: string; reason: string },
+  ) {
+    const response = await apiClient.post(
+      `/admin/dispute-queue/${disputeId}/handover`,
+      payload,
+    );
+    return unwrapApiResponse<DisputeQueueDetail>(response.data);
+  },
+
+  async decideDisputeHandover(
+    disputeId: string,
+    payload: { approve: boolean; reason?: string },
+  ) {
+    const response = await apiClient.post(
+      `/admin/dispute-queue/${disputeId}/handover/decide`,
+      payload,
+    );
+    return unwrapApiResponse<DisputeQueueDetail>(response.data);
+  },
+
+  /**
+   * Put a resolution to the parties, or apply it.
+   *
+   * Which happens is decided by the remedy, not by the caller: more time is the
+   * shopper's to give and goes to them as a proposal, while a refund the
+   * platform may impose applies at once. The response says which occurred.
+   */
+  async proposeDisputeResolution(
+    disputeId: string,
+    payload: {
+      resolution: CustomOrderDisputeResolution | string;
+      note?: string;
+      extraDays?: number;
+      refundAmount?: number;
+    },
+  ) {
+    const response = await apiClient.post(
+      `/admin/dispute-queue/${disputeId}/resolution`,
+      payload,
+    );
+    return unwrapApiResponse<DisputeQueueDetail>(response.data);
   },
 
   async getLedgerAllocations(params?: { page?: number; limit?: number; customOrderId?: string; brandId?: string; payoutId?: string }) {
