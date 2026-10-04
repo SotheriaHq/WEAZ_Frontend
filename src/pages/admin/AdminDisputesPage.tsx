@@ -20,6 +20,7 @@ import type { AdminDispute } from '@/types/admin';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { CreateDisputeModal, DisputeDetailModal } from './modals/DisputeModals';
 import DisputeQueueDetailDrawer from './disputes/DisputeQueueDetailDrawer';
+import DisputeOwnershipTabs from './disputes/DisputeOwnershipTabs';
 import {
   useUnifiedDisputeQueue,
   type DisputeQueueFilters,
@@ -117,29 +118,11 @@ const AdminDisputesPage: React.FC = () => {
 
       {/* Triage first. An admin opening this page is asking "what needs me?",
           not "show me everything in creation order". */}
-      <div className="flex flex-wrap items-center gap-2">
-        {ownershipChips.map((chip) => {
-          const active = filters.ownership === chip.value;
-          return (
-            <button
-              key={chip.value || 'all'}
-              type="button"
-              onClick={() => setFilters((prev) => ({ ...prev, ownership: chip.value }))}
-              aria-pressed={active}
-              className={`rounded-full border px-3.5 py-1.5 text-sm transition ${
-                active
-                  ? 'border-primary bg-primary/10 font-semibold text-primary'
-                  : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-300'
-              }`}
-            >
-              {chip.label}
-              {chip.count != null && chip.count > 0 ? (
-                <span className="ml-1.5 tabular-nums opacity-70">{chip.count}</span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
+      <DisputeOwnershipTabs
+        tabs={ownershipChips}
+        value={filters.ownership}
+        onChange={(ownership) => setFilters((prev) => ({ ...prev, ownership }))}
+      />
 
       <div className="flex w-full flex-col gap-3 md:flex-row md:items-end">
         <div className="w-full md:w-56">

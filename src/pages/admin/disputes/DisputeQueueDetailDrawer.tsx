@@ -13,11 +13,14 @@
  * and why it is unavailable on this order. Hiding it would send them looking
  * for a control that is deliberately absent.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import UniversalSelect from '@/components/forms/UniversalSelect';
+import { adminUsersApi } from '@/api/AdminApi';
 import { customOrdersAdminApi, type DisputeQueueDetail } from '@/api/CustomOrderApi';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import type { AdminUser } from '@/types/admin';
+import { unwrapApiResponse } from '@/types/auth';
 
 interface Props {
   disputeId: string | null;
@@ -49,6 +52,57 @@ const DisputeQueueDetailDrawer: React.FC<Props> = ({ disputeId, onClose, onChang
   const [note, setNote] = useState('');
   const [extraDays, setExtraDays] = useState('');
   const [refundAmount, setRefundAmount] = useState('');
+  const [successorId, setSuccessorId] = useState('');
+  const [handoverReason, setHandoverReason] = useState('');
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+
+  /**
+   * Who a dispute can be handed to.
+   *
+   * Loaded once the drawer opens rather than on every render: this is a list of
+   * colleagues, it changes rarely, and the handover controls are behind a
+   * collapsed section most sessions never open.
+   */
+  useEffect(() => {
+    if (!disputeId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await adminUsersApi.list({ limit: '100' });
+        const data = unwrapApiResponse<{ items?: AdminUser[] } | AdminUser[]>(
+          response.data as never,
+        );
+        const items = Array.isArray(data) ? data : (data.items ?? []);
+        if (!cancelled) {
+          setAdmins(
+            items.filter((user) =>
+              String(user.role ?? '').toLowerCase().includes('admin'),
+            ),
+          );
+        }
+      } catch {
+        // A missing colleague list disables handover, it does not break the
+        // drawer — reading and resolving the dispute still work.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [disputeId]);
+
+  const adminOptions = useMemo(
+    () =>
+      admins
+        // Never offer the current holder as their own successor; the API
+        // refuses it and an option that always fails is worse than no option.
+        .filter((user) => user.id !== detail?.claimedByAdminId)
+        .map((user) => ({
+          value: user.id,
+          label:
+            `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email,
+        })),
+    [admins, detail?.claimedByAdminId],
+  );
 
   const load = useCallback(async () => {
     if (!disputeId) return;
@@ -105,6 +159,7 @@ const DisputeQueueDetailDrawer: React.FC<Props> = ({ disputeId, onClose, onChang
   const isMine = Boolean(detail?.claimedByAdminId);
   const canClaim = hasPermission('DISPUTES_CLAIM') && !detail?.claimedByAdminId;
   const canResolve = hasPermission('DISPUTES_RESOLVE') && isMine;
+  const canApproveHandover = hasPermission('DISPUTES_HANDOVER_APPROVE');
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
@@ -221,10 +276,152 @@ const DisputeQueueDetailDrawer: React.FC<Props> = ({ disputeId, onClose, onChang
                   Claim this dispute
                 </button>
               ) : null}
+
+              {/*
+                A pending handover outranks the form to request one. The
+                approver and the requester see the same block and are offered
+                different controls — the admin asking to be released must not
+                be able to approve themselves, which the API also enforces.
+              */}
               {detail.handover?.pending ? (
-                <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
-                  ⏳ A handover is waiting on a SuperAdmin's decision.
-                </p>
+                <div className="mt-3 rounded-lg bg-amber-50 p-3 text-sm dark:bg-amber-500/10">
+                  <p className="font-medium text-amber-900 dark:text-amber-200">
+                    ⏳ Handover waiting on a SuperAdmin
+                  </p>
+                  {detail.handover.reason ? (
+                    <p className="mt-1 text-amber-900/90 dark:text-amber-200/90">
+                      “{detail.handover.reason}”
+                    </p>
+                  ) : null}
+                  {canApproveHandover ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          void run(() =>
+                            customOrdersAdminApi.decideDisputeHandover(detail.id, {
+                              approve: true,
+                            }),
+                          )
+                        }
+                        className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white disabled:opacity-60"
+                      >
+                        Approve handover
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          void run(() =>
+                            customOrdersAdminApi.decideDisputeHandover(detail.id, {
+                              approve: false,
+                              ...(handoverReason.trim()
+                                ? { reason: handoverReason.trim() }
+                                : {}),
+                            }),
+                          )
+                        }
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 disabled:opacity-60 dark:border-gray-600 dark:text-gray-200"
+                      >
+                        Refuse — it stays with them
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {/* Handing on, for the admin who holds it. */}
+              {isMine &&
+              !detail.handover?.pending &&
+              hasPermission('DISPUTES_HANDOVER_REQUEST') ? (
+                <details className="mt-3 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                  <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Hand this to someone else
+                  </summary>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    There is no way to simply put a dispute down. Name who takes
+                    it, say why, and a SuperAdmin decides.
+                  </p>
+                  <div className="mt-3">
+                    <UniversalSelect
+                      label="Hand to"
+                      value={successorId}
+                      onChange={setSuccessorId}
+                      options={adminOptions}
+                      placeholder="Choose an admin"
+                    />
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={handoverReason}
+                    onChange={(event) => setHandoverReason(event.target.value)}
+                    placeholder="Why are you handing this on?"
+                    className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900"
+                  />
+                  <button
+                    disabled={
+                      busy || !successorId || handoverReason.trim().length < 10
+                    }
+                    onClick={() =>
+                      void run(() =>
+                        customOrdersAdminApi.requestDisputeHandover(detail.id, {
+                          successorAdminId: successorId,
+                          reason: handoverReason.trim(),
+                        }),
+                      )
+                    }
+                    className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  >
+                    Request handover
+                  </button>
+                </details>
+              ) : null}
+
+              {/* Taking it off someone, for a SuperAdmin. */}
+              {detail.claimedByAdminId &&
+              !isMine &&
+              !detail.handover?.pending &&
+              canApproveHandover ? (
+                <details className="mt-3 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                  <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Reassign this dispute
+                  </summary>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    For a case whose owner has gone quiet. It moves straight to
+                    the person you name — it is never returned to the pool.
+                  </p>
+                  <div className="mt-3">
+                    <UniversalSelect
+                      label="Reassign to"
+                      value={successorId}
+                      onChange={setSuccessorId}
+                      options={adminOptions}
+                      placeholder="Choose an admin"
+                    />
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={handoverReason}
+                    onChange={(event) => setHandoverReason(event.target.value)}
+                    placeholder="Why is this being reassigned?"
+                    className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900"
+                  />
+                  <button
+                    disabled={
+                      busy || !successorId || handoverReason.trim().length < 10
+                    }
+                    onClick={() =>
+                      void run(() =>
+                        customOrdersAdminApi.reassignDispute(detail.id, {
+                          successorAdminId: successorId,
+                          reason: handoverReason.trim(),
+                        }),
+                      )
+                    }
+                    className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  >
+                    Reassign
+                  </button>
+                </details>
               ) : null}
             </section>
 

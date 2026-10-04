@@ -452,6 +452,23 @@ export interface CustomOrderDispute {
   resolution?: CustomOrderDisputeResolution | string | null;
   adminNotes?: string | null;
   assignedAdminId?: string | null;
+  /**
+   * A resolution WIEZ has put to a party and is waiting on.
+   *
+   * Present only while the dispute is AWAITING_PARTY_CONSENT. More time is the
+   * shopper's to give — it is the exact thing they already refused — so it is
+   * proposed rather than applied, and nothing moves until they answer.
+   */
+  proposal?: {
+    resolution: string;
+    note: string | null;
+    extraDays: number | null;
+    refundAmount: string | number | null;
+    consentBy: 'BUYER' | 'BRAND' | 'BOTH' | null;
+    respondByAt: string | null;
+    buyerConsentAt: string | null;
+    buyerDeclinedAt: string | null;
+  } | null;
   customOrderId?: string;
   openedAt: string;
   resolvedAt?: string | null;
@@ -1382,6 +1399,25 @@ export const customOrdersBuyerApi = {
     return unwrapApiResponse<CustomOrderDetail>(response.data);
   },
 
+  /**
+   * Answer a resolution WIEZ has proposed.
+   *
+   * Declining does not close the dispute — it returns it to the admin handling
+   * it with the disagreement still live, which is what the panel tells the
+   * shopper before they press anything.
+   */
+  async respondToDisputeProposal(
+    orderId: string,
+    disputeId: string,
+    payload: { accept: boolean; note?: string },
+  ) {
+    const response = await apiClient.post(
+      `/custom-orders/${orderId}/disputes/${disputeId}/proposal/respond`,
+      payload,
+    );
+    return unwrapApiResponse<CustomOrderDetail>(response.data);
+  },
+
   async getDisplayChartPreference() {
     const response = await apiClient.get('/custom-orders/preferences/display-chart');
     return unwrapApiResponse<DisplayChartPreference>(response.data);
@@ -1606,6 +1642,23 @@ export const customOrdersAdminApi = {
   ) {
     const response = await apiClient.post(
       `/admin/dispute-queue/${disputeId}/handover`,
+      payload,
+    );
+    return unwrapApiResponse<DisputeQueueDetail>(response.data);
+  },
+
+  /**
+   * Take a dispute off an admin who has gone quiet.
+   *
+   * Not a release — it moves straight to a named successor, because a dispute
+   * must always belong to someone. Same permission as approving a handover.
+   */
+  async reassignDispute(
+    disputeId: string,
+    payload: { successorAdminId: string; reason: string },
+  ) {
+    const response = await apiClient.post(
+      `/admin/dispute-queue/${disputeId}/reassign`,
       payload,
     );
     return unwrapApiResponse<DisputeQueueDetail>(response.data);

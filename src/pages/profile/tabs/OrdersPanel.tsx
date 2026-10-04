@@ -6,6 +6,7 @@ import AdminNoticePanel, {
   selectBuyerAdminNotices,
 } from '@/components/custom-orders/AdminNoticePanel';
 import DelayDisputePanel from '@/components/custom-orders/DelayDisputePanel';
+import DisputeProposalPanel from '@/components/custom-orders/DisputeProposalPanel';
 import ExtensionDecisionPanel, {
   ExtensionHistoryList,
 } from '@/components/custom-orders/ExtensionDecisionPanel';
@@ -896,6 +897,29 @@ export const BuyerCustomOrderDetailView: React.FC<{
       ) ?? null,
     [order?.disputes],
   );
+  /**
+   * A settlement this shopper has been asked to agree to.
+   *
+   * Only one at a time can be live, and only one that binds the BUYER: a
+   * proposal awaiting the brand is none of this screen's business, and showing
+   * it here would offer a shopper a decision that is not theirs.
+   */
+  const proposalDispute = useMemo(
+    () =>
+      order?.disputes.find(
+        (entry) =>
+          entry.status === 'AWAITING_PARTY_CONSENT' &&
+          entry.proposal != null &&
+          (entry.proposal.consentBy === 'BUYER' ||
+            entry.proposal.consentBy === 'BOTH') &&
+          // Already answered: the panel should not ask twice while the other
+          // party's answer is still outstanding.
+          !entry.proposal.buyerConsentAt &&
+          !entry.proposal.buyerDeclinedAt,
+      ) ?? null,
+    [order?.disputes],
+  );
+
   const acceptanceWindowOpen = useMemo(
     () =>
       order?.buyerAcceptanceWindowEndsAt
@@ -1141,6 +1165,28 @@ export const BuyerCustomOrderDetailView: React.FC<{
     );
   };
 
+  /**
+   * The shopper's answer to a settlement WIEZ proposed.
+   *
+   * Accepting applies the remedy; declining returns the dispute to the admin
+   * handling it with the disagreement still live. The success copy says which
+   * happened, because "Saved" tells a worried shopper nothing.
+   */
+  const handleRespondToProposal = async (accept: boolean) => {
+    if (!order || !proposalDispute) return;
+    await wrapMutation(
+      () =>
+        customOrdersBuyerApi.respondToDisputeProposal(
+          order.id,
+          proposalDispute.id,
+          { accept },
+        ),
+      accept
+        ? 'Agreed. We have told your maker.'
+        : 'Thanks — WIEZ is picking this back up with your maker.',
+    );
+  };
+
   // Read-only channel: the shopper marks notices seen, and never replies here.
   const handleAckAdminNotices = async () => {
     if (!order) return;
@@ -1337,6 +1383,22 @@ export const BuyerCustomOrderDetailView: React.FC<{
           busy={busy}
           onRespond={handleRespondToExtension}
           autoOpen={focusExtensionRequestId === latestOpenExtension.id}
+        />
+      ) : null}
+
+      {/*
+        A proposed settlement outranks everything below it.
+
+        When WIEZ has put a resolution to this shopper, answering it is the only
+        thing on the screen that anyone is waiting on — and until they do, the
+        dispute panel underneath would otherwise just say "we're on it" while
+        the actual blocker is them.
+      */}
+      {proposalDispute ? (
+        <DisputeProposalPanel
+          dispute={proposalDispute}
+          busy={busy}
+          onRespond={handleRespondToProposal}
         />
       ) : null}
 
