@@ -1,6 +1,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 
 type Variant = 'primary' | 'ghost' | 'outline';
 type Size = 'xs' | 'sm' | 'md' | 'lg';
@@ -47,7 +47,7 @@ export const FrostedButton: React.FC<FrostedButtonProps> = ({
     </span>
     {loading ? (
       <span className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
-        <VLoader size={16} phase="loading" showLabel={false} className="text-current" />
+        <MuseLoader size={16} className="text-current" />
       </span>
     ) : null}
   </button>

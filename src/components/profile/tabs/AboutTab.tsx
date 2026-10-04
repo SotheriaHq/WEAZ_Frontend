@@ -20,8 +20,8 @@ interface AboutTabProps {
       website?: string;
     };
     contactInfo: {
-      email: string;
-      phone: string;
+      email?: string | null;
+      phone?: string | null;
     };
     bannerImage?: string | null;
     established?: string;
@@ -193,48 +193,53 @@ const AboutTab: React.FC<AboutTabProps> = ({ brandData }) => {
         </section>
       )}
 
-      {/* Contact Information */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Email Card */}
-        <Card variant="bordered" padding="lg" className="hover:shadow-lg transition-shadow">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
-              <Mail className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
-                Email Address
-              </p>
-              <a
-                href={`mailto:${brandData.contactInfo.email}`}
-                className="text-lg font-medium text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 transition-colors break-all"
-              >
-                {brandData.contactInfo.email}
-              </a>
-            </div>
-          </div>
-        </Card>
+      {/* Contact Information — omit empty/redacted fields (public QR viewers
+          never receive account email from the brand profile API). */}
+      {(brandData.contactInfo.email || brandData.contactInfo.phone) && (
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {brandData.contactInfo.email ? (
+            <Card variant="bordered" padding="lg" className="hover:shadow-lg transition-shadow">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    Email Address
+                  </p>
+                  <a
+                    href={`mailto:${brandData.contactInfo.email}`}
+                    className="text-lg font-medium text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 transition-colors break-all"
+                  >
+                    {brandData.contactInfo.email}
+                  </a>
+                </div>
+              </div>
+            </Card>
+          ) : null}
 
-        {/* Phone Card */}
-        <Card variant="bordered" padding="lg" className="hover:shadow-lg transition-shadow">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
-              <Phone className="w-6 h-6 text-green-600 dark:text-green-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
-                Phone Number
-              </p>
-              <a
-                href={`tel:${brandData.contactInfo.phone}`}
-                className="text-lg font-medium text-gray-900 dark:text-white hover:text-green-600 dark:hover:text-green-400 transition-colors"
-              >
-                {brandData.contactInfo.phone}
-              </a>
-            </div>
-          </div>
-        </Card>
-      </section>
+          {brandData.contactInfo.phone ? (
+            <Card variant="bordered" padding="lg" className="hover:shadow-lg transition-shadow">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Phone className="w-6 h-6 text-green-600 dark:text-green-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    Phone Number
+                  </p>
+                  <a
+                    href={`tel:${brandData.contactInfo.phone}`}
+                    className="text-lg font-medium text-gray-900 dark:text-white hover:text-green-600 dark:hover:text-green-400 transition-colors"
+                  >
+                    {brandData.contactInfo.phone}
+                  </a>
+                </div>
+              </div>
+            </Card>
+          ) : null}
+        </section>
+      )}
     </div>
   );
 };

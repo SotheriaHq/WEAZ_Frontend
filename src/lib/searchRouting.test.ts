@@ -57,7 +57,7 @@ describe('searchRouting', () => {
       );
       expect(route.kind).toBe('brandStore');
       expect(route.to).toBe('/profile/owner_7');
-      expect(route.state).toMatchObject({ returnTo: '/market' });
+      expect(route.state).toMatchObject({ returnTo: '/runway' });
     });
 
     it('falls back to the product href when no brand owner is known', () => {

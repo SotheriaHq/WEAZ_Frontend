@@ -258,11 +258,11 @@ const EmailVerifyPage: React.FC = () => {
 
   const headingColor =
     status === 'success'
-      ? 'text-emerald-700'
+      ? 'text-emerald-700 dark:text-emerald-300'
       : status === 'pending'
         ? 'text-[var(--brand-primary-strong)]'
       : status === 'error'
-        ? 'text-rose-700'
+        ? 'text-rose-700 dark:text-rose-300'
         : 'text-[var(--brand-primary-strong)]';
 
   return (
@@ -279,13 +279,13 @@ const EmailVerifyPage: React.FC = () => {
         <p className="text-sm text-gray-600 leading-relaxed">{message}</p>
 
         {status === 'verifying' && (
-          <div className="mt-6 h-1 w-48 overflow-hidden rounded-full bg-purple-100">
+          <div className="mt-6 h-1 w-48 overflow-hidden rounded-full bg-purple-100 dark:bg-purple-500/20">
             <div className="h-full w-1/2 animate-pulse bg-[var(--brand-primary)]" />
           </div>
         )}
 
         {status === 'success' && redirectSeconds != null && (
-          <p className="mt-4 text-xs text-emerald-700">
+          <p className="mt-4 text-xs text-emerald-700 dark:text-emerald-300">
             Redirecting to {successDestination.target === 'profile' ? 'profile' : 'sign in'} in {Math.max(0, redirectSeconds)}s...
           </p>
         )}

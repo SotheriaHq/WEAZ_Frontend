@@ -4,6 +4,7 @@ import {
   isCatalogTargetType,
   mapCatalogTargetForLegacyApi,
   normalizeCatalogTarget,
+  toSavedItemRequest,
 } from './catalogTarget';
 
 describe('catalogTarget', () => {
@@ -51,6 +52,22 @@ describe('catalogTarget', () => {
       targetId: 'collection-1',
       legacyCollectionId: 'collection-1',
     });
+  });
+
+  it('strips the mapper breadcrumb out of a /saved request body', () => {
+    // The backend validates this body with `forbidNonWhitelisted: true`, so an
+    // extra property is a 400 rather than a field the server ignores. Clipping
+    // a design sent `legacyCollectionId` and got exactly that.
+    const request = toSavedItemRequest(
+      mapCatalogTargetForLegacyApi({
+        targetType: 'DESIGN',
+        designId: 'design-1',
+        legacyCollectionId: 'collection-1',
+      }),
+    );
+
+    expect(request).toEqual({ targetType: 'COLLECTION', targetId: 'collection-1' });
+    expect(Object.keys(request).sort()).toEqual(['targetId', 'targetType']);
   });
 
   it('does not guess targetId-only payloads', () => {

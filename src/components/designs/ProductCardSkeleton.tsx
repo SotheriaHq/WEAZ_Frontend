@@ -23,16 +23,20 @@ const ProductCardSkeleton: React.FC<ProductCardSkeletonProps> = ({
 }) => {
   // Single skeleton card component
   const SkeletonCard = ({ index }: { index: number }) => (
-    <div 
-      className="
-        relative
-        rounded-2xl
-        overflow-hidden
-        min-h-[320px]
-      "
-    >
+    /*
+      The skeleton must occupy the card's shape, not a guess at its height.
+
+      `min-h-[320px]` with a TRANSPARENT media placeholder meant the loading
+      state had no body: all that painted was the dark strip at the bottom and
+      the pale bars inside it, so a reloading rail read as a row of floating
+      form fields. And 320px is not the card's height — StoreProductCard is
+      `aspect-[4/5]`, so every card also jumped size the moment real data
+      arrived. Matching the aspect ratio fixes both: the placeholder is the same
+      box the card will be, and it is filled so it reads as a card.
+    */
+    <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl">
       {/* Full-bleed image skeleton */}
-      <div className="absolute inset-0 overflow-hidden bg-transparent">
+      <div className="absolute inset-0 overflow-hidden bg-gray-200 dark:bg-white/10">
         {/* Shimmer effect */}
         <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/10 to-transparent" />
         
@@ -45,14 +49,10 @@ const ProductCardSkeleton: React.FC<ProductCardSkeletonProps> = ({
         )}
       </div>
       
-      {/* Frosted glass info overlay skeleton */}
-      <div
-        className="
-          absolute inset-x-0 bottom-0 z-10
-          bg-gradient-to-t from-black/82 via-black/42 to-transparent
-          px-4 pb-4 pt-16
-        "
-      >
+      {/* Liquid gradient blend skeleton */}
+      {/* Mirrors the real card's blended overlay — same ramp, blur and padding — so
+          the swap to live content does not move anything. */}
+      <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/50 via-black/25 to-transparent px-3.5 pb-2.5 pt-7 backdrop-blur-md [mask-image:linear-gradient(to_bottom,transparent_0%,black_24px,black_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_24px,black_100%)]">
         <div className="flex flex-col gap-2">
           {/* Title */}
           <div className="h-4 w-3/4 bg-white/20 rounded-md" />

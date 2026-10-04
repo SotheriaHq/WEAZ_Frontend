@@ -1310,7 +1310,7 @@ const AdminMarketGovernancePage: React.FC = () => {
             <button
               type="button"
               onClick={() => void loadGovernance()}
-              className="rounded-full border border-rose-300 px-3 py-1.5 text-xs font-semibold"
+              className="rounded-full border border-rose-300 px-3 py-1.5 text-xs font-semibold dark:border-rose-500/40"
             >
               Retry
             </button>

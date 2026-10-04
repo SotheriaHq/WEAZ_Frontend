@@ -92,8 +92,12 @@ const InfoTooltip: React.FC<InfoTooltipProps> = ({ text, className = '' }) => {
       onMouseEnter={() => setVisible(true)}
       onMouseLeave={() => setVisible(false)}
     >
-      <button
-        type="button"
+      {/* Rendered as a span (not <button>) so InfoTooltip can live inside other
+          buttons (e.g. FilterSelector rows) without invalid nested-button DOM. */}
+      <span
+        role="button"
+        aria-label="More info"
+        tabIndex={-1}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -103,11 +107,9 @@ const InfoTooltip: React.FC<InfoTooltipProps> = ({ text, className = '' }) => {
           bg-gray-200/80 dark:bg-white/10 text-gray-500 dark:text-gray-400
           hover:bg-purple-100 dark:hover:bg-purple-500/20 hover:text-purple-600 dark:hover:text-purple-300
           transition-all duration-150 cursor-help focus:outline-none focus:ring-1 focus:ring-purple-400/40"
-        aria-label="More info"
-        tabIndex={-1}
       >
         i
-      </button>
+      </span>
 
       {visible ? (
         <OverlayPortal>

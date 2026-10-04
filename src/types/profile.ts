@@ -1,6 +1,9 @@
 import type { CatalogEntityType } from '@/constants/catalogDomain';
 import type { ContentPublicationStatus } from '@/utils/contentIntegrity';
 import type { ProfilePhotoViewState } from './profilePhoto';
+// One definition of the verification states, so a new one cannot be added
+// to the domain type and silently missed here.
+import type { VerificationStatusValue } from './verification';
 
 // Collection Types
 export interface CollectionDto {
@@ -78,6 +81,8 @@ export interface BrandMediaAssetDto {
 
 export interface BrandProfileDto {
   id: string;
+  /** Public handle for `/u/:username` links. */
+  username?: string | null;
   brandFullName: string;
   description: string | null;
   isStoreOpen?: boolean;
@@ -85,6 +90,8 @@ export interface BrandProfileDto {
   state: string | null;
   city: string | null;
   location: string | null;
+  /** Exact street address. Owner-only, and null when "show my location" is off. */
+  streetAddress?: string | null;
   bannerImage: string | null;
   bannerImageMeta?: BrandMediaAssetDto | null;
   logoImage: string | null;
@@ -98,7 +105,8 @@ export interface BrandProfileDto {
     website?: string | null;
   };
   contactInfo: {
-    email: string;
+    /** Null for public/QR viewers — account email is owner-only. */
+    email: string | null;
     phone?: string | null;
     businessType?: string | null;
   };
@@ -107,7 +115,7 @@ export interface BrandProfileDto {
   cacNumber?: string | null;
   tin?: string | null;
   verified?: boolean;
-  verificationStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'IN_REVIEW' | 'ADDITIONAL_INFO_REQUESTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  verificationStatus?: VerificationStatusValue;
   verificationBadgeVisible?: boolean;
   verifiedExplanationUrl?: string | null;
   averageRating?: number;

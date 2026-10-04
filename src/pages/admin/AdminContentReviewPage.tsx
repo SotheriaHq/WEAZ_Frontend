@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   XCircle,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import UniversalSelect from '@/components/forms/UniversalSelect';
@@ -19,6 +20,7 @@ import {
 } from '@/api/AdminApi';
 import { unwrapApiResponse } from '@/types/auth';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { queryKeys } from '@/query/queryKeys';
 import type {
   AdminContentReport,
   AdminContentReportListResponse,
@@ -59,6 +61,7 @@ const STATUS_OPTIONS = [
   { value: 'REJECTED', label: 'Rejected' },
   { value: 'APPROVED', label: 'Approved/Published' },
   { value: 'CANCELLED', label: 'Cancelled' },
+  { value: 'SUPERSEDED', label: 'Superseded' },
 ];
 
 const TYPE_OPTIONS = [
@@ -96,6 +99,7 @@ const statusLabel: Record<ContentSubmissionStatus, string> = {
   REJECTED: 'Rejected',
   CHANGES_REQUESTED: 'Changes Requested',
   CANCELLED: 'Cancelled',
+  SUPERSEDED: 'Superseded',
 };
 
 const statusTone: Record<ContentSubmissionStatus, string> = {
@@ -104,6 +108,7 @@ const statusTone: Record<ContentSubmissionStatus, string> = {
   REJECTED: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-200',
   CHANGES_REQUESTED: 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-200',
   CANCELLED: 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300',
+  SUPERSEDED: 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300',
 };
 
 const reportStatusTone: Record<ContentReportStatus, string> = {
@@ -146,17 +151,61 @@ const mediaIsVideo = (mediaType?: string | null, mimeType?: string | null) =>
   String(mediaType ?? '').toUpperCase().includes('VIDEO') ||
   String(mimeType ?? '').toLowerCase().startsWith('video/');
 
+/**
+ * Grid/tile source. Prefers the processed variants and only falls back to the
+ * original upload when a file has none (still processing, or uploaded before
+ * variants existed) — the original is a full-resolution camera file, and
+ * pulling several of those into 300px squares is what made this modal crawl.
+ */
 const getMediaPreviewSrc = (media?: Pick<ContentReviewMediaItem, 'previewUrl' | 'thumbnailUrl' | 'url'> | null) =>
   media?.previewUrl?.trim() || media?.thumbnailUrl?.trim() || media?.url?.trim() || null;
 
+/** Small source for a list row's 64px thumbnail. */
+const getMediaThumbnailSrc = (media?: Pick<ContentReviewMediaItem, 'previewUrl' | 'thumbnailUrl' | 'url'> | null) =>
+  media?.thumbnailUrl?.trim() || media?.previewUrl?.trim() || media?.url?.trim() || null;
+
+const formatAmount = (amount?: number | null, currency?: string | null) => {
+  if (amount === null || amount === undefined || Number.isNaN(Number(amount))) return null;
+  const code = (currency || 'NGN').toUpperCase();
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: code,
+      maximumFractionDigits: 2,
+    }).format(Number(amount));
+  } catch {
+    return `${code} ${Number(amount).toLocaleString()}`;
+  }
+};
+
+const VerificationPill: React.FC<{ label: string; ok: boolean }> = ({ label, ok }) => (
+  <span
+    className={
+      'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ' +
+      (ok
+        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200'
+        : 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200')
+    }
+  >
+    <span aria-hidden="true">{ok ? '✅' : '⚠️'}</span>
+    {label}
+  </span>
+);
+
 const MediaUnavailablePreview: React.FC<{ label?: string }> = ({ label = 'Media unavailable' }) => (
-  <div className="flex h-full w-full items-center justify-center bg-gray-100 px-4 text-center text-sm font-medium text-gray-500 dark:bg-white/8 dark:text-gray-400">
+  <div className="flex h-full w-full items-center justify-center bg-gray-100 px-4 text-center text-sm font-medium text-gray-500 dark:bg-white/[0.08] dark:text-gray-400">
     {label}
   </div>
 );
 
-const AdminReviewImagePreview: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+const AdminReviewImagePreview: React.FC<{
+  src: string;
+  alt: string;
+  /** The one tile a reviewer looks at first; everything else waits its turn. */
+  eager?: boolean;
+}> = ({ src, alt, eager = false }) => {
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   if (failed) {
     return <MediaUnavailablePreview />;
@@ -166,7 +215,17 @@ const AdminReviewImagePreview: React.FC<{ src: string; alt: string }> = ({ src, 
     <img
       src={src}
       alt={alt}
-      className="h-full w-full object-cover"
+      // Off-screen tiles in a scrolling queue and a grid below the fold must not
+      // compete for connections with the ones on screen.
+      loading={eager ? 'eager' : 'lazy'}
+      decoding="async"
+      fetchPriority={eager ? 'high' : 'low'}
+      draggable={false}
+      className={
+        'h-full w-full object-cover transition-opacity duration-200 ' +
+        (loaded ? 'opacity-100' : 'opacity-0')
+      }
+      onLoad={() => setLoaded(true)}
       onError={() => setFailed(true)}
     />
   );
@@ -187,6 +246,7 @@ const buildReviewLifecycle = (submission: AdminContentSubmission) => {
       submittedAt: submission.submittedAt,
       reviewedAt: submission.reviewedAt ?? null,
       reviewedById: submission.reviewedBy?.id ?? null,
+      reviewedBy: submission.reviewedBy ?? null,
     },
   ];
 };
@@ -194,6 +254,7 @@ const buildReviewLifecycle = (submission: AdminContentSubmission) => {
 const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedded = false }) => {
   const { hasPermission } = useAdminPermissions();
   const canManage = hasPermission('CONTENT_REVIEW_MANAGE');
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState<ReviewFilters>({
     status: 'ALL',
     entityType: 'ALL',
@@ -245,12 +306,33 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
   );
 
   const loadReasons = useCallback(async () => {
+    // Mirrors backend CONTENT_REVIEW_REASON_LABELS. The decision modal must
+    // NEVER offer an empty reason list (reject/request-changes requires a
+    // reason), so this local list backstops endpoint failures or old deploys.
+    const FALLBACK_REASON_OPTIONS: Array<{ value: string; label: string }> = [
+      { value: 'POOR_IMAGE_QUALITY', label: 'Poor image quality' },
+      { value: 'MISSING_REQUIRED_VIEW', label: 'Missing required view' },
+      { value: 'DUPLICATE_ANGLE', label: 'Duplicate angle uploaded' },
+      { value: 'MODEL_FABRIC_MISMATCH', label: 'Media does not match product/design details' },
+      { value: 'PROHIBITED_CONTENT', label: 'Offensive or unsafe content' },
+      { value: 'AI_OR_MANIPULATED_IMAGE_SUSPECTED', label: 'Image looks AI-generated or heavily edited' },
+      { value: 'WRONG_CATEGORY_OR_METADATA_MISMATCH', label: 'Incomplete or misleading product/design information' },
+      { value: 'UNSAFE_OR_FALSE_CLAIM', label: 'Listing makes an unsafe or false claim' },
+      { value: 'INTELLECTUAL_PROPERTY_OR_BRAND_MISUSE', label: 'Possible stolen or copyrighted image' },
+      { value: 'NOT_A_PRODUCT_OR_DESIGN_LISTING', label: 'Wrong or unrelated image' },
+      { value: 'OTHER', label: 'Other' },
+    ];
     try {
       const response = await adminContentReviewApi.getReasonCodes();
       const payload = unwrapApiResponse(response.data as any) as Array<{ code: string; label: string }>;
-      setReasonOptions(payload.map((reason) => ({ value: reason.code, label: reason.label })));
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to load review reasons');
+      const options = Array.isArray(payload)
+        ? payload
+            .filter((reason) => reason?.code)
+            .map((reason) => ({ value: reason.code, label: reason.label || reason.code }))
+        : [];
+      setReasonOptions(options.length > 0 ? options : FALLBACK_REASON_OPTIONS);
+    } catch {
+      setReasonOptions(FALLBACK_REASON_OPTIONS);
     }
   }, []);
 
@@ -347,6 +429,30 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
       if (action === 'approve') {
         await adminContentReviewApi.approveSubmission(submission.id);
         toast.success('Content approved and published');
+        // Fresh catalog/market data must paint after publish without a hard refresh.
+        //
+        // `['runway']` was missing, and Runway is the surface an admin lands on
+        // straight after approving — so the newly published designs were absent
+        // until a manual reload. Invalidating by ROOT key covers every
+        // parameterised variant (`['runway','feed',{…}]` per filter/category),
+        // which a single exact key would not.
+        //
+        // `refetchType: 'all'` matters here: by default React Query only
+        // refetches queries that are currently mounted, and Runway is not
+        // mounted yet at this moment. Without it the feed is merely marked
+        // stale, and whether it refetches on arrival depends on staleTime —
+        // which is exactly the "had to refresh manually" symptom.
+        await Promise.allSettled([
+          queryClient.invalidateQueries({ queryKey: ['runway'], refetchType: 'all' }),
+          queryClient.invalidateQueries({ queryKey: ['market'], refetchType: 'all' }),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.market.sections(),
+            refetchType: 'all',
+          }),
+          queryClient.invalidateQueries({ queryKey: ['designs'], refetchType: 'all' }),
+          queryClient.invalidateQueries({ queryKey: ['products'], refetchType: 'all' }),
+          queryClient.invalidateQueries({ queryKey: ['catalog'], refetchType: 'all' }),
+        ]);
       } else if (action === 'reject') {
         await adminContentReviewApi.rejectSubmission(submission.id, {
           reasonCode: decisionReason as ContentReviewReasonCode,
@@ -360,14 +466,13 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
         });
         toast.success('Changes requested');
       }
+      // A decision is terminal for this submission — close every modal in
+      // the flow (decision dialog AND the review modal) and refresh the list.
       setPendingDecision(null);
       setDecisionReason('');
       setDecisionNote('');
+      setSelected(null);
       await loadSubmissions();
-      if (selected?.id === submission.id) {
-        const response = await adminContentReviewApi.getSubmission(submission.id);
-        setSelected(unwrapApiResponse<AdminContentSubmission>(response.data as any));
-      }
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to update submission');
     } finally {
@@ -502,7 +607,7 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
         {loading ? (
           <div className="space-y-3 p-4">
             {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="h-20 animate-pulse rounded-lg bg-gray-100 dark:bg-white/8" />
+              <div key={index} className="h-20 animate-pulse rounded-lg bg-gray-100 dark:bg-white/[0.08]" />
             ))}
           </div>
         ) : submissions.length === 0 ? (
@@ -520,20 +625,29 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
                   <th className="px-4 py-3">Brand</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Trust</th>
-                  <th className="px-4 py-3">Slots</th>
+                  {/*
+                    The "Slots" column is gone. It showed
+                    slotCompleteness.present/required — the required media views
+                    (Front, Back, Left, Right) — but content cannot be submitted
+                    without all four, so it read "4/4" on every row and carried no
+                    information. Incompleteness is now surfaced where it matters:
+                    inline on the row when it actually happens (a media deleted
+                    after submission), and in full on the review drawer's
+                    "Required slots" checklist.
+                  */}
                   <th className="px-4 py-3">Submitted</th>
                   <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-white/8">
+              <tbody className="divide-y divide-gray-100 dark:divide-white/[0.08]">
                 {submissions.map((submission) => {
                   const thumbnail = submission.media[0];
-                  const thumbnailSrc = getMediaPreviewSrc(thumbnail);
+                  const thumbnailSrc = getMediaThumbnailSrc(thumbnail);
                   return (
                     <tr key={submission.id} className="align-top text-gray-700 dark:text-gray-200">
                       <td className="px-4 py-3">
                         <div className="flex min-w-[260px] items-center gap-3">
-                          <div className="h-16 w-16 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/8">
+                          <div className="h-16 w-16 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/[0.08]">
                             {thumbnailSrc && !mediaIsVideo(thumbnail?.mediaType, thumbnail?.mimeType) ? (
                               <AdminReviewImagePreview
                                 src={thumbnailSrc}
@@ -546,6 +660,27 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
                           <div>
                             <div className="font-semibold text-gray-900 dark:text-white">{submission.target.title || 'Untitled content'}</div>
                             <div className="text-xs text-gray-500">{submission.entityType === 'PRODUCT' ? 'Product' : 'Design'}</div>
+                            {submission.previousStatus === 'CHANGES_REQUESTED' && (
+                              <div className="mt-1 inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800 dark:bg-violet-500/15 dark:text-violet-200">
+                                Answered a change request
+                              </div>
+                            )}
+                            {/*
+                              What actually changed, computed server-side when
+                              the brand resubmitted. Without it a reviewer has
+                              to reopen the item and remember what it looked
+                              like — which is how change requests got forgotten.
+                            */}
+                            {(submission.changeSummary?.length ?? 0) > 0 && (
+                              <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                                {submission.changeSummary!.join(' · ')}
+                              </div>
+                            )}
+                            {submission.slotCompleteness.missing.length > 0 && (
+                              <div className="mt-1 text-xs text-red-600 dark:text-red-300">
+                                Missing {submission.slotCompleteness.missing.map(friendlyEnum).join(', ')}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -559,22 +694,12 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
                         <div>{friendlyEnum(submission.brand?.trustTier)}</div>
                         <div className="mt-1 text-gray-500">{friendlyEnum(submission.brand?.reviewMode)}</div>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm font-semibold">
-                          {submission.slotCompleteness.present}/{submission.slotCompleteness.required}
-                        </div>
-                        {submission.slotCompleteness.missing.length > 0 && (
-                          <div className="mt-1 text-xs text-red-600 dark:text-red-300">
-                            Missing {submission.slotCompleteness.missing.map(friendlyEnum).join(', ')}
-                          </div>
-                        )}
-                      </td>
                       <td className="px-4 py-3 text-xs text-gray-500">{formatDate(submission.submittedAt)}</td>
                       <td className="px-4 py-3 text-right">
                         <button
                           type="button"
                           onClick={() => void loadDetail(submission)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/8"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.08]"
                         >
                           <Eye size={14} />
                           Review
@@ -600,7 +725,7 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
           <Flag size={20} className="text-red-500" />
         </div>
         {reportsLoading ? (
-          <div className="mt-4 h-24 animate-pulse rounded-lg bg-gray-100 dark:bg-white/8" />
+          <div className="mt-4 h-24 animate-pulse rounded-lg bg-gray-100 dark:bg-white/[0.08]" />
         ) : reports.length === 0 ? (
           <div className="mt-4 rounded-lg border border-dashed border-gray-200 p-5 text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
             No reports are waiting for review.
@@ -668,22 +793,61 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
 
       <Modal open={Boolean(selected)} onClose={() => setSelected(null)} title="Review Submission" size="xl" backdropStyle="light">
         {!selected || detailLoading ? (
-          <div className="h-80 animate-pulse rounded-xl bg-gray-100 dark:bg-white/8" />
+          <div className="h-80 animate-pulse rounded-xl bg-gray-100 dark:bg-white/[0.08]" />
         ) : (
           <div className="space-y-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">{selected.target.title || 'Untitled content'}</h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   {selected.entityType === 'PRODUCT' ? 'Product' : 'Design'} · {selected.brand?.name ?? 'Unknown brand'}
                 </p>
+                {/* Whether the brand is verified, and whether its owner ever
+                    confirmed their email, changes how much benefit of the doubt
+                    a first listing earns. */}
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <VerificationPill
+                    label={selected.brand?.isVerified ? 'Brand verified' : `Brand ${friendlyEnum(selected.brand?.verificationStatus).toLowerCase()}`}
+                    ok={Boolean(selected.brand?.isVerified)}
+                  />
+                  <VerificationPill
+                    label={selected.brand?.emailVerified ? 'Email verified' : 'Email unverified'}
+                    ok={Boolean(selected.brand?.emailVerified)}
+                  />
+                  {selected.entityType === 'PRODUCT' && selected.target.customOrderEnabled !== null && selected.target.customOrderEnabled !== undefined ? (
+                    <span
+                      className={
+                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ' +
+                        (selected.target.customOrderEnabled
+                          ? 'bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-200'
+                          : 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300')
+                      }
+                    >
+                      <span aria-hidden="true">🧵</span>
+                      {selected.target.customOrderEnabled ? 'Custom orders on' : 'Custom orders off'}
+                    </span>
+                  ) : null}
+                </div>
               </div>
-              <span className={`inline-flex rounded-full px-3 py-1.5 text-sm font-semibold ${statusTone[selected.status]}`}>
+              <span className={`inline-flex shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold ${statusTone[selected.status]}`}>
                 {statusLabel[selected.status]}
               </span>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {selected.entityType === 'PRODUCT' ? (
+                <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Price</p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                    {formatAmount(selected.target.salePrice ?? selected.target.price, selected.target.currency) ?? '-'}
+                  </p>
+                  {selected.target.salePrice !== null && selected.target.salePrice !== undefined ? (
+                    <p className="mt-0.5 text-xs text-gray-500 line-through">
+                      {formatAmount(selected.target.price, selected.target.currency) ?? ''}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Trust tier</p>
                 <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{friendlyEnum(selected.brand?.trustTier)}</p>
@@ -700,17 +864,34 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
               </div>
             </div>
 
+            {/* The description is half of what is being approved — a listing can
+                pass on photos and fail on its copy. The API had always returned
+                it; the modal simply never showed it. */}
+            {selected.target.description?.trim() ? (
+              <div className="rounded-lg border border-gray-200 p-4 dark:border-white/10">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Description</h3>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-600 dark:text-gray-300">
+                  {selected.target.description}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-gray-200 p-4 text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
+                No description was submitted with this {selected.entityType === 'PRODUCT' ? 'product' : 'design'}.
+              </div>
+            )}
+
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {selected.media.map((media) => {
+              {selected.media.map((media, mediaIndex) => {
                 const mediaPreviewSrc = getMediaPreviewSrc(media);
                 const isVideo = mediaIsVideo(media.mediaType, media.mimeType);
                 return (
                   <div key={media.id} className="overflow-hidden rounded-lg border border-gray-200 dark:border-white/10">
-                    <div className="aspect-square bg-gray-100 dark:bg-white/8">
+                    <div className="aspect-square bg-gray-100 dark:bg-white/[0.08]">
                       {mediaPreviewSrc && !isVideo ? (
                         <AdminReviewImagePreview
                           src={mediaPreviewSrc}
                           alt={`${media.slotLabel} media`}
+                          eager={mediaIndex === 0}
                         />
                       ) : (
                         <MediaUnavailablePreview label={isVideo ? 'Video preview unavailable' : 'Media unavailable'} />
@@ -752,16 +933,28 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
               <div className="rounded-lg border border-gray-200 p-4 dark:border-white/10">
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">Review History</h3>
                 <div className="mt-3 space-y-3">
-                  {buildReviewLifecycle(selected).map((history) => (
+                  {buildReviewLifecycle(selected).map((history, index, all) => (
                     <div key={history.id} className="rounded-lg bg-gray-50 p-3 text-sm dark:bg-white/5">
-                      <div className="font-semibold text-gray-900 dark:text-white">{statusLabel[history.status]}</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {statusLabel[history.status]}
+                        </span>
+                        {/* History is newest-first, so cycle 1 is the last row.
+                            Numbering it makes "which round was this?" answerable
+                            without counting entries by hand. */}
+                        <span className="shrink-0 rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                          {index === 0 ? 'Latest' : `Cycle ${all.length - index}`}
+                        </span>
+                      </div>
                       <div className="mt-1 text-xs text-gray-500">Submitted: {formatDate(history.submittedAt)}</div>
                       {history.reviewedAt && (
                         <div className="mt-1 text-xs text-gray-500">Reviewed: {formatDate(history.reviewedAt)}</div>
                       )}
-                      {history.reviewedById && (
-                        <div className="mt-1 text-xs text-gray-500">Reviewer: {history.reviewedById}</div>
-                      )}
+                      {history.reviewedBy?.username || history.reviewedById ? (
+                        <div className="mt-1 text-xs text-gray-500">
+                          Reviewer: {history.reviewedBy?.username || history.reviewedById}
+                        </div>
+                      ) : null}
                       {history.reasonLabel && <div className="mt-1 text-gray-500 dark:text-gray-400">{history.reasonLabel}</div>}
                       {history.reasonNote && <div className="mt-1 text-gray-500 dark:text-gray-400">{history.reasonNote}</div>}
                     </div>
@@ -841,6 +1034,9 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
             error={decisionError ?? undefined}
             selectedAllowWrap
             optionAllowWrap
+            // Nested inside Modal (z-modal). Default dropdown layer sits under the
+            // modal and appears empty/unresponsive on iPad Safari / touch devices.
+            menuLayer="modal"
           />
           <textarea
             value={decisionNote}
@@ -857,7 +1053,7 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
             <button
               type="button"
               onClick={() => setPendingDecision(null)}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/8"
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.08]"
             >
               Cancel
             </button>

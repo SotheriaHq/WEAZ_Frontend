@@ -330,13 +330,13 @@ const AdminModerationPage: React.FC = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleQueueReview(item.id, 'approve')}
-                        className="rounded-lg bg-green-100 px-3 py-1 text-xs text-green-700 transition hover:bg-green-200"
+                        className="rounded-lg bg-green-100 px-3 py-1 text-xs text-green-700 transition hover:bg-green-200 dark:bg-green-500/20 dark:text-green-300"
                       >
                         ✅ Approve
                       </button>
                       <button
                         onClick={() => handleQueueReview(item.id, 'reject')}
-                        className="rounded-lg bg-red-100 px-3 py-1 text-xs text-red-700 transition hover:bg-red-200"
+                        className="rounded-lg bg-red-100 px-3 py-1 text-xs text-red-700 transition hover:bg-red-200 dark:bg-red-500/20 dark:text-red-300"
                       >
                         ❌ Reject
                       </button>

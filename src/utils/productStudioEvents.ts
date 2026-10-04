@@ -1,4 +1,4 @@
-export const PRODUCT_STUDIO_SYNC_EVENT = 'threadly:studio-product-sync';
+export const PRODUCT_STUDIO_SYNC_EVENT = 'wiez:studio-product-sync';
 
 export const emitProductStudioSync = (detail?: {
   productId?: string;

@@ -6,21 +6,21 @@ import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store';
 import { closeSidebar } from '@/features/uiSlice';
 import { useLocation, Outlet } from 'react-router-dom';
-import { useNotificationsBootstrap } from '@/hooks/useNotifications';
 import { ISLAND_BOTTOM_NAV_MOBILE_CLEARANCE_CLASS } from '@/components/navigation/IslandBottomNav';
 
+// Notifications bootstrap lives in `RootLayout` (App.tsx) and covers every
+// shell. Mounting it here as well double-subscribed the socket and doubled the
+// polling fallback for admins.
 const AdminScaffold: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
-
-  useNotificationsBootstrap();
 
   useEffect(() => {
     dispatch(closeSidebar());
   }, [dispatch, location.pathname]);
 
   return (
-    <div className={`min-h-screen overflow-x-hidden threadly-shell-bg ${ISLAND_BOTTOM_NAV_MOBILE_CLEARANCE_CLASS} lg:pb-0`}>
+    <div className={`min-h-screen overflow-x-hidden wiez-shell-bg ${ISLAND_BOTTOM_NAV_MOBILE_CLEARANCE_CLASS} lg:pb-0`}>
       <Navbar minimal={false} />
       <Sidebar overlayOnly />
       <AdminSidebar />

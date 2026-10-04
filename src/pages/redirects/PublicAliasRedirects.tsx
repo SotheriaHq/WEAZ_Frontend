@@ -1,6 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate, useParams } from 'react-router-dom';
+import { Navigate, useLocation, useParams } from 'react-router-dom';
 import { publicLinkApi } from '@/api/PublicLinkApi';
+
+/**
+ * Carry the query and hash through the redirect.
+ *
+ * These aliases resolved a username or slug to an id and then navigated to the
+ * bare path, dropping everything after it. That is why "Store" in the content
+ * viewer landed on the brand's Content tab: the viewer builds
+ * `/u/:username?tab=Store`, the alias threw `?tab=Store` away, and the catalog
+ * fell back to its default tab. Anything else a caller pins to an alias link —
+ * `?collectionId=`, `?visibility=`, a deep-link hash — was lost the same way.
+ */
+const withIncomingQuery = (path: string, search: string, hash: string): string => {
+  const [base, ownSearch = ''] = path.split('?');
+  const merged = new URLSearchParams(search);
+  // The alias's own params win: a redirect that pins a destination tab means it.
+  new URLSearchParams(ownSearch).forEach((value, key) => merged.set(key, value));
+  const serialized = merged.toString();
+  return `${base}${serialized ? `?${serialized}` : ''}${hash}`;
+};
 
 const AliasRedirectShell: React.FC<{ label: string }> = ({ label }) => {
   return (
@@ -26,6 +45,7 @@ const AliasRedirectError: React.FC<{ message: string }> = ({ message }) => {
 
 export const ProfileAliasRedirect: React.FC = () => {
   const { username } = useParams<{ username: string }>();
+  const { search, hash } = useLocation();
   const [target, setTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,13 +72,14 @@ export const ProfileAliasRedirect: React.FC = () => {
     };
   }, [username]);
 
-  if (target) return <Navigate to={target} replace />;
+  if (target) return <Navigate to={withIncomingQuery(target, search, hash)} replace />;
   if (error) return <AliasRedirectError message={error} />;
   return <AliasRedirectShell label="Opening profile..." />;
 };
 
 export const StorefrontAliasRedirect: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
+  const { search, hash } = useLocation();
   const [target, setTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,13 +106,14 @@ export const StorefrontAliasRedirect: React.FC = () => {
     };
   }, [slug]);
 
-  if (target) return <Navigate to={target} replace />;
+  if (target) return <Navigate to={withIncomingQuery(target, search, hash)} replace />;
   if (error) return <AliasRedirectError message={error} />;
   return <AliasRedirectShell label="Opening storefront..." />;
 };
 
 export const ProductAliasRedirect: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
+  const { search, hash } = useLocation();
   const [target, setTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -118,7 +140,7 @@ export const ProductAliasRedirect: React.FC = () => {
     };
   }, [slug]);
 
-  if (target) return <Navigate to={target} replace />;
+  if (target) return <Navigate to={withIncomingQuery(target, search, hash)} replace />;
   if (error) return <AliasRedirectError message={error} />;
   return <AliasRedirectShell label="Opening product..." />;
 };

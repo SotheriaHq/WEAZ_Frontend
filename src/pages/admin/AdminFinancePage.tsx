@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
 import UniversalSelect from '@/components/forms/UniversalSelect';
-import VLoader from '@/components/loaders/VLoader';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import Modal from '@/components/ui/Modal';
 import { adminFinanceApi, adminOrdersApi } from '@/api/AdminApi';
 import { customOrdersAdminApi, type CustomOrderDetail } from '@/api/CustomOrderApi';
@@ -164,6 +164,68 @@ const emptyCommissionDraft = (): CommissionDraft => ({
   isActive: true,
 });
 
+type TransactionGroup = {
+  key: string;
+  referenceType: string | null;
+  referenceId: string | null;
+  title: string;
+  brandName: string | null;
+  buyerName: string | null;
+  currency: string;
+  gross: number;
+  latestAt: string;
+  typeCounts: Record<string, number>;
+  items: AdminFinanceTransaction[];
+};
+
+/**
+ * Ledger movements read as a sequence, so each kind gets its own colour: money
+ * arriving, money held then released, money leaving, money going back. On a
+ * page that was entirely grey type this is the difference between scanning and
+ * reading.
+ */
+const LEDGER_TYPE_STYLES: Record<string, string> = {
+  PAYMENT_RECEIVED:
+    'bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-300',
+  ESCROW_RELEASE:
+    'bg-sky-500/10 text-sky-700 ring-sky-500/20 dark:text-sky-300',
+  PAYOUT_DISBURSED:
+    'bg-violet-500/10 text-violet-700 ring-violet-500/20 dark:text-violet-300',
+  REFUND_ISSUED:
+    'bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-300',
+  REVERSAL:
+    'bg-rose-500/10 text-rose-700 ring-rose-500/20 dark:text-rose-300',
+};
+
+const ledgerTypeStyle = (type?: string | null) =>
+  LEDGER_TYPE_STYLES[String(type ?? '')] ??
+  'bg-slate-500/10 text-slate-700 ring-slate-500/20 dark:text-slate-300';
+
+const LedgerTypeChip: React.FC<{ type: string; count?: number }> = ({ type, count }) => (
+  <span
+    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset ${ledgerTypeStyle(type)}`}
+  >
+    {prettify(type)}
+    {count && count > 1 ? <span className="opacity-70">×{count}</span> : null}
+  </span>
+);
+
+/** "2 minutes ago" beats a timestamp when the question is "did this just move?" */
+const relativeTime = (value?: string | null) => {
+  if (!value) return '—';
+  const then = new Date(value).getTime();
+  if (Number.isNaN(then)) return '—';
+  const seconds = Math.round((Date.now() - then) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(value).toLocaleDateString();
+};
+
 const prettify = (value?: string | null) => String(value || 'UNKNOWN').replaceAll('_', ' ');
 const compactId = (value?: string | null) => (value ? `#${String(value).slice(0, 8).toUpperCase()}` : '—');
 const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleString() : '—');
@@ -231,6 +293,9 @@ const AdminFinancePage: React.FC = () => {
   const [standardOrderDetail, setStandardOrderDetail] = useState<AdminStandardOrderDetail | null>(null);
   const [customOrderDetail, setCustomOrderDetail] = useState<CustomOrderDetail | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<AdminFinancialDocument | null>(null);
+  // Held as the group itself, not an id: the rows are already in memory, so
+  // opening one is instant and needs no request.
+  const [selectedTransactionGroup, setSelectedTransactionGroup] = useState<TransactionGroup | null>(null);
   const [editingRule, setEditingRule] = useState<AdminCommissionRule | null>(null);
   const [commissionDraft, setCommissionDraft] = useState<CommissionDraft>(emptyCommissionDraft);
   const [commissionModalOpen, setCommissionModalOpen] = useState(false);
@@ -248,8 +313,6 @@ const AdminFinancePage: React.FC = () => {
   const [documentDetailLoading, setDocumentDetailLoading] = useState(false);
   const [commissionSubmitting, setCommissionSubmitting] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [staleOlderThanMinutes, setStaleOlderThanMinutes] = useState('30');
-  const [staleLimit, setStaleLimit] = useState('60');
   const [staleReconcileResult, setStaleReconcileResult] =
     useState<AdminStalePaymentReconcileResult | null>(null);
 
@@ -257,6 +320,12 @@ const AdminFinancePage: React.FC = () => {
   const [paymentGatewayFilter, setPaymentGatewayFilter] = useState('');
   const [paymentSubjectFilter, setPaymentSubjectFilter] = useState('');
   const [paymentQuery, setPaymentQuery] = useState('');
+  /**
+   * The request is keyed off the DEFERRED value, so typing a reference no
+   * longer fires a search per keystroke and re-sorts the table underneath the
+   * cursor. The input itself stays fully controlled and responsive.
+   */
+  const deferredPaymentQuery = useDeferredValue(paymentQuery);
   const [escrowStatusFilter, setEscrowStatusFilter] = useState('');
   const [transactionTypeFilter, setTransactionTypeFilter] = useState('');
   const [transactionReferenceFilter, setTransactionReferenceFilter] = useState('');
@@ -309,7 +378,7 @@ const AdminFinancePage: React.FC = () => {
         ...(paymentStatusFilter ? { status: paymentStatusFilter } : {}),
         ...(paymentGatewayFilter ? { gateway: paymentGatewayFilter } : {}),
         ...(paymentSubjectFilter ? { subjectType: paymentSubjectFilter } : {}),
-        ...(paymentQuery.trim() ? { q: paymentQuery.trim() } : {}),
+        ...(deferredPaymentQuery.trim() ? { q: deferredPaymentQuery.trim() } : {}),
       });
       const data = unwrapApiResponse<{ items: AdminFinancePaymentAttempt[] }>(response.data as any);
       if (!isLatest('payments', requestId)) return;
@@ -325,7 +394,7 @@ const AdminFinancePage: React.FC = () => {
     isLatest,
     nextRequest,
     paymentGatewayFilter,
-    paymentQuery,
+    deferredPaymentQuery,
     paymentStatusFilter,
     paymentSubjectFilter,
   ]);
@@ -444,6 +513,18 @@ const AdminFinancePage: React.FC = () => {
 
   useEffect(() => {
     void loadOverview();
+  }, [loadOverview]);
+
+  // Near-real-time finance metrics: refresh the overview every 20s (paused when
+  // the tab is hidden). The payments table is intentionally NOT auto-refreshed
+  // so it doesn't reorder while an admin is reading/filtering it.
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadOverview();
+      }
+    }, 20_000);
+    return () => window.clearInterval(interval);
   }, [loadOverview]);
 
   useEffect(() => {
@@ -639,25 +720,11 @@ const AdminFinancePage: React.FC = () => {
   );
 
   const handleReconcileStalePayments = useCallback(async () => {
-    const parsedOlderThanMinutes = Number.parseInt(staleOlderThanMinutes, 10);
-    const parsedLimit = Number.parseInt(staleLimit, 10);
-
-    if (!Number.isFinite(parsedOlderThanMinutes) || parsedOlderThanMinutes < 1 || parsedOlderThanMinutes > 240) {
-      toast.error('Older-than minutes must be between 1 and 240');
-      return;
-    }
-
-    if (!Number.isFinite(parsedLimit) || parsedLimit < 1 || parsedLimit > 200) {
-      toast.error('Limit must be between 1 and 200');
-      return;
-    }
-
+    // No body: the server owns the window and the scan size, and defaults them
+    // to the same bounds its ten-minute cron already uses.
     setBusyKey('payments:reconcile-stale');
     try {
-      const response = await adminFinanceApi.reconcileStalePayments({
-        olderThanMinutes: parsedOlderThanMinutes,
-        limit: parsedLimit,
-      });
+      const response = await adminFinanceApi.reconcileStalePayments();
       const data = unwrapApiResponse<AdminStalePaymentReconcileResult>(response.data as any);
       setStaleReconcileResult(data);
       toast.success(
@@ -670,7 +737,31 @@ const AdminFinancePage: React.FC = () => {
     } finally {
       setBusyKey(null);
     }
-  }, [loadOverview, loadPayments, staleLimit, staleOlderThanMinutes]);
+  }, [loadOverview, loadPayments]);
+
+  const handleRepairCustomSettlements = useCallback(async () => {
+    setBusyKey('repair:custom-settlements');
+    try {
+      const response = await adminFinanceApi.repairCustomOrderSettlements({ limit: 50 });
+      const data = unwrapApiResponse<{
+        scanned: number;
+        repaired: number;
+        limit: number;
+        message: string;
+      }>(response.data as any);
+      toast.success(
+        data?.message ||
+          `Custom settlement repair: ${data?.repaired ?? 0} repaired of ${data?.scanned ?? 0} scanned.`,
+      );
+      void loadOverview();
+      void loadEscrow();
+      void loadTransactions();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to repair custom-order settlements');
+    } finally {
+      setBusyKey(null);
+    }
+  }, [loadEscrow, loadOverview, loadTransactions]);
 
   const handleReconciliationAction = useCallback(
     async (item: AdminReconciliationItem, action: 'claim' | 'release' | 'resolve') => {
@@ -783,9 +874,98 @@ const AdminFinancePage: React.FC = () => {
     [payments],
   );
 
+  /**
+   * One row per ORDER, not per ledger entry.
+   *
+   * A single order legitimately produces several transactions — payment
+   * received, escrow release, payout, sometimes a refund — so a flat ledger
+   * listed the same order three or four times and pushed everything else off
+   * the page. Reading "what happened to this order" meant scanning for its
+   * reference among rows that were interleaved with every other order's.
+   *
+   * Grouping is by reference (`referenceType:referenceId`), which is the only
+   * identity the ledger carries for an order. Entries with no reference cannot
+   * be grouped and stand alone on their own id, so nothing is ever hidden.
+   *
+   * Order is by MOST RECENT activity, so an order that just moved is at the
+   * top whether it was created today or last month — which is what an admin
+   * scanning this page is actually looking for.
+   */
+  const transactionGroups = useMemo(() => {
+    const groups = new Map<string, TransactionGroup>();
+
+    for (const transaction of transactions) {
+      const key =
+        transaction.referenceId
+          ? `${transaction.referenceType ?? 'UNKNOWN'}:${transaction.referenceId}`
+          : `entry:${transaction.id}`;
+
+      const existing = groups.get(key);
+      const amount = Number(transaction.totalAmount) || 0;
+      const at = transaction.createdAt;
+
+      if (!existing) {
+        groups.set(key, {
+          key,
+          referenceType: transaction.referenceType ?? null,
+          referenceId: transaction.referenceId ?? null,
+          title: transaction.referenceTitle || transaction.description || 'Untitled',
+          brandName: transaction.brand?.name ?? null,
+          buyerName: transaction.buyerName ?? null,
+          currency: transaction.currency,
+          gross: amount,
+          latestAt: at,
+          typeCounts: { [transaction.type]: 1 },
+          items: [transaction],
+        });
+        continue;
+      }
+
+      existing.gross += amount;
+      existing.items.push(transaction);
+      existing.typeCounts[transaction.type] = (existing.typeCounts[transaction.type] ?? 0) + 1;
+      if (at && (!existing.latestAt || new Date(at) > new Date(existing.latestAt))) {
+        existing.latestAt = at;
+      }
+      // A later row often carries the friendlier label; keep the best one.
+      existing.title = existing.title === 'Untitled'
+        ? transaction.referenceTitle || transaction.description || existing.title
+        : existing.title;
+      existing.brandName = existing.brandName ?? transaction.brand?.name ?? null;
+      existing.buyerName = existing.buyerName ?? transaction.buyerName ?? null;
+    }
+
+    return [...groups.values()]
+      .map((group) => ({
+        ...group,
+        items: [...group.items].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        ),
+      }))
+      .sort((a, b) => new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime());
+  }, [transactions]);
+
   return (
     <div className="space-y-6">
       <AdminBreadcrumb segments={[{ label: 'Finance' }]} />
+
+      <div className="flex border-b border-black/10 dark:border-white/10 gap-6">
+        <button
+          type="button"
+          onClick={() => navigate('/admin/finance')}
+          className="pb-3 text-sm font-semibold transition-all border-b-2 border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
+        >
+          Finance Control
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/admin/finance/settlement-policies')}
+          className="pb-3 text-sm font-semibold transition-all border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+        >
+          Settlement Policies
+        </button>
+      </div>
+
       <section className="rounded-3xl border border-black/10 bg-white/85 p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -795,13 +975,6 @@ const AdminFinancePage: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/admin/finance/settlement-policies')}
-              className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]"
-            >
-              Settlement policies
-            </button>
             <button
               type="button"
               onClick={refreshCurrentTab}
@@ -819,11 +992,26 @@ const AdminFinancePage: React.FC = () => {
                 {busyKey === 'run:LEDGER_INTEGRITY' ? 'Running...' : '🧾 Run ledger check'}
               </button>
             )}
+            {canProcess && (
+              <button
+                type="button"
+                onClick={() => void handleRepairCustomSettlements()}
+                disabled={busyKey === 'repair:custom-settlements'}
+                className="rounded-full border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100 dark:hover:bg-violet-500/20"
+              >
+                {busyKey === 'repair:custom-settlements'
+                  ? 'Repairing...'
+                  : '🛠️ Repair custom settlements'}
+              </button>
+            )}
           </div>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {overviewLoading ? (
+          {/* Skeletons only before the first figures arrive. On the 20s
+              refresh the cards keep their values and simply change when the
+              new ones land. */}
+          {overviewLoading && !overview ? (
             [1, 2, 3, 4].map((item) => <div key={item} className="h-28 animate-pulse rounded-3xl bg-slate-100 dark:bg-white/[0.04]" />)
           ) : (
             <>
@@ -835,7 +1023,7 @@ const AdminFinancePage: React.FC = () => {
           )}
         </div>
 
-        {!overviewLoading && overview ? (
+        {overview ? (
           <div className="mt-4 grid gap-3 md:grid-cols-4">
             <PillStat label="Pending payouts" value={String(overview.pendingPayouts ?? 0)} />
             <PillStat label="Open escrow" value={String(overview.activeEscrowHolds ?? 0)} />
@@ -916,7 +1104,7 @@ const AdminFinancePage: React.FC = () => {
                 </TableWrap>
               </Panel>
 
-              {!overviewLoading && overview?.settlementState ? (
+              {overview?.settlementState ? (
                 <Panel title="Settlement State" description="Held, released, pending, eligible, refunded, and wallet-visible settlement totals.">
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     <MetricCard label="Total held funds" value={amountOf(overview.settlementState.totalHeldFunds, overview.settlementState.currency || overview.currency)} note="Held across standard and custom orders" />
@@ -946,32 +1134,13 @@ const AdminFinancePage: React.FC = () => {
               </div>
               {canProcess && (
                 <div className="mb-4 rounded-2xl border border-black/10 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                    <div className="grid gap-3 sm:grid-cols-2 lg:max-w-[420px]">
-                      <InputShell>
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Older than (minutes)</div>
-                        <input
-                          type="number"
-                          min={1}
-                          max={240}
-                          value={staleOlderThanMinutes}
-                          onChange={(event) => setStaleOlderThanMinutes(event.target.value)}
-                          className="mt-1 w-full bg-transparent text-sm outline-none dark:text-white"
-                        />
-                      </InputShell>
-                      <InputShell>
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Scan limit</div>
-                        <input
-                          type="number"
-                          min={1}
-                          max={200}
-                          value={staleLimit}
-                          onChange={(event) => setStaleLimit(event.target.value)}
-                          className="mt-1 w-full bg-transparent text-sm outline-none dark:text-white"
-                        />
-                      </InputShell>
-                    </div>
-                    <div className="flex flex-col items-start gap-2 lg:items-end">
+                  {/* The window and scan size are the server's business, not
+                      the admin's: the same ten-minute cron runs this with its
+                      own bounds, and two number boxes asked for a decision
+                      nobody had grounds to make. The action keeps the server
+                      defaults. */}
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-col items-start gap-2">
                       <button
                         type="button"
                         onClick={() => void handleReconcileStalePayments()}
@@ -1136,35 +1305,72 @@ const AdminFinancePage: React.FC = () => {
                   <input type="date" value={transactionDateTo} onChange={(event) => setTransactionDateTo(event.target.value)} className="mt-1 w-full bg-transparent text-sm outline-none dark:text-white" />
                 </InputShell>
               </div>
-              <TableWrap loading={transactionsLoading} empty={!transactions.length} emptyMessage="No ledger transactions matched the current filters.">
-                <table className="w-full min-w-[980px] text-left text-sm">
+              <TableWrap loading={transactionsLoading} empty={!transactionGroups.length} emptyMessage="No ledger transactions matched the current filters.">
+                <table className="w-full min-w-[900px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-black/5 text-slate-500 dark:border-white/5 dark:text-slate-400">
-                      <th className="px-4 py-3 font-medium">Description</th>
-                      <th className="px-4 py-3 font-medium">Type</th>
-                      <th className="px-4 py-3 font-medium">Reference</th>
-                      <th className="px-4 py-3 font-medium">Brand</th>
-                      <th className="px-4 py-3 font-medium">Buyer</th>
-                      <th className="px-4 py-3 font-medium">Amount</th>
-                      <th className="px-4 py-3 font-medium">Action</th>
+                      <th className="px-4 py-3 font-medium">Order</th>
+                      <th className="px-4 py-3 font-medium">Activity</th>
+                      <th className="px-4 py-3 font-medium">Parties</th>
+                      <th className="px-4 py-3 font-medium">Last movement</th>
+                      <th className="px-4 py-3 text-right font-medium">Total</th>
+                      <th className="px-4 py-3 font-medium" />
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions.map((transaction) => (
-                      <tr key={transaction.id} className="border-b border-black/5 last:border-b-0 dark:border-white/5">
+                    {transactionGroups.map((group) => (
+                      <tr
+                        key={group.key}
+                        className="border-b border-black/5 transition-colors last:border-b-0 hover:bg-slate-50/70 dark:border-white/5 dark:hover:bg-white/[0.03]"
+                      >
                         <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-900 dark:text-white">{transaction.description}</div>
-                          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{transaction.referenceTitle || '—'} • {formatDate(transaction.createdAt)}</div>
+                          <div className="font-semibold text-slate-900 dark:text-white">{group.title}</div>
+                          <div className="mt-0.5 font-mono text-[11px] uppercase tracking-wide text-slate-400">
+                            {prettify(group.referenceType)} {compactId(group.referenceId)}
+                          </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{prettify(transaction.type)}</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{prettify(transaction.referenceType)} {compactId(transaction.referenceId)}</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{transaction.brand?.name || '—'}</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{transaction.buyerName || '—'}</td>
-                        <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">{amountOf(transaction.totalAmount, transaction.currency)}</td>
                         <td className="px-4 py-3">
-                          <button type="button" onClick={() => void openReference(transaction.referenceType, transaction.referenceId)} className="rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]">
-                            View order
-                          </button>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {Object.entries(group.typeCounts).map(([type, count]) => (
+                              <LedgerTypeChip key={type} type={type} count={count} />
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="italic text-slate-700 dark:text-slate-200">{group.brandName || '—'}</div>
+                          <div className="mt-0.5 text-xs italic text-slate-500 dark:text-slate-400">
+                            {group.buyerName || '—'}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-slate-700 dark:text-slate-200">{relativeTime(group.latestAt)}</div>
+                          <div className="mt-0.5 text-xs text-slate-400">{formatDate(group.latestAt)}</div>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="text-base font-bold tabular-nums text-slate-900 dark:text-white">
+                            {amountOf(group.gross, group.currency)}
+                          </div>
+                          <div className="mt-0.5 text-xs text-slate-400">
+                            {group.items.length} {group.items.length === 1 ? 'entry' : 'entries'}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedTransactionGroup(group)}
+                              className="rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]"
+                            >
+                              Activity
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void openReference(group.referenceType, group.referenceId)}
+                              className="rounded-full bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 dark:bg-white dark:text-slate-950"
+                            >
+                              Order
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1743,6 +1949,72 @@ const AdminFinancePage: React.FC = () => {
         ) : null}
       </Modal>
 
+      {/* Deliberately light: the entries are already loaded, so this opens
+          instantly and fetches nothing. It answers one question — what
+          happened to this order, in order — and hands off to the order itself
+          for anything more. */}
+      <Modal
+        open={Boolean(selectedTransactionGroup)}
+        onClose={() => setSelectedTransactionGroup(null)}
+        title="Order activity"
+        size="lg"
+      >
+        {selectedTransactionGroup ? (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-black/10 bg-slate-50/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="text-base font-semibold text-slate-900 dark:text-white">
+                {selectedTransactionGroup.title}
+              </div>
+              <div className="mt-1 font-mono text-[11px] uppercase tracking-wide text-slate-400">
+                {prettify(selectedTransactionGroup.referenceType)} {compactId(selectedTransactionGroup.referenceId)}
+              </div>
+              <div className="mt-3 flex flex-wrap items-baseline justify-between gap-3">
+                <div className="text-sm italic text-slate-600 dark:text-slate-300">
+                  {selectedTransactionGroup.brandName || '—'}
+                  <span className="not-italic text-slate-400"> · </span>
+                  {selectedTransactionGroup.buyerName || '—'}
+                </div>
+                <div className="text-lg font-bold tabular-nums text-slate-900 dark:text-white">
+                  {amountOf(selectedTransactionGroup.gross, selectedTransactionGroup.currency)}
+                </div>
+              </div>
+            </div>
+
+            <ol className="relative space-y-3 border-l border-dashed border-black/10 pl-5 dark:border-white/10">
+              {selectedTransactionGroup.items.map((item) => (
+                <li key={item.id} className="relative">
+                  <span className="absolute -left-[26px] top-1.5 h-2.5 w-2.5 rounded-full bg-slate-300 ring-4 ring-white dark:bg-white/30 dark:ring-zinc-950" />
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <LedgerTypeChip type={item.type} />
+                      <div className="mt-1 text-sm text-slate-700 dark:text-slate-200">{item.description}</div>
+                      <div className="mt-0.5 text-xs text-slate-400">{formatDate(item.createdAt)}</div>
+                    </div>
+                    <div className="text-sm font-bold tabular-nums text-slate-900 dark:text-white">
+                      {amountOf(item.totalAmount, item.currency)}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  const group = selectedTransactionGroup;
+                  setSelectedTransactionGroup(null);
+                  void openReference(group.referenceType, group.referenceId);
+                }}
+                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 dark:bg-white dark:text-slate-950"
+              >
+                Open order
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
       <Modal open={documentDetailLoading || Boolean(selectedDocument)} onClose={() => { setSelectedDocument(null); setDocumentDetailLoading(false); }} title="Financial Document" size="lg">
         {documentDetailLoading ? <LoaderBlock /> : selectedDocument ? (
           <div className="space-y-4">
@@ -1795,15 +2067,27 @@ const Panel: React.FC<{ title: string; description?: string; children: React.Rea
   </section>
 );
 
+/**
+ * Only the FIRST load is allowed to blank a table.
+ *
+ * `loading` alone used to swap the rows for a spinner, and the overview
+ * refreshes on a 20-second timer — so every twenty seconds each table on the
+ * screen emptied and came back. Switching tabs did the same thing on every
+ * visit, including ones already holding data. That is the shake: nothing was
+ * wrong with the data, the page was throwing it away and re-mounting it.
+ *
+ * With rows already on screen a refresh is invisible by design. The numbers
+ * change in place when the response lands; the structure never moves.
+ */
 const TableWrap: React.FC<{ loading: boolean; empty: boolean; emptyMessage: string; children: React.ReactNode }> = ({ loading, empty, emptyMessage, children }) => {
-  if (loading) return <LoaderBlock />;
+  if (loading && empty) return <LoaderBlock />;
   if (empty) return <div className="rounded-2xl border border-dashed border-black/10 px-4 py-10 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">{emptyMessage}</div>;
   return <div className="overflow-x-auto scrollbar-hide">{children}</div>;
 };
 
 const LoaderBlock = () => (
   <div className="flex items-center justify-center py-16">
-    <VLoader size={34} phase="loading" showLabel={false} />
+    <MuseLoader size={34} />
   </div>
 );
 

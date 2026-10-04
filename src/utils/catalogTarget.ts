@@ -100,6 +100,25 @@ export function buildCatalogTargetPayload(input: CatalogTargetInput): Normalized
   return target;
 }
 
+/**
+ * The two fields `/saved` actually declares, and nothing else.
+ *
+ * `mapCatalogTargetForLegacyApi` also hands back `legacyCollectionId` — a
+ * CLIENT-side breadcrumb recording which collection row a design is stored as.
+ * It is not part of the request, and the backend runs its global
+ * `ValidationPipe` with `forbidNonWhitelisted: true`, so a body carrying it is
+ * answered with a 400, not ignored. Only the DESIGN branch attaches it, which
+ * is why clipping a collection worked and clipping a design did not.
+ *
+ * `GET /saved/check` reads `req.query` directly with no DTO, so the extra key
+ * is harmless there — this is for request BODIES.
+ */
+export function toSavedItemRequest(
+  target: LegacyCatalogApiTarget,
+): { targetType: LegacyCatalogApiTarget['targetType']; targetId: string } {
+  return { targetType: target.targetType, targetId: target.targetId };
+}
+
 export function mapCatalogTargetForLegacyApi(
   input: CatalogTargetInput,
 ): LegacyCatalogApiTarget {

@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
+import { useImagePreload } from '@/hooks/useImagePreload';
+import { productApi } from '@/api/ProductApi';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
@@ -19,6 +22,7 @@ import { useActiveCustomOrderConfiguration } from '@/hooks/useActiveCustomOrderC
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { useBagging } from '@/hooks/useBagging';
 import { BAG_IT_EMOJI, BAG_IT_LABEL } from '@/constants/bagging';
+import { CustomOrderIndicator } from '@/components/custom-orders/CustomOrderIndicator';
 import {
   isCustomOrderOnlyProduct,
   isStrictlyOutOfStockProduct,
@@ -144,6 +148,7 @@ export default function InlineProductDetail({
     setMeasurementValues({});
     setModalMeasurementValues({});
     setShowMeasurementModal(false);
+    setSelectedImageIndex(0);
   }, [product.id]);
 
   useEffect(() => {
@@ -186,13 +191,47 @@ export default function InlineProductDetail({
     };
   }, [isAuth, requiredMeasurementKeys]);
 
+  // Feed/market-section payloads are slim: they carry only the cover image.
+  // Fetch the FULL product exactly once (single request, cached 5 min) so the
+  // gallery has every photo. Swiping never fires additional API calls — it just
+  // moves an index over the already-loaded (and preloaded) image list.
+  const productDetailQuery = useQuery({
+    queryKey: ['market', 'product-detail', product.id],
+    queryFn: () => productApi.getProduct(product.id),
+    enabled: Boolean(product.id),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+  const galleryProduct = useMemo(() => {
+    const detail = productDetailQuery.data;
+    if (!detail) return product;
+    const detailMedia = Array.isArray(detail.media) ? detail.media : [];
+    const detailImages = Array.isArray(detail.images) ? detail.images : [];
+    return {
+      ...product,
+      ...detail,
+      // Prefer fileUploadId so per-image signed-URL resolution targets a real
+      // FileUpload id (media.id is the ProductMedia row id on detail payloads).
+      media: detailMedia.length > 0
+        ? detailMedia.map((m) => ({
+            id: (m as { fileUploadId?: string | null }).fileUploadId || m.id,
+            url: m.url,
+            type: m.type,
+            isPrimary: m.isPrimary,
+          }))
+        : (product as any).media,
+      images: detailImages.length > 0 ? detailImages : product.images,
+      thumbnail: detail.thumbnail ?? product.thumbnail,
+    } as StoreProduct;
+  }, [product, productDetailQuery.data]);
+
   // Get product images
   const getProductImages = () => {
     const images: Array<{ id: string; url: string; type?: string; fileId?: string }> = [];
-    
+
     // Add media items
-    if (Array.isArray((product as any)?.media)) {
-      const media = (product as any).media as Array<{ id?: string; url?: string; type?: string }>;
+    if (Array.isArray((galleryProduct as any)?.media)) {
+      const media = (galleryProduct as any).media as Array<{ id?: string; url?: string; type?: string }>;
       media.forEach((m, idx) => {
         if (m.url) {
           const candidateId = typeof m.id === 'string' ? m.id.trim() : '';
@@ -214,11 +253,11 @@ export default function InlineProductDetail({
     
     // Fallback to thumbnail/images array
     if (images.length === 0) {
-      if (product.thumbnail) {
-        images.push({ id: 'thumb-0', url: product.thumbnail });
+      if (galleryProduct.thumbnail) {
+        images.push({ id: 'thumb-0', url: galleryProduct.thumbnail });
       }
-      if (Array.isArray(product.images)) {
-        product.images.forEach((img, idx) => {
+      if (Array.isArray(galleryProduct.images)) {
+        galleryProduct.images.forEach((img, idx) => {
           if (img && !images.some(i => i.url === img)) {
             images.push({ id: `img-${idx}`, url: img });
           }
@@ -240,6 +279,37 @@ export default function InlineProductDetail({
       if (next >= productImages.length) return 0;
       return next;
     });
+  };
+
+  // Warm the browser cache for every gallery image so flipping left/right (or
+  // tapping a thumbnail) swaps to an already-decoded image instead of stalling.
+  useImagePreload(productImages.map((img) => img.url));
+
+  // Touch swipe on the main image. Suppress the "open lightbox" click that would
+  // otherwise fire at the end of a swipe gesture.
+  const swipeStartXRef = useRef<number | null>(null);
+  const swipeStartYRef = useRef<number | null>(null);
+  const suppressImageClickRef = useRef(false);
+
+  const handleImageTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    swipeStartXRef.current = t.clientX;
+    swipeStartYRef.current = t.clientY;
+    suppressImageClickRef.current = false;
+  };
+
+  const handleImageTouchEnd = (e: React.TouchEvent) => {
+    const startX = swipeStartXRef.current;
+    const startY = swipeStartYRef.current;
+    swipeStartXRef.current = null;
+    swipeStartYRef.current = null;
+    if (startX === null || startY === null || productImages.length <= 1) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy)) return;
+    suppressImageClickRef.current = true;
+    moveImage(dx < 0 ? 1 : -1);
   };
 
   const formatCurrency = (price?: number | null) => {
@@ -510,9 +580,18 @@ export default function InlineProductDetail({
         {/* Image Gallery */}
         <div className="space-y-4">
           {/* Main Image */}
-          <div 
-            className="relative w-full overflow-hidden rounded-2xl cursor-zoom-in group"
-            onClick={() => productImages.length > 0 && setLightboxOpen(true)}
+          <div
+            className="relative w-full h-[520px] sm:h-[580px] lg:h-[650px] max-h-[70vh] rounded-2xl overflow-hidden cursor-zoom-in group"
+            onClick={() => {
+              if (suppressImageClickRef.current) {
+                suppressImageClickRef.current = false;
+                return;
+              }
+              if (productImages.length > 0) setLightboxOpen(true);
+            }}
+            onTouchStart={handleImageTouchStart}
+            onTouchEnd={handleImageTouchEnd}
+            style={{ touchAction: 'pan-y' }}
           >
             {currentImage ? (
               <ImageWithFallback
@@ -591,6 +670,28 @@ export default function InlineProductDetail({
               ))}
             </div>
           )}
+
+          {/* Off-screen preloaders: resolve the signed URL + decode every
+              non-visible gallery image (including fileId-signed ones the main
+              <ImageWithFallback> would otherwise re-resolve on each swap) so
+              flipping the main image is instant instead of frozen. */}
+          {productImages.length > 1 && (
+            <div aria-hidden className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0">
+              {productImages.map((img, idx) =>
+                idx === selectedImageIndex ? null : (
+                  <ImageWithFallback
+                    key={`preload-${img.id}`}
+                    src={img.url || undefined}
+                    fileId={img.fileId}
+                    alt=""
+                    fit="cover"
+                    containerClassName="h-2 w-2"
+                    className="h-2 w-2"
+                  />
+                ),
+              )}
+            </div>
+          )}
         </div>
 
         {/* Product Info */}
@@ -613,12 +714,14 @@ export default function InlineProductDetail({
             )}
             <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">{product.name}</h1>
             {isCustomOrderProduct && (
-              <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-purple-400/40 bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300">
-                <span>✂️</span>
-                <span>Custom Order</span>
-                {requiredMeasurementKeys.length > 0 ? (
-                  <span className="text-[11px] opacity-80">({requiredMeasurementKeys.length} points)</span>
-                ) : null}
+              <div className="mt-2 inline-flex items-center gap-2">
+                <CustomOrderIndicator
+                  pointsCount={requiredMeasurementKeys.length}
+                  size="md"
+                />
+                <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">
+                  Custom Order
+                </span>
               </div>
             )}
             
@@ -647,7 +750,17 @@ export default function InlineProductDetail({
           {/* Size Selection */}
           {sizes.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Size</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Size</h3>
+                <button
+                  type="button"
+                  onClick={() => navigate('/size-charts')}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 transition-colors"
+                >
+                  <span aria-hidden="true">📏</span>
+                  <span>Size Guide</span>
+                </button>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {sizes.map((size) => (
                   <button
@@ -707,7 +820,7 @@ export default function InlineProductDetail({
                     >
                       {selectedColor === color && (
                         <span
-                          className={`absolute inset-0 m-auto flex h-full w-full items-center justify-center text-sm ${color === 'White' || color === 'Yellow' ? 'text-gray-900' : 'text-white'}`}
+                          className={`absolute inset-0 m-auto flex h-full w-full items-center justify-center text-sm ${color === 'White' || color === 'Yellow' ? 'text-gray-900 dark:text-white' : 'text-white'}`}
                           aria-hidden="true"
                         >
                           ✅
@@ -736,7 +849,7 @@ export default function InlineProductDetail({
                 {isCustomOrderOnly
                   ? 'Custom order only'
                   : !isOutOfStock
-                    ? `${product.totalStock} in stock`
+                    ? (isOwnProduct ? `${product.totalStock} in stock` : 'In stock')
                     : 'Out of stock'}
               </span>
             </div>
@@ -778,38 +891,41 @@ export default function InlineProductDetail({
               ) : null}
             </div>
           ) : null}
-          <div className="flex gap-3 pt-4">
-            {isOwnProduct ? (
-              <div className="flex-1 flex items-center justify-center px-6 py-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-sm font-medium text-gray-600 dark:text-gray-300">
-                Your product
-              </div>
-            ) : (
-              <div className="flex-1 flex items-center justify-center px-6 py-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-sm font-medium text-gray-600 dark:text-gray-300">
-                {isCustomOrderOnly ? 'Custom-order only' : 'Bag the item above to continue'}
-              </div>
-            )}
+
+          <div className="flex gap-3 pt-2">
             {!isOwnProduct ? (
               <>
                 <button
                   type="button"
                   onClick={handleToggleWishlist}
                   disabled={wishlistBusy}
-                  className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:text-pink-500 hover:border-pink-300 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 h-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:text-pink-500 hover:border-pink-300 transition-all flex items-center justify-center gap-2 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                 >
                   <span aria-hidden="true">{isWishlisted ? '❤️' : '🤍'}</span>
+                  <span>{isWishlisted ? 'Wishlisted' : 'Wishlist'}</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleShare}
-                  className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:text-purple-500 hover:border-purple-300 transition-all flex items-center justify-center"
+                  className="flex-1 h-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:text-purple-500 hover:border-purple-300 transition-all flex items-center justify-center gap-2 font-medium text-sm"
                   aria-label="Share product"
                 >
                   <span aria-hidden="true">🔗</span>
+                  <span>Share</span>
                 </button>
               </>
-            ) : null}
-            {/* QR button disabled — only brand profile QR codes active */}
+            ) : (
+              <button
+                type="button"
+                onClick={handleShare}
+                className="w-full h-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:text-purple-500 hover:border-purple-300 transition-all flex items-center justify-center gap-2 font-medium text-sm"
+                aria-label="Share product"
+              >
+                <span aria-hidden="true">🔗</span>
+                <span>Share Product</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -865,7 +981,7 @@ export default function InlineProductDetail({
                   </button>
                 </div>
 
-                <div className="px-5 py-4 max-h-[50vh] overflow-y-auto scrollbar-threadly-strong space-y-3">
+                <div className="px-5 py-4 max-h-[50vh] overflow-y-auto scrollbar-wiez-strong space-y-3">
                   <p className="text-xs text-slate-600 dark:text-slate-400">
                     This product needs custom measurements. Add only the required points below to buy now.
                   </p>

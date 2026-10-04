@@ -1,7 +1,24 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouteError, isRouteErrorResponse, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, RefreshCcw, AlertTriangle, WifiOff, ServerCrash, ShieldX } from 'lucide-react';
+import { captureClientException } from '@/observability/sentry';
+import {
+  STALE_BUNDLE_SESSION_KEYS,
+  recoverFromStaleBundle,
+  shouldRecoverFromStaleBundle,
+} from '@/utils/staleBundle';
+
+/**
+ * Stale-deploy render crashes: React.lazy resolving a mixed-version chunk
+ * throws "Cannot read properties of undefined (reading 'default')" (Sentry
+ * 2026-07-11, /studio/store on release V2026.07.09). A fresh cache-busted
+ * document fixes it — showing users a dead error page does not.
+ *
+ * The detection and the reload live in `@/utils/staleBundle`, because this
+ * file, `main.tsx` and `RootErrorBoundary` all need to agree about them and
+ * the copies here and in `main.tsx` had already drifted.
+ */
 
 /**
  * ErrorPage - Premium error boundary page
@@ -17,6 +34,31 @@ const ErrorPage: React.FC = () => {
   const error = useRouteError();
   const navigate = useNavigate();
   console.error('ErrorPage caught:', error);
+
+  // Auto-recover ONCE per session from stale-bundle render crashes with a
+  // cache-busted reload instead of stranding the user on this page.
+  const [recovering] = useState<boolean>(() => {
+    // A 404/401 from a loader is a real answer, not a broken bundle.
+    if (isRouteErrorResponse(error) || !shouldRecoverFromStaleBundle(error)) {
+      return false;
+    }
+    return recoverFromStaleBundle(STALE_BUNDLE_SESSION_KEYS.router);
+  });
+
+  useEffect(() => {
+    // Router errorElement intercepts render errors before RootErrorBoundary,
+    // so this boundary must report to Sentry itself.
+    if (!isRouteErrorResponse(error)) {
+      captureClientException(error, {
+        boundary: recovering ? 'router-error-page-auto-recovery' : 'router-error-page',
+      });
+    }
+  }, [error, recovering]);
+
+  if (recovering) {
+    // Reload is in flight — a blank surface beats flashing an error page.
+    return <div className="min-h-screen bg-[#0a0a0a]" aria-busy="true" />;
+  }
 
   // Determine error type and customize display
   let status = 500;
@@ -160,7 +202,7 @@ const ErrorPage: React.FC = () => {
         >
           <button
             onClick={() => window.location.reload()}
-            className={`flex items-center gap-2 px-6 py-3 rounded-full bg-white text-gray-900 font-medium hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5`}
+            className={`flex items-center gap-2 px-6 py-3 rounded-full bg-white text-gray-900 font-medium hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 dark:bg-white/5 dark:text-white`}
           >
             <RefreshCcw className="w-5 h-5" />
             Try Again

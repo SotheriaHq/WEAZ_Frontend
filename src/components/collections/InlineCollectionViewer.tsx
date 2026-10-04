@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react'
 import { brandApi } from '@/api/BrandApi';
 import AccessApi, { type AccessState } from '@/api/AccessApi';
 import { toast } from 'sonner';
+import { CLIP_ADDED_TOAST, CLIP_REMOVED_TOAST } from '@/constants/clipping';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import StackedCarousel, { type CarouselMediaItem } from '@/components/collections/StackedCarousel';
@@ -20,6 +21,7 @@ import { addToCart, openCartDrawer } from '@/features/cartSlice';
 import { CollectionCartPreviewModal } from '@/components/collections/CollectionCartPreviewModal';
 import { getCollectionCartPreview, type CollectionCartPreviewResponse } from '@/api/collectionUploads';
 import { buildCollectionUrl, shareOrCopyLink } from '@/utils/publicLinks';
+import { buildDesignRoute } from '@/utils/catalogRoutes';
 import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useBagging } from '@/hooks/useBagging';
@@ -30,7 +32,7 @@ import {
   setCollectionDetailQueryData,
   useCollectionDetailQuery,
 } from '@/query/queries';
-import { THREADLY_QUERY_STALE_TIME_MS } from '@/query/queryClient';
+import { WIEZ_QUERY_STALE_TIME_MS } from '@/query/queryClient';
 import { queryKeys } from '@/query/queryKeys';
 
 interface InlineCollectionViewerProps {
@@ -50,11 +52,14 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const highlightCommentId = searchParams.get('commentId');
-  const [loading, setLoading] = useState(true);
+  const cachedDetail =
+    queryClient.getQueryData<any>(queryKeys.brand.collectionDetail(collectionId, 'design')) ??
+    queryClient.getQueryData<any>(queryKeys.design.detail(collectionId));
+  const [loading, setLoading] = useState(() => Boolean(collectionId && !cachedDetail));
   const [locked, setLocked] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [detail, setDetail] = useState<any | null>(null);
-  const detailRef = useRef<any | null>(null);
+  const [detail, setDetail] = useState<any | null>(() => cachedDetail ?? null);
+  const detailRef = useRef<any | null>(cachedDetail ?? null);
   const onBackRef = useRef(onBack);
   const [requestState, setRequestState] = useState<AccessState | null>(null);
   const [isThreaded, setIsThreaded] = useState(false);
@@ -226,15 +231,15 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
               const publicUrl = await queryClient.fetchQuery({
                 queryKey: queryKeys.media.publicUrl(fileId),
                 queryFn: () => brandApi.getPublicFileUrl(fileId),
-                staleTime: THREADLY_QUERY_STALE_TIME_MS,
+                staleTime: WIEZ_QUERY_STALE_TIME_MS,
               });
               const url =
                 publicUrl ??
                 (await queryClient.fetchQuery({
                   queryKey: queryKeys.media.signedUrl(fileId),
                   queryFn: () => brandApi.getPrivateSignedFileUrl(fileId),
-                  staleTime: THREADLY_QUERY_STALE_TIME_MS,
-                  gcTime: THREADLY_QUERY_STALE_TIME_MS,
+                  staleTime: WIEZ_QUERY_STALE_TIME_MS,
+                  gcTime: WIEZ_QUERY_STALE_TIME_MS,
                 }));
               return { ...item, url: url || item.url };
             } catch {
@@ -299,7 +304,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
 
   const handleWishlist = async () => {
     setIsWishlisted((prev) => !prev);
-    toast.success(!isWishlisted ? 'Added to saved items' : 'Removed from saved items');
+    toast.success(!isWishlisted ? CLIP_ADDED_TOAST : CLIP_REMOVED_TOAST);
   };
 
   const handleShare = async () => {
@@ -800,7 +805,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                       ? [{ label: 'Cancel Discount Sale', onClick: handleCancelSale }]
                       : [{ label: 'Discount Sale', onClick: () => setShowDiscountModal(true) }]
                     ),
-                    { label: 'Edit Collection Details', onClick: () => { navigate(`/profile/collections/edit/${collectionId}`); } },
+                    { label: 'Edit Collection Details', onClick: () => { navigate(buildDesignRoute({ designId: collectionId, mode: 'edit' })); } },
                   ]}
                 />
               ) : undefined}

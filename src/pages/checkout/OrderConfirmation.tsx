@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useDispatch } from 'react-redux';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { fetchCart, fetchCustomBagCount } from '@/features/cartSlice';
+import type { AppDispatch } from '@/store';
 import Button from '@/components/ui/Button';
 import { openPaystackInline } from '@/lib/paystackInline';
 import {
-  resolveInAppPaymentSession,
   resolvePaymentGateway,
+  resolvePaymentLaunchPlan,
 } from '@/lib/inAppPaymentSession';
 // import LazyOrderQrCard from '@/components/qr/LazyOrderQrCard'; // disabled — order QR codes off
 import {
@@ -53,6 +56,7 @@ const OrderConfirmation: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const dispatch = useDispatch<AppDispatch>();
   const locationState = (location.state as ConfirmationState | null) ?? null;
   const [attempt, setAttempt] = useState<PaymentAttemptSummary | null>(null);
   const [loading, setLoading] = useState(Boolean(searchParams.get('reference')) && !locationState?.summary);
@@ -101,6 +105,22 @@ const OrderConfirmation: React.FC = () => {
   const statusCopy = getCheckoutStatusCopy('confirmation', status, nextAction);
   const canResumePayment = Boolean(String(providerAccessCode ?? '').trim());
 
+  /*
+    This page is a landing, not only a redirect target: it is reached straight
+    from a provider return and from "View receipt" in My Orders, where nothing
+    else has cleared the bag. `PaymentReturnPage` refreshes on its own PAID
+    transition, but a buyer who never passes through it would still see the
+    pre-order badge. Both halves are refreshed because the badge sums standard
+    and custom lines, and the ref keeps a re-render from re-firing the fetch.
+  */
+  const paidBagRefreshDoneRef = React.useRef(false);
+  useEffect(() => {
+    if (status !== 'PAID' || paidBagRefreshDoneRef.current) return;
+    paidBagRefreshDoneRef.current = true;
+    void dispatch(fetchCart({ force: true }));
+    void dispatch(fetchCustomBagCount({ force: true }));
+  }, [dispatch, status]);
+
   const paymentSummaryLines = useMemo(() => {
     if (!paymentMethod || !paymentData || !isCheckoutPaymentMethod(paymentMethod)) return [];
     return getPaymentSummaryLines(paymentMethod, paymentData);
@@ -110,18 +130,42 @@ const OrderConfirmation: React.FC = () => {
     if (!reference) return;
 
     setResumingPayment(true);
-    setPaymentActionMessage('Opening secure checkout inside WEAZ...');
+    setPaymentActionMessage('Opening secure checkout inside WIEZ...');
     try {
-      const session = resolveInAppPaymentSession({
-        providerAccessCode,
-      });
       const resolvedGateway = resolvePaymentGateway({
         gateway: locationState?.gateway ?? attempt?.gateway,
       });
       const returnPath =
         `/bag/payment-return?reference=${encodeURIComponent(reference)}&gateway=${encodeURIComponent(resolvedGateway)}`;
+      const plan = resolvePaymentLaunchPlan({
+        providerAccessCode: providerAccessCode ?? attempt?.providerAccessCode,
+        authorizationUrl: attempt?.authorizationUrl,
+        status: attempt?.status,
+      });
 
-      await openPaystackInline(session.accessCode, {
+      if (plan.kind === 'FAILED') {
+        setPaymentActionMessage(plan.message);
+        toast.error(plan.message);
+        return;
+      }
+
+      /*
+        A saved-card charge is accepted server-side with no access code to
+        resume — there is no window to reopen, so hand the buyer to the return
+        page, which polls the reference until the gateway settles it.
+      */
+      if (plan.kind === 'CONFIRM' || plan.kind === 'SETTLED') {
+        navigate(returnPath);
+        return;
+      }
+
+      if (plan.kind === 'REDIRECT') {
+        setPaymentActionMessage('Opening secure card verification...');
+        window.location.assign(plan.url);
+        return;
+      }
+
+      await openPaystackInline(plan.accessCode, {
         onSuccess: () => {
           navigate(returnPath);
         },
@@ -136,7 +180,7 @@ const OrderConfirmation: React.FC = () => {
       });
     } catch (error: any) {
       setPaymentActionMessage(
-        'This payment can only continue from a secure in-app session. Retry the payment from inside WEAZ.',
+        'This payment can only continue from a secure in-app session. Retry the payment from inside WIEZ.',
       );
       toast.error(error?.message || 'Unable to resume payment');
     } finally {
@@ -153,13 +197,33 @@ const OrderConfirmation: React.FC = () => {
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
         <div className="mb-6 text-6xl">🧾</div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Loading payment confirmation</h1>
-        <p className="text-gray-500 dark:text-zinc-400">WEAZ is loading the latest payment and order state.</p>
+        <p className="text-gray-500 dark:text-zinc-400">WIEZ is loading the latest payment and order state.</p>
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+      {/* Top navigation bar for mobile browser & desktop */}
+      <div className="mb-6 flex items-center justify-between gap-3 border-b border-gray-200/70 pb-4 dark:border-zinc-800">
+        <button
+          type="button"
+          onClick={() => navigate('/runway')}
+          className="flex items-center gap-1.5 rounded-full border border-black/10 bg-black/5 px-3.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-black/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 transition-colors"
+        >
+          <span>← 👗</span>
+          <span>Back to Runway</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/profile')}
+          className="flex items-center gap-1.5 rounded-full border border-black/10 bg-black/5 px-3.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-black/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 transition-colors"
+        >
+          <span>👤</span>
+          <span>My Profile</span>
+        </button>
+      </div>
+
       <div className="mb-6 text-6xl">{statusCopy.emoji}</div>
       <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
         {statusCopy.headline}
@@ -290,7 +354,7 @@ const OrderConfirmation: React.FC = () => {
       <div className="flex flex-col justify-center gap-3 sm:flex-row">
         {canResumePayment && status !== 'PAID' && (
           <Button onClick={() => void handleContinuePayment()} size="lg" loading={resumingPayment}>
-            {nextAction?.ctaLabel || 'Continue Payment'}
+            💳 {nextAction?.ctaLabel || 'Continue Payment'}
           </Button>
         )}
         <Button
@@ -301,10 +365,10 @@ const OrderConfirmation: React.FC = () => {
           }
           size="lg"
         >
-          {attempt?.subjectType === 'CUSTOM_ORDER' ? 'Open Custom Order' : 'View My Orders'}
+          📦 {attempt?.subjectType === 'CUSTOM_ORDER' ? 'Open Custom Order' : 'View My Orders'}
         </Button>
-        <Button variant="secondary" onClick={() => navigate('/')} size="lg">
-          Continue Shopping
+        <Button variant="secondary" onClick={() => navigate('/runway')} size="lg">
+          ← 👗 Back to Runway
         </Button>
       </div>
     </div>

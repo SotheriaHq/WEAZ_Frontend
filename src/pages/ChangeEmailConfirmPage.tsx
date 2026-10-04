@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, LoaderCircle, MailCheck } from 'lucide-react';
+import { AlertTriangle, MailCheck } from 'lucide-react';
 import { AuthApi } from '@/api/AuthApi';
 import BrandWordmark from '@/components/brand/BrandWordmark';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import '../styles/auth.css';
 
 type ConfirmationStatus = 'checking' | 'success' | 'error';
@@ -103,7 +104,7 @@ const ChangeEmailConfirmPage: React.FC = () => {
           <BrandWordmark
             logoSize={32}
             logoClassName="drop-shadow-[0_0_12px_rgba(212,175,55,0.45)] group-hover:drop-shadow-[0_0_18px_rgba(212,175,55,0.6)] transition-[filter]"
-            textClassName="text-xl font-serif font-bold tracking-wide text-[var(--text-primary)] dark:text-white group-hover:text-[var(--brand-accent)] transition-colors"
+            
           />
         </Link>
 
@@ -119,7 +120,7 @@ const ChangeEmailConfirmPage: React.FC = () => {
               ) : status === 'error' ? (
                 <AlertTriangle className="h-7 w-7 text-red-300" aria-hidden="true" />
               ) : (
-                <LoaderCircle className="h-7 w-7 animate-spin text-[#D4AF37]" aria-hidden="true" />
+                <MuseLoader size={28} tone="current" className="text-[#D4AF37]" label={heading} />
               )}
             </div>
             <h1 className={`text-xl sm:text-2xl font-serif font-bold mb-3 ${statusTone}`}>

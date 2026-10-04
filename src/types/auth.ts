@@ -1,4 +1,7 @@
 import type { ThemePreference } from './theme';
+// One definition of the verification states, so a new one cannot be added
+// to the domain type and silently missed here.
+import type { VerificationStatusValue } from './verification';
 
 export type AuthRole = 'SuperAdmin' | 'Admin' | 'User';
 export type AuthUserType = 'BRAND' | 'REGULAR';
@@ -33,6 +36,7 @@ export interface AuthUserDto {
   email: string;
   firstName: string;
   lastName: string;
+  gender?: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'UNSPECIFIED' | null;
   role: AuthRole;
   type: AuthUserType;
   themePreference: ThemePreference;
@@ -66,7 +70,7 @@ export interface AuthUserDto {
   storeId: string | null;
   brandMemberships?: AuthBrandMembershipDto[];
   activeBrandId?: string | null;
-  verificationStatus?: 'NOT_SUBMITTED' | 'PENDING' | 'IN_REVIEW' | 'ADDITIONAL_INFO_REQUESTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | null;
+  verificationStatus?: VerificationStatusValue | null;
   isVerifiedBrand?: boolean;
   verificationBadgeVisible?: boolean;
   verifiedExplanationUrl?: string | null;

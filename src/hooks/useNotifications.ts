@@ -1,11 +1,22 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import type { RootState, AppDispatch } from '@/store';
 import { useRealtime } from '@/realtime';
 import { toast } from 'sonner';
+import { summarizeNotificationForToast } from '@/utils/notificationToast';
 import { determineNotificationRoute } from '@/utils/notificationRouting';
-import { useNotificationSettingsQuery } from '@/query/queries';
+import { refreshOwnerCatalogQueries, useNotificationSettingsQuery } from '@/query/queries';
+
+const CONTENT_REVIEW_NOTIFICATION_TYPES = new Set([
+  'CONTENT_REVIEW_APPROVED',
+  'CONTENT_PUBLISHED',
+  'CONTENT_CHANGES_REQUESTED',
+  'CONTENT_REVIEW_REJECTED',
+  'CONTENT_REVIEW_FAILED',
+  'CONTENT_RESUBMITTED',
+]);
 import {
   fetchNotifications,
   fetchUnreadCount,
@@ -23,6 +34,7 @@ import {
 export function useNotificationsBootstrap() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const userId = useSelector((s: RootState) => s.user.profile?.id);
   const initialized = useSelector((s: RootState) => s.notifications.initialized);
   const items = useSelector((s: RootState) => s.notifications.items);
@@ -83,6 +95,20 @@ export function useNotificationsBootstrap() {
     };
   }, [notificationSettingsQuery.data]);
 
+  // Catch-up sync whenever the socket (re)connects: anything that happened
+  // while the tab was offline/backgrounded — approvals, new notifications —
+  // was never pushed, so pull it now and refresh review-status queries.
+  useEffect(() => {
+    if (!userId) return;
+    const onRestored = () => {
+      dispatch(fetchUnreadCount());
+      dispatch(fetchNotifications({ limit: 30 }));
+      refreshOwnerCatalogQueries(queryClient, userId);
+    };
+    window.addEventListener('ws:restored', onRestored);
+    return () => window.removeEventListener('ws:restored', onRestored);
+  }, [dispatch, queryClient, userId]);
+
   // Realtime subscription
   useEffect(() => {
     if (!userId) return;
@@ -109,14 +135,19 @@ export function useNotificationsBootstrap() {
           targetUrl: payload.targetUrl ?? payload.payload?.targetUrl ?? undefined,
         }),
       );
-      dispatch(fetchUnreadCount());
-      dispatch(fetchNotifications({ limit: 30 }));
-      // Show toast for real-time notification
-      if (payload.message) {
-        toast.info(payload.message);
+      // One line, actor + action. The text itself stays in the list and thread.
+      const toastLine = summarizeNotificationForToast(payload);
+      if (toastLine) {
+        toast.info(toastLine);
       }
 
       const type = String(payload?.type || '').toUpperCase();
+      if (CONTENT_REVIEW_NOTIFICATION_TYPES.has(type)) {
+        refreshOwnerCatalogQueries(queryClient, userId);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('wiez:content-review-updated'));
+        }
+      }
       const isMessageSignal = type.includes('MESSAGE');
       const notVisible = document.visibilityState !== 'visible';
 
@@ -140,12 +171,12 @@ export function useNotificationsBootstrap() {
       if (messagingPrefsRef.current.desktop && notVisible && 'Notification' in window) {
         if (Notification.permission === 'granted') {
           const desktopNotification = new Notification(
-            isMessageSignal ? 'WEAZ message' : 'WEAZ',
+            isMessageSignal ? 'WIEZ message' : 'WIEZ',
             {
               body:
                 payload.message ||
                 (isMessageSignal ? 'You have a new order message' : 'You have a new notification'),
-              tag: `WEAZ:${payload.id}`,
+              tag: `WIEZ:${payload.id}`,
             },
           );
           // Make the desktop notification actionable: focus the tab and route to
@@ -183,13 +214,21 @@ export function useNotificationsBootstrap() {
     });
     const unsubDeleted = onNotificationDeleted((payload: any) => {
       if (!payload?.id) return;
-      dispatch(removeNotification({ id: payload.id }));
+      dispatch(
+        removeNotification({
+          id: payload.id,
+          unreadDelta:
+            typeof payload.unreadDelta === 'number'
+              ? payload.unreadDelta
+              : undefined,
+        }),
+      );
     });
     return () => {
       unsub();
       unsubDeleted();
     };
-  }, [userId, realtime, dispatch, playMessageTone, navigate]);
+  }, [userId, realtime, dispatch, playMessageTone, navigate, queryClient]);
 
   // Lightweight debounce for unread fetches
   const maybeFetchUnread = useCallback(() => {

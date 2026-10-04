@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSelector } from "react-redux";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { X } from "lucide-react";
-import VLoader from "@/components/loaders/VLoader";
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import type { RootState } from "@/store";
 import { brandApi } from "@/api/BrandApi";
 import { apiClient } from "@/api/httpClient";
@@ -30,6 +31,13 @@ import Tag from "@/components/ui/Tag";
 import InfoTooltip from "@/components/ui/InfoTooltip";
 import { getTagColor } from "@/utils/tagColors";
 import {
+  needsResubmission,
+  normalizeContentReviewStatus,
+  primaryActionLabel,
+  primaryActionPendingLabel,
+  reviewStateHint,
+} from "@/utils/contentReviewActions";
+import {
   getCollectionProductQueueItems,
   removeCollectionProductQueueItem,
   subscribeToCollectionProductQueue,
@@ -44,6 +52,7 @@ import {
   mapCreatorMetadataError,
   normalizeHashtagLabel,
 } from "@/utils/creatorMetadata";
+import useCachedResource from "@/hooks/useCachedResource";
 
 const MAX_PRODUCTS = 5;
 const MAX_TAGS = 20;
@@ -62,6 +71,25 @@ type CategoryOption = {
   id: string;
   name: string;
   types: CategoryTypeOption[];
+};
+
+const extractStoreProducts = (res: unknown): StoreProduct[] => {
+  const payload = res as any;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.data?.items)) return payload.data.items;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+};
+
+const mergeStoreProducts = (
+  current: StoreProduct[],
+  incoming: StoreProduct[],
+): StoreProduct[] => {
+  const merged = new Map(current.map((product) => [product.id, product]));
+  incoming.forEach((product) => {
+    merged.set(product.id, product);
+  });
+  return Array.from(merged.values());
 };
 
 const FILTER_SELECTION_STORAGE_PREFIX = "storeCollectionFilterSelection:";
@@ -365,6 +393,14 @@ const StoreCollectionCreate: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useSelector((state: RootState) => state.user.profile);
+  const queryClient = useQueryClient();
+  const storeCollectionProductsQueryKey = useMemo(
+    () => ['store-collection-create', 'products', user?.id ?? 'anon', 200] as const,
+    [user?.id],
+  );
+  const cachedStoreProducts = user?.id
+    ? queryClient.getQueryData<StoreProduct[]>(storeCollectionProductsQueryKey)
+    : undefined;
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -376,7 +412,6 @@ const StoreCollectionCreate: React.FC = () => {
   const [tags, setTags] = useState<string[]>([]);
 
   const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({});
   const [hasManualFilterEdits, setHasManualFilterEdits] = useState(false);
   const [hasManualTagEdits, setHasManualTagEdits] = useState(false);
@@ -384,12 +419,24 @@ const StoreCollectionCreate: React.FC = () => {
   const [hasManualSubCategoryEdit, setHasManualSubCategoryEdit] = useState(false);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
 
-  const [products, setProducts] = useState<StoreProduct[]>([]);
-  const [productsLoading, setProductsLoading] = useState(true);
+  const [products, setProducts] = useState<StoreProduct[]>(
+    () => cachedStoreProducts ?? [],
+  );
+  const [productsLoading, setProductsLoading] = useState(
+    () => Boolean(user?.id) && cachedStoreProducts === undefined,
+  );
   const [productsError, setProductsError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [creationMode, setCreationMode] = useState<"existing" | "new">(
     "existing",
+  );
+
+  /**
+   * Which half of the page a narrow screen is showing. Ignored from `lg` up,
+   * where both are visible side by side. See the step control in the layout.
+   */
+  const [mobileStep, setMobileStep] = useState<"products" | "details">(
+    "products",
   );
 
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
@@ -417,8 +464,21 @@ const StoreCollectionCreate: React.FC = () => {
   const [sessionFlowProductIds, setSessionFlowProductIds] = useState<string[]>(
     [],
   );
+  /**
+   * Review statuses belong here too. They used to be coerced to `null`, which
+   * made `isExistingCollectionEditMode` false for a collection sitting in
+   * CHANGES_REQUESTED — so the editor stopped recognising it as an existing
+   * collection at all, and the owner answering a change request was put back
+   * into what looks like a fresh create.
+   */
   const [existingCollectionStatus, setExistingCollectionStatus] = useState<
-    "DRAFT" | "PUBLISHED" | "ARCHIVED" | null
+    | "DRAFT"
+    | "PUBLISHED"
+    | "ARCHIVED"
+    | "IN_REVIEW"
+    | "CHANGES_REQUESTED"
+    | "REJECTED"
+    | null
   >(null);
   const [existingLinkedProductIds, setExistingLinkedProductIds] = useState<
     string[]
@@ -434,6 +494,27 @@ const StoreCollectionCreate: React.FC = () => {
     autoCleanupParam === "1" || returnMode === "new" || returnMode === "existing",
   );
   const restoredDraftSnapshotRef = useRef(false);
+  const { data: cachedCategories = [], loading: loadingCategories } =
+    useCachedResource<CategoryOption[]>({
+      queryKey: ['store-collection-create', 'categories-with-subcategories'],
+      queryFn: async () => {
+        try {
+          const cats = await brandApi.getCategoriesWithSubCategories(true);
+          if (!Array.isArray(cats)) return [];
+          return cats.map((c) => ({
+            id: c.id,
+            name: c.name,
+            types: Array.isArray(c.types)
+              ? c.types.map((t) => ({ id: t.id, name: t.name }))
+              : [],
+          }));
+        } catch {
+          return [];
+        }
+      },
+      staleTime: 30 * 60 * 1000,
+      gcTime: 60 * 60 * 1000,
+    });
 
   const clearSessionFilterCache = useCallback((sessionId?: string | null) => {
     if (!sessionId) return;
@@ -506,45 +587,21 @@ const StoreCollectionCreate: React.FC = () => {
   );
 
   useEffect(() => {
-    let mounted = true;
-    const loadCategories = async () => {
-      setLoadingCategories(true);
-      try {
-        const cats = await brandApi.getCategoriesWithSubCategories(true);
-        if (!mounted) return;
-        const mapped = cats.map((c) => ({
-          id: c.id,
-          name: c.name,
-          types: Array.isArray(c.types)
-            ? c.types.map((t) => ({ id: t.id, name: t.name }))
-            : [],
-        }));
-        setCategories(mapped);
-        if (mapped.length) {
-          setCategoryId((prev) => prev || mapped[0].id);
-          setCategoryTypeId((prev) => {
-            if (
-              prev &&
-              mapped.some((category) =>
-                category.types.some((categoryType) => categoryType.id === prev),
-              )
-            ) {
-              return prev;
-            }
-            return mapped[0].types[0]?.id ?? "";
-          });
-        }
-      } catch {
-        if (mounted) setCategories([]);
-      } finally {
-        if (mounted) setLoadingCategories(false);
+    setCategories(cachedCategories);
+    if (!cachedCategories.length) return;
+    setCategoryId((prev) => prev || cachedCategories[0].id);
+    setCategoryTypeId((prev) => {
+      if (
+        prev &&
+        cachedCategories.some((category) =>
+          category.types.some((categoryType) => categoryType.id === prev),
+        )
+      ) {
+        return prev;
       }
-    };
-    void loadCategories();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+      return cachedCategories[0].types[0]?.id ?? "";
+    });
+  }, [cachedCategories]);
 
   useEffect(() => {
     if (!prefillCollectionId) return;
@@ -771,7 +828,10 @@ const StoreCollectionCreate: React.FC = () => {
       setExistingCollectionStatus(
         detail.status === "DRAFT" ||
           detail.status === "PUBLISHED" ||
-          detail.status === "ARCHIVED"
+          detail.status === "ARCHIVED" ||
+          detail.status === "IN_REVIEW" ||
+          detail.status === "CHANGES_REQUESTED" ||
+          detail.status === "REJECTED"
           ? detail.status
           : null,
       );
@@ -958,30 +1018,32 @@ const StoreCollectionCreate: React.FC = () => {
     }
   }, [collectionSessionId, filterSelection]);
 
-  const loadProducts = useCallback(async () => {
+  const loadProducts = useCallback(async (options?: { forceRefresh?: boolean }) => {
     if (!user?.id) {
       setProducts([]);
       setProductsLoading(false);
       return;
     }
-    setProductsLoading(true);
+    const cached = queryClient.getQueryData<StoreProduct[]>(storeCollectionProductsQueryKey);
+    if (cached) {
+      setProducts((prev) => mergeStoreProducts(prev, cached));
+      setProductsLoading(false);
+    } else {
+      setProductsLoading(true);
+    }
     setProductsError(null);
     try {
-      const res = await getBrandProductsForOwner(user.id, 200);
-      const items = Array.isArray((res as any)?.items)
-        ? (res as any).items
-        : Array.isArray((res as any)?.data?.items)
-          ? (res as any).data.items
-          : Array.isArray((res as any)?.data)
-            ? (res as any).data
-            : [];
-      setProducts((prev) => {
-        const merged = new Map(prev.map((product) => [product.id, product]));
-        items.forEach((product: StoreProduct) => {
-          merged.set(product.id, product);
+      if (options?.forceRefresh) {
+        await queryClient.invalidateQueries({
+          queryKey: storeCollectionProductsQueryKey,
         });
-        return Array.from(merged.values());
+      }
+      const items = await queryClient.fetchQuery({
+        queryKey: storeCollectionProductsQueryKey,
+        queryFn: async () => extractStoreProducts(await getBrandProductsForOwner(user.id, 200)),
+        staleTime: options?.forceRefresh ? 0 : 3 * 60 * 1000,
       });
+      setProducts((prev) => mergeStoreProducts(prev, items));
     } catch (error: any) {
       setProductsError(
         error?.response?.data?.message ?? "Failed to load products.",
@@ -989,7 +1051,7 @@ const StoreCollectionCreate: React.FC = () => {
     } finally {
       setProductsLoading(false);
     }
-  }, [user?.id]);
+  }, [queryClient, storeCollectionProductsQueryKey, user?.id]);
 
   useEffect(() => {
     void loadProducts();
@@ -997,7 +1059,7 @@ const StoreCollectionCreate: React.FC = () => {
 
   useEffect(() => {
     if (!preselectProductId) return;
-    void loadProducts();
+    void loadProducts({ forceRefresh: true });
     setSessionFlowProductIds((prev) =>
       prev.includes(preselectProductId) ? prev : [...prev, preselectProductId],
     );
@@ -1311,7 +1373,7 @@ const StoreCollectionCreate: React.FC = () => {
     });
 
     if (replacedTempIds) {
-      void loadProducts();
+      void loadProducts({ forceRefresh: true });
     }
 
     readyItems.forEach((item) => {
@@ -1637,6 +1699,15 @@ const StoreCollectionCreate: React.FC = () => {
         existingCollectionStatus !== "DRAFT",
       ),
     [existingCollectionStatus, prefillCollectionId],
+  );
+  const collectionReviewStatus = useMemo(
+    () => normalizeContentReviewStatus(existingCollectionStatus),
+    [existingCollectionStatus],
+  );
+  const collectionNeedsResubmission = needsResubmission(collectionReviewStatus);
+  const collectionReviewHint = useMemo(
+    () => reviewStateHint(collectionReviewStatus),
+    [collectionReviewStatus],
   );
   const isDraftCollectionEditMode = useMemo(
     () => Boolean(prefillCollectionId && existingCollectionStatus === "DRAFT"),
@@ -2383,8 +2454,56 @@ const StoreCollectionCreate: React.FC = () => {
         </div>
       </div>
 
+      {/*
+        One job at a time on a phone; both at once where there is room.
+
+        This page asks for two unrelated things — WHICH products are in the
+        collection, and WHAT the collection is called and how it behaves. Side
+        by side on a desktop that reads as one workspace. Stacked into a single
+        phone column it becomes an unbroken scroll where the details form sits
+        below a product grid of unknown length, so a brand cannot tell how much
+        is left or that the two halves are separate decisions.
+
+        Below `lg` they become steps. Above it nothing changes: the grid is
+        still two columns of one continuous workspace, which is the right shape
+        when both fit on screen together.
+      */}
+      <div className="mb-4 flex items-center gap-2 lg:hidden">
+        {(['products', 'details'] as const).map((step, index) => {
+          const active = mobileStep === step;
+          return (
+            <button
+              key={step}
+              type="button"
+              onClick={() => setMobileStep(step)}
+              aria-current={active ? 'step' : undefined}
+              className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-left transition ${
+                active
+                  ? 'border-purple-500 bg-purple-50/70 dark:bg-purple-500/10'
+                  : 'border-theme text-theme-secondary'
+              }`}
+            >
+              <span
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                  active ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-600 dark:bg-white/10 dark:text-gray-300'
+                }`}
+              >
+                {index + 1}
+              </span>
+              <span className="truncate text-xs font-semibold">
+                {step === 'products' ? 'Products' : 'Details'}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <section className="lg:col-span-2 space-y-6">
+        <section
+          className={`lg:col-span-2 space-y-6 ${
+            mobileStep === 'products' ? '' : 'hidden lg:block'
+          }`}
+        >
           <div className="surface-card rounded-2xl border p-6">
             <h2 className="text-base font-semibold text-theme">
               How would you like to build this collection?
@@ -2494,7 +2613,7 @@ const StoreCollectionCreate: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void loadProducts()}
+                    onClick={() => void loadProducts({ forceRefresh: true })}
                     className="surface-control surface-interactive-hover rounded-lg border px-4 py-2 text-xs font-semibold"
                   >
                     Refresh Products
@@ -2518,7 +2637,14 @@ const StoreCollectionCreate: React.FC = () => {
                     No products found.
                   </div>
                 ) : (
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  /*
+                    Two per row on a phone. `grid-cols-1` gave each product the
+                    full width of the screen, so picking from a catalogue of any
+                    size meant scrolling past one enormous card at a time and
+                    never seeing two options together — which is the whole point
+                    of a selection grid.
+                  */
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                     {displayedProducts.map((product) =>
                       renderProductSelectionCard(product),
                     )}
@@ -2536,7 +2662,7 @@ const StoreCollectionCreate: React.FC = () => {
                     items to this collection.
                   </div>
                 ) : (
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                     {sessionProducts.map((product) =>
                       renderProductSelectionCard(product, {
                         showLinkedBadge: false,
@@ -2581,9 +2707,33 @@ const StoreCollectionCreate: React.FC = () => {
               </>
             )}
           </div>
+
+          {/* The step control above is a jump; this is the flow. Phones only —
+              on `lg` the details are already beside this column. */}
+          <button
+            type="button"
+            onClick={() => setMobileStep('details')}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/25 transition hover:-translate-y-0.5 lg:hidden"
+          >
+            Next: Collection details
+            <span aria-hidden="true">→</span>
+          </button>
         </section>
 
-        <section className="space-y-6 lg:sticky lg:top-4 self-start">
+        <section
+          className={`space-y-6 lg:sticky lg:top-4 self-start ${
+            mobileStep === 'details' ? '' : 'hidden lg:block'
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => setMobileStep('products')}
+            className="flex items-center gap-1.5 text-xs font-semibold text-theme-secondary transition hover:text-theme lg:hidden"
+          >
+            <span aria-hidden="true">←</span>
+            Back to products
+          </button>
+
           <div className="relative overflow-hidden rounded-2xl border border-purple-100/70 dark:border-white/10 bg-white/90 dark:bg-white/5 p-6 space-y-4">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400" />
             <h2 className="text-lg font-semibold text-theme relative">
@@ -2691,10 +2841,6 @@ const StoreCollectionCreate: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-theme-secondary mb-2 flex items-center">
-                      Style details
-                      <InfoTooltip text={CREATOR_METADATA_HELP.style} />
-                    </label>
                     <FilterSelector
                       value={filterSelection}
                       onChange={handleFilterSelectionChange}
@@ -2869,12 +3015,12 @@ const StoreCollectionCreate: React.FC = () => {
                         <span className="line-clamp-1 flex items-center gap-2">
                           {displayName}
                           {isPrimary && (
-                            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
                               Primary
                             </span>
                           )}
                           {isDraft && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
                               Draft
                             </span>
                           )}
@@ -2882,8 +3028,8 @@ const StoreCollectionCreate: React.FC = () => {
                             <span
                               className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                                 entry.status === "failed"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-sky-100 text-sky-700"
+                                  ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                                  : "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300"
                               }`}
                             >
                               {statusLabel}
@@ -2933,6 +3079,12 @@ const StoreCollectionCreate: React.FC = () => {
         </section>
       </div>
 
+      {/* What pressing the primary action will actually do. Without it, an owner
+          in a change-request cycle has no confirmation that resubmitting sends
+          the collection back to review rather than publishing it outright. */}
+      {collectionReviewHint && (
+        <p className="pt-2 text-xs text-theme-secondary">{collectionReviewHint}</p>
+      )}
       <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
         <button
           type="button"
@@ -2947,7 +3099,13 @@ const StoreCollectionCreate: React.FC = () => {
         >
           {isExistingCollectionEditMode ? "Discard changes" : "Back"}
         </button>
-        {isExistingCollectionEditMode ? (
+        {/*
+          Only a PUBLISHED collection collapses to a single "Save changes".
+          A collection answering a change request keeps the full set — park it
+          as a draft, or resubmit — because that is the point at which the owner
+          most needs both, and the single-button bar is what stranded them.
+        */}
+        {isExistingCollectionEditMode && !collectionNeedsResubmission ? (
           <button
             type="button"
             onClick={() => handleSubmit("publish")}
@@ -2955,9 +3113,9 @@ const StoreCollectionCreate: React.FC = () => {
             className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60 inline-flex items-center gap-2"
           >
             {submitting && (
-              <VLoader size={14} phase="loading" showLabel={false} />
+              <MuseLoader size={14} />
             )}
-            {submitting ? "Saving..." : "Save changes"}
+            {submitting ? "Saving…" : "Save changes"}
           </button>
         ) : (
           <>
@@ -2965,10 +3123,10 @@ const StoreCollectionCreate: React.FC = () => {
               type="button"
               onClick={() => handleSubmit("draft")}
               disabled={submitting || hasPendingSelectedProducts}
-              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60 inline-flex items-center gap-2"
+              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-60 inline-flex items-center gap-2 dark:bg-white/10 dark:text-gray-300"
             >
               {submitting && submitAction === "draft" && (
-                <VLoader size={14} phase="loading" showLabel={false} />
+                <MuseLoader size={14} />
               )}
               {submitting && submitAction === "draft"
                 ? "Saving..."
@@ -2981,11 +3139,15 @@ const StoreCollectionCreate: React.FC = () => {
               className="rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 disabled:opacity-60 inline-flex items-center gap-2"
             >
               {submitting && submitAction === "publish" && (
-                <VLoader size={14} phase="loading" showLabel={false} />
+                <MuseLoader size={14} />
               )}
               {submitting && submitAction === "publish"
-                ? "Going live..."
-                : "Go live"}
+                ? primaryActionPendingLabel(collectionReviewStatus)
+                : primaryActionLabel({
+                    status: collectionReviewStatus,
+                    isEditMode: Boolean(prefillCollectionId),
+                    entity: "collection",
+                  })}
             </button>
           </>
         )}

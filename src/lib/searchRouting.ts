@@ -21,7 +21,7 @@ export function buildRunwayPinnedHref(query: string, anchorDesignId?: string): s
   if (anchorDesignId) {
     params.set('anchorDesignId', anchorDesignId);
   }
-  return `/market?${params.toString()}`;
+  return `/runway?${params.toString()}`;
 }
 
 /**
@@ -58,7 +58,7 @@ export function resolveSearchResultRoute(
         kind: 'brandStore',
         // Lets the brand store send the user back to the Runway default feed
         // instead of the stale search results list.
-        state: { fromSearch: true, returnTo: '/market' },
+        state: { fromSearch: true, returnTo: '/runway' },
       };
     }
     return { to: item.href, kind: 'default', state: { fromSearch: true } };

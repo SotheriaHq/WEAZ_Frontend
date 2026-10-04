@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  hasSeenBrandSettlementNote,
   isBrandProfileComplete,
+  markBrandSettlementNoteSeen,
   resolveBrandProfileSetupDestination,
   resolveStoreSetupDestination,
+  sanitizeSingleSocialLink,
   saveStoreProgressLocally,
 } from '../utils/storeSetup';
 
@@ -58,5 +61,26 @@ describe('storeSetup helpers', () => {
     );
 
     expect(resolveStoreSetupDestination('user-1')).toBe('/studio/store/setup');
+  });
+
+  it('tracks brand settlement note as seen once per user', () => {
+    expect(hasSeenBrandSettlementNote('brand-1')).toBe(false);
+    markBrandSettlementNoteSeen('brand-1');
+    expect(hasSeenBrandSettlementNote('brand-1')).toBe(true);
+    expect(hasSeenBrandSettlementNote('brand-2')).toBe(false);
+  });
+
+  it('keeps only one connected social profile', () => {
+    expect(
+      sanitizeSingleSocialLink({
+        instagram: 'brand_a',
+        tiktok: 'brand_b',
+        twitter: '',
+      }),
+    ).toEqual({
+      instagram: 'brand_a',
+      tiktok: '',
+      twitter: '',
+    });
   });
 });

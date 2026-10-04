@@ -4,16 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { EmailVerificationBanner } from './EmailVerificationBanner';
 
 describe('EmailVerificationBanner', () => {
-  it('renders email verification status with resend and status actions', () => {
+  it('renders the prompt with a resend action', () => {
     const onResend = vi.fn();
-    const onCheckStatus = vi.fn();
 
     render(
       <EmailVerificationBanner
         title="Verify your email"
         description="Open the verification link, then come back."
         onResend={onResend}
-        onCheckStatus={onCheckStatus}
       />,
     );
 
@@ -21,13 +19,29 @@ describe('EmailVerificationBanner', () => {
     expect(screen.getByText('Verify your email')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Resend email' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Check status' }));
-
     expect(onResend).toHaveBeenCalledTimes(1);
-    expect(onCheckStatus).toHaveBeenCalledTimes(1);
   });
 
-  it('disables actions while resend or status check is running', () => {
+  /**
+   * Verification completes outside this tab, so the banner's owner polls and
+   * re-checks on focus. Offering a "check status" button asks the user to tell
+   * the app to notice something it can already see — and it was the only way
+   * out of a stale `isEmailVerified: false`, which is the bug that removed it.
+   */
+  it('offers no manual status check — detection is automatic', () => {
+    render(
+      <EmailVerificationBanner
+        title="Verify your email"
+        description="Open the verification link, then come back."
+        onResend={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /check status/i })).toBeNull();
+    expect(screen.getByText(/clears itself once you confirm/i)).toBeTruthy();
+  });
+
+  it('shows a passive checking hint and disables resend while it runs', () => {
     render(
       <EmailVerificationBanner
         title="Verify your email"
@@ -35,7 +49,6 @@ describe('EmailVerificationBanner', () => {
         isResending
         isChecking
         onResend={vi.fn()}
-        onCheckStatus={vi.fn()}
       />,
     );
 
@@ -43,9 +56,8 @@ describe('EmailVerificationBanner', () => {
       'disabled',
       true,
     );
-    expect(screen.getByRole('button', { name: 'Checking...' })).toHaveProperty(
-      'disabled',
-      true,
-    );
+    // A hint, not a control.
+    expect(screen.getByText('Checking…')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Checking…' })).toBeNull();
   });
 });

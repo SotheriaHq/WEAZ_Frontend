@@ -1,8 +1,7 @@
 export type DomainVerificationStatus = 'optional' | 'pending' | 'verified' | 'failed';
 export type WizardOrderProcessingMode = 'manual-review' | 'auto-confirm';
 export type WizardOrderCancellationWindow = 'none' | '1h' | '6h' | '24h';
-export type WizardCustomOrderConsultationMode = 'required' | 'optional';
-export type WizardCustomOrderLeadTime = '7-14' | '14-21' | '21-30' | '30-plus';
+export type WizardCustomOrderLeadTime = '1-2' | '2-4' | '4-7';
 
 export type WizardCollectionType = 'standard' | 'seasonal' | 'limited' | 'capsule';
 export type WizardCollectionStatus = 'active' | 'inactive';
@@ -112,7 +111,6 @@ export interface StoreWizardData {
   responseTimeSla: string;
   contactEmail: string;
   customOrdersEnabled: boolean;
-  customOrderConsultationMode: WizardCustomOrderConsultationMode;
   customOrderLeadTime: WizardCustomOrderLeadTime;
   customOrderRushSupported: boolean;
 

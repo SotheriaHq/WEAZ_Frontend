@@ -4,6 +4,7 @@ import { unwrapApiResponse } from "../types/auth";
 import type { SizingMode } from '@/types/sizing';
 import { filterV1GarmentCategories } from '@/utils/v1Taxonomy';
 import { WEB_UPLOAD_POLICIES, assertValidUploadFile } from '@/utils/uploadValidation';
+import { getNormalizedImageFile } from '@/api/UploadApi';
 import {
   type MediaViewSlot,
   toBackendMediaViewSlot,
@@ -12,6 +13,14 @@ import {
   getRequiredLegalAcceptances,
   LEGAL_CONTENT_PUBLISH_DOCUMENT_KEYS,
 } from '@/api/LegalApi';
+
+/**
+ * Product create/update are heavy transactional writes (media validation,
+ * taxonomy + filter checks, content submission). The global 15s axios default
+ * in `config/env.ts` aborts them on mobile connections, which silently strands
+ * a listing as a DRAFT — match the media-upload override instead.
+ */
+const PRODUCT_WRITE_TIMEOUT_MS = 90_000;
 
 // =====================
 // Types
@@ -26,6 +35,13 @@ export interface ProductVariant {
   price?: number;
   stock: number;
   lowStock?: boolean;
+  /**
+   * UI-only stable identity for the color group in the editor. Lets two
+   * as-yet-unnamed colors stay separate cards (grouping otherwise collapses by
+   * color string). Never sent to the backend — `buildStoreProductPayload`
+   * only forwards size/color/colorHex/sku/price/stock.
+   */
+  colorGroupId?: string;
 }
 
 export interface ProductMediaSlotInput {
@@ -424,6 +440,9 @@ export const productApi = {
         data: ProductDto;
       }>("/products", payload, {
         headers: { "Idempotency-Key": createIdempotencyKey() },
+        // The global 15s default is too tight for this write on mobile data —
+        // a timeout here strands a half-created listing. See updateProduct.
+        timeout: PRODUCT_WRITE_TIMEOUT_MS,
       });
       return response.data?.data ?? (response.data as unknown as ProductDto);
     } catch (error) {
@@ -444,7 +463,14 @@ export const productApi = {
       const response = await apiClient.patch<{
         status: string;
         data: ProductDto;
-      }>(`/products/${productId}`, payload);
+      }>(`/products/${productId}`, payload, {
+        // This is the go-live finalize call: the server validates structured
+        // media, taxonomy and filters, then opens a content submission — all
+        // in one transaction. On mobile data it regularly runs past the global
+        // 15s axios default, and an aborted request leaves the product sitting
+        // in DRAFT instead of IN_REVIEW.
+        timeout: PRODUCT_WRITE_TIMEOUT_MS,
+      });
       return response.data?.data ?? (response.data as unknown as ProductDto);
     } catch (error) {
       console.error("Failed to update product", error);
@@ -722,9 +748,40 @@ export const productApi = {
     viewSlot?: MediaViewSlot | string | null,
   ): Promise<{ id: string; url: string; viewSlot?: string | null }> {
     try {
-      assertValidUploadFile(file, WEB_UPLOAD_POLICIES.productMedia);
+      /*
+        iPad and iPhone cameras write HEIC.
+
+        The server's POST_IMAGE policy accepts jpg/jpeg/png/webp/gif and nothing
+        else, and the web policy mirrors it — so a photo straight off an iPad was
+        rejected before it ever left the browser, and the product was created
+        with no media. Designs never hit this because `CreateDesign` runs every
+        file through `getNormalizedImageFile` first; product media simply never
+        got the same treatment.
+
+        Two cases, one fix. A file that declares itself HEIC fails validation on
+        type. A file that is HEIC DATA carrying a .jpg name and an image/jpeg
+        MIME — which is what iOS produces when sharing rather than picking —
+        passes validation here and fails server-side instead. Normalising on any
+        validation failure covers both: the transcode endpoint accepts HEIC,
+        returns JPEG, and shrinks oversized photos on the way through, so it also
+        rescues the 12MP shot that breaks the 8MB cap.
+      */
+      let uploadable = file;
+      try {
+        assertValidUploadFile(uploadable, WEB_UPLOAD_POLICIES.productMedia);
+      } catch (validationError) {
+        try {
+          uploadable = await getNormalizedImageFile(file);
+          // Re-validate: if the normalized JPEG still fails, that is a real
+          // problem worth surfacing, and the ORIGINAL error is the useful one.
+          assertValidUploadFile(uploadable, WEB_UPLOAD_POLICIES.productMedia);
+        } catch {
+          throw validationError;
+        }
+      }
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", uploadable);
       formData.append("isPrimary", String(isPrimary));
       if (viewSlot) {
         formData.append("viewSlot", toBackendMediaViewSlot(viewSlot));
@@ -735,6 +792,8 @@ export const productApi = {
         data: { id: string; url: string; viewSlot?: string | null };
       }>(`/products/${productId}/media`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        // Mobile browsers need longer than the global 15s for multi-MB photos.
+        timeout: 90_000,
       });
       return (
         response.data?.data ??

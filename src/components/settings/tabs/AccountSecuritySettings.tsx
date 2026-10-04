@@ -449,8 +449,8 @@ const AccountSecuritySettings: React.FC = () => {
   const [emailSettings, setEmailSettings] = useState<EmailSettings | null>(null);
   const [emailSettingsBusyKey, setEmailSettingsBusyKey] = useState<string | null>(null);
 
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteWord, setDeleteWord] = useState('');
+  const [deleteStep, setDeleteStep] = useState<'idle' | 'warning' | 'confirm'>('idle');
+  const [deleteEmail, setDeleteEmail] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -700,20 +700,24 @@ const AccountSecuritySettings: React.FC = () => {
     event.preventDefault();
     setDeleteError(null);
 
-    if (deleteWord.trim().toUpperCase() !== 'DELETE') {
-      setDeleteError('Type DELETE to confirm.');
+    // Client-side pre-check for fast feedback; the backend re-verifies the
+    // email against the authenticated account and never looks up other users.
+    if (
+      deleteEmail.trim().toLowerCase() !== (profile?.email ?? '').trim().toLowerCase()
+    ) {
+      setDeleteError('The email you entered does not match this account.');
       return;
     }
 
     setDeleteBusy(true);
     try {
       const result = await AuthApi.deleteAccount({
-        confirmationWord: deleteWord,
+        email: deleteEmail.trim(),
         currentPassword: deletePassword,
       });
       logout();
       toast.success(result.message);
-      navigate('/', { replace: true });
+      navigate('/login', { replace: true });
     } catch (error: any) {
       const message = error?.response?.data?.message ?? 'Unable to delete account.';
       setDeleteError(message === 'Incorrect password' ? 'Incorrect password.' : message);
@@ -1066,7 +1070,7 @@ const AccountSecuritySettings: React.FC = () => {
           </div>
 
           <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/30 dark:bg-red-900/10">
-            {!showDeleteConfirm ? (
+            {deleteStep === 'idle' ? (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-medium text-red-900 dark:text-red-200">Delete Account</p>
@@ -1075,7 +1079,7 @@ const AccountSecuritySettings: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowDeleteConfirm(true);
+                    setDeleteStep('warning');
                     setDeleteError(null);
                   }}
                   className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
@@ -1083,13 +1087,51 @@ const AccountSecuritySettings: React.FC = () => {
                   Delete Account
                 </button>
               </div>
+            ) : deleteStep === 'warning' ? (
+              <div className="space-y-4">
+                <p className="text-sm font-semibold text-red-900 dark:text-red-200">
+                  ⚠️ Deleting your account is permanent and cannot be reversed.
+                </p>
+                <ul className="list-disc space-y-1.5 pl-5 text-sm text-red-700 dark:text-red-300">
+                  <li>Your profile, saved items, fittings, patches, and preferences will no longer be accessible.</li>
+                  <li>You will be signed out of every device and session immediately.</li>
+                  <li>Your email address and username are released from your identity and cannot be used to sign back in.</li>
+                  <li>Order, payment, dispute, security, and legal records are retained where the law requires — they are no longer linked to a usable account.</li>
+                  <li>Any orders still in progress will continue to completion; you will lose access to track or dispute them.</li>
+                </ul>
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteStep('idle')}
+                    className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100 dark:border-red-900/30 dark:text-red-300 dark:hover:bg-red-900/10"
+                  >
+                    Keep my account
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteStep('confirm');
+                      setDeleteError(null);
+                    }}
+                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
+                  >
+                    I understand — continue
+                  </button>
+                </div>
+              </div>
             ) : (
               <form onSubmit={submitDeleteAccount} className="space-y-4">
+                <p className="text-sm text-red-700 dark:text-red-300">
+                  To confirm, enter the email address on this account and your current password.
+                </p>
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-red-900 dark:text-red-200">Type DELETE to confirm</span>
+                  <span className="text-sm font-medium text-red-900 dark:text-red-200">Account email</span>
                   <input
-                    value={deleteWord}
-                    onChange={(event) => setDeleteWord(event.target.value)}
+                    type="email"
+                    value={deleteEmail}
+                    onChange={(event) => setDeleteEmail(event.target.value)}
+                    autoComplete="off"
+                    placeholder="you@example.com"
                     className="w-full rounded-lg border border-red-200 bg-white px-4 py-2.5 outline-none dark:border-red-900/30 dark:bg-black/20"
                     required
                   />
@@ -1109,8 +1151,8 @@ const AccountSecuritySettings: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      setShowDeleteConfirm(false);
-                      setDeleteWord('');
+                      setDeleteStep('idle');
+                      setDeleteEmail('');
                       setDeletePassword('');
                       setDeleteError(null);
                     }}

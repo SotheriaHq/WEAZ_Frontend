@@ -1,5 +1,11 @@
 import { apiClient } from './httpClient';
-import type { SizeFitProfile, SizeFitShareDto, SizeFitSharesPayload } from '@/types/sizeFit';
+import type {
+  ComputedSizeFitProfile,
+  SizeFitProfile,
+  SizeFitShareDto,
+  SizeFitSharesPayload,
+  SizingRegion,
+} from '@/types/sizeFit';
 
 const unwrap = <T>(raw: any): T => {
   return (raw?.data ?? raw) as T;
@@ -14,6 +20,13 @@ export const SizeFitApi = {
   async getPublicProfile(userId: string): Promise<SizeFitProfile> {
     const res = await apiClient.get(`/users/${userId}/size-fit/public`);
     return unwrap<SizeFitProfile>(res.data);
+  },
+
+  async getComputedProfile(params?: { region?: SizingRegion }): Promise<ComputedSizeFitProfile> {
+    const res = await apiClient.get('/users/me/size-fit/computed', {
+      params: params?.region ? { region: params.region } : undefined,
+    });
+    return unwrap<ComputedSizeFitProfile>(res.data);
   },
 
   async updateProfile(payload: {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { MARKET_SECTION_TITLE_CLASS } from '@/components/market/marketSectionType';
 import {
   marketApi,
   type MarketSectionItem,
@@ -57,7 +58,7 @@ const resolveSuggestionRoute = (item: MarketSectionItem) => {
     const slug = item.category?.slug ?? item.target?.key ?? targetId;
     return `/market-place?category=${encodeURIComponent(slug)}`;
   }
-  return item.target?.route || '/market-place';
+  return item.target?.route || '/market';
 };
 
 const formatPrice = (item: MarketSectionItem) => {
@@ -413,9 +414,7 @@ const MarketSuggestionBlocks: React.FC<MarketSuggestionBlocksProps> = ({
         >
           <div className="flex items-end justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                {block.title}
-              </h3>
+              <h3 className={MARKET_SECTION_TITLE_CLASS}>{block.title}</h3>
               {block.subtitle ? (
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   {block.subtitle}

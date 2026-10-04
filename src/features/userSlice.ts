@@ -43,6 +43,7 @@ const normalizeUser = (user: AuthUserDto): AuthUserDto => ({
     user.verificationBadgeVisible ?? user.isVerifiedBrand,
   ),
   verifiedExplanationUrl: user.verifiedExplanationUrl ?? null,
+  gender: user.gender ?? null,
 });
 
 const parsePersistedProfile = (raw: string | null): AuthUserDto | null => {
@@ -72,9 +73,17 @@ export const userSlice = createSlice({
   reducers: {
     setUser: (state, action: PayloadAction<AuthUserDto>) => {
       // Some endpoints return partial user objects (e.g. profile update flows).
-      // Merge with existing profile first so we don't accidentally null-out or
-      // lose critical fields like `type` and `role`.
-      const merged = state.profile ? ({ ...state.profile, ...action.payload } as AuthUserDto) : action.payload;
+      // Merge ONLY when the payload is the same authenticated identity.
+      // Cross-user merges create franken-profiles (wrong email/uid on navbar
+      // while catalog shows another brand) — a high-risk identity leak.
+      const incoming = action.payload;
+      const sameIdentity =
+        Boolean(state.profile?.id) &&
+        Boolean(incoming?.id) &&
+        state.profile!.id === incoming.id;
+      const merged = sameIdentity
+        ? ({ ...state.profile, ...incoming } as AuthUserDto)
+        : incoming;
       const normalized = normalizeUser(merged);
       state.profile = normalized;
       state.isAuthenticated = true;
@@ -89,7 +98,14 @@ export const userSlice = createSlice({
         return;
       }
 
-      const merged = state.profile ? ({ ...state.profile, ...action.payload } as AuthUserDto) : action.payload;
+      const incoming = action.payload;
+      const sameIdentity =
+        Boolean(state.profile?.id) &&
+        Boolean(incoming?.id) &&
+        state.profile!.id === incoming.id;
+      const merged = sameIdentity
+        ? ({ ...state.profile, ...incoming } as AuthUserDto)
+        : incoming;
       const normalized = normalizeUser(merged);
       state.profile = normalized;
       state.isAuthenticated = true;

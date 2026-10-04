@@ -1,6 +1,18 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import BrandReviewsDashboardPage from './BrandReviewsDashboardPage';
+
+const renderPage = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <BrandReviewsDashboardPage />
+    </QueryClientProvider>,
+  );
+};
 
 const { getBrandLifecycleDashboard, reportBrandLifecycleReview } = vi.hoisted(() => ({
   getBrandLifecycleDashboard: vi.fn(),
@@ -110,10 +122,10 @@ describe('BrandReviewsDashboardPage', () => {
   });
 
   it('renders read-only brand review dashboard data without buyer delete controls', async () => {
-    render(<BrandReviewsDashboardPage />);
+    renderPage();
 
     expect(await screen.findByText('Reviews Dashboard')).toBeTruthy();
-    expect(screen.getAllByText('Tailored Jacket').length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('Tailored Jacket')).length).toBeGreaterThan(0);
     expect(screen.getByText('The stitching and delivery were excellent.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /delete/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /approve/i })).toBeNull();
@@ -121,7 +133,7 @@ describe('BrandReviewsDashboardPage', () => {
   });
 
   it('reports a review for admin moderation with a required reason', async () => {
-    render(<BrandReviewsDashboardPage />);
+    renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Report' }));
     fireEvent.change(screen.getByPlaceholderText('Optional context for admins'), {

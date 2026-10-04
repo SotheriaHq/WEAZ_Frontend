@@ -178,7 +178,7 @@ const SearchSuggestionDropdown: React.FC<SearchSuggestionDropdownProps> = ({
                     rounded="xl"
                   />
                 ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-lg dark:bg-white/8">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-lg dark:bg-white/[0.08]">
                     {entry.kind === 'search'
                       ? '🔎'
                       : entry.kind === 'recent'

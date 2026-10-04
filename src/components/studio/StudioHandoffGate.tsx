@@ -8,6 +8,7 @@ import { setUser } from '@/features/userSlice';
 import type { AuthProfileResponse, AuthUserDto } from '@/types/auth';
 import { unwrapApiResponse } from '@/types/auth';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { env } from '@/config/env';
 
 type Status = 'idle' | 'exchanging' | 'failed' | 'ready';
@@ -254,13 +255,22 @@ export const StudioHandoffGate: React.FC<StudioHandoffGateProps> = ({ children }
           : 'py-8'
       }`}
     >
+      {/*
+        While it is still WORKING, this is the mark filling and nothing else. The
+        native shell already covers this frame with its own loading overlay, so
+        the title + sentence that used to live here were a second narration the
+        user could only see flicker past. A FAILURE still speaks: that is an
+        error state with something to act on, not a wait.
+      */}
       <div className="w-full max-w-sm px-2 text-center">
-        <div
-          className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[color:rgba(var(--brand-primary-rgb),0.22)] border-t-[color:var(--brand-primary)]"
-          aria-hidden="true"
-        />
-        <div className="text-base font-semibold">{status === 'failed' ? 'Studio session failed' : 'Studio'}</div>
-        <p className="mt-2 text-sm text-[color:var(--text-secondary)]">{message}</p>
+        {status === 'failed' ? (
+          <>
+            <div className="text-base font-semibold">Studio session failed</div>
+            <p className="mt-2 text-sm text-[color:var(--text-secondary)]">{message}</p>
+          </>
+        ) : (
+          <MuseLoader size={40} className="mx-auto" label="Loading Studio" />
+        )}
       </div>
     </div>
   );
