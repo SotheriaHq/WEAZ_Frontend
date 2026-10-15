@@ -96,7 +96,8 @@ const csp = [
   // apiBaseUrl: display media is served through the API host's /media/*
   // reverse proxy (stable cacheable URLs, HTTP/2) instead of per-request
   // signed S3 URLs — see MEDIA_PUBLIC_BASE_URL in the backend.
-  `img-src 'self' data: blob: ${apiBaseUrl} https://*.amazonaws.com https://*.s3.amazonaws.com https://*.cloudfront.net https://res.cloudinary.com https://images.unsplash.com https://lh3.googleusercontent.com https://unavatar.io https://flagcdn.com https://checkout.paystack.com https://standard.paystack.co`,
+  // media.weaz.me: the same /media/* proxy behind Cloudflare's edge cache.
+  `img-src 'self' data: blob: ${apiBaseUrl} https://media.weaz.me https://*.amazonaws.com https://*.s3.amazonaws.com https://*.cloudfront.net https://res.cloudinary.com https://images.unsplash.com https://lh3.googleusercontent.com https://unavatar.io https://flagcdn.com https://checkout.paystack.com https://standard.paystack.co`,
   "font-src 'self' data: https://fonts.gstatic.com",
   `connect-src ${buildConnectSrc()}`,
   // S3 hosts: the admin brand-verification review page previews evidence PDFs
