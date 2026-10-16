@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/SideBar';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store';
 import { closeSidebar } from '@/features/uiSlice';
+import { useLocation } from 'react-router-dom';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 import BrandSwitcher from '@/components/brand/BrandSwitcher';
@@ -19,9 +20,13 @@ type StudioScaffoldProps = {
 
 const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, children }) => {
   const dispatch = useDispatch<AppDispatch>();
+  const location = useLocation();
   const embeddedSurface = useEmbeddedSurface();
   const isEmbeddedMobile = embeddedSurface === 'mobile-app';
   const viewportLocked = useShellViewportLocked();
+  const isProductFormRoute =
+    location.pathname.startsWith('/studio/store/products/new') ||
+    /^\/studio\/store\/products\/[^/]+\/edit/.test(location.pathname);
 
   useEffect(() => {
     dispatch(closeSidebar());
@@ -66,7 +71,9 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
       <div
         className={
           isEmbeddedMobile
-            ? 'min-h-dvh bg-[color:var(--surface-primary)] px-3 pb-[env(safe-area-inset-bottom)] pt-2 sm:px-4'
+            ? `min-h-dvh bg-[color:var(--surface-primary)] px-3 pt-2 sm:px-4 ${
+                isProductFormRoute ? 'pb-0' : 'pb-[env(safe-area-inset-bottom)]'
+              }`
             : viewportLocked
               ? 'bg-[color:var(--surface-primary)] px-3 pt-20 sm:px-4 lg:pl-[236px]'
               : 'min-h-dvh bg-[color:var(--surface-primary)] px-3 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-20 sm:px-4 lg:pb-10 lg:pl-[236px]'

@@ -641,58 +641,119 @@ const FinancePage: React.FC = () => {
 
       {/* Balance hero + metric strip */}
       <div className="overflow-hidden rounded-2xl border border-black/10 bg-slate-950 text-white shadow-sm dark:border-white/10">
-        <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-          <div className="flex items-center gap-4">
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">
-                Available balance
-              </div>
-              <div className="mt-1 text-2xl font-bold tracking-tight">
-                {loading ? '—' : formatCurrency(availableBalance)}
-              </div>
-              {overview?.negativeBalance ? (
-                <div className="mt-1 text-xs text-rose-300">
-                  Negative — new releases will offset recovery automatically.
+        <div className="px-5 py-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">
+                    Available balance
+                  </span>
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      availableBalance >= 5000
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : 'bg-slate-800 text-slate-300 border border-slate-700'
+                    }`}
+                  >
+                    {availableBalance >= 5000 ? '✓ Ready to payout' : 'Min. ₦5,000 threshold'}
+                  </span>
                 </div>
-              ) : null}
+                <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums">
+                  {loading ? '—' : formatCurrency(availableBalance)}
+                </div>
+                {overview?.negativeBalance ? (
+                  <div className="mt-1 text-xs text-rose-300">
+                    Negative — new releases will offset recovery automatically.
+                  </div>
+                ) : null}
+              </div>
+              <div className="text-3xl" aria-hidden="true">
+                {overview?.negativeBalance ? '📉' : '💰'}
+              </div>
             </div>
-            <div className="text-2xl" aria-hidden="true">
-              {overview?.negativeBalance ? '📉' : '💰'}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRequestPayout}
+                disabled={!canRequestPayout}
+                className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-800 dark:text-white"
+              >
+                {requesting ? 'Submitting...' : 'Request payout'}
+              </button>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleRequestPayout}
-              disabled={!canRequestPayout}
-              className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-800 dark:text-white"
-            >
-              {requesting ? 'Submitting...' : 'Request payout'}
-            </button>
-            <div className="text-xs text-slate-400">Min. ₦5,000</div>
+
+          {/* Payout threshold progress bar */}
+          <div className="mt-4 border-t border-white/10 pt-3">
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
+              <span>
+                {availableBalance >= 5000
+                  ? `${formatCurrency(availableBalance)} available (100% threshold reached)`
+                  : `${formatCurrency(availableBalance)} of ₦5,000 (${Math.round(Math.min((availableBalance / 5000) * 100, 100))}%) to minimum payout`}
+              </span>
+              <span className={`font-semibold ${availableBalance >= 5000 ? 'text-emerald-400' : 'text-slate-400'}`}>
+                {availableBalance >= 5000
+                  ? 'Eligible for transfer'
+                  : `${formatCurrency(Math.max(5000 - availableBalance, 0))} remaining`}
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  availableBalance >= 5000 ? 'bg-emerald-400' : 'bg-violet-400'
+                }`}
+                style={{ width: `${Math.min(Math.max((availableBalance / 5000) * 100, 0), 100)}%` }}
+              />
+            </div>
           </div>
         </div>
 
         {/* Metric strip */}
         <div className="grid grid-cols-2 border-t border-white/10 sm:grid-cols-4">
           {[
-            { label: 'Released', value: overview?.releasedBalance ?? 0, note: 'Unlocked by milestones' },
-            { label: 'Reserved', value: overview?.reservedPayoutBalance ?? 0, note: 'In payout flow' },
-            { label: 'Paid out', value: overview?.paidOutBalance ?? 0, note: 'Settled to bank' },
+            {
+              label: 'Released',
+              emoji: '🔓',
+              value: overview?.releasedBalance ?? 0,
+              note: 'Unlocked by milestones',
+              accent: 'border-t-2 border-emerald-500 text-emerald-400',
+            },
+            {
+              label: 'Reserved',
+              emoji: '⏳',
+              value: overview?.reservedPayoutBalance ?? 0,
+              note: 'In payout flow',
+              accent: 'border-t-2 border-sky-500 text-sky-400',
+            },
+            {
+              label: 'Paid out',
+              emoji: '🏦',
+              value: overview?.paidOutBalance ?? 0,
+              note: 'Settled to bank',
+              accent: 'border-t-2 border-slate-500 text-slate-200',
+            },
             {
               label: 'Incoming',
+              emoji: '💸',
               value: overview?.incomingCredits ?? totalIncomingAmount,
               note: `${overview?.totalOrders ?? 0} paid order${(overview?.totalOrders ?? 0) === 1 ? '' : 's'}`,
+              accent: 'border-t-2 border-amber-500 text-amber-400',
             },
           ].map((metric, index) => (
             <div
               key={metric.label}
-              className={`px-5 py-3 ${index < 3 ? 'border-b border-white/10 sm:border-b-0 sm:border-r' : ''}`}
+              className={`px-5 py-3.5 ${metric.accent} ${index < 3 ? 'border-b border-white/10 sm:border-b-0 sm:border-r' : ''}`}
             >
-              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                {metric.label}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                  {metric.label}
+                </span>
+                <span className="text-xs" aria-hidden="true">
+                  {metric.emoji}
+                </span>
               </div>
-              <div className="mt-1 text-base font-bold">
+              <div className="mt-1 text-lg font-bold tabular-nums">
                 {loading ? '—' : formatCurrency(metric.value)}
               </div>
               <div className="mt-0.5 text-[11px] text-slate-500">{metric.note}</div>
@@ -767,16 +828,16 @@ const FinancePage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{hold.counterparty || 'Buyer'}</td>
-                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                    <td className="px-6 py-4 font-semibold tabular-nums text-gray-900 dark:text-white">
                       {formatCurrency(Number(hold.grossAmount || 0), hold.currency || currency)}
                     </td>
-                    <td className="px-6 py-4 font-medium text-rose-600 dark:text-rose-300">
+                    <td className="px-6 py-4 font-semibold tabular-nums text-rose-600 dark:text-rose-400">
                       {formatCurrency(Number(hold.commissionAmount || 0), hold.currency || currency)}
                     </td>
-                    <td className="px-6 py-4 font-medium text-sky-600 dark:text-sky-300">
+                    <td className="px-6 py-4 font-semibold tabular-nums text-sky-600 dark:text-sky-400">
                       {formatCurrency(Number(hold.releasedNetAmount || 0), hold.currency || currency)}
                     </td>
-                    <td className="px-6 py-4 font-medium text-amber-700 dark:text-amber-300">
+                    <td className="px-6 py-4 font-bold tabular-nums text-amber-700 dark:text-amber-300">
                       {formatCurrency(Number(hold.heldNetAmount || 0), hold.currency || currency)}
                     </td>
                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
@@ -900,19 +961,19 @@ const FinancePage: React.FC = () => {
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
                         {new Date(transaction.createdAt).toLocaleString()}
                       </td>
-                      <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                      <td className="px-6 py-4 font-semibold tabular-nums text-gray-900 dark:text-white">
                         {formatCurrency(
                           Number(transaction.grossAmount ?? transaction.amount ?? 0),
                           transaction.currency || currency,
                         )}
                       </td>
-                      <td className="px-6 py-4 font-medium text-rose-600 dark:text-rose-300">
+                      <td className="px-6 py-4 font-semibold tabular-nums text-rose-600 dark:text-rose-400">
                         {formatCurrency(
                           Number(transaction.commissionAmount ?? 0),
                           transaction.currency || currency,
                         )}
                       </td>
-                      <td className="px-6 py-4 font-medium text-emerald-600 dark:text-emerald-300">
+                      <td className="px-6 py-4 font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
                         +{formatCurrency(
                           Number(transaction.netAmount ?? transaction.amount ?? 0),
                           transaction.currency || currency,
@@ -974,7 +1035,7 @@ const FinancePage: React.FC = () => {
                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
                       {new Date(payout.createdAt).toLocaleDateString()}
                     </td>
-                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                    <td className="px-6 py-4 font-bold tabular-nums text-gray-900 dark:text-white">
                       {formatCurrency(Number(payout.amount || 0))}
                     </td>
                     <td className="px-6 py-4">

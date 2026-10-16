@@ -21,6 +21,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
+import { useEmbeddedSurface } from "@/hooks/useEmbeddedSurface";
 
 import { toast } from "sonner";
 import MediaRenderer from "@/components/media/MediaRenderer";
@@ -547,6 +548,8 @@ const EditProduct: React.FC = () => {
   );
   const user = useSelector((state: RootState) => state.user.profile);
   const queryClient = useQueryClient();
+  const embeddedSurface = useEmbeddedSurface();
+  const isEmbeddedMobile = embeddedSurface === "mobile-app";
 
   const isEditMode = Boolean(productId);
   const isCollectionContext = returnContext === "collection";
@@ -3467,9 +3470,9 @@ const EditProduct: React.FC = () => {
       than twice what the bar occupies, which read as yet more empty space at
       the end of the form.
     */
-    <div className="flex min-h-dvh flex-col bg-transparent text-theme font-sans">
+    <div className={`flex flex-col bg-transparent text-theme font-sans ${isEmbeddedMobile ? 'flex-1' : 'min-h-dvh'}`}>
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-3 py-3 pb-28 sm:px-5 sm:py-5 sm:pb-28 md:pb-16">
+      <main className={`flex-1 w-full max-w-7xl mx-auto px-3 py-3 sm:px-5 sm:py-5 md:pb-16 ${isEmbeddedMobile ? 'pb-6' : 'pb-28 sm:pb-28'}`}>
         <div className="mb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:mb-6">
           <div className="flex flex-col gap-1">
             <div className="flex items-center text-xs text-theme-secondary gap-2">
@@ -4244,7 +4247,7 @@ const EditProduct: React.FC = () => {
                           className="[&_label]:text-xs [&_label]:mb-1"
                         />
                         {profitMargin.margin > 0 && (
-                          <p className="text-[10px] text-gray-500 mt-1 truncate">
+                          <p className="text-[10px] text-gray-500 mt-1 break-words">
                             Margin: {profitMargin.margin}% • Profit:{" "}
                             {formatCurrency(profitMargin.profit, form.currency)}
                           </p>
@@ -4523,7 +4526,7 @@ const EditProduct: React.FC = () => {
                                         inputSize="sm"
                                         className="w-full min-w-0"
                                       />
-                                      <span className="hidden min-w-0 truncate text-[9px] text-gray-400 sm:block">
+                                      <span className="hidden min-w-0 break-all text-[9px] text-gray-400 sm:block">
                                         {variant.sku || "auto-SKU"}
                                       </span>
                                       <button
@@ -5261,7 +5264,13 @@ const EditProduct: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="sticky bottom-0 z-20 w-full px-4 py-2.5 backdrop-blur-md bg-white/80 dark:bg-zinc-900/80 border-t border-gray-200/40 dark:border-white/10 sm:px-6">
+      <footer
+        className={`sticky bottom-0 z-20 w-full px-4 pt-2.5 backdrop-blur-md bg-white/95 dark:bg-zinc-900/95 border-t border-gray-200/60 dark:border-white/10 sm:px-6 shadow-lg ${
+          isEmbeddedMobile
+            ? 'pb-[calc(env(safe-area-inset-bottom)+0.625rem)] -mx-3 w-[calc(100%+1.5rem)] sm:-mx-4 sm:w-[calc(100%+2rem)]'
+            : 'pb-2.5'
+        }`}
+      >
         {/*
           Why the primary button is inactive — stated once, not enumerated.
 

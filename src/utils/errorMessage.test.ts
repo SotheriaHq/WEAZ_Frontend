@@ -50,4 +50,31 @@ describe('getFriendlyErrorMessage', () => {
     const result = getFriendlyErrorMessage(customErr, 'Sign in failed');
     expect(result).toBe('Verification code has expired');
   });
+
+  it('replaces raw "Validation failed" with fallback message', () => {
+    const validationErr = new AxiosError('Bad Request', 'ERR_BAD_REQUEST', undefined, undefined, {
+      status: 400,
+      statusText: 'Bad Request',
+      headers: {},
+      config: {} as any,
+      data: { message: 'Validation failed' },
+    });
+    const result = getFriendlyErrorMessage(validationErr, 'Please check your information and try again.');
+    expect(result).toBe('Please check your information and try again.');
+  });
+
+  it('extracts structured email error into friendly email guidance', () => {
+    const structuredErr = new AxiosError('Bad Request', 'ERR_BAD_REQUEST', undefined, undefined, {
+      status: 400,
+      statusText: 'Bad Request',
+      headers: {},
+      config: {} as any,
+      data: {
+        message: 'Validation failed',
+        errors: [{ property: 'email', constraints: ['email must be an email'] }],
+      },
+    });
+    const result = getFriendlyErrorMessage(structuredErr, 'Sign in failed');
+    expect(result).toBe('Please enter a valid email address (e.g. name@example.com).');
+  });
 });
