@@ -40,6 +40,23 @@ export function getFriendlyErrorMessage(
 
     // 3. Backend custom error messages from payload
     const data = error.response.data as Record<string, unknown> | undefined;
+
+    // Check structured validation errors from class-validator
+    if (Array.isArray(data?.errors) && data.errors.length > 0) {
+      const first = data.errors[0] as { property?: string; messages?: string[]; constraints?: string[] };
+      const prop = (first?.property || '').toLowerCase();
+      const firstMsg = first?.messages?.[0] || first?.constraints?.[0];
+      if (prop === 'email' || prop.endsWith('.email')) {
+        return 'Please enter a valid email address (e.g. name@example.com).';
+      }
+      if (prop === 'password' || prop.endsWith('.password')) {
+        return 'Password must be at least 12 characters.';
+      }
+      if (typeof firstMsg === 'string' && firstMsg.trim()) {
+        return firstMsg.trim();
+      }
+    }
+
     const candidates = [
       data?.message,
       (data?.data as Record<string, unknown> | undefined)?.message,
@@ -51,6 +68,9 @@ export function getFriendlyErrorMessage(
         const msg = candidate.trim();
         const lower = msg.toLowerCase();
 
+        if (lower === 'validation failed' || lower === 'bad request') {
+          return 'Please check your information and try again.';
+        }
         if (msg.includes('ThrottlerException') || lower.includes('too many requests')) {
           return 'Too many requests. Please try again later.';
         }
