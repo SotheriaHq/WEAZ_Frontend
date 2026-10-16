@@ -12,6 +12,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
+import BrandAutoPublishCard from '@/components/admin/BrandAutoPublishCard';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import Modal from '@/components/ui/Modal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -856,6 +857,9 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Review mode</p>
                 <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{friendlyEnum(selected.brand?.reviewMode)}</p>
               </div>
+              {selected.brand?.id ? (
+                <BrandAutoPublishCard brandId={selected.brand.id} brandName={selected.brand.name} />
+              ) : null}
               <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Required slots</p>
                 <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">

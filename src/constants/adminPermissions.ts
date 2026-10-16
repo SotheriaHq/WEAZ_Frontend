@@ -226,6 +226,14 @@ const CATALOGUE = [
     description: 'Clear, escalate, or reject items in content review.',
   },
   {
+    key: 'CONTENT_AUTO_PUBLISH_MANAGE',
+    code: 'contentReview.autoPublish.manage',
+    group: 'Products & content',
+    label: 'Turn brand auto-publish on or off',
+    description:
+      'Let a brand’s designs and products go live without review, or take that away. Every change needs a reason and is audited.',
+  },
+  {
     key: 'FEATURED_MANAGE',
     code: 'featured.manage',
     group: 'Products & content',
@@ -368,6 +376,7 @@ const CATALOGUE = [
     label: 'Approve dispute handovers',
     description:
       'Approve or refuse a handover. SuperAdmin only — releasing an owner is a decision about accountability.',
+    superAdminOnly: true,
   },
 
   {

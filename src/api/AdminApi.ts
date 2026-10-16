@@ -359,7 +359,22 @@ export const adminDesignsApi = {
     apiClient.patch(`/admin/designs/${id}/moderate`, data),
 };
 
+export type BrandAutoPublishStatus = {
+  brandId: string;
+  brandName: string | null;
+  enabled: boolean;
+};
+
 export const adminContentReviewApi = {
+  getBrandAutoPublish: (brandId: string) =>
+    apiClient.get<BrandAutoPublishStatus>(
+      `/admin/content-review/brands/${brandId}/auto-publish`,
+    ),
+  setBrandAutoPublish: (brandId: string, data: { enabled: boolean; reason: string }) =>
+    apiClient.put<BrandAutoPublishStatus>(
+      `/admin/content-review/brands/${brandId}/auto-publish`,
+      data,
+    ),
   getReasonCodes: () =>
     apiClient.get<ContentReasonOption<ContentReviewReasonCode>[]>(
       '/admin/content-review/reason-codes',
