@@ -37,9 +37,32 @@ const StudioHome: React.FC = () => {
     setSearchParams(next, { replace: true });
   };
 
+  const activeKey = sections[active] ? active : 'overview';
+
+  /*
+    Visited sections stay mounted; only the active one is shown.
+
+    Rendering just `sections[active]` unmounted a section the moment the
+    island or sidebar left it, so coming back rebuilt it from nothing —
+    skeletons, refetches, scroll lost — for content the brand had just been
+    looking at ("routing back to Studio still reloads what I've seen",
+    2026-10-17). Hidden sections keep their DOM and state, so a return is
+    instant. React 19.1 has no <Activity>; `display: none` is the stand-in.
+    Sections mount lazily on first visit, so a cold Studio costs no more
+    than before.
+  */
+  const [visited, setVisited] = React.useState<string[]>(() => [activeKey]);
+  if (!visited.includes(activeKey)) {
+    setVisited([...visited, activeKey]);
+  }
+
   return (
     <StudioScaffold active={active} onSelect={setActive}>
-      {sections[active] || sections['overview']}
+      {visited.map((key) => (
+        <div key={key} style={key === activeKey ? undefined : { display: 'none' }} aria-hidden={key !== activeKey}>
+          {sections[key]}
+        </div>
+      ))}
     </StudioScaffold>
   );
 };
