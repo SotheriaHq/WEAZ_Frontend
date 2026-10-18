@@ -1800,59 +1800,19 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     navigate(`/studio/store?${params.toString()}`, { replace: true });
   };
 
-  const navigateToStudioProductDetails = async (productId: string) => {
-    try {
-      const res = await productApi.getProduct(productId);
-      const data = (res as any)?.data ?? res;
-      // Map backend product to StoreProduct shape for InlineProductDetail
-      const mapped: StoreProduct = {
-        id: data.id,
-        collectionId: data.collectionId || '',
-        brandId: data.brandId || user?.id || '',
-        name: data.name || data.title || '',
-        description: data.description || '',
-        price: data.price ?? 0,
-        salePrice: data.salePrice ?? null,
-        effectivePrice: data.effectivePrice ?? data.salePrice ?? data.price ?? 0,
-        isOnSale: Boolean(data.isOnSale),
-        discountPercent: data.discountPercent ?? null,
-        thumbnail: data.thumbnail || null,
-        images: data.images || [],
-        media: data.media || [],
-        mediaIds: data.mediaIds || [],
-        sizes: data.sizes || [],
-        sizingMode: data.sizingMode,
-        customMeasurementKeys: data.customMeasurementKeys || [],
-        customAvailable:
-          data.customAvailable ?? data.customOrderEnabled ?? false,
-        customOrderEnabled:
-          data.customOrderEnabled ?? data.customAvailable ?? false,
-        isCustomOrderOnly: data.isCustomOrderOnly ?? false,
-        canBagWhenOutOfStock: data.canBagWhenOutOfStock ?? false,
-        sizeAvailability: data.sizeAvailability || [],
-        colors: data.colors || [],
-        variants: data.variants || [],
-        totalStock: data.totalStock ?? 0,
-        isLowStock: Boolean(data.isLowStock),
-        isOutOfStock: Boolean(data.isOutOfStock),
-        isFeatured: Boolean(data.isFeatured),
-        isActive: data.isActive,
-        archivedAt: data.archivedAt ?? null,
-        deletedAt: data.deletedAt ?? null,
-        publishAt: data.publishAt ?? null,
-        threadsCount: data.threadsCount ?? 0,
-        viewsCount: data.viewsCount ?? 0,
-        brand: {
-          id: data.brand?.id || user?.id || '',
-          name: data.brand?.name || user?.firstName || '',
-          logo: data.brand?.logo || '',
-          currency: data.brand?.currency || 'NGN',
-        },
-      };
-      setInlineProduct(mapped);
-    } catch {
-      toast.error('Failed to load product details.');
-    }
+  /*
+    A brand's own product opens its EDITOR, never the shopper view.
+
+    This loaded the product and rendered `InlineProductDetail` — the buyer's
+    product page with a "back to store" breadcrumb — so a brand tapping their
+    own listing in their own Studio store saw it the way a shopper does, with
+    no way to change anything short of finding the ⋯ menu (owner report
+    2026-10-17). Studio is the owner's workspace; the tap goes where an owner
+    means to go, the same rule the native catalogue already follows for owners
+    (BrandShopTab → editProduct).
+  */
+  const navigateToStudioProductDetails = (productId: string) => {
+    navigate(`/studio/store/products/${productId}/edit`);
   };
 
   const handleCloseActiveCollectionView = () => {
