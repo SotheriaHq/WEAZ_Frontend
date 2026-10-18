@@ -1,3 +1,7 @@
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
+import { canUpdateBrandOrders } from '@/lib/brandAccess';
+import { QueueFacts, QueueOrderActions } from '@/components/custom-orders/CustomOrderQueue';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -292,6 +296,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [brandId, setBrandId] = useState<string | null>(null);
   const [order, setOrder] = useState<CustomOrderDetail | null>(null);
+  const profile = useSelector((state: RootState) => state.user.profile);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [activeTab, setActiveTab] = useState<StudioDetailTab>('overview');
@@ -1147,6 +1152,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
                 <CustomOrderBadge value={order.status} />
+
               </div>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
                 Use lifecycle updates for dispatch, transit, delivered, and final close states after production work has moved forward.
@@ -1327,6 +1333,8 @@ const StudioCustomOrderDetailPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <QueueFacts queue={order.queue} />
+      <QueueOrderActions orderId={order.id} queue={order.queue} audience="brand" access={canUpdateBrandOrders(profile, brandId) ? 'MANAGE' : 'READ'} onChanged={async () => { if (brandId) setOrder(await customOrdersBrandApi.getById(brandId, order.id)); }} />
       <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
         <button type="button" onClick={() => navigate('/studio')} className="font-semibold text-slate-800 dark:text-white">
           Studio

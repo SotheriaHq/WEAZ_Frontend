@@ -1,3 +1,7 @@
+import QueueRefundAttention from '@/components/custom-orders/QueueRefundAttention';
+import SubscriptionCompensations from '@/components/custom-orders/SubscriptionCompensations';
+import { QueueFacts } from '@/components/custom-orders/CustomOrderQueue';
+import { QueuePriceDisclosure } from '@/components/custom-orders/QueueCheckoutDisclosure';
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -948,6 +952,13 @@ const AdminFinancePage: React.FC = () => {
   return (
     <div className="space-y-6">
       <AdminBreadcrumb segments={[{ label: 'Finance' }]} />
+      <QueueRefundAttention />
+      <SubscriptionCompensations />
+      <section className="space-y-3 rounded-2xl border border-violet-200 p-4 dark:border-violet-900">
+        <h2 className="font-bold">Custom-order capture liabilities</h2>
+        <div className="grid grid-cols-2 gap-3"><div><p className="text-xs">Waiting-order holds</p><p className="font-bold tabular-nums">{overview?.queuedCustomHeldAmount == null ? 'Awaiting reconciliation summary' : amountOf(overview.queuedCustomHeldAmount, overview.currency)}</p></div><div><p className="text-xs">Refund obligations processing</p><p className="font-bold tabular-nums">{overview?.pendingRefundAmount == null ? 'Awaiting reconciliation summary' : amountOf(overview.pendingRefundAmount, overview.currency)}</p></div></div>
+        <p className="text-xs text-slate-600 dark:text-slate-300">Pending and Up Next captures remain liabilities, separate from earned commission and payout eligibility. Refunds may be pending, settled or need attention. Payment totals include each capture once; partial refunds affect only their recorded custom-order share.</p>
+      </section>
 
       <div className="flex border-b border-black/10 dark:border-white/10 gap-6">
         <button
@@ -1800,6 +1811,8 @@ const AdminFinancePage: React.FC = () => {
 
             <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
               <Panel title="Order snapshot" description="Core order context for finance-led custom-order review.">
+                <QueueFacts queue={customOrderDetail.queue} />
+                <QueuePriceDisclosure summary={customOrderDetail.buyerPriceSummary} />
                 <DetailList
                   items={[
                     { label: 'Source type', value: prettify(customOrderDetail.source.type) },

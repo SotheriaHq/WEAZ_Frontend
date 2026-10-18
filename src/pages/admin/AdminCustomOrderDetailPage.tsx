@@ -1,3 +1,4 @@
+import { QueueFacts, QueueOrderActions } from '@/components/custom-orders/CustomOrderQueue';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -467,6 +468,8 @@ const AdminCustomOrderDetailPage: React.FC = () => {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <CustomOrderBadge value={selected.status} />
+                  <QueueFacts queue={selected.queue} />
+                  <QueueOrderActions orderId={selected.id} queue={selected.queue} audience="admin" onChanged={async () => { await refresh({ background: true }); }} />
                   <CustomOrderBadge value={selected.paymentStatus} type="payment" />
                   <CustomOrderBadge value={selected.currentProgressStage ?? 'ORDER_PLACED'} type="stage" />
                   {needsAttention ? (
@@ -549,7 +552,7 @@ const AdminCustomOrderDetailPage: React.FC = () => {
                   <div className="truncate text-base font-bold text-slate-900 dark:text-white">
                     {buyerName}
                   </div>
-                  <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                  <div className="mt-0.5 break-words text-xs text-slate-500 dark:text-slate-400">
                     {buyer?.username ? `@${buyer.username}` : 'No username on file'}
                   </div>
                 </div>
@@ -1339,14 +1342,14 @@ const AdminCustomOrderDetailPage: React.FC = () => {
 
           <div className="mt-3 rounded-2xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
             <CustomOrderFieldTitle
-              title="Super admin cancellation"
-              description="Only for paid orders. Cancels the order and starts the full refund workflow. Irreversible money path — use when production cannot continue and the buyer must be refunded."
+              title={selected.queue?.canCancel ? "Waiting-order cancellation uses the reviewed queue action above" : "Super admin cancellation"}
+              description={selected.queue?.canCancel ? "Use the queue cancellation action above to review the server refund quote: VAT plus 10% of garment subtotal plus 10% of the jump fee are withheld; delivery is refunded in full." : "Only for paid orders. Cancels the order and starts the full refund workflow. Irreversible money path — use when production cannot continue and the buyer must be refunded."}
             />
             <input value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Cancellation reason (required)" className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950" />
             <textarea value={cancelNote} onChange={(event) => setCancelNote(event.target.value)} rows={2} className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Refund note (optional)" />
             <button
               type="button"
-              disabled={busy || selected.paymentStatus !== 'PAID' || cancelReason.trim().length < 3}
+              disabled={busy || Boolean(selected.queue?.canCancel) || selected.paymentStatus !== 'PAID' || cancelReason.trim().length < 3}
               onClick={() =>
                 setPendingAction({
                   title: 'Cancel this paid custom order?',

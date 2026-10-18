@@ -1,3 +1,4 @@
+import RunwayQueueNotices from '@/components/custom-orders/RunwayQueueNotices';
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -1098,6 +1099,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
 
     return (
       <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 px-4">
+      <RunwayQueueNotices />
         <div className="sticky top-16 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border-default)]/70 bg-[color:var(--surface-muted)]/60 px-4 py-3 backdrop-blur">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-theme-secondary">
@@ -1251,6 +1253,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
             shared scrim. Rendered next to the chips so the two rows cannot
             end up on different branches of this component. */}
         <RunwayStageChrome />
+        <RunwayQueueNotices placement="reels" />
         {reelsCategoryChips}
         {/* Stage — see the pinned-mode stage above.
 

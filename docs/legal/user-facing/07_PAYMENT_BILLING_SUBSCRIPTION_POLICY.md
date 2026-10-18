@@ -1,7 +1,7 @@
 # WIEZ Payment, Billing, and Settlement Policy
 
-Version: `2026.08.22-v1.0`  
-Effective Date: August 22, 2026  
+Version: `2026.10.18-v1.3`  
+Effective Date: October 18, 2026  
 Governing Entities: WIEZ Technology Ltd. (Nigeria) & Global Operating Affiliates  
 Billing & Payments Desk: `payments@wiez.com` / `billing@wiez.com`  
 Disputes & Escrow Desk: `disputes@wiez.com`
@@ -12,7 +12,7 @@ Disputes & Escrow Desk: `disputes@wiez.com`
 
 This Payment, Billing, and Settlement Policy ("Policy") governs all financial transactions, checkout initializations, payment authorizations, escrow custody, currency conversions, merchant payouts, refunds, reversals, and chargebacks executed across the WIEZ ecosystem (including the web platform at `wiez.com`, iOS and Android mobile applications, and API endpoints).
 
-In accordance with our platform architecture, **all buyers and brands must accept this Policy prior to initializing checkout sessions or receiving merchant settlements**. This document functions in tandem with the [Terms and Conditions](file:///c:/Users/UTL_ADMIN/Desktop/Shawn/threadly/docs/legal/user-facing/01_TERMS_AND_CONDITIONS.md) and [Seller and Brand Terms](file:///c:/Users/UTL_ADMIN/Desktop/Shawn/threadly/docs/legal/user-facing/05_SELLER_BRAND_TERMS.md).
+In accordance with our platform architecture, **all buyers and brands must accept this Policy prior to initializing checkout sessions or receiving merchant settlements**. This document functions in tandem with the [Terms and Conditions](/terms) and [Seller and Brand Terms](/seller-terms).
 
 ---
 
@@ -69,7 +69,7 @@ To protect buyers and sellers from intra-session foreign exchange volatility:
 
 To eliminate commercial fraud and guarantee buyer protection, WIEZ deploys an automated dual-track escrow engine (`StandardOrderEscrowService` and `CustomOrderFinanceSyncService`):
 
-Completing checkout locks the funds in our escrow bank account. What happens next depends on what was bought.
+Completing checkout captures payment and records held amounts in the settlement ledger. An internal hold does not establish a separately protected bank escrow; actual custody/settlement follows the provider arrangement. What happens next depends on what was bought.
 
 **Ready-to-wear standard orders**
 
@@ -80,7 +80,7 @@ Completing checkout locks the funds in our escrow bank account. What happens nex
 
 **Bespoke custom commissions**
 
-* a 60% upfront material deposit is released on approval of the sketch and measurement milestone;
+* the 60% garment production allocation cannot become available until Active under the existing settlement controls;
 * the 40% final balance stays in escrow;
 * it is released on delivery, once the 72-hour fit inspection window expires.
 
@@ -89,8 +89,18 @@ Completing checkout locks the funds in our escrow bank account. What happens nex
 * Funds are released to the Brand's available balance only after carrier delivery is confirmed and the **72-hour buyer inspection window** expires without an active dispute.
 
 ### 5.2. Custom Bespoke Apparel Orders
-* **Milestone 1 (60% Upfront Production Allocation)**: Released to the Brand upon mutual agreement on custom garment sketches, measurements, and fabric acquisition;
+* **Milestone 1 (60% Upfront Production Allocation)**: Eligible only once the queued order becomes Active, with the existing verification, financial, debt and dispute controls; no Pending/Up Next release;
 * **Milestone 2 (40% Final Fulfillment Allocation)**: Held in escrow and released to the Brand upon confirmed delivery and successful expiry of the 72-hour fit inspection window.
+
+### 5.3. Effect of an Approved Production Extension on Escrow
+Where a buyer grants a Brand additional production time (Terms of Service Section 7.6; a maximum of two approved extensions, three days each, six days in total, and never on an order carrying a rush fee), the escrow schedule moves with the order rather than against it:
+
+* the production, dispatch and delivery dates move by the number of days granted;
+* the buyer's 72-hour inspection window and the administrative auto-release date move by the same number of days, so **no milestone can become payout-eligible while the garment is still in production**;
+* the measurement retention period moves with the order, so the record supporting any later dispute remains available for the extended term;
+* the originally promised dates are retained on the order and remain the reference point for assessing Brand performance and for any delay claim.
+
+A **declined** or **expired** extension request changes nothing about the escrow schedule. Declining is not a refund request; it opens a dispute, which freezes disbursement under Section 8 in the ordinary way.
 
 ---
 
@@ -116,11 +126,12 @@ Brands manage accrued earnings via the WIEZ Brand Dashboard:
 ## 8. Cancellation, Refund, and Reversal Policy
 
 ### 8.1. Buyer Order Cancellations
+New-policy Pending/Up Next orders use the itemized pre-Active deductions in the subscription queue terms below, regardless of cancellation actor. The following production-stage rule applies only after Active and remains subject to mandatory remedies.
 * **Ready-to-Wear Orders**: Buyers may cancel an order for an immediate 100% refund at any point **prior to carrier dispatch**;
 * **Custom Bespoke Orders**: Once the 60% production milestone is approved and fabric cutting commences, the 60% material deposit becomes non-refundable. If cancelled prior to shipment, the remaining 40% escrow balance is refunded to the buyer.
 
 ### 8.2. Multi-Stage Refund Processing Timelines
-Refunds follow a rigorous multi-stage banking settlement cycle:
+Refunds follow separate platform, processor and bank-credit stages. The timing below is indicative, not a guarantee of instant or fixed-date bank credit. A requested or processing refund is not a completed refund:
 * **Stage 1 (WIEZ Platform Authorization — within 24 hours)**: The WIEZ Dispute & Escrow Desk reviews the case and issues a cryptographically signed refund authorization payload to the payment gateway within twenty-four (24) hours of dispute resolution;
 * **Stage 2 (Gateway & Settlement Processing — 24 to 48 hours)**: The payment provider (Paystacke) processes the reversal through the interbank switching network (`DEFAULT_SEED_SETTLEMENT_DELAY_HOURS = 48`);
 * **Stage 3 (Cardholder Bank Statement Credit — 5 to 10 business days)**: Depending on the cardholder's issuing bank and card scheme (Visa, Mastercard, Verve), the credit reflection typically appears on the account statement within five (5) to ten (10) banking days from gateway transmission.
@@ -139,8 +150,7 @@ Refunds follow a rigorous multi-stage banking settlement cycle:
 
 ## 10. Subscription and Membership Model Framework
 
-* **Current Operational Model**: As of Version 2026.08.22, WIEZ operates exclusively on an **escrow-backed per-transaction commission model**. WIEZ does **not** charge recurring monthly consumer subscription fees or buyer membership dues;
-* **Future Subscription Services**: In the event WIEZ introduces optional premium designer tools, specialized brand analytics subscriptions, or buyer VIP tiers, such services will be governed by explicit opt-in terms detailing recurring billing frequencies, 30-day renewal notices, pro-rated cancellation rights, and self-service billing management dashboards.
+WIEZ offers the recurring monthly brand custom-order subscriptions described below. No recurring shopper membership is created by a queue purchase. Subscription payment, authorization and invoices are separate from shopper garment payments and brand order earnings.
 
 ---
 
@@ -174,4 +184,49 @@ For billing escalations, payout inquiries, chargeback defense, and payment verif
   12B Admiralty Way, Lekki Phase 1,  
   Lagos, Nigeria  
 * **Payment Support Portal**: [wiez.com/help/payments](https://wiez.com/help/payments)
+
+---
+
+## Custom-order subscription queue terms
+
+### Subscription custom-order policy scope and consumer rights
+
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.18-v1.3`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+
+### Paid waiting queue, timing and priority
+
+Custom-order payment is captured once at placement. Pending and Up Next funds remain held and unavailable as brand earnings until Active; Up Next is a notice and position, never a second garment charge. There is one Up Next seat. Active production and rush times begin at activation, not during waiting; queue position is not a delivery guarantee. Standard garment earnings follow the existing 60% production / 40% completion calculation, with no production release before Active and with existing dispute, verification and payout controls preserved. An internal held balance is an accounting restriction, not a representation of a separately protected bank escrow or provider deposit guarantee.
+
+Ordinary Pending orders are FIFO. Only an Aru or Igwe brand that opts in may offer a paid jump. The separately disclosed fee is 20% of garment subtotal. It buys priority behind the current Up Next and earlier paid jumps, without displacing Up Next. When ordinary eligible orders are waiting, at most two paid-priority orders activate consecutively before one ordinary order. There is no paid jump offer when it provides no priority benefit. Of an earned jump fee, WIEZ receives 10% and the brand 90%; no brand share is earned before Active. Existing duplicate-source restrictions remain; ordering different items from one brand is permitted subject to ordinary checks.
+
+Both Pending and Up Next expire 42 x 24 hours after committed paid placement. Cards and details show the cancellation countdown and exact deadline. One retain is permitted from 48 hours through exactly 12 hours remaining, inclusive, adding 42 days to the existing deadline while preserving priority. It is unavailable outside that window or after use, activation or cancellation. Shopper and brand reminders are scheduled at 48, 24 and 5 hours. **No outage grace applies:** failed notifications, unavailable notices or a WIEZ outage do not extend the cancellation deadline. The 5-hour notice does not reopen retain.
+
+An admin may demote Up Next to Pending with a visible promotion hold. The hold stays until an admin releases it; it does not pause expiry, cancellation rights or the eligible retain window. Ordinary intake closure stops new purchases while already-paid obligations continue. Safety suspension stops promotion and unreleased payouts pending admin review. Removing a listing does not remove paid order snapshots or obligations. A capture completed after eligibility changes remains recorded and is resolved through the applicable cancellation/refund process.
+
+### Cancellation charges, refund status and resubmission
+
+Before Active, the shopper, brand, authorized admin or expiry process may cancel Pending or Up Next. **The same disclosed deductions apply to every such cancellation, including cancellation by the brand, admin or system:** the VAT actually recorded on the original payment, 10% of garment subtotal excluding VAT/delivery/jump fee, and 10% of any jump fee. Delivery is refunded in full and 90% of the jump fee is refunded. A missing VAT component means zero VAT deduction; this policy creates no VAT rate or new tax. There is no duplicate platform-share deduction on the jump fee and the brand earns no pre-Active jump share.
+
+The server presents an itemized quote for confirmation and checks eligibility again before cancellation. Example: garment NGN100,000 + recorded VAT NGN7,500 + delivery NGN5,000 + jump NGN20,000 totals NGN132,500. Deductions total NGN19,500 and the refund is NGN113,000. This is an illustration using an existing VAT line, not a tax-rate promise. Mandatory statutory remedies prevail where applicable.
+
+Cancellation records a refund request; it does not mean the bank has credited the shopper. Orders show requested, processing, processed, failed or attention-required status as appropriate. Provider processing and bank credit are distinct; bank receipt may take additional business days. Cancelling one line in mixed checkout does not cancel or refund sibling orders. No repeated request creates a second refund. After Active, existing dispute/admin cancellation, defect and delivery remedies apply.
+
+Cancelled history, receipt, deductions, refund progress and permitted order messaging remain accessible. A resubmission is a separately priced new order at the back of the current queue, with current source, measurements, intake and payment checks. It may be placed while the previous refund is processing, but requires **a separate payment**; the pending refund is not wallet credit and continues independently. A new order does not inherit the old position or a free jump.
+
+### Brand subscriptions, billing changes and campaigns
+
+| Tier | Monthly NGN | Active cap | Delivery cap | Up Next | Pending | Paid jump offer |
+|---|---:|---:|---:|---:|---|---|
+| Thread | 10,000 | 2 | 2 | 1 | Unlimited | No |
+| Aso-oke | 15,000 | 3 | 4 | 1 | Unlimited | No |
+| Aru | 30,000 | 4 | 5 | 1 | Unlimited | Brand opt-in |
+| Igwe | 50,000 | 6 | 5 | 1 | Unlimited | Brand opt-in |
+
+These are recurring monthly brand subscriptions, requiring express recurring-payment authorization; they are not shopper memberships. New brands cannot receive custom orders before first verified payment. Existing eligible brands retain free unlimited Legacy capacity until a paid assignment succeeds; Legacy is not a sold tier and does not include paid jumps. Failed initial or switch payments never create free paid-tier access or erase the previous valid entitlement.
+
+Existing agreements retain their agreed price snapshot on renewal; a new agreement or tier change uses current pricing. An upgrade applies immediately after verified payment of the difference prorated over the remaining billing period. A downgrade applies at the next renewal, with no refund for the current period. The monthly billing anniversary remains unchanged; a missing calendar day falls back to that month's last day. Billing dates are displayed in Lagos time (Africa/Lagos). Confirm the amount, renewal and effective capacity before payment.
+
+Voluntary cancellation stops future renewal; access remains through the paid-period end. At paid-period expiry, new intake pauses, while already-paid obligations continue. A failed renewal has seven days to recover at the existing locked price, with authorized retries on days 1, 3 and 7. This recovery window does not grant free intake. After it ends, a new subscription uses current prices. Payment-method authorization, billing receipts and invoice history remain available through billing support and the billing workspace.
+
+Only one global capacity campaign may be active at a time. An automatic campaign ends at its exact configured deadline; a manual campaign remains effective until reset and is labelled accordingly. A brand-specific override wins over tier/campaign capacity and may have an expiry or be removed manually. Reduced capacity preserves existing work and pauses additional promotions until capacity permits. Runway notices, including notices called a free-order period, are informational and grant no financial discount or capacity change without explicit configuration. More than five brand cancellations of waiting orders in one action or a rolling 24 hours raises an admin attention alert; it does not automatically suspend the brand.
 

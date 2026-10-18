@@ -1,3 +1,4 @@
+import BrandSubscriptionPage from './BrandSubscriptionPage';
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import StudioScaffold from '@/components/studio/StudioScaffold';
@@ -19,6 +20,7 @@ const sections: Record<string, React.ReactNode> = {
   customers: <CustomersPage />,
   analytics: <AnalyticsPage />,
   finance: <FinancePage />,
+  subscription: <BrandSubscriptionPage />,
 };
 
 const StudioHome: React.FC = () => {

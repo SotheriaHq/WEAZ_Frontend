@@ -1,3 +1,4 @@
+import { QueuePaymentOutcome } from '@/components/custom-orders/QueueCheckoutDisclosure';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -195,6 +196,7 @@ const OrderConfirmation: React.FC = () => {
   if (loading && !summary) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+      <QueuePaymentOutcome customOrderIds={attempt?.customOrderIds ?? []} />
         <div className="mb-6 text-6xl">🧾</div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Loading payment confirmation</h1>
         <p className="text-gray-500 dark:text-zinc-400">WIEZ is loading the latest payment and order state.</p>

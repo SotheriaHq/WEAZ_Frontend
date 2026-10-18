@@ -67,6 +67,7 @@ export const NotificationItem = React.memo<NotificationItemProps>(
   ({ notification, onAvatarClick, onUsernameClick, onBodyClick, onMarkRead, onDelete, onOpenEntity }) => {
     const { id, type, isRead, actor, target, message } = notification;
     const displayName = getActorDisplayName(notification);
+    const isQueueNotice = /CUSTOM_ORDER|QUEUE|RETAIN/.test(String(type));
     const actionText = getActionText(type);
     const ariaAction = getAriaAction(type);
     const hasActor = hasValidActor(notification);
@@ -229,7 +230,10 @@ export const NotificationItem = React.memo<NotificationItemProps>(
 
               {/* Preview text if no action text */}
               {!actionText && message && (
+                <>
                 <p className="preview-text">{message}</p>
+                {isQueueNotice ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Open the order for its current deadline, refund status and available actions. Notification delivery does not extend cancellation.</p> : null}
+                </>
               )}
             </>
           )}

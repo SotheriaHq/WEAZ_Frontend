@@ -1,7 +1,7 @@
 # WIEZ Content, Intellectual Property, and Copyright Policy
 
-Version: `2026.08.22-v1.0`  
-Effective Date: August 22, 2026  
+Version: `2026.10.18-v1.3`  
+Effective Date: October 18, 2026  
 Governing Entities: WIEZ Technology Ltd. (Nigeria) & Global Operating Affiliates  
 Designated IP & Copyright Agent: `copyright@wiez.com` / `legal@wiez.com`
 
@@ -203,3 +203,14 @@ For all intellectual property inquiries, statutory DMCA notices, trademark claim
   Lagos, Nigeria  
 * **Official Web Portal**: [wiez.com/legal/copyright](https://wiez.com/legal/copyright)
 
+---
+
+## Custom-order subscription queue terms
+
+### Subscription custom-order policy scope and consumer rights
+
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.18-v1.3`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+
+## Removed sources and existing custom-order evidence
+
+Removing or restricting an infringing or unavailable design/product prevents new eligible purchases; it does not delete existing paid order snapshots, payment/refund evidence or the parties' obligations. WIEZ may retain limited source/specification evidence for fulfillment, disputes, copyright claims, financial audit and legal holds under the Privacy Policy. This retention does not grant permission to continue an infringing manufacture or publicly republish removed content. Safety or infringement review may stop promotion and unreleased payouts pending authorized review. Where an order cannot proceed, it is resolved under the applicable order and Payment Policies, with mandatory legal remedies preserved. A resubmission requires a currently permitted source and fresh checks; an archived order is not permission to reorder removed content.

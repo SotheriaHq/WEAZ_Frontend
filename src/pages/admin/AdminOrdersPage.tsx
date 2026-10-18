@@ -1,3 +1,6 @@
+import type { QueueLane } from '@/api/CustomOrderQueueApi';
+import AdminOrderQueueWorkspace from './AdminOrderQueueWorkspace';
+import { QueueFacts } from '@/components/custom-orders/CustomOrderQueue';
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -220,6 +223,7 @@ const AdminOrdersPage: React.FC = () => {
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const [standardStatusFilter, setStandardStatusFilter] = useState('');
   const [customStatusFilter, setCustomStatusFilter] = useState('');
+  const [queueConfigurationOpen, setQueueConfigurationOpen] = useState(false);
   const [customSort, setCustomSort] = useState<CustomSort>('ATTENTION');
   const [attentionOnly, setAttentionOnly] = useState(searchParams.get('attention') === '1');
   const [customPage, setCustomPage] = useState(1);
@@ -297,7 +301,9 @@ const AdminOrdersPage: React.FC = () => {
           : { page: customPage }),
         limit: CUSTOM_PAGE_SIZE,
         q: deferredSearchQuery.trim() || undefined,
-        status: customStatusFilter ? (customStatusFilter as CustomOrderStatus) : undefined,
+        status: customStatusFilter && !customStatusFilter.startsWith('queue:') ? (customStatusFilter as CustomOrderStatus) : undefined,
+        queueLane: customStatusFilter.startsWith('queue:') ? (customStatusFilter === 'queue:CANCELLED' ? 'TERMINAL' : customStatusFilter.slice(6)) as QueueLane : undefined,
+        cancelled: customStatusFilter === 'queue:CANCELLED' ? true : undefined,
         attention: attentionOnly ? 1 : undefined,
         sort: sortParam,
       });
@@ -897,6 +903,7 @@ const AdminOrdersPage: React.FC = () => {
                 <td className="py-3.5 px-5 align-middle">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <CustomOrderBadge value={entry.status} />
+                      <QueueFacts queue={entry.queue} />
                     <CustomOrderBadge value={entry.currentProgressStage || 'ORDER_PLACED'} type="stage" />
                   </div>
                 </td>
@@ -945,6 +952,7 @@ const AdminOrdersPage: React.FC = () => {
                 </div>
                 <div className="mt-1 flex flex-wrap justify-end gap-1.5">
                   <CustomOrderBadge value={entry.status} />
+                      <QueueFacts queue={entry.queue} />
                   <CustomOrderBadge value={entry.paymentStatus} type="payment" />
                 </div>
               </div>
@@ -980,6 +988,7 @@ const AdminOrdersPage: React.FC = () => {
             </div>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               <CustomOrderBadge value={entry.status} />
+                      <QueueFacts queue={entry.queue} />
               <CustomOrderBadge value={entry.currentProgressStage || 'ORDER_PLACED'} type="stage" />
             </div>
             <div className="mt-3 font-hanken-grotesk font-extrabold text-slate-900 dark:text-white text-base">
@@ -1053,6 +1062,10 @@ const AdminOrdersPage: React.FC = () => {
         </div>
       </div>
 
+      <div className="space-y-4">
+        <button className="queue-button" onClick={() => setQueueConfigurationOpen((open) => !open)} aria-expanded={queueConfigurationOpen}>?? Subscription tiers, capacity campaigns and Runway notices</button>
+        {queueConfigurationOpen ? <AdminOrderQueueWorkspace /> : null}
+      </div>
       {/* Stats Grid */}
       {activeTab !== 'COMMISSION' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1113,6 +1126,7 @@ const AdminOrdersPage: React.FC = () => {
                       onChange={setCustomStatusFilter}
                       options={[
                         { value: '', label: 'All statuses' },
+                        ...['PENDING', 'UP_NEXT', 'ACTIVE', 'IN_DELIVERY', 'CANCELLED'].map((lane) => ({ value: `queue:${lane}`, label: lane === 'UP_NEXT' ? 'Up Next' : lane === 'IN_DELIVERY' ? 'Delivery' : lane.charAt(0) + lane.slice(1).toLowerCase() })),
                         { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pending acceptance' },
                         { value: 'ACCEPTED', label: 'Accepted' },
                         { value: 'IN_PRODUCTION', label: 'In production' },

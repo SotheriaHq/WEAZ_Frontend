@@ -1,3 +1,4 @@
+import { BrandQueueSettings } from '@/components/custom-orders/QueueBrandControls';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -336,6 +337,7 @@ export default function StoreManagement() {
 
   return (
     <div className="animate-in fade-in space-y-4 duration-500 sm:space-y-8">
+      {status?.brandId ? <BrandQueueSettings brandId={status.brandId} /> : null}
       {returnTo ? (
         <div className="flex items-center gap-3">
           <button

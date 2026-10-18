@@ -1447,6 +1447,9 @@ export interface AdminFinancialDocument {
 }
 
 export interface AdminFinanceOverview {
+  queuedCustomHeldAmount?: number;
+  queuedCustomOrderCount?: number;
+  pendingRefundAmount?: number;
   currency: string;
   gmv: number;
   totalCommissions: number;

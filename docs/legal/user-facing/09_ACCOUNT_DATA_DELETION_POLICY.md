@@ -1,7 +1,7 @@
 # WIEZ Account and Data Deletion Policy
 
-Version: `2026.08.22-v1.0`  
-Effective Date: August 22, 2026  
+Version: `2026.10.18-v1.3`  
+Effective Date: October 18, 2026  
 Governing Entities: WIEZ Technology Ltd. (Nigeria) & Global Operating Affiliates  
 Privacy & Deletion Desk: `privacy@wiez.com` / `dpo@wiez.com`  
 Web Deletion Portal: [wiez.com/account/delete](https://wiez.com/account/delete)
@@ -171,3 +171,14 @@ For all questions regarding account deletion, data erasure, portability requests
   Lagos, Nigeria  
 * **Dedicated Deletion Portal**: [wiez.com/account/delete](https://wiez.com/account/delete)
 
+---
+
+## Custom-order subscription queue terms
+
+### Subscription custom-order policy scope and consumer rights
+
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.18-v1.3`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+
+## Queue obligations, subscription cancellation and financial evidence
+
+Cancelling a brand subscription stops future renewal and keeps access until paid-period end; it is not account deletion and does not cancel paid shopper obligations. Existing Pending/Up Next orders, admin promotion holds, Active/Delivery work, unsettled refunds, disputed captures, subscription invoices and financial recovery remain subject to the active-obligation checks in this Policy. A pre-Active cancellation uses the applicable accepted queue-policy quote; deletion never bypasses deductions, legally required refunds or reconciliation. Refund-processing orders remain visible until resolution, and resubmission is an independent payment, not use of a pending refund as credit. On closure, preserve the minimum financial, acceptance, billing, payment, refund, audit and dispute evidence required by existing retention/legal-hold rules; apply the existing anonymization rules to personal information when eligible. Removing a source or closing a brand must not cascade-delete these obligations. Expiry reminders failing or the account being inaccessible does not extend a waiting-order deadline.

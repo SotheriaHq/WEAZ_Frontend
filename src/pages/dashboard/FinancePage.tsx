@@ -66,6 +66,9 @@ type FinanceOverview = {
   totalOrders: number;
   activeEscrowHolds?: number;
   queuedCustomAllocations?: number;
+  queuedCustomHeldAmount?: number;
+  queuedCustomOrderCount?: number;
+  pendingRefundAmount?: number;
   negativeBalance: boolean;
 };
 
@@ -88,6 +91,8 @@ type IncomingTransaction = {
 type HeldFundsItem = {
   id: string;
   holdType: string;
+  queueLane?: string | null;
+  queueJumpHeldAmount?: number | string;
   referenceId?: string | null;
   title: string;
   counterparty?: string | null;
@@ -233,6 +238,9 @@ const FinancePage: React.FC = () => {
               totalOrders: Number(overviewData.totalOrders || 0),
               activeEscrowHolds: Number(overviewData.activeEscrowHolds || 0),
               queuedCustomAllocations: Number(overviewData.queuedCustomAllocations || 0),
+              queuedCustomHeldAmount: Number(overviewData.queuedCustomHeldAmount || 0),
+              queuedCustomOrderCount: Number(overviewData.queuedCustomOrderCount || 0),
+              pendingRefundAmount: Number(overviewData.pendingRefundAmount || 0),
               negativeBalance: Boolean(overviewData.negativeBalance),
             }
           : null,
@@ -639,6 +647,11 @@ const FinancePage: React.FC = () => {
         </div>
       </div>
 
+      <section className="space-y-3 rounded-2xl border border-violet-200 bg-violet-50 p-4 text-slate-900 dark:border-violet-900 dark:bg-slate-950 dark:text-white">
+        <h2 className="font-bold">Custom-order queue liabilities</h2>
+        <div className="grid grid-cols-2 gap-3"><div><p className="text-xs">Pending and Up Next holds ({overview?.queuedCustomOrderCount ?? 0} orders)</p><p className="font-bold tabular-nums">{formatCurrency(overview?.queuedCustomHeldAmount ?? 0, overview?.currency || 'NGN')}</p></div><div><p className="text-xs">Refunds processing</p><p className="font-bold tabular-nums">{formatCurrency(overview?.pendingRefundAmount ?? 0, overview?.currency || 'NGN')}</p></div></div>
+        <p className="text-xs">Waiting-order captures and jump earnings are unavailable for payout until Active. Refund processing does not mean a shopper has received the money. Existing payout controls apply only to eligible balances.</p>
+      </section>
       {/* Balance hero + metric strip */}
       <div className="overflow-hidden rounded-2xl border border-black/10 bg-slate-950 text-white shadow-sm dark:border-white/10">
         <div className="px-5 py-5">
@@ -823,6 +836,7 @@ const FinancePage: React.FC = () => {
                   >
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900 dark:text-white">{hold.title}</div>
+                      {hold.queueLane ? <p className="mt-1 text-xs font-semibold text-violet-700 dark:text-violet-200">Queue lane: {hold.queueLane.replaceAll('_', ' ')}. Priority fee held: {formatCurrency(Number(hold.queueJumpHeldAmount ?? 0), hold.currency || currency)}.</p> : null}
                       <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         {formatHoldTypeLabel(hold.holdType)} {hold.referenceId ? `• ${formatReferenceCode(hold.referenceId)}` : ''}
                       </div>

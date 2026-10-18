@@ -1,3 +1,4 @@
+import { QueuePriceDisclosure } from '@/components/custom-orders/QueueCheckoutDisclosure';
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Minus, Plus, Trash2, ShoppingBag, Lock, ArrowLeft, AlertCircle } from 'lucide-react';
@@ -473,11 +474,11 @@ const CartDrawer: React.FC = () => {
                               navigate(`/products/${item.productId}`);
                             }}
                           >
-                            <h4 className="text-xs font-semibold text-gray-900 dark:text-white line-clamp-1 leading-tight group-hover/link:text-purple-600 dark:group-hover/link:text-purple-400 transition-colors">
+                            <h4 className="text-xs font-semibold text-gray-900 dark:text-white break-words leading-tight group-hover/link:text-purple-600 dark:group-hover/link:text-purple-400 transition-colors">
                               {item.product.name}
                             </h4>
                             {item.brand?.name && (
-                              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+                              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 break-words">
                                 {item.brand.name}
                               </p>
                             )}
@@ -600,10 +601,10 @@ const CartDrawer: React.FC = () => {
                               </div>
 
                               <div className="min-w-0 flex-1 space-y-1">
-                                <p className="text-xs font-semibold text-gray-900 dark:text-white line-clamp-1 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors">
+                                <p className="text-xs font-semibold text-gray-900 dark:text-white break-words hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors">
                                   {customLine.sourceTitle}
                                 </p>
-                                <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1">
+                                <p className="text-[10px] text-gray-500 dark:text-gray-400 break-words">
                                   {customLine.sourceBrandName || 'Custom order'} · Qty: 1
                                 </p>
                                 <p className="text-[10px] text-gray-500 dark:text-gray-400">
@@ -641,6 +642,7 @@ const CartDrawer: React.FC = () => {
                               </div>
 
                               <div className="text-right">
+                                <QueuePriceDisclosure summary={customLine.buyerPriceSummary} />
                                 <p className="text-sm font-bold text-gray-900 dark:text-white">
                                   {formatPrice(
                                     customLine.buyerPriceSummary.grandTotal,

@@ -1,7 +1,7 @@
 # WIEZ Master Cookie, Local Storage, and Device Telemetry Directive
 
-**Effective Date:** August 22, 2026  
-**Document Version:** 2026.08-PROD.3  
+**Effective Date:** October 18, 2026  
+**Document Version:** 2026.10.18-v1.3  
 **Applies To:** Web Applications (`wiez.com`, `fthreadly`), Mobile Applications (iOS / Android / `threadly-mobile`), Brand Studio Workspaces, Embedded WebViews, and all platform APIs.
 
 ---
@@ -232,3 +232,14 @@ If you have questions regarding our storage practices, cryptographic security, o
   12B Admiralty Way, Lekki Phase 1,  
   Lagos, Nigeria.
 
+---
+
+## Custom-order subscription queue terms
+
+### Subscription custom-order policy scope and consumer rights
+
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.18-v1.3`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+
+## Queue countdowns, billing and functional storage
+
+The queue may use existing authenticated functional caches to display your position, billing state, held payment, expiry countdown and refund progress. These displays do not create a wallet or authorize payment. The server's order, payment and deadline records govern; a device clock or stale/offline cache cannot confirm retain, cancellation, payment or refund completion. Reopening or reconnecting refreshes those records. Recurring-payment and legal acceptance evidence stays on the server. This feature does not introduce a new advertising tracker or override cookie/marketing choices. Reminder failures or unavailable app access do not create an extension to the scheduled waiting-order expiry; see the Buyer and Payment Policies for the no-grace rule.

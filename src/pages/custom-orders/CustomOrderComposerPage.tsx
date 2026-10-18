@@ -1,3 +1,6 @@
+import { useQuery } from '@tanstack/react-query';
+import { customOrderQueueApi } from '@/api/CustomOrderQueueApi';
+import { QueueBrandCounts } from '@/components/custom-orders/CustomOrderQueue';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -184,6 +187,8 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
   const [cities, setCities] = useState<string[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [rushSelected, setRushSelected] = useState(false);
+  const [queueJumpSelected, setQueueJumpSelected] = useState(false);
+  const intake = useQuery({ queryKey: ['custom-order-intake', configuration?.brandId], queryFn: () => customOrderQueueApi.brand(configuration!.brandId), enabled: Boolean(configuration?.brandId), staleTime: 15000 });
   const [measurementConfirmed, setMeasurementConfirmed] = useState(false);
   const [measurementRecencyConfirmed, setMeasurementRecencyConfirmed] = useState(false);
   const [sizeFitProfile, setSizeFitProfile] = useState<SizeFitProfile | null>(null);
@@ -664,6 +669,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
         configurationVersionId: configuration.versions?.[0]?.id,
         measurementValues: measurementPayload,
         rushSelected,
+        queueJumpSelected,
         shippingAddress,
         pricingChartFamily,
         displayChartFamily,
@@ -833,6 +839,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
         configurationVersionId: preview.configurationVersionId,
         measurementValues: measurementPayload,
         rushSelected,
+        queueJumpSelected,
         shippingAddress,
         contactInfo,
         customerName: customerName.trim(),
@@ -1315,6 +1322,15 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
 
           <section className="rounded-3xl border border-black/10 bg-white/80 p-4 sm:p-6 dark:border-white/10 dark:bg-white/5">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Bag preview</div>
+            <div className="my-3 space-y-3 text-sm text-slate-700 dark:text-slate-200">
+              {configuration.brandId ? <QueueBrandCounts brandId={configuration.brandId} /> : null}
+              {intake.isError ? <p role="alert">Current intake could not be verified. <button className="queue-button" onClick={() => void intake.refetch()}>Retry</button></p> : null}
+              {intake.data && !intake.data.intakeAllowed ? <p role="alert">New orders are paused for this brand. Existing paid orders continue.</p> : null}
+              {(intake.data?.openOrderCount ?? 0) > 0 ? <p>You already have {intake.data?.openOrderCount} open orders with this brand. This new request requires a separate payment.</p> : null}
+              <p>Payment is captured at placement and held until Active. Pending and Up Next expire after 42 days. One retain is available from 48 to 12 hours before expiry. Delayed reminders do not extend cancellation.</p>
+              <p>All pre-Active cancellations withhold VAT, 10% of garment subtotal and 10% of any jump fee; delivery is fully refunded.</p>
+              {intake.data?.jumpAvailable ? <label className="flex items-start gap-2"><input type="checkbox" className="mt-1" checked={queueJumpSelected} onChange={(event) => { setQueueJumpSelected(event.target.checked); setPreview(null); }} /><span>Add paid queue priority for 20% of garment subtotal. Current Up Next stays protected. Paid jumps remain FIFO, with at most two priority promotions before one ordinary order. This does not promise an immediate production slot.</span></label> : <p>Paid priority is unavailable. Only Aru and Igwe brands with paid jumps enabled can offer it.</p>}
+            </div>
             <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
               <div className="flex items-center justify-between"><span>Base production charge</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(Number(configuration.baseProductionCharge))}</span></div>
               {preview ? (
@@ -1327,7 +1343,9 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
                       {(preview.buyerPriceSummary.rushFee ?? 0) > 0 && (
                         <div className="flex items-center justify-between"><span>Rush fee</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.rushFee ?? 0, preview.currency)}</span></div>
                       )}
-                      <div className="flex items-center justify-between"><span>Subtotal</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.subtotal ?? preview.buyerPriceSummary.grandTotal, preview.currency)}</span></div>
+                      <div className="flex items-center justify-between"><span>Garment subtotal</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.subtotal ?? preview.buyerPriceSummary.grandTotal, preview.currency)}</span></div>
+                      <div className="flex flex-wrap items-center justify-between gap-2"><span>Paid jump fee</span><span>{formatCurrency(preview.buyerPriceSummary.queueJumpFee ?? 0, preview.currency)}</span></div>
+                      <div className="flex flex-wrap items-center justify-between gap-2"><span>VAT</span><span>{formatCurrency(preview.buyerPriceSummary.vatAmount ?? 0, preview.currency)}</span></div>
                       <div className="flex items-center justify-between"><span>Shipping</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(preview.buyerPriceSummary.shippingFee ?? 0, preview.currency)}</span></div>
                       <div className="flex items-center justify-between border-t border-black/10 pt-3 text-base dark:border-white/10"><span className="font-semibold text-slate-900 dark:text-white">Grand total</span><span className="font-semibold text-emerald-600 dark:text-emerald-300">{formatCurrency(preview.buyerPriceSummary.grandTotal, preview.currency)}</span></div>
                     </>

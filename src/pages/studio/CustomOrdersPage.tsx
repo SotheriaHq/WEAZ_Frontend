@@ -1,5 +1,12 @@
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
+import { canUpdateBrandOrders } from '@/lib/brandAccess';
+import QueueBulkCancellation from '@/components/custom-orders/QueueBulkCancellation';
+import type { QueueLane } from '@/api/CustomOrderQueueApi';
+import { BrandQueueSettings } from '@/components/custom-orders/QueueBrandControls';
+import { QueueFacts, QueueBrandCounts } from '@/components/custom-orders/CustomOrderQueue';
 import React, { useDeferredValue, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getStoreStatus } from '@/api/StoreApi';
 import { useCachedQuery, cachePolicies } from '@/cache';
 import { queryKeys } from '@/query/queryKeys';
@@ -26,6 +33,7 @@ const formatCurrency = (value: number | undefined, currency = 'NGN') =>
 
 const statusFilterOptions = [
   { value: '', label: 'All statuses' },
+  ...['PENDING', 'UP_NEXT', 'ACTIVE', 'IN_DELIVERY', 'CANCELLED'].map((lane) => ({ value: `queue:${lane}`, label: lane === 'UP_NEXT' ? 'Up Next' : lane === 'IN_DELIVERY' ? 'Delivery' : lane.charAt(0) + lane.slice(1).toLowerCase() })),
   { value: 'DRAFT', label: 'Draft' },
   { value: 'PENDING_PAYMENT', label: 'Pending payment' },
   { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pre-production hold' },
@@ -110,6 +118,7 @@ const StudioCustomOrderCard: React.FC<{
         hasAdminNotice ? 'ring-2 ring-rose-400/70 ring-offset-1 ring-offset-transparent' : ''
       }`}
     >
+      <div className="px-3"><QueueFacts queue={order.queue} /></div>
       <div className="grid items-center gap-0 lg:grid-cols-[64px_minmax(0,1fr)_170px_140px_130px]">
         {/* Mobile + Desktop Thumbnail */}
         <div className="flex items-center gap-3 p-3 lg:p-0 overflow-hidden border-b border-black/[0.04] dark:border-white/[0.04] lg:border-b-0">
@@ -141,8 +150,8 @@ const StudioCustomOrderCard: React.FC<{
                 {formatCurrency(order.buyerPriceSummary.grandTotal, order.buyerPriceSummary.currency)}
               </span>
             </div>
-            <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{order.sourceTitle}</div>
-            <div className="text-[11px] text-slate-500 truncate">
+            <div className="text-xs font-bold text-slate-900 dark:text-white break-words">{order.sourceTitle}</div>
+            <div className="text-[11px] text-slate-500 break-words">
               {order.buyer?.name || 'Buyer'} • {[order.delivery?.city, order.delivery?.state].filter(Boolean).join(', ') || 'No address'}
             </div>
           </div>
@@ -233,28 +242,40 @@ const StudioCustomOrderCard: React.FC<{
 type CustomOrdersData = {
   brandId: string | null;
   orders: CustomOrderListItem[];
+  total: number;
   summaryByOrderId: Record<string, ThreadSummaryResponse | null>;
 };
 
 const CustomOrdersPage: React.FC = () => {
   const navigate = useNavigate();
+  const profile = useSelector((state: RootState) => state.user.profile);
   // The whole row, not just its id: the drawer pins a reference card naming the
   // piece, and the queue already holds the title, cover and status it needs.
   const [chatTarget, setChatTarget] = useState<CustomOrderListItem | null>(null);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [params, setParams] = useSearchParams();
+  const statusFilter = params.get('customFilter') ?? '';
+  const searchQuery = params.get('customQ') ?? '';
+  const page = Math.max(1, Number(params.get('customPage')) || 1);
+  const sort = params.get('customSort') ?? 'queue';
+  const updateParam = (key: string, value: string) => { const next = new URLSearchParams(params); if (value) next.set(key, value); else next.delete(key); if (key !== 'customPage') next.delete('customPage'); setParams(next, { replace: true }); };
+  const setStatusFilter = (value: string) => updateParam('customFilter', value);
+  const setSearchQuery = (value: string) => updateParam('customQ', value);
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
   // Cache-first: a previously loaded queue paints instantly and revalidates in
   // the background; each (status, search) combination is cached under its own key.
   const customOrdersQuery = useCachedQuery<CustomOrdersData>({
-    key: queryKeys.customOrders.brandQueue({ status: statusFilter, search: deferredSearchQuery }),
+    key: queryKeys.customOrders.brandQueue({ status: statusFilter, search: deferredSearchQuery, page, sort }),
     fetcher: async () => {
       const status = await getStoreStatus();
       const response = await customOrdersBrandApi.list(status.brandId, {
-        status: statusFilter ? (statusFilter as CustomOrderStatus) : undefined,
+        status: statusFilter && !statusFilter.startsWith('queue:') ? (statusFilter as CustomOrderStatus) : undefined,
+        queueLane: statusFilter.startsWith('queue:') ? (statusFilter === 'queue:CANCELLED' ? 'TERMINAL' : statusFilter.slice(6)) as QueueLane : undefined,
+        cancelled: statusFilter === 'queue:CANCELLED' ? true : undefined,
         q: deferredSearchQuery || undefined,
         limit: 30,
+        page,
+        sort: sort as 'queue' | 'newest' | 'oldest',
       });
       const visibleOrders = collapseVisibleQueueOrders(response.items);
       const orderIds = visibleOrders.map((entry) => entry.id);
@@ -273,7 +294,7 @@ const CustomOrdersPage: React.FC = () => {
           {},
         );
       }
-      return { brandId: status.brandId, orders: visibleOrders, summaryByOrderId };
+      return { brandId: status.brandId, orders: visibleOrders, total: response.total, summaryByOrderId };
     },
     policy: cachePolicies.defaultQuery,
   });
@@ -287,7 +308,7 @@ const CustomOrdersPage: React.FC = () => {
       total: orders.length,
       awaitingMoney: orders.filter((entry) => entry.paymentStatus !== 'PAID').length,
       active: orders.filter((entry) =>
-        ['PENDING_BRAND_ACCEPTANCE', 'ACCEPTED', 'IN_PRODUCTION', 'READY_FOR_DISPATCH', 'IN_TRANSIT'].includes(entry.status),
+        entry.queue?.lane === 'ACTIVE' || entry.queue?.lane === 'IN_DELIVERY' || ['PENDING_BRAND_ACCEPTANCE', 'ACCEPTED', 'IN_PRODUCTION', 'READY_FOR_DISPATCH', 'IN_TRANSIT'].includes(entry.status),
       ).length,
       issues: orders.filter(
         (entry) =>
@@ -312,6 +333,7 @@ const CustomOrdersPage: React.FC = () => {
         <span className="font-medium">Custom orders</span>
       </div>
 
+      {brandId ? <><QueueBrandCounts brandId={brandId} /><BrandQueueSettings brandId={brandId} /></> : null}
       <section className="rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-3 py-4 text-white shadow-sm sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -374,6 +396,7 @@ const CustomOrdersPage: React.FC = () => {
         </div>
       </section>
 
+      {brandId && canUpdateBrandOrders(profile, brandId) ? <QueueBulkCancellation brandId={brandId} orders={orders} onChanged={async () => { await customOrdersQuery.refetch(); }} /> : null}
       <section className="rounded-2xl border border-black/10 bg-white/85 p-3 shadow-[0_24px_80px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.04] sm:rounded-[2rem] sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -403,6 +426,8 @@ const CustomOrdersPage: React.FC = () => {
           />
         </div>
 
+        <div className="mt-3"><UniversalSelect label="Queue order" value={sort} onChange={(value) => updateParam('customSort', value)} options={[{ value: 'queue', label: 'Queue sequence' }, { value: 'newest', label: 'Newest placement first' }, { value: 'oldest', label: 'Oldest placement first' }]} /></div>
+        {customOrdersQuery.error ? <p className="mt-3 text-sm text-rose-700 dark:text-rose-200" role="alert">Unable to refresh this queue. <button className="queue-button" onClick={() => void customOrdersQuery.refetch()}>Retry</button></p> : null}
         <div className="mt-5 space-y-2">
           {loading && orders.length === 0 ? (
             <div className="space-y-2">
@@ -430,6 +455,7 @@ const CustomOrdersPage: React.FC = () => {
             />
           ))}
         </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm"><span>Page {page} of {Math.max(1, Math.ceil((customOrdersQuery.data?.total ?? 0) / 30))} | {customOrdersQuery.data?.total ?? 0} orders</span><div className="flex flex-wrap gap-2"><button className="queue-button" disabled={loading || page <= 1} onClick={() => updateParam('customPage', String(page - 1))}>Previous</button><button className="queue-button" disabled={loading || page * 30 >= (customOrdersQuery.data?.total ?? 0)} onClick={() => updateParam('customPage', String(page + 1))}>Next</button></div></div>
       </section>
 
       <OrderChatDrawer

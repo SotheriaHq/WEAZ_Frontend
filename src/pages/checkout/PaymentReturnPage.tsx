@@ -1,3 +1,4 @@
+import { QueuePaymentOutcome } from '@/components/custom-orders/QueueCheckoutDisclosure';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -398,6 +399,7 @@ const PaymentReturnPage: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+      <QueuePaymentOutcome customOrderIds={attempt?.customOrderIds ?? (attempt?.customOrderId ? [attempt.customOrderId] : [])} />
       {/* Top navigation bar for mobile browser & desktop */}
       <div className="mb-6 flex items-center justify-between gap-3 border-b border-gray-200/70 pb-4 dark:border-zinc-800">
         <button

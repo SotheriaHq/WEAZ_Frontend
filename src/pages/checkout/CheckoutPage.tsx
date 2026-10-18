@@ -1,3 +1,4 @@
+import { QueuePriceDisclosure } from '@/components/custom-orders/QueueCheckoutDisclosure';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from '@/store';
@@ -1895,7 +1896,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                               />
                             )}
                             <div className="min-w-0">
-                              <p className="font-medium truncate">{item.product.name}</p>
+                              <p className="font-medium break-words">{item.product.name}</p>
                               <p className="text-gray-400 text-xs">
                                 Qty: {item.quantity}
                                 {item.selectedSize && <> · Size {item.selectedSize}</>}
@@ -1943,7 +1944,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                               )}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-medium truncate">{line.sourceTitle}</p>
+                              <p className="font-medium break-words">{line.sourceTitle}</p>
+                              <QueuePriceDisclosure summary={line.buyerPriceSummary} />
                               <p className="text-gray-400 text-xs">
                                 Qty: 1 · {line.sourceBrandName || 'Custom order'}
                                 {line.rushSelected ? ' · Rush' : ''}
@@ -2007,7 +2009,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{item.product.name}</p>
+                          <p className="break-words text-sm font-semibold text-slate-950 dark:text-white">{item.product.name}</p>
                           <p className="text-xs text-slate-500 dark:text-slate-400">{item.brand.name}</p>
                         </div>
                         <span className="text-sm font-semibold text-slate-950 dark:text-white">{formatPrice(item.itemTotal)}</span>
@@ -2042,7 +2044,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{line.sourceTitle}</p>
+                            <p className="break-words text-sm font-semibold text-slate-950 dark:text-white">{line.sourceTitle}</p>
+                            <QueuePriceDisclosure summary={line.buyerPriceSummary} />
                             <p className="text-xs text-slate-500 dark:text-slate-400">{line.sourceBrandName || 'Custom order'}</p>
                           </div>
                           <span className="text-sm font-semibold text-slate-950 dark:text-white">

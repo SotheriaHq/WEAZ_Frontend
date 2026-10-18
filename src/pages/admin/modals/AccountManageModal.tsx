@@ -1,3 +1,4 @@
+import { AdminBrandQueueControls } from '@/components/custom-orders/QueueBrandControls';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Modal from '@/components/ui/Modal';
@@ -163,7 +164,7 @@ const PermissionColumn: React.FC<{
                   <span aria-hidden="true" className="text-[9px] text-gray-400 dark:text-gray-500">
                     {open ? '▼' : '▶'}
                   </span>
-                  <span className="truncate text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <span className="break-words text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                     {section.group}
                   </span>
                 </span>
@@ -765,8 +766,8 @@ const AccountManageModal: React.FC<Props> = ({
                   {initials}
                 </div>
                 <div className="min-w-0">
-                  <h2 className="truncate text-lg font-bold text-gray-900 dark:text-white">{displayName}</h2>
-                  <p className="truncate text-sm text-gray-600 dark:text-gray-300">{email}</p>
+                  <h2 className="break-words text-lg font-bold text-gray-900 dark:text-white">{displayName}</h2>
+                  <p className="break-words text-sm text-gray-600 dark:text-gray-300">{email}</p>
                 </div>
               </div>
               <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusMeta.chipClass}`}>
@@ -867,6 +868,7 @@ const AccountManageModal: React.FC<Props> = ({
             </div>
           </div>
 
+          {isBrandAccount && brandId ? <AdminBrandQueueControls brandId={brandId} /> : null}
           {/* Brand storefront controls. Rendered for every brand account —
               "View store" opens a public page and needs no extra grant; the
               override/suspend/verify buttons keep their own permission gates. */}
@@ -1006,10 +1008,10 @@ const AccountManageModal: React.FC<Props> = ({
                     return (
                       <li key={item.id} className="flex items-baseline justify-between gap-3 text-xs">
                         <div className="min-w-0">
-                          <p className="truncate font-semibold text-gray-800 dark:text-gray-100">
+                          <p className="break-words font-semibold text-gray-800 dark:text-gray-100">
                             {TRANSACTION_LABELS[item.kind] ?? item.kind} · {item.title}
                           </p>
-                          <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
+                          <p className="break-words text-[11px] text-gray-500 dark:text-gray-400">
                             {formatDate(item.occurredAt)} · {humanize(item.status)}
                             {item.reference ? ` · ${item.reference}` : ''}
                           </p>
@@ -1054,10 +1056,10 @@ const AccountManageModal: React.FC<Props> = ({
                     return (
                       <li key={reminder.id} className="flex items-baseline justify-between gap-3 text-xs">
                         <div className="min-w-0">
-                          <p className="truncate font-semibold text-gray-800 dark:text-gray-100">
+                          <p className="break-words font-semibold text-gray-800 dark:text-gray-100">
                             {REMINDER_LABELS[reminder.type] ?? humanize(reminder.type)}
                           </p>
-                          <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
+                          <p className="break-words text-[11px] text-gray-500 dark:text-gray-400">
                             {formatDate(reminder.createdAt)}
                             {reminder.detail ? ` · ${humanize(reminder.detail)}` : ''}
                             {reminder.isRead ? '' : ' · unread'}
@@ -1102,13 +1104,13 @@ const AccountManageModal: React.FC<Props> = ({
                     return (
                       <li key={dispute.id} className="flex items-baseline justify-between gap-3 text-xs">
                         <div className="min-w-0">
-                          <p className="truncate font-semibold text-gray-800 dark:text-gray-100">
+                          <p className="break-words font-semibold text-gray-800 dark:text-gray-100">
                             <span className={dispute.isOpen ? 'text-rose-600 dark:text-rose-300' : 'text-emerald-600 dark:text-emerald-300'}>
                               {dispute.isOpen ? '🔴' : '🟢'} {humanize(dispute.status)}
                             </span>{' '}
                             · {isCustom ? 'Custom order' : 'Store order'}
                           </p>
-                          <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
+                          <p className="break-words text-[11px] text-gray-500 dark:text-gray-400">
                             {formatDate(dispute.createdAt)} · {dispute.description}
                           </p>
                         </div>

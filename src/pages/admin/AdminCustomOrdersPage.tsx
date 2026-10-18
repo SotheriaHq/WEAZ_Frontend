@@ -1,3 +1,6 @@
+import type { QueueLane } from '@/api/CustomOrderQueueApi';
+import { QueueOrderActions } from '@/components/custom-orders/CustomOrderQueue';
+import { QueueFacts } from '@/components/custom-orders/CustomOrderQueue';
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
@@ -196,9 +199,11 @@ const AdminCustomOrdersPage: React.FC = () => {
           ...(statusFilter === 'HAS_DISPUTE'
             ? { disputed: true }
             : {
-                status: statusFilter
+                status: statusFilter && !statusFilter.startsWith('queue:')
                   ? (statusFilter as CustomOrderStatus)
                   : undefined,
+                queueLane: statusFilter.startsWith('queue:') ? (statusFilter === 'queue:CANCELLED' ? 'TERMINAL' : statusFilter.slice(6)) as QueueLane : undefined,
+        cancelled: statusFilter === 'queue:CANCELLED' ? true : undefined,
               }),
         }),
       ]);
@@ -357,6 +362,7 @@ const AdminCustomOrdersPage: React.FC = () => {
               onChange={setStatusFilter}
               options={[
                 { value: '', label: 'All statuses' },
+                    ...['PENDING', 'UP_NEXT', 'ACTIVE', 'IN_DELIVERY', 'CANCELLED'].map((lane) => ({ value: `queue:${lane}`, label: lane === 'UP_NEXT' ? 'Up Next' : lane === 'IN_DELIVERY' ? 'Delivery' : lane.charAt(0) + lane.slice(1).toLowerCase() })),
                 /*
                   Distinct from the DISPUTED status below it, and deliberately
                   first. A delay dispute leaves the order IN_PRODUCTION so the
@@ -383,6 +389,7 @@ const AdminCustomOrdersPage: React.FC = () => {
                     <div className="font-semibold text-slate-900 dark:text-white">{entry.sourceTitle}</div>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <CustomOrderBadge value={entry.status} />
+                      <QueueFacts queue={entry.queue} />
                       <CustomOrderBadge value={entry.currentProgressStage ?? 'ORDER_PLACED'} type="stage" />
                       {/*
                         The dispute tag, which the status badge cannot carry: a
@@ -434,6 +441,8 @@ const AdminCustomOrdersPage: React.FC = () => {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <CustomOrderBadge value={selected.status} />
+                  <QueueFacts queue={selected.queue} />
+                  <QueueOrderActions orderId={selected.id} queue={selected.queue} audience="admin" onChanged={refresh} />
                   <CustomOrderBadge value={selected.paymentStatus} type="payment" />
                   <CustomOrderBadge value={selected.currentProgressStage ?? 'ORDER_PLACED'} type="stage" />
                 </div>
@@ -666,14 +675,14 @@ const AdminCustomOrdersPage: React.FC = () => {
 
               <div className="rounded-2xl border border-black/10 p-3 dark:border-white/10">
                 <CustomOrderFieldTitle
-                  title="Super admin cancellation"
-                  description="Only for paid orders. Cancels the order and starts the full refund workflow. Irreversible money path."
+                  title={selected.queue?.canCancel ? "Waiting-order cancellation uses the reviewed queue action above" : "Super admin cancellation"}
+                  description={selected.queue?.canCancel ? "Use the queue cancellation action above to review the server refund quote: VAT plus 10% of garment subtotal plus 10% of the jump fee are withheld; delivery is refunded in full." : "Only for paid orders. Cancels the order and starts the full refund workflow. Irreversible money path."}
                 />
                 <input value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Cancellation reason (required)" className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950" />
                 <textarea value={cancelNote} onChange={(event) => setCancelNote(event.target.value)} rows={2} className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-950" placeholder="Refund note (optional)" />
                 <button
                   type="button"
-                  disabled={busy || selected.paymentStatus !== 'PAID' || cancelReason.trim().length < 3}
+                  disabled={busy || Boolean(selected.queue?.canCancel) || selected.paymentStatus !== 'PAID' || cancelReason.trim().length < 3}
                   onClick={() =>
                     setPendingAction({
                       title: 'Cancel this paid custom order?',
@@ -1039,6 +1048,7 @@ const AdminCustomOrdersPage: React.FC = () => {
                 <div className="font-semibold text-slate-900 dark:text-white">{entry.sourceTitle}</div>
                 <div className="mt-1 flex flex-wrap gap-2">
                   <CustomOrderBadge value={entry.status} />
+                      
                   <CustomOrderBadge value={entry.paymentStatus} type="payment" />
                 </div>
                 <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">Issues {entry.issueCount} • Disputes {entry.disputeCount}</div>

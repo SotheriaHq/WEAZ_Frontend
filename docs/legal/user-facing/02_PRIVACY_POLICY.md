@@ -1,7 +1,7 @@
 # WIEZ Master Privacy Policy and Data Governance Directive
 
-**Effective Date:** August 22, 2026  
-**Document Version:** 2026.08-PROD.3  
+**Effective Date:** October 18, 2026  
+**Document Version:** 2026.10.18-v1.3  
 **Applies To:** Web (`wiez.com`, `fthreadly`), Mobile Applications (iOS / Android / `threadly-mobile`), Brand Studio Workspaces, Escrow Ledger Services, and all platform APIs.
 
 ---
@@ -326,4 +326,14 @@ If you have questions, data portability requests, or privacy compliance inquirie
   12B Admiralty Way, Lekki Phase 1,  
   Lagos, Nigeria.
 
+---
 
+## Custom-order subscription queue terms
+
+### Subscription custom-order policy scope and consumer rights
+
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.18-v1.3`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+
+## Custom-order queue and subscription records
+
+To perform queue purchases, billing, cancellation and support, WIEZ processes placement/activation/expiry/retain timestamps, lane and priority, admin promotion-hold reasons, tier and price snapshots, billing periods and authorization references, payment/refund component amounts and statuses, notification delivery records, and access/audit events. The purposes are contract performance, payment reconciliation, fraud prevention and resolving disputes; existing lawful bases, minimization, access controls, retention and legal-hold rules apply. Queue previews expose aggregate counts rather than other shoppers' identities or measurements. Notifications limit private information; marketing consent does not replace necessary transaction notices. Measurements remain limited to the relevant order and authorized participants. Cancellation, suspension, listing removal or subscription termination does not erase evidence needed to finish refunds or satisfy retention obligations. Subscription cancellation is distinct from account/data deletion. You may exercise the rights and contact routes in this Policy.

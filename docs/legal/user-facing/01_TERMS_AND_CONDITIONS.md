@@ -1,7 +1,7 @@
 # WIEZ Master Terms of Service
 
-**Effective Date:** August 22, 2026  
-**Document Version:** 2026.08-PROD.2  
+**Effective Date:** October 18, 2026  
+**Document Version:** 2026.10.18-v1.3  
 **Applies To:** Web (`wiez.com`, `fthreadly`), Mobile Applications (iOS / Android / `threadly-mobile`), Brand Studio Workspaces, and all platform APIs.
 
 ---
@@ -171,6 +171,16 @@ Custom orders represent unique, individualized garments tailored to specific bod
 ### 7.5. Fabric Sourcing & Sourcing Variations
 Where a custom order includes brand-sourced textiles, minor artisanal dye-lot variations, weave slubs, and display monitor color differences do not constitute actionable defects.
 
+### 7.6. Production Deadlines and Time Extensions
+* Each new subscription-queue custom order records its production terms at checkout; production, dispatch and delivery dates run from activation. Historical orders retain their recorded dates. Queue waiting is not production delay.
+* **A Brand cannot extend its own deadline.** Where a Brand requires additional time it must request it from the Shopper, who may accept or decline. Neither WIEZ nor the Brand may grant the extension in the Shopper's place.
+* **Platform limits**: a maximum of **three (3) calendar days per request**, **two (2) approved extensions per order**, and **six (6) calendar days in total per order**. Declined and expired requests do not consume these limits.
+* **Rush orders cannot be extended at all.** Where a Shopper has paid a rush production fee, WIEZ refuses extension requests on that order. The fee is consideration for a date.
+* **The Shopper has twenty-four (24) hours to respond**, or until the original deadline, whichever falls first. **A failure to respond is not consent**: the request expires, no time is granted, and the order is escalated for WIEZ administrative review.
+* **Accepting** moves the production, dispatch and delivery dates by the days granted, and moves the Bespoke Inspection Window (Section 7.4) and the corresponding escrow release schedule with them. The originally promised dates are retained on the order record and remain the reference point for assessing Brand performance.
+* **Declining is not a cancellation and not a refund request.** The order and the Shopper's payment are unaffected. A dispute is opened and WIEZ places the order under administrative intervention, during which WIEZ may communicate separately and privately with each party. Communications sent by WIEZ in that capacity are informational and are not a channel for replies; both parties retain their existing in-order messaging and dispute routes.
+* Every request, response, attached comment, number of days granted and resulting date change is recorded on the order and retained under the Privacy Policy.
+
 ---
 
 ## 8. Payments, Escrow Settlements, and Financial Ledger Architecture
@@ -181,8 +191,8 @@ WIEZ integrates with PCI-DSS compliant third-party payment processors (including
 ### 8.2. Settlement Escrow Ledger
 To safeguard marketplace integrity:
 * All Shopper funds collected at checkout are deposited into a segregated settlement ledger (`CustomOrderFinanceSyncService`).
-* Funds are held in an escrow-like pending status during manufacturing and transit.
-* **Payout Release Trigger**: Funds are released to the Brand's available balance only after: (a) verified carrier delivery confirmation, AND (b) the expiration of the 72-hour buyer inspection window without an open unresolved dispute.
+* New subscription-queue custom funds remain held throughout Pending/Up Next; only the eligible production allocation may release from Active, with the remaining allocation subject to completion and dispute controls.
+* **Payout Release Trigger**: Standard-order settlement and the final custom-order allocation follow delivery/inspection and dispute controls. Custom production allocation follows the 60%/40% terms below and cannot release before Active; Pending/Up Next are fully held.
 
 ### 8.3. Platform Commissions and Transaction Fees
 * WIEZ deducts an agreed platform commission (as declared in the Brand Studio agreement, default: 8%–12%) plus standard payment gateway interchange fees from each completed order.
@@ -209,6 +219,7 @@ If a Shopper initiates an unauthorized payment dispute or credit card chargeback
 * Return shipping costs are the responsibility of the Shopper unless the return is due to Brand shipping error or damaged goods.
 
 ### 9.2. Custom Bespoke Orders
+The pre-Active cancellation rights and itemized deductions in the subscription queue terms below apply to Pending/Up Next purchases under the new policy. The following production limitations apply after Active and remain subject to mandatory law and authorized dispute remedies.
 * **No Cancellation Post-Cutting**: Because bespoke fabrics are cut to personal specifications, custom orders cannot be cancelled once the Brand updates the order stage to "Production/Cutting Started".
 * Custom bespoke orders are non-refundable unless the Brand fails to deliver the garment or fails to correct an established sizing deviation exceeding the ±0.75-inch fit tolerance.
 
@@ -322,7 +333,7 @@ In the event of a Force Majeure Event:
 * WIEZ's obligation to disburse escrow settlements may be temporarily suspended during a Force Majeure Event but shall resume promptly upon the cessation of the event.
 
 ### 14A.3. Extended Force Majeure
-If a Force Majeure Event continues for more than sixty (60) days and materially prevents the fulfillment of an order, either party may cancel the affected order. Funds held in escrow for orders cancelled due to extended Force Majeure Events will be refunded to the Shopper in full.
+If a Force Majeure Event continues for more than sixty (60) days and materially prevents the fulfillment of an order, either party may cancel the affected order. Historical and standard orders retain their applicable force-majeure remedies. A new-policy Pending/Up Next cancellation uses its accepted pre-Active deduction policy; mandatory statutory refunds prevail.
 
 ---
 
@@ -425,4 +436,48 @@ If you have any questions, compliance inquiries, or concerns regarding these Ter
 * **Security & Vulnerabilities**: `security@wiez.com`
 * **Corporate Entity & Address**: WIEZ Platforms Limited, 12B Admiralty Way, Lekki Phase 1, Lagos, Nigeria.
 
+---
+
+## Custom-order subscription queue terms
+
+### Subscription custom-order policy scope and consumer rights
+
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.18-v1.3`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+
+### Paid waiting queue, timing and priority
+
+Custom-order payment is captured once at placement. Pending and Up Next funds remain held and unavailable as brand earnings until Active; Up Next is a notice and position, never a second garment charge. There is one Up Next seat. Active production and rush times begin at activation, not during waiting; queue position is not a delivery guarantee. Standard garment earnings follow the existing 60% production / 40% completion calculation, with no production release before Active and with existing dispute, verification and payout controls preserved. An internal held balance is an accounting restriction, not a representation of a separately protected bank escrow or provider deposit guarantee.
+
+Ordinary Pending orders are FIFO. Only an Aru or Igwe brand that opts in may offer a paid jump. The separately disclosed fee is 20% of garment subtotal. It buys priority behind the current Up Next and earlier paid jumps, without displacing Up Next. When ordinary eligible orders are waiting, at most two paid-priority orders activate consecutively before one ordinary order. There is no paid jump offer when it provides no priority benefit. Of an earned jump fee, WIEZ receives 10% and the brand 90%; no brand share is earned before Active. Existing duplicate-source restrictions remain; ordering different items from one brand is permitted subject to ordinary checks.
+
+Both Pending and Up Next expire 42 x 24 hours after committed paid placement. Cards and details show the cancellation countdown and exact deadline. One retain is permitted from 48 hours through exactly 12 hours remaining, inclusive, adding 42 days to the existing deadline while preserving priority. It is unavailable outside that window or after use, activation or cancellation. Shopper and brand reminders are scheduled at 48, 24 and 5 hours. **No outage grace applies:** failed notifications, unavailable notices or a WIEZ outage do not extend the cancellation deadline. The 5-hour notice does not reopen retain.
+
+An admin may demote Up Next to Pending with a visible promotion hold. The hold stays until an admin releases it; it does not pause expiry, cancellation rights or the eligible retain window. Ordinary intake closure stops new purchases while already-paid obligations continue. Safety suspension stops promotion and unreleased payouts pending admin review. Removing a listing does not remove paid order snapshots or obligations. A capture completed after eligibility changes remains recorded and is resolved through the applicable cancellation/refund process.
+
+### Cancellation charges, refund status and resubmission
+
+Before Active, the shopper, brand, authorized admin or expiry process may cancel Pending or Up Next. **The same disclosed deductions apply to every such cancellation, including cancellation by the brand, admin or system:** the VAT actually recorded on the original payment, 10% of garment subtotal excluding VAT/delivery/jump fee, and 10% of any jump fee. Delivery is refunded in full and 90% of the jump fee is refunded. A missing VAT component means zero VAT deduction; this policy creates no VAT rate or new tax. There is no duplicate platform-share deduction on the jump fee and the brand earns no pre-Active jump share.
+
+The server presents an itemized quote for confirmation and checks eligibility again before cancellation. Example: garment NGN100,000 + recorded VAT NGN7,500 + delivery NGN5,000 + jump NGN20,000 totals NGN132,500. Deductions total NGN19,500 and the refund is NGN113,000. This is an illustration using an existing VAT line, not a tax-rate promise. Mandatory statutory remedies prevail where applicable.
+
+Cancellation records a refund request; it does not mean the bank has credited the shopper. Orders show requested, processing, processed, failed or attention-required status as appropriate. Provider processing and bank credit are distinct; bank receipt may take additional business days. Cancelling one line in mixed checkout does not cancel or refund sibling orders. No repeated request creates a second refund. After Active, existing dispute/admin cancellation, defect and delivery remedies apply.
+
+Cancelled history, receipt, deductions, refund progress and permitted order messaging remain accessible. A resubmission is a separately priced new order at the back of the current queue, with current source, measurements, intake and payment checks. It may be placed while the previous refund is processing, but requires **a separate payment**; the pending refund is not wallet credit and continues independently. A new order does not inherit the old position or a free jump.
+
+### Brand subscriptions, billing changes and campaigns
+
+| Tier | Monthly NGN | Active cap | Delivery cap | Up Next | Pending | Paid jump offer |
+|---|---:|---:|---:|---:|---|---|
+| Thread | 10,000 | 2 | 2 | 1 | Unlimited | No |
+| Aso-oke | 15,000 | 3 | 4 | 1 | Unlimited | No |
+| Aru | 30,000 | 4 | 5 | 1 | Unlimited | Brand opt-in |
+| Igwe | 50,000 | 6 | 5 | 1 | Unlimited | Brand opt-in |
+
+These are recurring monthly brand subscriptions, requiring express recurring-payment authorization; they are not shopper memberships. New brands cannot receive custom orders before first verified payment. Existing eligible brands retain free unlimited Legacy capacity until a paid assignment succeeds; Legacy is not a sold tier and does not include paid jumps. Failed initial or switch payments never create free paid-tier access or erase the previous valid entitlement.
+
+Existing agreements retain their agreed price snapshot on renewal; a new agreement or tier change uses current pricing. An upgrade applies immediately after verified payment of the difference prorated over the remaining billing period. A downgrade applies at the next renewal, with no refund for the current period. The monthly billing anniversary remains unchanged; a missing calendar day falls back to that month's last day. Billing dates are displayed in Lagos time (Africa/Lagos). Confirm the amount, renewal and effective capacity before payment.
+
+Voluntary cancellation stops future renewal; access remains through the paid-period end. At paid-period expiry, new intake pauses, while already-paid obligations continue. A failed renewal has seven days to recover at the existing locked price, with authorized retries on days 1, 3 and 7. This recovery window does not grant free intake. After it ends, a new subscription uses current prices. Payment-method authorization, billing receipts and invoice history remain available through billing support and the billing workspace.
+
+Only one global capacity campaign may be active at a time. An automatic campaign ends at its exact configured deadline; a manual campaign remains effective until reset and is labelled accordingly. A brand-specific override wins over tier/campaign capacity and may have an expiry or be removed manually. Reduced capacity preserves existing work and pauses additional promotions until capacity permits. Runway notices, including notices called a free-order period, are informational and grant no financial discount or capacity change without explicit configuration. More than five brand cancellations of waiting orders in one action or a rolling 24 hours raises an admin attention alert; it does not automatically suspend the brand.
 

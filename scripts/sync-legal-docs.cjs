@@ -39,8 +39,8 @@ const FILES = [
   ['ACCOUNT_DELETION_POLICY', 'account-deletion', 'Account and Data Deletion Policy', '09_ACCOUNT_DATA_DELETION_POLICY.md', 'Self-service account closure, soft deactivation, cryptographic pseudonymization, and statutory financial retention schedules.'],
 ];
 
-const ver = '2026.10.02-v1.2';
-const eff = 'October 2, 2026';
+const ver = '2026.10.18-v1.3';
+const eff = 'October 18, 2026';
 
 const frontendOut = path.join(frontendRoot, 'src', 'pages', 'legal', 'legalDocuments.ts');
 const mobileOut = path.join(workspaceRoot, 'threadly-mobile', 'src', 'legal', 'legalDocuments.ts');
@@ -122,6 +122,14 @@ if (!docsDir) {
 }
 
 const frontendContents = build('@/api/LegalApi', docsDir);
+// Keep isolated frontend builds on the same source policies as the workspace.
+const repoDocsDir = path.join(frontendRoot, 'docs', 'legal', 'user-facing');
+if (path.resolve(docsDir) !== path.resolve(repoDocsDir)) {
+  fs.mkdirSync(repoDocsDir, { recursive: true });
+  for (const [, , , fileName] of FILES) {
+    fs.copyFileSync(path.join(docsDir, fileName), path.join(repoDocsDir, fileName));
+  }
+}
 if (!writeIfDirExists(frontendOut, frontendContents)) {
   console.error('SYNC_LEGAL_FAILED: frontend legal output directory does not exist:', path.dirname(frontendOut));
   process.exit(1);

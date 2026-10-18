@@ -586,11 +586,12 @@ export const NotificationsDropdown: React.FC<Props> = ({ open, onClose, anchorRe
                                 {renderStyledActionText(actionTextWithoutTitle)}
                               </span>
                               {contentTitle ? (
-                                <span className="ml-1 inline-flex max-w-[200px] items-center truncate rounded-md border border-purple-300/50 bg-purple-100/70 px-1.5 py-0.5 font-bold italic text-[color:var(--brand-primary)] dark:border-purple-400/30 dark:bg-purple-500/15 dark:text-purple-300">
+                                <span className="ml-1 inline-flex max-w-[200px] items-center break-words rounded-md border border-purple-300/50 bg-purple-100/70 px-1.5 py-0.5 font-bold italic text-[color:var(--brand-primary)] dark:border-purple-400/30 dark:bg-purple-500/15 dark:text-purple-300">
                                   "{contentTitle}"
                                 </span>
                               ) : null}
                             </p>
+                            {/CUSTOM_ORDER|QUEUE|RETAIN/.test(String(n.type)) ? <p className="mt-1 text-xs text-theme-secondary">Open the order for its current deadline, refund status and available actions. Notification delivery does not extend cancellation.</p> : null}
                             {/* The nouns in the sentence are destinations too:
                                 the bagged item, and the brand that made it. */}
                             {entityLinks.content || entityLinks.brand ? (

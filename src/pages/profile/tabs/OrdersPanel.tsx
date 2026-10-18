@@ -1,3 +1,4 @@
+import { QueueFacts, QueueOrderActions } from '@/components/custom-orders/CustomOrderQueue';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
@@ -66,7 +67,7 @@ import { queryClient } from '@/query/queryClient';
 import { useRealtime } from '@/realtime/RealtimeProvider';
 
 const STANDARD_STATUS_OPTIONS = ['ALL', 'PENDING', 'PROCESSING', 'SHIPPED'] as const;
-const CUSTOM_STATUS_OPTIONS = ['ALL', 'PENDING', 'ACTIVE', 'COMPLETED', 'ISSUES'] as const;
+const CUSTOM_STATUS_OPTIONS = ['ALL', 'PENDING', 'UP_NEXT', 'ACTIVE', 'IN_DELIVERY', 'HELD', 'CANCELLED', 'COMPLETED', 'ISSUES'] as const;
 
 type StandardStatusFilter = (typeof STANDARD_STATUS_OPTIONS)[number];
 type CustomStatusFilter = (typeof CUSTOM_STATUS_OPTIONS)[number];
@@ -214,6 +215,7 @@ const customStatusBucket = (status: string | undefined): CustomStatusFilter => {
   switch (normalizeStatus(status)) {
     case 'DRAFT':
     case 'PENDING_PAYMENT':
+    case 'QUEUED':
     case 'PENDING_BRAND_ACCEPTANCE':
       return 'PENDING';
     case 'ACCEPTED':
@@ -1248,7 +1250,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
   const title = order?.source.title ?? previewOrder?.sourceTitle ?? 'Custom order';
   const brandName = order?.source.brandName ?? previewOrder?.brand?.name ?? 'Brand';
   const paymentStatusValue = order?.paymentStatus ?? previewOrder?.paymentStatus ?? null;
-  const paymentPending = paymentStatusValue !== null && paymentStatusValue !== 'PAID';
+  const paymentPending = paymentStatusValue !== null && paymentStatusValue !== 'PAID' && !(order?.queue?.lane ?? previewOrder?.queue?.lane);
   const grandTotal = order
     ? formatCurrency(
         order.buyerPriceSummary.grandTotal,
@@ -1265,8 +1267,8 @@ export const BuyerCustomOrderDetailView: React.FC<{
     : paymentStatusValue === 'FAILED'
       ? 'Payment failed'
       : 'Awaiting payment';
-  const headline = paymentPending ? paymentStatusLabel : getBuyerCustomHeadline(effectiveStage);
-  const description = paymentPending
+  const headline = order?.queue?.canResubmit ? 'Order cancelled' : order?.queue?.lane === 'PENDING' ? 'Waiting in the brand queue' : order?.queue?.lane === 'UP_NEXT' ? 'Up Next for production' : paymentPending ? paymentStatusLabel : getBuyerCustomHeadline(effectiveStage);
+  const description = order?.queue?.canResubmit ? 'This order was cancelled. Follow its refund status below; resubmitting requires a separate payment and current quote.' : order?.queue?.lane === 'PENDING' || order?.queue?.lane === 'UP_NEXT' ? 'Payment is captured and held. Production begins when an Active slot becomes available. The cancellation deadline continues while this order waits.' : paymentPending
     ? paymentStatusValue === 'FAILED'
       ? 'Your payment did not complete. Please retry to place this custom order.'
       : 'Complete payment to place this custom order and notify the brand.'
@@ -1298,7 +1300,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
                 stage={previewOrder.currentProgressStage}
                 brandName={previewOrder.brand?.name}
                 compact
-                statusLabel={paymentPending ? paymentStatusLabel : null}
+                statusLabel={order?.queue?.canResubmit ? 'Cancelled' : order?.queue?.lane === 'PENDING' ? 'Pending' : order?.queue?.lane === 'UP_NEXT' ? 'Up Next' : paymentPending ? paymentStatusLabel : null}
                 progressIndex={paymentPending ? -1 : null}
               />
               <div>
@@ -1347,6 +1349,8 @@ export const BuyerCustomOrderDetailView: React.FC<{
   return (
     <div className="space-y-4 sm:space-y-6">
       {ConfirmDialog}
+      <QueueFacts queue={order.queue} />
+      <QueueOrderActions orderId={order.id} queue={order.queue} audience="buyer" onChanged={async () => { setOrder(await customOrdersBuyerApi.getById(orderId)); }} />
       {/*
         One row on a phone, not three.
 
@@ -1443,7 +1447,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
             <BuyerCustomStageFiller
               stage={effectiveStage}
               brandName={brandName}
-              statusLabel={paymentPending ? paymentStatusLabel : null}
+              statusLabel={order?.queue?.canResubmit ? 'Cancelled' : order?.queue?.lane === 'PENDING' ? 'Pending' : order?.queue?.lane === 'UP_NEXT' ? 'Up Next' : paymentPending ? paymentStatusLabel : null}
               progressIndex={paymentPending ? -1 : null}
             />
             {/* The code, the title and the total share a row on a phone
@@ -1500,7 +1504,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
         </div>
       </section>
 
-      {order.paymentStatus !== 'PAID' ? (
+      {order.paymentStatus !== 'PAID' && !order.queue?.lane ? (
         <section className="rounded-[28px] border border-amber-200/80 bg-amber-50/80 p-6 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
           <div className="text-sm font-semibold text-amber-900 dark:text-amber-100">
             Payment must complete before production intake is locked
@@ -1623,7 +1627,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
                       {attempt.status}
                     </td>
                     <td className="px-3 py-2 font-mono">
-                      <span className="block max-w-[140px] truncate" title={attempt.reference}>
+                      <span className="block max-w-[140px] break-words" title={attempt.reference}>
                         {attempt.reference}
                       </span>
                     </td>
@@ -2061,7 +2065,13 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
     const needle = query.trim().toLowerCase();
     return customOrders.filter((order) => {
       const bucket = customStatusBucket(order.status);
-      const statusMatch = customStatus === 'ALL' || bucket === customStatus;
+      const lane = order.queue?.lane;
+      const statusMatch = customStatus === 'ALL'
+        || (customStatus === 'HELD' && (lane === 'PENDING' || lane === 'UP_NEXT'))
+        || (customStatus === 'CANCELLED' && Boolean(order.queue?.canResubmit))
+        || (customStatus === 'COMPLETED' && (order.status === 'COMPLETED' || order.status === 'CLOSED') && !order.queue?.canResubmit)
+        || (customStatus === 'ISSUES' && (bucket === 'ISSUES' || Boolean(order.openDisputes?.length)))
+        || (lane ? lane === customStatus : bucket === customStatus);
       if (!statusMatch) return false;
       if (!needle) return true;
       return customOrderSummarySearchText(order).includes(needle);
@@ -2298,7 +2308,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
+                          <p className="break-words text-sm font-semibold text-gray-900 dark:text-white">
                             {firstItem?.name || 'Order'}
                           </p>
                           <p className="money shrink-0 text-sm text-gray-900 dark:text-white">
@@ -2383,7 +2393,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
+                        <div className="break-words text-sm font-semibold text-gray-900 dark:text-white">
                           {order.sourceTitle}
                         </div>
                         <div className="money shrink-0 text-sm text-gray-900 dark:text-white">
@@ -2399,6 +2409,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
                         <span className="font-mono text-[10px] text-gray-500 dark:text-gray-400">
                           {formatCustomOrderCode(order.id)}
                         </span>
+                        {order.queue ? <QueueFacts queue={order.queue} /> : null}
                         {shouldShowBuyerStatusBadge(order.status) ? (
                           <CustomOrderBadge value={order.status} />
                         ) : null}
