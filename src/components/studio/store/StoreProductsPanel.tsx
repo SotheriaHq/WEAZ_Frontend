@@ -1023,12 +1023,13 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           cursor: currentPageCursor ?? undefined,
           search: searchQuery.trim() ? searchQuery.trim() : undefined,
           collectionId: filterCollection !== 'all' ? filterCollection : undefined,
-          isActive:
-            filterStatus === 'active'
-              ? true
-              : filterStatus === 'draft'
-                ? false
-                : undefined,
+          // Drafts are asked for by `publicationStatus`, the field this tab
+          // shows. `isActive=false` dropped a DRAFT row stored with
+          // `isActive=true`: it flashed from the previous list, then vanished.
+          // A server that predates the param returns every owner row, which
+          // the client-side DRAFT filter below still narrows correctly.
+          isActive: filterStatus === 'active' ? true : undefined,
+          publicationStatus: filterStatus === 'draft' ? 'DRAFT' : undefined,
           isFeatured: filterStatus === 'featured' ? true : undefined,
           includeDeleted: filterStatus === 'deleted' ? true : undefined,
           onlyDeleted: filterStatus === 'deleted' ? true : undefined,

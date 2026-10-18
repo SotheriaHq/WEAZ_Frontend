@@ -23,6 +23,9 @@ const sections: Record<string, React.ReactNode> = {
   subscription: <BrandSubscriptionPage />,
 };
 
+/** Sections kept mounted after they are left — see `visited` below. */
+const MAX_LIVE_SECTIONS = 4;
+
 const StudioHome: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const raw = searchParams.get('tab') || 'overview';
@@ -53,9 +56,18 @@ const StudioHome: React.FC = () => {
     Sections mount lazily on first visit, so a cold Studio costs no more
     than before.
   */
+  /*
+    Bounded: the four most recently opened sections stay mounted.
+
+    Keeping every section alive grew the WebView's DOM and heap with each one
+    visited, and inside the app that memory is taken from the same phone the
+    native shell runs on — on a low-RAM Android it surfaced as multi-second
+    garbage-collection stalls in the shell. Most recently used goes last;
+    reordering keyed children moves DOM nodes, it does not remount them.
+  */
   const [visited, setVisited] = React.useState<string[]>(() => [activeKey]);
-  if (!visited.includes(activeKey)) {
-    setVisited([...visited, activeKey]);
+  if (visited[visited.length - 1] !== activeKey) {
+    setVisited([...visited.filter((key) => key !== activeKey), activeKey].slice(-MAX_LIVE_SECTIONS));
   }
 
   return (
