@@ -738,6 +738,7 @@ export interface CustomOrderDetail {
     deliveryMaxDays?: number | null;
     rushSelected?: boolean;
     queueJumpSelected?: boolean;
+    previousOrderId?: string;
   };
   /** Admin detail only: the technical ids, grouped instead of scattered. */
   references?: Record<string, string | null>;
@@ -1268,6 +1269,7 @@ export const customOrdersBuyerApi = {
     measurementValues: Record<string, number>;
     rushSelected?: boolean;
     queueJumpSelected?: boolean;
+    previousOrderId?: string;
     shippingAddress?: Record<string, unknown>;
     pricingChartFamily?: CustomOrderChartFamily;
     displayChartFamily?: CustomOrderChartFamily;
@@ -1287,6 +1289,7 @@ export const customOrdersBuyerApi = {
     measurementValues: Record<string, number>;
     rushSelected: boolean;
     queueJumpSelected?: boolean;
+    previousOrderId?: string;
     shippingAddress: Record<string, unknown>;
     contactInfo: Record<string, unknown>;
     customerName: string;

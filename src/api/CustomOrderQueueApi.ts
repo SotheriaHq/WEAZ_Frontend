@@ -5,6 +5,7 @@ import { createIdempotencyKey } from './idempotency';
 
 export type QueueLane = 'PENDING' | 'UP_NEXT' | 'ACTIVE' | 'IN_DELIVERY' | 'TERMINAL' | 'COMPLETED' | 'CANCELLED' | 'NONE' | null;
 export interface QueuePresenter {
+  refundHistory?: Array<{ id: string; kind: string; status: string; amount: number; currency: string; createdAt: string }>;
   lane: QueueLane;
   orderRevision: number;
   queueExpiresAt: string | null;
@@ -15,11 +16,12 @@ export interface QueuePresenter {
   canCancel: boolean;
   canResubmit: boolean;
   adminPromotionHeld: boolean;
+  needsLaneReconciliation?: boolean;
   position: number | null;
   waitingCount: number;
   activatedAt?: string | null;
   captureSummary?: { held?: boolean; amount?: number; heldAmount?: number; currency?: string; status?: string } | null;
-  refundSummary?: { amount?: number; currency?: string; status?: string } | null;
+  refundSummary?: { kind?: string; amount?: number; currency?: string; status?: string; settlement?: { status?: string; amount?: number; currency?: string } | null } | null;
 }
 export interface QueueBrandSummary {
   brandId: string;
@@ -37,6 +39,8 @@ export interface QueueBrandSummary {
   serverNow: string;
 }
 export interface QueueRefundQuote {
+  settlement?: { status: 'RECORDED' | 'REQUIRES_RECONCILIATION'; amount?: number; currency?: string; rate?: string };
+  settlementIsEstimate?: boolean;
   orderRevision: number;
   currency: string;
   capturedAmount?: number;
@@ -98,6 +102,7 @@ export const customOrderQueueApi = {
   notices: () => get<{ notices: QueueNotice[]; serverNow: string }>(`${root}/notices`),
 };
 export const adminOrderQueueApi = {
+  reconcileLane: async (id: string, lane: 'ACTIVE' | 'IN_DELIVERY', evidence: string, expectedRevision: number) => (await post<{ queue: QueuePresenter }>(`${admin}/orders/${id}/reconcile-lane`, { lane, evidence, expectedRevision })).queue,
   brand: (id: string) => get<QueueBrandSummary>(`${admin}/brands/${id}`),
   intake: (id: string, blocked: boolean, reason: string) => patch<QueueBrandSummary>(`${admin}/brands/${id}/intake`, { blocked, reason }),
   refundQuote: (id: string) => get<QueueRefundQuote>(`${admin}/orders/${id}/refund-quote`),

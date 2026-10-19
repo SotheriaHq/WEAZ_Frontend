@@ -1,4 +1,3 @@
-import { BrandQueueSettings } from '@/components/custom-orders/QueueBrandControls';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -57,7 +56,9 @@ export default function StoreManagement() {
     staleTime: 60_000,
     queryFn: async () => {
       const verificationRequest = user?.id
-        ? brandApi.getVerificationStatus(user.id, { force: true }).catch(() => null)
+        ? brandApi
+            .getVerificationStatus(user.id, { force: true })
+            .catch(() => null)
         : Promise.resolve<VerificationStatusResponse | null>(null);
       let s = await getStoreStatus();
 
@@ -124,7 +125,12 @@ export default function StoreManagement() {
 
   const { data: draftCollections = [], loading: draftCollectionsLoading } =
     useCachedResource<any[]>({
-      queryKey: ['store', 'management', 'draft-collections', user?.id ?? 'anon'],
+      queryKey: [
+        'store',
+        'management',
+        'draft-collections',
+        user?.id ?? 'anon',
+      ],
       enabled: Boolean(user?.id),
       queryFn: async () => {
         const collections = await brandApi.getCollections(user!.id, {
@@ -132,8 +138,13 @@ export default function StoreManagement() {
           scope: 'store',
         });
         return (collections || []).filter((collection: any) => {
-          const collectionStatus = String(collection?.status || '').toUpperCase();
-          return collectionStatus === 'DRAFT' && collection?.isSystemGenerated !== true;
+          const collectionStatus = String(
+            collection?.status || '',
+          ).toUpperCase();
+          return (
+            collectionStatus === 'DRAFT' &&
+            collection?.isSystemGenerated !== true
+          );
         });
       },
     });
@@ -201,11 +212,20 @@ export default function StoreManagement() {
 
   const kpis = overview?.kpis || {};
   const recentOrders = overview?.recentOrders || [];
-  const routeSearchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const routeSearchParams = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search],
+  );
   const returnTo = routeSearchParams.get('returnTo');
   const returnLabel = routeSearchParams.get('returnLabel') || 'Back';
-  const verificationStatus = verification?.verificationStatus ?? user?.verificationStatus ?? 'NOT_SUBMITTED';
-  const verificationBadgeVisible = verification?.badgeState.verificationBadgeVisible ?? user?.verificationBadgeVisible ?? false;
+  const verificationStatus =
+    verification?.verificationStatus ??
+    user?.verificationStatus ??
+    'NOT_SUBMITTED';
+  const verificationBadgeVisible =
+    verification?.badgeState.verificationBadgeVisible ??
+    user?.verificationBadgeVisible ??
+    false;
   const verificationInProgress =
     verificationStatus === 'PENDING' ||
     verificationStatus === 'IN_REVIEW' ||
@@ -255,7 +275,8 @@ export default function StoreManagement() {
 
     return {
       eyebrow: 'Verify your brand',
-      title: 'Your store is ready. Finish brand verification to start making sales.',
+      title:
+        'Your store is ready. Finish brand verification to start making sales.',
       description:
         'Complete verification to strengthen trust, unlock a better buyer experience, and make your store feel fully open for business.',
       primaryLabel: 'Open verification',
@@ -323,9 +344,7 @@ export default function StoreManagement() {
     if (isStoreOpenPending(user?.id)) {
       return (
         <div className="rounded-2xl border border-gray-200 bg-white/70 p-6 dark:border-white/10 dark:bg-white/5">
-          <div className="font-semibold text-theme">
-            Finalizing Store
-          </div>
+          <div className="font-semibold text-theme">Finalizing Store</div>
           <div className="mt-1 text-sm text-theme-secondary">
             Your store is being activated. This usually takes a few seconds.
           </div>
@@ -337,7 +356,6 @@ export default function StoreManagement() {
 
   return (
     <div className="animate-in fade-in space-y-4 duration-500 sm:space-y-8">
-      {status?.brandId ? <BrandQueueSettings brandId={status.brandId} /> : null}
       {returnTo ? (
         <div className="flex items-center gap-3">
           <button
@@ -353,7 +371,7 @@ export default function StoreManagement() {
 
       <div className="sticky top-0 z-30">
         <div className="rounded-none border-0 bg-transparent px-1 py-2 shadow-none backdrop-blur-none md:rounded-2xl md:border md:border-gray-200/60 md:bg-white/90 md:px-4 md:py-3 md:shadow-lg md:backdrop-blur-xl md:dark:border-white/10 md:dark:bg-[#111118]/90">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl border-2 border-white shadow-md dark:border-white/10">
               {avatarUrl ? (
                 <MediaRenderer
@@ -372,15 +390,24 @@ export default function StoreManagement() {
             </div>
 
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-base font-bold leading-tight text-theme">
+              <h1 className="break-words text-base font-bold leading-tight text-theme">
                 {brandName}
               </h1>
-              <p className="mt-0.5 truncate text-xs leading-tight text-theme-secondary">
+              <p className="mt-0.5 break-words text-xs leading-tight text-theme-secondary">
                 {brandDescription}
               </p>
             </div>
 
-            <div className="hidden items-center gap-1 sm:flex">
+            <button
+              type="button"
+              onClick={() =>
+                navigate('/settings?tab=subscription-billing&from=studio')
+              }
+              className="min-h-11 py-2 text-sm font-bold tracking-wide text-purple-700 hover:underline dark:text-purple-300"
+            >
+              UPGRADE
+            </button>
+            <div className="hidden flex-wrap items-center gap-1 sm:flex">
               <div className="group relative">
                 <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
                   {kpis.reviewScore ? '⭐' : '☆'}
@@ -395,7 +422,7 @@ export default function StoreManagement() {
               {brandLocation ? (
                 <div className="inline-flex max-w-[220px] items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
                   <span aria-hidden="true">📍</span>
-                  <span className="truncate" title={brandLocation}>
+                  <span className="break-words" title={brandLocation}>
                     {brandLocation}
                   </span>
                 </div>
@@ -443,7 +470,9 @@ export default function StoreManagement() {
                   title={verificationLabel}
                 >
                   <span>{verificationMarker}</span>
-                  <span className="max-w-[140px] truncate">{verificationLabel}</span>
+                  <span className="max-w-[140px] truncate">
+                    {verificationLabel}
+                  </span>
                 </button>
               )}
 
@@ -466,7 +495,9 @@ export default function StoreManagement() {
                   : 'border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-300'
               }`}
             >
-              <span className="text-xs">{status.isStoreOpen ? '🟢' : '🟡'}</span>
+              <span className="text-xs">
+                {status.isStoreOpen ? '🟢' : '🟡'}
+              </span>
               {status.isStoreOpen ? 'Live' : 'Draft'}
             </div>
 
@@ -486,7 +517,10 @@ export default function StoreManagement() {
               type="button"
               onClick={() => {
                 if (isEmbeddedMobile) {
-                  postStudioNativeEvent({ type: 'OPEN_NATIVE_ROUTE', path: '/profile?tab=Store' });
+                  postStudioNativeEvent({
+                    type: 'OPEN_NATIVE_ROUTE',
+                    path: '/profile?tab=Store',
+                  });
                   return;
                 }
                 navigate('/profile');
@@ -506,7 +540,9 @@ export default function StoreManagement() {
       {showVerificationPrompt ? (
         <section className="rounded-2xl border border-sky-200/80 bg-gradient-to-r from-sky-50 via-white to-indigo-50 p-3 shadow-sm dark:border-sky-500/20 dark:from-sky-500/10 dark:via-white/5 dark:to-indigo-500/10 sm:rounded-3xl sm:p-5">
           <div className="flex flex-row items-center justify-between gap-3 sm:flex-col sm:items-start sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className={`min-w-0 ${isEmbeddedMobile ? 'max-w-none' : 'sm:max-w-3xl'}`}>
+            <div
+              className={`min-w-0 ${isEmbeddedMobile ? 'max-w-none' : 'sm:max-w-3xl'}`}
+            >
               <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-700 dark:text-sky-200 sm:text-xs">
                 {verificationPrompt.eyebrow}
               </div>
@@ -568,7 +604,9 @@ export default function StoreManagement() {
           type="button"
           onClick={() => setAnalyticsCollapsed(false)}
           className={`fixed right-3 z-40 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2 text-sm font-semibold text-white shadow-2xl sm:right-6 ${
-            isEmbeddedMobile ? 'bottom-[calc(env(safe-area-inset-bottom)+1rem)]' : 'bottom-24 lg:bottom-20'
+            isEmbeddedMobile
+              ? 'bottom-[calc(env(safe-area-inset-bottom)+1rem)]'
+              : 'bottom-24 lg:bottom-20'
           }`}
           aria-label="Open analytics panel"
         >
@@ -587,13 +625,13 @@ export default function StoreManagement() {
         >
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <div>
-              <h3 className="text-base font-bold text-theme">
-                Analytics
-              </h3>
+              <h3 className="text-base font-bold text-theme">Analytics</h3>
               <p className="text-xs text-gray-500">Live store performance</p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold text-green-600">● Live</span>
+              <span className="text-xs font-semibold text-green-600">
+                ● Live
+              </span>
               <button
                 type="button"
                 onClick={() => setAnalyticsCollapsed(true)}
@@ -650,7 +688,9 @@ export default function StoreManagement() {
                   ))}
                 </div>
               ) : (
-                <p className="mt-2 text-xs text-gray-500">No top products yet.</p>
+                <p className="mt-2 text-xs text-gray-500">
+                  No top products yet.
+                </p>
               )}
             </div>
 
@@ -661,7 +701,10 @@ export default function StoreManagement() {
               {recentOrders.length > 0 ? (
                 <div className="mt-3 space-y-3">
                   {recentOrders.slice(0, 3).map((order: any) => (
-                    <div key={order.id} className="flex items-center justify-between">
+                    <div
+                      key={order.id}
+                      className="flex items-center justify-between"
+                    >
                       <div>
                         <p className="text-xs font-semibold text-theme">
                           #{order.id}
@@ -677,7 +720,9 @@ export default function StoreManagement() {
                   ))}
                 </div>
               ) : (
-                <p className="mt-2 text-xs text-gray-500">No recent orders yet.</p>
+                <p className="mt-2 text-xs text-gray-500">
+                  No recent orders yet.
+                </p>
               )}
             </div>
 

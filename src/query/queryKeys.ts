@@ -243,6 +243,18 @@ export const PRIVATE_QUERY_ROOTS = new Set<string>([
   // here, so the previous account's patched brands survived logout in memory —
   // and would have survived to disk the moment `patches` became persistable.
   'patches',
+  // Financial and queue payloads must never survive a session change.
+  'brand-queue-subscription',
+  'subscription-store',
+  'subscription-compensations',
+  'custom-order-queue-brand',
+  'admin-custom-order-queue-brand',
+  'custom-order-payment-queue',
+  'admin-queue-refund-attention',
+  'queue-admin-tiers',
+  'queue-admin-campaigns',
+  'queue-admin-notices',
+  'brand-runway-queue-notices',
 ]);
 
 /**

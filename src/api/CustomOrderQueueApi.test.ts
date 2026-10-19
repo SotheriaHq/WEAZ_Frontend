@@ -26,9 +26,9 @@ describe('queue API contracts', () => {
   });
   it('submits explicit recurring consent, accepted policy and the approved price ceiling', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: { data: { action: 'PAYMENT_REQUIRED', reference: 'sub-a', amountNgn: 10000 } } });
-    const result = await brandSubscriptionApi.checkout('brand-a', 'THREAD', 'https://wiez.com/studio?tab=subscription', 10000);
+    const result = await brandSubscriptionApi.checkout('brand-a', 'THREAD', 'https://wiez.com/settings?tab=subscription-billing', 10000);
     expect(result.reference).toBe('sub-a');
-    expect(apiClient.post).toHaveBeenCalledWith('/brands/brand-a/subscription/checkout', { tierKey: 'THREAD', callbackUrl: 'https://wiez.com/studio?tab=subscription', expectedAmountNgn: 10000, recurringConsent: true, legalVersion: '2026.10.18-v1.3' }, expect.any(Object));
+    expect(apiClient.post).toHaveBeenCalledWith('/brands/brand-a/subscription/checkout', { tierKey: 'THREAD', callbackUrl: 'https://wiez.com/settings?tab=subscription-billing', expectedAmountNgn: 10000, recurringConsent: true, legalVersion: '2026.10.19-v1.5' }, expect.any(Object));
   });
   it('does not turn a failed capture or refund request into a successful queue state', async () => {
     vi.mocked(apiClient.post).mockRejectedValue(new Error('No provider response'));

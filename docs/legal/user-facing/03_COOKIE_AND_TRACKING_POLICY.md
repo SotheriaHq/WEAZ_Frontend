@@ -1,7 +1,9 @@
 # WIEZ Master Cookie, Local Storage, and Device Telemetry Directive
 
-**Effective Date:** October 18, 2026  
-**Document Version:** 2026.10.18-v1.3  
+**Effective Date:** October 19, 2026
+
+**Document Version:** 2026.10.19-v1.5
+
 **Applies To:** Web Applications (`wiez.com`, `fthreadly`), Mobile Applications (iOS / Android / `threadly-mobile`), Brand Studio Workspaces, Embedded WebViews, and all platform APIs.
 
 ---
@@ -238,8 +240,14 @@ If you have questions regarding our storage practices, cryptographic security, o
 
 ### Subscription custom-order policy scope and consumer rights
 
-The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.18-v1.3`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.19-v1.5`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
 
 ## Queue countdowns, billing and functional storage
 
 The queue may use existing authenticated functional caches to display your position, billing state, held payment, expiry countdown and refund progress. These displays do not create a wallet or authorize payment. The server's order, payment and deadline records govern; a device clock or stale/offline cache cannot confirm retain, cancellation, payment or refund completion. Reopening or reconnecting refreshes those records. Recurring-payment and legal acceptance evidence stays on the server. This feature does not introduce a new advertising tracker or override cookie/marketing choices. Reminder failures or unavailable app access do not create an extension to the scheduled waiting-order expiry; see the Buyer and Payment Policies for the no-grace rule.
+
+### Original-payment conversion for custom-order refunds
+
+When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. WIEZ records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
+
+An agreed post-Active partial dispute refund returns only the agreed amount. The order continues in its existing production/delivery lane. Each refund is recorded separately, repeat requests cannot duplicate it, and any later full remedy refunds only the remaining refundable balance. Future milestone earnings are reduced for the refunded share; no held milestone becomes payable because of a partial refund.

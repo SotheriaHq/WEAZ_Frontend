@@ -1,6 +1,10 @@
 import { apiClient } from './httpClient';
 import { createIdempotencyKey } from './idempotency';
-import type { PaymentData, PaymentMethodType, ShippingAddress } from './StoreApi';
+import type {
+  PaymentData,
+  PaymentMethodType,
+  ShippingAddress,
+} from './StoreApi';
 
 export type PaymentAttemptStatus =
   | 'PENDING'
@@ -202,6 +206,7 @@ export interface PaymentAttemptSummary {
 }
 
 export interface SavedPaymentCardSummary {
+  nickname?: string | null;
   id: string;
   gateway: 'PAYSTACK';
   brand: string | null;
@@ -225,7 +230,17 @@ function extract<T>(res: any): T {
 }
 
 export const paymentApi = {
-  async initializeUnified(req: InitializeUnifiedCheckoutRequest): Promise<PaymentInitResult> {
+  async renameSavedCard(savedCardId: string, nickname: string) {
+    return extract<{ success: boolean }>(
+      await apiClient.patch(
+        `/payment/saved-cards/${encodeURIComponent(savedCardId)}`,
+        { nickname },
+      ),
+    );
+  },
+  async initializeUnified(
+    req: InitializeUnifiedCheckoutRequest,
+  ): Promise<PaymentInitResult> {
     const idempotencyKey = req.idempotencyKey ?? createIdempotencyKey();
     const res = await apiClient.post(
       '/payment/initialize-unified',
@@ -235,13 +250,29 @@ export const paymentApi = {
     return extract<PaymentInitResult>(res);
   },
 
-  async verify(reference: string, gateway: string, otp?: string): Promise<PaymentVerifyResult> {
-    const res = await apiClient.post('/payment/verify', { reference, gateway, otp });
+  async verify(
+    reference: string,
+    gateway: string,
+    otp?: string,
+  ): Promise<PaymentVerifyResult> {
+    const res = await apiClient.post('/payment/verify', {
+      reference,
+      gateway,
+      otp,
+    });
     return extract<PaymentVerifyResult>(res);
   },
 
-  async verifyWithStatus(reference: string, gateway: string, statusHint?: string): Promise<PaymentVerifyResult> {
-    const res = await apiClient.post('/payment/verify', { reference, gateway, statusHint });
+  async verifyWithStatus(
+    reference: string,
+    gateway: string,
+    statusHint?: string,
+  ): Promise<PaymentVerifyResult> {
+    const res = await apiClient.post('/payment/verify', {
+      reference,
+      gateway,
+      statusHint,
+    });
     return extract<PaymentVerifyResult>(res);
   },
 
@@ -260,14 +291,18 @@ export const paymentApi = {
     return extract<SavedPaymentCardSummary[]>(res) ?? [];
   },
 
-  async removeSavedCard(savedCardId: string): Promise<SavedPaymentMethodMutationResult> {
+  async removeSavedCard(
+    savedCardId: string,
+  ): Promise<SavedPaymentMethodMutationResult> {
     const res = await apiClient.delete(
       `/payment/saved-cards/${encodeURIComponent(savedCardId)}`,
     );
     return extract<SavedPaymentMethodMutationResult>(res);
   },
 
-  async setDefaultSavedCard(savedCardId: string): Promise<SavedPaymentMethodMutationResult> {
+  async setDefaultSavedCard(
+    savedCardId: string,
+  ): Promise<SavedPaymentMethodMutationResult> {
     const res = await apiClient.post(
       `/payment/saved-cards/${encodeURIComponent(savedCardId)}/default`,
     );
@@ -285,8 +320,12 @@ export const paymentApi = {
     return extract<CardValidationSessionSummary>(res);
   },
 
-  async getCardValidationSession(sessionId: string): Promise<CardValidationSessionSummary> {
-    const res = await apiClient.get(`/payment/cards/validate/${encodeURIComponent(sessionId)}`);
+  async getCardValidationSession(
+    sessionId: string,
+  ): Promise<CardValidationSessionSummary> {
+    const res = await apiClient.get(
+      `/payment/cards/validate/${encodeURIComponent(sessionId)}`,
+    );
     return extract<CardValidationSessionSummary>(res);
   },
 
@@ -295,8 +334,13 @@ export const paymentApi = {
     return extract<PaymentClientCheckoutPolicy>(res);
   },
 
-  async simulate(reference: string, outcome: PaymentAttemptStatus): Promise<PaymentAttemptSummary> {
-    const res = await apiClient.post(`/payment/mock/${reference}/simulate`, { outcome });
+  async simulate(
+    reference: string,
+    outcome: PaymentAttemptStatus,
+  ): Promise<PaymentAttemptSummary> {
+    const res = await apiClient.post(`/payment/mock/${reference}/simulate`, {
+      outcome,
+    });
     return extract<PaymentAttemptSummary>(res);
   },
 };

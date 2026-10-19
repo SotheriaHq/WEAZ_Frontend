@@ -1,4 +1,4 @@
-import { QueueFacts, QueueOrderActions } from '@/components/custom-orders/CustomOrderQueue';
+import { QueueFacts, QueueHistoricalReconciliation, QueueOrderActions } from '@/components/custom-orders/CustomOrderQueue';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -469,6 +469,7 @@ const AdminCustomOrderDetailPage: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   <CustomOrderBadge value={selected.status} />
                   <QueueFacts queue={selected.queue} />
+                  <QueueHistoricalReconciliation orderId={selected.id} queue={selected.queue} onChanged={async () => { await refresh({ background: true }); }} />
                   <QueueOrderActions orderId={selected.id} queue={selected.queue} audience="admin" onChanged={async () => { await refresh({ background: true }); }} />
                   <CustomOrderBadge value={selected.paymentStatus} type="payment" />
                   <CustomOrderBadge value={selected.currentProgressStage ?? 'ORDER_PLACED'} type="stage" />

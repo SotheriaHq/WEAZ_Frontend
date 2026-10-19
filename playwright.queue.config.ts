@@ -6,6 +6,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
+  outputDir: '../.tmp/queue-playwright',
   reporter: 'list',
   use: { baseURL: 'http://127.0.0.1:5174', headless: true, screenshot: 'only-on-failure' },
   webServer: { command: 'npm run dev -- --host 127.0.0.1 --port 5174', url: 'http://127.0.0.1:5174/tests/e2e/queue/fixture.html', reuseExistingServer: true, timeout: 60000 },

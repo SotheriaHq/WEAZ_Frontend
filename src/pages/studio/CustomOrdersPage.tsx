@@ -1,6 +1,6 @@
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
-import { canUpdateBrandOrders } from '@/lib/brandAccess';
+import { canUpdateOrders } from '@/lib/brandAccess';
 import QueueBulkCancellation from '@/components/custom-orders/QueueBulkCancellation';
 import type { QueueLane } from '@/api/CustomOrderQueueApi';
 import { BrandQueueSettings } from '@/components/custom-orders/QueueBrandControls';
@@ -299,7 +299,7 @@ const CustomOrdersPage: React.FC = () => {
     policy: cachePolicies.defaultQuery,
   });
   const brandId = customOrdersQuery.data?.brandId ?? null;
-  const orders = customOrdersQuery.data?.orders ?? [];
+  const orders = useMemo(() => customOrdersQuery.data?.orders ?? [], [customOrdersQuery.data?.orders]);
   const summaryByOrderId = customOrdersQuery.data?.summaryByOrderId ?? {};
   const loading = customOrdersQuery.isLoading;
 
@@ -396,7 +396,7 @@ const CustomOrdersPage: React.FC = () => {
         </div>
       </section>
 
-      {brandId && canUpdateBrandOrders(profile, brandId) ? <QueueBulkCancellation brandId={brandId} orders={orders} onChanged={async () => { await customOrdersQuery.refetch(); }} /> : null}
+      {brandId && canUpdateOrders(profile, brandId) ? <QueueBulkCancellation brandId={brandId} orders={orders} onChanged={async () => { await customOrdersQuery.refetch(); }} /> : null}
       <section className="rounded-2xl border border-black/10 bg-white/85 p-3 shadow-[0_24px_80px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.04] sm:rounded-[2rem] sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

@@ -94,4 +94,16 @@ describe('clearWebPrivateSessionState', () => {
     expect(authContextSource).toContain('void clearPrivateSession()');
     expect(authContextSource).toContain('const logout = () =>');
   });
+
+  it('removes all queue and billing data before another account can render it', async () => {
+    const { clearWebPrivateSessionState } = await loadCleanupModule();
+    const client = new QueryClient();
+    const roots = ['brand-queue-subscription', 'subscription-store', 'subscription-compensations',
+      'custom-order-queue-brand', 'admin-custom-order-queue-brand', 'custom-order-payment-queue',
+      'admin-queue-refund-attention', 'queue-admin-tiers', 'queue-admin-campaigns', 'queue-admin-notices',
+      'brand-runway-queue-notices'];
+    for (const root of roots) client.setQueryData([root, 'previous-account'], { privateBalance: 500 });
+    await clearWebPrivateSessionState({ client });
+    for (const root of roots) expect(client.getQueryData([root, 'previous-account'])).toBeUndefined();
+  });
 });

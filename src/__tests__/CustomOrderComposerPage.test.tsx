@@ -1,4 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as renderComponent, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CustomOrderComposerPage from '@/pages/custom-orders/CustomOrderComposerPage';
@@ -8,6 +10,11 @@ const getMyProfile = vi.fn();
 const updateProfile = vi.fn();
 const previewPrice = vi.fn();
 const dispatchMock = vi.fn();
+const render = (ui: ReactNode) => renderComponent(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>);
+
+vi.mock('@/api/CustomOrderQueueApi', () => ({
+  customOrderQueueApi: { brand: vi.fn().mockResolvedValue({ intakeAllowed: true, jumpAvailable: false, counts: { PENDING: 0, UP_NEXT: 0, ACTIVE: 0, IN_DELIVERY: 0 }, capacity: { tierKey: 'THREAD', active: 2, inDelivery: 2 } }) },
+}));
 
 vi.mock('react-redux', () => ({
   useDispatch: () => dispatchMock,

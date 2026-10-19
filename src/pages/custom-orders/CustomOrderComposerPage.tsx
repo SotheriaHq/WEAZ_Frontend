@@ -835,6 +835,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
     try {
       const submission = await customOrdersBuyerApi.create({
         checkoutIntentId: preview.checkoutIntentId,
+        previousOrderId: searchParams.get('previousOrderId') ?? undefined,
         configurationId: configuration.id,
         configurationVersionId: preview.configurationVersionId,
         measurementValues: measurementPayload,
@@ -1320,8 +1321,9 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
             </label>
           </section>
 
-          <section className="rounded-3xl border border-black/10 bg-white/80 p-4 sm:p-6 dark:border-white/10 dark:bg-white/5">
+          <section className="border-t border-black/10 py-5 dark:border-white/10">
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Bag preview</div>
+            {searchParams.get('previousOrderId') ? <p className="mt-3 text-sm font-medium">This is a new order at the current price and back of the queue. A separate payment is required; your previous refund continues independently.</p> : null}
             <div className="my-3 space-y-3 text-sm text-slate-700 dark:text-slate-200">
               {configuration.brandId ? <QueueBrandCounts brandId={configuration.brandId} /> : null}
               {intake.isError ? <p role="alert">Current intake could not be verified. <button className="queue-button" onClick={() => void intake.refetch()}>Retry</button></p> : null}
