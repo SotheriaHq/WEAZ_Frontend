@@ -51,3 +51,37 @@ for (const surface of surfaces) {
     });
   }
 }
+
+for (const state of ['loading', 'empty', 'error', 'permission']) {
+  test(`billing ${state} state remains actionable`, async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto(`/tests/e2e/queue/fixture.html?view=billing&state=${state}`);
+    if (state === 'loading') await expect(page.getByText(/Loading subscription/)).toBeVisible();
+    if (state === 'empty') await expect(page.getByText('No paid subscription. Select a tier to open custom-order intake.')).toBeVisible();
+    if (state === 'error') { await expect(page.getByText('Unable to load subscription.')).toBeVisible(); await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeEnabled(); }
+    if (state === 'permission') { await expect(page.getByText('Only the brand owner can change subscription or payment settings.')).toBeVisible(); await expect(page.getByRole('button', { name: 'Preview current tier' })).toBeDisabled(); }
+    await page.screenshot({ path: `test-results/queue-state-${state}.png`, fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
+for (const surface of surfaces) {
+  test(`${surface.name}: dark billing remains readable and keyboard accessible`, async ({ page }) => {
+    await page.setViewportSize(surface);
+    await page.goto('/tests/e2e/queue/fixture.html?view=billing&theme=dark');
+    await page.getByRole('button', { name: 'Preview change' }).first().focus();
+    await expect(page.getByRole('button', { name: 'Preview change' }).first()).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('button', { name: 'Confirm and continue' })).toBeDisabled();
+    await page.screenshot({ path: `test-results/queue-dark-${surface.name}.png`, fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
+test('confirmed cancellation survives a failed background refresh', async ({ page }) => {
+  await page.goto('/tests/e2e/queue/fixture.html?view=shopper&state=refresh-error');
+  await page.getByRole('button', { name: 'Cancel waiting order' }).click();
+  await page.getByRole('textbox').fill('No longer required');
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click();
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'Resubmit with current quote' })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { fixtureCalls: Array<{action: string}> }).fixtureCalls.filter(call => call.action === 'cancel').length)).toBe(1);
+});

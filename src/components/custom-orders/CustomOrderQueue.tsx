@@ -1,6 +1,6 @@
 import { getFriendlyErrorMessage } from '@/utils/errorMessage';
 import { queueServerNow } from '@/features/orders/queueClock';
-import { canRetainQueue, formatQueueCountdown } from '@/features/orders/customOrderQueuePresentation';
+import { canRetainQueue, formatQueueCountdown, nextQueueClockDelay } from '@/features/orders/customOrderQueuePresentation';
 import { useCallback, useEffect, useState, useRef, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -10,18 +10,37 @@ import Modal from '@/components/ui/Modal';
 import { useOverlayBackClose } from '@/hooks/useOverlayBackClose';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { queryClient } from '@/query/queryClient';
+import { useQueueConfirm } from './useQueueConfirm';
+import UniversalSelect from '@/components/forms/UniversalSelect';
 
 const listeners = new Set<() => void>();
 let clock = performance.now();
-let timer: ReturnType<typeof setInterval> | undefined;
-function tick() { clock = performance.now(); listeners.forEach((listener) => listener()); }
+let timer: ReturnType<typeof setTimeout> | undefined;
+const boundaries = new Map<symbol, number[]>();
+function schedule() {
+  clearTimeout(timer); timer = undefined;
+  if (!listeners.size || document.visibilityState === 'hidden') return;
+  timer = setTimeout(tick, nextQueueClockDelay(performance.now(), [...boundaries.values()].flat()));
+}
+function tick() { clock = performance.now(); listeners.forEach((listener) => listener()); schedule(); }
 function subscribe(listener: () => void) {
   listeners.add(listener);
-  if (!timer) { tick(); timer = setInterval(tick, 1000); document.addEventListener('visibilitychange', tick); window.addEventListener('online', tick); }
-  return () => { listeners.delete(listener); if (!listeners.size) { clearInterval(timer); timer = undefined; document.removeEventListener('visibilitychange', tick); window.removeEventListener('online', tick); } };
+  if (listeners.size === 1) { tick(); document.addEventListener('visibilitychange', tick); window.addEventListener('online', tick); }
+  return () => { listeners.delete(listener); if (!listeners.size) { clearTimeout(timer); timer = undefined; document.removeEventListener('visibilitychange', tick); window.removeEventListener('online', tick); } };
 }
 const subscribeIdle = () => () => undefined;
-export function useQueueTick(active = true) {
+export function useQueueTick(active = true, queue?: QueuePresenter | null) {
+  const boundaryKey = useRef(Symbol('visible-queue'));
+  useEffect(() => {
+    if (!active || !queue) return;
+    const monotonic = performance.now();
+    const serverNow = queueServerNow(queue, monotonic);
+    if (serverNow == null) return;
+    const key = boundaryKey.current;
+    boundaries.set(key, [queue.queueExpiresAt, queue.retainOpensAt, queue.retainClosesAt].map((value, index) => value ? monotonic + Date.parse(value) - serverNow + (index === 2 ? 1 : 0) : NaN));
+    schedule();
+    return () => { boundaries.delete(key); schedule(); };
+  }, [active, queue]);
   return useSyncExternalStore(active ? subscribe : subscribeIdle, () => clock, () => 0);
 }
 export function queueRemainingMs(queue: QueuePresenter, monotonicNow: number) {
@@ -34,23 +53,29 @@ export const queueTierName = (key: string) => ({ THREAD: 'Thread', ASO_OKE: 'Aso
 export const queueLaneLabels: Record<string, string> = { PENDING: 'Pending', UP_NEXT: 'Up Next', ACTIVE: 'Active', IN_DELIVERY: 'Delivery', COMPLETED: 'Completed', CANCELLED: 'Cancelled', NONE: 'Not queued' };
 const money = (value: number | undefined, currency = 'NGN') => new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(value ?? 0);
 export function QueueFacts({ queue }: { queue?: QueuePresenter | null }) {
-  const tickNow = useQueueTick(queue?.lane === 'PENDING' || queue?.lane === 'UP_NEXT');
+  const tickNow = useQueueTick(queue?.lane === 'PENDING' || queue?.lane === 'UP_NEXT', queue);
   if (!queue?.lane || queue.lane === 'NONE') return null;
   const waiting = queue.lane === 'PENDING' || queue.lane === 'UP_NEXT';
   const serverNow = queueServerNow(queue, tickNow);
   return <div className="my-2 min-w-0 space-y-1 break-words text-xs text-slate-700 dark:text-slate-200">
-    <div className="flex flex-wrap gap-2"><span className="rounded-lg bg-violet-100 px-2 py-1 font-semibold text-violet-900 dark:bg-violet-950 dark:text-violet-100">🧵 {queue.lane === 'TERMINAL' ? queue.canResubmit ? 'Cancelled' : 'Completed' : queueLaneLabels[queue.lane] ?? queue.lane}</span>{queue.position != null ? <span className="py-1">Position {queue.position} | {queue.waitingCount} waiting</span> : null}</div>
-    {waiting ? <div className="rounded-lg bg-amber-50 p-2 text-amber-900 dark:bg-amber-950 dark:text-amber-100"><span className="font-semibold">⏳ {(serverNow == null ? null : formatQueueCountdown(queue.queueExpiresAt, serverNow)) ?? 'Refreshing cancellation deadline from WIEZ'}</span>{queue.queueExpiresAt ? <div>Cancellation deadline: <time dateTime={queue.queueExpiresAt}>{new Date(queue.queueExpiresAt).toLocaleString('en-NG', { timeZone: 'Africa/Lagos' })} WAT</time></div> : null}</div> : null}
-    {queue.adminPromotionHeld ? <p className="rounded-lg bg-rose-50 p-2 text-rose-800 dark:bg-rose-950 dark:text-rose-100">🛑 Admin promotion hold. This order stays Pending until released. Its cancellation deadline and cancellation rights continue.</p> : null}
+    <div className="flex flex-wrap gap-2"><span className="font-semibold text-violet-800 dark:text-violet-200">🧵 {queue.lane === 'TERMINAL' ? queue.canResubmit ? 'Cancelled' : 'Completed' : queueLaneLabels[queue.lane] ?? queue.lane}</span>{queue.position != null ? <span className="py-1">Position {queue.position} | {queue.waitingCount} waiting</span> : null}</div>
+    {waiting ? <div className="border-l-2 border-amber-400 pl-3 text-amber-900 dark:border-amber-600 dark:text-amber-200"><span className="font-semibold">⏳ {(serverNow == null ? null : formatQueueCountdown(queue.queueExpiresAt, serverNow)) ?? 'Refreshing cancellation deadline from WIEZ'}</span>{queue.queueExpiresAt ? <div>Cancellation deadline: <time dateTime={queue.queueExpiresAt}>{new Date(queue.queueExpiresAt).toLocaleString('en-NG', { timeZone: 'Africa/Lagos' })} WAT</time></div> : null}</div> : null}
+    {queue.adminPromotionHeld ? <p className="font-medium text-rose-700 dark:text-rose-200">🛑 Admin promotion hold. This order stays Pending until released. Its cancellation deadline and cancellation rights continue.</p> : null}
     {waiting ? <p>Payment captured and held until Active. Cancellation deadlines apply even if a reminder is delayed.</p> : null}
     {waiting && queue.captureSummary ? <p className="font-semibold tabular-nums">Captured and held: {money(queue.captureSummary.heldAmount ?? queue.captureSummary.amount, queue.captureSummary.currency)}</p> : null}
     {queue.refundSummary ? <p>Refund: {queue.refundSummary.status ?? 'Processing'}{queue.refundSummary.amount != null ? ` | ${money(queue.refundSummary.amount, queue.refundSummary.currency)}` : ''}. Processing does not mean money has reached your bank.</p> : null}
+    {queue.refundSummary?.kind === 'PARTIAL' && !queue.canResubmit ? <p>This is a partial refund. Your order continues in its existing fulfilment stage.</p> : null}
+    {(queue.refundHistory?.length ?? 0) > 1 ? <details><summary className="cursor-pointer py-2">Refund history</summary><ul className="space-y-2">{queue.refundHistory!.map(refund => <li key={refund.id}>{refund.kind === 'PARTIAL' ? 'Partial refund' : 'Cancellation refund'}: {money(refund.amount, refund.currency)} · {refund.status}</li>)}</ul></details> : null}
+    {queue.refundSummary?.settlement?.status === 'RECORDED' && queue.refundSummary.settlement.currency !== queue.refundSummary.currency ? <p className="tabular-nums">Original payment method refund: {money(queue.refundSummary.settlement.amount, queue.refundSummary.settlement.currency)}, using the recorded payment rate.</p> : null}
   </div>;
 }
 export function QueueRefundBreakdown({ quote }: { quote: QueueRefundQuote }) {
-  return <dl className="space-y-2 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-900">{[
+  return <dl className="space-y-2 border-y border-slate-200 py-3 text-sm dark:border-slate-800">{[
     ['Captured', quote.capturedAmount], ['Garment subtotal', quote.garmentSubtotal], ['VAT withheld', quote.vatWithheld], ['10% garment cancellation fee', quote.garmentFeeWithheld], ['10% jump cancellation fee', quote.jumpFeeWithheld], ['Delivery refunded in full', quote.deliveryRefund], ['Total withheld', quote.totalWithheld], ['Refund requested', quote.refundAmount],
-  ].filter(([, value]) => value != null).map(([label, value]) => <div key={String(label)} className="flex flex-wrap justify-between gap-2"><dt>{label}</dt><dd className="font-semibold tabular-nums">{money(Number(value), quote.currency)}</dd></div>)}</dl>;
+  ].filter(([, value]) => value != null).map(([label, value]) => <div key={String(label)} className="flex flex-wrap justify-between gap-2"><dt>{label}</dt><dd className="font-semibold tabular-nums">{money(Number(value), quote.currency)}</dd></div>)}
+    {quote.settlement?.status === 'RECORDED' && quote.settlement.currency !== quote.currency ? <div className="space-y-1 border-t border-slate-200 pt-3 dark:border-slate-800"><dt>Estimated refund to your original payment method</dt><dd className="font-semibold tabular-nums">{money(quote.settlement.amount, quote.settlement.currency)}</dd><dd>Uses the original payment rate of {quote.settlement.rate}. Minor-unit rounding is finalized when the refund is recorded.</dd></div> : null}
+    {quote.settlement?.status === 'REQUIRES_RECONCILIATION' ? <div className="pt-2"><dt>Payment reconciliation required</dt><dd>Your cancellation will be recorded. WIEZ must verify the original payment conversion before submitting the refund.</dd></div> : null}
+  </dl>;
 }
 type QueueAction = 'retain' | 'cancel' | 'promote' | 'demote' | 'release-hold' | 'resubmit';
 export function QueueOrderActions({ orderId, queue: initial, audience, onChanged, access = 'MANAGE' }: { access?: 'READ' | 'MANAGE'; orderId: string; queue?: QueuePresenter | null; audience: 'buyer' | 'brand' | 'admin'; onChanged?: () => void | Promise<void> }) {
@@ -70,7 +95,7 @@ export function QueueOrderActions({ orderId, queue: initial, audience, onChanged
   useEffect(() => { setUpdated(null); }, [initial]);
   useEffect(() => { requestRef.current += 1; setAction(null); setQuote(null); setUpdated(null); }, [orderId]);
   const queue = updated ?? initial;
-  const tickNow = useQueueTick(queue?.lane === 'PENDING' || queue?.lane === 'UP_NEXT');
+  const tickNow = useQueueTick(queue?.lane === 'PENDING' || queue?.lane === 'UP_NEXT', queue);
   if (!queue?.lane || queue.lane === 'NONE') return null;
   const waiting = queue.lane === 'PENDING' || queue.lane === 'UP_NEXT';
   const canRetainNow = canRetainQueue(queue, queueServerNow(queue, tickNow) ?? NaN);
@@ -95,12 +120,15 @@ export function QueueOrderActions({ orderId, queue: initial, audience, onChanged
         const result = audience === 'admin' && action !== 'retain' ? await adminOrderQueueApi.action(orderId, action as 'cancel' | 'promote' | 'demote' | 'release-hold', reason.trim(), quote?.orderRevision ?? queue.orderRevision) : action === 'retain' ? await customOrderQueueApi.retain(orderId, queue.orderRevision) : await customOrderQueueApi.cancel(orderId, reason.trim(), quote?.orderRevision ?? queue.orderRevision);
         if (identityRef.current !== orderId) return;
         setUpdated(result);
-        await Promise.all([['orders'], ['customOrders'], ['custom-order-queue-brand']].map((queryKey) => queryClient.invalidateQueries({ queryKey })));
-        await onChanged?.();
+        const refreshes = await Promise.allSettled([
+          ...[['orders'], ['customOrders'], ['custom-order-queue-brand']].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+          Promise.resolve().then(() => onChanged?.()),
+        ]);
+        if (refreshes.some(refresh => refresh.status === 'rejected')) toast.message('Order updated. Refresh to load the remaining details.');
       }
       toast.success(action === 'cancel' ? 'Cancellation recorded. Track refund processing on this order.' : action === 'retain' ? 'Position retained for another 42 days.' : 'Order updated.');
       setAction(null); setReason('');
-    } catch (error: unknown) { toast.error(getFriendlyErrorMessage(error, 'The order changed or the request failed. Refresh and try again.')); await onChanged?.(); }
+    } catch (error: unknown) { toast.error(getFriendlyErrorMessage(error, 'The order changed or the request failed. Refresh and try again.')); void Promise.resolve().then(() => onChanged?.()).catch(() => undefined); }
     finally { setBusy(false); }
   }
   return <div className="space-y-2" onClick={(event) => event.stopPropagation()}>
@@ -131,5 +159,35 @@ export function QueueBrandCounts({ brandId }: { brandId: string }) {
   if (query.isPending) return <p role="status" className="text-sm">Loading current queue capacity…</p>;
   if (query.isError) return <div role="alert">Queue capacity unavailable. <button className="queue-button" onClick={() => void query.refetch()}>Retry</button></div>;
   const summary = query.data;
-  return <section className="space-y-3 rounded-2xl border border-violet-200 bg-violet-50 p-4 text-slate-900 dark:border-violet-900 dark:bg-slate-950 dark:text-white"><div className="flex flex-wrap justify-between gap-2"><h2 className="font-bold">🧵 {queueTierName(summary.capacity.tierKey)} queue</h2><span>{!summary.intakeAllowed ? 'New intake paused' : 'Accepting new orders'}</span></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{Object.entries(summary.counts).map(([lane, count]) => <div key={lane}><div className="text-lg font-bold tabular-nums">{count}{lane === 'ACTIVE' ? ` / ${summary.capacity.active ?? 'Unlimited'}` : lane === 'IN_DELIVERY' ? ` / ${summary.capacity.inDelivery ?? 'Unlimited'}` : lane === 'UP_NEXT' ? ' / 1' : ''}</div><div className="text-xs">{queueLaneLabels[lane]}</div></div>)}</div></section>;
+  return <section className="queue-section text-slate-900 dark:text-white"><div className="flex flex-wrap justify-between gap-2"><h2 className="font-bold">🧵 {queueTierName(summary.capacity.tierKey)} queue</h2><span>{!summary.intakeAllowed ? 'New intake paused' : 'Accepting new orders'}</span></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{Object.entries(summary.counts).map(([lane, count]) => <div key={lane}><div className="text-lg font-bold tabular-nums">{count}{lane === 'ACTIVE' ? ` / ${summary.capacity.active ?? 'Unlimited'}` : lane === 'IN_DELIVERY' ? ` / ${summary.capacity.inDelivery ?? 'Unlimited'}` : lane === 'UP_NEXT' ? ' / 1' : ''}</div><div className="text-xs">{queueLaneLabels[lane]}</div></div>)}</div></section>;
+}
+
+export function QueueHistoricalReconciliation({ orderId, queue, onChanged }: { orderId: string; queue?: QueuePresenter | null; onChanged: () => void | Promise<void> }) {
+  const { hasPermission } = useAdminPermissions();
+  const { confirm, ConfirmDialog } = useQueueConfirm();
+  const [lane, setLane] = useState<'ACTIVE' | 'IN_DELIVERY'>('ACTIVE');
+  const [evidence, setEvidence] = useState('');
+  const [reconciled, setReconciled] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setEvidence(''); setLane('ACTIVE'); setReconciled(false); }, [orderId]);
+  if (!queue?.needsLaneReconciliation || reconciled) return null;
+  async function submit() {
+    if (!queue || busy) return;
+    setBusy(true);
+    const accepted = await confirm({ title: 'Confirm historical fulfilment stage', message: 'Use verified production or delivery evidence. This changes capacity accounting and may let other paid orders progress. Existing payments, promises and disputes are preserved.', confirmText: 'Confirm stage' });
+    if (!accepted) { setBusy(false); return; }
+    try { await adminOrderQueueApi.reconcileLane(orderId, lane, evidence.trim(), queue.orderRevision); setReconciled(true); await Promise.allSettled([Promise.resolve().then(onChanged)]); toast.success('Historical fulfilment stage reconciled'); }
+    catch (error) { toast.error(getFriendlyErrorMessage(error, 'The order changed or reconciliation failed. Refresh and review the evidence.')); }
+    finally { setBusy(false); }
+  }
+  return <section className="queue-section my-3 text-sm text-amber-950 dark:text-amber-100">
+    <p className="font-semibold">🔎 Historical fulfilment stage needs review</p>
+    <p>Production and delivery history could not establish this order’s occupied stage. Automatic queue promotion for this brand is paused until the historical records are reconciled.</p>
+    <fieldset disabled={busy || !hasPermission('moderation.write')} className="space-y-3">
+      <UniversalSelect label="Verified stage" value={lane} onChange={value => setLane(value === 'IN_DELIVERY' ? 'IN_DELIVERY' : 'ACTIVE')} options={[{ value: 'ACTIVE', label: 'Active production' }, { value: 'IN_DELIVERY', label: 'In Delivery' }]} disabled={busy || !hasPermission('moderation.write')} />
+      <label className="block">Evidence and reason<textarea value={evidence} onChange={event => setEvidence(event.target.value)} maxLength={3000} className="mt-1 w-full rounded-lg border border-amber-300 bg-white p-3 text-slate-950 dark:bg-slate-950 dark:text-white" /></label>
+      <button className="queue-button" disabled={evidence.trim().length < 10 || busy} onClick={() => void submit()}>{busy ? 'Saving…' : 'Review and confirm stage'}</button>
+    </fieldset>
+    {ConfirmDialog}
+  </section>;
 }

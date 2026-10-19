@@ -25,6 +25,9 @@ const now = Date.now();
 const id = '11111111-1111-4111-8111-111111111111';
 const brandId = '22222222-2222-4222-8222-222222222222';
 const view = new URLSearchParams(location.search).get('view') || 'shopper';
+const scenario = new URLSearchParams(location.search).get('state');
+queryClient.setDefaultOptions({ queries: { retry: false } });
+if (new URLSearchParams(location.search).get('theme') === 'dark') document.documentElement.classList.add('dark');
 const queue: QueuePresenter = registerQueuePayload({ lane: 'PENDING', orderRevision: 1, serverNow: new Date(now).toISOString(), queueExpiresAt: new Date(now + 24 * 3600000).toISOString(), retainOpensAt: new Date(now - 24 * 3600000).toISOString(), retainClosesAt: new Date(now + 12 * 3600000).toISOString(), canRetain: true, canCancel: true, canResubmit: false, adminPromotionHeld: true, position: 8, waitingCount: 19, captureSummary: { amount: 132500, heldAmount: 132500, currency: 'NGN', held: true }, refundSummary: null });
 const summary = { brandId, counts: { PENDING: 18, UP_NEXT: 1, ACTIVE: 4, IN_DELIVERY: 2 }, capacity: { tierKey: 'ARU', active: 4, inDelivery: 5, queueJumpAllowed: true }, queueJumpEnabled: true, intakeAllowed: true, intakeBlocked: false, jumpAvailable: true, openOrderCount: 2, serverNow: new Date(now).toISOString() };
 const tiers = [ ['THREAD', 'Thread', 10000, 2, 2], ['ASO_OKE', 'Aso-oke', 15000, 3, 4], ['ARU', 'Aru', 30000, 4, 5], ['IGWE', 'Igwe', 50000, 6, 5] ].map(([key, label, price, active, delivery]) => ({ tierKey: String(key), label: String(label), monthlyPriceNgn: Number(price), maxActive: Number(active), maxInDelivery: Number(delivery), queueJumpAllowed: key === 'ARU' || key === 'IGWE', updatedAt: new Date(now).toISOString() }));
@@ -57,10 +60,15 @@ customOrdersBrandApi.list = async () => ({ items: [listOrder], total: 1, limit: 
 customOrdersBuyerApi.getById = async () => detail as never;
 customOrdersBuyerApi.listPaymentAttempts = async () => [];
 messagingApi.getBulkCustomOrderSummariesForBrand = async () => ({ items: [] });
-brandSubscriptionApi.get = async () => ({ subscription: { tierKey: 'THREAD', status: 'ACTIVE', currentPeriodStart: new Date(now - 86400000).toISOString(), currentPeriodEnd: new Date(now + 29 * 86400000).toISOString(), lockedMonthlyPriceNgn: 10000, cancelAtPeriodEnd: false }, tiers, invoices: [], serverNow: new Date(now).toISOString() });
+brandSubscriptionApi.get = async () => {
+  if (scenario === 'loading') return new Promise(() => undefined);
+  if (scenario === 'error') throw new Error('Fixture service unavailable');
+  return { subscription: scenario === 'empty' ? null : { tierKey: 'THREAD', status: 'ACTIVE', currentPeriodStart: new Date(now - 86400000).toISOString(), currentPeriodEnd: new Date(now + 29 * 86400000).toISOString(), lockedMonthlyPriceNgn: 10000, cancelAtPeriodEnd: false }, tiers, invoices: [], serverNow: new Date(now).toISOString() };
+};
 brandSubscriptionApi.preview = async () => ({ amountNgn: 4833.33, kind: 'UPGRADE', effectiveAt: new Date(now).toISOString(), periodEnd: new Date(now + 29 * 86400000).toISOString() });
 brandSubscriptionApi.checkout = async (_brand, tierKey) => { calls.push({ action: 'subscription-checkout', payload: tierKey }); return { action: 'SCHEDULED_DOWNGRADE', amountNgn: 0, effectiveAt: new Date(now + 29 * 86400000).toISOString() }; };
 const profile = { username: 'fixture', type: view === 'shopper' || view === 'detail' ? 'REGULAR' : 'BRAND', role: view === 'admin' || view === 'finance' ? 'SuperAdmin' : 'User', activeBrandId: brandId, brandMemberships: [{ brandId, brandName: 'Example Brand', role: 'OWNER', status: 'ACTIVE', isOwner: true }] };
+if (scenario === 'permission') profile.brandMemberships = [{ brandId, brandName: 'Example Brand', role: 'STAFF', status: 'ACTIVE', isOwner: false }];
 const store = configureStore({ reducer: () => ({ user: { profile, isAuthenticated: true }, ui: { isMobile: innerWidth < 768 }, cart: { items: [] } }) });
-const content = view === 'admin' ? <AdminOrderQueueWorkspace /> : view === 'brand' ? <CustomOrdersPage /> : view === 'billing' ? <BrandSubscriptionPage /> : view === 'finance' ? <><QueueRefundAttention /><SubscriptionCompensations /></> : view === 'detail' ? <BuyerCustomOrderDetailView orderId={id} onBack={() => undefined} previewOrder={listOrder} /> : <><h1 className="text-2xl font-bold">{title}</h1><QueueFacts queue={queue} /><QueueOrderActions orderId={id} queue={queue} audience="buyer" /></>;
+const content = view === 'admin' ? <AdminOrderQueueWorkspace /> : view === 'brand' ? <CustomOrdersPage /> : view === 'billing' ? <BrandSubscriptionPage /> : view === 'finance' ? <><QueueRefundAttention /><SubscriptionCompensations /></> : view === 'detail' ? <BuyerCustomOrderDetailView orderId={id} onBack={() => undefined} previewOrder={listOrder} /> : <><h1 className="text-2xl font-bold">{title}</h1><QueueFacts queue={queue} /><QueueOrderActions orderId={id} queue={queue} audience="buyer" onChanged={() => { if (scenario === 'refresh-error') throw new Error('Fixture refresh failed after successful mutation'); }} /></>;
 createRoot(document.getElementById('root')!).render(<Provider store={store}><QueryClientProvider client={queryClient}><MemoryRouter initialEntries={['/studio?tab=orders&orderTab=custom']}><RealtimeProvider><main className="mx-auto max-w-6xl space-y-4 p-3 text-slate-900 dark:bg-black dark:text-white">{content}</main></RealtimeProvider></MemoryRouter></QueryClientProvider></Provider>);

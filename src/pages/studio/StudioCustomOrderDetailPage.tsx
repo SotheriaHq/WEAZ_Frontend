@@ -1,6 +1,6 @@
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
-import { canUpdateBrandOrders } from '@/lib/brandAccess';
+import { canUpdateOrders } from '@/lib/brandAccess';
 import { QueueFacts, QueueOrderActions } from '@/components/custom-orders/CustomOrderQueue';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -1334,7 +1334,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <QueueFacts queue={order.queue} />
-      <QueueOrderActions orderId={order.id} queue={order.queue} audience="brand" access={canUpdateBrandOrders(profile, brandId) ? 'MANAGE' : 'READ'} onChanged={async () => { if (brandId) setOrder(await customOrdersBrandApi.getById(brandId, order.id)); }} />
+      <QueueOrderActions orderId={order.id} queue={order.queue} audience="brand" access={canUpdateOrders(profile, brandId) ? 'MANAGE' : 'READ'} onChanged={async () => { if (brandId) setOrder(await customOrdersBrandApi.getById(brandId, order.id)); }} />
       <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
         <button type="button" onClick={() => navigate('/studio')} className="font-semibold text-slate-800 dark:text-white">
           Studio

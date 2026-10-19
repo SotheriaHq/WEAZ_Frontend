@@ -1,9 +1,13 @@
 # WIEZ Seller and Brand Terms
 
-Version: `2026.10.18-v1.3`  
-Effective Date: October 18, 2026  
-Governing Entities: WIEZ Technology Ltd. (Nigeria) & Global Operating Affiliates  
-Seller Support & Merchant Desk: `brands@wiez.com` / `disputes@wiez.com`  
+Version: `2026.10.19-v1.4`
+
+Effective Date: October 19, 2026
+
+Governing Entities: WIEZ Technology Ltd. (Nigeria) & Global Operating Affiliates
+
+Seller Support & Merchant Desk: `brands@wiez.com` / `disputes@wiez.com`
+
 Merchant Verification Desk: `kyc@wiez.com`
 
 ---
@@ -278,7 +282,7 @@ For all merchant onboarding inquiries, payout escalations, fee questions, and se
 
 ### Subscription custom-order policy scope and consumer rights
 
-The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.18-v1.3`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.19-v1.4`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
 
 ### Paid waiting queue, timing and priority
 
@@ -317,3 +321,9 @@ Voluntary cancellation stops future renewal; access remains through the paid-per
 
 Only one global capacity campaign may be active at a time. An automatic campaign ends at its exact configured deadline; a manual campaign remains effective until reset and is labelled accordingly. A brand-specific override wins over tier/campaign capacity and may have an expiry or be removed manually. Reduced capacity preserves existing work and pauses additional promotions until capacity permits. Runway notices, including notices called a free-order period, are informational and grant no financial discount or capacity change without explicit configuration. More than five brand cancellations of waiting orders in one action or a rolling 24 hours raises an admin attention alert; it does not automatically suspend the brand.
 
+
+### Original-payment conversion for custom-order refunds
+
+When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. WIEZ records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
+
+An agreed post-Active partial dispute refund returns only the agreed amount. The order continues in its existing production/delivery lane. Each refund is recorded separately, repeat requests cannot duplicate it, and any later full remedy refunds only the remaining refundable balance. Future milestone earnings are reduced for the refunded share; no held milestone becomes payable because of a partial refund.

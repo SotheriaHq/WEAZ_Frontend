@@ -1,7 +1,8 @@
 # WIEZ Master Community Guidelines and Marketplace Integrity Directive
 
-**Effective Date:** October 18, 2026
-**Document Version:** 2026.10.18-v1.3  
+**Effective Date:** October 19, 2026
+**Document Version:** 2026.10.19-v1.4
+
 **Applies To:** All registered users (Shoppers and Brands), visitors, and third-party contributors across the WIEZ Web Platform (`wiez.com`), Mobile Applications (iOS / Android), Brand Studio Workspaces, and all associated communication channels.
 
 ---
@@ -406,8 +407,14 @@ WIEZ reserves the right to update and refine these Guidelines as the platform gr
 
 ### Subscription custom-order policy scope and consumer rights
 
-The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.18-v1.3`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.19-v1.4`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
 
 ## Queue integrity and continuing order communication
 
 Do not falsify payment, position, production readiness, retention deadlines or refund completion. Brands must disclose any paid priority offer and its fairness limits and must not privately bypass queue controls or demand an extra off-platform payment. Only Aru/Igwe opt-in offers may sell priority under the Payment Policy. More than five brand waiting-order cancellations in one action or a rolling 24 hours creates an admin attention flag, not an automatic suspension. Intake closure and safety suspension have different effects; safety review may stop promotion and unreleased payouts. Shoppers and brands retain permitted messaging in Pending, Up Next, Active, cancelled, refund-processing and completed orders, subject to existing safety, blocking and privacy controls. Promotional/free-order Runway notices are informational; do not claim that a notice alone grants a discount or extra capacity. Use the order/support routes to challenge a hold or refund discrepancy rather than harassing the other party.
+
+### Original-payment conversion for custom-order refunds
+
+When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. WIEZ records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
+
+An agreed post-Active partial dispute refund returns only the agreed amount. The order continues in its existing production/delivery lane. Each refund is recorded separately, repeat requests cannot duplicate it, and any later full remedy refunds only the remaining refundable balance. Future milestone earnings are reduced for the refunded share; no held milestone becomes payable because of a partial refund.

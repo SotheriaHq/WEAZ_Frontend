@@ -60,10 +60,10 @@ assert.equal(pages.length, 9, 'All nine legal policies must be published.');
 for (const page of pages) {
   const fileName = path.basename(page.sourceDocument);
   const markdown = fs.readFileSync(path.join(repoRoot, 'docs', 'legal', 'user-facing', fileName), 'utf8');
-  assert.equal(page.version, '2026.10.18-v1.3');
-  assert.equal(page.effectiveDate, 'October 18, 2026');
+  assert.equal(page.version, '2026.10.19-v1.4');
+  assert.equal(page.effectiveDate, 'October 19, 2026');
   assert.equal(page.content, markdown, `${fileName}: published web text must match the isolated-clone source.`);
-  assert.match(markdown, /2026\.10\.18-v1\.3/);
+  assert.match(markdown, /2026\.10\.19-v1\.4/);
   assert.match(markdown, /mandatory consumer rights/);
   assert.match(markdown, /Custom-order subscription queue terms/);
 
@@ -98,7 +98,7 @@ if (fs.existsSync(mobileGeneratedPath)) {
 
 const backendConstants = path.resolve(repoRoot, '..', 'bthreadly', 'src', 'legal', 'legal.constants.ts');
 if (fs.existsSync(backendConstants)) {
-  assert.match(fs.readFileSync(backendConstants, 'utf8'), /LEGAL_VERSION = '2026\.10\.18-v1\.3'/, 'Acceptance version must match published policies.');
+  assert.match(fs.readFileSync(backendConstants, 'utf8'), /LEGAL_VERSION = '2026\.10\.19-v1\.4'/, 'Acceptance version must match published policies.');
 } else {
   console.log('Legal acceptance version parity skipped: sibling backend checkout is absent.');
 }

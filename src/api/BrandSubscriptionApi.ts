@@ -1,3 +1,4 @@
+import { LEGAL_PAGE_VERSION } from '@/pages/legal/legalDocuments';
 import { apiClient } from './httpClient';
 import { unwrapApiResponse } from '@/types/auth';
 import { createIdempotencyKey } from './idempotency';
@@ -24,7 +25,7 @@ async function post<T>(url: string, payload: unknown) {
 export const brandSubscriptionApi = {
   get: async (id: string) => unwrapApiResponse<{ subscription: BrandQueueSubscription | null; assignedTierKey?: string | null; legacyEligible?: boolean; tiers: QueueTier[]; invoices: BrandSubscriptionInvoice[]; compensations?: Array<{reference: string; amountNgn: number; currency: string; status: string; reason?: string; refundedAt?: string | null; lastError?: string | null}>; serverNow: string }>((await apiClient.get(path(id))).data),
   preview: (id: string, tierKey: string) => post<SubscriptionPreview>(`${path(id)}/preview`, { tierKey }),
-  checkout: (id: string, tierKey: string, callbackUrl: string, expectedAmountNgn: number) => post<SubscriptionCheckout>(`${path(id)}/checkout`, { tierKey, callbackUrl, expectedAmountNgn, recurringConsent: true, legalVersion: '2026.10.18-v1.3' }),
+  checkout: (id: string, tierKey: string, callbackUrl: string, expectedAmountNgn: number) => post<SubscriptionCheckout>(`${path(id)}/checkout`, { tierKey, callbackUrl, expectedAmountNgn, recurringConsent: true, legalVersion: LEGAL_PAGE_VERSION }),
   cancelRenewal: (id: string) => post<unknown>(`${path(id)}/cancel-renewal`, {}),
   verify: (id: string, reference: string) => post<{ status: string; subscription?: BrandQueueSubscription }>(`${path(id)}/verify`, { reference }),
 };

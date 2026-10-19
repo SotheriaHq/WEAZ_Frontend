@@ -1,4 +1,8 @@
 type RetainQueue = { lane: string | null; canRetain: boolean; retainOpensAt: string | null; retainClosesAt: string | null };
+/** Minute updates, with one earlier wake-up for an exact expiry/retain boundary. */
+export function nextQueueClockDelay(now: number, boundaries: readonly number[]): number {
+  return boundaries.reduce((delay, boundary) => Number.isFinite(boundary) && boundary > now ? Math.min(delay, Math.max(1, boundary - now)) : delay, 60000);
+}
 export function formatQueueCountdown(deadline: string | null | undefined, now: number): string | null {
   const expiry = deadline ? Date.parse(deadline) : NaN;
   if (!Number.isFinite(expiry) || !Number.isFinite(now)) return null;
