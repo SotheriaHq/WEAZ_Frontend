@@ -1,3 +1,5 @@
+import { LegacyStudioBillingRedirect } from './pages/settings/LegacyStudioBillingRedirect';
+import { SubscriptionNotice } from '@/components/custom-orders/SubscriptionNotice';
 
 import React, { Suspense, useEffect, lazy, useRef, useState } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet, Navigate, useParams, useLocation } from 'react-router-dom';
@@ -400,6 +402,7 @@ const RootLayout: React.FC = () => {
           <Outlet />
         </Suspense>
         <GenderPrompt />
+        <SubscriptionNotice />
       </>
     </BagFlowProvider>
   );
@@ -609,9 +612,11 @@ const router = createBrowserRouter([
         path: '/studio',
         element: (
           <StudioProtected>
-            <RequireStoreSetup>
-              {withStudioRouteFallback('overview', <StudioHome />)}
-            </RequireStoreSetup>
+            <LegacyStudioBillingRedirect>
+              <RequireStoreSetup>
+                {withStudioRouteFallback('overview', <StudioHome />)}
+              </RequireStoreSetup>
+            </LegacyStudioBillingRedirect>
           </StudioProtected>
         ),
       },

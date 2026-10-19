@@ -17,7 +17,11 @@ import QueueRefundAttention from '../../../src/components/custom-orders/QueueRef
 import SubscriptionCompensations from '../../../src/components/custom-orders/SubscriptionCompensations';
 import AdminOrderQueueWorkspace from '../../../src/pages/admin/AdminOrderQueueWorkspace';
 import CustomOrdersPage from '../../../src/pages/studio/CustomOrdersPage';
-import BrandSubscriptionPage from '../../../src/pages/studio/BrandSubscriptionPage';
+import BrandSubscriptionPage from '../../../src/pages/settings/SubscriptionBillingSettings';
+import { LegacyStudioBillingRedirect } from '../../../src/pages/settings/LegacyStudioBillingRedirect';
+import SettingsHome from '../../../src/pages/settings/SettingsHome';
+import { SubscriptionNotice } from '../../../src/components/custom-orders/SubscriptionNotice';
+import { Routes, Route } from 'react-router-dom';
 import { BuyerCustomOrderDetailView } from '../../../src/pages/profile/tabs/OrdersPanel';
 import '../../../src/index.css';
 
@@ -40,7 +44,8 @@ const calls: Array<{ action: string; payload?: unknown }> = [];
 (window as unknown as { fixtureCalls: typeof calls }).fixtureCalls = calls;
 apiClient.defaults.adapter = async (config) => {
   let data: unknown = {};
-  if (config.url === '/store/status') data = { brandId, isStoreOpen: true, hasStore: true };
+  if (config.url?.includes('/saved-cards/')) { calls.push({ action: config.method === 'patch' ? 'rename-card' : config.method === 'delete' ? 'delete-card' : 'default-card', payload: config.data }); data = { success: true }; }
+  else if (config.url === '/store/status') data = { brandId, isStoreOpen: true, hasStore: true };
   else if (config.url?.includes('/compensations')) data = { captures: [{ id, brandName: 'Example Brand', reference: 'fixture-payment', invoiceReference: 'fixture-invoice', amountNgn: 10000, currency: 'NGN', status: 'NEEDS_ATTENTION', reason: 'Provider acceptance is unknown', providerRefundId: null, createdAt: new Date(now).toISOString() }], nextCursor: null, serverNow: new Date(now).toISOString() };
   else if (config.url === '/admin/custom-order-queue/refunds') data = { refunds: [{ id, customOrderId: id, amount: 113000, currency: 'NGN', status: 'NEEDS_ATTENTION', providerRefundId: null, lastError: 'Reconcile the existing provider result', createdAt: new Date(now).toISOString() }] };
   return { config, status: 200, statusText: 'OK', headers: {}, data: { data } };
@@ -65,10 +70,17 @@ brandSubscriptionApi.get = async () => {
   if (scenario === 'error') throw new Error('Fixture service unavailable');
   return { subscription: scenario === 'empty' ? null : { tierKey: 'THREAD', status: 'ACTIVE', currentPeriodStart: new Date(now - 86400000).toISOString(), currentPeriodEnd: new Date(now + 29 * 86400000).toISOString(), lockedMonthlyPriceNgn: 10000, cancelAtPeriodEnd: false }, tiers, invoices: [], serverNow: new Date(now).toISOString() };
 };
+brandSubscriptionApi.history = async (_id, kind) => ({ items: [{ id, tierKey: 'THREAD', status: 'PAID', createdAt: new Date(now).toISOString(), amountNgn: 10000, lockedMonthlyPriceNgn: 10000, reference: kind === 'BILLING' ? 'wzsub-fixture-receipt' : undefined }], nextCursor: null });
+brandSubscriptionApi.cards = async () => [{ id, nickname: 'Business card', gateway: 'PAYSTACK', brand: 'Visa', bank: 'Test bank', last4: '4081', expMonth: '12', expYear: '2030', reusable: true, isDefault: false, addedAt: new Date(now).toISOString(), lastUsedAt: new Date(now).toISOString() }];
+brandSubscriptionApi.changeCard = async (_brand, savedCardId) => { calls.push({ action: 'renewal-card', payload: savedCardId }); return { success: true }; };
+brandSubscriptionApi.cancelRenewal = async () => { calls.push({ action: 'cancel-renewal' }); return {}; };
+brandSubscriptionApi.claimNotice = async () => { calls.push({ action: 'claim-notice' }); return { notice: { tierKey: 'ASO_OKE', title: 'Make room for your next big idea', message: 'Explore Aso-oke. Find Billing & subscriptions in Settings.', targetUrl: '/settings?tab=subscription-billing' } }; };
+brandSubscriptionApi.dismissNotice = async () => ({ success: true });
+brandSubscriptionApi.verify = async (_brand, reference) => { calls.push({ action: 'subscription-verify', payload: reference }); return { status: 'PAID' }; };
 brandSubscriptionApi.preview = async () => ({ amountNgn: 4833.33, kind: 'UPGRADE', effectiveAt: new Date(now).toISOString(), periodEnd: new Date(now + 29 * 86400000).toISOString() });
 brandSubscriptionApi.checkout = async (_brand, tierKey) => { calls.push({ action: 'subscription-checkout', payload: tierKey }); return { action: 'SCHEDULED_DOWNGRADE', amountNgn: 0, effectiveAt: new Date(now + 29 * 86400000).toISOString() }; };
 const profile = { username: 'fixture', type: view === 'shopper' || view === 'detail' ? 'REGULAR' : 'BRAND', role: view === 'admin' || view === 'finance' ? 'SuperAdmin' : 'User', activeBrandId: brandId, brandMemberships: [{ brandId, brandName: 'Example Brand', role: 'OWNER', status: 'ACTIVE', isOwner: true }] };
 if (scenario === 'permission') profile.brandMemberships = [{ brandId, brandName: 'Example Brand', role: 'STAFF', status: 'ACTIVE', isOwner: false }];
 const store = configureStore({ reducer: () => ({ user: { profile, isAuthenticated: true }, ui: { isMobile: innerWidth < 768 }, cart: { items: [] } }) });
-const content = view === 'admin' ? <AdminOrderQueueWorkspace /> : view === 'brand' ? <CustomOrdersPage /> : view === 'billing' ? <BrandSubscriptionPage /> : view === 'finance' ? <><QueueRefundAttention /><SubscriptionCompensations /></> : view === 'detail' ? <BuyerCustomOrderDetailView orderId={id} onBack={() => undefined} previewOrder={listOrder} /> : <><h1 className="text-2xl font-bold">{title}</h1><QueueFacts queue={queue} /><QueueOrderActions orderId={id} queue={queue} audience="buyer" onChanged={() => { if (scenario === 'refresh-error') throw new Error('Fixture refresh failed after successful mutation'); }} /></>;
-createRoot(document.getElementById('root')!).render(<Provider store={store}><QueryClientProvider client={queryClient}><MemoryRouter initialEntries={['/studio?tab=orders&orderTab=custom']}><RealtimeProvider><main className="mx-auto max-w-6xl space-y-4 p-3 text-slate-900 dark:bg-black dark:text-white">{content}</main></RealtimeProvider></MemoryRouter></QueryClientProvider></Provider>);
+const content = view === 'legacy-billing' ? <Routes><Route path='/studio' element={<LegacyStudioBillingRedirect><p>Studio fixture</p></LegacyStudioBillingRedirect>} /><Route path='/settings' element={<SettingsHome />} /></Routes> : view === 'settings-billing' ? <SettingsHome /> : view === 'notice' ? <><SubscriptionNotice /><Routes><Route path='/settings' element={<SettingsHome />} /><Route path='*' element={<p>Studio fixture</p>} /></Routes></> : view === 'admin' ? <AdminOrderQueueWorkspace /> : view === 'brand' ? <CustomOrdersPage /> : view === 'billing' ? <BrandSubscriptionPage /> : view === 'finance' ? <><QueueRefundAttention /><SubscriptionCompensations /></> : view === 'detail' ? <BuyerCustomOrderDetailView orderId={id} onBack={() => undefined} previewOrder={listOrder} /> : <><h1 className="text-2xl font-bold">{title}</h1><QueueFacts queue={queue} /><QueueOrderActions orderId={id} queue={queue} audience="buyer" onChanged={() => { if (scenario === 'refresh-error') throw new Error('Fixture refresh failed after successful mutation'); }} /></>;
+createRoot(document.getElementById('root')!).render(<Provider store={store}><QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[view === 'legacy-billing' ? `/studio?tab=subscription&brandId=${brandId}&reference=legacy-payment-reference&surface=mobile-app` : view === 'settings-billing' ? '/settings?tab=subscription-billing' : '/studio?tab=orders&orderTab=custom']}><RealtimeProvider><main className="mx-auto max-w-6xl space-y-4 p-3 text-slate-900 dark:bg-black dark:text-white">{content}</main></RealtimeProvider></MemoryRouter></QueryClientProvider></Provider>);

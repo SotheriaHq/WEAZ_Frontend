@@ -2,7 +2,7 @@
 
 **Effective Date:** October 19, 2026
 
-**Document Version:** 2026.10.19-v1.4
+**Document Version:** 2026.10.19-v1.5
 
 **Applies To:** Web (`wiez.com`, `fthreadly`), Mobile Applications (iOS / Android / `threadly-mobile`), Brand Studio Workspaces, Escrow Ledger Services, and all platform APIs.
 
@@ -334,7 +334,7 @@ If you have questions, data portability requests, or privacy compliance inquirie
 
 ### Subscription custom-order policy scope and consumer rights
 
-The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.19-v1.4`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.19-v1.5`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
 
 ## Custom-order queue and subscription records
 
@@ -345,3 +345,7 @@ To perform queue purchases, billing, cancellation and support, WIEZ processes pl
 When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. WIEZ records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
 
 An agreed post-Active partial dispute refund returns only the agreed amount. The order continues in its existing production/delivery lane. Each refund is recorded separately, repeat requests cannot duplicate it, and any later full remedy refunds only the remaining refundable balance. Future milestone earnings are reduced for the refunded share; no held milestone becomes payable because of a partial refund.
+
+### Subscription and saved-payment privacy
+
+Subscription tier, billing history, subscription history and saved-payment settings are private to the brand owner and authorized operational administrators. They are not published on public brand pages or disclosed through shopper queue responses. WIEZ stores provider-issued payment authorizations encrypted, masked card details, the original payment identity needed for verification, and billing records. New-card entry for subscription settings occurs in the provider’s secure payment flow. These settings do not store card numbers, CVVs or PINs. A server-side notice receipt records when a brand owner was shown or dismissed an upgrade notice, applying one shared 24-hour limit across login, Studio, web and native. Igwe and free Legacy brands receive no automatic upgrade notice.

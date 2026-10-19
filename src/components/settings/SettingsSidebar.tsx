@@ -28,16 +28,78 @@ const sidebarGroups: SidebarGroup[] = [
     id: 'personal',
     label: 'Personal',
     items: [
-      { key: 'account-security', label: 'Account & Security', path: '/settings?tab=account-security', icon: '👤', description: 'Email, password, devices' },
-      { key: 'notifications', label: 'Notifications', path: '/settings?tab=notifications', icon: '🔔', description: 'Email & push alerts' },
-      { key: 'email-preferences', label: 'Email Preferences', path: '/settings?tab=email-preferences', icon: '📧', description: 'Scenario-level email delivery' },
-      { key: 'privacy', label: 'Privacy', path: '/settings?tab=privacy', icon: '🛡️', description: 'Data & visibility' },
-      { key: 'profile-visibility', label: 'Profile Visibility', path: '/settings?tab=profile-visibility', icon: '👁️', description: 'Who can see your profile', nonAdmin: true },
-      { key: 'location', label: 'Location', path: '/settings?tab=location', icon: '📍', description: 'Share location access' },
-      { key: 'size-fits', label: 'Size & Fittings', path: '/settings?tab=size-fits', icon: '📏', description: 'Body measurements', nonAdmin: true },
-      { key: 'market-preferences', label: 'Market & Feed', path: '/settings?tab=market-preferences', icon: '🧵', description: 'Hidden content and reset' },
-      { key: 'upload-preferences', label: 'Upload Preferences', path: '/settings?tab=upload-preferences', icon: '⬆️', description: 'Quality limits and data usage' },
-      { key: 'billing', label: 'Accounts', path: '/settings?tab=billing', icon: '🏦', description: 'Wallet, payout account, and payout history' },
+      {
+        key: 'account-security',
+        label: 'Account & Security',
+        path: '/settings?tab=account-security',
+        icon: '👤',
+        description: 'Email, password, devices',
+      },
+      {
+        key: 'notifications',
+        label: 'Notifications',
+        path: '/settings?tab=notifications',
+        icon: '🔔',
+        description: 'Email & push alerts',
+      },
+      {
+        key: 'email-preferences',
+        label: 'Email Preferences',
+        path: '/settings?tab=email-preferences',
+        icon: '📧',
+        description: 'Scenario-level email delivery',
+      },
+      {
+        key: 'privacy',
+        label: 'Privacy',
+        path: '/settings?tab=privacy',
+        icon: '🛡️',
+        description: 'Data & visibility',
+      },
+      {
+        key: 'profile-visibility',
+        label: 'Profile Visibility',
+        path: '/settings?tab=profile-visibility',
+        icon: '👁️',
+        description: 'Who can see your profile',
+        nonAdmin: true,
+      },
+      {
+        key: 'location',
+        label: 'Location',
+        path: '/settings?tab=location',
+        icon: '📍',
+        description: 'Share location access',
+      },
+      {
+        key: 'size-fits',
+        label: 'Size & Fittings',
+        path: '/settings?tab=size-fits',
+        icon: '📏',
+        description: 'Body measurements',
+        nonAdmin: true,
+      },
+      {
+        key: 'market-preferences',
+        label: 'Market & Feed',
+        path: '/settings?tab=market-preferences',
+        icon: '🧵',
+        description: 'Hidden content and reset',
+      },
+      {
+        key: 'upload-preferences',
+        label: 'Upload Preferences',
+        path: '/settings?tab=upload-preferences',
+        icon: '⬆️',
+        description: 'Quality limits and data usage',
+      },
+      {
+        key: 'billing',
+        label: 'Accounts',
+        path: '/settings?tab=billing',
+        icon: '🏦',
+        description: 'Wallet, payout account, and payout history',
+      },
     ],
   },
   {
@@ -45,23 +107,85 @@ const sidebarGroups: SidebarGroup[] = [
     label: 'Brand',
     collapsible: true,
     items: [
-      { key: 'patches', label: 'Brand Patches', path: '/settings?tab=patches', icon: '✅', description: 'Manage brand patches' },
-      { key: 'subscriptions', label: 'Subscriptions', path: '/settings?tab=subscriptions', icon: '👥', description: 'Your subscribers' },
+      {
+        key: 'patches',
+        label: 'Brand Patches',
+        path: '/settings?tab=patches',
+        icon: '✅',
+        description: 'Manage brand patches',
+      },
+      {
+        key: 'subscriptions',
+        label: 'Brand subscribers',
+        path: '/settings?tab=subscriptions',
+        icon: '👥',
+        description: 'Your subscribers',
+      },
     ],
   },
   {
     id: 'studio',
-    label: 'Studio',
+    label: 'Business',
     collapsible: true,
     brandOnly: true,
     items: [
-      { key: 'store-general', label: 'General', path: '/settings?tab=store-general', icon: '⚙️', description: 'Store name, bio, logo' },
-      { key: 'store-hours', label: 'Working Hours', path: '/settings?tab=store-hours', icon: '🕒', description: 'Days & hours you operate' },
-      { key: 'store-social', label: 'Social & Links', path: '/settings?tab=store-social', icon: '🔗', description: 'Social links, verification' },
-      { key: 'store-policies', label: 'Policies', path: '/settings?tab=store-policies', icon: '📄', description: 'Return, shipping, terms' },
-      { key: 'store-team', label: 'Team Members', path: '/settings?tab=store-team', icon: '👥', description: 'Manage access' },
-      { key: 'store-notifications', label: 'Store Notifications', path: '/settings?tab=store-notifications', icon: '🔔', description: 'Order & store alerts' },
-      { key: 'store-danger', label: 'Danger Zone', path: '/settings?tab=store-danger', icon: '⚠️', danger: true, description: 'Close or delete store' },
+      {
+        key: 'subscription-billing',
+        label: 'Billing & subscriptions',
+        path: '/settings?tab=subscription-billing',
+        icon: '🧵',
+        description: 'Plans, renewals, history and payment methods',
+      },
+      {
+        key: 'store-general',
+        label: 'General',
+        path: '/settings?tab=store-general',
+        icon: '⚙️',
+        description: 'Store name, bio, logo',
+      },
+      {
+        key: 'store-hours',
+        label: 'Working Hours',
+        path: '/settings?tab=store-hours',
+        icon: '🕒',
+        description: 'Days & hours you operate',
+      },
+      {
+        key: 'store-social',
+        label: 'Social & Links',
+        path: '/settings?tab=store-social',
+        icon: '🔗',
+        description: 'Social links, verification',
+      },
+      {
+        key: 'store-policies',
+        label: 'Policies',
+        path: '/settings?tab=store-policies',
+        icon: '📄',
+        description: 'Return, shipping, terms',
+      },
+      {
+        key: 'store-team',
+        label: 'Team Members',
+        path: '/settings?tab=store-team',
+        icon: '👥',
+        description: 'Manage access',
+      },
+      {
+        key: 'store-notifications',
+        label: 'Store Notifications',
+        path: '/settings?tab=store-notifications',
+        icon: '🔔',
+        description: 'Order & store alerts',
+      },
+      {
+        key: 'store-danger',
+        label: 'Danger Zone',
+        path: '/settings?tab=store-danger',
+        icon: '⚠️',
+        danger: true,
+        description: 'Close or delete store',
+      },
     ],
   },
 ];
@@ -72,7 +196,9 @@ interface SettingsSidebarProps {
 }
 
 export function getGroupForKey(key: string): SidebarGroup | undefined {
-  return sidebarGroups.find((group) => group.items.some((item) => item.key === key));
+  return sidebarGroups.find((group) =>
+    group.items.some((item) => item.key === key),
+  );
 }
 
 export function getItemForKey(key: string): SidebarItem | undefined {
@@ -83,7 +209,10 @@ export function getItemForKey(key: string): SidebarItem | undefined {
   return undefined;
 }
 
-export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSelect }) => {
+export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
+  active,
+  onSelect,
+}) => {
   const navigate = useNavigate();
   const me = useSelector((state: RootState) => state.user.profile);
   const isBrandUser = hasActiveBrandMembership(me);
@@ -144,15 +273,23 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
         )}
 
         {isExpanded ? (
-          <div className={group.collapsible ? 'ml-2 border-l border-gray-200 dark:border-white/10' : ''}>
+          <div
+            className={
+              group.collapsible
+                ? 'ml-2 border-l border-gray-200 dark:border-white/10'
+                : ''
+            }
+          >
             {group.items.map(({ key, label, path, icon, danger }) => {
               const isActive = active === key;
               return (
                 <button
                   key={key}
                   onClick={() => handleSelect(key, path)}
-            className={`flex w-full items-center gap-2 py-2.5 text-left text-[11px] leading-snug transition-colors md:gap-2.5 md:py-2 md:text-sm ${
-                    group.collapsible ? 'pl-3 pr-2 md:pl-6 md:pr-4' : 'px-3 md:px-4'
+                  className={`flex w-full items-center gap-2 py-2.5 text-left text-[11px] leading-snug transition-colors md:gap-2.5 md:py-2 md:text-sm ${
+                    group.collapsible
+                      ? 'pl-3 pr-2 md:pl-6 md:pr-4'
+                      : 'px-3 md:px-4'
                   } ${
                     isActive
                       ? '-ml-[1px] border-l-[3px] border-primary bg-primary/10 font-medium text-primary'
@@ -161,7 +298,12 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
                         : 'text-gray-600 hover:bg-gray-100 hover:text-black dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'
                   }`}
                 >
-                  <span className="shrink-0 text-sm md:text-base" aria-hidden="true">{icon}</span>
+                  <span
+                    className="shrink-0 text-sm md:text-base"
+                    aria-hidden="true"
+                  >
+                    {icon}
+                  </span>
                   <span className="min-w-0">{label}</span>
                 </button>
               );
@@ -174,7 +316,9 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ active, onSele
 
   const sidebarContent = (
     <div className="py-4">
-      <h2 className="mb-2 px-2 text-sm font-semibold text-gray-900 md:mb-4 md:px-4 md:text-xl dark:text-white">Settings</h2>
+      <h2 className="mb-2 px-2 text-sm font-semibold text-gray-900 md:mb-4 md:px-4 md:text-xl dark:text-white">
+        Settings
+      </h2>
       <nav className="space-y-1">
         {visibleGroups.map((group, index) => (
           <React.Fragment key={group.id}>

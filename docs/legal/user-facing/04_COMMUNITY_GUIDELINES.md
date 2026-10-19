@@ -1,7 +1,7 @@
 # WIEZ Master Community Guidelines and Marketplace Integrity Directive
 
 **Effective Date:** October 19, 2026
-**Document Version:** 2026.10.19-v1.4
+**Document Version:** 2026.10.19-v1.5
 
 **Applies To:** All registered users (Shoppers and Brands), visitors, and third-party contributors across the WIEZ Web Platform (`wiez.com`), Mobile Applications (iOS / Android), Brand Studio Workspaces, and all associated communication channels.
 
@@ -407,7 +407,7 @@ WIEZ reserves the right to update and refine these Guidelines as the platform gr
 
 ### Subscription custom-order policy scope and consumer rights
 
-The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.19-v1.4`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.19-v1.5`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
 
 ## Queue integrity and continuing order communication
 

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import SubscriptionBillingSettings from './SubscriptionBillingSettings';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
@@ -34,7 +35,10 @@ const ComingSoon: React.FC<{ title: string; description: string }> = ({
       <p className="text-gray-500 dark:text-gray-400">{description}</p>
     </div>
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="p-4 rounded-full bg-gray-100 dark:bg-white/5 mb-4 text-3xl" aria-hidden="true">
+      <div
+        className="p-4 rounded-full bg-gray-100 dark:bg-white/5 mb-4 text-3xl"
+        aria-hidden="true"
+      >
         🚧
       </div>
       <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -68,19 +72,24 @@ const LocationSettings: React.FC = () => {
           Location
         </h1>
         <p className="text-gray-500 dark:text-gray-400">
-          Choose whether WIEZ can ask for your location to personalize nearby brands, delivery context, and future local discovery.
+          Choose whether WIEZ can ask for your location to personalize nearby
+          brands, delivery context, and future local discovery.
         </p>
       </div>
 
       <div className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-2xl" aria-hidden="true">
+        <div
+          className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-2xl"
+          aria-hidden="true"
+        >
           📍
         </div>
         <h2 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
           Share your location?
         </h2>
         <p className="mb-5 max-w-xl text-sm leading-6 text-gray-600 dark:text-gray-300">
-          WIEZ will always ask before using your location. Your precise location will not be shared with brands or other users from this screen.
+          WIEZ will always ask before using your location. Your precise location
+          will not be shared with brands or other users from this screen.
         </p>
         <button
           type="button"
@@ -110,14 +119,20 @@ const UploadPreferencesSettings: React.FC = () => (
           className="flex min-h-14 items-center gap-3 border-b border-gray-200 py-3 dark:border-white/10"
         >
           <span aria-hidden="true">{item.icon}</span>
-          <span className="flex-1 font-medium text-gray-900 dark:text-white">{item.label}</span>
-          <span className="text-sm text-gray-500 dark:text-gray-400">Unavailable</span>
+          <span className="flex-1 font-medium text-gray-900 dark:text-white">
+            {item.label}
+          </span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            Unavailable
+          </span>
         </div>
       ))}
     </div>
 
     <div className="flex flex-col items-center gap-2 py-10 text-center">
-      <span className="text-3xl" aria-hidden="true">⬆️</span>
+      <span className="text-3xl" aria-hidden="true">
+        ⬆️
+      </span>
       <p className="font-medium text-gray-900 dark:text-white">
         Upload preferences are not available yet
       </p>
@@ -152,8 +167,8 @@ const StoreDangerZone: React.FC = () => (
         Delete Store Data
       </h3>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Request permanent deletion of all store data including products,
-        orders history, and analytics. This is irreversible.
+        Request permanent deletion of all store data including products, orders
+        history, and analytics. This is irreversible.
       </p>
       <button className="px-4 py-2 border border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded-lg text-sm font-medium transition-colors">
         Request Data Deletion
@@ -210,10 +225,10 @@ const sections: Record<string, React.ReactNode> = {
 };
 
 /* ── Breadcrumbs ─────────────────────────────────────────────────── */
-const Breadcrumbs: React.FC<{ activeKey: string; onNavigate: (key: string) => void }> = ({
-  activeKey,
-  onNavigate,
-}) => {
+const Breadcrumbs: React.FC<{
+  activeKey: string;
+  onNavigate: (key: string) => void;
+}> = ({ activeKey, onNavigate }) => {
   const group = getGroupForKey(activeKey);
   const item = getItemForKey(activeKey);
 
@@ -227,7 +242,9 @@ const Breadcrumbs: React.FC<{ activeKey: string; onNavigate: (key: string) => vo
       </button>
       {group && (
         <>
-          <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">›</span>
+          <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">
+            ›
+          </span>
           <span className="text-gray-400 dark:text-gray-500">
             {group.label}
           </span>
@@ -235,7 +252,9 @@ const Breadcrumbs: React.FC<{ activeKey: string; onNavigate: (key: string) => vo
       )}
       {item && (
         <>
-          <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">›</span>
+          <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">
+            ›
+          </span>
           <span className="text-gray-900 dark:text-white font-medium">
             {item.label}
           </span>
@@ -251,17 +270,24 @@ const SettingsHome: React.FC = () => {
   const me = useSelector((s: RootState) => s.user.profile);
   const isBrandUser = hasActiveBrandMembership(me);
   const active = searchParams.get('tab') || 'account';
-  const normalizedAccountTab = active === 'account' || active === 'security' ? 'account-security' : active;
+  const normalizedAccountTab =
+    active === 'account' || active === 'security' ? 'account-security' : active;
   const normalizedActive =
-    isBrandUser && normalizedAccountTab === 'store-payments' ? 'billing' : normalizedAccountTab;
+    isBrandUser && normalizedAccountTab === 'store-payments'
+      ? 'billing'
+      : normalizedAccountTab;
   const resolvedActive =
     !isBrandUser && normalizedActive.startsWith('store-')
       ? 'account'
       : normalizedActive;
   const resolvedSection =
-    resolvedActive === 'billing' && isBrandUser
-      ? <StorePaymentsSettings />
-      : sections[resolvedActive];
+    resolvedActive === 'subscription-billing' ? (
+      <SubscriptionBillingSettings />
+    ) : resolvedActive === 'billing' && isBrandUser ? (
+      <StorePaymentsSettings />
+    ) : (
+      sections[resolvedActive]
+    );
 
   useEffect(() => {
     if (isBrandUser && active === 'store-payments') {

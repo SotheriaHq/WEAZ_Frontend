@@ -39,7 +39,7 @@ const FILES = [
   ['ACCOUNT_DELETION_POLICY', 'account-deletion', 'Account and Data Deletion Policy', '09_ACCOUNT_DATA_DELETION_POLICY.md', 'Self-service account closure, soft deactivation, cryptographic pseudonymization, and statutory financial retention schedules.'],
 ];
 
-const ver = '2026.10.19-v1.4';
+const ver = '2026.10.19-v1.5';
 const eff = 'October 19, 2026';
 
 const frontendOut = path.join(frontendRoot, 'src', 'pages', 'legal', 'legalDocuments.ts');

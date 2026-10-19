@@ -1,6 +1,6 @@
 # WIEZ Account and Data Deletion Policy
 
-Version: `2026.10.19-v1.4`
+Version: `2026.10.19-v1.5`
 
 Effective Date: October 19, 2026
 
@@ -181,7 +181,7 @@ For all questions regarding account deletion, data erasure, portability requests
 
 ### Subscription custom-order policy scope and consumer rights
 
-The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.19-v1.4`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.19-v1.5`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
 
 ## Queue obligations, subscription cancellation and financial evidence
 
@@ -192,3 +192,7 @@ Cancelling a brand subscription stops future renewal and keeps access until paid
 When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. WIEZ records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
 
 An agreed post-Active partial dispute refund returns only the agreed amount. The order continues in its existing production/delivery lane. Each refund is recorded separately, repeat requests cannot duplicate it, and any later full remedy refunds only the remaining refundable balance. Future milestone earnings are reduced for the refunded share; no held milestone becomes payable because of a partial refund.
+
+### Saved-card removal and financial history
+
+Removing a saved card disables reuse and removes its checkout authorization while retaining the minimal deletion record needed to prevent historical backfill from restoring it. A card used for active renewal requires a replacement or cancellation of future renewal first; an already processing payment requires verification. Financial receipts and subscription history follow the existing financial-record retention rules and are not erased by card removal. Subscription notice receipts are associated with the owner and brand and are deleted when those records are deleted.

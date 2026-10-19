@@ -1,4 +1,3 @@
-import BrandSubscriptionPage from './BrandSubscriptionPage';
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import StudioScaffold from '@/components/studio/StudioScaffold';
@@ -20,7 +19,6 @@ const sections: Record<string, React.ReactNode> = {
   customers: <CustomersPage />,
   analytics: <AnalyticsPage />,
   finance: <FinancePage />,
-  subscription: <BrandSubscriptionPage />,
 };
 
 /** Sections kept mounted after they are left — see `visited` below. */
@@ -67,13 +65,21 @@ const StudioHome: React.FC = () => {
   */
   const [visited, setVisited] = React.useState<string[]>(() => [activeKey]);
   if (visited[visited.length - 1] !== activeKey) {
-    setVisited([...visited.filter((key) => key !== activeKey), activeKey].slice(-MAX_LIVE_SECTIONS));
+    setVisited(
+      [...visited.filter((key) => key !== activeKey), activeKey].slice(
+        -MAX_LIVE_SECTIONS,
+      ),
+    );
   }
 
   return (
     <StudioScaffold active={active} onSelect={setActive}>
       {visited.map((key) => (
-        <div key={key} style={key === activeKey ? undefined : { display: 'none' }} aria-hidden={key !== activeKey}>
+        <div
+          key={key}
+          style={key === activeKey ? undefined : { display: 'none' }}
+          aria-hidden={key !== activeKey}
+        >
           {sections[key]}
         </div>
       ))}
