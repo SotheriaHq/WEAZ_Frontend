@@ -1,26 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import { apiClient } from '@/api/httpClient';
-import { marketApi, type MarketSection, type MarketSectionItem, type MarketSignalEvent } from '@/api/MarketApi';
+import type { MarketSection, MarketSectionItem } from '@/api/MarketApi';
 import { unwrapApiResponse, type ApiSuccessPayload } from '@/types/auth';
 import type { AppDispatch, RootState } from '@/store';
-import StoreProductCard, { type StoreProduct } from '@/components/designs/StoreProductCard';
-import ContentTile from '@/components/catalog/ContentTile';
+import type { StoreProduct } from '@/components/designs/StoreProductCard';
 import ProductCardSkeleton from '@/components/designs/ProductCardSkeleton';
 import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 import { fetchWishlist } from '@/features/wishlistSlice';
-import FeaturedSection from '@/components/FeaturedSection';
 import MarketTrendingHero from '@/components/market/MarketTrendingHero';
-import {
-  MARKET_SECTION_HEADER_CLASS,
-  MARKET_SECTION_TITLE_CLASS,
-} from '@/components/market/marketSectionType';
+import MarketSectionRail from '@/components/market/MarketSectionRail';
 import MarketTrendingTodayModal from '@/components/market/MarketTrendingTodayModal';
-import FeaturedGalleryModal from '@/components/FeaturedGalleryModal';
 import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import {
@@ -30,7 +23,6 @@ import {
   type RawProductsPayload,
 } from '@/utils/marketProductMapper';
 import {
-  getSectionItemSignalKey,
   getSectionItemTargetId,
   mapSectionProductToMarketplaceProduct,
 } from '@/utils/marketSectionMapper';
@@ -45,19 +37,9 @@ import { selectIsMobile } from '@/features/uiSlice';
 import { createMixSeed, mixFeedItems } from '@/utils/feedMixer';
 
 const BASE_FILTERS = ['FOR_YOU', 'MENSWEAR', 'WOMENSWEAR', 'EVERYBODY', 'ON_SALE'] as const;
-
-// Speed in pixels per second for the marquee
-const MARQUEE_PX_PER_S = 40;
-// Width per compact carousel card (336px) + gap-4 (16px)
-const CARD_WIDTH = 352;
 const FRESH_DROP_DAY_MS = 24 * 60 * 60 * 1000;
-const FRESH_DROP_MAX_AGE_MS = 7 * FRESH_DROP_DAY_MS;
-/** How many pieces one day's trending list can hold. */
 const TRENDING_TODAY_LIMIT = 15;
-const SYSTEM_FRESH_DROPS_LIMIT = 20;
-const ADMIN_FRESH_DROPS_LIMIT = 10;
-
-const MARKET_FALLBACK_PRODUCT_LIMIT = 24;
+const MARKET_FALLBACK_PRODUCT_LIMIT = 32;
 
 const getUtcDayIndex = (nowMs: number): number => Math.floor(nowMs / FRESH_DROP_DAY_MS);
 
@@ -70,37 +52,7 @@ const selectDailyBatch = <T,>(items: T[], batchSize: number, utcDayIndex: number
   return items.slice(start, start + batchSize);
 };
 
-/**
- * Rotate the order of a section rail's items.
- *
- * WHY: the Explore grid has been score-mixed per mount since feedMixer landed,
- * but the section rails were not — they render `section.items` exactly as the
- * API returned them, and that order is stable across requests. So every visit
- * to Market showed the same cards in the same row, in the same alignment.
- *
- * This mixes the rail with the SAME per-mount seed the grid uses: the set of
- * cards is untouched (server curation still decides membership), only the order
- * rotates, and it stays fixed for the whole visit so nothing reshuffles under a
- * scroll. Scoring signals are projected out of the section item so freshness and
- * engagement still bias the front of the rail — see utils/feedMixer.
- */
-const mixSectionItems = (items: MarketSectionItem[], seed: string): MarketSectionItem[] => {
-  if (items.length <= 1) return items;
-  return mixFeedItems(
-    items.map((item) => ({
-      id: item.id,
-      brandId: item.brand?.id ?? null,
-      createdAt: item.createdAt ?? null,
-      updatedAt: item.updatedAt ?? null,
-      viewsCount: item.stats?.views ?? null,
-      threadsCount: item.stats?.threads ?? null,
-      item,
-    })),
-    seed,
-  ).map((entry) => entry.item);
-};
-
-const extractProductsFromSections = (sections: MarketSection[]) => {
+const extractProductsFromSections = (sections: MarketSection[]): MarketplaceProduct[] => {
   const byId = new Map<string, MarketplaceProduct>();
   for (const section of sections) {
     for (const item of section.items ?? []) {
@@ -115,394 +67,36 @@ const extractProductsFromSections = (sections: MarketSection[]) => {
   );
 };
 
-const ProductCarousel: React.FC<{
-  title: string;
-  products: MarketplaceProduct[];
-  onViewProduct: (product: StoreProduct) => void;
-}> = ({ title, products, onViewProduct }) => {
-  const [isPaused, setIsPaused] = useState(false);
-  const [previewNavigationActive, setPreviewNavigationActive] = useState(false);
-  const useMarquee = products.length > 2;
-
-  // Duplicate only when marquee is active so the seamless loop works.
-  // The CSS animation translates by -50% of the track width, which equals one copy.
-  const duplicatedProducts = useMemo(
-    () => (useMarquee ? [...products, ...products] : products),
-    [products, useMarquee],
-  );
-
-  // Duration: time to scroll one full copy width
-  const durationS = useMemo(
-    () => Math.max(18, Math.round((products.length * CARD_WIDTH) / MARQUEE_PX_PER_S)),
-    [products.length],
-  );
-
-  if (products.length === 0) return null;
-
-  return (
-    <section className="space-y-3">
-      {/* keyframes injected once per carousel render */}
-      <style>{`
-        @keyframes wiez-marquee {
-          from { transform: translateX(0); }
-          to   { transform: translateX(-50%); }
-        }
-      `}</style>
-
-      <div className={MARKET_SECTION_HEADER_CLASS}>
-        <h2 className={MARKET_SECTION_TITLE_CLASS}>{title}</h2>
-        {useMarquee ? (
-          <button
-            type="button"
-            onClick={() => setIsPaused((p) => !p)}
-            className="rounded-full border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/10"
-            aria-label={isPaused ? 'Resume auto-scroll' : 'Pause auto-scroll'}
-          >
-            {isPaused ? '▶' : '⏸'}
-          </button>
-        ) : null}
-      </div>
-
-      {useMarquee ? (
-        <div
-          className="overflow-hidden"
-          onMouseLeave={() => setPreviewNavigationActive(false)}
-        >
-          <div
-            className="flex gap-4"
-            style={{
-              width: 'max-content',
-              animation: `wiez-marquee ${durationS}s linear infinite`,
-              animationPlayState: isPaused || previewNavigationActive ? 'paused' : 'running',
-            }}
-          >
-            {duplicatedProducts.map((product, index) => (
-              <div
-                key={`${product.id}-${index}`}
-                className="w-[336px] max-w-[82vw] shrink-0"
-              >
-                <StoreProductCard
-                  product={product}
-                  onViewProduct={onViewProduct}
-                  enableHoverGallery
-                  onPreviewNavigationActiveChange={setPreviewNavigationActive}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="flex gap-4">
-            {products.map((product) => (
-              <div key={product.id} className="w-[336px] max-w-[82vw] shrink-0">
-                <StoreProductCard
-                  product={product}
-                  onViewProduct={onViewProduct}
-                  enableHoverGallery
-                  onPreviewNavigationActiveChange={() => undefined}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </section>
-  );
-};
-
-const MarketSectionPreviewRail: React.FC<{
-  section: MarketSection;
-  onViewProduct: (product: MarketplaceProduct) => void;
-  onOpenItem: (item: MarketSectionItem) => void;
-  onTrackSignal: (event: MarketSignalEvent) => void;
-  onHideItem: (section: MarketSection, item: MarketSectionItem) => void;
-  onViewAll: (section: MarketSection) => void;
-  compact?: boolean;
-}> = ({ section, onViewProduct, onOpenItem, onTrackSignal, onHideItem, onViewAll, compact = false }) => {
-  const sectionRef = useRef<HTMLElement | null>(null);
-  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const observedKeysRef = useRef<Set<string>>(new Set());
-  const sectionObservedRef = useRef(false);
-
-  const itemsBySignalKey = useMemo(() => {
-    return new Map(
-      (section.items ?? []).map((item, index) => [
-        getSectionItemSignalKey(section.key, item, index),
-        { item, index },
-      ]),
-    );
-  }, [section.items, section.key]);
-
-  const setItemRef = useCallback((key: string, node: HTMLDivElement | null) => {
-    if (!node) {
-      itemRefs.current.delete(key);
-      return;
-    }
-    itemRefs.current.set(key, node);
-  }, []);
-
-  useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-
-          if (entry.target === sectionRef.current && !sectionObservedRef.current) {
-            sectionObservedRef.current = true;
-            onTrackSignal({
-              targetType: 'SECTION',
-              targetId: section.key,
-              signalType: 'MARKET_SECTION_VIEW',
-              surface: 'MARKET_HOME',
-              sectionKey: section.key,
-            });
-            continue;
-          }
-
-          const signalKey = (entry.target as HTMLElement).dataset.marketSignalKey;
-          if (!signalKey || observedKeysRef.current.has(signalKey)) continue;
-          const payload = itemsBySignalKey.get(signalKey);
-          const targetId = payload ? getSectionItemTargetId(payload.item) : '';
-          if (!payload || !targetId) continue;
-
-          observedKeysRef.current.add(signalKey);
-          if (observedKeysRef.current.size > 300) {
-            observedKeysRef.current.clear();
-          }
-          onTrackSignal({
-            targetType: payload.item.entityType,
-            targetId,
-            signalType: 'IMPRESSION',
-            surface: 'MARKET_HOME',
-            sectionKey: section.key,
-            position: payload.index,
-          });
-        }
-      },
-      { threshold: 0.5 },
-    );
-
-    if (sectionRef.current) observer.observe(sectionRef.current);
-    for (const node of itemRefs.current.values()) {
-      observer.observe(node);
-    }
-
-    return () => observer.disconnect();
-  }, [itemsBySignalKey, onTrackSignal, section.key]);
-
-  if (!section.items?.length) return null;
-
-  return (
-    <section ref={sectionRef} className={compact ? 'space-y-2' : 'space-y-3'}>
-      {/*
-        The title, and the way out. Nothing else.
-
-        "Hot Right Now" carried FOUR pieces of chrome above one strip of cards:
-        the title, a subtitle written for whoever tuned the ranking
-        ("Deterministic V1 heat from product views and thread activity"), a grey
-        chip restating the same idea in shopper words ("People are checking
-        these out"), and a bordered "See What's Hot" button. Three of them say
-        the same thing and none of them is a garment.
-
-        What is left is the heading and a link. The link is italic and the system
-        colour — moving sideways is not a decision, so it does not get a border
-        and a fill that outrank the cards underneath. Matches the app, which
-        carries the identical rule in `components/ui/InlineNavLink.tsx`.
-      */}
-      <div className="flex items-baseline justify-between gap-4">
-        <h2 className={`font-bold text-gray-900 dark:text-white ${compact ? 'text-base sm:text-xl' : 'text-xl'}`}>
-          {section.title}
-        </h2>
-        {section.viewAll?.enabled ? (
-          <button
-            type="button"
-            onClick={() => onViewAll(section)}
-            className="shrink-0 rounded text-xs font-bold italic text-[color:var(--brand-accent,#9333EA)] underline-offset-2 transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--brand-accent,#9333EA)]"
-          >
-            See more →
-          </button>
-        ) : null}
-      </div>
-
-      <div className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className={`flex ${compact ? 'gap-3' : 'gap-4'}`}>
-          {section.items.map((item, index) => {
-            const product = mapSectionProductToMarketplaceProduct(item);
-            const mediaUrl = item.media?.thumbnailUrl || item.media?.url || null;
-            const mediaFileId = item.media?.fileId ?? null;
-            const signalKey = getSectionItemSignalKey(section.key, item, index);
-            const targetId = getSectionItemTargetId(item);
-            const canOpen = Boolean(product || item.target?.route || targetId);
-            const priceLabel = item.price?.effectiveAmount
-              ? new Intl.NumberFormat('en-NG', {
-                  style: 'currency',
-                  currency: item.price.currency || 'NGN',
-                  maximumFractionDigits: 0,
-                }).format(item.price.effectiveAmount)
-              : item.priceRange?.min
-                ? `From ${new Intl.NumberFormat('en-NG', {
-                    style: 'currency',
-                    currency: item.priceRange.currency || 'NGN',
-                    maximumFractionDigits: 0,
-                  }).format(item.priceRange.min)}`
-                : item.stats?.products
-                  ? `${item.stats.products} item${item.stats.products === 1 ? '' : 's'}`
-                  : null;
-
-            const trackOpen = () => {
-              if (!targetId) return;
-              onTrackSignal({
-                targetType: item.entityType,
-                targetId,
-                signalType: 'OPEN',
-                surface: 'MARKET_HOME',
-                sectionKey: section.key,
-                position: index,
-              });
-            };
-
-            /*
-              A product renders as THE product card. Anything else does not.
-
-              These rails were drawing a card of their own — a white box with a
-              cropped thumbnail on top and text beneath — while every other
-              product surface in the app uses `StoreProductCard`: full-bleed
-              media, the frosted info panel, the custom-order scissors, and the
-              bag control with its heartbeat. So "Hot right now", "Loved near
-              you" and the rest looked like a different product to the rails
-              directly above and below them, and had no bag affordance at all.
-
-              The condition is what the item IS, not which rail it is in. Section
-              items are a mixed bag: "Shop by Style" carries categories and "New
-              designers to watch" carries brands, and neither has a price, stock
-              or a bag action to put on a product card. Those keep the tile.
-            */
-            if (product) {
-              return (
-                <div
-                  key={`${section.key}-${item.sourceType}-${item.sourceId}`}
-                  ref={(node) => setItemRef(signalKey, node)}
-                  data-market-signal-key={signalKey}
-                  className={`shrink-0 ${compact ? 'w-[240px] sm:w-[280px]' : 'w-[300px]'} max-w-[82vw]`}
-                >
-                  <StoreProductCard
-                    product={product}
-                    onViewProduct={(next) => {
-                      trackOpen();
-                      onViewProduct(next);
-                    }}
-                    enableHoverGallery
-                    onPreviewNavigationActiveChange={() => undefined}
-                  />
-                </div>
-              );
-            }
-
-            /*
-              Non-product items wear the SAME card, not a different one.
-
-              A category or a brand has no price, no stock and nothing to bag, so
-              it cannot literally be a `StoreProductCard`. What it can be — and
-              now is — is the same card SHELL: identical width, `aspect-[4/5]`
-              full-bleed media, and the same frosted panel pinned to the bottom
-              with white text over a blurred tint. Only the contents of the panel
-              differ, because only the contents genuinely differ.
-
-              Previously this was a white box with a cropped `h-32` thumbnail and
-              text stacked underneath — a different shape, a different aspect
-              ratio and a different colour treatment sitting in the same scroller
-              as the product cards.
-            */
-            return (
-              <div
-                key={`${section.key}-${item.sourceType}-${item.sourceId}`}
-                ref={(node) => setItemRef(signalKey, node)}
-                data-market-signal-key={signalKey}
-                className={`shrink-0 ${compact ? 'w-[240px] sm:w-[280px]' : 'w-[300px]'} max-w-[82vw]`}
-              >
-                <ContentTile
-                  title={item.title}
-                  subtitle={item.subtitle || item.brand?.name || null}
-                  priceLabel={priceLabel}
-                  mediaUrl={mediaUrl}
-                  mediaFileId={mediaFileId}
-                  mediaAlt={item.media?.alt || item.title}
-                  disabled={!canOpen}
-                  onOpen={() => {
-                    if (!canOpen) return;
-                    trackOpen();
-                    onOpenItem(item);
-                  }}
-                  actions={
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onTrackSignal({
-                          targetType: item.entityType,
-                          targetId: targetId || item.sourceId || item.id,
-                          signalType: 'NOT_INTERESTED',
-                          surface: 'MARKET_HOME',
-                          sectionKey: section.key,
-                          position: index,
-                        });
-                        onHideItem(section, item);
-                      }}
-                      className="rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-semibold text-white opacity-0 shadow-sm transition-opacity hover:bg-black/80 focus:opacity-100 group-hover:opacity-100"
-                    >
-                      Not interested
-                    </button>
-                  }
-                />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-};
-
-const isOutOfStockCustomOrderProduct = (product: MarketplaceProduct) =>
-  Boolean(
-    product.isCustomOrderOnly ||
-      product.canBagWhenOutOfStock ||
-      (product.customOrderEnabled && Number(product.totalStock ?? 0) <= 0),
-  );
-
-const MarketPlace: React.FC = () => {
+export const MarketPlace: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const isAuth = useSelector((state: RootState) => state.user.isAuthenticated);
+  const isMobileViewportUi = useSelector(selectIsMobile);
 
   const [selectedProduct, setSelectedProduct] = useState<MarketplaceProduct | null>(null);
-  const [galleryOpen, setGalleryOpen] = useState(false);
-  const isMobileViewportUi = useSelector(selectIsMobile);
   useScrollLock(Boolean(selectedProduct));
-  // Rule 29: an OS/browser Back gesture closes the open product view in place
-  // instead of popping the underlying route.
   useOverlayBackClose(
     Boolean(selectedProduct),
     () => setSelectedProduct(null),
     isMobileViewportUi,
   );
-  const [selectedFilter, setSelectedFilter] = useState<string>('FOR_YOU');
-  const [visibleCount, setVisibleCount] = useState(18);
+
+  // Filter & Sort State
+  const [selectedAudienceFilter, setSelectedAudienceFilter] = useState<string>('FOR_YOU');
+  const [craftsmanshipFilter, setCraftsmanshipFilter] = useState<string>('ALL');
+  const [priceRangeFilter, setPriceRangeFilter] = useState<string>('ALL');
+  const [sortBy, setSortBy] = useState<string>('EDITORIAL');
+
   const [trendingTodayOpen, setTrendingTodayOpen] = useState(false);
   const [marketClockMs, setMarketClockMs] = useState<number>(() => Date.now());
-  const [hiddenTargetIds, setHiddenTargetIds] = useState<Set<string>>(() => new Set());
+  const [hiddenTargetIds] = useState<Set<string>>(() => new Set());
   const { anonymousSessionId, flushMarketSignals, trackMarketSignal } = useMarketSignals('MARKET_HOME');
 
-  // Warm the Runway feed cache while this screen idles so Market → Runway
-  // switches paint instantly instead of cold-loading.
   useMarketSurfacePrefetch('market');
   const { saveScrollPosition } = useScrollRestore('MARKET_PLACE');
 
   const marketSectionsParams = useMemo(
-    () => ({ limit: 8, anonymousSessionId }),
+    () => ({ limit: 12, anonymousSessionId }),
     [anonymousSessionId],
   );
   const marketSectionsQuery = useMarketSections(marketSectionsParams);
@@ -564,11 +158,9 @@ const MarketPlace: React.FC = () => {
         }
       }
 
-      const sorted = Array.from(dedupedById.values()).sort(
+      return Array.from(dedupedById.values()).sort(
         (a, b) => getProductRecencyTimestamp(b) - getProductRecencyTimestamp(a),
       );
-
-      return sorted;
     },
     enabled: shouldUseFallbackProducts,
   });
@@ -578,15 +170,13 @@ const MarketPlace: React.FC = () => {
     [fallbackProductsQuery.data, hiddenTargetIds],
   );
 
-  // Scored rotation: a fresh seed per screen mount means every visit
-  // (login / refresh / re-route) renders a differently mixed grid, while the
-  // order stays stable during the visit. Rules documented in utils/feedMixer.
   const marketMixSeedRef = useRef(createMixSeed());
   const rawProducts = sectionProducts.length > 0 ? sectionProducts : fallbackProducts;
   const products = useMemo(
     () => mixFeedItems(rawProducts, marketMixSeedRef.current),
     [rawProducts],
   );
+
   const loading =
     products.length === 0 &&
     (marketSectionsQuery.isLoading ||
@@ -595,19 +185,18 @@ const MarketPlace: React.FC = () => {
     products.length > 0 &&
     (marketSectionsQuery.isFetching ||
       (shouldUseFallbackProducts && fallbackProductsQuery.isFetching));
-  const error = useMemo(() => {
-    if (products.length > 0) return null;
-    const queryError =
-      marketSectionsQuery.error ?? fallbackProductsQuery.error ?? null;
-    if (!queryError) return null;
-    if (queryError instanceof Error) return queryError.message;
-    return 'Unable to load the general market right now.';
-  }, [fallbackProductsQuery.error, marketSectionsQuery.error, products.length]);
 
   useEffect(() => {
     if (!isAuth) return;
     void dispatch(fetchWishlist({ page: 1, limit: 100 }));
   }, [dispatch, isAuth]);
+
+  useEffect(() => {
+    const updateMarketClock = () => setMarketClockMs(Date.now());
+    updateMarketClock();
+    const interval = window.setInterval(updateMarketClock, 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const handleOpenProduct = useCallback(
     (product: StoreProduct, metadata?: Record<string, unknown>) => {
@@ -628,15 +217,6 @@ const MarketPlace: React.FC = () => {
     [flushMarketSignals, saveScrollPosition, trackMarketSignal],
   );
 
-  const handleOpenSectionProduct = useCallback(
-    (product: MarketplaceProduct) => {
-      saveScrollPosition('MARKET_PLACE', window.scrollY);
-      setSelectedProduct(product);
-      void flushMarketSignals();
-    },
-    [flushMarketSignals, saveScrollPosition],
-  );
-
   const handleOpenSectionItem = useCallback(
     (item: MarketSectionItem) => {
       saveScrollPosition('MARKET_PLACE', window.scrollY);
@@ -652,7 +232,6 @@ const MarketPlace: React.FC = () => {
         return;
       }
       if (item.entityType === 'BRAND' && targetId) {
-        // Prefer target.route when present; brand section cards often use Brand.id.
         const brandRoute =
           (typeof item.target?.route === 'string' && item.target.route.startsWith('/')
             ? item.target.route
@@ -672,505 +251,443 @@ const MarketPlace: React.FC = () => {
     [flushMarketSignals, navigate, saveScrollPosition],
   );
 
-  const handleHideMarketSectionItem = useCallback(
-    async (section: MarketSection, item: MarketSectionItem) => {
-      const targetId = getSectionItemTargetId(item);
-      if (!targetId) return;
-
-      setHiddenTargetIds((current) => {
-        const next = new Set(current);
-        next.add(targetId);
-        if (item.sourceId) next.add(item.sourceId);
-        return next;
-      });
-
-      try {
-        const suppression = await marketApi.createMarketSuppression({
-          anonymousSessionId,
-          targetType: item.entityType,
-          targetId,
-          brandId: item.entityType === 'BRAND' ? item.brand?.id ?? targetId : undefined,
-          categoryId:
-            item.entityType === 'CATEGORY' ? item.category?.id ?? targetId : undefined,
-          sectionKey: section.key,
-          suppressionType: 'NOT_INTERESTED',
-          reason: 'market_section_card',
-        });
-        toast.success('Hidden from this market view.', {
-          action: {
-            label: 'Undo',
-            onClick: () => {
-              void marketApi
-                .deleteMarketSuppression(suppression.id, { anonymousSessionId })
-                .catch(() => undefined);
-              setHiddenTargetIds((current) => {
-                const next = new Set(current);
-                next.delete(targetId);
-                if (item.sourceId) next.delete(item.sourceId);
-                return next;
-              });
-            },
-          },
-        });
-      } catch {
-        setHiddenTargetIds((current) => {
-          const next = new Set(current);
-          next.delete(targetId);
-          if (item.sourceId) next.delete(item.sourceId);
-          return next;
-        });
-        toast.error('Could not hide that item. Try again.');
-      }
-    },
-    [anonymousSessionId],
-  );
-
-  const handleViewAllSection = useCallback(
-    (section: MarketSection) => {
-      if (!section.viewAll?.enabled) return;
-      trackMarketSignal({
-        targetType: 'SECTION',
-        targetId: section.key,
-        signalType: 'VIEW_ALL_CLICK',
-        surface: 'MARKET_HOME',
-        sectionKey: section.key,
-      });
-      void flushMarketSignals();
+  const handleExploreSection = useCallback(
+    (sectionKey: string, title: string) => {
       saveScrollPosition('MARKET_PLACE', window.scrollY);
-      navigate(`/market/sections/${encodeURIComponent(section.key)}`, {
-        state: {
-          title: section.title,
-          subtitle: section.subtitle ?? null,
-        },
+      void flushMarketSignals();
+      navigate(`/market/sections/${encodeURIComponent(sectionKey)}`, {
+        state: { title },
       });
     },
-    [flushMarketSignals, navigate, saveScrollPosition, trackMarketSignal],
+    [flushMarketSignals, navigate, saveScrollPosition],
   );
 
-  useEffect(() => {
-    const updateMarketClock = () => setMarketClockMs(Date.now());
-    updateMarketClock();
-    const interval = window.setInterval(updateMarketClock, 60_000);
-    return () => window.clearInterval(interval);
-  }, []);
-
-  const availableFilters = useMemo(() => {
-    const fromProducts = new Set<string>(BASE_FILTERS);
-    if (products.some((p) => p.customAvailable === true)) {
-      fromProducts.add('CUSTOM_FIT');
-    }
-    return Array.from(fromProducts);
-  }, [products]);
+  const utcDayIndex = useMemo(() => getUtcDayIndex(marketClockMs), [marketClockMs]);
 
   const recencySortedProducts = useMemo(
     () => [...products].sort((a, b) => getProductRecencyTimestamp(b) - getProductRecencyTimestamp(a)),
     [products],
   );
 
-  const utcDayIndex = useMemo(() => getUtcDayIndex(marketClockMs), [marketClockMs]);
-
-  const weeklyEligibleProducts = useMemo(() => {
-    const nowMs = marketClockMs;
-    return recencySortedProducts.filter((product) => {
-      const recencyTs = getProductRecencyTimestamp(product);
-      return recencyTs > 0 && nowMs - recencyTs <= FRESH_DROP_MAX_AGE_MS;
-    });
-  }, [recencySortedProducts, marketClockMs]);
-
-  const adminFeaturedFreshDrops = useMemo(
-    () => weeklyEligibleProducts.filter((product) => product.isFeatured === true).slice(0, ADMIN_FRESH_DROPS_LIMIT),
-    [weeklyEligibleProducts],
-  );
-
-  const systemFreshDropPool = useMemo(() => {
-    const adminFeaturedIds = new Set(adminFeaturedFreshDrops.map((product) => product.id));
-    return weeklyEligibleProducts.filter((product) => !adminFeaturedIds.has(product.id));
-  }, [weeklyEligibleProducts, adminFeaturedFreshDrops]);
-
-  const systemFreshDrops = useMemo(
-    () => selectDailyBatch(systemFreshDropPool, SYSTEM_FRESH_DROPS_LIMIT, utcDayIndex),
-    [systemFreshDropPool, utcDayIndex],
-  );
-
-  const freshDrops = useMemo(() => {
-    // selectDailyBatch decides WHICH drops are eligible today — that is the
-    // product rule and stays day-stable. Only the render ORDER rotates per
-    // visit. Admin-featured keeps its front-of-rail placement (it is curated
-    // positioning, not ranking); just its internal order is mixed.
-    const combined = [
-      ...mixFeedItems(adminFeaturedFreshDrops, marketMixSeedRef.current),
-      ...mixFeedItems(systemFreshDrops, marketMixSeedRef.current),
-    ];
-    return combined.slice(0, SYSTEM_FRESH_DROPS_LIMIT + ADMIN_FRESH_DROPS_LIMIT);
-  }, [adminFeaturedFreshDrops, systemFreshDrops]);
-
-  // Every rail below renders from this, so the rotation is applied exactly once.
-  const mixedMarketSections = useMemo(
-    () =>
-      marketSections.map((section) => ({
-        ...section,
-        items: mixSectionItems(section.items ?? [], marketMixSeedRef.current),
-      })),
-    [marketSections],
-  );
-
-  const sectionProductsByKey = useMemo(() => {
-    const byKey = new Map<string, MarketplaceProduct[]>();
-    for (const section of mixedMarketSections) {
-      const mapped = (section.items ?? [])
-        .map((item) => mapSectionProductToMarketplaceProduct(item))
-        .filter((product): product is MarketplaceProduct => Boolean(product));
-      if (mapped.length > 0) {
-        byKey.set(section.key, mapped);
-      }
-    }
-    return byKey;
-  }, [mixedMarketSections]);
-
-  // Client feedback: reach Explore Market faster; push personalization rails lower.
-  const primaryPreviewSections = useMemo(
-    () =>
-      mixedMarketSections.filter(
-        (section) =>
-          section.key !== 'fresh-drops' &&
-          section.key !== 'picked-for-you' &&
-          section.items?.length > 0,
-      ),
-    [mixedMarketSections],
-  );
-  const pickedForYouSection = useMemo(
-    () => mixedMarketSections.find((section) => section.key === 'picked-for-you' && section.items?.length > 0) ?? null,
-    [mixedMarketSections],
-  );
-
-  const freshDropsForDisplay = sectionProductsByKey.get('fresh-drops') ?? freshDrops;
-
-  /*
-    What is trending TODAY, and the same list the hero, its "Up next" rows and
-    its "See all" sheet all draw from.
-
-    `selectDailyBatch` is the existing primitive for "the set for this UTC day"
-    — Fresh Drops already uses it — so trending rotates on the same clock as
-    the rest of the page instead of inventing a second notion of a day.
-
-    Fifteen rather than three: the hero shows one and lists three, and "See
-    all" has to have somewhere to go. A shorter day simply yields a shorter
-    list.
-  */
   const trendingToday = useMemo(
     () => selectDailyBatch(recencySortedProducts, TRENDING_TODAY_LIMIT, utcDayIndex),
     [recencySortedProducts, utcDayIndex],
   );
 
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      if (selectedFilter === 'MENSWEAR' && product.sizingMode === 'CUSTOM') return false;
-      if (selectedFilter === 'WOMENSWEAR' && product.sizingMode === 'CUSTOM') return false;
-      if (selectedFilter === 'ON_SALE' && !product.isOnSale) return false;
-      if (
-        selectedFilter === 'CUSTOM_FIT' &&
-        product.customAvailable !== true
-      ) {
-        return false;
+  const availableFilters = useMemo(() => {
+    const list = [...BASE_FILTERS];
+    if (products.some((p) => p.customAvailable === true || p.isCustomOrderOnly)) {
+      return [...list, 'CUSTOM_FIT'];
+    }
+    return list;
+  }, [products]);
+
+  // Filter item predicate based on audience, craftsmanship, price, and sort
+  const matchesFilters = useCallback(
+    (item: MarketSectionItem): boolean => {
+      const product = mapSectionProductToMarketplaceProduct(item);
+      const effectivePrice =
+        item.price?.effectiveAmount ??
+        item.price?.amount ??
+        product?.effectivePrice ??
+        product?.price ??
+        0;
+
+      // Audience Filter
+      if (selectedAudienceFilter === 'MENSWEAR') {
+        if (product && product.sizingMode === 'CUSTOM') return false;
+      } else if (selectedAudienceFilter === 'WOMENSWEAR') {
+        if (product && product.sizingMode === 'CUSTOM') return false;
+      } else if (selectedAudienceFilter === 'ON_SALE') {
+        if (product && !product.isOnSale) return false;
+      } else if (selectedAudienceFilter === 'CUSTOM_FIT') {
+        const isCustom = product?.customAvailable || product?.isCustomOrderOnly || product?.customOrderEnabled;
+        if (!isCustom) return false;
+      }
+
+      // Craftsmanship Filter
+      if (craftsmanshipFilter === 'READY_TO_WEAR') {
+        if (product?.isCustomOrderOnly) return false;
+      } else if (craftsmanshipFilter === 'CUSTOM_FIT') {
+        const isCustom = product?.customAvailable || product?.isCustomOrderOnly || product?.customOrderEnabled;
+        if (!isCustom) return false;
+      }
+
+      // Price Range Filter
+      if (priceRangeFilter === 'UNDER_100K') {
+        if (effectivePrice > 100000) return false;
+      } else if (priceRangeFilter === '100K_300K') {
+        if (effectivePrice < 100000 || effectivePrice > 300000) return false;
+      } else if (priceRangeFilter === '300K_500K') {
+        if (effectivePrice < 300000 || effectivePrice > 500000) return false;
+      } else if (priceRangeFilter === 'ABOVE_500K') {
+        if (effectivePrice < 500000) return false;
       }
 
       return true;
-    });
-  }, [products, selectedFilter]);
-
-  const outOfStockCustomOrderProducts = useMemo(
-    () => filteredProducts.filter((product) => isOutOfStockCustomOrderProduct(product)),
-    [filteredProducts],
+    },
+    [craftsmanshipFilter, priceRangeFilter, selectedAudienceFilter],
   );
 
-  const generalMarketProducts = useMemo(
-    () => filteredProducts.filter((product) => !isOutOfStockCustomOrderProduct(product)),
-    [filteredProducts],
+  const sortItems = useCallback(
+    (items: MarketSectionItem[]): MarketSectionItem[] => {
+      const sorted = [...items];
+      if (sortBy === 'PRICE_LOW') {
+        sorted.sort((a, b) => {
+          const pa = a.price?.effectiveAmount ?? a.price?.amount ?? 0;
+          const pb = b.price?.effectiveAmount ?? b.price?.amount ?? 0;
+          return pa - pb;
+        });
+      } else if (sortBy === 'PRICE_HIGH') {
+        sorted.sort((a, b) => {
+          const pa = a.price?.effectiveAmount ?? a.price?.amount ?? 0;
+          const pb = b.price?.effectiveAmount ?? b.price?.amount ?? 0;
+          return pb - pa;
+        });
+      } else if (sortBy === 'NEWEST') {
+        sorted.sort((a, b) => {
+          const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return tb - ta;
+        });
+      }
+      return sorted;
+    },
+    [sortBy],
   );
 
-  const visibleProducts = useMemo(
-    () => generalMarketProducts.slice(0, visibleCount),
-    [generalMarketProducts, visibleCount],
-  );
+  // Dynamically constructed sections: from backend API or curated initial sections
+  const processedSections = useMemo((): MarketSection[] => {
+    // If backend returned sections, use them
+    if (marketSections.length > 0) {
+      return marketSections
+        .map((section) => {
+          const filtered = (section.items ?? []).filter(matchesFilters);
+          return {
+            ...section,
+            items: sortItems(filtered),
+          };
+        })
+        .filter((section) => section.items.length > 0);
+    }
 
-  useEffect(() => {
-    setVisibleCount(18);
-  }, [selectedFilter]);
+    // Fallback constructed initial sections from products
+    if (products.length === 0) return [];
+
+    const fallbackItems: MarketSectionItem[] = products.map((p) => ({
+      id: p.id,
+      entityType: 'PRODUCT',
+      sourceType: 'PRODUCT',
+      sourceId: p.id,
+      title: p.name,
+      subtitle: p.brand?.name ?? null,
+      price: {
+        amount: p.price,
+        effectiveAmount: p.effectivePrice,
+        currency: 'NGN',
+        isOnSale: p.isOnSale,
+      },
+      media: {
+        url: p.thumbnail || p.images[0] || '',
+        thumbnailUrl: p.thumbnail || p.images[0] || '',
+      },
+      brand: p.brand,
+      createdAt: p.publishAt || null,
+    }));
+
+    const newArrivals = sortItems(fallbackItems.slice(0, 12).filter(matchesFilters));
+    const customFitPieces = sortItems(
+      fallbackItems
+        .filter((i) => {
+          const prod = products.find((p) => p.id === i.sourceId);
+          return prod?.customAvailable || prod?.isCustomOrderOnly;
+        })
+        .filter(matchesFilters),
+    );
+    const trendingDrops = sortItems(fallbackItems.slice(6, 18).filter(matchesFilters));
+    const readyToWear = sortItems(
+      fallbackItems
+        .filter((i) => {
+          const prod = products.find((p) => p.id === i.sourceId);
+          return prod && !prod.isOutOfStock && !prod.isCustomOrderOnly;
+        })
+        .filter(matchesFilters),
+    );
+
+    const initialList: Array<{
+      key: string;
+      title: string;
+      eyebrow: string;
+      items: MarketSectionItem[];
+    }> = [];
+
+    if (newArrivals.length > 0) {
+      initialList.push({
+        key: 'fresh-drops',
+        title: 'New Arrivals & Master Ateliers',
+        eyebrow: 'HANDPICKED SILHOUETTES',
+        items: newArrivals,
+      });
+    }
+
+    if (trendingDrops.length > 0) {
+      initialList.push({
+        key: 'hot-right-now',
+        title: 'Trending Drops & High Demand',
+        eyebrow: 'COMMUNITY FAVORITES',
+        items: trendingDrops,
+      });
+    }
+
+    if (customFitPieces.length > 0) {
+      initialList.push({
+        key: 'custom-fit',
+        title: 'Artisanal & Custom Fit Couture',
+        eyebrow: 'MADE TO MEASURE',
+        items: customFitPieces,
+      });
+    }
+
+    if (readyToWear.length > 0) {
+      initialList.push({
+        key: 'almost-gone',
+        title: 'Archive Drops & Ready to Ship',
+        eyebrow: 'IMMEDIATE DISPATCH',
+        items: readyToWear,
+      });
+    }
+
+    return initialList.map((sec) => ({
+      key: sec.key,
+      title: sec.title,
+      subtitle: undefined,
+      emotionalLabel: sec.eyebrow,
+      layout: 'HORIZONTAL_RAIL' as const,
+      sourceType: 'PRODUCT' as const,
+      previewItemLimit: 12,
+      detailPageLimit: 24,
+      minimumItems: 1,
+      viewAll: {
+        enabled: true,
+        key: sec.key,
+        route: `/market/sections/${sec.key}`,
+        label: `Explore ${sec.title}`,
+      },
+      items: sec.items,
+    }));
+  }, [marketSections, matchesFilters, products, sortItems]);
 
   return (
     <div
-      /*
-        The top gap is set here, once. `py-4` gave the same 16px above the
-        first thing on the page as between the rails below it, so the hero
-        looked stuck to the navbar while the page beneath it breathed. A
-        heading needs more room above than the content it heads, and the
-        bottom stays where it was.
-      */
-      className={`mx-auto w-full max-w-[1440px] px-4 pb-4 pt-6 transition-opacity sm:px-6 sm:pt-8 lg:px-8 ${
+      className={`mx-auto w-full max-w-[1440px] px-4 pb-16 pt-5 transition-opacity sm:px-6 sm:pt-7 lg:px-8 ${
         refreshing ? 'opacity-95' : 'opacity-100'
       }`}
     >
-      <div className="space-y-6">
+      <div className="space-y-8 sm:space-y-10">
+        {/* ── 1. Top Component: Flagship Trending Hero (Image 1 Parity) ── */}
         <MarketTrendingHero
           products={trendingToday}
           onOpenProduct={handleOpenProduct}
           onSeeAll={() => setTrendingTodayOpen(true)}
         />
 
-        <FeaturedSection
-          filterType="PRODUCT"
-          onViewProduct={(productId) => {
-            const p = products.find((pr) => pr.id === productId);
-            if (p) handleOpenProduct(p, { source: 'featured_section' });
-          }}
-          onSeeAll={() => setGalleryOpen(true)}
-        />
+        {/* ── 2. Destination Catalog Header & Top Area (Image 2 Parity) ── */}
+        <div className="space-y-4 border-t border-gray-200/70 pt-8 dark:border-white/10">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[color:var(--brand-primary,#9333EA)]">
+                DESTINATION CATALOG
+              </p>
+              <h2 className="mt-1 font-serif text-2xl font-normal tracking-tight text-gray-900 dark:text-white sm:text-3xl">
+                Explore the Market
+              </h2>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 max-w-xl">
+                Discover independent African fashion ateliers, ready-to-wear drops, and bespoke couture.
+              </p>
+            </div>
 
-        {loading ? (
-          <section>
-            <div className="mb-3 h-7 w-40 animate-pulse rounded-lg bg-gray-200/80 dark:bg-white/10" />
-            <div className="flex gap-4 overflow-hidden">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="min-w-[260px] max-w-[260px]">
-                  <ProductCardSkeleton />
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : (
-          <ProductCarousel
-            title="Fresh Drops"
-            products={freshDropsForDisplay}
-            onViewProduct={(product) => handleOpenProduct(product, { source: 'fresh_drops' })}
-          />
-        )}
-
-        <section className="space-y-5">
-          <div className="sticky top-16 z-20 bg-white/[0.72] px-3 py-2 backdrop-blur-md dark:bg-[#0f0b13]/[0.78]">
-            {/* Heading + search row — on small screens header is compact, search hidden */}
-            <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-stretch sm:gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0">
-                <h2 className={MARKET_SECTION_TITLE_CLASS}>Explore the Market</h2>
-              </div>
-              <div className="hidden w-full flex-col gap-3 sm:flex lg:w-auto lg:min-w-[480px] lg:flex-row">
-                <SearchBarWithSuggestions
-                  placeholder="Search products, brands, styles, or tags..."
-                  className="w-full"
-                />
-              </div>
-            </div>
-            <div className="mt-1.5 flex gap-5 overflow-x-auto border-b border-gray-200/80 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10">
-              {availableFilters.map((filter) => {
-                const active = selectedFilter === filter;
-                return (
-                  <button
-                    key={filter}
-                    type="button"
-                    onClick={() => setSelectedFilter(filter)}
-                    aria-pressed={active}
-                    className={`relative whitespace-nowrap pb-3 pt-2 text-sm font-semibold transition-colors ${
-                      active
-                        ? 'text-gray-900 dark:text-white'
-                        : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
-                    }`}
-                  >
-                    {filter === 'FOR_YOU' && 'Discover'}
-                    {filter === 'MENSWEAR' && 'Menswear'}
-                    {filter === 'WOMENSWEAR' && 'Womenswear'}
-                    {filter === 'EVERYBODY' && 'Everybody'}
-                    {filter === 'ON_SALE' && 'On Sale'}
-                    {filter === 'CUSTOM_FIT' && 'Custom Fit'}
-                    <span
-                      aria-hidden="true"
-                      className={`absolute inset-x-0 bottom-0 mx-auto h-0.5 w-7 rounded-full transition-all ${
-                        active ? 'bg-gray-900 dark:bg-white' : 'bg-transparent'
-                      }`}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-            {/* Search visible only on small screens — below the filter chips */}
-            <div className="mt-2 sm:hidden">
+            {/* Global Search Bar */}
+            <div className="w-full lg:max-w-md">
               <SearchBarWithSuggestions
-                placeholder="Search products, brands..."
+                placeholder="Search designers, Aso-Oke, trench..."
                 className="w-full"
               />
             </div>
           </div>
 
-          {error ? (
-            <div className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
-              {error}
-            </div>
-          ) : null}
+          {/* Audience Filter Chips Row */}
+          <div className="flex items-center gap-2 overflow-x-auto border-b border-gray-200/80 pb-2.5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10">
+            {availableFilters.map((filter) => {
+              const active = selectedAudienceFilter === filter;
+              return (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setSelectedAudienceFilter(filter)}
+                  aria-pressed={active}
+                  className={`relative whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition-all ${
+                    active
+                      ? 'bg-purple-700 text-white shadow-sm'
+                      : 'bg-gray-100/80 text-gray-600 hover:bg-gray-200/70 hover:text-gray-900 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
+                  }`}
+                >
+                  {filter === 'FOR_YOU' && 'Discover •'}
+                  {filter === 'MENSWEAR' && 'Menswear'}
+                  {filter === 'WOMENSWEAR' && 'Womenswear'}
+                  {filter === 'EVERYBODY' && 'Everybody (genderless)'}
+                  {filter === 'ON_SALE' && 'On Sale Archive'}
+                  {filter === 'CUSTOM_FIT' && 'Custom Fit'}
+                </button>
+              );
+            })}
+          </div>
 
-          {loading ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 12 }).map((_, index) => (
-                <ProductCardSkeleton key={index} />
-              ))}
-            </div>
-          ) : generalMarketProducts.length === 0 && outOfStockCustomOrderProducts.length === 0 ? (
-            <div className="rounded-2xl border border-gray-200 bg-white/70 p-10 text-center dark:border-white/10 dark:bg-white/5">
-              <p className="text-3xl">🧭</p>
-              <h3 className="mt-3 text-xl font-bold text-gray-900 dark:text-white">No products matched this view</h3>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Try another market filter or use the global search bar above for broader discovery.</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedFilter('FOR_YOU');
-                }}
-                className="mt-5 rounded-full border border-gray-300 px-5 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100 dark:border-white/15 dark:text-gray-200 dark:hover:bg-white/10"
+          {/* Secondary Filter & Sort Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-gray-600 dark:text-gray-400 pt-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-medium text-gray-500 dark:text-gray-400">Filter by:</span>
+
+              {/* Craftsmanship Type Dropdown */}
+              <select
+                value={craftsmanshipFilter}
+                onChange={(e) => setCraftsmanshipFilter(e.target.value)}
+                className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-medium text-gray-800 shadow-sm transition hover:border-gray-300 dark:border-white/10 dark:bg-[#181322] dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-500"
               >
-                Reset view
-              </button>
+                <option value="ALL">All Craftsmanship</option>
+                <option value="READY_TO_WEAR">Ready to Wear</option>
+                <option value="CUSTOM_FIT">Custom Fit / Bespoke</option>
+              </select>
+
+              {/* Price Range Dropdown */}
+              <select
+                value={priceRangeFilter}
+                onChange={(e) => setPriceRangeFilter(e.target.value)}
+                className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-medium text-gray-800 shadow-sm transition hover:border-gray-300 dark:border-white/10 dark:bg-[#181322] dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              >
+                <option value="ALL">All Price Ranges</option>
+                <option value="UNDER_100K">Under ₦100,000</option>
+                <option value="100K_300K">₦100,000 - ₦300,000</option>
+                <option value="300K_500K">₦300,000 - ₦500,000</option>
+                <option value="ABOVE_500K">Above ₦500,000</option>
+              </select>
             </div>
-          ) : (
-            <>
-              {visibleProducts.length > 0 ? (
-                <>
-                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 md:gap-5">
-                    {visibleProducts.map((product, index) => (
-                      <motion.div
-                        key={product.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="w-full"
-                      >
-                        <StoreProductCard
-                          product={product}
-                          priority={index < 3}
-                          onViewProduct={(selected) =>
-                            handleOpenProduct(selected, { source: 'market_grid' })
-                          }
-                        />
-                      </motion.div>
-                    ))}
-                  </div>
 
-                  {visibleCount < generalMarketProducts.length && (
-                    <div className="flex justify-center pt-4">
-                      <button
-                        type="button"
-                        onClick={() => setVisibleCount((prev) => prev + 18)}
-                        className="rounded-full border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-100 dark:border-white/15 dark:bg-white/5 dark:text-gray-100 dark:hover:bg-white/10"
-                      >
-                        Load more items
-                      </button>
+            <div className="flex items-center gap-3">
+              <span>
+                Showing <strong className="font-semibold text-gray-900 dark:text-white">{processedSections.length}</strong> curated sections
+              </span>
+              <span>•</span>
+              <div className="flex items-center gap-1.5">
+                <span>Sort:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1 font-semibold text-gray-800 shadow-sm dark:border-white/10 dark:bg-[#181322] dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                >
+                  <option value="EDITORIAL">Curated Editorial</option>
+                  <option value="NEWEST">Newest Drops</option>
+                  <option value="PRICE_LOW">Price: Low to High</option>
+                  <option value="PRICE_HIGH">Price: High to Low</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 3. 100% Section-Driven Rails (Zero Vertical Infinite Grid on Home) ── */}
+        {loading ? (
+          <div className="space-y-8">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="space-y-3">
+                <div className="h-6 w-48 animate-pulse rounded-lg bg-gray-200 dark:bg-white/10" />
+                <div className="flex gap-4 overflow-hidden">
+                  {Array.from({ length: 4 }).map((__, j) => (
+                    <div key={j} className="w-[300px] shrink-0">
+                      <ProductCardSkeleton />
                     </div>
-                  )}
-                </>
-              ) : (
-                <div className="rounded-2xl border border-amber-300/70 bg-amber-50/80 p-5 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-                  No in-stock products matched this view. Custom-order-only pieces that are temporarily out of stock are still available below.
+                  ))}
                 </div>
-              )}
-
-              {outOfStockCustomOrderProducts.length > 0 ? (
-                <section className="space-y-4 rounded-2xl border border-amber-300/70 bg-amber-50/60 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
-                  <div className="space-y-1">
-                    <h3 className="text-lg font-black text-gray-900 dark:text-white">Out Of Stock, Still Open For Custom Orders</h3>
-                    <p className="text-sm text-gray-700 dark:text-amber-100/90">
-                      These products are sold out for standard checkout, but brands still accept custom-order bags. If they are not restocked within 7 days, they leave the market automatically.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 md:gap-5">
-                    {outOfStockCustomOrderProducts.map((product) => (
-                      <motion.div
-                        key={`custom-order-only-${product.id}`}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="w-full"
-                      >
-                        <StoreProductCard
-                          product={product}
-                          onViewProduct={(selected) =>
-                            handleOpenProduct(selected, {
-                              source: 'custom_order_out_of_stock',
-                            })
-                          }
-                        />
-                      </motion.div>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-            </>
-          )}
-        </section>
-
-        {/* Discovery rails after Explore Market so users reach the product grid faster.
-            Picked For You is intentionally last among these rails. */}
-        {!loading && primaryPreviewSections.length > 0 ? (
-          <div className="space-y-5 sm:space-y-6">
-            {primaryPreviewSections.map((section) => (
-              <MarketSectionPreviewRail
+              </div>
+            ))}
+          </div>
+        ) : processedSections.length > 0 ? (
+          <div className="space-y-10 sm:space-y-12">
+            {processedSections.map((section) => (
+              <MarketSectionRail
                 key={section.key}
                 section={section}
-                compact
-                onViewProduct={handleOpenSectionProduct}
+                title={section.title}
+                eyebrow={section.emotionalLabel ?? undefined}
+                items={section.items}
+                onViewProduct={(product) => handleOpenProduct(product, { source: `section_${section.key}` })}
                 onOpenItem={handleOpenSectionItem}
                 onTrackSignal={trackMarketSignal}
-                onHideItem={handleHideMarketSectionItem}
-                onViewAll={handleViewAllSection}
+                onExploreSection={handleExploreSection}
               />
             ))}
           </div>
-        ) : null}
-
-        {!loading && pickedForYouSection ? (
-          <MarketSectionPreviewRail
-            section={pickedForYouSection}
-            compact
-            onViewProduct={handleOpenSectionProduct}
-            onOpenItem={handleOpenSectionItem}
-            onTrackSignal={trackMarketSignal}
-            onHideItem={handleHideMarketSectionItem}
-            onViewAll={handleViewAllSection}
-          />
-        ) : null}
+        ) : (
+          <div className="rounded-3xl border border-gray-200 bg-white/70 p-12 text-center shadow-sm dark:border-white/10 dark:bg-white/5">
+            <p className="text-3xl">🧭</p>
+            <h3 className="mt-3 font-serif text-xl font-bold text-gray-900 dark:text-white">
+              No sections matched your filter criteria
+            </h3>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              Try switching back to &apos;Discover •&apos; or resetting your craftsmanship and price filters.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedAudienceFilter('FOR_YOU');
+                setCraftsmanshipFilter('ALL');
+                setPriceRangeFilter('ALL');
+                setSortBy('EDITORIAL');
+              }}
+              className="mt-5 rounded-full bg-purple-700 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-md transition hover:bg-purple-600 active:scale-95"
+            >
+              Reset Filters
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* ── Product Quick Detail Overlay ── */}
       <AnimatePresence>
         {selectedProduct && (
           <OverlayPortal>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-layer-modal bg-black/60 p-3 backdrop-blur-sm sm:p-6 flex items-center justify-center"
-          >
             <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 18 }}
-              className="mx-auto max-h-[92vh] w-full max-w-6xl overflow-y-auto overscroll-contain rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-[#120d18] sm:p-6 glass-scrollbar flex flex-col"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-layer-modal bg-black/60 p-3 backdrop-blur-sm sm:p-6 flex items-center justify-center"
             >
-              <div className="mb-3 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setSelectedProduct(null)}
-                  className="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:border-white/20 dark:text-gray-200 dark:hover:bg-white/10"
-                >
-                  ✖ Close
-                </button>
-              </div>
-              <InlineProductDetail
-                product={selectedProduct}
-                onBack={() => setSelectedProduct(null)}
-                brandName={selectedProduct.brand?.name}
-              />
+              <motion.div
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 18 }}
+                className="mx-auto max-h-[92vh] w-full max-w-6xl overflow-y-auto overscroll-contain rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-[#120d18] sm:p-6 glass-scrollbar flex flex-col"
+              >
+                <div className="mb-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProduct(null)}
+                    className="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:border-white/20 dark:text-gray-200 dark:hover:bg-white/10"
+                  >
+                    ✖ Close
+                  </button>
+                </div>
+                <InlineProductDetail
+                  product={selectedProduct}
+                  onBack={() => setSelectedProduct(null)}
+                  brandName={selectedProduct.brand?.name}
+                />
+              </motion.div>
             </motion.div>
-          </motion.div>
           </OverlayPortal>
         )}
       </AnimatePresence>
 
-      <FeaturedGalleryModal open={galleryOpen} onClose={() => setGalleryOpen(false)} />
-
+      {/* ── Full Editorial Queue Modal (Trending Today) ── */}
       <MarketTrendingTodayModal
         open={trendingTodayOpen}
         products={trendingToday}
