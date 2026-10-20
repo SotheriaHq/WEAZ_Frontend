@@ -2,8 +2,80 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Market Redesign & Embedded Sections E2E', () => {
   test.beforeEach(async ({ page }) => {
-    // Intercept Market APIs to provide consistent mock responses across all viewports
-    await page.route('**/api/v1/market/feed*', async (route) => {
+    // Intercept Store Products and Market APIs to provide consistent mock responses across all viewports
+    const mockStoreProducts = [
+      {
+        id: 'prod-1',
+        name: 'Heritage Embroidered Agbada',
+        description: 'Lagos Couture Atelier',
+        brand: { id: 'brand-1', name: 'Deola Atelier' },
+        price: 185000,
+        effectivePrice: 185000,
+        currency: 'NGN',
+        thumbnail: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35',
+        images: ['https://images.unsplash.com/photo-1594938298603-c8148c4dae35'],
+        isCustomOrderOnly: false,
+        customAvailable: true,
+        createdAt: '2026-10-18T10:00:00.000Z',
+      },
+      {
+        id: 'prod-2',
+        name: 'Structured Indigo Trench',
+        description: 'Oshogbo Dye House',
+        brand: { id: 'brand-2', name: 'Post-Imperial' },
+        price: 95000,
+        effectivePrice: 95000,
+        currency: 'NGN',
+        thumbnail: 'https://images.unsplash.com/photo-1509631179647-0177331693ae',
+        images: ['https://images.unsplash.com/photo-1509631179647-0177331693ae'],
+        isCustomOrderOnly: false,
+        customAvailable: false,
+        createdAt: '2026-10-18T09:00:00.000Z',
+      },
+      {
+        id: 'prod-3',
+        name: 'Silk Organza Draped Dress',
+        description: 'Eko Fashion Week Edit',
+        brand: { id: 'brand-3', name: 'Kenneth Ize' },
+        price: 240000,
+        effectivePrice: 240000,
+        currency: 'NGN',
+        thumbnail: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f',
+        images: ['https://images.unsplash.com/photo-1515886657613-9f3515b0c78f'],
+        isCustomOrderOnly: true,
+        customAvailable: true,
+        createdAt: '2026-10-18T08:00:00.000Z',
+      },
+      {
+        id: 'prod-4',
+        name: 'Minimalist Linen Kaftan',
+        description: 'Abuja Atelier',
+        brand: { id: 'brand-4', name: 'Orange Culture' },
+        price: 48000,
+        effectivePrice: 48000,
+        currency: 'NGN',
+        thumbnail: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b',
+        images: ['https://images.unsplash.com/photo-1539109136881-3be0616acf4b'],
+        isCustomOrderOnly: false,
+        customAvailable: true,
+        createdAt: '2026-10-18T07:00:00.000Z',
+      },
+    ];
+
+    await page.route((url) => url.pathname.includes('/store/products'), async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            items: mockStoreProducts,
+            pagination: { hasNextPage: false, nextCursor: null },
+          },
+        }),
+      });
+    });
+
+    await page.route((url) => url.pathname.includes('/market/feed'), async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -90,7 +162,9 @@ test.describe('Market Redesign & Embedded Sections E2E', () => {
       });
     });
 
-    await page.route('**/api/v1/market/sections*', async (route) => {
+    await page.route(
+      (url) => url.pathname.endsWith('/market/sections') || url.pathname.includes('/market/sections?'),
+      async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -192,7 +266,7 @@ test.describe('Market Redesign & Embedded Sections E2E', () => {
       });
     });
 
-    await page.route('**/api/v1/market/sections/fresh-drops*', async (route) => {
+    await page.route((url) => url.pathname.includes('/market/sections/fresh-drops'), async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -249,7 +323,7 @@ test.describe('Market Redesign & Embedded Sections E2E', () => {
       });
     });
 
-    await page.route('**/api/v1/market/suggestions*', async (route) => {
+    await page.route((url) => url.pathname.includes('/market/suggestions'), async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -315,9 +389,10 @@ test.describe('Market Redesign & Embedded Sections E2E', () => {
     const heroComponent = page.locator('[data-testid="market-trending-hero"]');
     await expect(heroComponent).toBeVisible();
 
-    // Verify #1 Badge and Naira Price
-    await expect(page.getByText('#1 TRENDING ON WIEZ')).toBeVisible();
-    await expect(heroComponent.getByText(/₦/)).toBeVisible();
+    // Verify Trending Headline, Badge, and Naira Price
+    await expect(page.getByText(/Trending now on/i)).toBeVisible();
+    await expect(page.getByText(/HANDCRAFTED|HANDPICKED/i)).toBeVisible();
+    await expect(heroComponent.getByText(/₦/).first()).toBeVisible();
     await expect(page.getByText('CUSTOM FIT ORDER →')).toBeVisible();
 
     // Verify right column queue (#2, #3, #4 badges)
@@ -328,7 +403,7 @@ test.describe('Market Redesign & Embedded Sections E2E', () => {
     const heroBox = await heroComponent.boundingBox();
     expect(heroBox).not.toBeNull();
 
-    const destinationCatalog = page.locator('main, section').filter({ hasText: 'Destination Catalog' }).first();
+    const destinationCatalog = page.locator('section').filter({ hasText: 'Destination Catalog' }).first();
     if (await destinationCatalog.isVisible()) {
       const catalogBox = await destinationCatalog.boundingBox();
       if (catalogBox && heroBox) {
@@ -337,25 +412,31 @@ test.describe('Market Redesign & Embedded Sections E2E', () => {
     }
 
     // 3. Section Rail & Explore Links Verification
-    const exploreFreshDropsLink = page.getByRole('link', { name: /Explore Fresh Drops/i }).first();
-    await expect(exploreFreshDropsLink).toBeVisible();
+    const exploreFreshDropsBtn = page.getByRole('button', { name: /Explore/i }).first();
+    await expect(exploreFreshDropsBtn).toBeVisible();
+
+    // Verify End-of-Rail Explore Card is present
+    await expect(page.getByText('Sector Archive').first()).toBeVisible();
+    await expect(page.getByText(/Explore All/i).first()).toBeVisible();
 
     // 4. Click Explore Fresh Drops -> Navigates to Section Page
-    await exploreFreshDropsLink.click();
-    await expect(page).toHaveURL(/\/market\/sections\/fresh-drops/);
+    await exploreFreshDropsBtn.click();
+    await expect(page).toHaveURL(/\/market\/sections/);
 
     // 5. Section Detail Page Elements
     await expect(page.getByText('Back to Market')).toBeVisible();
     await expect(page.getByText(/Fresh Drops/i).first()).toBeVisible();
 
-    // Check Embedded Curations (Anti-Repetition: Section does not repeat itself)
-    const embeddedSectionHeading = page.getByText(/Embedded Curations in this Sector/i);
+    // Check Embedded Curations (Anti-Repetition: Main market section titles like 'loved near you' must NOT appear)
+    const embeddedSectionHeading = page.getByText(/Curated Suggestions & Sub-Themes for this Sector/i);
     if (await embeddedSectionHeading.isVisible()) {
-      // Bespoke Suiting sub-section should be present
-      await expect(page.getByText('Bespoke Suiting & Tailoring')).toBeVisible();
-      // But fresh-drops itself must NOT be duplicated inside embedded rails
-      const embeddedRails = page.locator('section').filter({ hasText: 'Embedded Curations' });
+      // Bespoke Suiting sub-section should be present from suggestions
+      await expect(page.getByText('Bespoke Suiting & Tailoring').first()).toBeVisible();
+      // But main market sections must NOT be duplicated inside embedded rails
+      const embeddedRails = page.locator('section').filter({ hasText: 'Curated Suggestions' });
       await expect(embeddedRails.getByText('Fresh Drops & New Arrivals')).toHaveCount(0);
+      await expect(embeddedRails.getByText('Highest Sales & Most Coveted')).toHaveCount(0);
+      await expect(embeddedRails.getByText('Loved Near You')).toHaveCount(0);
     }
 
     // Verify Filter Toolbar
