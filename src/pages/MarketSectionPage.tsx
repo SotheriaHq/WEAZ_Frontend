@@ -15,7 +15,6 @@ import {
   type MarketSection,
   type MarketSectionDetailResponse,
   type MarketSectionItem,
-  type MarketSectionsResponse,
 } from '@/api/MarketApi';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import InlineProductDetail from '@/components/catalog/InlineProductDetail';
@@ -36,6 +35,46 @@ import { useScrollRestore } from '@/components/ScrollRestoreProvider';
 import { useScrollLock } from '@/hooks/useScrollLock';
 
 const SECTION_DETAIL_LIMIT = 24;
+
+const MAIN_MARKET_SECTION_KEYS = new Set([
+  'hot-right-now',
+  'fresh-drops',
+  'picked-for-you',
+  'new-designers-to-watch',
+  'shop-by-style',
+  'loved-near-you',
+  'shop-the-look',
+  'almost-gone',
+  'still-thinking-about-these',
+  'more-from-brands-you-like',
+  'style-picks-of-the-week',
+  'latest-collections',
+  'adire',
+  'bestsellers-row',
+  'fresh-row',
+  'custom-ready-row',
+  'for-moodboard',
+]);
+
+const MAIN_MARKET_SECTION_TITLES = new Set([
+  'loved near you',
+  'hot right now',
+  'fresh drops',
+  'fresh on wiez',
+  'picked for you',
+  'new designers to watch',
+  'shop by style',
+  'shop the look',
+  'almost gone',
+  'still thinking about these',
+  'more from brands you like',
+  'style picks of the week',
+  'latest collections',
+  'adire casual',
+  'highest sales & most coveted',
+  'artisanal custom fit runway',
+  'for your moodboard',
+]);
 
 type FilterChip = 'ALL' | 'READY_TO_WEAR' | 'CUSTOM_FIT' | 'UNDER_50K' | '50K_150K' | 'ABOVE_150K';
 type SortOption = 'trending' | 'price_asc' | 'price_desc' | 'newest';
@@ -190,14 +229,7 @@ const MarketSectionPage: React.FC = () => {
         : undefined,
   });
 
-  // 2. Fetch Complementary Market Sections
-  const { data: allSectionsData } = useQuery<MarketSectionsResponse>({
-    queryKey: queryKeys.market.sections({ anonymousSessionId }),
-    queryFn: () => marketApi.getMarketSections({ anonymousSessionId }),
-    staleTime: 60 * 1000,
-  });
-
-  // 3. Fetch Suggestion Blocks for this Section
+  // 2. Fetch Suggestion Blocks for this Section
   const { data: suggestionData } = useQuery({
     queryKey: queryKeys.market.suggestions({
       context: 'MARKET_SECTION_DETAIL',
@@ -354,14 +386,17 @@ const MarketSectionPage: React.FC = () => {
   const hasNextPage = Boolean(section?.pagination?.hasNextPage && section.pagination.nextCursor);
 
   // 4. Curated & Strict Deduplication of Embedded Fashion Sub-Sections:
-  // "SO, each screens can also have imbeeded sections. But no section repition on screens or home."
+  // Strictly EXCLUDE any main market sections (no "loved near you", "hot right now", etc.).
+  // Only display suggestion blocks and thematic partitions of this section's own items.
   const embeddedSubSections = useMemo(() => {
     const excludedKeys = new Set<string>([
       normalizedSectionKey.toLowerCase(),
       ...(parentKey ? [parentKey.toLowerCase()] : []),
+      ...Array.from(MAIN_MARKET_SECTION_KEYS),
     ]);
     const seenTitles = new Set<string>([
       (section?.title || '').trim().toLowerCase(),
+      ...Array.from(MAIN_MARKET_SECTION_TITLES),
     ]);
 
     const result: Array<{
@@ -372,7 +407,39 @@ const MarketSectionPage: React.FC = () => {
       section: MarketSection;
     }> = [];
 
-    // Source A: Thematic partitions of current section items (category or tag based)
+    // Source A: Suggestion blocks from backend suggestion service
+    if (suggestionData?.blocks) {
+      for (const block of suggestionData.blocks) {
+        const blockKey = block.blockKey.toLowerCase();
+        const titleLower = block.title.trim().toLowerCase();
+        if (
+          block.items &&
+          block.items.length >= 2 &&
+          !excludedKeys.has(blockKey) &&
+          !seenTitles.has(titleLower)
+        ) {
+          excludedKeys.add(blockKey);
+          seenTitles.add(titleLower);
+          result.push({
+            key: block.blockKey,
+            title: block.title,
+            emotionalLabel: 'CURATED SUGGESTIONS',
+            items: block.items,
+            section: {
+              key: block.blockKey,
+              title: block.title,
+              subtitle: block.subtitle || 'Personalized and complementary recommendations',
+              emotionalLabel: 'CURATED SUGGESTIONS',
+              layout: 'HORIZONTAL_RAIL',
+              sourceType: 'PRODUCT',
+              items: block.items,
+            },
+          });
+        }
+      }
+    }
+
+    // Source B: Thematic partitions of current section items (category or tag based)
     const itemsByCategory = new Map<string, MarketSectionItem[]>();
     for (const it of items) {
       const cat = it.category?.name || (it.tags && it.tags[0]) || null;
@@ -394,13 +461,13 @@ const MarketSectionPage: React.FC = () => {
           result.push({
             key: subKey,
             title: catName,
-            emotionalLabel: 'ATELIER THEME',
+            emotionalLabel: 'ATELIER FOCUS',
             items: catItems,
             section: {
               key: subKey,
               title: catName,
               subtitle: `Curated ${catName} pieces inside ${section?.title || 'this section'}`,
-              emotionalLabel: 'ATELIER THEME',
+              emotionalLabel: 'ATELIER FOCUS',
               layout: 'HORIZONTAL_RAIL',
               sourceType: 'PRODUCT',
               items: catItems,
@@ -410,65 +477,9 @@ const MarketSectionPage: React.FC = () => {
       }
     }
 
-    // Source B: Suggestion blocks from backend
-    if (suggestionData?.blocks) {
-      for (const block of suggestionData.blocks) {
-        const blockKey = block.blockKey.toLowerCase();
-        const titleLower = block.title.trim().toLowerCase();
-        if (
-          block.items &&
-          block.items.length >= 2 &&
-          !excludedKeys.has(blockKey) &&
-          !seenTitles.has(titleLower)
-        ) {
-          excludedKeys.add(blockKey);
-          seenTitles.add(titleLower);
-          result.push({
-            key: block.blockKey,
-            title: block.title,
-            emotionalLabel: 'RELATED FOCUS',
-            items: block.items,
-            section: {
-              key: block.blockKey,
-              title: block.title,
-              subtitle: block.subtitle || 'Complementary editorial curation',
-              emotionalLabel: 'RELATED FOCUS',
-              layout: 'HORIZONTAL_RAIL',
-              sourceType: 'PRODUCT',
-              items: block.items,
-            },
-          });
-        }
-      }
-    }
-
-    // Source C: Complementary API sections from Market
-    if (allSectionsData?.sections) {
-      for (const apiSec of allSectionsData.sections) {
-        const secKey = apiSec.key.toLowerCase();
-        const titleLower = apiSec.title.trim().toLowerCase();
-        if (
-          apiSec.items &&
-          apiSec.items.length >= 2 &&
-          !excludedKeys.has(secKey) &&
-          !seenTitles.has(titleLower)
-        ) {
-          excludedKeys.add(secKey);
-          seenTitles.add(titleLower);
-          result.push({
-            key: apiSec.key,
-            title: apiSec.title,
-            emotionalLabel: apiSec.emotionalLabel || 'FASHION SECTOR',
-            items: apiSec.items,
-            section: apiSec,
-          });
-        }
-      }
-    }
-
-    // Return at most 3 embedded sub-sections to keep the screen focused & elegant
+    // Return at most 3 embedded sub-sections
     return result.slice(0, 3);
-  }, [allSectionsData?.sections, items, normalizedSectionKey, parentKey, section?.title, suggestionData?.blocks]);
+  }, [items, normalizedSectionKey, parentKey, section?.title, suggestionData?.blocks]);
 
   // 5. Client-Side Filtering & Sorting of the Primary Catalog Grid
   const filteredAndSortedItems = useMemo(() => {
@@ -555,44 +566,7 @@ const MarketSectionPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Embedded Fashion Sub-Sections (if any exist) */}
-      {embeddedSubSections.length > 0 && (
-        <section className="space-y-8 pt-2 border-t border-gray-100 dark:border-white/5">
-          <div className="flex items-center gap-2">
-            <Layers className="h-4 w-4 text-primary" />
-            <span className="text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
-              Embedded Curations in this Sector
-            </span>
-          </div>
-
-          <div className="space-y-12">
-            {embeddedSubSections.map((subSec) => (
-              <MarketSectionRail
-                key={subSec.key}
-                section={subSec.section}
-                title={subSec.title}
-                eyebrow={subSec.emotionalLabel}
-                items={subSec.items}
-                onViewProduct={(product) => setSelectedProduct(product)}
-                onOpenItem={(it) => {
-                  const prod = mapSectionProductToMarketplaceProduct(it);
-                  if (prod) {
-                    setSelectedProduct(prod);
-                  } else if (it.target?.route) {
-                    navigate(it.target.route);
-                  }
-                }}
-                onTrackSignal={trackMarketSignal}
-                onExploreSection={(secKey) =>
-                  navigate(`/market/sections/${encodeURIComponent(secKey)}?parent=${encodeURIComponent(normalizedSectionKey)}`)
-                }
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Section Catalog: Interactive Filter & Sort Toolbar */}
+      {/* Section Catalog: Primary Content Owned by this Screen */}
       <section className="space-y-6 pt-4">
         <div className="flex flex-col gap-4 border-b border-gray-200/80 pb-5 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -741,6 +715,43 @@ const MarketSectionPage: React.FC = () => {
           </>
         )}
       </section>
+
+      {/* Unique Thematic Sub-Sections & Suggestions Displayed UNDER the Main Section Catalog */}
+      {embeddedSubSections.length > 0 && (
+        <section className="space-y-8 pt-8 border-t border-gray-200/80 dark:border-white/10">
+          <div className="flex items-center gap-2">
+            <Layers className="h-4 w-4 text-primary" />
+            <span className="text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
+              Curated Suggestions & Sub-Themes for this Sector
+            </span>
+          </div>
+
+          <div className="space-y-12">
+            {embeddedSubSections.map((subSec) => (
+              <MarketSectionRail
+                key={subSec.key}
+                section={subSec.section}
+                title={subSec.title}
+                eyebrow={subSec.emotionalLabel}
+                items={subSec.items}
+                onViewProduct={(product) => setSelectedProduct(product)}
+                onOpenItem={(it) => {
+                  const prod = mapSectionProductToMarketplaceProduct(it);
+                  if (prod) {
+                    setSelectedProduct(prod);
+                  } else if (it.target?.route) {
+                    navigate(it.target.route);
+                  }
+                }}
+                onTrackSignal={trackMarketSignal}
+                onExploreSection={(secKey) =>
+                  navigate(`/market/sections/${encodeURIComponent(secKey)}?parent=${encodeURIComponent(normalizedSectionKey)}`)
+                }
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Quick View Modal */}
       <AnimatePresence>
