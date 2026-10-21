@@ -1,3 +1,5 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { creatorCategoriesOptions, creatorFiltersOptions } from '@/query/creatorMetadataQueries';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -25,15 +27,41 @@ import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 import { useCachedResource } from '@/hooks/useCachedResource';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
+import { getStudioProductsPage } from '@/api/StudioStoreApi';
+import { useBrandCommerceAccess } from '@/hooks/useBrandCommerceAccess';
+import { resolveAccountDisplayName } from '@/lib/brandAccess';
 import VerifiedBrandBadge from '@/components/brand/VerifiedBrandBadge';
 
 export default function StoreManagement() {
+  const creatorQueryClient = useQueryClient();
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void creatorQueryClient.prefetchQuery(creatorCategoriesOptions);
+      void creatorQueryClient.prefetchQuery(creatorFiltersOptions);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [creatorQueryClient]);
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user.profile);
   const embeddedSurface = useEmbeddedSurface();
   const isEmbeddedMobile = embeddedSurface === 'mobile-app';
   const showStudioFloatingControls = location.pathname.startsWith('/studio');
+
+  const commerce = useBrandCommerceAccess();
+  const initialStatus = new URLSearchParams(location.search).get('status') || 'all';
+  useCachedResource({
+    queryKey: ['store', 'panel', 'products', user?.id ?? 'anon', 1, 12, 'newest', null, '', 'all', initialStatus],
+    enabled: Boolean(user?.id) && new URLSearchParams(location.search).get('view') !== 'collections',
+    queryFn: ({ signal }) => getStudioProductsPage(user!.id, {
+      page: 1, limit: 12, sortBy: 'newest',
+      isActive: initialStatus === 'active' ? true : undefined,
+      publicationStatus: initialStatus === 'draft' ? 'DRAFT' : undefined,
+      isFeatured: initialStatus === 'featured' ? true : undefined,
+      includeDeleted: initialStatus === 'deleted' ? true : undefined,
+      onlyDeleted: initialStatus === 'deleted' ? true : undefined,
+    }, signal),
+  });
 
   const [analyticsOpen] = useState(true);
   const [analyticsCollapsed, setAnalyticsCollapsed] = useState(true);
@@ -44,52 +72,36 @@ export default function StoreManagement() {
   // (skeleton ONLY on the true first load); stale data revalidates silently.
   // This replaces the legacy useState+useEffect fetches that re-skeletoned the
   // Store tab on every navigation (client-reported).
-  const {
-    data: statusBundle,
-    loading,
-    error: statusError,
-  } = useCachedResource<{
-    status: StoreStatusResponse;
-    verification: VerificationStatusResponse | null;
-  }>({
+  const { data: status, loading, error: statusError } = useCachedResource<StoreStatusResponse>({
     queryKey: ['store', 'management', 'status', user?.id ?? 'anon'],
+    retainPreviousData: false,
+    enabled: Boolean(user?.id),
     staleTime: 60_000,
     queryFn: async () => {
-      const verificationRequest = user?.id
-        ? brandApi
-            .getVerificationStatus(user.id, { force: true })
-            .catch(() => null)
-        : Promise.resolve<VerificationStatusResponse | null>(null);
-      let s = await getStoreStatus();
-
-      if (!s?.isStoreOpen && isStoreOpenPending(user?.id)) {
+      let current = await getStoreStatus();
+      if (!current?.isStoreOpen && isStoreOpenPending(user?.id)) {
         for (let attempt = 0; attempt < 5; attempt += 1) {
           await sleep(500);
-          try {
-            const retryStatus = await getStoreStatus();
-            s = retryStatus;
-            if (retryStatus?.isStoreOpen) {
-              break;
-            }
-          } catch {
-            // Keep trying while in pending-open grace period.
-          }
+          current = await getStoreStatus();
+          if (current?.isStoreOpen) break;
         }
       }
-
-      const verificationData = await verificationRequest;
-      return { status: s, verification: verificationData };
+      return current;
     },
   });
-  const status = statusBundle?.status ?? null;
-  const verification = statusBundle?.verification ?? null;
-
+  const { data: verification = null } = useCachedResource<VerificationStatusResponse | null>({
+    queryKey: ['store', 'management', 'verification', user?.id ?? 'anon'],
+    retainPreviousData: false,
+    enabled: Boolean(user?.id && status?.isStoreOpen),
+    queryFn: () => brandApi.getVerificationStatus(user!.id),
+  });
   const { data: overviewBundle } = useCachedResource<{
     overview: any;
     analytics: any;
   }>({
     queryKey: ['store', 'management', 'overview', user?.id ?? 'anon'],
-    enabled: Boolean(user?.id),
+    retainPreviousData: false,
+    enabled: Boolean(user?.id && !analyticsCollapsed),
     queryFn: async () => {
       try {
         const [overviewData, analyticsData] = await Promise.all([
@@ -123,32 +135,6 @@ export default function StoreManagement() {
   const overview = overviewBundle?.overview ?? null;
   const analytics = overviewBundle?.analytics ?? null;
 
-  const { data: draftCollections = [], loading: draftCollectionsLoading } =
-    useCachedResource<any[]>({
-      queryKey: [
-        'store',
-        'management',
-        'draft-collections',
-        user?.id ?? 'anon',
-      ],
-      enabled: Boolean(user?.id),
-      queryFn: async () => {
-        const collections = await brandApi.getCollections(user!.id, {
-          visibility: 'all',
-          scope: 'store',
-        });
-        return (collections || []).filter((collection: any) => {
-          const collectionStatus = String(
-            collection?.status || '',
-          ).toUpperCase();
-          return (
-            collectionStatus === 'DRAFT' &&
-            collection?.isSystemGenerated !== true
-          );
-        });
-      },
-    });
-
   const resolvedAvatar = useMemo(
     () =>
       resolveProfileImageSource({
@@ -165,17 +151,16 @@ export default function StoreManagement() {
   const avatarFallback = useMemo(
     () =>
       getAvatarFallback(
-        `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim(),
+        resolveAccountDisplayName(user),
         user?.username,
       ),
-    [user?.firstName, user?.lastName, user?.username],
+    [user],
   );
 
   const brandName = useMemo(() => {
     if (status?.profile?.name) return status.profile.name;
     if (user?.brandFullName) return user.brandFullName;
-    const fullName = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim();
-    return fullName || user?.username || 'Your Store';
+    return resolveAccountDisplayName(user) || 'Your Store';
   }, [
     status?.profile?.name,
     user?.brandFullName,
@@ -223,7 +208,7 @@ export default function StoreManagement() {
     user?.verificationStatus ??
     'NOT_SUBMITTED';
   const verificationBadgeVisible =
-    verification?.badgeState.verificationBadgeVisible ??
+    verification?.badgeState?.verificationBadgeVisible ??
     user?.verificationBadgeVisible ??
     false;
   const verificationInProgress =
@@ -298,8 +283,8 @@ export default function StoreManagement() {
   // Redirects derive from the cached status — they run on both fresh fetches
   // and instant cache paints, so draft stores still bounce to setup.
   useEffect(() => {
-    if (statusBundle) {
-      const s = statusBundle.status;
+    if (status) {
+      const s = status;
       if (s?.isStoreOpen) {
         clearStoreOpenPending(user?.id);
         return;
@@ -323,7 +308,7 @@ export default function StoreManagement() {
       }
       toast.error('Failed to load store status');
     }
-  }, [statusBundle, statusError, navigate, user?.id]);
+  }, [status, statusError, navigate, user?.id]);
 
   if (loading) {
     return <StudioPageSkeleton variant="dashboard" />;
@@ -370,8 +355,9 @@ export default function StoreManagement() {
       ) : null}
 
       <div className="sticky top-0 z-30">
-        <div className="rounded-none border-0 bg-transparent px-1 py-2 shadow-none backdrop-blur-none md:rounded-2xl md:border md:border-gray-200/60 md:bg-white/90 md:px-4 md:py-3 md:shadow-lg md:backdrop-blur-xl md:dark:border-white/10 md:dark:bg-[#111118]/90">
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="bg-transparent px-1 py-2 md:py-3">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start gap-3">
             <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl border-2 border-white shadow-md dark:border-white/10">
               {avatarUrl ? (
                 <MediaRenderer
@@ -389,24 +375,23 @@ export default function StoreManagement() {
               )}
             </div>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
               <h1 className="break-words text-base font-bold leading-tight text-theme">
                 {brandName}
               </h1>
-              <p className="mt-0.5 break-words text-xs leading-tight text-theme-secondary">
+              <p className="mt-0.5 break-words text-sm leading-relaxed text-theme-secondary">
                 {brandDescription}
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                navigate('/settings?tab=subscription-billing&from=studio')
-              }
-              className="min-h-11 py-2 text-sm font-bold tracking-wide text-purple-700 hover:underline dark:text-purple-300"
-            >
-              UPGRADE
-            </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+            {commerce.data?.canUpgrade && !isEmbeddedMobile ? (
+              <button type="button" onClick={() => navigate('/settings?tab=subscription-billing&from=studio')}
+                className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-purple-700 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600">
+                Upgrade
+              </button>
+            ) : null}
             <div className="hidden flex-wrap items-center gap-1 sm:flex">
               <div className="group relative">
                 <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
@@ -470,7 +455,7 @@ export default function StoreManagement() {
                   title={verificationLabel}
                 >
                   <span>{verificationMarker}</span>
-                  <span className="max-w-[140px] truncate">
+                  <span className="max-w-[140px] break-words">
                     {verificationLabel}
                   </span>
                 </button>
@@ -504,7 +489,7 @@ export default function StoreManagement() {
             <button
               type="button"
               onClick={() => setShowStoreQr(true)}
-              className="group relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white/80 text-gray-600 shadow-sm transition-all hover:scale-105 hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-emerald-300"
+              className="group relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-600 shadow-sm transition-all hover:scale-105 hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-emerald-300"
               aria-label="Open storefront QR code"
             >
               <span className="text-sm">🪪</span>
@@ -525,7 +510,7 @@ export default function StoreManagement() {
                 }
                 navigate('/profile');
               }}
-              className="group relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white/80 text-gray-600 shadow-sm transition-all hover:scale-105 hover:bg-purple-50 hover:text-purple-600 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-purple-400"
+              className="group relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-600 shadow-sm transition-all hover:scale-105 hover:bg-purple-50 hover:text-purple-600 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-purple-400"
               aria-label="Preview as visitor"
             >
               <span className="text-sm">👁️</span>
@@ -533,6 +518,7 @@ export default function StoreManagement() {
                 Preview as visitor
               </span>
             </button>
+            </div>
           </div>
         </div>
       </div>
@@ -546,7 +532,7 @@ export default function StoreManagement() {
               <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-700 dark:text-sky-200 sm:text-xs">
                 {verificationPrompt.eyebrow}
               </div>
-              <h2 className="mt-1 line-clamp-2 text-sm font-semibold text-theme sm:mt-2 sm:text-xl">
+              <h2 className="mt-1 break-words text-sm font-semibold text-theme sm:mt-2 sm:text-xl">
                 {verificationPrompt.title}
               </h2>
               <p className="mt-2 hidden text-sm leading-6 text-theme-secondary sm:block">
@@ -577,10 +563,9 @@ export default function StoreManagement() {
       ) : null}
 
       <StoreProductsPanel
+        key={user?.id}
         layoutMode={layoutMode}
         onToggleLayoutMode={() => setLayoutMode((prev) => !prev)}
-        draftCollections={draftCollections}
-        draftCollectionsLoading={draftCollectionsLoading}
       />
 
       <LazyEntityQrModal

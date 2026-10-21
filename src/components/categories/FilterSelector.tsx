@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiChevronDown, FiX } from "react-icons/fi";
-import { brandApi, type FilterDimensionOption } from "@/api/BrandApi";
+import { type FilterDimensionOption } from "@/api/BrandApi";
+import { useQuery } from '@tanstack/react-query';
+import { creatorFiltersOptions, EMPTY_CREATOR_FILTERS } from '@/query/creatorMetadataQueries';
 import InfoTooltip from "@/components/ui/InfoTooltip";
 import {
   CREATOR_FILTER_DIMENSION_ORDER,
@@ -58,49 +60,18 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
   disabled = false,
   onTagSuggestions,
 }) => {
-  const [dimensions, setDimensions] = useState<FilterDimensionOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const { data: allDimensions = EMPTY_CREATOR_FILTERS, isLoading: loading, isError: refreshFailed, refetch } = useQuery(creatorFiltersOptions);
+  const loadError = refreshFailed && allDimensions.length === 0;
+  const dimensions = useMemo(() => sortDimensions(allDimensions.filter((dimension) =>
+    appliesToEntity(dimension, entityType) &&
+    !LEGACY_DISCOVERY_DIMENSION_SLUGS.has(String(dimension.slug ?? '').trim().toLowerCase()),
+  )), [allDimensions, entityType]);
   const [expandedDimensionId, setExpandedDimensionId] = useState<string | null>(
     null,
   );
   const [searchByDimension, setSearchByDimension] = useState<
     Record<string, string>
   >({});
-
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      try {
-        setLoadError(false);
-        const fetched = await brandApi.getFilterDimensions();
-        if (!mounted) return;
-
-        const applicable = fetched.filter((dimension) => {
-          const slug = String(dimension.slug ?? "").trim().toLowerCase();
-          return (
-            appliesToEntity(dimension, entityType) &&
-            !LEGACY_DISCOVERY_DIMENSION_SLUGS.has(slug)
-          );
-        });
-
-        setDimensions(sortDimensions(applicable));
-      } catch (error) {
-        console.error("Failed to load filter dimensions", error);
-        if (mounted) {
-          setDimensions([]);
-          setLoadError(true);
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    void load();
-    return () => {
-      mounted = false;
-    };
-  }, [entityType]);
 
   useEffect(() => {
     if (!onTagSuggestions) return;
@@ -170,9 +141,10 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
   }
 
   if (loadError) {
-    return renderNonBlockingState(
-      "Style details could not load. You can save a draft, but choose at least one before going live.",
-    );
+    return <div className="space-y-2">
+      {renderNonBlockingState("Style details could not load. You can save a draft, but choose at least one before going live.")}
+      <button type="button" onClick={() => void refetch()} className="rounded-xl bg-purple-600 px-4 py-2 text-sm font-semibold text-white">Retry style details</button>
+    </div>;
   }
 
   if (dimensions.length === 0) {

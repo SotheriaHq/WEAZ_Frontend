@@ -3,6 +3,7 @@ import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import type { SizeFitShareDto, SizeFitSharePolicy, SizeFitSharesPayload } from '@/types/sizeFit';
 import SearchApi from '@/api/SearchApi';
+import MediaRenderer from '@/components/media/MediaRenderer';
 import type { SearchItem } from '@/types/search';
 import { motion } from 'framer-motion';
 
@@ -233,7 +234,7 @@ export const EndUserSizeFitQuickShareModal: React.FC<EndUserSizeFitQuickShareMod
                             >
                               <div className="h-6 w-6 shrink-0 overflow-hidden rounded-full border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/10">
                                 {item.imageUrl ? (
-                                  <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                                  <MediaRenderer kind="image" src={item.imageUrl} alt="" fit="cover" className="h-full w-full" />
                                 ) : (
                                   <div className="flex h-full w-full items-center justify-center font-bold text-[10px] text-gray-400">
                                     {item.title.charAt(0).toUpperCase()}

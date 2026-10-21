@@ -3,7 +3,7 @@ import { getFriendlyErrorMessage } from '@/utils/errorMessage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useSearchParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { getStoreStatus } from '@/api/StoreApi';
 import {
@@ -90,6 +90,8 @@ function BrandSubscriptionContent() {
     queryFn: () => brandSubscriptionApi.get(brandId!),
     enabled: canManage,
   });
+  const client = useQueryClient();
+  useEffect(() => { void client.invalidateQueries({ queryKey: ['brand-commerce-access'] }); }, [client, billing.data?.subscription?.tierKey, billing.data?.subscription?.status, billing.data?.subscription?.currentPeriodEnd]);
   const refetchBilling = billing.refetch;
   const [consent, setConsent] = useState(false);
   const [selectedCard, setSelectedCard] = useState('');

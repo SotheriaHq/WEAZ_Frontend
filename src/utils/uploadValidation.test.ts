@@ -16,7 +16,7 @@ describe('uploadValidation', () => {
     const file = makeFile('avatar.png', 'image/png', WEB_UPLOAD_POLICIES.profileImage.maxSizeBytes + 1);
 
     expect(validateUploadFile(file, WEB_UPLOAD_POLICIES.profileImage)).toContain(
-      'Profile photo must be 2 MB or smaller.',
+      'Profile photo must be 5 MB or smaller.',
     );
   });
 

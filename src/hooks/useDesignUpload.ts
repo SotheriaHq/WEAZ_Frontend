@@ -199,8 +199,6 @@ const prepareDesignUploadItems = async (
       try {
         const processed = await preprocessImageFile(file, 'detail', {
           maxSizeBytes,
-          targetReductionRatio: 0.9,
-          quality: 0.99,
           minQuality: 0.9,
         });
         if (processed.file.size <= maxSizeBytes || !isImageUploadFile(file)) {

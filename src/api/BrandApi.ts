@@ -653,10 +653,7 @@ export const brandApi = {
     }
     try {
       const response = await apiClient.get('/categories', {
-        headers: {
-          'Cache-Control': 'no-cache',
-          Pragma: 'no-cache',
-        },
+        ...(force ? { headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } } : {}),
       });
       let mapped = mapCategoriesWithSubCategories((response?.data ?? undefined) as unknown);
 
@@ -691,36 +688,31 @@ export const brandApi = {
    * Used by creation forms to populate filter selectors.
    */
   async getFilterDimensions(): Promise<FilterDimensionOption[]> {
-    try {
-      const response = await apiClient.get('/categories/filters');
-      const payload = response?.data;
-      const items = extractArrayPayload(payload);
+    const response = await apiClient.get('/categories/filters');
+    const payload = response?.data;
+    const items = extractArrayPayload(payload);
 
-      return items
-        .map((d: any) => ({
-          id: String(d?.id ?? ''),
-          slug: String(d?.slug ?? ''),
-          name: String(d?.name ?? ''),
-          description: d?.description ?? null,
-          isMulti: d?.isMulti ?? true,
-          appliesTo: Array.isArray(d?.appliesTo) ? d.appliesTo : [],
-          values: Array.isArray(d?.values)
-            ? d.values
-              .map((v: any) => ({
-                id: String(v?.id ?? ''),
-                slug: String(v?.slug ?? ''),
-                name: String(v?.name ?? ''),
-                description: v?.description ?? null,
-                order: typeof v?.order === 'number' ? v.order : undefined,
-              }))
-              .filter((v: FilterValueOption) => v.id.length > 0 && v.name.length > 0)
-            : [],
-        }))
-        .filter((d: FilterDimensionOption) => d.id.length > 0 && d.values.length > 0);
-    } catch (error) {
-      console.error('Error fetching filter dimensions', error);
-      return [];
-    }
+    return items
+      .map((d: any) => ({
+        id: String(d?.id ?? ''),
+        slug: String(d?.slug ?? ''),
+        name: String(d?.name ?? ''),
+        description: d?.description ?? null,
+        isMulti: d?.isMulti ?? true,
+        appliesTo: Array.isArray(d?.appliesTo) ? d.appliesTo : [],
+        values: Array.isArray(d?.values)
+          ? d.values
+            .map((v: any) => ({
+              id: String(v?.id ?? ''),
+              slug: String(v?.slug ?? ''),
+              name: String(v?.name ?? ''),
+              description: v?.description ?? null,
+              order: typeof v?.order === 'number' ? v.order : undefined,
+            }))
+            .filter((v: FilterValueOption) => v.id.length > 0 && v.name.length > 0)
+          : [],
+      }))
+      .filter((d: FilterDimensionOption) => d.id.length > 0 && d.values.length > 0);
   },
   async listBrandAccessRequests(
     brandId: string,

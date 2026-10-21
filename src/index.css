@@ -2701,3 +2701,15 @@ html:not(.dark) .input-glass:focus {
   .queue-tab { @apply min-h-11 border-b-2 border-transparent px-2 py-3 text-sm font-semibold text-slate-600 transition-colors hover:text-violet-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-600 dark:text-slate-300 dark:hover:text-violet-300; }
   .queue-tab[aria-selected="true"] { @apply border-violet-600 text-violet-800 dark:border-violet-400 dark:text-violet-200; }
 }
+
+/* Native Studio WebViews use the same 0-or-2px border policy as native controls.
+   Scope through the document so portal dialogs follow the same rule. */
+html[data-embedded-surface="mobile-app"] .border { border-width: 2px; }
+html[data-embedded-surface="mobile-app"] .border-t { border-top-width: 2px; }
+html[data-embedded-surface="mobile-app"] .border-r { border-right-width: 2px; }
+html[data-embedded-surface="mobile-app"] .border-b { border-bottom-width: 2px; }
+html[data-embedded-surface="mobile-app"] .border-l { border-left-width: 2px; }
+html[data-embedded-surface="mobile-app"] .border-x { border-left-width: 2px; border-right-width: 2px; }
+html[data-embedded-surface="mobile-app"] .border-y { border-top-width: 2px; border-bottom-width: 2px; }
+html[data-embedded-surface="mobile-app"] .divide-y > :not([hidden]) ~ :not([hidden]) { border-top-width: 2px; }
+html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidden]) { border-left-width: 2px; }

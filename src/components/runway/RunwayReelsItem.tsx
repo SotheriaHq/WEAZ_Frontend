@@ -1,3 +1,4 @@
+import RunwayExposure from './RunwayExposure';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { MessageCircle, Bookmark } from 'lucide-react';
@@ -271,6 +272,7 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
   // the wrapper's, and two `snap-stop: always` positions that close together is
   // a double-stop. Exactly one snap target per page.
   return (
+    <RunwayExposure designId={item.collectionId || item.id} active={isActive} className="h-full w-full">
     <article
       className="runway-reel-stage relative h-full w-full shrink-0 overflow-hidden bg-black"
       data-runway-reel-id={item.id}
@@ -292,6 +294,7 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
           return (
             <button
               key={slide.id}
+              data-runway-content={slideActive ? 'true' : undefined}
               type="button"
               onClick={revealMeta}
               aria-label={`${item.collectionTitle || 'Design'} — view ${index + 1} of ${slides.length}`}
@@ -618,6 +621,7 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
         aria-hidden
       />
     </article>
+    </RunwayExposure>
   );
 };
 

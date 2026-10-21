@@ -130,6 +130,10 @@ const sidebarGroups: SidebarGroup[] = [
     brandOnly: true,
     items: [
       {
+        key: 'store-customers', label: 'Customers', path: '/settings?tab=store-customers',
+        icon: '👥', description: 'Customer purchase threshold · paid plans',
+      },
+      {
         key: 'subscription-billing',
         label: 'Billing & subscriptions',
         path: '/settings?tab=subscription-billing',

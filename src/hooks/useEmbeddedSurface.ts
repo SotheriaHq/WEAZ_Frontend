@@ -45,6 +45,9 @@ export function useEmbeddedSurface(): EmbeddedSurface {
   const explicitSurface = useMemo(() => getEmbeddedSurface(location.search), [location.search]);
 
   useEffect(() => {
+    const surface = explicitSurface ?? readSessionEmbeddedSurface();
+    if (surface) document.documentElement.dataset.embeddedSurface = surface;
+    else delete document.documentElement.dataset.embeddedSurface;
     if (explicitSurface) {
       writeSessionEmbeddedSurface(explicitSurface);
     }

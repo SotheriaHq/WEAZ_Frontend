@@ -69,6 +69,8 @@ export interface MediaRendererProps {
 
   /** Optional direct access to the underlying element (for playback control, etc.) */
   imgRef?: React.Ref<HTMLImageElement>;
+  draggable?: boolean;
+  mediaStyle?: React.CSSProperties;
   videoRef?: React.Ref<HTMLVideoElement>;
 }
 
@@ -104,6 +106,8 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
   loading,
   fetchPriority,
   imgRef,
+  draggable,
+  mediaStyle,
   videoRef,
 }) => {
   // For 'contain' mode: use intrinsic sizing with max constraints - no cropping
@@ -199,6 +203,8 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
     <div className={frameClassName}>
       <img
         ref={imgRef}
+        draggable={draggable}
+        style={mediaStyle}
         src={normalizedSrc}
         srcSet={srcSet}
         sizes={sizes}

@@ -46,3 +46,7 @@ GEMINI.md
 .aider*
 project-memory/
 memory-bank/
+
+# Local discovery/store regression output
+/test-results/discovery/
+/test-results/store-layout-390.png

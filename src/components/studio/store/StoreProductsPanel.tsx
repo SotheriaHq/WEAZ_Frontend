@@ -1,3 +1,6 @@
+import useDebounce from '@/hooks/useDebounce';
+import ProductCardSkeleton from '@/components/designs/ProductCardSkeleton';
+import { getStudioProductsPage } from '@/api/StudioStoreApi';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -486,6 +489,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const [filterStock, setFilterStock] = useState('all');
   const [productSortBy, setProductSortBy] = useState<ProductSortBy>('newest');
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery.trim(), 300);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
 
   const [products, setProducts] = useState<BackendProduct[]>([]);
@@ -493,7 +497,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   // (true only when no cached data exists) — never re-add useState loaders here.
   const [collections, setCollections] = useState<CollectionOption[]>([]);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(25);
+  const [limit, setLimit] = useState(12);
   const [total, setTotal] = useState(0);
 
   const [cursorByPage, setCursorByPage] = useState<Record<number, string | null | undefined>>({});
@@ -980,7 +984,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
         limit,
         productSortBy,
         currentPageCursor ?? null,
-        searchQuery.trim(),
+        debouncedSearch,
         filterCollection,
         filterStatus,
       ] as const,
@@ -991,7 +995,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       limit,
       page,
       productSortBy,
-      searchQuery,
+      debouncedSearch,
       user?.id,
     ],
   );
@@ -1013,41 +1017,16 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   }>({
     queryKey: storeProductsQueryKey,
     enabled: productsQueryEnabled,
-    queryFn: async ({ signal }) => {
-      const productsRes = await apiClient.get<Partial<ProductsResponse>>(`/brands/${user!.id}/products`, {
-        signal,
-        params: {
-          page,
-          limit,
-          sortBy: productSortBy,
-          cursor: currentPageCursor ?? undefined,
-          search: searchQuery.trim() ? searchQuery.trim() : undefined,
-          collectionId: filterCollection !== 'all' ? filterCollection : undefined,
-          // Drafts are asked for by `publicationStatus`, the field this tab
-          // shows. `isActive=false` dropped a DRAFT row stored with
-          // `isActive=true`: it flashed from the previous list, then vanished.
-          // A server that predates the param returns every owner row, which
-          // the client-side DRAFT filter below still narrows correctly.
-          isActive: filterStatus === 'active' ? true : undefined,
-          publicationStatus: filterStatus === 'draft' ? 'DRAFT' : undefined,
-          isFeatured: filterStatus === 'featured' ? true : undefined,
-          includeDeleted: filterStatus === 'deleted' ? true : undefined,
-          onlyDeleted: filterStatus === 'deleted' ? true : undefined,
-        },
-      });
-      const productsPayload = unwrapApiResponse<Partial<ProductsResponse>>(productsRes.data);
-      const items = Array.isArray(productsPayload?.items)
-        ? (productsPayload.items as BackendProduct[])
-        : [];
-      return {
-        items,
-        total: typeof productsPayload?.total === 'number' ? productsPayload.total : items.length,
-        nextCursor:
-          typeof productsPayload?.nextCursor === 'string' && productsPayload.nextCursor.length > 0
-            ? productsPayload.nextCursor
-            : null,
-      };
-    },
+    queryFn: ({ signal }) => getStudioProductsPage<BackendProduct>(user!.id, {
+      page, limit, sortBy: productSortBy, cursor: currentPageCursor ?? undefined,
+      search: debouncedSearch || undefined,
+      collectionId: filterCollection !== 'all' ? filterCollection : undefined,
+      isActive: filterStatus === 'active' ? true : undefined,
+      publicationStatus: filterStatus === 'draft' ? 'DRAFT' : undefined,
+      isFeatured: filterStatus === 'featured' ? true : undefined,
+      includeDeleted: filterStatus === 'deleted' ? true : undefined,
+      onlyDeleted: filterStatus === 'deleted' ? true : undefined,
+    }, signal),
   });
   const loading = productsQueryEnabled && productsQueryLoading;
 
@@ -2134,7 +2113,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   return (
     <div className={isEmbeddedMobile ? 'space-y-3' : 'space-y-4 sm:space-y-6'}>
       {outletView === 'products' && !inlineProduct && (
-      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden sm:rounded-2xl">
+      <div className="overflow-hidden rounded-2xl">
         <div className="space-y-3 p-3 sm:p-4 lg:p-6 lg:space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
@@ -2223,7 +2202,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           {/* Product name badge - Top Left to avoid bottom text overlap */}
                           {previewSources.length > 1 && activePreview.productName && (
                             <div className="absolute left-2 top-2 z-30 max-w-[calc(100%-3rem)] sm:left-2.5 sm:top-2.5">
-                              <span className="inline-block max-w-full truncate rounded-full border border-white/20 bg-white/20 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm backdrop-blur-md transition-opacity duration-300 dark:border-white/10 dark:bg-black/30 sm:px-2.5">
+                              <span className="inline-block max-w-full break-words rounded-full border border-white/20 bg-white/20 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm backdrop-blur-md transition-opacity duration-300 dark:border-white/10 dark:bg-black/30 sm:px-2.5">
                                 {activePreview.productName}
                               </span>
                             </div>
@@ -2267,7 +2246,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
                       {/* Frosted Glass Text Component - Bottom Overlay */}
                       <div className="absolute bottom-0 left-0 right-0 z-30 border-t border-white/20 bg-white/60 p-1.5 backdrop-blur-md transition-transform duration-300 dark:border-white/10 dark:bg-black/60 sm:p-3">
-                        <p className="line-clamp-1 text-xs font-bold text-gray-900 drop-shadow-sm dark:text-white sm:text-sm">
+                        <p className="break-words text-xs font-bold text-gray-900 drop-shadow-sm dark:text-white sm:text-sm">
                           {collection.name}
                         </p>
                         <p className="mt-0.5 hidden text-[10px] font-medium text-gray-700 dark:text-gray-300 sm:block sm:text-xs">
@@ -2299,7 +2278,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
       {/* ═══ UNIFIED COMMAND CENTER ═══ */}
       {outletView === 'products' && !inlineProduct && (
-      <div className="mb-4 overflow-hidden rounded-xl border border-gray-200/80 bg-white/95 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 sm:mb-6 sm:rounded-2xl lg:overflow-visible">
+      <div className="mb-4 overflow-hidden rounded-2xl sm:mb-6 lg:overflow-visible">
 
         {/* Header Row */}
         <div className="relative p-3 pb-3 sm:p-4 lg:p-5 lg:pb-4">
@@ -2506,7 +2485,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       )}
 
       {outletView === 'collections' && !inlineProduct && (
-        <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg overflow-hidden">
+        <div className="overflow-hidden rounded-2xl">
           <div className="border-b border-gray-200/80 dark:border-white/10 p-4 sm:p-6">
             <div className="mb-4 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
               <button
@@ -2531,7 +2510,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               {activeCollection && (
                 <>
                   <span>/</span>
-                  <span className="text-gray-900 dark:text-white truncate max-w-[200px]">
+                  <span className="text-gray-900 dark:text-white break-words max-w-[200px]">
                     {activeCollection.name}
                   </span>
                 </>
@@ -2660,7 +2639,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           <div className="p-4 sm:p-6">
             {!activeCollection ? (
               managedCollectionsTotal === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-300/80 bg-gray-50/70 p-6 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
+                <div className="rounded-2xl p-6 text-sm text-gray-600 dark:text-gray-300">
                   No collections match your current filters.
                 </div>
               ) : (
@@ -2732,7 +2711,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                               {/* Product name badge - Top Left to avoid bottom text overlap */}
                               {previewSources.length > 1 && activePreview.productName && (
                                 <div className="absolute top-3 left-3 z-30 max-w-[calc(100%-4rem)]">
-                                  <span className="inline-block rounded-full bg-white/20 dark:bg-black/30 backdrop-blur-md border border-white/20 dark:border-white/10 px-3 py-1 text-xs font-medium text-white truncate shadow-sm transition-opacity duration-300">
+                                  <span className="inline-block rounded-full bg-white/20 dark:bg-black/30 backdrop-blur-md border border-white/20 dark:border-white/10 px-3 py-1 text-xs font-medium text-white break-words shadow-sm transition-opacity duration-300">
                                     {activePreview.productName}
                                   </span>
                                 </div>
@@ -2857,7 +2836,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           <div className="absolute bottom-0 left-0 right-0 z-30 space-y-2 p-4 bg-white/60 dark:bg-black/60 backdrop-blur-md border-t border-white/20 dark:border-white/10 transition-transform duration-300">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="line-clamp-1 text-sm font-bold text-gray-900 dark:text-white drop-shadow-sm">
+                                <p className="break-words text-sm font-bold text-gray-900 dark:text-white drop-shadow-sm">
                                   {collection.name}
                                 </p>
                                 <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5">
@@ -2877,7 +2856,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                               </span>
                             </div>
 
-                            <p className="line-clamp-2 text-xs font-medium text-gray-800 dark:text-gray-200 leading-relaxed">
+                            <p className="break-words text-xs font-medium text-gray-800 dark:text-gray-200 leading-relaxed">
                               {collection.description?.trim() || 'No description yet.'}
                             </p>
                           </div>
@@ -2894,7 +2873,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 ))}
               </div>
             ) : activeCollectionProducts.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-300/80 bg-gray-50/70 p-6 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
+              <div className="rounded-2xl p-6 text-sm text-gray-600 dark:text-gray-300">
                 No products currently linked to this collection.
               </div>
             ) : (
@@ -2920,7 +2899,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       />
                     </div>
                     <div className="space-y-1 p-3">
-                      <p className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">
+                      <p className="break-words text-sm font-semibold text-gray-900 dark:text-white">
                         {product.name}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -3022,7 +3001,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
       {/* Inline Product Detail View */}
       {inlineProduct && (
-        <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/90 dark:bg-white/5 shadow-lg p-4 sm:p-6">
+        <div className="rounded-2xl p-4 sm:p-6">
           <InlineProductDetail
             product={inlineProduct}
             onBack={() => setInlineProduct(null)}
@@ -3033,7 +3012,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
       {/* Products - with CSS containment for smooth tab transitions */}
       {outletView === 'products' && !inlineProduct && (
-      <div className="rounded-xl border border-gray-200 bg-white/90 shadow-lg dark:border-white/10 dark:bg-white/5 sm:rounded-2xl">
+      <div className="rounded-2xl">
         {/*
           Quick Actions — the drawer the ⚡ in the toolbar opens.
 
@@ -3158,7 +3137,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             options={PRODUCT_SORT_OPTIONS}
           />
         </div>
-        <div className="p-2.5 sm:p-4 lg:p-6">
+        <div className="py-3 lg:p-6">
           <div
             ref={listRef}
             style={{
@@ -3180,6 +3159,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               together at any phone width.
             */}
             <div className="grid grid-cols-2 gap-3 transition-all duration-300 min-[520px]:grid-cols-3 lg:grid-cols-4">
+            {loading && products.length === 0 ? <ProductCardSkeleton count={6} proportion="studio" /> : null}
             {visibleProductFillers.map((task) => (
               <ProductPublishFillerCard
                 key={task.id}
@@ -3378,8 +3358,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   <div className="absolute inset-x-0 bottom-0 z-10 border-t border-white/10 bg-black/35 p-1.5 backdrop-blur-xl sm:p-2">
                     <div className="flex flex-col gap-0.5 sm:gap-1">
                       {/* Name and Collection */}
-                      <h3 className="line-clamp-1 text-xs font-semibold text-white drop-shadow-sm sm:text-sm">{product.name}</h3>
-                      <p className="line-clamp-1 text-[10px] text-white/60 sm:text-[11px]">{collectionLabel}</p>
+                      <h3 className="break-words text-xs font-semibold text-white drop-shadow-sm sm:text-sm">{product.name}</h3>
+                      <p className="break-words text-[10px] text-white/60 sm:text-[11px]">{collectionLabel}</p>
                       
                       {/* Price Section */}
                       <div className="flex items-baseline gap-1.5">
@@ -3396,7 +3376,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       {/* Stock info row */}
                       <div className="mt-0.5 flex items-center justify-between gap-2">
                         <span
-                          className={`min-w-0 truncate text-[10px] font-medium cursor-help ${
+                          className={`min-w-0 break-words text-[10px] font-medium cursor-help ${
                             getProductStockState(product) === 'CUSTOM_ORDER_ONLY'
                               ? 'text-violet-300'
                               : getProductStockState(product) === 'OUT_OF_STOCK'
@@ -3543,7 +3523,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
         {/* Pagination — only shown when there is at least one product */}
         {products.length > 0 && (
-        <div className="border-t border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 p-4">
+        <div className="p-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <span className="text-gray-500 dark:text-gray-400 text-sm">Items per page:</span>
@@ -3553,11 +3533,12 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 onChange={(e) => {
                   const next = parseInt(e.target.value, 10);
                   setPage(1);
-                  setLimit(Number.isFinite(next) ? next : 25);
+                  setLimit(Number.isFinite(next) ? next : 12);
                 }}
                 fullWidth={false}
               >
                 <option value={10}>10</option>
+                <option value={12}>12</option>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
                 <option value={100}>100</option>

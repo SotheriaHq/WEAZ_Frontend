@@ -1,70 +1,55 @@
-import React from 'react';
-import { Users, Search, UserPlus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useSelector } from 'react-redux';
+import { Link } from 'react-router-dom';
+import type { RootState } from '@/store';
+import { getActiveBrandId } from '@/lib/brandAccess';
+import { brandCustomersApi } from '@/api/BrandCustomersApi';
+import SearchField from '@/components/SearchField';
 
-/**
- * Customers Page (Studio)
- * Shows list of customers who have ordered from the store
- */
-const CustomersPage: React.FC = () => {
-  // Mock empty state for now
-  const customers: any[] = [];
-
-  return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Customers
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            View and manage your store customers
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search customers..."
-              className="wiez-search-input pl-10 w-64"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Empty State */}
-      {customers.length === 0 ? (
-        <div className="bg-white dark:bg-zinc-900/50 rounded-2xl border border-gray-100 dark:border-zinc-800 p-12">
-          <div className="flex flex-col items-center justify-center text-center">
-            <div className="w-20 h-20 rounded-full bg-purple-500/10 flex items-center justify-center mb-6">
-              <Users className="w-10 h-10 text-purple-500" />
-            </div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              No customers yet
-            </h2>
-            <p className="text-gray-500 dark:text-gray-400 max-w-sm mb-6">
-              When customers place orders from your store, they'll appear here. 
-              Start by adding products and sharing your store!
-            </p>
-            <div className="flex items-center gap-3">
-              <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-xl transition-colors flex items-center gap-2">
-                <UserPlus className="w-4 h-4" />
-                Share Store
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-white dark:bg-zinc-900/50 rounded-2xl border border-gray-100 dark:border-zinc-800 overflow-hidden">
-          {/* Customers table would go here */}
-          <p className="p-6 text-gray-500">Customer list coming soon...</p>
-        </div>
-      )}
+export default function CustomersPage() {
+  const profile = useSelector((state: RootState) => state.user.profile);
+  const brandId = getActiveBrandId(profile);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { setDebouncedSearch(search.trim()); }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+  useEffect(() => { setSearch(''); setDebouncedSearch(''); setPage(1); }, [brandId, profile?.id]);
+  const customers = useQuery({
+    queryKey: ['brand-customers', profile?.id, brandId, page, debouncedSearch],
+    queryFn: ({ signal }) => brandCustomersApi.list(brandId!, { page, search: debouncedSearch }, signal),
+    enabled: Boolean(brandId),
+    staleTime: 15_000,
+    refetchOnMount: true,
+  });
+  return <section className="space-y-5">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div><h1 className="text-2xl font-bold text-theme">Customers</h1>
+        <p className="mt-1 text-sm text-theme-secondary">Shoppers with paid orders from your brand. Cancelled and fully refunded orders do not count.</p></div>
+      <Link className="inline-flex min-h-11 items-center rounded-2xl bg-purple-100 px-4 font-semibold text-purple-800 dark:bg-purple-950 dark:text-purple-200" to="/settings?tab=store-customers">Customer settings</Link>
     </div>
-  );
-};
-
-export default CustomersPage;
+    <SearchField value={search} onChange={value => { setSearch(value); setPage(1); }} collapsible={false} ariaLabel="Search customers by name or username" placeholder="Search customers…" />
+    {customers.isLoading ? <p role="status">Loading customers…</p> : null}
+    {customers.isError ? <div role="alert"><p>Customers could not be loaded.</p><button type="button" className="min-h-11 rounded-2xl bg-purple-600 px-4 text-white" onClick={() => void customers.refetch()}>Try again</button></div> : null}
+    {customers.data ? <>
+      <p className="text-sm text-theme-secondary">{customers.data.total} shoppers · {customers.data.settings.effectiveMinimumOrders}+ paid orders</p>
+      {customers.data.items.length ? <div className="max-h-[65dvh] overflow-auto">
+        <table className="w-full text-left text-sm"><caption className="sr-only">Customers with qualifying paid orders</caption>
+          <thead><tr className="text-theme-secondary"><th scope="col" className="p-3">Shopper</th><th scope="col" className="p-3">Orders</th><th scope="col" className="p-3">Last order</th></tr></thead>
+          <tbody>{customers.data.items.map(customer => <tr key={customer.id} className="odd:bg-gray-50 dark:odd:bg-zinc-900">
+            <td className="break-words rounded-l-2xl p-3 [overflow-wrap:anywhere]"><span className="font-semibold text-theme">{customer.name}</span>{customer.username ? <div className="text-theme-secondary">@{customer.username}</div> : null}</td>
+            <td className="p-3 tabular-nums">{customer.orderCount}</td><td className="rounded-r-2xl p-3">{new Date(customer.lastOrderAt).toLocaleDateString()}</td>
+          </tr>)}</tbody>
+        </table>
+      </div> : <p className="py-10 text-center text-theme-secondary">{debouncedSearch ? 'No shoppers match your search.' : 'No shoppers meet the current purchase threshold yet.'}</p>}
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" disabled={page === 1 || customers.isFetching || search.trim() !== debouncedSearch} onClick={() => setPage(p => p - 1)} className="min-h-11 rounded-2xl bg-gray-100 px-4 disabled:opacity-40 dark:bg-zinc-800">Previous</button>
+        <span>Page {page}</span>
+        <button type="button" disabled={!customers.data.hasNextPage || customers.isFetching || search.trim() !== debouncedSearch} onClick={() => setPage(p => p + 1)} className="min-h-11 rounded-2xl bg-gray-100 px-4 disabled:opacity-40 dark:bg-zinc-800">Next</button>
+      </div>
+    </> : null}
+  </section>;
+}
