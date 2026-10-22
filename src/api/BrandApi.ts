@@ -1,3 +1,5 @@
+import { getMediaUrlIdentity, isRenewableMediaUrl, isUsableMediaUrl, mediaUrlCacheExpiresAt } from '@/utils/mediaUrlPolicy';
+import { getMediaSessionEpoch, advanceMediaSessionEpoch } from '@/utils/mediaUrlSession';
 import { apiClient } from './httpClient';
 import { isAxiosError } from 'axios';
 import { reviewsApi, type ProductReviewResponse } from './ReviewsApi';
@@ -78,13 +80,63 @@ const getCollectionBasePath = (scope?: CollectionScope) =>
   scope === 'store' ? '/store-collections' : scope === 'all' ? '/collections' : '/designs';
 
 const SIGNED_URL_TTL_MS = 4 * 60 * 1000;
-const SIGNED_URL_REFRESH_SKEW_MS = 30 * 1000;
 const MISSING_SIGNED_URL_TTL_MS = 2 * 60 * 1000;
 const BRAND_PROFILE_TTL_MS = 30 * 1000;
 const COLLECTION_READ_TTL_MS = 30 * 1000;
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 const signedUrlPending = new Map<string, Promise<string | null>>();
 const signedUrlMissingCache = new Map<string, number>();
+function cacheSignedUrl(key: string, value: { url: string; expiresAt: number }) {
+  signedUrlCache.set(key, value);
+  while (signedUrlCache.size > 512) signedUrlCache.delete(signedUrlCache.keys().next().value!);
+}
+
+
+const SOURCE_BATCH_UNAVAILABLE = Symbol('source-batch-unavailable');
+const sourceBatchQueues = new Map<string, Array<{ source: string; epoch: number; resolve: (value: string | null | typeof SOURCE_BATCH_UNAVAILABLE) => void }>>();
+const sourceBatchActive = new Map<string, number>();
+const sourceBatchDisabled = new Set<string>();
+let sourceBatchTimer: ReturnType<typeof setTimeout> | null = null;
+
+function flushSourceBatches() {
+  sourceBatchTimer = null;
+  for (const [path, queue] of sourceBatchQueues) {
+    if ((sourceBatchActive.get(path) ?? 0) >= 2 || !queue.length) continue;
+    const batch = queue.splice(0, 50).filter((entry) => {
+      if (entry.epoch === getMediaSessionEpoch()) return true;
+      entry.resolve(null); return false;
+    });
+    if (!batch.length) continue;
+    sourceBatchActive.set(path, (sourceBatchActive.get(path) ?? 0) + 1);
+    void apiClient.post(path, { urls: [...new Set(batch.map((entry) => entry.source))] })
+      .then((response) => {
+        const payload = response.data?.data ?? response.data;
+        const bySource = new Map<string, string | null>((payload?.items ?? []).map((item: { source: string; url?: string | null }) => [item.source, item.url ?? null]));
+        batch.forEach((entry) => entry.resolve(entry.epoch === getMediaSessionEpoch() ? (bySource.get(entry.source) ?? null) : null));
+      })
+      .catch((error) => {
+        if (error?.response?.status === 404 || error?.response?.status === 405) sourceBatchDisabled.add(path);
+        const compatible = !error?.response || error.response.status === 404 || error.response.status === 405;
+        batch.forEach((entry) => entry.resolve(entry.epoch === getMediaSessionEpoch() && compatible ? SOURCE_BATCH_UNAVAILABLE : null));
+      })
+      .finally(() => {
+        sourceBatchActive.set(path, Math.max(0, (sourceBatchActive.get(path) ?? 1) - 1));
+        if ([...sourceBatchQueues.values()].some((pending) => pending.length) && sourceBatchTimer === null) sourceBatchTimer = setTimeout(flushSourceBatches, 0);
+      });
+  }
+}
+
+function requestSourceBatch(path: string, source: string): Promise<string | null | typeof SOURCE_BATCH_UNAVAILABLE> {
+  if (sourceBatchDisabled.has(path)) return Promise.resolve(SOURCE_BATCH_UNAVAILABLE);
+  const queue = sourceBatchQueues.get(path) ?? [];
+  sourceBatchQueues.set(path, queue);
+  if ([...sourceBatchQueues.values()].reduce((sum, items) => sum + items.length, 0) >= 2048) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    queue.push({ source, epoch: getMediaSessionEpoch(), resolve });
+    if (sourceBatchTimer === null) sourceBatchTimer = setTimeout(flushSourceBatches, 25);
+  });
+}
+
 const brandProfileCache = new Map<string, { data: BrandProfileDto | null; expiresAt: number }>();
 const brandProfilePending = new Map<string, Promise<BrandProfileDto | null>>();
 const collectionListCache = new Map<string, { data: CollectionDto[]; expiresAt: number }>();
@@ -171,29 +223,7 @@ const requestPublicUrlBatched = (fileId: string): Promise<PublicUrlBatchResult> 
 const getPublicUrlCacheKey = (fileId: string) => `public:${fileId}`;
 const getPrivateSignedUrlCacheKey = (fileId: string) => `private:${fileId}`;
 
-const getSignedUrlCacheExpiresAt = (url: string): number => {
-  try {
-    const parsed = new URL(url);
-    const unixExpires = parsed.searchParams.get('Expires') ?? parsed.searchParams.get('expires');
-    if (unixExpires) {
-      const timestamp = Number(unixExpires) * 1000;
-      if (Number.isFinite(timestamp)) return Math.max(Date.now(), timestamp - SIGNED_URL_REFRESH_SKEW_MS);
-    }
-
-    const amzDate = parsed.searchParams.get('X-Amz-Date');
-    const amzExpires = Number(parsed.searchParams.get('X-Amz-Expires'));
-    const match = amzDate?.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
-    if (match && Number.isFinite(amzExpires)) {
-      const [, year, month, day, hour, minute, second] = match;
-      const startedAt = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
-      return Math.max(Date.now(), startedAt + amzExpires * 1000 - SIGNED_URL_REFRESH_SKEW_MS);
-    }
-  } catch {
-    return Date.now() + SIGNED_URL_TTL_MS;
-  }
-
-  return Date.now() + SIGNED_URL_TTL_MS;
-};
+const getSignedUrlCacheExpiresAt = (url: string): number => mediaUrlCacheExpiresAt(url, SIGNED_URL_TTL_MS);
 
 type CollectionReadOptions = {
   forceRefresh?: boolean;
@@ -1673,10 +1703,59 @@ export const brandApi = {
     return this.getPrivateSignedFileUrl(fileId, options);
   },
 
+  /** Renew the exact source through trusted-origin parsing and file authorization. */
+  async getSignedMediaSourceUrl(source: string, options?: SignedUrlResolveOptions & { allowSignedFallback?: boolean }): Promise<string | null> {
+    if (!source || !isRenewableMediaUrl(source)) return null;
+    const epoch = getMediaSessionEpoch();
+    const identity = getMediaUrlIdentity(source);
+    const cacheKey = `source:${options?.allowSignedFallback === false ? 'public' : 'authorized'}:${identity}`;
+    if (options?.forceRefresh) { signedUrlCache.delete(cacheKey); signedUrlMissingCache.delete(cacheKey); }
+    const cached = signedUrlCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now() && isUsableMediaUrl(cached.url)) return cached.url;
+    const pending = signedUrlPending.get(cacheKey);
+    if (pending) return pending;
+    const request = (async (): Promise<string | null> => {
+      const paths = options?.allowSignedFallback === false
+        ? ['/uploads/public-url-by-key']
+        : ['/uploads/public-url-by-key', '/uploads/signed-url-by-key'];
+      for (const path of paths) {
+        try {
+          const batchPath = path === '/uploads/public-url-by-key' ? '/uploads/public-urls-by-source' : '/uploads/signed-urls-by-source';
+          const batched = await requestSourceBatch(batchPath, identity);
+          if (epoch !== getMediaSessionEpoch()) return null;
+          if (batched !== SOURCE_BATCH_UNAVAILABLE) {
+            if (batched && isUsableMediaUrl(batched, Date.now(), 0)) {
+              cacheSignedUrl(cacheKey, { url: batched, expiresAt: getSignedUrlCacheExpiresAt(batched) });
+              return batched;
+            }
+            continue;
+          }
+          // Compatibility fallback when the deployed API lacks source batching.
+          // Do not put expiring bearer credentials in API query strings/logs.
+          const response = await apiClient.get(path, {
+            params: { url: identity, ...(options?.forceRefresh ? { _cb: Date.now() } : {}) },
+            ...(options?.forceRefresh ? { headers: { 'Cache-Control': 'no-cache' } } : {}),
+          });
+          if (epoch !== getMediaSessionEpoch()) return null;
+          const url = (unwrapApiResponse<{ url?: string }>(response.data) as { url?: string })?.url ?? (response.data as { url?: string })?.url ?? null;
+          if (typeof url === 'string' && isUsableMediaUrl(url, Date.now(), 0)) {
+            cacheSignedUrl(cacheKey, { url, expiresAt: getSignedUrlCacheExpiresAt(url) });
+            return url;
+          }
+        } catch { if (epoch !== getMediaSessionEpoch()) return null; }
+      }
+      return null;
+    })();
+    signedUrlPending.set(cacheKey, request);
+    try { return await request; }
+    finally { if (signedUrlPending.get(cacheKey) === request) signedUrlPending.delete(cacheKey); }
+  },
+
   async getPublicFileUrl(
     fileId: string,
     options?: SignedUrlResolveOptions,
   ): Promise<string | null> {
+    const epoch = getMediaSessionEpoch();
     const cacheKey = String(fileId ?? '').trim();
     if (!cacheKey) return null;
     const forceRefresh = options?.forceRefresh === true;
@@ -1702,14 +1781,15 @@ export const brandApi = {
       return inflight;
     }
 
-    const request = (async (): Promise<string | null> => {
+    const request = Promise.resolve().then(async (): Promise<string | null> => {
       try {
         // Batched resolution first — one round trip for the whole screen.
         if (!publicUrlBatchEndpointUnavailable && !forceRefresh) {
           const batched = await requestPublicUrlBatched(cacheKey);
+          if (epoch !== getMediaSessionEpoch()) return null;
           if (batched !== PUBLIC_URL_BATCH_FAILED) {
             if (typeof batched === 'string' && batched) {
-              signedUrlCache.set(publicCacheKey, {
+              cacheSignedUrl(publicCacheKey, {
                 url: batched,
                 expiresAt: getSignedUrlCacheExpiresAt(batched),
               });
@@ -1730,8 +1810,9 @@ export const brandApi = {
           (payload as { url?: string })?.url ??
           (response.data as { url?: string })?.url ??
           null;
-        if (typeof directUrl === 'string') {
-          signedUrlCache.set(publicCacheKey, {
+        if (epoch !== getMediaSessionEpoch()) return null;
+        if (typeof directUrl === 'string' && isUsableMediaUrl(directUrl, Date.now(), 0)) {
+          cacheSignedUrl(publicCacheKey, {
             url: directUrl,
             expiresAt: getSignedUrlCacheExpiresAt(directUrl),
           });
@@ -1739,6 +1820,7 @@ export const brandApi = {
         }
         return null;
       } catch (error) {
+        if (epoch !== getMediaSessionEpoch()) return null;
         const status =
           error && typeof error === 'object' && 'response' in error
             ? (error as { response?: { status?: number } }).response?.status
@@ -1760,11 +1842,11 @@ export const brandApi = {
         } else {
           console.error('Error generating signed file URL:', error);
         }
-        return existing?.url ?? null;
+        return epoch === getMediaSessionEpoch() && existing?.url && isUsableMediaUrl(existing.url, Date.now(), 0) ? existing.url : null;
       } finally {
-        signedUrlPending.delete(publicCacheKey);
+        if (signedUrlPending.get(publicCacheKey) === request) signedUrlPending.delete(publicCacheKey);
       }
-    })();
+    });
 
     signedUrlPending.set(publicCacheKey, request);
     return request;
@@ -1774,6 +1856,7 @@ export const brandApi = {
     fileId: string,
     options?: SignedUrlResolveOptions,
   ): Promise<string | null> {
+    const epoch = getMediaSessionEpoch();
     const cacheKey = String(fileId ?? '').trim();
     if (!cacheKey) return null;
     const forceRefresh = options?.forceRefresh === true;
@@ -1799,7 +1882,7 @@ export const brandApi = {
       return inflight;
     }
 
-    const request = (async (): Promise<string | null> => {
+    const request = Promise.resolve().then(async (): Promise<string | null> => {
       try {
         const response = await apiClient.get(`/uploads/signed-url/${cacheKey}`);
         const payload = unwrapApiResponse<{ url?: string }>(response.data);
@@ -1807,8 +1890,9 @@ export const brandApi = {
           (payload as { url?: string })?.url ??
           (response.data as { url?: string })?.url ??
           null;
-        if (typeof directUrl === 'string') {
-          signedUrlCache.set(privateCacheKey, {
+        if (epoch !== getMediaSessionEpoch()) return null;
+        if (typeof directUrl === 'string' && isUsableMediaUrl(directUrl, Date.now(), 0)) {
+          cacheSignedUrl(privateCacheKey, {
             url: directUrl,
             expiresAt: getSignedUrlCacheExpiresAt(directUrl),
           });
@@ -1816,6 +1900,7 @@ export const brandApi = {
         }
         return null;
       } catch (error) {
+        if (epoch !== getMediaSessionEpoch()) return null;
         const status =
           error && typeof error === 'object' && 'response' in error
             ? (error as { response?: { status?: number } }).response?.status
@@ -1824,11 +1909,11 @@ export const brandApi = {
           signedUrlMissingCache.set(privateCacheKey, Date.now() + MISSING_SIGNED_URL_TTL_MS);
           return null;
         }
-        return existing?.url ?? null;
+        return epoch === getMediaSessionEpoch() && existing?.url && isUsableMediaUrl(existing.url, Date.now(), 0) ? existing.url : null;
       } finally {
-        signedUrlPending.delete(privateCacheKey);
+        if (signedUrlPending.get(privateCacheKey) === request) signedUrlPending.delete(privateCacheKey);
       }
-    })();
+    });
 
     signedUrlPending.set(privateCacheKey, request);
     return request;
@@ -1843,6 +1928,7 @@ export const brandApi = {
     s3Key: string,
     cacheKey: string,
   ): Promise<string | null> {
+    const epoch = getMediaSessionEpoch();
     const key = String(s3Key ?? '').trim().replace(/^\/+/, '');
     if (!key) return null;
 
@@ -1859,10 +1945,11 @@ export const brandApi = {
           (payload as { url?: string })?.url ??
           (response.data as { url?: string })?.url ??
           null;
-        if (typeof signedUrl === 'string' && signedUrl.length > 0) {
-          signedUrlCache.set(cacheKey, {
+        if (epoch !== getMediaSessionEpoch()) return null;
+        if (typeof signedUrl === 'string' && isUsableMediaUrl(signedUrl, Date.now(), 0)) {
+          cacheSignedUrl(cacheKey, {
             url: signedUrl,
-            expiresAt: Date.now() + SIGNED_URL_TTL_MS,
+            expiresAt: getSignedUrlCacheExpiresAt(signedUrl),
           });
           return signedUrl;
         }
@@ -1955,6 +2042,7 @@ export const brandApi = {
 
   invalidateSignedUrlCache(key?: string) {
     if (!key) {
+      advanceMediaSessionEpoch();
       signedUrlCache.clear();
       signedUrlPending.clear();
       signedUrlMissingCache.clear();

@@ -1,4 +1,7 @@
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import { getCachedMediaUrl as getCachedUrl, invalidateCachedMediaUrl as invalidateCachedUrl, mediaSessionCacheKey, resolveCachedMediaUrl as resolveSignedUrl } from '@/utils/mediaUrlCache';
+import { getMediaUrlExpiryMs, getMediaUrlIdentity, isRenewableMediaUrl, isStorageProviderUrl, isUsableMediaUrl, MEDIA_URL_REFRESH_SKEW_MS } from '@/utils/mediaUrlPolicy';
+import { getMediaSessionEpoch, subscribeMediaSession } from '@/utils/mediaUrlSession';
+import React, { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import DefaultAvatar from './DefaultAvatar';
 import { brandApi } from '@/api/BrandApi';
 import MediaRenderer from './media/MediaRenderer';
@@ -63,67 +66,7 @@ const roundClass = (rounded: ImageWithFallbackProps['rounded']) => {
   }
 };
 
-// Session-storage backed cache for signed URLs to prevent flickering on navigation
-const CACHE_KEY = 'wiez_signed_url_cache';
-const CACHE_EXPIRY_MS = 14 * 60 * 1000; // 14 minutes (signed URLs typically expire at 15min)
-
-interface CacheEntry {
-  url: string;
-  expiresAt: number;
-}
-
-const getCache = (): Record<string, CacheEntry> => {
-  try {
-    const cached = sessionStorage.getItem(CACHE_KEY);
-    return cached ? JSON.parse(cached) : {};
-  } catch {
-    return {};
-  }
-};
-
-const setCache = (cache: Record<string, CacheEntry>) => {
-  try {
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-  } catch {
-    // SessionStorage might be full or unavailable
-  }
-};
-
-const getCachedUrl = (fileId: string): string | null => {
-  const cache = getCache();
-  const entry = cache[fileId];
-  if (entry && entry.expiresAt > Date.now()) {
-    return entry.url;
-  }
-  // Clean up expired entry
-  if (entry) {
-    delete cache[fileId];
-    setCache(cache);
-  }
-  return null;
-};
-
-const setCachedUrl = (fileId: string, url: string) => {
-  const cache = getCache();
-  cache[fileId] = {
-    url,
-    expiresAt: Date.now() + CACHE_EXPIRY_MS,
-  };
-  setCache(cache);
-};
-
-const invalidateCachedUrl = (key: string) => {
-  const cache = getCache();
-  if (!cache[key]) return;
-  delete cache[key];
-  setCache(cache);
-};
-
-const isS3LikeUrl = (value?: string | null) => {
-  if (!value) return false;
-  const lower = value.toLowerCase();
-  return lower.includes('.s3.') || lower.includes('amazonaws.com');
-};
+const isS3LikeUrl = isRenewableMediaUrl;
 
 const STORAGE_KEY_PREFIXES = [
   'PROFILE_IMAGE',
@@ -138,59 +81,7 @@ const STORAGE_KEY_PREFIXES = [
   'MESSAGE_DOCUMENT',
 ] as const;
 
-const hasSignedUrlParams = (value?: string | null) => {
-  if (!value) return false;
-  try {
-    const parsed = new URL(value);
-    return Boolean(
-      parsed.searchParams.get('X-Amz-Signature') ||
-        parsed.searchParams.get('Signature') ||
-        parsed.searchParams.get('Expires') ||
-        parsed.searchParams.get('expires') ||
-        parsed.searchParams.get('token'),
-    );
-  } catch {
-    return false;
-  }
-};
-
-const parseCompactAmzDate = (value: string) => {
-  const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(value);
-  if (!match) return null;
-  const [, year, month, day, hour, minute, second] = match;
-  const timestamp = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
-  return Number.isFinite(timestamp) ? timestamp : null;
-};
-
-const getSignedUrlExpiresAt = (value: string) => {
-  try {
-    const parsed = new URL(value);
-    const unixExpires = parsed.searchParams.get('Expires') ?? parsed.searchParams.get('expires');
-    if (unixExpires) {
-      const timestamp = Number(unixExpires) * 1000;
-      if (Number.isFinite(timestamp)) return timestamp;
-    }
-
-    const amzDate = parsed.searchParams.get('X-Amz-Date');
-    const amzExpires = Number(parsed.searchParams.get('X-Amz-Expires'));
-    const amzStartedAt = amzDate ? parseCompactAmzDate(amzDate) : null;
-    if (amzStartedAt && Number.isFinite(amzExpires)) {
-      return amzStartedAt + amzExpires * 1000;
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-};
-
-const isUsableInitialUrl = (value?: string | null) => {
-  if (!value || !/^https?:\/\//i.test(value)) return false;
-  if (isS3LikeUrl(value) && !hasSignedUrlParams(value)) return false;
-  if (!hasSignedUrlParams(value)) return true;
-  const expiresAt = getSignedUrlExpiresAt(value);
-  return Boolean(expiresAt && expiresAt > Date.now() + 30_000);
-};
+const isUsableInitialUrl = isUsableMediaUrl;
 
 const isRawStorageKey = (value?: string | null) => {
   if (!value) return false;
@@ -212,37 +103,21 @@ const canUseSourceDirectly = (src?: string | null, fileId?: string | null) =>
   isUsableInitialUrl(src) && !shouldPreferFileIdResolution(src, fileId);
 
 const resolveSourceCacheKey = (fileId?: string | null, src?: string | null) => {
-  if (fileId) return fileId;
+  if (fileId) return `${fileId}:${src ? getMediaUrlIdentity(src) : 'none'}`;
   if (!src) return null;
   if (isRawStorageKey(src)) return `key:${src}`;
-  return src;
+  return getMediaUrlIdentity(src);
 };
 
-// In-flight dedup: prevents concurrent requests for the same fileId/src
-const inflight = new Map<string, Promise<string | null>>();
 const lastGoodUrlCache = new Map<string, string>();
-
-const resolveSignedUrl = async (
-  key: string,
-  fetcher: () => Promise<string | null>,
-): Promise<string | null> => {
-  const cached = getCachedUrl(key);
-  if (cached) return cached;
-
-  const existing = inflight.get(key);
-  if (existing) return existing;
-
-  const promise = fetcher()
-    .then((url) => {
-      if (url) setCachedUrl(key, url);
-      return url || null;
-    })
-    .catch(() => null)
-    .finally(() => { inflight.delete(key); });
-
-  inflight.set(key, promise);
-  return promise;
-};
+function rememberLastGood(key: string, value: string) {
+  lastGoodUrlCache.set(mediaSessionCacheKey(key), value);
+  while (lastGoodUrlCache.size > 256) lastGoodUrlCache.delete(lastGoodUrlCache.keys().next().value!);
+}
+function previousGood(key: string): string | null {
+  const value = lastGoodUrlCache.get(mediaSessionCacheKey(key));
+  return value && isUsableMediaUrl(value) ? value : null;
+}
 
 export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   src,
@@ -263,8 +138,11 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   waitForDecode = false,
   onLoaded,
 }) => {
+  const sessionEpoch = useSyncExternalStore(subscribeMediaSession, getMediaSessionEpoch, getMediaSessionEpoch);
+  const previousEpoch = React.useRef(sessionEpoch);
+  const [resolutionRevision, setResolutionRevision] = useState(0);
   const sourceCacheKey = resolveSourceCacheKey(fileId, src);
-  const cachedLastGoodUrl = sourceCacheKey ? lastGoodUrlCache.get(sourceCacheKey) ?? null : null;
+  const cachedLastGoodUrl = sourceCacheKey ? previousGood(sourceCacheKey) ?? null : null;
   const [resolved, setResolved] = useState<string | null>(() => {
     if (canUseSourceDirectly(src, fileId)) return src ?? null;
     // fileId-based: always resolve via cache, never use the raw ID
@@ -310,6 +188,10 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
 
   useEffect(() => {
     let mounted = true;
+    const accountChanged = previousEpoch.current !== sessionEpoch;
+    const forceRefresh = resolutionRevision > 0 || accountChanged;
+    previousEpoch.current = sessionEpoch;
+    if (accountChanged) { setLastGoodUrl(null); setResolved(null); }
     retryCountRef.current = 0;
 
     const run = async () => {
@@ -319,7 +201,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       setEverErrored(false);
       setInstant(false);
       if (sourceCacheKey) {
-        const cachedLastGood = lastGoodUrlCache.get(sourceCacheKey);
+        const cachedLastGood = previousGood(sourceCacheKey);
         if (cachedLastGood) {
           setLastGoodUrl(cachedLastGood);
         }
@@ -336,29 +218,29 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         canUseSourceDirectly(src, fileId) ||
         Boolean(cachedFileUrl) ||
         Boolean(cachedSourceUrl) ||
-        Boolean(sourceCacheKey && lastGoodUrlCache.get(sourceCacheKey));
-      const hasPreviouslyPaintedSource = Boolean(sourceCacheKey && lastGoodUrlCache.get(sourceCacheKey));
+        Boolean(sourceCacheKey && previousGood(sourceCacheKey));
+      const hasPreviouslyPaintedSource = Boolean(sourceCacheKey && previousGood(sourceCacheKey));
 
       if ((waitForDecode && !hasPreviouslyPaintedSource) || (!waitForDecode && !hasInstantSource)) {
         setLoaded(false);
       }
 
-      if (canUseSourceDirectly(src, fileId)) {
+      if (!forceRefresh && canUseSourceDirectly(src, fileId)) {
         setResolved(src ?? null);
         if (!waitForDecode) setLoaded(true);
         return;
       }
 
-      if (!fileId && src && isS3LikeUrl(src)) {
-        const url = await resolveSignedUrl(src, () => brandApi.getSignedS3Url(src));
-        if (mounted) {
-          if (url) {
-            setResolved(url);
-          } else {
-            setResolved(null);
-            setHadError(true);
+      if (src && isS3LikeUrl(src)) {
+        const url = await resolveSignedUrl(sourceCacheKey ?? src, async () => {
+          if (typeof brandApi.getSignedMediaSourceUrl === 'function') {
+            const renewed = await brandApi.getSignedMediaSourceUrl(src, { forceRefresh });
+            if (renewed) return renewed;
           }
-        }
+          if (fileId) return forceRefresh ? brandApi.getSignedFileUrl(fileId, { forceRefresh: true }) : brandApi.getSignedFileUrl(fileId);
+          return isStorageProviderUrl(src) ? (forceRefresh ? brandApi.getSignedS3Url(src, { forceRefresh: true }) : brandApi.getSignedS3Url(src)) : null;
+        }, forceRefresh);
+        if (mounted) { setResolved(url); if (!url) setHadError(true); }
         return;
       }
 
@@ -379,7 +261,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       }
 
       // Non-S3 absolute URLs and querystring assets can be used directly.
-      if (!fileId && src) {
+      if (!fileId && src && isUsableInitialUrl(src)) {
         setResolved(src);
         return;
       }
@@ -424,7 +306,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     return () => {
       mounted = false;
     };
-  }, [fileId, sourceCacheKey, src, waitForDecode]);
+  }, [fileId, sourceCacheKey, src, waitForDecode, sessionEpoch, resolutionRevision]);
 
   useEffect(() => {
     if (hadError) setEverErrored(true);
@@ -434,8 +316,8 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   useEffect(() => {
     if (!hadError || retryCountRef.current >= 1) return;
     retryCountRef.current += 1;
+    let mounted = true;
     const timer = setTimeout(() => {
-      setHadError(false);
       setLoaded(false);
       if (!sourceCacheKey) return;
       // If the current URL failed to load, drop any cached mapping for this key
@@ -466,7 +348,11 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
        * existed for. Going straight there turns a hard outage into one slow
        * frame.
        */
-      const fetcher = fileId
+      const fetcher = src && isRenewableMediaUrl(src) && typeof brandApi.getSignedMediaSourceUrl === 'function'
+        ? async () => (await brandApi.getSignedMediaSourceUrl(src, { forceRefresh: true }))
+          ?? (fileId ? (await brandApi.getPrivateSignedFileUrl(fileId, { forceRefresh: true }))
+            ?? (await brandApi.getPublicFileUrl(fileId, { forceRefresh: true })) : null)
+        : fileId
         ? async () =>
             /*
              * Private FIRST, public as the fallback — not private alone.
@@ -485,16 +371,36 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
           : src && !/^https?:\/\//i.test(src)
             ? () => brandApi.getSignedS3KeyUrl(src, { forceRefresh: true })
             : async () => src ?? null;
-      resolveSignedUrl(sourceCacheKey, fetcher).then((url) => {
+      resolveSignedUrl(sourceCacheKey, fetcher, true).then((url) => {
+        if (!mounted) return;
         if (url) {
           setResolved(url);
           setLoaded(false);
+          setHadError(false);
         }
         else setHadError(true);
       });
     }, 2000);
-    return () => clearTimeout(timer);
+    return () => { mounted = false; clearTimeout(timer); };
   }, [hadError, fileId, sourceCacheKey, src]);
+
+  useEffect(() => {
+    const expiresAt = getMediaUrlExpiryMs(resolved);
+    if (expiresAt === null) return;
+    const timeout = setTimeout(() => setResolutionRevision((value) => value + 1),
+      Math.min(2_147_483_647, Math.max(1000, expiresAt - Date.now() - MEDIA_URL_REFRESH_SKEW_MS)));
+    return () => clearTimeout(timeout);
+  }, [resolved]);
+
+  useEffect(() => {
+    const check = () => {
+      if (isRenewableMediaUrl(resolved ?? src) && !isUsableMediaUrl(resolved)) setResolutionRevision((value) => value + 1);
+    };
+    const visible = () => { if (document.visibilityState === 'visible') check(); };
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', visible);
+    return () => { window.removeEventListener('focus', check); document.removeEventListener('visibilitychange', visible); };
+  }, [resolved, src]);
 
   // Only treat as "resolving" when there is actually a source to resolve.
   // Without this guard, a null src causes the shimmer to show forever because
@@ -548,7 +454,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       if (resolved) {
         setLastGoodUrl(resolved);
         if (sourceCacheKey) {
-          lastGoodUrlCache.set(sourceCacheKey, resolved);
+          rememberLastGood(sourceCacheKey, resolved);
         }
       }
     }
@@ -563,7 +469,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     if (resolved) {
       setLastGoodUrl(resolved);
       if (sourceCacheKey) {
-        lastGoodUrlCache.set(sourceCacheKey, resolved);
+        rememberLastGood(sourceCacheKey, resolved);
       }
     }
   };

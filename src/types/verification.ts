@@ -173,6 +173,7 @@ export interface VerificationUploadInstruction {
   fileId: string;
   expectedKey: string;
   uploadUrl: string;
+  uploadHeaders?: Record<string, string> | null;
   uploadFields?: Record<string, string> | null;
   method: 'POST' | 'PUT';
   expiresIn?: number;

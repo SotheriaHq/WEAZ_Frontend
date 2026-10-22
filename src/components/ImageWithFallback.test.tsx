@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ImageWithFallback from './ImageWithFallback';
 
 const brandApiMock = vi.hoisted(() => ({
+  getSignedMediaSourceUrl: vi.fn(),
+  getPrivateSignedFileUrl: vi.fn(),
+  getPublicFileUrl: vi.fn(),
   getSignedFileUrl: vi.fn(),
   getSignedS3Url: vi.fn(),
   getSignedS3KeyUrl: vi.fn(),
@@ -26,6 +29,7 @@ vi.mock('./DefaultAvatar', () => ({
 describe('ImageWithFallback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    brandApiMock.getSignedMediaSourceUrl.mockResolvedValue(null);
     sessionStorage.clear();
   });
 

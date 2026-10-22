@@ -479,7 +479,8 @@ const uploadPresignedFile = async (
       return;
     }
 
-    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    const headers = entry.uploadHeaders ?? { 'Content-Type': file.type || 'application/octet-stream' };
+    Object.entries(headers).forEach(([name, value]) => xhr.setRequestHeader(name, value));
     xhr.send(file);
   });
 };
