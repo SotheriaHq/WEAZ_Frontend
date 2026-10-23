@@ -1064,7 +1064,8 @@ html {
 
   /* WIEZ Material & Surface Lab: Neumorphic recessed card */
   .neu-recessed-card,
-  .surface-card-recessed {
+  .surface-card-recessed,
+  .surface-card {
     background-color: var(--neu-surface);
     color: var(--neu-text);
     border-radius: 1rem;
@@ -1073,7 +1074,8 @@ html {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .neu-recessed-card:hover,
-  .surface-card-recessed:hover {
+  .surface-card-recessed:hover,
+  .surface-card:hover {
     box-shadow: inset 5px 5px 10px var(--neu-shadow-dark), inset -5px -5px 10px var(--neu-shadow-light);
   }
 
@@ -1238,15 +1240,15 @@ html {
 
   /* Tag sizes */
   .chip-xs {
-    @apply text-[11px] px-2 py-0.5;
+    @apply neu-inset-chip text-[11px] px-2 py-0.5;
   }
 
   .chip-sm {
-    @apply text-[12px] px-2.5 py-1;
+    @apply neu-inset-chip text-[12px] px-2.5 py-1;
   }
 
   .chip-md {
-    @apply text-[13px] px-3 py-1.5;
+    @apply neu-inset-chip text-[13px] px-3 py-1.5;
   }
 
   /* Tag color accents */
@@ -1560,12 +1562,14 @@ body.modal-open {
 }
 
 .tag-badge {
+  @apply neu-inset-chip;
   background: rgba(147, 51, 234, 0.15);
   color: #a855f7;
   border: 1px solid rgba(147, 51, 234, 0.3);
 }
 
 .tag-badge-outline {
+  @apply neu-inset-chip;
   background: rgba(147, 51, 234, 0.06);
   color: #6b7280;
   border: 1.5px solid rgba(147, 51, 234, 0.18);
@@ -1575,6 +1579,7 @@ body.modal-open {
 }
 
 :is(.dark) .tag-badge-outline {
+  @apply neu-inset-chip;
   background: rgba(168, 85, 247, 0.08);
   color: #c4b5fd;
   border-color: rgba(168, 85, 247, 0.25);
