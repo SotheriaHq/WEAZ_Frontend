@@ -1,8 +1,8 @@
 # WIEZ Content, Intellectual Property, and Copyright Policy
 
-Version: `2026.10.19-v1.5`
+Version: `2026.10.23-v1.6`
 
-Effective Date: October 19, 2026
+Effective Date: October 23, 2026
 
 Governing Entities: WIEZ Technology Ltd. (Nigeria) & Global Operating Affiliates
 
@@ -212,7 +212,7 @@ For all intellectual property inquiries, statutory DMCA notices, trademark claim
 
 ### Subscription custom-order policy scope and consumer rights
 
-The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.19-v1.5`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.23-v1.6`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
 
 ## Removed sources and existing custom-order evidence
 

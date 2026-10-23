@@ -80,7 +80,6 @@ export const brandSubscriptionApi = {
     unwrapApiResponse<{
       subscription: BrandQueueSubscription | null;
       assignedTierKey?: string | null;
-      legacyEligible?: boolean;
       tiers: QueueTier[];
       invoices: BrandSubscriptionInvoice[];
       compensations?: Array<{

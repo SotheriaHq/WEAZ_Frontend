@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 
 export type UseFilePickerOptions = {
@@ -23,13 +23,19 @@ export const useFilePicker = ({
   const [isDragActive, setIsDragActive] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; if (resetTimer.current !== null) clearTimeout(resetTimer.current); };
+  }, []);
 
   // accept checker
   const mapAccepted = useCallback((file: File, localAccept?: string[]) => {
     const list = localAccept ?? accept;
     if (!list || list.length === 0) return true;
     return list.some(a => {
-      if (a.includes('/')) return file.type.startsWith(a.split('/')[0]);
+      if (a.includes('/')) return a.endsWith('/*') ? file.type.startsWith(a.slice(0, -1)) : file.type === a;
       return file.name.toLowerCase().endsWith(a.toLowerCase());
     });
   }, [accept]);
@@ -37,6 +43,7 @@ export const useFilePicker = ({
   const handleFiles = useCallback((files: FileList | null) => {
     if (disabled || !files) return;
     const incoming = Array.from(files);
+    if (incoming.length === 0) return;
     const accepted: File[] = [];
     const errs: string[] = [];
 
@@ -54,9 +61,10 @@ export const useFilePicker = ({
     }
 
     let limited = accepted;
-    if (typeof maxFiles === 'number' && maxFiles > 0 && accepted.length > maxFiles) {
-      limited = accepted.slice(0, maxFiles);
-      errs.push(`Only the first ${maxFiles} file(s) were added. Additional files were ignored.`);
+    if (typeof maxFiles === 'number' && accepted.length > Math.max(0, maxFiles)) {
+      limited = accepted.slice(0, Math.max(0, maxFiles));
+      errs.push(maxFiles <= 0 ? 'Remove an existing file before adding another.' :
+        `Only the first ${maxFiles} file(s) were added. Additional files were ignored.`);
     }
 
     setPendingCount(limited.length);
@@ -66,7 +74,9 @@ export const useFilePicker = ({
       try {
         onFiles?.(limited);
       } finally {
-        window.setTimeout(() => {
+        if (resetTimer.current !== null) clearTimeout(resetTimer.current);
+        if (mounted.current) resetTimer.current = setTimeout(() => {
+          resetTimer.current = null;
           setPendingCount(0);
         }, 0);
       }
@@ -81,9 +91,8 @@ export const useFilePicker = ({
   }, [accept, maxSizeBytes, onFiles, mapAccepted, disabled, maxFiles]);
 
   const onInputChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
-    if (disabled) return;
-    handleFiles(e.target.files);
-    if (inputRef.current) inputRef.current.value = '';
+    try { handleFiles(e.target.files); }
+    finally { e.target.value = ''; }
   };
 
   const onDrop: React.DragEventHandler<HTMLDivElement> = (e) => {

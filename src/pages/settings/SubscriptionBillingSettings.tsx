@@ -384,8 +384,7 @@ function BrandSubscriptionContent() {
                 </p>
               ) : null}
               {canManage &&
-              !subscription.cancelAtPeriodEnd &&
-              subscription.tierKey !== 'LEGACY' ? (
+              !subscription.cancelAtPeriodEnd ? (
                 <button
                   className="queue-button"
                   disabled={busy}
@@ -397,9 +396,7 @@ function BrandSubscriptionContent() {
             </section>
           ) : !billing.isPending && !billing.isError ? (
             <p>
-              {billing.data?.legacyEligible
-                ? 'Your existing brand has free, unlimited Legacy custom-order capacity. A paid tier takes effect only after verified payment. Legacy does not include paid queue jumps.'
-                : 'No paid subscription. Select a tier to open custom-order intake.'}
+              No paid subscription. Select a tier to open custom-order intake.
             </p>
           ) : null}
           {billing.data?.assignedTierKey ? (
@@ -418,7 +415,6 @@ function BrandSubscriptionContent() {
           ) : null}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {(billing.data?.tiers ?? [])
-              .filter((tier) => tier.tierKey !== 'LEGACY')
               .map((tier) => (
                 <section className="queue-section min-w-0" key={tier.tierKey}>
                   <h2 className="break-words text-lg font-bold">
@@ -657,7 +653,6 @@ function BrandSubscriptionContent() {
           }}
           hasSubscription={Boolean(
             subscription &&
-              subscription.tierKey !== 'LEGACY' &&
               ['ACTIVE', 'PAST_DUE'].includes(subscription.status),
           )}
         />
