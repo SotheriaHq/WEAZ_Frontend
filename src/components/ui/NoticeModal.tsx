@@ -110,10 +110,10 @@ const TONE_STYLE: Record<NoticeTone, { glyph: string; title: string; plate: stri
 };
 
 const PRIMARY_BUTTON =
-  'inline-flex items-center justify-center gap-1.5 rounded-full bg-fuchsia-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-fuchsia-500/25 transition-colors hover:bg-fuchsia-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#15111a]';
+  'inline-flex items-center justify-center gap-1.5 rounded-full bg-fuchsia-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-fuchsia-500/25 transition-all hover:bg-fuchsia-700 active:scale-[0.98] active:translate-y-[1px] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#15111a]';
 
 const SECONDARY_BUTTON =
-  'inline-flex items-center justify-center rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:border-white/15 dark:text-slate-200 dark:hover:border-white/25 dark:hover:text-white dark:focus-visible:ring-offset-[#15111a]';
+  'neu-pressed-button inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-slate-700 transition-all hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:text-slate-200 dark:hover:text-white dark:focus-visible:ring-offset-[#15111a]';
 
 /** Mount once, near the app root. */
 export const NoticeModalHost: React.FC = () => {
