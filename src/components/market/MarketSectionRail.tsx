@@ -369,6 +369,25 @@ export const MarketSectionRail: React.FC<MarketSectionRailProps> = ({
             />
           );
         })}
+
+        {/* ── End-of-Rail Explore / View More Card ── */}
+        <div
+          onClick={handleExplore}
+          className="group relative flex w-[200px] sm:w-[220px] shrink-0 cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed border-gray-300/80 bg-gradient-to-b from-stone-50/60 to-stone-100/80 p-5 text-center transition-all duration-300 hover:border-purple-500 hover:bg-purple-50/30 hover:shadow-md dark:border-white/15 dark:from-white/[0.02] dark:to-white/[0.05] dark:hover:border-purple-400 dark:hover:bg-purple-950/20"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-900 text-white shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:bg-purple-600 dark:bg-white dark:text-gray-900">
+            <span className="text-xl leading-none font-bold">→</span>
+          </div>
+          <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.2em] text-purple-600 dark:text-purple-400">
+            Sector Archive
+          </p>
+          <h4 className="mt-1 font-serif text-sm font-semibold text-gray-900 dark:text-white line-clamp-2">
+            Explore All {title}
+          </h4>
+          <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+            View full edit & custom fits
+          </p>
+        </div>
       </div>
     </section>
   );

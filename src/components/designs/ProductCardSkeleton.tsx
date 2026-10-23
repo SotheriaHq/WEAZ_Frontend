@@ -5,6 +5,7 @@ interface ProductCardSkeletonProps {
   count?: number;
   /** View mode - unused for single skeleton, but kept for backwards compatibility */
   viewMode?: 'grid' | 'list';
+  proportion?: 'catalog' | 'studio';
 }
 
 /**
@@ -19,7 +20,8 @@ interface ProductCardSkeletonProps {
  */
 const ProductCardSkeleton: React.FC<ProductCardSkeletonProps> = ({ 
   count, 
-  viewMode: _viewMode = 'grid' 
+  viewMode: _viewMode = 'grid',
+  proportion = 'catalog',
 }) => {
   // Single skeleton card component
   const SkeletonCard = ({ index }: { index: number }) => (
@@ -34,7 +36,7 @@ const ProductCardSkeleton: React.FC<ProductCardSkeletonProps> = ({
       arrived. Matching the aspect ratio fixes both: the placeholder is the same
       box the card will be, and it is filled so it reads as a card.
     */
-    <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl">
+    <div className={`relative w-full overflow-hidden rounded-2xl ${proportion === 'studio' ? 'aspect-[100/158] lg:aspect-[5/6]' : 'aspect-[4/5]'}`}>
       {/* Full-bleed image skeleton */}
       <div className="absolute inset-0 overflow-hidden bg-gray-200 dark:bg-white/10">
         {/* Shimmer effect */}

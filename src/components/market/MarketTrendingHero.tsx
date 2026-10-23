@@ -185,7 +185,11 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
     : 'HANDPICKED • READY TO WEAR';
 
   return (
-    <section aria-labelledby="market-trending-heading" className="w-full">
+    <section
+      aria-labelledby="market-trending-heading"
+      data-testid="market-trending-hero"
+      className="w-full"
+    >
       {/* Header section matching Image 1 */}
       <div className="mb-4">
         <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[color:var(--brand-primary,#9333EA)]">

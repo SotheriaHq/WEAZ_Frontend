@@ -3,7 +3,7 @@ import React from 'react';
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   hoverEffect?: boolean;
   glass?: boolean;
-  variant?: 'default' | 'bordered' | 'elevated';
+  variant?: 'default' | 'bordered' | 'elevated' | 'recessed';
   padding?: 'none' | 'sm' | 'md' | 'lg';
 }
 
@@ -18,16 +18,16 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
     ...props
   }, ref) => {
     
-    const baseStyles = 'rounded-2xl border';
+    const baseStyles = 'rounded-2xl';
     
     // "Glass" style vs "Solid" style
     const bgStyles = glass
-      ? 'surface-menu backdrop-blur-xl shadow-glass'
+      ? 'surface-menu backdrop-blur-xl shadow-glass border'
       : variant === 'bordered'
-        ? 'surface-card shadow-sm'
+        ? 'surface-card shadow-sm border'
         : variant === 'elevated'
-          ? 'surface-card shadow-md'
-          : 'surface-card shadow-sm';
+          ? 'surface-card shadow-md border'
+          : 'neu-recessed-card';
 
     const hoverStyles = hoverEffect
       ? 'transition-all duration-300 hover:-translate-y-1 hover:shadow-glass-hover hover:border-brand-primary/30' 

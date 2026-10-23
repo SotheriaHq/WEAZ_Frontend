@@ -1,4 +1,5 @@
 import React from 'react';
+import MediaRenderer from './MediaRenderer';
 
 /**
  * PinchZoomImage — lightweight pinch + double-tap zoom for a single inline
@@ -204,13 +205,16 @@ const PinchZoomImage: React.FC<PinchZoomImageProps> = ({
       onPointerCancel={onPointerUp}
       onDoubleClick={(e) => toggleDoubleTap(e as unknown as React.PointerEvent)}
     >
-      <img
-        ref={imgRef}
+      <MediaRenderer
+        kind="image"
+        imgRef={imgRef}
         src={src}
         alt={alt}
         draggable={false}
-        className="block h-auto max-h-full w-full select-none object-contain will-change-transform"
-        style={{ transformOrigin: 'center center' }}
+        className="contents"
+        maxHeightClassName="max-h-full"
+        mediaClassName="block h-auto max-h-full w-full select-none object-contain will-change-transform"
+        mediaStyle={{ transformOrigin: 'center center' }}
       />
     </div>
   );

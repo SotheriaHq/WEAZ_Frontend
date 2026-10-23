@@ -254,6 +254,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
     >
       {/* Full Image Background — aspect box reserves layout (CLS) before paint */}
       <div
+        data-runway-content="true"
         className={`relative w-full bg-transparent ${cardAspectRatio ? '' : 'aspect-[3/4] min-h-[200px]'}`}
         style={cardAspectStyle}
       >

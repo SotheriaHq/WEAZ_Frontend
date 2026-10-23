@@ -1,4 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render as rawRender, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FilterSelector from "./FilterSelector";
 import { brandApi } from "@/api/BrandApi";
@@ -68,8 +70,15 @@ const dimensions = [
   },
 ];
 
+let client: QueryClient;
+function render(ui: React.ReactElement) {
+  return rawRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
 describe("FilterSelector", () => {
   beforeEach(() => {
+    client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.clearAllMocks();
     vi.mocked(brandApi.getFilterDimensions).mockResolvedValue(dimensions as any);
   });
 
@@ -83,6 +92,18 @@ describe("FilterSelector", () => {
     expect(screen.getByText("Color family")).toBeInTheDocument();
     expect(screen.getByText("Fit")).toBeInTheDocument();
     expect(screen.queryByText("Price Range")).not.toBeInTheDocument();
+  });
+
+  it('shares one request and cached options across product and design selectors', async () => {
+    render(<><FilterSelector value={{}} onChange={vi.fn()} entityType="PRODUCT" /><FilterSelector value={{}} onChange={vi.fn()} entityType="DESIGN" /></>);
+    expect(await screen.findAllByText('Cultural vibe')).toHaveLength(2);
+    expect(brandApi.getFilterDimensions).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the metadata error without caching it as an empty successful response', async () => {
+    vi.mocked(brandApi.getFilterDimensions).mockRejectedValueOnce(new Error('offline'));
+    render(<FilterSelector value={{}} onChange={vi.fn()} entityType="PRODUCT" />);
+    expect(await screen.findByText(/Style details could not load/)).toBeInTheDocument();
   });
 
   it("maps selected values back into the filterSelection structure", async () => {

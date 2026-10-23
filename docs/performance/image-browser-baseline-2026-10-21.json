@@ -1,0 +1,18 @@
+{
+  "generatedAt": "2026-10-21T13:01:57.564Z",
+  "browser": "143.0.7499.4",
+  "baselineRef": "b466a5847fd8f6cb98fbe22f1a1248b774e96e30",
+  "limitations": "One synthetic stress image and one processing sample; compare full reconstructed input resolution, not a human perceptual-quality percentage.",
+  "result": {
+    "fixture": "2400x3200 synthetic chromatic weave with folds",
+    "inputBytes": 10929673,
+    "outputBytes": 816492,
+    "outputWidth": 857,
+    "outputHeight": 1143,
+    "skipped": false,
+    "preprocessMs": 2839.100000023842,
+    "rgbSsim8x8": 0.050170469205410864,
+    "psnrDb": 13.552725966252643,
+    "maximumRgbError": 168
+  }
+}

@@ -13,6 +13,7 @@ import AccountSecuritySettings from '@/components/settings/tabs/AccountSecurityS
 import NotificationSettings from '@/components/settings/tabs/NotificationSettings';
 import EmailPreferencesSettings from '@/components/settings/tabs/EmailPreferencesSettings';
 import StoreGeneralSettings from '@/components/settings/tabs/StoreGeneralSettings';
+import CustomerSettings from '@/components/settings/tabs/CustomerSettings';
 import StorePoliciesSettings from '@/components/settings/tabs/StorePoliciesSettings';
 import StorePaymentsSettings from '@/components/settings/tabs/StorePaymentsSettings';
 import StoreHoursSettings from '@/components/settings/tabs/StoreHoursSettings';
@@ -210,6 +211,7 @@ const sections: Record<string, React.ReactNode> = {
 
   // Studio
   'store-general': <StoreGeneralSettings />,
+  'store-customers': <CustomerSettings />,
   'store-hours': <StoreHoursSettings />,
   'store-social': (
     <ComingSoon

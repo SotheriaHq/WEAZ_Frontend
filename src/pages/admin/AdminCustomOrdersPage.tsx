@@ -383,7 +383,7 @@ const AdminCustomOrdersPage: React.FC = () => {
           <div className="mt-5 space-y-3">
             {loading ? <div className="text-sm text-slate-500 dark:text-slate-400">Loading order queue...</div> : null}
             {orders.map((entry) => (
-              <button key={entry.id} type="button" onClick={() => navigate(`/admin/custom-orders/${entry.id}`)} className={`w-full rounded-2xl border px-4 py-4 text-left transition ${selected?.id === entry.id ? 'border-emerald-400 bg-emerald-500/10' : 'border-black/10 bg-white/70 hover:border-emerald-300 dark:border-white/10 dark:bg-white/[0.03]'}`}>
+              <button key={entry.id} type="button" onClick={() => navigate(`/admin/custom-orders/${entry.id}`)} className={`w-full neu-recessed-card px-4 py-4 text-left transition ${selected?.id === entry.id ? 'ring-2 ring-emerald-500' : 'hover:border-emerald-300'}`}>
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <div className="font-semibold text-slate-900 dark:text-white">{entry.sourceTitle}</div>

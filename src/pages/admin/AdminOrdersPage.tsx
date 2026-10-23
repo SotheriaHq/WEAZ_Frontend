@@ -572,7 +572,7 @@ const AdminOrdersPage: React.FC = () => {
 
   const renderCommissionWorkspace = () => (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-6 dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="neu-recessed-card p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="font-geist text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-300">
@@ -590,7 +590,7 @@ const AdminOrdersPage: React.FC = () => {
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <label className="space-y-2 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-white/10 dark:bg-slate-900">
+          <label className="space-y-2 neu-recessed-card p-4">
             <div className="font-geist text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
               Standard order commission (%)
             </div>
@@ -606,7 +606,7 @@ const AdminOrdersPage: React.FC = () => {
             />
           </label>
 
-          <label className="space-y-2 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-white/10 dark:bg-slate-900">
+          <label className="space-y-2 neu-recessed-card p-4">
             <div className="font-geist text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
               Custom order commission (%)
             </div>
@@ -644,7 +644,7 @@ const AdminOrdersPage: React.FC = () => {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-white/10 dark:bg-slate-900">
+        <div className="neu-recessed-card p-5">
           <div className="font-geist text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
             Standard order example
           </div>
@@ -655,7 +655,7 @@ const AdminOrdersPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-white/10 dark:bg-slate-900">
+        <div className="neu-recessed-card p-5">
           <div className="font-geist text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
             Custom order example
           </div>
@@ -667,7 +667,7 @@ const AdminOrdersPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-white/10 dark:bg-slate-900">
+      <div className="neu-recessed-card p-5">
         <div className="font-geist text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
           Active finance rules snapshot
         </div>
@@ -1072,7 +1072,7 @@ const AdminOrdersPage: React.FC = () => {
           {(activeTab === 'CUSTOM' ? customMetrics : standardMetrics).map((metric) => (
             <div
               key={metric.label}
-              className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-white/5 shadow-2xs flex flex-col justify-between min-h-[100px]"
+              className="neu-recessed-card p-4 flex flex-col justify-between min-h-[100px]"
             >
               <span className="font-geist text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 {metric.label}
@@ -1086,7 +1086,7 @@ const AdminOrdersPage: React.FC = () => {
       ) : null}
 
       {/* Main Data Section */}
-      <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/5 shadow-2xs overflow-hidden flex flex-col">
+      <section className="neu-recessed-card overflow-hidden flex flex-col">
         {activeTab === 'COMMISSION' ? (
           <div className="p-6">{renderCommissionWorkspace()}</div>
         ) : (
@@ -1155,7 +1155,7 @@ const AdminOrdersPage: React.FC = () => {
                       type="button"
                       onClick={() => setAttentionOnly((prev) => !prev)}
                       aria-pressed={attentionOnly}
-                      className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 font-geist text-xs font-semibold shrink-0 transition ${
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 font-geist text-xs font-semibold shrink-0 transition neu-pressed-button ${
                         attentionOnly
                           ? 'border-rose-300/80 bg-rose-500/10 text-rose-700 dark:border-rose-500/40 dark:text-rose-300'
                           : 'border-slate-200/60 text-slate-700 hover:border-slate-300 dark:border-white/10 dark:text-slate-200'
@@ -1166,7 +1166,7 @@ const AdminOrdersPage: React.FC = () => {
                   </>
                 )}
 
-                <div className="inline-flex items-center bg-slate-100/70 dark:bg-slate-950 p-0.5 rounded-xl border border-slate-200/60 dark:border-white/10 shrink-0 ml-auto md:ml-0">
+                <div className="inline-flex items-center neu-recessed-card p-0.5 shrink-0 ml-auto md:ml-0">
                   {(['TABLE', 'LIST', 'CARDS'] as OrdersView[]).map((mode) => (
                     <button
                       key={mode}
@@ -1174,7 +1174,7 @@ const AdminOrdersPage: React.FC = () => {
                       onClick={() => setViewMode(mode)}
                       className={`px-2.5 py-1 rounded-lg font-geist text-[11px] font-bold tracking-wider transition-colors ${
                         viewMode === mode
-                          ? 'bg-[#10B981] text-white shadow-2xs'
+                          ? 'neu-pressed-button text-[#10B981] font-extrabold'
                           : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >

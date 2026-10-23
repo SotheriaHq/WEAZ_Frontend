@@ -1,5 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { marketApi, type GetMarketFeedParams } from '@/api/MarketApi';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
 import { queryKeys } from '@/query/queryKeys';
 import type { MarketFeedResponse } from '@/types/market';
 
@@ -18,10 +20,11 @@ export const useRunwayFeed = (
     initialData?: MarketFeedResponse;
   },
 ) => {
+  const userId = useSelector((state: RootState) => state.user.profile?.id);
   return useQuery({
     // Cache key stays under queryKeys.runway; transport may still hit
     // GET /collections/market until the backend renames the design feed path.
-    queryKey: queryKeys.runway.feed(params),
+    queryKey: [...queryKeys.runway.feed(params), userId ?? 'guest'],
     queryFn: async ({ signal }) => {
       return await marketApi.getRunwayFeed(params, { signal });
     },

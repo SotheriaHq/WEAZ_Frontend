@@ -448,13 +448,13 @@ html {
        .dark block: :root and .dark have equal specificity on <html>, so a
        later :root silently overrides .dark and locks every modal to the
        light surface regardless of theme (this exact bug shipped once). */
-    --neu-surface: #f0efee;           /* warm light surface — no lavender */
-    --neu-surface-soft: #e7e5e4;
-    --neu-text: #0d0d0d;
+    --neu-surface: #eff0ed;           /* WIEZ Material & Surface Lab light paper */
+    --neu-surface-soft: #e1e4de;
+    --neu-text: #252824;
     --neu-text-muted: #78716c;
-    --neu-border: rgba(163, 158, 153, 0.3);
-    --neu-shadow-dark: rgba(163, 158, 153, 0.32);
-    --neu-shadow-light: rgba(255, 255, 255, 0.9);
+    --neu-border: rgba(187, 194, 185, 0.45);
+    --neu-shadow-dark: #bbc2b9;
+    --neu-shadow-light: #ffffff;
   }
 
   .dark {
@@ -565,8 +565,8 @@ html {
     --neu-text: #f5f5f5;
     --neu-text-muted: #a3a3a3;
     --neu-border: rgba(255, 255, 255, 0.08);
-    --neu-shadow-dark: rgba(0, 0, 0, 0.5);
-    --neu-shadow-light: rgba(255, 255, 255, 0.03);
+    --neu-shadow-dark: rgba(0, 0, 0, 0.65);
+    --neu-shadow-light: rgba(255, 255, 255, 0.06);
     --menu-hover-bg: color-mix(in srgb, var(--brand-primary) 18%, var(--surface-primary));
     --menu-active-bg: color-mix(in srgb, var(--brand-primary) 25%, var(--surface-primary));
     --menu-selected-bg: color-mix(in srgb, var(--brand-primary) 28%, var(--surface-primary));
@@ -914,7 +914,7 @@ html {
   }
 
   .glass-chip {
-    @apply bg-white/70 dark:bg-white/10 backdrop-blur-md border border-white/30 dark:border-white/10 rounded-full;
+    @apply neu-inset-chip;
   }
 
   .wiez-shell-bg {
@@ -1062,6 +1062,77 @@ html {
     @apply inline-flex items-center justify-center gap-2 rounded-xl neu-modal-inset px-3 py-2.5 text-sm font-medium text-[color:var(--neu-text)] disabled:opacity-60 disabled:cursor-not-allowed;
   }
 
+  /* WIEZ Material & Surface Lab: Neumorphic recessed card */
+  .neu-recessed-card,
+  .surface-card-recessed,
+  .surface-card {
+    background-color: var(--neu-surface);
+    color: var(--neu-text);
+    border-radius: 1rem;
+    box-shadow: inset 4px 4px 9px var(--neu-shadow-dark), inset -4px -4px 9px var(--neu-shadow-light);
+    border: 1px solid var(--neu-border);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .neu-recessed-card:hover,
+  .surface-card-recessed:hover,
+  .surface-card:hover {
+    box-shadow: inset 5px 5px 10px var(--neu-shadow-dark), inset -5px -5px 10px var(--neu-shadow-light);
+  }
+
+  /* WIEZ Material & Surface Lab: Neumorphic pressed button */
+  button:not(:disabled):active {
+    transform: scale(0.985) translateY(1px);
+    transition: transform 0.08s ease;
+  }
+
+  .neu-pressed-button {
+    background-color: var(--neu-surface-soft);
+    color: var(--neu-text);
+    border-radius: 0.75rem;
+    box-shadow: inset 4px 4px 8px var(--neu-shadow-dark), inset -4px -4px 8px var(--neu-shadow-light);
+    border: 1px solid var(--neu-border);
+    transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+    will-change: transform, box-shadow;
+  }
+  .neu-pressed-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.02);
+    box-shadow: inset 3px 3px 6px var(--neu-shadow-dark), inset -3px -3px 6px var(--neu-shadow-light);
+  }
+  .neu-pressed-button:active:not(:disabled) {
+    transform: translateY(1px) scale(0.98);
+    box-shadow: inset 6px 6px 12px var(--neu-shadow-dark), inset -6px -6px 12px var(--neu-shadow-light);
+  }
+
+  /* WIEZ Material & Surface Lab: Pressed / Inset Chip */
+  .neu-inset-chip,
+  .chip-inset {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background-color: var(--neu-surface-soft);
+    color: var(--neu-text);
+    border-radius: 9999px;
+    box-shadow: inset 3px 3px 7px var(--neu-shadow-dark), inset -3px -3px 7px var(--neu-shadow-light);
+    border: 1px solid var(--neu-border);
+    transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+    will-change: transform, box-shadow;
+  }
+  .neu-inset-chip:hover:not(:disabled),
+  .chip-inset:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.02);
+  }
+  .neu-inset-chip:active:not(:disabled),
+  .chip-inset:active:not(:disabled) {
+    transform: translateY(1px) scale(0.98);
+    box-shadow: inset 4px 4px 8px var(--neu-shadow-dark), inset -4px -4px 8px var(--neu-shadow-light);
+  }
+  .neu-inset-chip.selected,
+  .chip-inset.selected {
+    box-shadow: inset 3px 3px 7px var(--neu-shadow-dark), inset -3px -3px 7px var(--neu-shadow-light), 0 0 0 2px var(--brand-primary);
+  }
+
   .neu-btn-press,
   .neu-modal-surface button,
   .neu-modal-surface [role="button"] {
@@ -1174,15 +1245,15 @@ html {
 
   /* Tag sizes */
   .chip-xs {
-    @apply text-[11px] px-2 py-0.5;
+    @apply neu-inset-chip text-[11px] px-2 py-0.5;
   }
 
   .chip-sm {
-    @apply text-[12px] px-2.5 py-1;
+    @apply neu-inset-chip text-[12px] px-2.5 py-1;
   }
 
   .chip-md {
-    @apply text-[13px] px-3 py-1.5;
+    @apply neu-inset-chip text-[13px] px-3 py-1.5;
   }
 
   /* Tag color accents */
@@ -1496,12 +1567,14 @@ body.modal-open {
 }
 
 .tag-badge {
+  @apply neu-inset-chip;
   background: rgba(147, 51, 234, 0.15);
   color: #a855f7;
   border: 1px solid rgba(147, 51, 234, 0.3);
 }
 
 .tag-badge-outline {
+  @apply neu-inset-chip;
   background: rgba(147, 51, 234, 0.06);
   color: #6b7280;
   border: 1.5px solid rgba(147, 51, 234, 0.18);
@@ -1511,6 +1584,7 @@ body.modal-open {
 }
 
 :is(.dark) .tag-badge-outline {
+  @apply neu-inset-chip;
   background: rgba(168, 85, 247, 0.08);
   color: #c4b5fd;
   border-color: rgba(168, 85, 247, 0.25);
@@ -2701,3 +2775,15 @@ html:not(.dark) .input-glass:focus {
   .queue-tab { @apply min-h-11 border-b-2 border-transparent px-2 py-3 text-sm font-semibold text-slate-600 transition-colors hover:text-violet-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-600 dark:text-slate-300 dark:hover:text-violet-300; }
   .queue-tab[aria-selected="true"] { @apply border-violet-600 text-violet-800 dark:border-violet-400 dark:text-violet-200; }
 }
+
+/* Native Studio WebViews use the same 0-or-2px border policy as native controls.
+   Scope through the document so portal dialogs follow the same rule. */
+html[data-embedded-surface="mobile-app"] .border { border-width: 2px; }
+html[data-embedded-surface="mobile-app"] .border-t { border-top-width: 2px; }
+html[data-embedded-surface="mobile-app"] .border-r { border-right-width: 2px; }
+html[data-embedded-surface="mobile-app"] .border-b { border-bottom-width: 2px; }
+html[data-embedded-surface="mobile-app"] .border-l { border-left-width: 2px; }
+html[data-embedded-surface="mobile-app"] .border-x { border-left-width: 2px; border-right-width: 2px; }
+html[data-embedded-surface="mobile-app"] .border-y { border-top-width: 2px; border-bottom-width: 2px; }
+html[data-embedded-surface="mobile-app"] .divide-y > :not([hidden]) ~ :not([hidden]) { border-top-width: 2px; }
+html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidden]) { border-left-width: 2px; }

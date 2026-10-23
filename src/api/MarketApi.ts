@@ -10,6 +10,7 @@ import { normalizeSizingMode } from '@/types/sizing';
 import { resolveCatalogEntityType } from '@/utils/catalogEntity';
 
 export interface GetMarketFeedParams {
+  feedKey?: string;
   cursor?: string;
   limit?: number;
   tag?: string;
@@ -299,7 +300,7 @@ const isDefaultFeedParams = (params?: GetMarketFeedParams): boolean => {
   const activeKeys = Object.entries(params as Record<string, unknown>)
     .filter(([, value]) => value !== undefined && value !== null)
     .map(([key]) => key);
-  return activeKeys.length === 1 && (params as Record<string, unknown>).counts === 'combined';
+  return activeKeys.every(key => key === 'counts' || key === 'feedKey') && params.counts === 'combined' && (!params.feedKey || params.feedKey === 'explore');
 };
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>

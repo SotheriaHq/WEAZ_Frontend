@@ -199,8 +199,6 @@ const prepareDesignUploadItems = async (
       try {
         const processed = await preprocessImageFile(file, 'detail', {
           maxSizeBytes,
-          targetReductionRatio: 0.9,
-          quality: 0.99,
           minQuality: 0.9,
         });
         if (processed.file.size <= maxSizeBytes || !isImageUploadFile(file)) {
@@ -481,7 +479,8 @@ const uploadPresignedFile = async (
       return;
     }
 
-    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    const headers = entry.uploadHeaders ?? { 'Content-Type': file.type || 'application/octet-stream' };
+    Object.entries(headers).forEach(([name, value]) => xhr.setRequestHeader(name, value));
     xhr.send(file);
   });
 };

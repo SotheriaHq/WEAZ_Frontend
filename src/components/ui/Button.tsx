@@ -12,7 +12,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
    * link     — inline text action.
    * danger   — destructive action.
    */
-  variant?: 'primary' | 'brand' | 'secondary' | 'ghost' | 'link' | 'danger';
+  variant?: 'primary' | 'brand' | 'secondary' | 'ghost' | 'link' | 'danger' | 'neumorphic';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   fullWidth?: boolean;
@@ -48,15 +48,16 @@ const Button: React.FC<ButtonProps> = ({
   const inferredLoading = /\b(saving|loading|submitting|uploading|signing)\b/i.test(inferredText);
   const showLoader = loading || Boolean(disabled && inferredLoading);
 
-  const baseClasses = 'relative inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-0 focus:ring-offset-0 disabled:opacity-50 disabled:cursor-not-allowed';
+  const baseClasses = 'relative inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-0 focus:ring-offset-0 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] active:translate-y-[1px]';
 
   const variantClasses = {
     // Black fill — confident, editorial, fashion-native. Default for all actions.
-    primary:   'bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)]',
+    primary:   'bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
     // Purple fill — reserved for brand-owned CTAs (follow, shop, subscribe).
-    brand:     'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-strong)] text-white',
+    brand:     'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-strong)] text-white active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
     // Outline — transparent with border. Supporting action alongside primary.
-    secondary: 'bg-transparent border border-[color:var(--border-strong)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-muted)]',
+    secondary: 'neu-pressed-button',
+    neumorphic: 'neu-pressed-button',
     // Ghost — no border. Low-emphasis actions in dense UI.
     ghost:     'bg-transparent surface-interactive-hover text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
     link:      'bg-transparent hover:underline text-[var(--text-primary)] underline-offset-2',

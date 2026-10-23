@@ -190,7 +190,7 @@ export const CustomOrderBadge: React.FC<{ value?: string | null; type?: 'status'
   const tone = statusToneMap[value] ?? 'bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-200';
   return (
     <span
-      className={`inline-flex max-w-full whitespace-normal break-words rounded-full px-3 py-1 text-left text-xs font-semibold leading-snug ${tone}`}
+      className={`chip-sm inline-flex max-w-full whitespace-normal break-words text-left font-semibold leading-snug ${tone}`}
     >
       {text}
     </span>
@@ -354,7 +354,7 @@ export const CustomOrderMetricCard: React.FC<{ label: string; value: React.React
   value,
   helper,
 }) => (
-  <div className="group relative flex h-full min-h-0 min-w-0 flex-col justify-center overflow-hidden rounded-xl border border-black/5 bg-gradient-to-br from-white to-slate-50/50 px-3.5 py-3 shadow-sm dark:border-white/[0.05] dark:from-white/[0.03] dark:to-transparent">
+  <div className="neu-recessed-card group relative flex h-full min-h-0 min-w-0 flex-col justify-center overflow-hidden px-3.5 py-3">
     <div className="relative text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{label}</div>
     <div className="relative mt-1 min-w-0 break-words text-base font-bold leading-snug text-slate-900 dark:text-white">{value}</div>
     {helper ? <div className="relative mt-0.5 min-w-0 break-words text-[11px] font-medium text-slate-500 dark:text-slate-400">{helper}</div> : null}
@@ -423,7 +423,7 @@ export const CustomOrderSection: React.FC<{
   const bodyId = useId();
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-black/10 bg-white/80 dark:border-white/10 dark:bg-white/5">
+    <section className="overflow-hidden neu-recessed-card">
       <h3>
         <button
           type="button"
@@ -611,7 +611,7 @@ export const CustomOrderDataTable: React.FC<{
   }
 
   return (
-    <section className="rounded-2xl border border-black/10 bg-white/70 dark:border-white/10 dark:bg-white/[0.03]">
+    <section className="neu-recessed-card">
       {title ? (
         <div className="border-b border-black/10 px-4 py-3 text-sm font-semibold text-slate-900 dark:border-white/10 dark:text-white">
           {title}
@@ -659,7 +659,7 @@ export const CustomOrderStageProgress: React.FC<{
             : 'border-black/10 bg-white/80 text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300';
 
         return (
-          <div key={stage.value} className={`rounded-2xl border px-3 py-3 ${tone}`}>
+          <div key={stage.value} className={`neu-recessed-card px-3 py-3 ${tone}`}>
             <div className="flex items-start gap-2">
               <span className="text-sm leading-none" aria-hidden="true">{emoji}</span>
               <div className="min-w-0">
