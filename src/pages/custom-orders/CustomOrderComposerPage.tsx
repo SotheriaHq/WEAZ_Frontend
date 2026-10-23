@@ -1087,13 +1087,13 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
               </div>
             </div>
             {hasPrefilledMeasurements ? (
-              <div className="mt-4 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">
+              <div className="mt-4 neu-recessed-card px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
                 <div className="font-semibold">Review saved fittings before checkout</div>
                 <p className="mt-1">Saved measurements were prefilled from your profile. You must confirm or update them before price lock and payment.</p>
               </div>
             ) : null}
             {needsMeasurementReviewPrompt ? (
-              <div className="mt-4 rounded-2xl border border-rose-300/60 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-700/40 dark:bg-rose-500/10 dark:text-rose-100">
+              <div className="mt-4 neu-recessed-card px-4 py-3 text-sm text-rose-900 dark:text-rose-100">
                 <div className="font-semibold">Review measurements before checkout</div>
                 <p className="mt-1">
                   {measurementsLastUpdatedAtMs
@@ -1163,7 +1163,7 @@ const CustomOrderComposerPage: React.FC<CustomOrderComposerPageProps> = ({
                   {savedAddresses.map((address) => {
                     const isActive = editingAddressId === address.id;
                     return (
-                      <div key={address.id} className={`relative rounded-2xl border p-3 ${isActive ? 'border-emerald-400 bg-emerald-50/70 dark:border-emerald-500/40 dark:bg-emerald-500/10' : 'border-black/10 bg-white dark:border-white/10 dark:bg-slate-950'}`}>
+                      <div key={address.id} className={`relative neu-recessed-card p-3 ${isActive ? 'ring-2 ring-emerald-500' : ''}`}>
                         <div className="flex items-start justify-between gap-3">
                           <button type="button" onClick={() => applySavedAddress(address)} className="flex-1 text-left">
                             <div className="text-sm font-semibold text-slate-900 dark:text-white">{address.customerName}</div>

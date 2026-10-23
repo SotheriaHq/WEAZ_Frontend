@@ -1,0 +1,104 @@
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { useBrandCommerceAccess } from "@/hooks/useBrandCommerceAccess";
+import { brandCustomersApi } from "@/api/BrandCustomersApi";
+
+export default function CustomerSettings() {
+  const navigate = useNavigate();
+  const access = useBrandCommerceAccess();
+  const client = useQueryClient();
+  const [minimum, setMinimum] = useState("3");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (access.data) setMinimum(String(access.data.customerMinimumOrders));
+  }, [access.data]);
+  const valid =
+    /^\d+$/.test(minimum) && Number(minimum) >= 1 && Number(minimum) <= 1000;
+  const enabled = access.data?.canConfigureCustomers === true;
+  async function save() {
+    if (!access.brandId || !valid || !enabled || saving) return;
+    setSaving(true);
+    try {
+      await brandCustomersApi.update(access.brandId, Number(minimum));
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["brand-commerce-access"] }),
+        client.invalidateQueries({ queryKey: ["brand-customers"] }),
+      ]);
+      toast.success("Customer settings saved");
+    } catch {
+      toast.error("Could not save customer settings. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <section className="max-w-2xl space-y-5">
+      <h1 className="text-2xl font-bold text-theme">Customer settings</h1>
+      <p className="text-theme-secondary">
+        Choose how many paid orders a shopper needs to appear in Customers.
+        Standard and custom orders count together. Cancelled and fully refunded
+        orders are excluded.
+      </p>
+      {!access.canManage ? (
+        <p role="status">Only the brand owner can change customer settings.</p>
+      ) : null}
+      {access.isLoading ? <p role="status">Loading settings…</p> : null}
+      {access.isError ? (
+        <p role="alert">
+          Could not load settings.{" "}
+          <button
+            type="button"
+            className="min-h-11 font-semibold"
+            onClick={() => void access.refetch()}
+          >
+            Try again
+          </button>
+        </p>
+      ) : null}
+      {access.data ? (
+        <>
+          {!enabled ? (
+            <div className="space-y-3">
+              <p className="text-theme-secondary">Free brands see every shopper with a qualifying paid order. A paid subscription enables purchase thresholds.</p>
+              {access.data.canUpgrade ? <button type="button" onClick={() => navigate('/settings?tab=subscription-billing')} className="min-h-11 rounded-2xl bg-purple-600 px-5 font-semibold text-white shadow-md">Upgrade</button> : null}
+            </div>
+          ) : null}
+          <label className="block space-y-2">
+            <span className="font-semibold text-theme">
+              Minimum paid orders {!enabled ? "· Upgrade" : ""}
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={1000}
+              step={1}
+              value={minimum}
+              onChange={(event) => setMinimum(event.target.value)}
+              disabled={!enabled || saving}
+              aria-describedby="customer-threshold-help"
+              className="block min-h-11 w-full rounded-2xl bg-gray-100 px-4 py-3 text-theme disabled:opacity-50 dark:bg-zinc-900"
+            />
+          </label>
+          <p
+            id="customer-threshold-help"
+            className="text-sm text-theme-secondary"
+          >
+            Set a whole number from 1 to 1,000. The default is 3. A plan
+            downgrade shows all qualifying shoppers and keeps your saved
+            threshold for later.
+          </p>
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={!enabled || !valid || saving}
+            className="min-h-11 rounded-2xl bg-purple-600 px-5 font-semibold text-white shadow-md disabled:bg-gray-200 disabled:text-gray-500 dark:disabled:bg-zinc-800"
+          >
+            {saving ? "Saving…" : "Save customer settings"}
+          </button>
+        </>
+      ) : null}
+    </section>
+  );
+}

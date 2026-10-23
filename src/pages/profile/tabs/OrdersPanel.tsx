@@ -523,7 +523,7 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-gray-200/80 bg-white/70 shadow-sm backdrop-blur-sm dark:border-gray-800/80 dark:bg-white/[0.03] sm:rounded-[28px]">
+      <section className="overflow-hidden neu-recessed-card sm:rounded-[28px]">
         <div className="grid gap-3 p-3 sm:gap-6 sm:p-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           <CustomOrderMediaPreview
             src={firstItem?.thumbnail ?? null}
@@ -536,7 +536,7 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
           <div className="space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-2">
-                <div className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass(normalizeStatus(order.status))}`}>
+                <div className={`chip-sm inline-flex items-center font-semibold ${statusBadgeClass(normalizeStatus(order.status))}`}>
                   {normalizeStatus(order.status)}
                 </div>
                 <h2 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white">
@@ -572,7 +572,7 @@ const StandardOrderDetailView: React.FC<{ orderId: string; onBack: () => void }>
                   type="button"
                   onClick={() => void handleConfirmDelivery()}
                   disabled={confirmingDelivery}
-                  className="mt-3 rounded-full bg-emerald-500 px-5 py-2.5 text-sm font-bold text-black transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-3 rounded-full bg-emerald-500 px-5 py-2.5 text-sm font-bold text-black transition-colors hover:bg-emerald-400 active:scale-[0.98] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {confirmingDelivery ? 'Confirming...' : 'Delivered and confirmed'}
                 </button>
@@ -2487,7 +2487,7 @@ const InfoPill: React.FC<{ label: string; value: string; mono?: boolean }> = ({
   value,
   mono = false,
 }) => (
-  <div className="rounded-2xl border border-gray-200 bg-gray-50/80 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+  <div className="chip-inset px-4 py-3">
     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
       {label}
     </p>

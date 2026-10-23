@@ -550,8 +550,8 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                                   !available
                                     ? 'border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900 text-gray-400 cursor-not-allowed line-through'
                                     : selectedSize === size
-                                    ? 'border-purple-500 bg-purple-500 text-white shadow-lg shadow-purple-500/30'
-                                    : 'border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 text-gray-900 dark:text-white'
+                                    ? 'neu-inset-chip selected border-purple-500 bg-purple-500 text-white'
+                                    : 'neu-pressed-button text-gray-900 dark:text-white'
                                 }`}
                               >
                                 {size}

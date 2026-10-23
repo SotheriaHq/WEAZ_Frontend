@@ -647,13 +647,13 @@ const FinancePage: React.FC = () => {
         </div>
       </div>
 
-      <section className="space-y-3 rounded-2xl border border-violet-200 bg-violet-50 p-4 text-slate-900 dark:border-violet-900 dark:bg-slate-950 dark:text-white">
+      <section className="space-y-3 neu-recessed-card p-4 text-slate-900 dark:text-white">
         <h2 className="font-bold">Custom-order queue liabilities</h2>
         <div className="grid grid-cols-2 gap-3"><div><p className="text-xs">Pending and Up Next holds ({overview?.queuedCustomOrderCount ?? 0} orders)</p><p className="font-bold tabular-nums">{formatCurrency(overview?.queuedCustomHeldAmount ?? 0, overview?.currency || 'NGN')}</p></div><div><p className="text-xs">Refunds processing</p><p className="font-bold tabular-nums">{formatCurrency(overview?.pendingRefundAmount ?? 0, overview?.currency || 'NGN')}</p></div></div>
         <p className="text-xs">Waiting-order captures and jump earnings are unavailable for payout until Active. Refund processing does not mean a shopper has received the money. Existing payout controls apply only to eligible balances.</p>
       </section>
       {/* Balance hero + metric strip */}
-      <div className="overflow-hidden rounded-2xl border border-black/10 bg-slate-950 text-white shadow-sm dark:border-white/10">
+      <div className="overflow-hidden neu-recessed-card text-white">
         <div className="px-5 py-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -775,7 +775,7 @@ const FinancePage: React.FC = () => {
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/50">
+      <section className="overflow-hidden neu-recessed-card">
         <div className="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -887,7 +887,7 @@ const FinancePage: React.FC = () => {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/50">
+      <section className="overflow-hidden neu-recessed-card">
         <div className="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -1013,7 +1013,7 @@ const FinancePage: React.FC = () => {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/50">
+      <section className="overflow-hidden neu-recessed-card">
         <div className="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
           <h2 className="text-lg font-semibold">Payout History</h2>
         </div>
@@ -1346,7 +1346,7 @@ const FinanceReceiptMetric: React.FC<{
   value: string;
   tone?: string;
 }> = ({ label, value, tone = 'text-gray-900 dark:text-white' }) => (
-  <div className="rounded-2xl border border-gray-200/80 bg-gray-50/80 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+  <div className="chip-inset px-4 py-3">
     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
       {label}
     </div>
@@ -1365,7 +1365,7 @@ const FinanceReceiptList: React.FC<{
 
   return (
     <section
-      className={`rounded-2xl border border-gray-200/80 bg-white/80 ${
+      className={`neu-recessed-card ${
         compact ? 'p-4' : 'p-5'
       } dark:border-white/10 dark:bg-white/[0.03]`}
     >
@@ -1380,7 +1380,7 @@ const FinanceReceiptList: React.FC<{
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 dark:border-white/10 dark:bg-black/10">
+      <div className="neu-recessed-card px-4">
         {rows.map((row, index) => (
           <div
             key={`${row.label}-${index}`}

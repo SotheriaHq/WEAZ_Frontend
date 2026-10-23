@@ -1,3 +1,5 @@
+import { useQuery } from '@tanstack/react-query';
+import { creatorCategoriesOptions, EMPTY_CREATOR_CATEGORIES } from '@/query/creatorMetadataQueries';
 import React, {
   useEffect,
   useState,
@@ -115,13 +117,8 @@ import { TourOverlay, type TourStep } from '@/components/ui/TourOverlay';
 import { useOneTimeTour } from '@/hooks/useOneTimeTour';
 // ============================================================================
 
-type CategoryTypeOption = { id: string; slug?: string; name: string; categoryId?: string };
-type CategoryOption = {
-  id: string;
-  slug: string;
-  name: string;
-  types: CategoryTypeOption[];
-};
+
+
 
 const DESIGN_SIZING_MODE_OPTIONS = [
   { value: 'NONE', label: 'No size specification' },
@@ -405,29 +402,7 @@ const CreateDesignInner: React.FC = () => {
   }, [location.pathname, location.search]);
   const requiresEmailVerification = !isEditMode && user?.isEmailVerified === false;
 
-  const { data: categories = [], loading: loadingCategories } =
-    useCachedResource<CategoryOption[]>({
-      queryKey: ['design-create', 'categories-with-subcategories'],
-      queryFn: async () => {
-        const cats = await brandApi.getCategoriesWithSubCategories(false);
-        if (!Array.isArray(cats)) return [];
-        return cats.map((c) => ({
-          id: c.id,
-          slug: c.slug,
-          name: c.name,
-          types: Array.isArray(c.types)
-            ? c.types.map((t) => ({
-                id: t.id,
-                slug: t.slug,
-                name: t.name,
-                categoryId: t.categoryId,
-              }))
-            : [],
-        }));
-      },
-      staleTime: 30 * 60 * 1000,
-      gcTime: 60 * 60 * 1000,
-    });
+  const { data: categories = EMPTY_CREATOR_CATEGORIES, isLoading: loadingCategories } = useQuery(creatorCategoriesOptions);
 
   const { data: cachedTagSuggestions } = useCachedResource<string[]>({
     queryKey: ['design-create', 'tag-suggestions', 80],
@@ -633,7 +608,7 @@ const CreateDesignInner: React.FC = () => {
     }
     if (
       categoryTypeId &&
-      !selected.types.some((categoryType) => categoryType.id === categoryTypeId)
+      !(selected.types ?? []).some((categoryType) => categoryType.id === categoryTypeId)
     ) {
       setCategoryTypeId("");
     }
@@ -1031,7 +1006,7 @@ const CreateDesignInner: React.FC = () => {
   const handleCategoryChange = (value: string) => {
     setCategoryId(value);
     const nextCategory = filteredCategories.find((category) => category.id === value);
-    setCategoryTypeId(nextCategory?.types[0]?.id ?? "");
+    setCategoryTypeId(nextCategory?.types?.[0]?.id ?? "");
   };
 
   const handleAudienceChange = (value: string) => {

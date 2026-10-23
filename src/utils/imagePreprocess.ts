@@ -9,237 +9,120 @@ export interface ImagePreprocessResult {
 
 export interface ImagePreprocessOptions {
   maxSizeBytes?: number;
-  /**
-   * A best-effort reduction target expressed as a fraction of the source
-   * file. `0.9` means "try to make the result at least 90% smaller". It is a
-   * target rather than a guarantee: a small, already-efficient image should
-   * never be enlarged or visibly destroyed merely to hit a byte number.
-   */
+  /** Advisory only. A byte-reduction percentage never authorizes reducing resolution. */
   targetReductionRatio?: number;
+  /** Quality for an over-budget lossy fallback; the first attempt is lossless. */
   quality?: number;
   minQuality?: number;
 }
 
-const profileMaxWidth: Record<ImagePreprocessProfile, number> = {
-  avatar: 512,
-  banner: 1920,
-  card: 1280,
-  detail: 2048,
+const MAX_LONG_SIDE: Record<ImagePreprocessProfile, number> = {
+  avatar: 1080, banner: 2560, card: 2560, detail: 4096,
 };
-
+const MIN_LONG_SIDE: Record<ImagePreprocessProfile, number> = {
+  avatar: 720, banner: 1920, card: 1920, detail: 2048,
+};
 const MAX_INPUT_PIXELS = 50_000_000;
-const MIN_OUTPUT_WIDTH = 720;
-const MIN_TARGET_BYTES = 64 * 1024;
-const DEFAULT_JPEG_QUALITY = 0.99;
-const DEFAULT_MIN_JPEG_QUALITY = 0.9;
-const MAX_SIZE_ATTEMPTS = 12;
-
-const isGifFile = (file: File) =>
-  file.type.trim().toLowerCase() === 'image/gif' || /\.gif$/i.test(file.name);
+const MAX_ATTEMPTS = 6;
+const QUALITY_FLOOR = 0.95;
+const PASSTHROUGH_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const inferImageType = (file: File) => {
-  const type = file.type.trim().toLowerCase();
-  if (type.startsWith('image/')) return type;
+  const declared = file.type.trim().toLowerCase();
+  if (declared.startsWith('image/')) return declared;
   const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
-  if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg';
-  if (extension === 'png') return 'image/png';
-  if (extension === 'webp') return 'image/webp';
-  if (extension === 'gif') return 'image/gif';
-  if (extension === 'heic') return 'image/heic';
-  if (extension === 'heif') return 'image/heif';
-  if (extension === 'avif') return 'image/avif';
-  return '';
-};
-
-const canvasToBlob = (
-  canvas: HTMLCanvasElement,
-  type: string,
-  quality?: number,
-) =>
-  new Promise<Blob | null>((resolve) => {
-    canvas.toBlob((nextBlob) => resolve(nextBlob), type, quality);
-  });
-
-const buildPreprocessedName = (name: string, outputType: string) => {
-  const ext =
-    outputType === 'image/png'
-      ? 'png'
-      : outputType === 'image/webp'
-        ? 'webp'
-        : 'jpg';
-  return name.replace(/\.[^.]+$/, '') + `.pre.${ext}`;
-};
-
-const isLossyOutputType = (outputType: string) =>
-  outputType === 'image/jpeg' || outputType === 'image/webp';
-
-const encodeCanvas = async (
-  canvas: HTMLCanvasElement,
-  outputType: string,
-  quality: number,
-) => {
-  const blob = await canvasToBlob(
-    canvas,
-    outputType,
-    isLossyOutputType(outputType) ? quality : undefined,
-  );
-  if (
-    outputType !== 'image/webp' ||
-    (blob && String(blob.type || '').toLowerCase() === 'image/webp')
-  ) {
-    return { blob, outputType };
-  }
-
-  return {
-    blob: await canvasToBlob(canvas, 'image/jpeg', quality),
-    outputType: 'image/jpeg',
+  const types: Record<string, string> = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+    gif: 'image/gif', heic: 'image/heic', heif: 'image/heif', avif: 'image/avif',
   };
+  return types[extension] ?? '';
 };
+
+const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
+  new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+
+async function isLosslessWebp(blob: Blob) {
+  if (blob.type !== 'image/webp') return false;
+  const bytes = new Uint8Array(await blob.slice(0, 65536).arrayBuffer());
+  const view = new DataView(bytes.buffer);
+  for (let offset = 12; offset + 8 <= bytes.length;) {
+    const kind = String.fromCharCode(...bytes.slice(offset, offset + 4));
+    if (kind === 'VP8L') return true;
+    if (kind === 'VP8 ') return false;
+    const length = view.getUint32(offset + 4, true);
+    offset += 8 + length + (length & 1);
+  }
+  return false;
+}
 
 export async function preprocessImageFile(
   file: File,
   profile: ImagePreprocessProfile,
   options: ImagePreprocessOptions = {},
 ): Promise<ImagePreprocessResult> {
-  const inferredType = inferImageType(file);
-  if (!inferredType) {
-    return { file, originalFile: file, skipped: true, reason: 'not-image' };
-  }
-
-  const workingFile =
-    file.type.trim().toLowerCase() === inferredType
-      ? file
-      : new File([file], file.name, {
-          type: inferredType,
-          lastModified: file.lastModified,
-        });
-
-  if (isGifFile(workingFile)) {
-    return { file, originalFile: file, skipped: true, reason: 'gif-preserved' };
-  }
-
-  if (typeof window === 'undefined' || typeof document === 'undefined') {
-    return { file, originalFile: file, skipped: true, reason: 'no-dom' };
-  }
-
+  const type = inferImageType(file);
+  let fallbackFile = file;
+  const unchanged = (reason: string): ImagePreprocessResult => ({ file: fallbackFile, originalFile: file, skipped: true, reason });
+  if (!type) return unchanged('not-image');
+  if (type === 'image/gif') return unchanged('gif-preserved');
+  if (typeof window === 'undefined' || typeof document === 'undefined') return unchanged('no-dom');
+  const maxBytes = options.maxSizeBytes ?? Number.POSITIVE_INFINITY;
+  if (!(maxBytes > 0)) throw new Error('Image upload size limit must be positive.');
+  const workingFile = file.type.toLowerCase() === type ? file : new File([file], file.name, { type, lastModified: file.lastModified });
+  fallbackFile = workingFile;
   const bitmap = await createImageBitmap(workingFile);
+  let canvas: HTMLCanvasElement | undefined;
   try {
-    const pixels = bitmap.width * bitmap.height;
-    if (pixels > MAX_INPUT_PIXELS) {
+    if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > MAX_INPUT_PIXELS)
       throw new Error('Image dimensions are too large. Choose a smaller image.');
-    }
-
-    const targetWidth = Math.min(bitmap.width, profileMaxWidth[profile]);
-    const needsResize = targetWidth < bitmap.width;
-    const requestedReductionRatio = Math.max(
-      0,
-      Math.min(options.targetReductionRatio ?? 0, 0.95),
-    );
-    const reductionTargetBytes =
-      requestedReductionRatio > 0
-        ? Math.max(
-            MIN_TARGET_BYTES,
-            Math.floor(workingFile.size * (1 - requestedReductionRatio)),
-          )
-        : undefined;
-    const targetSizeBytes = Math.min(
-      options.maxSizeBytes ?? Number.POSITIVE_INFINITY,
-      reductionTargetBytes ?? Number.POSITIVE_INFINITY,
-    );
-    const needsSizeReduction = workingFile.size > targetSizeBytes;
-
-    if (!needsResize && !needsSizeReduction) {
-      return { file, originalFile: file, skipped: true, reason: 'already-optimal' };
-    }
-
-    const canvas = document.createElement('canvas');
+    const originalLongSide = Math.max(bitmap.width, bitmap.height);
+    const fitsOriginal = workingFile.size <= maxBytes && PASSTHROUGH_TYPES.has(type);
+    const initialLongSide = fitsOriginal ? originalLongSide : Math.min(originalLongSide, MAX_LONG_SIDE[profile]);
+    // An efficient source is a better master than a second lossy generation.
+    if (fitsOriginal && type !== 'image/png')
+      return unchanged('already-optimal');
+    if (fitsOriginal && workingFile.size < 64 * 1024)
+      return unchanged('already-optimal');
+    canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      return { file, originalFile: file, skipped: true, reason: 'context-unavailable' };
-    }
-
-    let outputType =
-      workingFile.type === 'image/png' && !needsSizeReduction
-        ? 'image/png'
-        : 'image/webp';
-    const minQuality = Math.max(
-      0.35,
-      Math.min(options.minQuality ?? DEFAULT_MIN_JPEG_QUALITY, DEFAULT_JPEG_QUALITY),
-    );
-    let quality = Math.max(
-      minQuality,
-      Math.min(options.quality ?? DEFAULT_JPEG_QUALITY, DEFAULT_JPEG_QUALITY),
-    );
-    let currentWidth = targetWidth;
-    let currentHeight = Math.max(
-      1,
-      Math.round(bitmap.height * (currentWidth / bitmap.width)),
-    );
-    let bestBlob: Blob | null = null;
-    let bestOutputType = outputType;
-
-    for (let attempt = 0; attempt < MAX_SIZE_ATTEMPTS; attempt += 1) {
-      canvas.width = currentWidth;
-      canvas.height = currentHeight;
-      ctx.clearRect(0, 0, currentWidth, currentHeight);
-      if (outputType === 'image/jpeg') {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, currentWidth, currentHeight);
+    if (!ctx) return unchanged('context-unavailable');
+    const finiteQuality = (value: number | undefined, fallback: number) =>
+      typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(QUALITY_FLOOR, value)) : fallback;
+    const minQuality = finiteQuality(options.minQuality, QUALITY_FLOOR);
+    const fallbackQuality = Math.max(minQuality, finiteQuality(options.quality, 0.97));
+    let longSide = initialLongSide;
+    let quality = 1;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const scale = longSide / originalLongSide;
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      let blob = await canvasToBlob(canvas, 'image/webp', quality);
+      // Canvas quality=1 is not a cross-browser lossless guarantee. Inspect the
+      // WebP bitstream; PNG is the lossless fallback and preserves transparency.
+      if (quality === 1 && (!blob || !(await isLosslessWebp(blob))))
+        blob = await canvasToBlob(canvas, 'image/png');
+      if (blob && !['image/png', 'image/webp'].includes(blob.type)) blob = null;
+      if (!blob) return unchanged('blob-failed');
+      if (blob.size <= maxBytes) {
+        if (fitsOriginal && blob.size >= workingFile.size) return unchanged('not-smaller');
+        const extension = blob.type === 'image/webp' ? 'webp' : blob.type === 'image/png' ? 'png' : 'jpg';
+        const next = new File([blob], workingFile.name.replace(/\.[^.]+$/, '') + `.pre.${extension}`, { type: blob.type, lastModified: file.lastModified });
+        return { file: next, originalFile: file, skipped: false };
       }
-      ctx.drawImage(bitmap, 0, 0, currentWidth, currentHeight);
-
-      const encoded = await encodeCanvas(canvas, outputType, quality);
-      const blob = encoded.blob;
-      outputType = encoded.outputType;
-
-      if (!blob) break;
-      if (!bestBlob || blob.size < bestBlob.size) {
-        bestBlob = blob;
-        bestOutputType = outputType;
-      }
-
-      if (blob.size <= targetSizeBytes) break;
-
-      const nextWidth = Math.round(currentWidth * 0.84);
-      if (nextWidth >= MIN_OUTPUT_WIDTH && nextWidth < currentWidth) {
-        // Reducing dimensions preserves texture better than repeatedly
-        // lowering JPEG/WebP quality. Keep the 99% starting quality while
-        // there is still useful pixel area to remove.
-        currentWidth = nextWidth;
-        currentHeight = Math.max(
-          1,
-          Math.round(bitmap.height * (currentWidth / bitmap.width)),
-        );
-        continue;
-      }
-
-      if (isLossyOutputType(outputType) && quality > minQuality) {
-        quality = Math.max(minQuality, quality - 0.02);
-        continue;
-      }
-
-      break;
+      if (fitsOriginal) return unchanged('original-within-upload-limit');
+      // Only the actual upload ceiling can trigger a lossy or smaller retry.
+      if (quality === 1 && fallbackQuality < 1) { quality = fallbackQuality; continue; }
+      if (quality > minQuality) { quality = Math.max(minQuality, quality - 0.02); continue; }
+      const nextSide = Math.max(Math.min(originalLongSide, MIN_LONG_SIDE[profile]), Math.round(longSide * 0.9));
+      if (nextSide >= longSide) break;
+      longSide = nextSide;
+      quality = 1;
     }
-
-    if (!bestBlob) {
-      return { file, originalFile: file, skipped: true, reason: 'blob-failed' };
-    }
-
-    // A compression pass must never make a creator upload more bytes. This
-    // matters especially for small WebP/JPEG source files that are already
-    // efficiently encoded.
-    if (bestBlob.size >= workingFile.size) {
-      return { file, originalFile: file, skipped: true, reason: 'not-smaller' };
-    }
-
-    const nextName = buildPreprocessedName(workingFile.name, bestOutputType);
-    const nextFile = new File([bestBlob], nextName, {
-      type: bestOutputType,
-      lastModified: Date.now(),
-    });
-
-    return { file: nextFile, originalFile: file, skipped: false };
+    throw new Error('This image cannot fit the upload limit while retaining detail. Choose a smaller original or crop it.');
   } finally {
     bitmap.close();
+    if (canvas) { canvas.width = 0; canvas.height = 0; }
   }
 }

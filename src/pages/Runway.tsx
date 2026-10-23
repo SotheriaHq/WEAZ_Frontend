@@ -1,4 +1,7 @@
+import { RUNWAY_CATEGORIES } from '@/constants/runwayCategories';
 import RunwayQueueNotices from '@/components/custom-orders/RunwayQueueNotices';
+import RunwayExposure from '@/components/runway/RunwayExposure';
+import { useMarketSignals } from '@/hooks/useMarketSignals';
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -39,7 +42,6 @@ import { useScrollRestore } from '@/components/ScrollRestoreProvider';
 import { useMarketSurfacePrefetch } from '@/hooks/useMarketSurfacePrefetch';
 import useRunwayFeed from '@/hooks/useRunwayFeed';
 import useRunwayPinnedFeed from '@/hooks/useRunwayPinnedFeed';
-import { createMixSeed, mixFeedItems } from '@/utils/feedMixer';
 import { queryKeys } from '@/query/queryKeys';
 import {
   RUNWAY_CHIPS_HEIGHT_PX,
@@ -68,21 +70,11 @@ const MASONRY_BREAKPOINT_COLS = {
 // Error type detection
 type ErrorType = 'network' | 'timeout' | 'server' | 'empty' | 'category_empty' | 'unknown';
 
-const FALLBACK_FEED_CATEGORIES: FeedCategory[] = [
-  {
-    id: 'discover',
-    key: 'discover',
-    label: 'Discover',
-    displayOrder: 10,
-    isDefaultForGuest: true,
-    isDefaultForNewUser: true,
-  },
-  { id: 'explore', key: 'explore', label: 'Explore', displayOrder: 20 },
-  { id: 'african-style', key: 'african-style', label: 'African Style', displayOrder: 30 },
-  { id: 'casual-style', key: 'casual-style', label: 'Casual', displayOrder: 40 },
-];
+const FALLBACK_FEED_CATEGORIES: FeedCategory[] = RUNWAY_CATEGORIES.map((category, index) => ({ ...category, id: category.key, displayOrder: (index + 1) * 10 }));
 
-const BROAD_FEED_CATEGORY_KEYS = new Set(['all', 'discover', 'explore', 'for-you']);
+const EMPTY_MARKET_ITEMS: MarketItem[] = [];
+
+const BROAD_FEED_CATEGORY_KEYS = new Set(['all', 'discover', 'explore', 'for-you', 'african-casual', 'casual-style']);
 
 const feedTagForCategory = (categoryKey: string) =>
   BROAD_FEED_CATEGORY_KEYS.has(categoryKey.toLowerCase()) ? null : categoryKey;
@@ -301,11 +293,13 @@ interface RunwayProps {
 }
 
 const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
+  const user = useSelector((s: RootState) => s.user.profile);
+  const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useDispatch();
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('discover');
+  const [selectedCategory, setSelectedCategory] = useState<string>(() => isAuth ? 'discover' : 'explore');
   const [viewItem, setViewItem] = useState<MarketItem | null>(null);
   /**
    * The reel whose comments are open, or null.
@@ -316,7 +310,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
    */
   const [commentsItem, setCommentsItem] = useState<MarketItem | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
+  useMarketSignals('Runway');
   /** Phone + responsive mobile: reels. Wider tablets/iPad keep masonry. */
   const isMobileReels = useSelector(selectIsMobile);
   /*
@@ -383,18 +377,18 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
   }, [isMobileReels]);
 
   const feedCategoriesQuery = useQuery({
-    queryKey: queryKeys.runway.feedCategories(),
+    queryKey: [...queryKeys.runway.feedCategories(), isAuth ? user?.id : 'guest'],
     queryFn: ({ signal }) => marketApi.getFeedCategories({ signal }),
   });
   const feedCategories = useMemo(() => {
     const categories = feedCategoriesQuery.data?.categories ?? FALLBACK_FEED_CATEGORIES;
     return [...categories]
-      .filter((category) => category.status === undefined || category.status === 'ACTIVE')
+      .filter((category) => (category.status === undefined || category.status === 'ACTIVE') && (!category.requiresAuth || isAuth))
       .sort((left, right) => {
         if (left.displayOrder !== right.displayOrder) return left.displayOrder - right.displayOrder;
         return left.key.localeCompare(right.key);
       });
-  }, [feedCategoriesQuery.data?.categories]);
+  }, [feedCategoriesQuery.data?.categories, isAuth]);
   const defaultFeedCategory =
     feedCategoriesQuery.data?.defaults?.selected ??
     (isAuth
@@ -416,6 +410,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
 
   // Design feed (Runway UI) via React Query
   const feedQuery = useRunwayFeed({
+      feedKey: selectedCategory,
       tag: activeFeedTag ?? undefined,
       counts: 'combined',
   });
@@ -599,11 +594,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
   // The backend rotates per fresh load, but the persisted query cache replays
   // the previous response within staleTime — so remix presentation-side with a
   // per-mount seed, exactly like the MarketPlace grid does.
-  const runwayMixSeedRef = useRef(createMixSeed());
-  const items = useMemo(
-    () => mixFeedItems(feedData?.items ?? [], runwayMixSeedRef.current),
-    [feedData?.items],
-  );
+  const items = feedData?.items ?? EMPTY_MARKET_ITEMS;
 
   // Reset reels pagination when the primary feed page or category changes.
   useEffect(() => {
@@ -611,7 +602,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
     setReelsNextCursor(feedData?.nextCursor ?? null);
     setReelsHasMore(Boolean(feedData?.hasNextPage));
     reelsFetchInFlightRef.current = false;
-  }, [feedData?.items, feedData?.nextCursor, feedData?.hasNextPage, activeFeedTag]);
+  }, [feedData?.items, feedData?.nextCursor, feedData?.hasNextPage, activeFeedTag, selectedCategory]);
 
   const mediaTargetIds = useMemo(() => {
     const base = items.map((item) => item.id).filter(Boolean);
@@ -704,7 +695,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
   const filteredItems = useMemo(() => {
     let result = items;
 
-    if (activeFeedTag) {
+    if (activeFeedTag && !['african-casual', 'casual-style'].includes(selectedCategory)) {
       result = result.filter((item) => {
         const categoryTerms = [activeFeedTag, activeFeedTag.replace(/[-_]+/g, ' ')];
         const hasMatchingTag = item.tags.some((tag) =>
@@ -725,7 +716,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
       );
     }
     return result;
-  }, [items, selectedTag, activeFeedTag]);
+  }, [items, selectedTag, activeFeedTag, selectedCategory]);
 
   /** First page + reels cursor pages (deduped). Masonry only uses filteredItems. */
   const runwayReelsItems = useMemo(() => {
@@ -748,15 +739,13 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
     setReelsFetchingMore(true);
     try {
       const page = await marketApi.getRunwayFeed({
+        feedKey: selectedCategory,
         tag: activeFeedTag ?? undefined,
         counts: 'combined',
         cursor: reelsNextCursor,
         limit: 12,
       });
-      const mixed = mixFeedItems(
-        page.items ?? [],
-        `${runwayMixSeedRef.current}:cursor:${reelsNextCursor}`,
-      );
+      const mixed = page.items ?? [];
       setReelsExtraItems((prev) => {
         const seen = new Set(prev.map((entry) => entry.id));
         const next = [...prev];
@@ -777,6 +766,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
     }
   }, [
     activeFeedTag,
+    selectedCategory,
     isMobileReels,
     reelsExtraItems.length,
     reelsHasMore,
@@ -1381,7 +1371,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
           columnClassName="pl-6 space-y-6 bg-clip-padding"
         >
           {filteredItems.map((item, index) => (
-            <div key={item.id} className="w-full">
+            <RunwayExposure key={item.id} designId={item.collectionId || item.id} className="w-full">
               <DesignCard
                 item={item}
                 priority={index < 4}
@@ -1395,7 +1385,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
                 onTogglePatch={handleTogglePatch}
                 patchBusy={item.brandId ? isPatchLoading(item.brandId) : false}
               />
-            </div>
+            </RunwayExposure>
           ))}
         </Masonry>
       ) : shouldLoadProductFallback({

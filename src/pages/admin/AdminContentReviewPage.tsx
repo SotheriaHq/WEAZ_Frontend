@@ -1,3 +1,4 @@
+import MediaRenderer from "@/components/media/MediaRenderer";
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -213,16 +214,18 @@ const AdminReviewImagePreview: React.FC<{
   }
 
   return (
-    <img
+    <MediaRenderer
+      kind="image"
+      fit="cover"
+      className="h-full w-full"
       src={src}
       alt={alt}
       // Off-screen tiles in a scrolling queue and a grid below the fold must not
       // compete for connections with the ones on screen.
       loading={eager ? 'eager' : 'lazy'}
-      decoding="async"
       fetchPriority={eager ? 'high' : 'low'}
       draggable={false}
-      className={
+      mediaClassName={
         'h-full w-full object-cover transition-opacity duration-200 ' +
         (loaded ? 'opacity-100' : 'opacity-0')
       }

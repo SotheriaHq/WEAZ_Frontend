@@ -1,345 +1,101 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { brandApi } from '@/api/BrandApi';
-import {
-  WIEZ_MEDIA_URL_GC_TIME_MS,
-  WIEZ_QUERY_STALE_TIME_MS,
-} from '@/query/queryClient';
+import { WIEZ_MEDIA_URL_GC_TIME_MS, WIEZ_QUERY_STALE_TIME_MS } from '@/query/queryClient';
 import { queryKeys } from '@/query/queryKeys';
+import { clearCachedMediaUrls, resolveCachedMediaUrl } from '@/utils/mediaUrlCache';
+import { getMediaUrlExpiryMs, getMediaUrlIdentity, isRenewableMediaUrl, isStorageProviderUrl, isUsableMediaUrl, MEDIA_URL_REFRESH_SKEW_MS } from '@/utils/mediaUrlPolicy';
+import { getMediaSessionEpoch, subscribeMediaSession } from '@/utils/mediaUrlSession';
 
-// Re-use the same session-storage cache from ImageWithFallback
-const CACHE_KEY = 'wiez_signed_url_cache';
-const CACHE_EXPIRY_MS = 14 * 60 * 1000;
+export const clearSignedFileUrlSessionCache = clearCachedMediaUrls;
 
-interface CacheEntry { url: string; expiresAt: number; }
-
-const getCache = (): Record<string, CacheEntry> => {
-  try { return JSON.parse(sessionStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; }
-};
-
-const getCachedUrl = (key: string): string | null => {
-  const entry = getCache()[key];
-  return entry && entry.expiresAt > Date.now() ? entry.url : null;
-};
-
-const invalidateCachedUrl = (key: string) => {
-  const cache = getCache();
-  if (!cache[key]) return;
-  delete cache[key];
-  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch { /* full */ }
-};
-
-const setCachedUrl = (key: string, url: string) => {
-  const cache = getCache();
-  cache[key] = { url, expiresAt: Date.now() + CACHE_EXPIRY_MS };
-  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch { /* full */ }
-};
-
-export const clearSignedFileUrlSessionCache = () => {
-  inflight.clear();
-  try {
-    sessionStorage.removeItem(CACHE_KEY);
-  } catch {
-    // Session storage may be unavailable.
-  }
-};
-
-// In-flight dedup map (shared module-level singleton)
-const inflight = new Map<string, Promise<string | null>>();
-
-const dedup = async (
-  key: string,
-  fetcher: () => Promise<string | null>,
-): Promise<string | null> => {
-  const cached = getCachedUrl(key);
-  if (cached) return cached;
-  const existing = inflight.get(key);
-  if (existing) return existing;
-  const p = fetcher()
-    .then((u) => { if (u) setCachedUrl(key, u); return u || null; })
-    .catch(() => null)
-    .finally(() => { inflight.delete(key); });
-  inflight.set(key, p);
-  return p;
-};
-
-const isS3LikeUrl = (value?: string | null) => {
-  if (!value) return false;
-  const lower = value.toLowerCase();
-  return lower.includes('.s3.') || lower.includes('amazonaws.com');
-};
-
-const isHttpUrl = (value?: string | null) => Boolean(value && /^https?:\/\//i.test(value));
-
-const hasSignedUrlParams = (value?: string | null) => {
-  if (!value) return false;
-  try {
-    const parsed = new URL(value);
-    return Boolean(
-      parsed.searchParams.get('X-Amz-Signature') ||
-        parsed.searchParams.get('Signature') ||
-        parsed.searchParams.get('Expires') ||
-        parsed.searchParams.get('expires') ||
-        parsed.searchParams.get('token'),
-    );
-  } catch {
-    return false;
-  }
-};
-
-const parseCompactAmzDate = (value: string) => {
-  const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(value);
-  if (!match) return null;
-  const [, year, month, day, hour, minute, second] = match;
-  const timestamp = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
-  return Number.isFinite(timestamp) ? timestamp : null;
-};
-
-const getSignedUrlExpiresAt = (value: string) => {
-  try {
-    const parsed = new URL(value);
-    const unixExpires = parsed.searchParams.get('Expires') ?? parsed.searchParams.get('expires');
-    if (unixExpires) {
-      const timestamp = Number(unixExpires) * 1000;
-      if (Number.isFinite(timestamp)) return timestamp;
-    }
-
-    const amzDate = parsed.searchParams.get('X-Amz-Date');
-    const amzExpires = Number(parsed.searchParams.get('X-Amz-Expires'));
-    const amzStartedAt = amzDate ? parseCompactAmzDate(amzDate) : null;
-    if (amzStartedAt && Number.isFinite(amzExpires)) {
-      return amzStartedAt + amzExpires * 1000;
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-};
-
-const isUsableInitialUrl = (value?: string | null) => {
-  if (!isHttpUrl(value)) return false;
-  if (!hasSignedUrlParams(value)) return true;
-  const expiresAt = getSignedUrlExpiresAt(value!);
-  return Boolean(expiresAt && expiresAt > Date.now() + 30_000);
-};
-
-const isRawStorageKey = (value?: string | null) => {
-  if (!value) return false;
-  return !/^https?:\/\//i.test(value) && !value.includes('?');
-};
-
-const shouldPreferFileIdResolution = (value?: string | null, fileId?: string | null) => {
-  if (!value || !fileId) return false;
-  return isS3LikeUrl(value);
-};
-
-/**
- * Resolve a signed URL for a given fileId with an optional initial fallback URL.
- * Guarantees a stable url string or null, plus loading/error states.
- */
+/** Resolve a capability without letting API/session caches outlive its expiry. */
 export function useSignedFileUrl(fileId?: string | null, initial?: string | null) {
   const queryClient = useQueryClient();
-  const [url, setUrl] = useState<string | null>(() => {
-    if (isUsableInitialUrl(initial) && !shouldPreferFileIdResolution(initial, fileId)) {
-      return initial ?? null;
-    }
-    // Try cache first for instant render
-    if (fileId) {
-      const cached = getCachedUrl(fileId);
-      if (cached) return cached;
-    }
-    if (shouldPreferFileIdResolution(initial, fileId)) {
-      return null;
-    }
-    if (initial && isRawStorageKey(initial)) {
-      return getCachedUrl(`key:${initial}`) ?? initial;
-    }
-    if (initial && isS3LikeUrl(initial)) {
-      return getCachedUrl(initial) ?? initial;
-    }
-    return initial ?? null;
-  });
-  const [loading, setLoading] = useState<boolean>(
-    Boolean(
-      fileId &&
-        (shouldPreferFileIdResolution(initial, fileId) ||
-          !isUsableInitialUrl(initial)),
-    ),
-  );
+  const epoch = useSyncExternalStore(subscribeMediaSession, getMediaSessionEpoch, getMediaSessionEpoch);
+  const previousEpoch = useRef(epoch);
+  const [revision, setRevision] = useState(0);
+  const refresh = useCallback(() => setRevision((value) => value + 1), []);
+  const [url, setUrl] = useState<string | null>(() => isUsableMediaUrl(initial) ? initial! : null);
+  const [loading, setLoading] = useState(Boolean((fileId || initial) && !isUsableMediaUrl(initial)));
   const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     let cancelled = false;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const force = revision > 0 || previousEpoch.current !== epoch;
+    previousEpoch.current = epoch;
+    const identity = initial ? getMediaUrlIdentity(initial) : 'none';
+    const cacheKey = `file:${fileId ?? 'none'}:source:${identity}`;
     setError(null);
-
-    if (isUsableInitialUrl(initial) && !shouldPreferFileIdResolution(initial, fileId)) {
-      setUrl(initial ?? null);
-      setLoading(false);
-      return;
-    }
-
-    // Prefer a usable payload URL first; fileId resolution is only needed when
-    // the direct URL is missing or close to signed-URL expiry.
-    if (!fileId && initial && !isS3LikeUrl(initial) && !isRawStorageKey(initial)) {
-        setUrl(initial);
-        setLoading(false);
-        return;
-    }
-
-    // Handle S3 URLs (signed or unsigned) by resolving a fresh URL through API.
-    if (!fileId && initial && isS3LikeUrl(initial)) {
-      setLoading(true);
-      dedup(initial, () => brandApi.getSignedS3Url(initial)).then((signed) => {
-        if (!cancelled) {
-          if (signed) {
-            setUrl(signed);
-            setLoading(false);
-            return;
-          }
-
-          // Retry once after short delay for transient auth/network delays.
-          retryTimer = setTimeout(() => {
-            brandApi.invalidateSignedUrlCache(initial);
-            invalidateCachedUrl(initial);
-            void dedup(initial, () =>
-              brandApi.getSignedS3Url(initial, { forceRefresh: true }),
-            ).then((retrySigned) => {
-              if (!cancelled) {
-                setUrl(retrySigned ?? initial);
-                setLoading(false);
-              }
-            });
-          }, 900);
-        }
-      });
-      return () => {
-        cancelled = true;
-        if (retryTimer) clearTimeout(retryTimer);
-      };
-    }
-
-    if (!fileId && initial && isRawStorageKey(initial)) {
-      const cacheKey = `key:${initial}`;
-      setLoading(true);
-      dedup(cacheKey, () => brandApi.getSignedS3KeyUrl(initial)).then((signed) => {
-        if (!cancelled) {
-          if (signed) {
-            setUrl(signed);
-            setLoading(false);
-            return;
-          }
-
-          retryTimer = setTimeout(() => {
-            brandApi.invalidateSignedUrlCache(initial);
-            invalidateCachedUrl(cacheKey);
-            void dedup(cacheKey, () =>
-              brandApi.getSignedS3KeyUrl(initial, { forceRefresh: true }),
-            ).then((retrySigned) => {
-              if (!cancelled) {
-                setUrl(retrySigned ?? initial);
-                setLoading(false);
-              }
-            });
-          }, 900);
-        }
-      });
-
-      return () => {
-        cancelled = true;
-        if (retryTimer) clearTimeout(retryTimer);
-      };
-    }
-
-    if (!fileId) {
-      // No fileId, just use initial and mark as not loading
-      setUrl(initial ?? null);
-      setLoading(false);
-      return;
-    }
-
-    // Check cache for instant display
-    const cached = getCachedUrl(fileId);
-    if (cached) {
-      setUrl(cached);
-      setLoading(false);
-      return;
-    }
-
+    if (!force && isUsableMediaUrl(initial)) { setUrl(initial!); setLoading(false); return; }
+    if (!fileId && !initial) { setUrl(null); setLoading(false); return; }
     setLoading(true);
-    dedup(fileId, () =>
-      queryClient.fetchQuery({
-        queryKey: queryKeys.media.publicUrl(fileId),
-        queryFn: () => brandApi.getPublicFileUrl(fileId),
-        staleTime: WIEZ_QUERY_STALE_TIME_MS,
-        retry: false,
-      }).then((publicUrl) => {
-        if (publicUrl) return publicUrl;
-        return queryClient.fetchQuery({
-          queryKey: queryKeys.media.signedUrl(fileId),
-          queryFn: () => brandApi.getPrivateSignedFileUrl(fileId),
-          staleTime: WIEZ_QUERY_STALE_TIME_MS,
-          gcTime: WIEZ_MEDIA_URL_GC_TIME_MS,
-          retry: false,
-        });
-      }),
-    ).then((signed) => {
-      if (!cancelled) {
-        if (signed) {
-          setUrl(signed);
-          setLoading(false);
-          return;
+    void resolveCachedMediaUrl(cacheKey, async () => {
+      if (initial && isRenewableMediaUrl(initial)) {
+        const sourceResolver = brandApi.getSignedMediaSourceUrl;
+        if (typeof sourceResolver === 'function') {
+          const renewed = await sourceResolver.call(brandApi, initial, { forceRefresh: force });
+          if (renewed) return renewed;
         }
-
-        // Retry once after short delay for transient auth/network delays.
-        retryTimer = setTimeout(() => {
-          brandApi.invalidateSignedUrlCache(fileId);
-          invalidateCachedUrl(fileId);
-          queryClient.removeQueries({ queryKey: queryKeys.media.publicUrl(fileId), exact: true });
-          queryClient.removeQueries({ queryKey: queryKeys.media.signedUrl(fileId), exact: true });
-          void dedup(fileId, () =>
-            queryClient.fetchQuery({
-              queryKey: queryKeys.media.publicUrl(fileId),
-              queryFn: () => brandApi.getPublicFileUrl(fileId, { forceRefresh: true }),
-              staleTime: WIEZ_QUERY_STALE_TIME_MS,
-              retry: false,
-            }).then((publicUrl) => {
-              if (publicUrl) return publicUrl;
-              return queryClient.fetchQuery({
-                queryKey: queryKeys.media.signedUrl(fileId),
-                queryFn: () => brandApi.getPrivateSignedFileUrl(fileId, { forceRefresh: true }),
-                staleTime: WIEZ_QUERY_STALE_TIME_MS,
-                gcTime: WIEZ_MEDIA_URL_GC_TIME_MS,
-                retry: false,
-              });
-            }),
-          ).then((retrySigned) => {
-            if (!cancelled) {
-              if (retrySigned) {
-                setUrl(retrySigned);
-                setError(null);
-              } else {
-                setError(new Error('Failed to resolve signed URL'));
-                setUrl(initial ?? null);
-              }
-              setLoading(false);
-            }
-          });
-        }, 900);
-        return;
+        // Compatibility with older APIs supports legacy AWS keys only.
+        if (!fileId && isStorageProviderUrl(initial) && typeof brandApi.getSignedS3Url === 'function') {
+          return brandApi.getSignedS3Url(initial, force ? { forceRefresh: true } : undefined);
+        }
       }
+      if (!fileId) {
+        if (initial && !/^https?:\/\//i.test(initial) && typeof brandApi.getSignedS3KeyUrl === 'function') {
+          return brandApi.getSignedS3KeyUrl(initial, force ? { forceRefresh: true } : undefined);
+        }
+        return isUsableMediaUrl(initial) && !isRenewableMediaUrl(initial) ? initial! : null;
+      }
+      const publicKey = queryKeys.media.publicUrl(fileId);
+      const privateKey = queryKeys.media.signedUrl(fileId);
+      const cached = queryClient.getQueryData<string | null>(publicKey);
+      const mustRefresh = force || Boolean(cached && !isUsableMediaUrl(cached));
+      if (mustRefresh) {
+        brandApi.invalidateSignedUrlCache(fileId);
+        queryClient.removeQueries({ queryKey: publicKey, exact: true });
+        queryClient.removeQueries({ queryKey: privateKey, exact: true });
+      }
+      const options = mustRefresh ? { forceRefresh: true } : undefined;
+      const publicUrl = await queryClient.fetchQuery({
+        queryKey: publicKey,
+        queryFn: () => options ? brandApi.getPublicFileUrl(fileId, options) : brandApi.getPublicFileUrl(fileId),
+        staleTime: mustRefresh ? 0 : WIEZ_QUERY_STALE_TIME_MS, gcTime: WIEZ_MEDIA_URL_GC_TIME_MS, retry: false,
+      });
+      if (publicUrl && isUsableMediaUrl(publicUrl, Date.now(), 0)) return publicUrl;
+      const cachedPrivate = queryClient.getQueryData<string | null>(privateKey);
+      if (cachedPrivate && !isUsableMediaUrl(cachedPrivate)) queryClient.removeQueries({ queryKey: privateKey, exact: true });
+      return queryClient.fetchQuery({
+        queryKey: privateKey,
+        queryFn: () => options ? brandApi.getPrivateSignedFileUrl(fileId, options) : brandApi.getPrivateSignedFileUrl(fileId),
+        staleTime: mustRefresh ? 0 : WIEZ_QUERY_STALE_TIME_MS, gcTime: WIEZ_MEDIA_URL_GC_TIME_MS, retry: false,
+      });
+    }, force).then((resolved) => {
+      if (cancelled) return;
+      setUrl(resolved);
+      setError(resolved ? null : new Error('Unable to resolve media URL'));
+      setLoading(false);
     });
+    return () => { cancelled = true; };
+  }, [epoch, fileId, initial, queryClient, revision]);
 
-    return () => {
-      cancelled = true;
-      if (retryTimer) {
-        clearTimeout(retryTimer);
-      }
-    };
-  }, [fileId, initial, queryClient]);
+  useEffect(() => {
+    const expiresAt = getMediaUrlExpiryMs(url);
+    if (expiresAt === null) return;
+    const timer = setTimeout(refresh, Math.min(2_147_483_647, Math.max(1000, expiresAt - Date.now() - MEDIA_URL_REFRESH_SKEW_MS)));
+    return () => clearTimeout(timer);
+  }, [refresh, url]);
 
-  return { url, loading, error } as const;
+  useEffect(() => {
+    const check = () => { if ((fileId || isRenewableMediaUrl(initial)) && !isUsableMediaUrl(url)) refresh(); };
+    const onVisible = () => { if (document.visibilityState === 'visible') check(); };
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { window.removeEventListener('focus', check); document.removeEventListener('visibilitychange', onVisible); };
+  }, [fileId, initial, refresh, url]);
+
+  return { url, loading, error, refresh } as const;
 }
 
 export default useSignedFileUrl;

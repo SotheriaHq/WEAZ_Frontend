@@ -604,11 +604,13 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       >
         {!imgError && activeImage?.url && !fillsFrameExactly ? (
           <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-            <img
+            <MediaRenderer
+              kind="image"
+              fit="cover"
               src={activeImage.url}
               alt=""
-              className="h-full w-full object-cover blur-2xl scale-125 opacity-40 dark:opacity-30"
-              decoding="async"
+              className="h-full w-full"
+              mediaClassName="h-full w-full object-cover blur-2xl scale-125 opacity-40 dark:opacity-30"
             />
             <div className="absolute inset-0 bg-black/10 dark:bg-black/30" />
           </div>

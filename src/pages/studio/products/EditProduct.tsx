@@ -32,7 +32,7 @@ import {
   type Category,
   type ProductVariant,
 } from "@/api/ProductApi";
-import { brandApi, type CategoryTypeOption } from "@/api/BrandApi";
+import { brandApi } from "@/api/BrandApi";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import UniversalSelect, {
@@ -111,6 +111,8 @@ import {
   type MediaViewSlot,
 } from "@/utils/contentIntegrity";
 import { queryKeys } from "@/query/queryKeys";
+import { useQuery } from '@tanstack/react-query';
+import { creatorCategoriesOptions, EMPTY_CREATOR_CATEGORIES } from '@/query/creatorMetadataQueries';
 import useCachedResource from "@/hooks/useCachedResource";
 import MediaSlotGrid, {
   type MediaSlotGridItem,
@@ -431,11 +433,12 @@ type TaxonomyCategoryOption = {
   types: { id: string; name: string }[];
 };
 
+const EMPTY_STORE_COLLECTIONS: Category[] = [];
+const EMPTY_COLLECTION_CATEGORIES: Record<string, string> = {};
+
 type ProductEditorSupportData = {
   categories: Category[];
   collectionCategoryById: Record<string, string>;
-  taxonomyCategories: TaxonomyCategoryOption[];
-  categoryTypes: CategoryTypeOption[];
 };
 
 type ProductEditorPolicyDefaults = {
@@ -596,69 +599,23 @@ const EditProduct: React.FC = () => {
     [user?.id],
   );
 
-  const { data: productEditorSupportData, loading: categoriesLoading } =
+  const { data: creatorCategories = EMPTY_CREATOR_CATEGORIES, isLoading: categoriesLoading } = useQuery(creatorCategoriesOptions);
+  const { data: productEditorSupportData, loading: collectionsLoading } =
     useCachedResource<ProductEditorSupportData>({
       queryKey: productEditorSupportQueryKey,
+      enabled: Boolean(user?.id),
+      retainPreviousData: false,
       queryFn: async () => {
-        const [collectionsResult, categoryTypesResult, categoriesWithSubResult] =
-          await Promise.allSettled([
-            user?.id
-              ? brandApi.getCollections(user.id, { visibility: "all", scope: "store" })
-              : Promise.resolve(null),
-            brandApi.getCategoryTypes(undefined, true),
-            brandApi.getCategoriesWithSubCategories(true),
-          ]);
-
-        const collections =
-          collectionsResult.status === "fulfilled" ? collectionsResult.value : null;
-        const mappedCollections: Category[] = user?.id
-          ? (collections || [])
-              .filter((c: any) => Boolean(c?.isAvailableInStore))
-              .map((c: any) => ({
-                id: String(c.id),
-                name: String(c.title || c.name || "Untitled collection"),
-                slug: String(c.id),
-              }))
-          : [];
-
+        const collections = await brandApi.getCollections(user!.id, { visibility: 'all', scope: 'store' });
         const categoryByCollection: Record<string, string> = {};
-        (collections || []).forEach((c: any) => {
-          if (c?.id && c?.categoryId) {
-            categoryByCollection[String(c.id)] = String(c.categoryId);
-          }
-        });
-
-        const categoriesWithSub =
-          categoriesWithSubResult.status === "fulfilled"
-            ? categoriesWithSubResult.value
-            : null;
-        const taxonomyCategories: TaxonomyCategoryOption[] = Array.isArray(categoriesWithSub)
-          ? categoriesWithSub.map((c: any) => ({
-              id: String(c.id),
-              name: String(c.name || ""),
-              types: (c.types || []).map((t: any) => ({
-                id: String(t.id),
-                name: String(t.name || ""),
-              })),
-            }))
-          : [];
-
-        let resolvedTypes =
-          categoryTypesResult.status === "fulfilled" &&
-          Array.isArray(categoryTypesResult.value)
-            ? categoryTypesResult.value
-            : [];
-        if (resolvedTypes.length === 0 && Array.isArray(categoriesWithSub)) {
-          resolvedTypes = categoriesWithSub
-            .flatMap((category: any) => category.types ?? [])
-            .filter((type: any) => Boolean(type?.id) && Boolean(type?.name));
+        for (const collection of collections ?? []) {
+          if (collection.id && collection.categoryId) categoryByCollection[collection.id] = collection.categoryId;
         }
-
         return {
-          categories: mappedCollections,
+          categories: (collections ?? []).filter((collection) => collection.isAvailableInStore).map((collection) => ({
+            id: collection.id, name: collection.title || 'Untitled collection', slug: collection.id,
+          })),
           collectionCategoryById: categoryByCollection,
-          taxonomyCategories,
-          categoryTypes: resolvedTypes,
         };
       },
       staleTime: 30 * 60 * 1000,
@@ -701,15 +658,9 @@ const EditProduct: React.FC = () => {
   // Reviewer note carried on the notification deep link — display fallback
   // only; the banner itself is gated on the server-side review state.
   const reviewNoteParam = reviewSearchParams.get('reviewNote')?.trim() || '';
-  const [categories, setCategories] = useState<Category[]>(
-    () => productEditorSupportData?.categories ?? [],
-  );
-  const [collectionCategoryById, setCollectionCategoryById] = useState<
-    Record<string, string>
-  >(() => productEditorSupportData?.collectionCategoryById ?? {});
-  const [categoryTypes, setCategoryTypes] = useState<CategoryTypeOption[]>(
-    () => productEditorSupportData?.categoryTypes ?? [],
-  );
+  const categories = productEditorSupportData?.categories ?? EMPTY_STORE_COLLECTIONS;
+  const collectionCategoryById = productEditorSupportData?.collectionCategoryById ?? EMPTY_COLLECTION_CATEGORIES;
+  const categoryTypes = useMemo(() => creatorCategories.flatMap((category) => category.types ?? []), [creatorCategories]);
   const [loading, setLoading] = useState(
     () => isEditMode && cachedProductDetail === undefined,
   );
@@ -769,9 +720,7 @@ const EditProduct: React.FC = () => {
   );
   const { confirm, ConfirmDialog: ConfirmModal } = useConfirm();
 
-  const [taxonomyCategories, setTaxonomyCategories] = useState<
-    TaxonomyCategoryOption[]
-  >(() => productEditorSupportData?.taxonomyCategories ?? []);
+  const taxonomyCategories = useMemo<TaxonomyCategoryOption[]>(() => creatorCategories.map((category) => ({ ...category, types: category.types ?? [] })), [creatorCategories]);
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({});
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
 
@@ -1201,13 +1150,7 @@ const EditProduct: React.FC = () => {
     }));
   }, [storePolicyDefaults]);
 
-  useEffect(() => {
-    if (!productEditorSupportData) return;
-    setCategories(productEditorSupportData.categories);
-    setCollectionCategoryById(productEditorSupportData.collectionCategoryById);
-    setTaxonomyCategories(productEditorSupportData.taxonomyCategories);
-    setCategoryTypes(productEditorSupportData.categoryTypes);
-  }, [productEditorSupportData]);
+
 
   // Load product if editing
   useEffect(() => {
@@ -1456,7 +1399,7 @@ const EditProduct: React.FC = () => {
   );
 
   useEffect(() => {
-    if (!isCollectionFlow || !collectionContextId || categoriesLoading) return;
+    if (!isCollectionFlow || !collectionContextId || collectionsLoading) return;
     const contextCategoryId = collectionCategoryById[collectionContextId];
 
     setForm((prev) => {
@@ -1490,7 +1433,7 @@ const EditProduct: React.FC = () => {
       return changed ? next : prev;
     });
   }, [
-    categoriesLoading,
+    collectionsLoading,
     categoryTypes,
     collectionCategoryById,
     collectionContextId,
@@ -2854,9 +2797,7 @@ const EditProduct: React.FC = () => {
           // Aim for the target...
           const processed = await preprocessImageFile(file, "detail", {
             maxSizeBytes: targetSizeBytes,
-            targetReductionRatio: 0.9,
-            quality: 0.99,
-            minQuality: 0.9,
+                minQuality: 0.9,
           });
           // ...but accept anything the API will take.
           if (processed.file.size <= maxSizeBytes) {
@@ -3959,11 +3900,11 @@ const EditProduct: React.FC = () => {
                               }
                               options={collectionSelectOptions}
                               placeholder={
-                                categoriesLoading
+                                collectionsLoading
                                   ? 'Loading collections...'
                                   : 'No collection (standalone)'
                               }
-                              disabled={categoriesLoading || isCollectionFlow}
+                              disabled={collectionsLoading || isCollectionFlow}
                               searchable
                               emptyMessage="No collections available"
                               optionAllowWrap
@@ -3971,12 +3912,12 @@ const EditProduct: React.FC = () => {
                               menuLayer="modal"
                             />
                             <p className="mt-1.5 text-[11px] text-theme-secondary">
-                              {categoriesLoading
+                              {collectionsLoading
                                 ? 'Loading collections…'
                                 : categories.length
                                   ? 'Optional. Use only if this product belongs in a store collection.'
                                   : 'No collections yet — product can stay standalone.'}
-                              {!categoriesLoading && categories.length === 0 ? (
+                              {!collectionsLoading && categories.length === 0 ? (
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -5057,7 +4998,7 @@ const EditProduct: React.FC = () => {
                 <div>
                   <dt className="text-xs text-theme-secondary">Category</dt>
                   <dd className="text-sm text-theme">
-                    {productEditorSupportData?.taxonomyCategories?.find(
+                    {taxonomyCategories.find(
                       (c) => c.id === form.taxonomyCategoryId,
                     )?.name ?? "—"}
                   </dd>
@@ -5065,10 +5006,10 @@ const EditProduct: React.FC = () => {
                 <div>
                   <dt className="text-xs text-theme-secondary">Subcategory</dt>
                   <dd className="text-sm text-theme">
-                    {productEditorSupportData?.taxonomyCategories
-                      ?.find((c) => c.id === form.taxonomyCategoryId)
+                    {taxonomyCategories
+                      .find((c) => c.id === form.taxonomyCategoryId)
                       ?.types?.find((t) => t.id === form.categoryTypeId)?.name ??
-                      productEditorSupportData?.categoryTypes?.find(
+                      categoryTypes.find(
                         (t) => t.id === form.categoryTypeId,
                       )?.name ??
                       "—"}

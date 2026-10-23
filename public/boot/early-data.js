@@ -9,10 +9,10 @@
     var opts = { credentials: 'omit', headers: { Accept: 'application/json' } };
     var early = {};
     var path = window.location.pathname;
-    if (path === '/' || path === '/market') {
-      early['feed:combined'] = fetch(API + '/collections/market?counts=combined', opts);
+    if (path === '/' || path === '/runway') {
+      early['feed:combined'] = fetch(API + '/collections/market?counts=combined&feedKey=explore', opts);
     }
-    if (path === '/market-place') {
+    if (path === '/market' || path === '/market-place') {
       early['sections'] = fetch(API + '/market/sections', opts);
     }
     for (var key in early) {

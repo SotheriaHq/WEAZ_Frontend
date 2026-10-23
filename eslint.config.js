@@ -45,9 +45,19 @@ export default tseslint.config([
           allowFiles: [
             'src/pages/Login.tsx',
             'src/pages/SignUp.tsx',
+            // Static, dimensioned brand artwork is decorative chrome, not uploaded media.
+            'src/brand/WiezMark.tsx',
+            'src/brand/WiezWordmark.tsx',
           ],
         },
       ],
+    },
+  },
+  {
+    files: ['**/*.test.tsx'],
+    rules: {
+      // Test doubles need direct load/error/readiness control; application code stays strict.
+      'threadly/no-raw-media-elements': 'off',
     },
   },
 ])

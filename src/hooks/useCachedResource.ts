@@ -53,6 +53,8 @@ export interface CachedResourceOptions<T> {
    * background to avoid needless load.
    */
   refetchInterval?: number;
+  /** Keep previous filter results only when the identity is unchanged. */
+  retainPreviousData?: boolean;
 }
 
 export interface CachedResource<T> {
@@ -80,7 +82,7 @@ export interface CachedResource<T> {
 export function useCachedResource<T>(
   options: CachedResourceOptions<T>,
 ): CachedResource<T> {
-  const { queryKey, queryFn, enabled = true, initialData, staleTime, gcTime, refetchInterval } = options;
+  const { queryKey, queryFn, enabled = true, initialData, staleTime, gcTime, refetchInterval, retainPreviousData = true } = options;
 
   const query = useQuery<T>({
     queryKey,
@@ -99,7 +101,7 @@ export function useCachedResource<T>(
      * With it, the old results stay put, `isLoading` stays false, and the only
      * thing that changes is `isPlaceholderData`. One layout, no flash.
      */
-    placeholderData: keepPreviousData,
+    placeholderData: retainPreviousData ? keepPreviousData : undefined,
     ...(initialData !== undefined ? { initialData } : {}),
     ...(staleTime !== undefined ? { staleTime } : {}),
     ...(gcTime !== undefined ? { gcTime } : {}),
