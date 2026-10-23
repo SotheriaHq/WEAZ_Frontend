@@ -64,7 +64,7 @@ const PendingScopeTabs: React.FC<{
   <div
     role="tablist"
     aria-label={`${allLabel} scope`}
-    className="inline-flex rounded-2xl border border-slate-200 bg-slate-100/70 p-1 dark:border-white/10 dark:bg-white/5"
+    className="inline-flex neu-recessed-card p-1"
   >
     <button
       type="button"
@@ -74,7 +74,7 @@ const PendingScopeTabs: React.FC<{
       className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
         pendingOnly
           ? 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
-          : 'bg-white text-indigo-700 shadow-sm dark:bg-slate-800 dark:text-indigo-300'
+          : 'neu-pressed-button text-indigo-700 dark:text-indigo-300 font-extrabold'
       }`}
     >
       {allLabel}
@@ -86,7 +86,7 @@ const PendingScopeTabs: React.FC<{
       onClick={() => onSelect(true)}
       className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
         pendingOnly
-          ? 'bg-white text-amber-700 shadow-sm dark:bg-slate-800 dark:text-amber-300'
+          ? 'neu-pressed-button text-amber-700 dark:text-amber-300 font-extrabold'
           : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
       }`}
     >

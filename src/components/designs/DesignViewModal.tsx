@@ -95,7 +95,7 @@ type ModalMedia = {
  * never jumps under the cursor mid-interaction.
  */
 const ACTION_TILE_CLASS =
-  'flex h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-center transition-colors';
+  'neu-pressed-button flex h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-center transition-colors';
 const ACTION_TILE_NEUTRAL_CLASS =
   'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/[0.08] dark:text-slate-200 dark:hover:bg-white/[0.14]';
 /**
@@ -783,10 +783,10 @@ const DesignViewModal: React.FC<Props> = ({
   // ------------------------------------------------------------------
   if (isMobile) {
     const mobileActionBtn =
-      'inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10';
+      'neu-pressed-button inline-flex items-center gap-1 rounded-full px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200';
     // Clipped is the same pill, filled — see ACTION_TILE_ACTIVE_CLASS.
     const mobileActionBtnActive =
-      'inline-flex items-center gap-1 rounded-full border border-indigo-600 bg-indigo-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-indigo-700 dark:border-indigo-500 dark:bg-indigo-500 dark:text-white dark:hover:bg-indigo-400';
+      'chip-inset inline-flex items-center gap-1 rounded-full px-3 py-2 text-xs font-medium text-white transition bg-indigo-600 dark:bg-indigo-500';
 
     return (
       <OverlayPortal>

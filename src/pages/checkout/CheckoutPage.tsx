@@ -1538,7 +1538,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                               <button
                                 type="button"
                                 onClick={() => setOpenAddressMenuId((current) => (current === savedAddress.id ? null : savedAddress.id))}
-                                className="rounded-full border border-black/10 px-2 py-1 text-xs font-semibold text-slate-600 dark:border-white/10 dark:text-slate-300"
+                                className="neu-pressed-button px-2 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300"
                                 aria-label="Open shipping address actions"
                               >
                                 ...

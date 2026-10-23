@@ -1080,6 +1080,11 @@ html {
   }
 
   /* WIEZ Material & Surface Lab: Neumorphic pressed button */
+  button:not(:disabled):active {
+    transform: scale(0.985) translateY(1px);
+    transition: transform 0.08s ease;
+  }
+
   .neu-pressed-button {
     background-color: var(--neu-surface-soft);
     color: var(--neu-text);

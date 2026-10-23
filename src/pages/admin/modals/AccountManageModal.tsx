@@ -223,7 +223,7 @@ const normalizePermissions = (
     : [];
 
 const actionButtonClass =
-  'inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-inherit dark:focus-visible:ring-offset-black';
+  'neu-pressed-button inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-inherit dark:focus-visible:ring-offset-black';
 
 /**
  * Query param that reopens this modal for a brand. It is written into the
@@ -759,7 +759,7 @@ const AccountManageModal: React.FC<Props> = ({
       >
         <div className="space-y-5">
           {/* Identity header */}
-          <div className="rounded-2xl border border-gray-200/80 bg-gradient-to-br from-white to-gray-50 px-4 py-4 dark:border-white/10 dark:from-white/10 dark:to-white/5">
+          <div className="neu-recessed-card px-4 py-4">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex items-center gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-sm font-bold text-white shadow-md">
@@ -819,7 +819,7 @@ const AccountManageModal: React.FC<Props> = ({
           </div>
 
           {/* Account lifecycle actions */}
-          <div className="rounded-2xl border border-gray-200/80 bg-white px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="neu-recessed-card px-4 py-4">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Account lifecycle</h3>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Changes apply immediately and are audited.</p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -1129,7 +1129,7 @@ const AccountManageModal: React.FC<Props> = ({
 
           {/* Temporary password reissue (admins) */}
           {canUpdateSensitiveUserAccess && isAdminTarget && !isDeleted && (
-            <div className="rounded-2xl border border-gray-200/80 bg-white px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="neu-recessed-card px-4 py-4">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Temporary Password Reissue</h3>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Current passwords are never viewable. Reissue a temporary password after SuperAdmin verification.
@@ -1175,7 +1175,7 @@ const AccountManageModal: React.FC<Props> = ({
 
           {/* Admin permissions */}
           {canManagePermissions && isAdminTarget && !isDeleted && (
-            <div className="rounded-2xl border border-gray-200/80 bg-white px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="neu-recessed-card px-4 py-4">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Permissions</h3>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Grant or revoke admin capabilities. Saving signs this admin out — the new set applies at their next sign-in.

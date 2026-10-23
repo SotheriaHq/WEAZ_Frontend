@@ -2883,7 +2883,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     key={product.id}
                     type="button"
                     onClick={() => navigateToStudioProductDetails(product.id)}
-                    className="overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-zinc-900/70 lg:rounded-xl"
+                    className="overflow-hidden neu-recessed-card text-left transition lg:rounded-xl"
                   >
                     {/* Same cover proportion as the catalog card above. */}
                     <div className="aspect-[100/158] bg-gray-100 dark:bg-white/5 lg:aspect-[4/5]">
@@ -3983,7 +3983,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               setDraftReminderProduct(null);
             }}
           />
-          <div className="relative w-full max-w-md mx-4 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
+          <div className="relative w-full max-w-md mx-4 neu-modal-surface rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
             <div className="p-6 border-b border-gray-100 dark:border-white/10">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">Continue your draft?</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">

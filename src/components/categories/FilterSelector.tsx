@@ -167,7 +167,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
         )}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200/60 bg-white/50 divide-y divide-gray-200/70 dark:border-white/10 dark:bg-white/[0.03] dark:divide-white/10">
+      <div className="overflow-hidden neu-recessed-card divide-y divide-gray-200/70 dark:divide-white/10">
         {dimensions.map((dim) => {
           const isExpanded = expandedDimensionId === dim.id;
           const selectedValues = value[dim.id] ?? [];
@@ -277,8 +277,8 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                                 disabled={disabled}
                                 className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                                   isSelected
-                                    ? "border-purple-400/70 bg-purple-50 text-purple-700 dark:border-purple-400/60 dark:bg-purple-500/10 dark:text-purple-300"
-                                    : "border-gray-200/70 bg-white text-gray-700 hover:border-purple-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-purple-500/40"
+                                    ? "neu-inset-chip selected border-purple-400/70 bg-purple-50 text-purple-700 dark:border-purple-400/60 dark:bg-purple-500/10 dark:text-purple-300"
+                                    : "neu-pressed-button text-gray-700 dark:text-gray-300"
                                 }`}
                               >
                                 <span

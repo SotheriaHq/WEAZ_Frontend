@@ -977,7 +977,7 @@ const AdminFinancePage: React.FC = () => {
         </button>
       </div>
 
-      <section className="rounded-3xl border border-black/10 bg-white/85 p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
+      <section className="neu-recessed-card p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">📒 Finance Console</h1>
@@ -989,7 +989,7 @@ const AdminFinancePage: React.FC = () => {
             <button
               type="button"
               onClick={refreshCurrentTab}
-              className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]"
+              className="neu-pressed-button px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
             >
               🔄 Refresh
             </button>
@@ -1008,7 +1008,7 @@ const AdminFinancePage: React.FC = () => {
                 type="button"
                 onClick={() => void handleRepairCustomSettlements()}
                 disabled={busyKey === 'repair:custom-settlements'}
-                className="rounded-full border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100 dark:hover:bg-violet-500/20"
+                className="neu-pressed-button px-4 py-2 text-sm font-semibold text-violet-900 dark:text-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {busyKey === 'repair:custom-settlements'
                   ? 'Repairing...'
@@ -1044,7 +1044,7 @@ const AdminFinancePage: React.FC = () => {
         ) : null}
       </section>
 
-      <section className="overflow-hidden rounded-3xl border border-black/10 bg-white/85 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
+      <section className="overflow-hidden neu-recessed-card">
         <div className="border-b border-black/5 px-4 py-3 dark:border-white/5">
           <div className="flex gap-2 overflow-x-auto scrollbar-hide">
             {FINANCE_TABS.map((tab) => (
@@ -1775,7 +1775,7 @@ const AdminFinancePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate(`/admin/orders/${standardOrderDetail.id}`)}
-                className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]"
+                className="neu-pressed-button px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
               >
                 Open full order workspace
               </button>
@@ -1896,7 +1896,7 @@ const AdminFinancePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate(`/admin/custom-orders/${customOrderDetail.id}`)}
-                className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]"
+                className="neu-pressed-button px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
               >
                 Open full order workspace
               </button>
@@ -1974,7 +1974,7 @@ const AdminFinancePage: React.FC = () => {
       >
         {selectedTransactionGroup ? (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-black/10 bg-slate-50/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="neu-recessed-card px-4 py-3">
               <div className="text-base font-semibold text-slate-900 dark:text-white">
                 {selectedTransactionGroup.title}
               </div>
@@ -2059,7 +2059,7 @@ const AdminFinancePage: React.FC = () => {
             <Toggle label="Active" checked={commissionDraft.isActive} onToggle={() => setCommissionDraft((current) => ({ ...current, isActive: !current.isActive }))} />
           </div>
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={closeRuleModal} className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.06]">Cancel</button>
+            <button type="button" onClick={closeRuleModal} className="neu-pressed-button px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Cancel</button>
             <button type="button" onClick={() => void submitRule()} disabled={commissionSubmitting} className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950">
               {commissionSubmitting ? 'Saving...' : editingRule ? 'Save changes' : 'Create rule'}
             </button>
@@ -2071,7 +2071,7 @@ const AdminFinancePage: React.FC = () => {
 };
 
 const Panel: React.FC<{ title: string; description?: string; children: React.ReactNode }> = ({ title, description, children }) => (
-  <section className="rounded-3xl border border-black/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+  <section className="neu-recessed-card p-4">
     <div className="mb-4">
       <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
       {description ? <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{description}</p> : null}
@@ -2118,7 +2118,7 @@ const DetailList: React.FC<{ items: Array<{ label: string; value: React.ReactNod
 );
 
 const MetricCard: React.FC<{ label: string; value: string; note: string }> = ({ label, value, note }) => (
-  <div className="rounded-3xl border border-black/10 bg-slate-50/80 px-4 py-4 dark:border-white/10 dark:bg-white/[0.04]">
+  <div className="neu-recessed-card px-4 py-4">
     <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</div>
     <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{value}</div>
     <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">{note}</div>
@@ -2126,14 +2126,14 @@ const MetricCard: React.FC<{ label: string; value: string; note: string }> = ({ 
 );
 
 const PillStat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-white/[0.03]">
+  <div className="chip-inset px-4 py-3">
     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</div>
     <div className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{value}</div>
   </div>
 );
 
 const Badge: React.FC<{ tone: string; label: string }> = ({ tone, label }) => (
-  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${tone}`}>{label}</span>
+  <span className={`chip-sm font-semibold ${tone}`}>{label}</span>
 );
 
 const InputShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -2151,7 +2151,7 @@ const PaymentSettlementCard: React.FC<{
   detail: AdminPaymentSettlementDetail;
   currency: string;
 }> = ({ detail, currency }) => (
-  <div className="rounded-2xl border border-black/10 bg-slate-50/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+  <div className="neu-recessed-card px-4 py-3">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <div className="font-semibold text-slate-900 dark:text-white">
