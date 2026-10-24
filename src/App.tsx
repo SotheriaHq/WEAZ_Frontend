@@ -14,18 +14,15 @@ import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
 import { NoticeModalHost } from '@/components/ui/NoticeModal';
 import { MuseLoader } from '@/components/loaders/MuseLoader';
-import ErrorPage from './pages/ErrorPage';
+const ErrorPage = lazy(() => import('./pages/ErrorPage'));
 import SeoHead from './components/seo/SeoHead';
 import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
-// Placeholder pages for features under development
-import {
-  NotFound,
-  SubscriptionsPlaceholder,
-  HistoryPlaceholder,
-  WatchLaterPlaceholder,
-  TrendingPlaceholder,
-} from './pages/placeholders';
-import StudioScaffold from './components/studio/StudioScaffold';
+const NotFound = lazy(() => import('./pages/placeholders/NotFound'));
+const SubscriptionsPlaceholder = lazy(() => import('./pages/placeholders/SubscriptionsPlaceholder'));
+const HistoryPlaceholder = lazy(() => import('./pages/placeholders/HistoryPlaceholder'));
+const WatchLaterPlaceholder = lazy(() => import('./pages/placeholders/WatchLaterPlaceholder'));
+const TrendingPlaceholder = lazy(() => import('./pages/placeholders/TrendingPlaceholder'));
+const StudioScaffold = lazy(() => import('./components/studio/StudioScaffold'));
 import StudioHandoffGate from './components/studio/StudioHandoffGate';
 import RequireStoreSetup from './components/store/RequireStoreSetup';
 import { BagFlowProvider } from './features/bagging/BagFlowProvider';
@@ -198,9 +195,11 @@ const withStudioRouteFallback = (
 ) => (
   <Suspense
     fallback={
-      <StudioScaffold active={active} onSelect={noopStudioSelect}>
-        <StudioRouteFallback />
-      </StudioScaffold>
+      <Suspense fallback={<StudioRouteFallback />}>
+        <StudioScaffold active={active} onSelect={noopStudioSelect}>
+          <StudioRouteFallback />
+        </StudioScaffold>
+      </Suspense>
     }
   >
     {element}
@@ -549,7 +548,7 @@ const router = createBrowserRouter([
   {
     // Root wrapper that provides Router context to global drawers
     element: <RootLayout />,
-    errorElement: <ErrorPage />,
+    errorElement: withRouteFallback(<ErrorPage />),
     children: [
       {
         path: '/',
@@ -565,10 +564,10 @@ const router = createBrowserRouter([
           { path: 'market/sections/:sectionKey', element: withRouteFallback(<MarketSectionPage />) },
           { path: 'search', element: withRouteFallback(<SearchResultsPage />) },
           { path: 'diagnostics', element: withRouteFallback(<DiagnosticsPage />) },
-          { path: 'subscriptions', element: <SubscriptionsPlaceholder /> },
-          { path: 'history', element: <HistoryPlaceholder /> },
-          { path: 'watch-later', element: <WatchLaterPlaceholder /> },
-          { path: 'trending', element: <TrendingPlaceholder /> },
+          { path: 'subscriptions', element: withRouteFallback(<SubscriptionsPlaceholder />) },
+          { path: 'history', element: withRouteFallback(<HistoryPlaceholder />) },
+          { path: 'watch-later', element: withRouteFallback(<WatchLaterPlaceholder />) },
+          { path: 'trending', element: withRouteFallback(<TrendingPlaceholder />) },
           { path: 'size-charts', element: withRouteFallback(<SizeChartsPage />) },
           { path: 'help/verified-badge', element: <VerifiedBadgeMeaningPage /> },
           { path: 'legal', element: withRouteFallback(<LegalIndexPage />) },
@@ -1040,7 +1039,7 @@ const router = createBrowserRouter([
       // Catch-all 404 route - must be last
       {
         path: '*',
-        element: <NotFound />,
+        element: withRouteFallback(<NotFound />),
       },
     ],
   },

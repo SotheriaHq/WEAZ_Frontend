@@ -5,7 +5,7 @@ export function DeferredOverlay({ open, children }: { open: boolean; children: R
   const [opened, setOpened] = useState(open);
   useEffect(() => { if (open) setOpened(true); }, [open]);
   if (!open && !opened) return null;
-  return <Suspense fallback={<div role="status" className="fixed inset-x-4 bottom-6 z-50 rounded-2xl bg-[color:var(--surface-primary)] p-4 text-theme shadow-lg">Loading…</div>}>
+  return <Suspense fallback={open ? <div role="status" className="fixed inset-x-4 bottom-6 z-50 rounded-2xl bg-[color:var(--surface-primary)] p-4 text-theme shadow-lg">Loading…</div> : null}>
     {children}
   </Suspense>;
 }
