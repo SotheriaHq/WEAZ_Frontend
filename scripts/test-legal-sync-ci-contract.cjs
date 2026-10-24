@@ -59,7 +59,7 @@ const pages = readPages(generated);
 assert.equal(pages.length, 9, 'All nine legal policies must be published.');
 for (const page of pages) {
   const fileName = path.basename(page.sourceDocument);
-  const markdown = fs.readFileSync(path.join(repoRoot, 'docs', 'legal', 'user-facing', fileName), 'utf8');
+  const markdown = fs.readFileSync(path.join(repoRoot, 'docs', 'legal', 'user-facing', fileName), 'utf8').replace(/\r\n?/g, '\n');
   assert.equal(page.version, '2026.10.23-v1.6');
   assert.equal(page.effectiveDate, 'October 23, 2026');
   assert.equal(page.content, markdown, `${fileName}: published web text must match the isolated-clone source.`);
@@ -69,7 +69,7 @@ for (const page of pages) {
 
   const workspaceSource = path.resolve(repoRoot, '..', 'docs', 'legal', 'user-facing', fileName);
   if (fs.existsSync(workspaceSource)) {
-    assert.equal(markdown, fs.readFileSync(workspaceSource, 'utf8'), `${fileName}: workspace and vendored policy must agree.`);
+    assert.equal(markdown, fs.readFileSync(workspaceSource, 'utf8').replace(/\r\n?/g, '\n'), `${fileName}: workspace and vendored policy must agree.`);
   }
 }
 

@@ -71,7 +71,7 @@ function build(importPath, docsDir) {
       version: ver,
       sourceDocument: 'docs/legal/user-facing/' + fileName,
       summary,
-      content: fs.readFileSync(sourcePath, 'utf8'),
+      content: fs.readFileSync(sourcePath, 'utf8').replace(/\r\n?/g, '\n'),
     };
   });
 
