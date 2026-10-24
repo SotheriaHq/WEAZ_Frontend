@@ -150,6 +150,20 @@ if (fs.existsSync(path.join(repoRoot, 'dist', 'index.html'))) {
   if (preloadTags.some(tag => !/\/assets\/(?:react-vendor|router-vendor|redux-vendor)-/.test(tag))) {
     fail('dist/index.html: public boot must not preload unopened feature/admin routes');
   }
+  const routeBootstrap = read('dist/boot/route-preload.js');
+  const routesMatch = routeBootstrap.match(/var routes = ([^\n]+);/);
+  if (!routesMatch) fail('dist/boot/route-preload.js: production route hashes were not generated');
+  else {
+    const routes = JSON.parse(routesMatch[1]);
+    for (const route of ['/', '/runway', '/market']) {
+      if (!Array.isArray(routes[route]) || routes[route].length === 0) fail(`Missing initial-route hints for ${route}`);
+      for (const href of routes[route] ?? []) {
+        if (!/^\/assets\/[A-Za-z0-9_.-]+\.(?:js|css)$/.test(href) || !fs.existsSync(path.join(repoRoot, 'dist', href.slice(1)))) {
+          fail(`Invalid or missing built initial-route asset: ${href}`);
+        }
+      }
+    }
+  }
 }
 
 if (failures.length > 0) {

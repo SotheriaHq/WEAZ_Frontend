@@ -103,6 +103,7 @@ export default defineConfig(({ mode }) => {
       dedupe: ['react', 'react-dom'],
     },
     build: {
+      manifest: true,
       target: ['es2020', 'safari14'],
       cssTarget: 'safari14',
       // Mobile browsers were stalling on a blank screen while preloading every

@@ -38,6 +38,7 @@
     <!-- Kick off primary data fetches in parallel with the JS bundle
          (anonymous visitors) — adopted by the app via window.__WIEZ_EARLY__. -->
     <script src="/boot/early-data.js" defer></script>
+    <script src="/boot/route-preload.js" async></script>
     <script src="/boot/analytics.js" defer></script>
     <!-- Identical font families/weights, served with the app. Preload the
          primary Latin subset; CSS requests other scripts only when needed. -->
