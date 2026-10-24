@@ -87,7 +87,7 @@ assertIncludes('src/hooks/useSignedFileUrl.ts', 'retry: false', 'media public de
 // authorize it again when stale/expired and never render an expired URL.
 assertIncludes('src/hooks/useSignedFileUrl.ts', 'gcTime: WIEZ_MEDIA_URL_GC_TIME_MS', 'media queries must use the shared retention window');
 assertIncludes('src/hooks/useSignedFileUrl.ts', 'staleTime: mustRefresh ? 0 : WIEZ_QUERY_STALE_TIME_MS', 'forced refresh must bypass freshness without discarding the retention policy');
-assertIncludes('src/hooks/useSignedFileUrl.ts', '!isUsableMediaUrl(cachedPublic)', 'expired cached capabilities must be removed');
+assertIncludes('src/hooks/useSignedFileUrl.ts', '!isUsableMediaUrl(cached)', 'expired cached capabilities must be removed');
 assertIncludes('src/hooks/useSignedFileUrl.ts', 'getMediaUrlExpiryMs(url)', 'mounted media must schedule an expiry refresh');
 
 assertOrder(
