@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 
 // Product controls use WIEZ primitives. Load any future vendor component's
 // stylesheet with that component rather than blocking every public page.
+import './styles/web-fonts.css';
 import './index.css';
 import App from './App';
 import { RealtimeProvider } from './realtime';

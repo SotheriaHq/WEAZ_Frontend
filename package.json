@@ -28,7 +28,7 @@
     "check:perf-regressions": "node scripts/check-perf-regressions.cjs",
     "check:security-headers": "node scripts/check-security-headers.cjs",
     "purge:cloudflare": "node scripts/purge-cloudflare-cache.cjs",
-    "ci:phase8": "npm run test:legal-sync-ci-contract && npm run build && npm run lint && npm test -- --run src/__tests__/RequireStoreSetup.test.tsx src/__tests__/useBrandProfile.renderIsolation.test.tsx src/__tests__/renderableMedia.test.ts src/__tests__/customerEntitlementExpiry.test.ts src/__tests__/customerEntitlementExpiry.hook.test.tsx && npm run check:perf-regressions"
+    "ci:phase8": "npm run test:legal-sync-ci-contract && npm run build && npm run lint && npm test -- --run src/__tests__/RequireStoreSetup.test.tsx src/__tests__/useBrandProfile.renderIsolation.test.tsx src/__tests__/renderableMedia.test.ts src/__tests__/customerEntitlementExpiry.test.ts src/__tests__/customerEntitlementExpiry.hook.test.tsx src/__tests__/webFonts.test.ts src/__tests__/designViewerLazy.test.tsx && npm run check:perf-regressions"
   },
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",

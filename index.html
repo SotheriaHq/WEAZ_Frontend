@@ -39,14 +39,9 @@
          (anonymous visitors) — adopted by the app via window.__WIEZ_EARLY__. -->
     <script src="/boot/early-data.js" defer></script>
     <script src="/boot/analytics.js" defer></script>
-    <!-- Fonts: fewer families/weights = less LCP contention. display=swap so
-         text paints with system fallback immediately. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Identical font families/weights, served with the app. Preload the
+         primary Latin subset; CSS requests other scripts only when needed. -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/wiez-web/plus-jakarta-sans-latin-153fc85b7029.woff2" crossorigin />
     <!-- The splash draws this before React exists, so it is preloaded to be
          on screen at first paint. It must stay in step with the <img> below:
          this pointed at the favicon after the splash switched to the mark, so

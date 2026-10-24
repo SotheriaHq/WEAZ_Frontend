@@ -45,6 +45,9 @@ import ScrollRestoreProvider from '@/components/ScrollRestoreProvider';
 import MobileExitGuard from '@/components/navigation/MobileExitGuard';
 import { isNewBuildAvailable } from '@/utils/buildVersionGuard';
 import { GenderPrompt } from '@/components/profile/GenderPrompt';
+import { DeferredOverlay } from '@/components/ui/DeferredOverlay';
+import { selectCartIsDrawerOpen } from '@/features/cartSlice';
+import { selectWishlistIsDrawerOpen } from '@/features/wishlistSlice';
 
 const SettingsHome = lazy(() => import('./pages/settings/SettingsHome'));
 const CollectionsSettings = lazy(() => import('./pages/settings/CollectionsSettings'));
@@ -300,6 +303,8 @@ const ViewportSync: React.FC<{ watchKey?: string }> = ({ watchKey }) => {
 };
 
 const RootLayout: React.FC = () => {
+  const bagOpen = useSelector(selectCartIsDrawerOpen);
+  const wishlistOpen = useSelector(selectWishlistIsDrawerOpen);
   const location = useLocation();
   const embeddedSurface = useEmbeddedSurface();
   const isEmbeddedMobile = embeddedSurface === 'mobile-app';
@@ -393,8 +398,8 @@ const RootLayout: React.FC = () => {
         {!isEmbeddedMobile ? <MobileExitGuard /> : null}
         {!isEmbeddedMobile ? (
           <Suspense fallback={null}>
-            <CartDrawer />
-            <WishlistDrawer />
+            <DeferredOverlay open={bagOpen}><CartDrawer /></DeferredOverlay>
+            <DeferredOverlay open={wishlistOpen}><WishlistDrawer /></DeferredOverlay>
             <GlobalModalRouter />
           </Suspense>
         ) : null}

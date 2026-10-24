@@ -91,12 +91,12 @@ assertIncludes('src/hooks/useSignedFileUrl.ts', '!isUsableMediaUrl(cached)', 'ex
 assertIncludes('src/hooks/useSignedFileUrl.ts', 'getMediaUrlExpiryMs(url)', 'mounted media must schedule an expiry refresh');
 
 assertOrder(
-  'src/components/designs/DesignViewModal.tsx',
+  'src/components/designs/DesignViewModalContent.tsx',
   'queryKeys.media.publicUrl(m.fileId)',
   'queryKeys.media.signedUrl(m.fileId)',
   'design modal media hydration must stay public-first',
 );
-assertIncludes('src/components/designs/DesignViewModal.tsx', 'retry: false', 'design modal media fallback must not retry public-denial loops');
+assertIncludes('src/components/designs/DesignViewModalContent.tsx', 'retry: false', 'design modal media fallback must not retry public-denial loops');
 assertIncludes('src/components/ImageWithFallback.tsx', 'isUsableInitialUrl(src)', 'stable public URLs must be used directly');
 assertIncludes('src/components/ImageWithFallback.tsx', 'resolveSignedUrl', 'signed URL resolution must stay deduped');
 
