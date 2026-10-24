@@ -4,19 +4,12 @@ import { SubscriptionNotice } from '@/components/custom-orders/SubscriptionNotic
 import React, { Suspense, useEffect, lazy, useRef, useState } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet, Navigate, useParams, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import SettingsHome from './pages/settings/SettingsHome';
-import CollectionsSettings from './pages/settings/CollectionsSettings';
-import SignupPage from './pages/SignUp';
-import Success from './pages/Success';
-import LoginPage from './pages/Login';
-import AccountReactivationRequestPage from './pages/AccountReactivationRequestPage';
 // Removed separate BrandPublic visitor page; unified profile view handles both owner & visitor modes
 import ProtectedRoute, { RequireAuthenticated } from './components/ProtectedRoute';
 import GuestRoute from './components/GuestRoute';
 import { AuthProvider } from './context/AuthContext';
 import { DropdownManagerProvider } from './context/DropdownManagerContext';
 import { BrandPatchProvider } from './context/BrandPatchContext';
-import { ProfileLayout } from './components/catalog/ProfileLayout';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
 import { NoticeModalHost } from '@/components/ui/NoticeModal';
@@ -24,8 +17,6 @@ import { MuseLoader } from '@/components/loaders/MuseLoader';
 import ErrorPage from './pages/ErrorPage';
 import SeoHead from './components/seo/SeoHead';
 import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
-import OrderConfirmation from './pages/checkout/OrderConfirmation';
-import PaymentReturnPage from './pages/checkout/PaymentReturnPage';
 // Placeholder pages for features under development
 import {
   NotFound,
@@ -34,14 +25,11 @@ import {
   WatchLaterPlaceholder,
   TrendingPlaceholder,
 } from './pages/placeholders';
-import ShopSetupWizardPage from './pages/studio/shop/ShopSetupWizardPage';
-import ShopSetupEssentialsPage from './pages/studio/shop/ShopSetupEssentialsPage';
 import StudioScaffold from './components/studio/StudioScaffold';
 import StudioHandoffGate from './components/studio/StudioHandoffGate';
 import RequireStoreSetup from './components/store/RequireStoreSetup';
 import { BagFlowProvider } from './features/bagging/BagFlowProvider';
 import { ProfileAliasRedirect } from './pages/redirects/PublicAliasRedirects';
-import VerifiedBadgeMeaningPage from './pages/ui/VerifiedBadgeMeaningPage';
 import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
@@ -58,6 +46,18 @@ import MobileExitGuard from '@/components/navigation/MobileExitGuard';
 import { isNewBuildAvailable } from '@/utils/buildVersionGuard';
 import { GenderPrompt } from '@/components/profile/GenderPrompt';
 
+const SettingsHome = lazy(() => import('./pages/settings/SettingsHome'));
+const CollectionsSettings = lazy(() => import('./pages/settings/CollectionsSettings'));
+const SignupPage = lazy(() => import('./pages/SignUp'));
+const Success = lazy(() => import('./pages/Success'));
+const LoginPage = lazy(() => import('./pages/Login'));
+const AccountReactivationRequestPage = lazy(() => import('./pages/AccountReactivationRequestPage'));
+const ProfileLayout = lazy(() => import('./components/catalog/ProfileLayout').then(module => ({ default: module.ProfileLayout })));
+const OrderConfirmation = lazy(() => import('./pages/checkout/OrderConfirmation'));
+const PaymentReturnPage = lazy(() => import('./pages/checkout/PaymentReturnPage'));
+const ShopSetupWizardPage = lazy(() => import('./pages/studio/shop/ShopSetupWizardPage'));
+const ShopSetupEssentialsPage = lazy(() => import('./pages/studio/shop/ShopSetupEssentialsPage'));
+const VerifiedBadgeMeaningPage = lazy(() => import('./pages/ui/VerifiedBadgeMeaningPage'));
 const Runway = lazy(() => import('./pages/Runway'));
 const CartDrawer = lazy(() => import('./components/designs/CartDrawer'));
 const WishlistDrawer = lazy(() => import('./components/designs/WishlistDrawer'));
