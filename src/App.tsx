@@ -1053,23 +1053,39 @@ const router = createBrowserRouter([
 const HotRouteChunkPrefetch: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
-    const warm = () => {
-      if (cancelled) return;
-      void import('./pages/SearchResultsPage');
-      void import('./pages/MarketPlace');
-      void import('./pages/catalog/Catalog');
-    };
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+    if (connection?.saveData || /^(slow-)?2g$/.test(connection?.effectiveType ?? '')) return;
+    // First paint owns the network and CPU. Warm one route at a time only
+    // after page load; an idle deadline must never force work onto a busy boot.
+    const routes = [
+      () => import('./pages/SearchResultsPage'),
+      () => import('./pages/MarketPlace'),
+      () => import('./pages/catalog/Catalog'),
+    ];
+    let routeIndex = 0;
+    let idleId: number | undefined;
+    let timerId: number | undefined;
     const canIdle = typeof window.requestIdleCallback === 'function';
-    const idleId = canIdle
-      ? window.requestIdleCallback(warm, { timeout: 4000 })
-      : window.setTimeout(warm, 2500);
+    const warm = () => {
+      if (cancelled || routeIndex >= routes.length) return;
+      const loadRoute = routes[routeIndex++];
+      void loadRoute().catch(() => undefined).finally(scheduleNext);
+    };
+    const scheduleNext = () => {
+      if (cancelled || routeIndex >= routes.length) return;
+      if (canIdle) idleId = window.requestIdleCallback(warm);
+      else timerId = window.setTimeout(warm, 2500);
+    };
+    const afterLoad = () => { timerId = window.setTimeout(scheduleNext, 5000); };
+    if (document.readyState === 'complete') afterLoad();
+    else window.addEventListener('load', afterLoad, { once: true });
     return () => {
       cancelled = true;
-      if (canIdle && typeof window.cancelIdleCallback === 'function') {
+      window.removeEventListener('load', afterLoad);
+      if (idleId !== undefined && typeof window.cancelIdleCallback === 'function') {
         window.cancelIdleCallback(idleId);
-      } else {
-        window.clearTimeout(idleId);
       }
+      if (timerId !== undefined) window.clearTimeout(timerId);
     };
   }, []);
   return null;

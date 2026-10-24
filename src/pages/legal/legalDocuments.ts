@@ -12,8 +12,7 @@ export type LegalPageDefinition = {
   content: string;
 };
 
-export const LEGAL_PAGE_VERSION = "2026.10.23-v1.6";
-export const LEGAL_PAGE_EFFECTIVE_DATE = "October 23, 2026";
+export { LEGAL_PAGE_VERSION, LEGAL_PAGE_EFFECTIVE_DATE } from './legalVersion';
 
 export const LEGAL_PAGES: LegalPageDefinition[] = [
   {

@@ -1,4 +1,4 @@
-import { LEGAL_PAGE_VERSION } from '@/pages/legal/legalDocuments';
+import { LEGAL_PAGE_VERSION } from '@/pages/legal/legalVersion';
 import { apiClient } from './httpClient';
 import { unwrapApiResponse } from '@/types/auth';
 import { createIdempotencyKey } from './idempotency';

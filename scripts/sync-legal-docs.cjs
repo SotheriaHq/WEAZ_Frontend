@@ -43,6 +43,7 @@ const ver = '2026.10.23-v1.6';
 const eff = 'October 23, 2026';
 
 const frontendOut = path.join(frontendRoot, 'src', 'pages', 'legal', 'legalDocuments.ts');
+const frontendVersionOut = path.join(path.dirname(frontendOut), 'legalVersion.ts');
 const mobileOut = path.join(workspaceRoot, 'threadly-mobile', 'src', 'legal', 'legalDocuments.ts');
 
 function resolveDocsDir() {
@@ -57,7 +58,7 @@ function generatedFileIsUsable(filePath) {
   return text.includes('export const LEGAL_PAGES') && text.includes('content:');
 }
 
-function build(importPath, docsDir) {
+function build(importPath, docsDir, separateVersion = false) {
   const pages = FILES.map(([key, slug, title, fileName, summary]) => {
     const sourcePath = path.join(docsDir, fileName);
     if (!fs.existsSync(sourcePath)) {
@@ -88,8 +89,10 @@ function build(importPath, docsDir) {
     '  summary: string;\n' +
     '  content: string;\n' +
     '};\n\n' +
-    'export const LEGAL_PAGE_VERSION = ' + JSON.stringify(ver) + ';\n' +
-    'export const LEGAL_PAGE_EFFECTIVE_DATE = ' + JSON.stringify(eff) + ';\n\n' +
+    (separateVersion
+      ? "export { LEGAL_PAGE_VERSION, LEGAL_PAGE_EFFECTIVE_DATE } from './legalVersion';\n\n"
+      : 'export const LEGAL_PAGE_VERSION = ' + JSON.stringify(ver) + ';\n' +
+        'export const LEGAL_PAGE_EFFECTIVE_DATE = ' + JSON.stringify(eff) + ';\n\n') +
     'export const LEGAL_PAGES: LegalPageDefinition[] = ' + JSON.stringify(pages, null, 2) + ';\n\n' +
     'export const LEGAL_PAGE_BY_SLUG = new Map(\n' +
     '  LEGAL_PAGES.map((doc) => [doc.slug, doc]),\n' +
@@ -121,7 +124,11 @@ if (!docsDir) {
   process.exit(1);
 }
 
-const frontendContents = build('@/api/LegalApi', docsDir);
+const frontendContents = build('@/api/LegalApi', docsDir, true);
+writeIfDirExists(frontendVersionOut,
+  '// AUTO-GENERATED - DO NOT EDIT DIRECTLY\n' +
+  'export const LEGAL_PAGE_VERSION = ' + JSON.stringify(ver) + ';\n' +
+  'export const LEGAL_PAGE_EFFECTIVE_DATE = ' + JSON.stringify(eff) + ';\n');
 // Keep isolated frontend builds on the same source policies as the workspace.
 const repoDocsDir = path.join(frontendRoot, 'docs', 'legal', 'user-facing');
 if (path.resolve(docsDir) !== path.resolve(repoDocsDir)) {

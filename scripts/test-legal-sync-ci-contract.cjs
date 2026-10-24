@@ -56,6 +56,10 @@ function readPages(source) {
 }
 
 const pages = readPages(generated);
+const versionSource = fs.readFileSync(path.join(repoRoot, 'src', 'pages', 'legal', 'legalVersion.ts'), 'utf8');
+assert.match(versionSource, /LEGAL_PAGE_VERSION = "2026\.10\.23-v1\.6"/);
+assert.match(versionSource, /LEGAL_PAGE_EFFECTIVE_DATE = "October 23, 2026"/);
+assert.doesNotMatch(versionSource, /LEGAL_PAGES|content:/, 'Checking acceptance must not import policy bodies.');
 assert.equal(pages.length, 9, 'All nine legal policies must be published.');
 for (const page of pages) {
   const fileName = path.basename(page.sourceDocument);

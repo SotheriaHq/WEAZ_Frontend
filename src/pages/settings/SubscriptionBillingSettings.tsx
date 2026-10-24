@@ -1,4 +1,4 @@
-import { LEGAL_PAGE_VERSION } from '@/pages/legal/legalDocuments';
+import { LEGAL_PAGE_VERSION } from '@/pages/legal/legalVersion';
 import { getFriendlyErrorMessage } from '@/utils/errorMessage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';

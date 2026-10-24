@@ -1,11 +1,12 @@
-import React from 'react';
-import { Smile } from 'lucide-react';
-import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
+import React, { lazy, Suspense } from 'react';
+import type { EmojiClickData } from 'emoji-picker-react';
 import { toast } from 'sonner';
 import type { CommentTarget } from '@/types/comments';
 import { CommentsApi } from '@/api/CommentsApi';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
+
+const NativeEmojiPicker = lazy(() => import('./NativeEmojiPicker'));
 
 type Props = {
   targetType: CommentTarget;
@@ -61,21 +62,18 @@ const CommentComposer: React.FC<Props> = ({ targetType, targetId, parentId, onCr
         />
         <button
           type="button"
+          aria-label="Choose emoji"
+          aria-expanded={showEmojiPicker}
           onClick={() => setShowEmojiPicker((p) => !p)}
           className="absolute right-8 top-1/2 -translate-y-1/2 p-1.5 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
         >
-          <Smile size={18} />
+          <span aria-hidden="true">😀</span>
         </button>
         {showEmojiPicker && (
           <div className="absolute bottom-full right-0 mb-2 z-50">
-            <EmojiPicker
-              onEmojiClick={onEmojiClick}
-              emojiStyle={EmojiStyle.NATIVE}
-              theme={Theme.DARK}
-              searchDisabled
-              skinTonesDisabled
-              lazyLoadEmojis
-            />
+            <Suspense fallback={<div role="status" className="rounded-2xl bg-[color:var(--surface-primary)] p-4 text-theme">Loading emojis…</div>}>
+              <NativeEmojiPicker onEmojiClick={onEmojiClick} />
+            </Suspense>
           </div>
         )}
       </div>
