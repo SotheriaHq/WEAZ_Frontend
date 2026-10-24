@@ -21,7 +21,8 @@ import {
   getContentStatusTone,
   type ContentPublicationStatus,
 } from '@/utils/contentIntegrity';
-import ContentReviewDecisionModal from '@/components/content-integrity/ContentReviewDecisionModal';
+import { DeferredOverlay } from '@/components/ui/DeferredOverlay';
+const ContentReviewDecisionModal = React.lazy(() => import('@/components/content-integrity/ContentReviewDecisionModal'));
 import { SYSTEM_TILE_ASPECT } from '@/components/catalog/ContentTile';
 
 export interface StoreProduct {
@@ -912,6 +913,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         </div>
       </div>
     </article>
+    <DeferredOverlay open={reviewDecisionOpen}>
     <ContentReviewDecisionModal
       open={reviewDecisionOpen}
       onClose={() => setReviewDecisionOpen(false)}
@@ -920,6 +922,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       title={product.name}
       onEdit={onEdit ? () => onEdit(product) : undefined}
     />
+    </DeferredOverlay>
     </>
   );
 };

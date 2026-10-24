@@ -3,8 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CommentsApi } from '@/api/CommentsApi';
 import type { CommentV2Dto } from '@/types/comments';
 import CommentInput from '@/components/ui/CommentInput';
-import { Smile } from 'lucide-react';
-import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
+import type { EmojiClickData } from 'emoji-picker-react';
+import NativeEmojiPicker from '@/components/comments/LazyNativeEmojiPicker';
 import CommentItem from '@/components/comments/CommentItem';
 import {
   fetchUnifiedCollectionCommentsQuery,
@@ -289,10 +289,12 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
           />
           <button
             type="button"
+            aria-label="Choose emoji"
+            aria-expanded={showEmojiPicker}
             onClick={() => setShowEmojiPicker((p) => !p)}
             className="absolute right-12 top-1/2 -translate-y-1/2 p-1.5 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
           >
-            <Smile size={18} />
+            <span aria-hidden="true">😀</span>
           </button>
           {showEmojiPicker && (
             <div 
@@ -353,16 +355,12 @@ const UnifiedCollectionComments: React.FC<Props> = ({ collectionId, onCommentAdd
                   border-color: rgba(139, 92, 246, 0.4) !important;
                 }
               `}</style>
-              <EmojiPicker
+              <NativeEmojiPicker
                 onEmojiClick={(e: EmojiClickData) => { 
                   setText((prev) => prev + e.emoji); 
                   setShowEmojiPicker(false); 
                 }}
-                emojiStyle={EmojiStyle.NATIVE}
-                theme={Theme.AUTO}
-                searchDisabled
-                skinTonesDisabled
-                lazyLoadEmojis
+                theme="auto"
                 width="100%"
                 height="100%"
                 previewConfig={{ showPreview: false }}

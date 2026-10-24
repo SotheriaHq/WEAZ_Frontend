@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/react';
 
-const dsn = String(import.meta.env.VITE_SENTRY_DSN ?? '').trim();
+// Keep the absent configuration statically removable in public builds.
+const dsn = import.meta.env.VITE_SENTRY_DSN?.trim();
 
 export function initSentry(): void {
   if (!dsn) {

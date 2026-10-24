@@ -423,6 +423,7 @@ export default function VerificationWizardPage() {
         presign.method,
         file,
         presign.uploadFields,
+        presign.uploadHeaders,
       );
       const finalized = await brandApi.finalizeVerificationUpload(brandId, {
         fileId: presign.fileId,

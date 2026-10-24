@@ -140,7 +140,9 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
 }) => {
   const sessionEpoch = useSyncExternalStore(subscribeMediaSession, getMediaSessionEpoch, getMediaSessionEpoch);
   const previousEpoch = React.useRef(sessionEpoch);
+  const mountEpoch = React.useRef(sessionEpoch);
   const [resolutionRevision, setResolutionRevision] = useState(0);
+  const handledRevision = React.useRef(resolutionRevision);
   const sourceCacheKey = resolveSourceCacheKey(fileId, src);
   const cachedLastGoodUrl = sourceCacheKey ? previousGood(sourceCacheKey) ?? null : null;
   const [resolved, setResolved] = useState<string | null>(() => {
@@ -189,7 +191,8 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   useEffect(() => {
     let mounted = true;
     const accountChanged = previousEpoch.current !== sessionEpoch;
-    const forceRefresh = resolutionRevision > 0 || accountChanged;
+    const forceRefresh = resolutionRevision !== handledRevision.current || accountChanged || mountEpoch.current !== sessionEpoch;
+    handledRevision.current = resolutionRevision;
     previousEpoch.current = sessionEpoch;
     if (accountChanged) { setLastGoodUrl(null); setResolved(null); }
     retryCountRef.current = 0;

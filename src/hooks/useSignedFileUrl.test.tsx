@@ -89,10 +89,15 @@ describe('useSignedFileUrl', () => {
   });
   it('does not retain an old account capability after cleanup', async () => {
     const initial = 'https://media.example.com/private?token=old-account';
-    brandApiMock.getSignedMediaSourceUrl.mockResolvedValue(null);
-    const { result } = renderHook(() => useSignedFileUrl(null, initial), { wrapper: createWrapper() });
+    let release!: (value: string | null) => void;
+    brandApiMock.getSignedMediaSourceUrl.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+    const { result, rerender } = renderHook(() => useSignedFileUrl(null, initial), { wrapper: createWrapper() });
     expect(result.current.url).toBe(initial);
     await act(async () => { clearSignedFileUrlSessionCache(); });
+    expect(result.current.url).toBeNull();
+    rerender();
+    expect(result.current.url).toBeNull();
+    await act(async () => { release(null); });
     expect(result.current.url).toBeNull();
   });
 

@@ -51,10 +51,15 @@ const WiezWordmark: React.FC<WiezWordmarkProps> = ({
   const { resolvedTheme } = useTheme();
   const src =
     resolvedTheme === 'dark' ? BRAND_ASSETS.wordmarkDark : BRAND_ASSETS.wordmarkLight;
+  const sources = resolvedTheme === 'dark'
+    ? [BRAND_ASSETS.wordmarkDark160, BRAND_ASSETS.wordmarkDark320, BRAND_ASSETS.wordmarkDark]
+    : [BRAND_ASSETS.wordmarkLight160, BRAND_ASSETS.wordmarkLight320, BRAND_ASSETS.wordmarkLight];
 
   return (
     <img
       src={src}
+      srcSet={`${sources[0]} 160w, ${sources[1]} 320w, ${sources[2]} 720w`}
+      sizes={`${Math.round(height * WORDMARK_ASPECT_RATIO)}px`}
       width={Math.round(height * WORDMARK_ASPECT_RATIO)}
       height={height}
       alt={labelled ? PRODUCT_NAME : ''}

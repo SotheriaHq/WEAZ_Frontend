@@ -1,5 +1,6 @@
 import type { SizingMode } from '@/types/sizing';
 import { apiClient } from './httpClient';
+import { retryUploadCompletion } from '../utils/uploadFinalizeRetry';
 import { createIdempotencyKey } from './idempotency';
 import {
   type MediaViewSlot,
@@ -178,7 +179,8 @@ export async function finalizeDesignUploads(
     draftVersion?: number;
   },
 ) {
-  const response = await apiClient.post(
+  const idempotencyKey = createIdempotencyKey();
+  const response = await retryUploadCompletion(() => apiClient.post(
     `/designs/${designId}/finalize`,
     {
       completions: completions.map((completion, index) => ({
@@ -197,10 +199,10 @@ export async function finalizeDesignUploads(
       draftVersion: options?.draftVersion,
     },
     {
-      headers: { 'Idempotency-Key': createIdempotencyKey() },
+      headers: { 'Idempotency-Key': idempotencyKey },
       timeout: DESIGN_MUTATION_TIMEOUT_MS,
     },
-  );
+  ));
   clearDesignDetailCache(designId);
   return unwrapData<unknown>(response.data);
 }

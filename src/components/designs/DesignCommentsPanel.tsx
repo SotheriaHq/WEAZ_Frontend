@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
+import type { EmojiClickData } from 'emoji-picker-react';
+import NativeEmojiPicker from '@/components/comments/LazyNativeEmojiPicker';
 import { useQueryClient } from '@tanstack/react-query';
 import type { CommentV2Dto } from '@/types/comments';
 import { CommentsApi } from '@/api/CommentsApi';
@@ -380,13 +381,8 @@ const DesignCommentsPanel: React.FC<Props> = ({
           </button>
           {showEmojiPicker && (
             <div className="absolute bottom-full right-0 mb-2 z-50 scrollbar-hide">
-              <EmojiPicker
+              <NativeEmojiPicker
                 onEmojiClick={onEmojiClick}
-                emojiStyle={EmojiStyle.NATIVE}
-                theme={Theme.DARK}
-                searchDisabled
-                skinTonesDisabled
-                lazyLoadEmojis
               />
             </div>
           )}

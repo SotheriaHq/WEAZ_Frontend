@@ -1,6 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { NoticeModalHost, dismissNotice, showNotice } from './NoticeModal';
+
+// These assertions cover the real dialog's focus/actions. Cold lazy loading
+// and cancellation before the module resolves are covered in noticeLazy.
+beforeAll(async () => { await import('./NoticeModalView'); });
 
 afterEach(() => {
   act(() => dismissNotice());

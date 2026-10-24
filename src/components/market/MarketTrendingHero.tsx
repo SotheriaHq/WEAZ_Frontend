@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, LazyMotion, domAnimation } from 'framer-motion';
+import * as motion from 'framer-motion/m';
 
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { CLIP_EMOJI, clipActionLabel } from '@/constants/clipping';
@@ -222,7 +223,7 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
 
           {/* Central Image Layer with Smooth Transitions */}
           <div className="absolute inset-0 z-0 overflow-hidden">
-            <AnimatePresence initial={false}>
+            <LazyMotion features={domAnimation}><AnimatePresence initial={false}>
               <motion.div
                 key={`${active.id}-${frameIndex}`}
                 initial={{ opacity: 0, scale: 1.02 }}
@@ -242,7 +243,7 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
                   fallbackName={active.name}
                 />
               </motion.div>
-            </AnimatePresence>
+            </AnimatePresence></LazyMotion>
 
             {/* Gradient Scrims: Dark gradient overlay ensuring crisp typography */}
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#120d18] via-[#120d18]/40 to-transparent" />

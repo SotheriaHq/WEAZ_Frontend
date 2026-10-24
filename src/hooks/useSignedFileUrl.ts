@@ -13,17 +13,22 @@ export const clearSignedFileUrlSessionCache = clearCachedMediaUrls;
 export function useSignedFileUrl(fileId?: string | null, initial?: string | null) {
   const queryClient = useQueryClient();
   const epoch = useSyncExternalStore(subscribeMediaSession, getMediaSessionEpoch, getMediaSessionEpoch);
-  const previousEpoch = useRef(epoch);
+  const mountEpoch = useRef(epoch);
   const [revision, setRevision] = useState(0);
+  const handledRevision = useRef(revision);
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
-  const [url, setUrl] = useState<string | null>(() => isUsableMediaUrl(initial) ? initial! : null);
+  const scope = JSON.stringify([fileId ?? null, initial ?? null]);
+  const [resolvedState, setResolvedState] = useState(() => ({ scope, epoch, url: isUsableMediaUrl(initial) ? initial! : null }));
+  const setUrl = useCallback((url: string | null) => setResolvedState({ scope, epoch, url }), [epoch, scope]);
+  const url = resolvedState.epoch !== epoch ? null
+    : resolvedState.scope === scope ? resolvedState.url : mountEpoch.current === epoch && isUsableMediaUrl(initial) ? initial! : null;
   const [loading, setLoading] = useState(Boolean((fileId || initial) && !isUsableMediaUrl(initial)));
   const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const force = revision > 0 || previousEpoch.current !== epoch;
-    previousEpoch.current = epoch;
+    const force = revision !== handledRevision.current || mountEpoch.current !== epoch;
+    handledRevision.current = revision;
     const identity = initial ? getMediaUrlIdentity(initial) : 'none';
     const cacheKey = `file:${fileId ?? 'none'}:source:${identity}`;
     setError(null);
@@ -78,7 +83,7 @@ export function useSignedFileUrl(fileId?: string | null, initial?: string | null
       setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [epoch, fileId, initial, queryClient, revision]);
+  }, [epoch, fileId, initial, queryClient, revision, setUrl]);
 
   useEffect(() => {
     const expiresAt = getMediaUrlExpiryMs(url);

@@ -103,6 +103,7 @@ export default defineConfig(({ mode }) => {
       dedupe: ['react', 'react-dom'],
     },
     build: {
+      manifest: true,
       target: ['es2020', 'safari14'],
       cssTarget: 'safari14',
       // Mobile browsers were stalling on a blank screen while preloading every
@@ -113,7 +114,7 @@ export default defineConfig(({ mode }) => {
             return deps;
           }
           return deps.filter((dep) =>
-            /\/assets\/(react-vendor|router-vendor|redux-vendor)-/.test(dep),
+            /(?:^|\/)assets\/(react-vendor|router-vendor|redux-vendor)-/.test(dep),
           );
         },
       },
@@ -122,9 +123,7 @@ export default defineConfig(({ mode }) => {
           manualChunks(id) {
             if (id.includes('/node_modules/')) {
               if (
-                id.includes('/react/') ||
-                id.includes('/react-dom/') ||
-                id.includes('/scheduler/')
+                /\/node_modules\/(?:react|react-dom|scheduler)\//.test(id)
               ) {
                 return 'react-vendor';
               }

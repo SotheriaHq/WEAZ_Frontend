@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { brandSubscriptionApi } from '@/api/BrandSubscriptionApi';
 import { paymentApi } from '@/api/PaymentApi';
-import { LEGAL_PAGE_VERSION } from '@/pages/legal/legalDocuments';
+import { LEGAL_PAGE_VERSION } from '@/pages/legal/legalVersion';
 import { getFriendlyErrorMessage } from '@/utils/errorMessage';
 import { useQueueConfirm } from './useQueueConfirm';
 

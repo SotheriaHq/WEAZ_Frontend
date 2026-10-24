@@ -1,0 +1,29 @@
+/* The empty/error state retains its motion without a per-frame JS driver. */
+.runway-state-enter { animation: runway-state-enter 500ms ease-out both; }
+.runway-state-glow { animation: runway-state-glow 6s ease-in-out infinite; }
+.runway-state-float { animation: runway-state-float 3s ease-in-out infinite; }
+.runway-state-tip { animation: runway-state-tip 300ms ease-out both; }
+
+@keyframes runway-state-enter {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes runway-state-glow {
+  0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.5; transform: translate(-50%, -50%) scale(1.1); }
+}
+@keyframes runway-state-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes runway-state-tip {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .runway-state-enter, .runway-state-glow, .runway-state-float, .runway-state-tip {
+    animation: none;
+  }
+  .runway-state-glow { opacity: 0.3; }
+}
