@@ -161,7 +161,7 @@ if (fs.existsSync(path.join(repoRoot, 'dist', 'index.html'))) {
         if (/\/(?:CommentThread|ContentReviewDecisionModal|MarketProductOverlay|InlineProductDetail)-/.test(href)) {
           fail(`Initial route ${route} loads an unopened interaction: ${href}`);
         }
-        if (!/^\/assets\/[A-Za-z0-9_.-]+\.(?:js|css)$/.test(href) || !fs.existsSync(path.join(repoRoot, 'dist', href.slice(1)))) {
+        if (!/^(?:\/assets\/[A-Za-z0-9_.-]+\.(?:js|css)|\/fonts\/wiez-web\/(?:playfair-display-latin|plus-jakarta-sans-latin-ext)-[a-f0-9]{12}\.woff2)$/.test(href) || !fs.existsSync(path.join(repoRoot, 'dist', href.slice(1)))) {
           fail(`Invalid or missing built initial-route asset: ${href}`);
         }
       }

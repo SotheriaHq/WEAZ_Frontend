@@ -6,8 +6,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { RefreshCcw, WifiOff, ServerCrash, SearchX, Sparkles, TrendingUp, Clock } from 'lucide-react';
-import { LazyMotion, domAnimation } from 'framer-motion';
-import * as motion from 'framer-motion/m';
+import '@/components/runway/runwayState.css';
 import Masonry from 'react-masonry-css';
 import { useQuery } from '@tanstack/react-query';
 import DesignApi from '@/api/DesignApi';
@@ -201,36 +200,26 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
   const Icon = config.icon;
 
   return (
-    <LazyMotion features={domAnimation}><motion.section
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="surface-card relative overflow-hidden rounded-3xl backdrop-blur-xl"
+    <section
+      className="runway-state-enter surface-card relative overflow-hidden rounded-3xl backdrop-blur-xl"
     >
       {/* Animated gradient background */}
       <div className="absolute inset-0 overflow-hidden">
-        <motion.div
-          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-gradient-to-r ${config.gradient} blur-3xl`}
-          animate={{
-            scale: [1, 1.1, 1],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+        <div
+          className={`runway-state-glow absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-gradient-to-r ${config.gradient} blur-3xl`}
         />
       </div>
 
       <div className="relative z-10 flex flex-col items-center justify-center py-16 px-6 text-center">
         {/* Floating emoji */}
-        <motion.div
-          className="relative mb-6"
-          animate={{ y: [0, -10, 0] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+        <div
+          className="runway-state-float relative mb-6"
         >
           <div className={`w-24 h-24 rounded-full bg-gradient-to-br ${config.iconBg} flex items-center justify-center shadow-lg`}>
             <Icon className={`w-10 h-10 ${config.iconColor}`} />
           </div>
           <span className="absolute -top-2 -right-2 text-3xl">{config.emoji}</span>
-        </motion.div>
+        </div>
 
         {/* Title */}
         <h2 className="text-2xl md:text-3xl font-bold text-theme mb-2">
@@ -246,46 +235,40 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
         {/* Tips */}
         <div className="flex flex-wrap justify-center gap-3 mb-8">
           {config.tips.map((tip, index) => (
-            <motion.div
+            <div
               key={tip.text}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 + index * 0.1 }}
-              className="surface-control flex items-center gap-2 rounded-full px-4 py-2 shadow-sm"
+              style={{ animationDelay: `${0.2 + index * 0.1}s` }}
+              className="runway-state-tip surface-control flex items-center gap-2 rounded-full px-4 py-2 shadow-sm"
             >
               <span>{tip.icon}</span>
               <span className="text-sm text-theme-secondary">{tip.text}</span>
-            </motion.div>
+            </div>
           ))}
         </div>
 
         {/* Action buttons */}
         <div className="flex flex-col sm:flex-row items-center gap-4">
           {onRetry && (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            <button
               onClick={onRetry}
               className="flex items-center gap-2 px-6 py-3 rounded-full bg-[color:var(--text-primary)] text-[color:var(--surface-primary)] font-semibold opacity-95 transition-all hover:opacity-85 shadow-lg"
             >
               <RefreshCcw className="w-5 h-5" />
               Try Again
-            </motion.button>
+            </button>
           )}
           {config.showViewAll && onViewAll && (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            <button
               onClick={onViewAll}
-              className="surface-control surface-interactive-hover flex items-center gap-2 rounded-full px-6 py-3 font-semibold transition-all"
+              className="surface-control surface-interactive-hover flex items-center gap-2 rounded-full px-6 py-3 font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               <TrendingUp className="w-5 h-5" />
               View All Designs
-            </motion.button>
+            </button>
           )}
         </div>
       </div>
-    </motion.section></LazyMotion>
+    </section>
   );
 };
 

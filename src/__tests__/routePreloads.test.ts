@@ -2,7 +2,7 @@ import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 // Build helper is plain JavaScript so the same implementation runs in Node CI.
 // @ts-expect-error build helper has no declaration file
-import { collectRouteAssets, renderRoutePreloads } from '../../scripts/generate-route-preloads.mjs';
+import { collectMarketFonts, collectRouteAssets, renderRoutePreloads } from '../../scripts/generate-route-preloads.mjs';
 
 describe('initial-route asset preloading', () => {
   const manifest = {
@@ -21,8 +21,8 @@ describe('initial-route asset preloading', () => {
   });
 
   it('selects the current route, deduplicates links and treats CSS as style hints', () => {
-    const script = renderRoutePreloads({ '/': ['/assets/Runway-abc.js'], '/market': ['/assets/Market-def.js', '/assets/core-xyz.css'] });
-    const links: Array<{ rel?: string; href?: string; as?: string; crossOrigin?: string }> = [];
+    const script = renderRoutePreloads({ '/': ['/assets/Runway-abc.js'], '/market': ['/assets/Market-def.js', '/assets/core-xyz.css', '/fonts/wiez-web/playfair-display-latin-123456abcdef.woff2'] });
+    const links: Array<{ rel?: string; href?: string; as?: string; type?: string; crossOrigin?: string }> = [];
     const context = {
       window: { location: { pathname: '/market/' } },
       document: {
@@ -36,9 +36,24 @@ describe('initial-route asset preloading', () => {
     expect(links).toEqual([
       { href: '/assets/Market-def.js', rel: 'modulepreload', crossOrigin: '' },
       { href: '/assets/core-xyz.css', rel: 'preload', as: 'style', crossOrigin: '' },
+      { href: '/fonts/wiez-web/playfair-display-latin-123456abcdef.woff2', rel: 'preload', as: 'font', type: 'font/woff2', crossOrigin: '' },
     ]);
     context.window.location.pathname = '/settings';
     vm.runInNewContext(script, context);
-    expect(links).toHaveLength(2);
+    expect(links).toHaveLength(3);
+  });
+
+  it('selects the visible Market subsets from verified build filenames and rejects missing/unsafe records', () => {
+    const files = [
+      { name: 'playfair-display-latin-ext-111111111111.woff2' },
+      { name: 'plus-jakarta-sans-latin-ext-abcdefabcdef.woff2' },
+      { name: 'playfair-display-latin-123456abcdef.woff2' },
+    ];
+    expect(collectMarketFonts({ files })).toEqual([
+      '/fonts/wiez-web/playfair-display-latin-123456abcdef.woff2',
+      '/fonts/wiez-web/plus-jakarta-sans-latin-ext-abcdefabcdef.woff2',
+    ]);
+    expect(() => collectMarketFonts({ files: [] })).toThrow('Missing visible Market font');
+    expect(() => collectMarketFonts({ files: [{ name: '../playfair-display-latin-123456abcdef.woff2' }] })).toThrow('Missing visible Market font');
   });
 });

@@ -33,10 +33,20 @@ export function renderRoutePreloads(routes) {
     `assets.forEach(function (href) {\n` +
     `  if (document.querySelector('link[href="' + href + '"]')) return;\n` +
     `  var link = document.createElement('link');\n` +
-    `  link.rel = /\\.css$/.test(href) ? 'preload' : 'modulepreload';\n` +
-    `  if (link.rel === 'preload') link.as = 'style';\n` +
+    `  var font = /\\.woff2$/.test(href);\n` +
+    `  link.rel = font || /\\.css$/.test(href) ? 'preload' : 'modulepreload';\n` +
+    `  if (link.rel === 'preload') link.as = font ? 'font' : 'style';\n` +
+    `  if (font) link.type = 'font/woff2';\n` +
     `  link.href = href; link.crossOrigin = ''; document.head.appendChild(link);\n` +
     `});\n})();\n`;
+}
+
+export function collectMarketFonts(manifest) {
+  return ['playfair-display-latin', 'plus-jakarta-sans-latin-ext'].map(prefix => {
+    const font = manifest.files.find(file => new RegExp(`^${prefix}-[a-f0-9]{12}\\.woff2$`).test(file.name));
+    if (!font) throw new Error(`Missing visible Market font: ${prefix}`);
+    return `/fonts/wiez-web/${font.name}`;
+  });
 }
 
 export function generateRoutePreloads(root) {
@@ -44,7 +54,8 @@ export function generateRoutePreloads(root) {
   const manifestPath = path.join(dist, '.vite', 'manifest.json');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const runway = collectRouteAssets(manifest, 'src/pages/Runway.tsx');
-  const market = collectRouteAssets(manifest, 'src/pages/MarketPlace.tsx');
+  const fonts = JSON.parse(fs.readFileSync(path.join(dist, 'fonts', 'wiez-web', 'manifest.json'), 'utf8'));
+  const market = [...collectMarketFonts(fonts), ...collectRouteAssets(manifest, 'src/pages/MarketPlace.tsx')];
   for (const href of new Set([...runway, ...market])) {
     if (!fs.existsSync(path.join(dist, href.slice(1)))) throw new Error(`Missing built route asset: ${href}`);
   }
