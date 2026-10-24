@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const ts = require('typescript');
 
 const repoRoot = path.resolve(__dirname, '..');
 const failures = [];
@@ -82,8 +83,12 @@ assertOrder(
   'media hook must try public URLs before private signed fallback',
 );
 assertIncludes('src/hooks/useSignedFileUrl.ts', 'retry: false', 'media public denial must not retry into request spam');
-// Same WIEZ_ rename rot as the queryClient assertions above.
-assertIncludes('src/hooks/useSignedFileUrl.ts', 'gcTime: WIEZ_QUERY_STALE_TIME_MS', 'signed media query cache must stay short-lived');
+// Retention and freshness are separate: reuse an inactive capability, but
+// authorize it again when stale/expired and never render an expired URL.
+assertIncludes('src/hooks/useSignedFileUrl.ts', 'gcTime: WIEZ_MEDIA_URL_GC_TIME_MS', 'media queries must use the shared retention window');
+assertIncludes('src/hooks/useSignedFileUrl.ts', 'staleTime: mustRefresh ? 0 : WIEZ_QUERY_STALE_TIME_MS', 'forced refresh must bypass freshness without discarding the retention policy');
+assertIncludes('src/hooks/useSignedFileUrl.ts', '!isUsableMediaUrl(cachedPublic)', 'expired cached capabilities must be removed');
+assertIncludes('src/hooks/useSignedFileUrl.ts', 'getMediaUrlExpiryMs(url)', 'mounted media must schedule an expiry refresh');
 
 assertOrder(
   'src/components/designs/DesignViewModal.tsx',
@@ -111,7 +116,17 @@ const walk = (dir) => {
     }
     if (!/\.(ts|tsx|js|jsx|cjs)$/.test(entry.name)) continue;
     const content = read(relative);
-    if (content.includes('/uploads/signed-url')) signedUrlReferences.push(relative);
+    // Inspect executable literals, not documentation comments describing the
+    // centralized API. Both ordinary and interpolated endpoint strings count.
+    const source = ts.createSourceFile(relative, content, ts.ScriptTarget.Latest, true);
+    let referencesEndpoint = false;
+    const visit = (node) => {
+      if ((ts.isStringLiteralLike(node) || node.kind === ts.SyntaxKind.TemplateHead)
+          && node.text.includes('/uploads/signed-url')) referencesEndpoint = true;
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+    if (referencesEndpoint) signedUrlReferences.push(relative);
   }
 };
 walk('src');
