@@ -6,10 +6,12 @@ import type { RootState } from '@/store';
 import { getActiveBrandId } from '@/lib/brandAccess';
 import { brandCustomersApi } from '@/api/BrandCustomersApi';
 import SearchField from '@/components/SearchField';
+import { useBrandCommerceAccess } from '@/hooks/useBrandCommerceAccess';
 
 export default function CustomersPage() {
   const profile = useSelector((state: RootState) => state.user.profile);
   const brandId = getActiveBrandId(profile);
+  const commerce = useBrandCommerceAccess();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -25,15 +27,17 @@ export default function CustomersPage() {
     staleTime: 15_000,
     refetchOnMount: true,
   });
+  const criteriaExpired = commerce.entitlementExpired;
   return <section className="space-y-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h1 className="text-2xl font-bold text-theme">Customers</h1>
         <p className="mt-1 text-sm text-theme-secondary">Shoppers with paid orders from your brand. Cancelled and fully refunded orders do not count.</p></div>
-      <Link className="inline-flex min-h-11 items-center rounded-2xl bg-purple-100 px-4 font-semibold text-purple-800 dark:bg-purple-950 dark:text-purple-200" to="/settings?tab=store-customers">Customer settings</Link>
+      {commerce.canManage ? <Link className="inline-flex min-h-11 items-center rounded-2xl bg-purple-100 px-4 font-semibold text-purple-800 dark:bg-purple-950 dark:text-purple-200" to="/settings?tab=store-customers">Customer settings</Link> : null}
     </div>
     <SearchField value={search} onChange={value => { setSearch(value); setPage(1); }} collapsible={false} ariaLabel="Search customers by name or username" placeholder="Search customers…" />
     {customers.isLoading ? <p role="status">Loading customers…</p> : null}
     {customers.isError ? <div role="alert"><p>Customers could not be loaded.</p><button type="button" className="min-h-11 rounded-2xl bg-purple-600 px-4 text-white" onClick={() => void customers.refetch()}>Try again</button></div> : null}
+    {criteriaExpired && customers.isFetching ? <p role="status">Updating customer criteria…</p> : null}
     {customers.data ? <>
       <p className="text-sm text-theme-secondary">{customers.data.total} shoppers · {customers.data.settings.effectiveMinimumOrders}+ paid orders</p>
       {customers.data.items.length ? <div className="max-h-[65dvh] overflow-auto">
