@@ -158,6 +158,9 @@ if (fs.existsSync(path.join(repoRoot, 'dist', 'index.html'))) {
     for (const route of ['/', '/runway', '/market']) {
       if (!Array.isArray(routes[route]) || routes[route].length === 0) fail(`Missing initial-route hints for ${route}`);
       for (const href of routes[route] ?? []) {
+        if (/\/(?:CommentThread|ContentReviewDecisionModal|MarketProductOverlay|InlineProductDetail)-/.test(href)) {
+          fail(`Initial route ${route} loads an unopened interaction: ${href}`);
+        }
         if (!/^\/assets\/[A-Za-z0-9_.-]+\.(?:js|css)$/.test(href) || !fs.existsSync(path.join(repoRoot, 'dist', href.slice(1)))) {
           fail(`Invalid or missing built initial-route asset: ${href}`);
         }

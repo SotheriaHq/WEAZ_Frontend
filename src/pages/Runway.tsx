@@ -6,7 +6,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { RefreshCcw, WifiOff, ServerCrash, SearchX, Sparkles, TrendingUp, Clock } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { LazyMotion, domAnimation } from 'framer-motion';
+import * as motion from 'framer-motion/m';
 import Masonry from 'react-masonry-css';
 import { useQuery } from '@tanstack/react-query';
 import DesignApi from '@/api/DesignApi';
@@ -200,7 +201,7 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
   const Icon = config.icon;
 
   return (
-    <motion.section
+    <LazyMotion features={domAnimation}><motion.section
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
@@ -284,7 +285,7 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
           )}
         </div>
       </div>
-    </motion.section>
+    </motion.section></LazyMotion>
   );
 };
 

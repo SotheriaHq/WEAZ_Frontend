@@ -1,4 +1,4 @@
-import { useQueueTick } from './CustomOrderQueue';
+import { useQueueTick } from './useQueueTick';
 import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useQuery } from '@tanstack/react-query';
