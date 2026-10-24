@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react';
+import React from 'react';
 import type { EmojiClickData } from 'emoji-picker-react';
 import { toast } from 'sonner';
 import type { CommentTarget } from '@/types/comments';
@@ -6,7 +6,7 @@ import { CommentsApi } from '@/api/CommentsApi';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 
-const NativeEmojiPicker = lazy(() => import('./NativeEmojiPicker'));
+import NativeEmojiPicker from './LazyNativeEmojiPicker';
 
 type Props = {
   targetType: CommentTarget;
@@ -71,9 +71,7 @@ const CommentComposer: React.FC<Props> = ({ targetType, targetId, parentId, onCr
         </button>
         {showEmojiPicker && (
           <div className="absolute bottom-full right-0 mb-2 z-50">
-            <Suspense fallback={<div role="status" className="rounded-2xl bg-[color:var(--surface-primary)] p-4 text-theme">Loading emojis…</div>}>
-              <NativeEmojiPicker onEmojiClick={onEmojiClick} />
-            </Suspense>
+            <NativeEmojiPicker onEmojiClick={onEmojiClick} />
           </div>
         )}
       </div>

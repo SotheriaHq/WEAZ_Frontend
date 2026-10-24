@@ -1,9 +1,8 @@
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 
-import 'primereact/resources/themes/lara-light-blue/theme.css';
-import 'primereact/resources/primereact.min.css';
-import 'primeicons/primeicons.css';
+// Product controls use WIEZ primitives. Load any future vendor component's
+// stylesheet with that component rather than blocking every public page.
 import './index.css';
 import App from './App';
 import { RealtimeProvider } from './realtime';

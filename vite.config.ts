@@ -113,7 +113,7 @@ export default defineConfig(({ mode }) => {
             return deps;
           }
           return deps.filter((dep) =>
-            /\/assets\/(react-vendor|router-vendor|redux-vendor)-/.test(dep),
+            /(?:^|\/)assets\/(react-vendor|router-vendor|redux-vendor)-/.test(dep),
           );
         },
       },

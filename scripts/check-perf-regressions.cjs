@@ -137,6 +137,21 @@ for (const relative of signedUrlReferences) {
   }
 }
 
+// Vite supplies HTML preload paths relative to dist ("assets/..."), not
+// necessarily root-relative. Verify the actual artifact to catch filter drift.
+if (fs.existsSync(path.join(repoRoot, 'dist', 'index.html'))) {
+  const html = read('dist/index.html');
+  const preloadTags = html.match(/<link\b[^>]*rel="modulepreload"[^>]*>/g) ?? [];
+  for (const vendor of ['react-vendor', 'router-vendor', 'redux-vendor']) {
+    if (!preloadTags.some(tag => tag.includes(`/assets/${vendor}-`))) {
+      fail(`dist/index.html: missing ${vendor} module preload; do not introduce an entry-to-vendor request waterfall`);
+    }
+  }
+  if (preloadTags.some(tag => !/\/assets\/(?:react-vendor|router-vendor|redux-vendor)-/.test(tag))) {
+    fail('dist/index.html: public boot must not preload unopened feature/admin routes');
+  }
+}
+
 if (failures.length > 0) {
   console.error('Performance regression guard failed:');
   for (const failure of failures) console.error(`- ${failure}`);

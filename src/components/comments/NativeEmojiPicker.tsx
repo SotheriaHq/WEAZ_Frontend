@@ -1,6 +1,8 @@
-import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from 'emoji-picker-react';
+import EmojiPicker, { EmojiStyle, Theme, type PickerProps } from 'emoji-picker-react';
 
-export default function NativeEmojiPicker({ onEmojiClick }: { onEmojiClick: (event: EmojiClickData) => void }) {
-  return <EmojiPicker onEmojiClick={onEmojiClick} emojiStyle={EmojiStyle.NATIVE} theme={Theme.DARK}
-    searchDisabled skinTonesDisabled lazyLoadEmojis />;
+export type NativeEmojiPickerProps = Omit<PickerProps, 'emojiStyle' | 'theme'> & { theme?: 'dark' | 'auto' };
+
+export default function NativeEmojiPicker({ theme = 'dark', ...props }: NativeEmojiPickerProps) {
+  return <EmojiPicker searchDisabled skinTonesDisabled lazyLoadEmojis {...props}
+    emojiStyle={EmojiStyle.NATIVE} theme={theme === 'auto' ? Theme.AUTO : Theme.DARK} />;
 }
