@@ -287,7 +287,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 </div>
                 <button
                   onClick={applyDefaults}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-purple-500/20 bg-purple-600/10 px-2 py-1.5 text-[10px] font-medium text-purple-600 transition-colors hover:bg-purple-600/20 dark:text-purple-400 sm:gap-2 sm:px-4 sm:py-2 sm:text-sm"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-gray-200 dark:border-white/10 bg-purple-600/10 px-2 py-1.5 text-[10px] font-medium text-purple-600 transition-colors hover:bg-purple-600/20 dark:text-purple-400 sm:gap-2 sm:px-4 sm:py-2 sm:text-sm"
                 >
                   <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span className="whitespace-nowrap">Apply Recommended</span>

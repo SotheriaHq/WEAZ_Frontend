@@ -3692,7 +3692,7 @@ const EditProduct: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => mediaFileInputRef.current?.click()}
-                        className="w-6 h-6 rounded-full border-2 border-dashed border-theme-strong flex items-center justify-center text-gray-400 hover:border-purple-400 hover:text-purple-500 transition-all"
+                        className="w-6 h-6 rounded-full border-2 border-dashed border-theme-strong flex items-center justify-center text-gray-400 hover:border-gray-400 hover:text-purple-500 transition-all"
                         aria-label="Add more images"
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -3714,7 +3714,7 @@ const EditProduct: React.FC = () => {
                       await processAndUploadFiles(files);
                     }
                   }}
-                  className="group aspect-[4/3] w-full rounded-2xl border-2 border-dashed border-gray-300/80 bg-gray-50/50 hover:bg-purple-50/5 hover:border-purple-500/50 dark:border-white/15 dark:bg-white/[0.02] flex items-center justify-center transition-all cursor-pointer"
+                  className="group aspect-[4/3] w-full rounded-2xl border-2 border-dashed border-gray-300/80 bg-gray-50/50 hover:bg-purple-50/5 hover:border-gray-400 dark:hover:border-white/30 dark:border-white/15 dark:bg-white/[0.02] flex items-center justify-center transition-all cursor-pointer"
                 >
                   <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-white/10 flex items-center justify-center text-purple-600 transition-colors group-hover:bg-purple-200">
                     <Plus className="w-6 h-6" />
@@ -3999,7 +3999,7 @@ const EditProduct: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setShowTagPicker(true)}
-                          className="mb-2 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1.5 text-[12px] font-semibold text-purple-700 transition hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+                          className="mb-2 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-gray-200 bg-purple-50 px-3 py-1.5 text-[12px] font-semibold text-purple-700 transition hover:bg-purple-100 dark:border-white/10 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
                         >
                           🔎 See more hashtags ({form.tags.length}/{MAX_PRODUCT_TAGS})
                         </button>
@@ -4778,7 +4778,7 @@ const EditProduct: React.FC = () => {
                                       key={opt.code}
                                       className={`flex items-center gap-2 rounded-md border px-2 py-2 text-xs transition-colors ${
                                         isSelected
-                                          ? "border-purple-500/60 bg-purple-500/10 text-theme"
+                                          ? "border-gray-300/70 dark:border-white/20 bg-purple-500/10 text-theme"
                                           : "border-gray-300/70 dark:border-white/15 text-theme-secondary"
                                       } ${!form.isPhysicalProduct ? "opacity-60" : ""}`}
                                     >

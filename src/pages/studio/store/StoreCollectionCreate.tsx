@@ -2273,8 +2273,8 @@ const StoreCollectionCreate: React.FC = () => {
         tabIndex={0}
         className={`group relative rounded-lg border p-2.5 text-left transition-all duration-200 cursor-pointer ${
           selected
-            ? "border-purple-300 bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:border-purple-400/60 dark:from-purple-600/20 dark:via-fuchsia-600/10 dark:to-pink-600/10 shadow-lg shadow-purple-500/10"
-            : "surface-card hover:border-purple-300/70 hover:shadow-md"
+            ? "border-gray-200 bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:border-white/10 dark:from-purple-600/20 dark:via-fuchsia-600/10 dark:to-pink-600/10 shadow-sm"
+            : "surface-card hover:border-gray-300 dark:hover:border-white/20 hover:shadow-md"
         }`}
       >
         <div className="relative mb-2 aspect-[5/4] w-full overflow-hidden rounded-lg border border-theme bg-theme-muted">
@@ -2479,7 +2479,7 @@ const StoreCollectionCreate: React.FC = () => {
               aria-current={active ? 'step' : undefined}
               className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-left transition ${
                 active
-                  ? 'border-purple-500 bg-purple-50/70 dark:bg-purple-500/10'
+                  ? 'border-gray-300 bg-purple-50/70 dark:border-white/20 dark:bg-purple-500/10'
                   : 'border-theme text-theme-secondary'
               }`}
             >
@@ -2518,8 +2518,8 @@ const StoreCollectionCreate: React.FC = () => {
                 onClick={() => setCreationMode("existing")}
                 className={`rounded-xl border px-4 py-3 text-left transition ${
                   creationMode === "existing"
-                    ? "border-purple-500 bg-purple-50/70 dark:bg-purple-500/10"
-                    : "border-theme hover:border-purple-300"
+                    ? "border-gray-300 bg-purple-50/70 dark:border-white/20 dark:bg-purple-500/10"
+                    : "border-theme hover:border-gray-300 dark:hover:border-white/20"
                 }`}
               >
                 <div className="text-sm font-semibold text-theme">
@@ -2534,8 +2534,8 @@ const StoreCollectionCreate: React.FC = () => {
                 onClick={() => setCreationMode("new")}
                 className={`rounded-xl border px-4 py-3 text-left transition ${
                   creationMode === "new"
-                    ? "border-purple-500 bg-purple-50/70 dark:bg-purple-500/10"
-                    : "border-theme hover:border-purple-300"
+                    ? "border-gray-300 bg-purple-50/70 dark:border-white/20 dark:bg-purple-500/10"
+                    : "border-theme hover:border-gray-300 dark:hover:border-white/20"
                 }`}
               >
                 <div className="text-sm font-semibold text-theme">
@@ -2734,7 +2734,7 @@ const StoreCollectionCreate: React.FC = () => {
             Back to products
           </button>
 
-          <div className="relative overflow-hidden rounded-2xl border border-purple-100/70 dark:border-white/10 bg-white/90 dark:bg-white/5 p-6 space-y-4">
+          <div className="relative overflow-hidden rounded-2xl border border-theme dark:border-white/10 bg-white/90 dark:bg-white/5 p-6 space-y-4">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400" />
             <h2 className="text-lg font-semibold text-theme relative">
               Collection Details
@@ -2914,7 +2914,7 @@ const StoreCollectionCreate: React.FC = () => {
                                   }
                                 }}
                                 className="px-2 py-1 rounded-lg text-[10px] font-medium bg-purple-50 dark:bg-purple-500/10
-                            text-purple-600 dark:text-purple-300 border border-purple-200/60 dark:border-purple-500/20
+                            text-purple-600 dark:text-purple-300 border border-theme
                             hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
                               >
                                 + {normalizeHashtagLabel(suggestion)}
@@ -3095,7 +3095,7 @@ const StoreCollectionCreate: React.FC = () => {
             }
             await navigateAway("/studio/store?view=collections");
           })()}
-          className="rounded-lg border border-theme bg-white/80 dark:bg-white/5 px-4 py-2 text-sm font-semibold text-theme-secondary hover:border-purple-300"
+          className="rounded-lg border border-theme bg-white/80 dark:bg-white/5 px-4 py-2 text-sm font-semibold text-theme-secondary hover:border-gray-300 dark:hover:border-white/20"
         >
           {isExistingCollectionEditMode ? "Discard changes" : "Back"}
         </button>
@@ -3170,7 +3170,7 @@ const StoreCollectionCreate: React.FC = () => {
               {/* Header with gradient accent */}
               <div className="relative">
                 <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500" />
-                <div className="flex items-center justify-between px-6 py-5 border-b border-purple-200/30 dark:border-white/10">
+                <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200/50 dark:border-white/10">
                   <div>
                     <div className="text-base font-bold bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 bg-clip-text text-transparent">
                       Product Details
@@ -3197,7 +3197,7 @@ const StoreCollectionCreate: React.FC = () => {
 
               <div className="relative grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
                 {/* Image Container with enhanced styling */}
-                <div className="rounded-2xl bg-gradient-to-br from-gray-100/80 via-white to-purple-50/50 dark:from-white/10 dark:via-white/5 dark:to-purple-900/20 p-4 border border-purple-200/40 dark:border-white/10 shadow-inner">
+                <div className="rounded-2xl bg-gradient-to-br from-gray-100/80 via-white to-purple-50/50 dark:from-white/10 dark:via-white/5 dark:to-purple-900/20 p-4 border border-gray-200/50 dark:border-white/10 shadow-inner">
                   <div className="flex items-center justify-center min-h-[260px]">
                     {activePreviewImage ? (
                       <ImageWithFallback
@@ -3224,8 +3224,8 @@ const StoreCollectionCreate: React.FC = () => {
                             onClick={() => setPreviewImageIndex(index)}
                             className={`h-14 rounded-lg border-2 overflow-hidden transition-all ${
                               isActive
-                                ? "border-purple-500 shadow-md shadow-purple-500/20"
-                                : "border-gray-200/80 dark:border-white/10 hover:border-purple-300"
+                                ? "border-gray-400 shadow-sm"
+                                : "border-gray-200/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20"
                             }`}
                           >
                             <ImageWithFallback
@@ -3278,7 +3278,7 @@ const StoreCollectionCreate: React.FC = () => {
                         {previewProduct.isActive ? "Active" : "Draft"}
                       </div>
                     </div>
-                    <div className="rounded-xl bg-gradient-to-br from-purple-50 to-fuchsia-50 dark:from-purple-900/30 dark:to-fuchsia-900/30 border border-purple-200/50 dark:border-purple-500/20 px-4 py-3 shadow-sm">
+                    <div className="rounded-xl bg-gradient-to-br from-purple-50 to-fuchsia-50 dark:from-purple-900/30 dark:to-fuchsia-900/30 border border-gray-200/50 dark:border-white/10 px-4 py-3 shadow-sm">
                       <div className="text-[10px] uppercase tracking-wider text-purple-500 dark:text-purple-400 font-semibold">
                         Sizes
                       </div>

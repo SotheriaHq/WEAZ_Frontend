@@ -34,7 +34,7 @@ const SegmentChips: React.FC<SegmentChipsProps> = ({ options, value, onChange, c
             role="tab"
             aria-selected={selected}
             onClick={() => onChange(opt.key)}
-            className={`rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 ${sizes.chip} ` +
+            className={`rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-white/20 ${sizes.chip} ` +
               (selected
                 ? 'neu-pressed-button text-[color:var(--text-primary)] font-semibold shadow-sm'
                 : 'text-gray-700 dark:text-white/80 hover:text-gray-900 dark:hover:text-white')}

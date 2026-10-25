@@ -299,7 +299,7 @@ export default function BrandReviewsDashboardPage() {
                   }}
                   className={`rounded-xl border p-4 text-left transition ${
                     selected
-                      ? 'border-purple-400 bg-purple-50 text-purple-900 dark:border-purple-400/50 dark:bg-purple-500/10 dark:text-purple-100'
+                      ? 'border-gray-300 bg-purple-50 text-purple-900 dark:border-white/20 dark:bg-purple-500/10 dark:text-purple-100'
                       : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.08]'
                   }`}
                 >
