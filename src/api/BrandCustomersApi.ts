@@ -7,6 +7,8 @@ export interface BrandCommerceAccess {
   canConfigureCustomers: boolean;
   customerMinimumOrders: number;
   effectiveMinimumOrders: number;
+  serverNow: string;
+  entitlementExpiresAt: string | null;
 }
 export interface BrandCustomerPage {
   items: Array<{
@@ -20,7 +22,7 @@ export interface BrandCustomerPage {
   page: number;
   limit: number;
   hasNextPage: boolean;
-  settings: BrandCommerceAccess;
+  settings: { effectiveMinimumOrders: number };
 }
 export const brandCustomersApi = {
   access: async (id: string, signal?: AbortSignal) =>

@@ -4,44 +4,29 @@ import { SubscriptionNotice } from '@/components/custom-orders/SubscriptionNotic
 import React, { Suspense, useEffect, lazy, useRef, useState } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet, Navigate, useParams, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import SettingsHome from './pages/settings/SettingsHome';
-import CollectionsSettings from './pages/settings/CollectionsSettings';
-import SignupPage from './pages/SignUp';
-import Success from './pages/Success';
-import LoginPage from './pages/Login';
-import AccountReactivationRequestPage from './pages/AccountReactivationRequestPage';
 // Removed separate BrandPublic visitor page; unified profile view handles both owner & visitor modes
 import ProtectedRoute, { RequireAuthenticated } from './components/ProtectedRoute';
 import GuestRoute from './components/GuestRoute';
 import { AuthProvider } from './context/AuthContext';
 import { DropdownManagerProvider } from './context/DropdownManagerContext';
 import { BrandPatchProvider } from './context/BrandPatchContext';
-import { ProfileLayout } from './components/catalog/ProfileLayout';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
 import { NoticeModalHost } from '@/components/ui/NoticeModal';
 import { MuseLoader } from '@/components/loaders/MuseLoader';
-import ErrorPage from './pages/ErrorPage';
+const ErrorPage = lazy(() => import('./pages/ErrorPage'));
 import SeoHead from './components/seo/SeoHead';
 import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
-import OrderConfirmation from './pages/checkout/OrderConfirmation';
-import PaymentReturnPage from './pages/checkout/PaymentReturnPage';
-// Placeholder pages for features under development
-import {
-  NotFound,
-  SubscriptionsPlaceholder,
-  HistoryPlaceholder,
-  WatchLaterPlaceholder,
-  TrendingPlaceholder,
-} from './pages/placeholders';
-import ShopSetupWizardPage from './pages/studio/shop/ShopSetupWizardPage';
-import ShopSetupEssentialsPage from './pages/studio/shop/ShopSetupEssentialsPage';
-import StudioScaffold from './components/studio/StudioScaffold';
+const NotFound = lazy(() => import('./pages/placeholders/NotFound'));
+const SubscriptionsPlaceholder = lazy(() => import('./pages/placeholders/SubscriptionsPlaceholder'));
+const HistoryPlaceholder = lazy(() => import('./pages/placeholders/HistoryPlaceholder'));
+const WatchLaterPlaceholder = lazy(() => import('./pages/placeholders/WatchLaterPlaceholder'));
+const TrendingPlaceholder = lazy(() => import('./pages/placeholders/TrendingPlaceholder'));
+const StudioScaffold = lazy(() => import('./components/studio/StudioScaffold'));
 import StudioHandoffGate from './components/studio/StudioHandoffGate';
 import RequireStoreSetup from './components/store/RequireStoreSetup';
 import { BagFlowProvider } from './features/bagging/BagFlowProvider';
 import { ProfileAliasRedirect } from './pages/redirects/PublicAliasRedirects';
-import VerifiedBadgeMeaningPage from './pages/ui/VerifiedBadgeMeaningPage';
 import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
@@ -57,7 +42,22 @@ import ScrollRestoreProvider from '@/components/ScrollRestoreProvider';
 import MobileExitGuard from '@/components/navigation/MobileExitGuard';
 import { isNewBuildAvailable } from '@/utils/buildVersionGuard';
 import { GenderPrompt } from '@/components/profile/GenderPrompt';
+import { DeferredOverlay } from '@/components/ui/DeferredOverlay';
+import { selectCartIsDrawerOpen } from '@/features/cartSlice';
+import { selectWishlistIsDrawerOpen } from '@/features/wishlistSlice';
 
+const SettingsHome = lazy(() => import('./pages/settings/SettingsHome'));
+const CollectionsSettings = lazy(() => import('./pages/settings/CollectionsSettings'));
+const SignupPage = lazy(() => import('./pages/SignUp'));
+const Success = lazy(() => import('./pages/Success'));
+const LoginPage = lazy(() => import('./pages/Login'));
+const AccountReactivationRequestPage = lazy(() => import('./pages/AccountReactivationRequestPage'));
+const ProfileLayout = lazy(() => import('./components/catalog/ProfileLayout').then(module => ({ default: module.ProfileLayout })));
+const OrderConfirmation = lazy(() => import('./pages/checkout/OrderConfirmation'));
+const PaymentReturnPage = lazy(() => import('./pages/checkout/PaymentReturnPage'));
+const ShopSetupWizardPage = lazy(() => import('./pages/studio/shop/ShopSetupWizardPage'));
+const ShopSetupEssentialsPage = lazy(() => import('./pages/studio/shop/ShopSetupEssentialsPage'));
+const VerifiedBadgeMeaningPage = lazy(() => import('./pages/ui/VerifiedBadgeMeaningPage'));
 const Runway = lazy(() => import('./pages/Runway'));
 const CartDrawer = lazy(() => import('./components/designs/CartDrawer'));
 const WishlistDrawer = lazy(() => import('./components/designs/WishlistDrawer'));
@@ -195,9 +195,11 @@ const withStudioRouteFallback = (
 ) => (
   <Suspense
     fallback={
-      <StudioScaffold active={active} onSelect={noopStudioSelect}>
-        <StudioRouteFallback />
-      </StudioScaffold>
+      <Suspense fallback={<StudioRouteFallback />}>
+        <StudioScaffold active={active} onSelect={noopStudioSelect}>
+          <StudioRouteFallback />
+        </StudioScaffold>
+      </Suspense>
     }
   >
     {element}
@@ -300,6 +302,8 @@ const ViewportSync: React.FC<{ watchKey?: string }> = ({ watchKey }) => {
 };
 
 const RootLayout: React.FC = () => {
+  const bagOpen = useSelector(selectCartIsDrawerOpen);
+  const wishlistOpen = useSelector(selectWishlistIsDrawerOpen);
   const location = useLocation();
   const embeddedSurface = useEmbeddedSurface();
   const isEmbeddedMobile = embeddedSurface === 'mobile-app';
@@ -393,8 +397,8 @@ const RootLayout: React.FC = () => {
         {!isEmbeddedMobile ? <MobileExitGuard /> : null}
         {!isEmbeddedMobile ? (
           <Suspense fallback={null}>
-            <CartDrawer />
-            <WishlistDrawer />
+            <DeferredOverlay open={bagOpen}><CartDrawer /></DeferredOverlay>
+            <DeferredOverlay open={wishlistOpen}><WishlistDrawer /></DeferredOverlay>
             <GlobalModalRouter />
           </Suspense>
         ) : null}
@@ -544,7 +548,7 @@ const router = createBrowserRouter([
   {
     // Root wrapper that provides Router context to global drawers
     element: <RootLayout />,
-    errorElement: <ErrorPage />,
+    errorElement: withRouteFallback(<ErrorPage />),
     children: [
       {
         path: '/',
@@ -560,10 +564,10 @@ const router = createBrowserRouter([
           { path: 'market/sections/:sectionKey', element: withRouteFallback(<MarketSectionPage />) },
           { path: 'search', element: withRouteFallback(<SearchResultsPage />) },
           { path: 'diagnostics', element: withRouteFallback(<DiagnosticsPage />) },
-          { path: 'subscriptions', element: <SubscriptionsPlaceholder /> },
-          { path: 'history', element: <HistoryPlaceholder /> },
-          { path: 'watch-later', element: <WatchLaterPlaceholder /> },
-          { path: 'trending', element: <TrendingPlaceholder /> },
+          { path: 'subscriptions', element: withRouteFallback(<SubscriptionsPlaceholder />) },
+          { path: 'history', element: withRouteFallback(<HistoryPlaceholder />) },
+          { path: 'watch-later', element: withRouteFallback(<WatchLaterPlaceholder />) },
+          { path: 'trending', element: withRouteFallback(<TrendingPlaceholder />) },
           { path: 'size-charts', element: withRouteFallback(<SizeChartsPage />) },
           { path: 'help/verified-badge', element: <VerifiedBadgeMeaningPage /> },
           { path: 'legal', element: withRouteFallback(<LegalIndexPage />) },
@@ -1035,7 +1039,7 @@ const router = createBrowserRouter([
       // Catch-all 404 route - must be last
       {
         path: '*',
-        element: <NotFound />,
+        element: withRouteFallback(<NotFound />),
       },
     ],
   },
@@ -1053,23 +1057,39 @@ const router = createBrowserRouter([
 const HotRouteChunkPrefetch: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
-    const warm = () => {
-      if (cancelled) return;
-      void import('./pages/SearchResultsPage');
-      void import('./pages/MarketPlace');
-      void import('./pages/catalog/Catalog');
-    };
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+    if (connection?.saveData || /^(slow-)?2g$/.test(connection?.effectiveType ?? '')) return;
+    // First paint owns the network and CPU. Warm one route at a time only
+    // after page load; an idle deadline must never force work onto a busy boot.
+    const routes = [
+      () => import('./pages/SearchResultsPage'),
+      () => import('./pages/MarketPlace'),
+      () => import('./pages/catalog/Catalog'),
+    ];
+    let routeIndex = 0;
+    let idleId: number | undefined;
+    let timerId: number | undefined;
     const canIdle = typeof window.requestIdleCallback === 'function';
-    const idleId = canIdle
-      ? window.requestIdleCallback(warm, { timeout: 4000 })
-      : window.setTimeout(warm, 2500);
+    const warm = () => {
+      if (cancelled || routeIndex >= routes.length) return;
+      const loadRoute = routes[routeIndex++];
+      void loadRoute().catch(() => undefined).finally(scheduleNext);
+    };
+    const scheduleNext = () => {
+      if (cancelled || routeIndex >= routes.length) return;
+      if (canIdle) idleId = window.requestIdleCallback(warm);
+      else timerId = window.setTimeout(warm, 2500);
+    };
+    const afterLoad = () => { timerId = window.setTimeout(scheduleNext, 5000); };
+    if (document.readyState === 'complete') afterLoad();
+    else window.addEventListener('load', afterLoad, { once: true });
     return () => {
       cancelled = true;
-      if (canIdle && typeof window.cancelIdleCallback === 'function') {
+      window.removeEventListener('load', afterLoad);
+      if (idleId !== undefined && typeof window.cancelIdleCallback === 'function') {
         window.cancelIdleCallback(idleId);
-      } else {
-        window.clearTimeout(idleId);
       }
+      if (timerId !== undefined) window.clearTimeout(timerId);
     };
   }, []);
   return null;

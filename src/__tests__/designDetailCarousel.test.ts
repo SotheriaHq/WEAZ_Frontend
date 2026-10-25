@@ -99,7 +99,7 @@ describe('design detail cache short-circuit', () => {
  */
 describe('the content viewer controls', () => {
   const source = readFileSync(
-    resolve(process.cwd(), 'src/components/designs/DesignViewModal.tsx'),
+    resolve(process.cwd(), 'src/components/designs/DesignViewModalContent.tsx'),
     'utf8',
   );
 

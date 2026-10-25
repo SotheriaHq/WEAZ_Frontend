@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import CommentThread from '@/components/comments/CommentThread';
+import { MuseLoader } from '@/components/loaders/MuseLoader';
+import { useOverlayBackClose } from '@/hooks/useOverlayBackClose';
+const CommentThread = React.lazy(() => import('@/components/comments/CommentThread'));
 
 /**
  * Comments over the live reel, as a draggable bottom sheet.
@@ -56,6 +58,7 @@ export const RunwayCommentsSheet: React.FC<RunwayCommentsSheetProps> = ({
   const dragStartAtRef = useRef(0);
   const [dragOffset, setDragOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
+  useOverlayBackClose(open, onClose);
 
   // Reset any residual drag when the sheet is dismissed, so reopening starts
   // from rest rather than from wherever the last gesture ended.
@@ -182,7 +185,7 @@ export const RunwayCommentsSheet: React.FC<RunwayCommentsSheetProps> = ({
             </button>
           </div>
           {title ? (
-            <span className="w-full truncate text-left text-xs text-theme-secondary">
+            <span className="w-full break-words text-left text-xs text-theme-secondary">
               {title}
             </span>
           ) : null}
@@ -196,7 +199,7 @@ export const RunwayCommentsSheet: React.FC<RunwayCommentsSheetProps> = ({
         */}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[env(safe-area-inset-bottom,0px)] scrollbar-wiez">
           {open && collectionId ? (
-            <CommentThread targetType="COLLECTION" targetId={collectionId} />
+            <React.Suspense fallback={<MuseLoader size={32} label="Loading comments" />}><CommentThread targetType="COLLECTION" targetId={collectionId} /></React.Suspense>
           ) : null}
         </div>
       </div>

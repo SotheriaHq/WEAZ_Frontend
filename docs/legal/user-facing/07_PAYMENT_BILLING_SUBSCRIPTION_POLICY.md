@@ -1,8 +1,8 @@
 # WIEZ Payment, Billing, and Settlement Policy
 
-Version: `2026.10.19-v1.5`
+Version: `2026.10.23-v1.6`
 
-Effective Date: October 19, 2026
+Effective Date: October 23, 2026
 
 Governing Entities: WIEZ Technology Ltd. (Nigeria) & Global Operating Affiliates
 
@@ -195,7 +195,7 @@ For billing escalations, payout inquiries, chargeback defense, and payment verif
 
 ### Subscription custom-order policy scope and consumer rights
 
-The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.19-v1.5`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.23-v1.6`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
 
 ### Paid waiting queue, timing and priority
 
@@ -226,7 +226,7 @@ Cancelled history, receipt, deductions, refund progress and permitted order mess
 | Aru | 30,000 | 4 | 5 | 1 | Unlimited | Brand opt-in |
 | Igwe | 50,000 | 6 | 5 | 1 | Unlimited | Brand opt-in |
 
-These are recurring monthly brand subscriptions, requiring express recurring-payment authorization; they are not shopper memberships. New brands cannot receive custom orders before first verified payment. Existing eligible brands retain free unlimited Legacy capacity until a paid assignment succeeds; Legacy is not a sold tier and does not include paid jumps. Failed initial or switch payments never create free paid-tier access or erase the previous valid entitlement.
+These are recurring monthly brand subscriptions, requiring express recurring-payment authorization; they are not shopper memberships. All brands require an active paid subscription with a verified payment before receiving new custom orders. Free storefront and standard-commerce access remain available without a custom-order subscription. Failed initial or switch payments never create free paid-tier access or erase the previous valid entitlement.
 
 Existing agreements retain their agreed price snapshot on renewal; a new agreement or tier change uses current pricing. An upgrade applies immediately after verified payment of the difference prorated over the remaining billing period. A downgrade applies at the next renewal, with no refund for the current period. The monthly billing anniversary remains unchanged; a missing calendar day falls back to that month's last day. Billing dates are displayed in Lagos time (Africa/Lagos). Confirm the amount, renewal and effective capacity before payment.
 
@@ -249,4 +249,4 @@ A successful authenticated reusable-card payment saves a provider authorization 
 
 A card required for automatic renewal cannot be deleted until the owner selects a replacement renewal card or stops renewal. A payment already processing must be verified before its card is removed. Deletion disables saved reuse and removes its stored checkout authorization; it does not remove historical financial receipts or cancel an already authorized payment. Previously deleted cards are not restored by historical backfill; a new authenticated payment may save the card again. The payer identity recorded for each payment attempt remains unchanged when a renewal card or account email is later changed.
 
-Upgrade notices are dismissible and link to plan review. Login and Studio share one server-enforced 24-hour notice limit per owner and brand across web/native. No-subscription owners are offered Thread; Thread → Aso-oke → Aru → Igwe follows the next-tier sequence. Current Igwe and free Legacy brands receive no automatic notice. Subscription levels are not public.
+Upgrade notices are dismissible and link to plan review. Login and Studio share one server-enforced 24-hour notice limit per owner and brand across web/native. No-subscription owners are offered Thread; Thread → Aso-oke → Aru → Igwe follows the next-tier sequence. Current Igwe brands receive no automatic notice. Subscription levels are not public.

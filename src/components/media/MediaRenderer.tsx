@@ -2,6 +2,8 @@ import React from 'react';
 import { cn } from '../../lib/utils';
 import { isKnownUnavailableSeedMediaUrl } from '@/utils/mediaSource';
 import { isPreviewUnavailableDataUrl } from '@/utils/imagePreview';
+import { useMediaCapabilityUrl } from '@/hooks/useMediaCapabilityUrl';
+import { getMediaUrlIdentity, isRenewableMediaUrl } from '@/utils/mediaUrlPolicy';
 
 export type MediaKind = 'image' | 'video';
 
@@ -131,10 +133,31 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
     mediaClassName
   );
 
-  const normalizedSrc = React.useMemo(
+  const inputSrc = React.useMemo(
     () => (typeof src === 'string' ? src.trim() : ''),
     [src],
   );
+  const localVideoRef = React.useRef<HTMLVideoElement | null>(null);
+  const playback = React.useRef<{ identity: string; time: number; playing: boolean } | null>(null);
+  const rememberPlayback = React.useCallback(() => {
+    const element = localVideoRef.current;
+    if (element && element.currentTime > 0) playback.current = { identity: getMediaUrlIdentity(inputSrc), time: element.currentTime, playing: !element.paused };
+  }, [inputSrc]);
+  const capability = useMediaCapabilityUrl(inputSrc, rememberPlayback);
+  const posterCapability = useMediaCapabilityUrl(poster);
+  const normalizedSrc = capability.url ?? '';
+  const mediaIdentity = getMediaUrlIdentity(inputSrc);
+  const activeMedia = React.useRef({ identity: mediaIdentity, epoch: capability.epoch });
+  const mounted = React.useRef(true);
+  activeMedia.current = { identity: mediaIdentity, epoch: capability.epoch };
+  React.useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const retry = React.useRef({ identity: mediaIdentity, used: false });
+  if (retry.current.identity !== mediaIdentity) retry.current = { identity: mediaIdentity, used: false };
+  const setVideoRef = React.useCallback((element: HTMLVideoElement | null) => {
+    localVideoRef.current = element;
+    if (typeof videoRef === 'function') videoRef(element);
+    else if (videoRef) videoRef.current = element;
+  }, [videoRef]);
   const isKnownUnavailableSource = React.useMemo(
     () =>
       isKnownUnavailableSeedMediaUrl(normalizedSrc) ||
@@ -146,6 +169,21 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
   React.useEffect(() => {
     setHasLoadError(false);
   }, [kind, normalizedSrc]);
+
+  const handleError = () => {
+    if (isRenewableMediaUrl(inputSrc) && !retry.current.used) {
+      retry.current.used = true;
+      void capability.refresh().then((url) => {
+        if (!mounted.current || activeMedia.current.identity !== mediaIdentity || activeMedia.current.epoch !== capability.epoch) return;
+        if (url && url !== normalizedSrc) return;
+        setHasLoadError(true);
+        onError?.();
+      });
+      return;
+    }
+    setHasLoadError(true);
+    onError?.();
+  };
 
   const shouldRenderMedia =
     normalizedSrc.length > 0 &&
@@ -179,7 +217,7 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
     return (
       <div className={frameClassName}>
         <video
-          ref={videoRef}
+          ref={setVideoRef}
           src={normalizedSrc}
           controls={controls}
           autoPlay={autoPlay}
@@ -187,13 +225,21 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
           muted={muted}
           loop={loop}
           preload={preload}
-          poster={poster}
+          poster={posterCapability.url ?? undefined}
           className={elementClassName}
           onLoadedData={onLoadedData}
-          onError={() => {
-            setHasLoadError(true);
-            onError?.();
+          onTimeUpdate={rememberPlayback}
+          onPause={rememberPlayback}
+          onPlay={rememberPlayback}
+          onLoadedMetadata={() => {
+            const saved = playback.current;
+            const element = localVideoRef.current;
+            if (saved?.identity === mediaIdentity && element && saved.time > 0) {
+              element.currentTime = Number.isFinite(element.duration) ? Math.min(saved.time, element.duration) : saved.time;
+              if (saved.playing) void element.play().catch(() => undefined);
+            }
           }}
+          onError={handleError}
         />
       </div>
     );
@@ -217,10 +263,7 @@ export const MediaRenderer: React.FC<MediaRendererProps> = ({
         decoding="async"
         fetchPriority={fetchPriority}
         onLoad={onLoad}
-        onError={() => {
-          setHasLoadError(true);
-          onError?.();
-        }}
+        onError={handleError}
       />
     </div>
   );

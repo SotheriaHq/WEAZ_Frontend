@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { RootState } from '@/store';
 import { getActiveBrandId, isBrandOwner } from '@/lib/brandAccess';
 import { brandSubscriptionApi } from '@/api/BrandSubscriptionApi';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
-import Modal from '@/components/ui/Modal';
+import { DeferredOverlay } from '@/components/ui/DeferredOverlay';
+const Modal = lazy(() => import('@/components/ui/Modal'));
 
 type Notice = NonNullable<
   Awaited<ReturnType<typeof brandSubscriptionApi.claimNotice>>['notice']
@@ -92,7 +93,7 @@ export function SubscriptionNotice() {
       void brandSubscriptionApi.dismissNotice(brandId).catch(() => undefined);
   }
   return (
-    <Modal
+    <DeferredOverlay open={Boolean(current)}><Modal
       open={Boolean(current)}
       onClose={close}
       title={current?.title}
@@ -118,6 +119,6 @@ export function SubscriptionNotice() {
           </button>
         </div>
       </div>
-    </Modal>
+    </Modal></DeferredOverlay>
   );
 }

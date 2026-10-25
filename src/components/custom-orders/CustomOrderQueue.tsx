@@ -3,14 +3,12 @@ import { queueServerNow } from '@/features/orders/queueClock';
 import {
   canRetainQueue,
   formatQueueCountdown,
-  nextQueueClockDelay,
 } from '@/features/orders/customOrderQueuePresentation';
 import {
   useCallback,
   useEffect,
   useState,
   useRef,
-  useSyncExternalStore,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -25,74 +23,10 @@ import Modal from '@/components/ui/Modal';
 import { useOverlayBackClose } from '@/hooks/useOverlayBackClose';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { queryClient } from '@/query/queryClient';
-import { useQueueConfirm } from './useQueueConfirm';
-import UniversalSelect from '@/components/forms/UniversalSelect';
 
-const listeners = new Set<() => void>();
-let clock = performance.now();
-let timer: ReturnType<typeof setTimeout> | undefined;
-const boundaries = new Map<symbol, number[]>();
-function schedule() {
-  clearTimeout(timer);
-  timer = undefined;
-  if (!listeners.size || document.visibilityState === 'hidden') return;
-  timer = setTimeout(
-    tick,
-    nextQueueClockDelay(performance.now(), [...boundaries.values()].flat()),
-  );
-}
-function tick() {
-  clock = performance.now();
-  listeners.forEach((listener) => listener());
-  schedule();
-}
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  if (listeners.size === 1) {
-    tick();
-    document.addEventListener('visibilitychange', tick);
-    window.addEventListener('online', tick);
-  }
-  return () => {
-    listeners.delete(listener);
-    if (!listeners.size) {
-      clearTimeout(timer);
-      timer = undefined;
-      document.removeEventListener('visibilitychange', tick);
-      window.removeEventListener('online', tick);
-    }
-  };
-}
-const subscribeIdle = () => () => undefined;
-export function useQueueTick(active = true, queue?: QueuePresenter | null) {
-  const boundaryKey = useRef(Symbol('visible-queue'));
-  useEffect(() => {
-    if (!active || !queue) return;
-    const monotonic = performance.now();
-    const serverNow = queueServerNow(queue, monotonic);
-    if (serverNow == null) return;
-    const key = boundaryKey.current;
-    boundaries.set(
-      key,
-      [queue.queueExpiresAt, queue.retainOpensAt, queue.retainClosesAt].map(
-        (value, index) =>
-          value
-            ? monotonic + Date.parse(value) - serverNow + (index === 2 ? 1 : 0)
-            : NaN,
-      ),
-    );
-    schedule();
-    return () => {
-      boundaries.delete(key);
-      schedule();
-    };
-  }, [active, queue]);
-  return useSyncExternalStore(
-    active ? subscribe : subscribeIdle,
-    () => clock,
-    () => 0,
-  );
-}
+import { useQueueTick } from './useQueueTick';
+export { useQueueTick } from './useQueueTick';
+
 export function queueRemainingMs(queue: QueuePresenter, monotonicNow: number) {
   if (!queue.queueExpiresAt) return null;
   const server = queueServerNow(queue, monotonicNow);
@@ -108,7 +42,6 @@ export const queueTierName = (key: string) =>
       ASO_OKE: 'Aso-oke',
       ARU: 'Aru',
       IGWE: 'Igwe',
-      LEGACY: 'Legacy',
     }) as Record<string, string>
   )[key] ?? key;
 export const queueLaneLabels: Record<string, string> = {
@@ -658,109 +591,6 @@ export function QueueBrandCounts({ brandId }: { brandId: string }) {
           </div>
         ))}
       </div>
-    </section>
-  );
-}
-
-export function QueueHistoricalReconciliation({
-  orderId,
-  queue,
-  onChanged,
-}: {
-  orderId: string;
-  queue?: QueuePresenter | null;
-  onChanged: () => void | Promise<void>;
-}) {
-  const { hasPermission } = useAdminPermissions();
-  const { confirm, ConfirmDialog } = useQueueConfirm();
-  const [lane, setLane] = useState<'ACTIVE' | 'IN_DELIVERY'>('ACTIVE');
-  const [evidence, setEvidence] = useState('');
-  const [reconciled, setReconciled] = useState(false);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    setEvidence('');
-    setLane('ACTIVE');
-    setReconciled(false);
-  }, [orderId]);
-  if (!queue?.needsLaneReconciliation || reconciled) return null;
-  async function submit() {
-    if (!queue || busy) return;
-    setBusy(true);
-    const accepted = await confirm({
-      title: 'Confirm historical fulfilment stage',
-      message:
-        'Use verified production or delivery evidence. This changes capacity accounting and may let other paid orders progress. Existing payments, promises and disputes are preserved.',
-      confirmText: 'Confirm stage',
-    });
-    if (!accepted) {
-      setBusy(false);
-      return;
-    }
-    try {
-      await adminOrderQueueApi.reconcileLane(
-        orderId,
-        lane,
-        evidence.trim(),
-        queue.orderRevision,
-      );
-      setReconciled(true);
-      await Promise.allSettled([Promise.resolve().then(onChanged)]);
-      toast.success('Historical fulfilment stage reconciled');
-    } catch (error) {
-      toast.error(
-        getFriendlyErrorMessage(
-          error,
-          'The order changed or reconciliation failed. Refresh and review the evidence.',
-        ),
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <section className="queue-section my-3 text-sm text-amber-950 dark:text-amber-100">
-      <p className="font-semibold">
-        🔎 Historical fulfilment stage needs review
-      </p>
-      <p>
-        Production and delivery history could not establish this order’s
-        occupied stage. Automatic queue promotion for this brand is paused until
-        the historical records are reconciled.
-      </p>
-      <fieldset
-        disabled={busy || !hasPermission('moderation.write')}
-        className="space-y-3"
-      >
-        <UniversalSelect
-          label="Verified stage"
-          value={lane}
-          onChange={(value) =>
-            setLane(value === 'IN_DELIVERY' ? 'IN_DELIVERY' : 'ACTIVE')
-          }
-          options={[
-            { value: 'ACTIVE', label: 'Active production' },
-            { value: 'IN_DELIVERY', label: 'In Delivery' },
-          ]}
-          disabled={busy || !hasPermission('moderation.write')}
-        />
-        <label className="block">
-          Evidence and reason
-          <textarea
-            value={evidence}
-            onChange={(event) => setEvidence(event.target.value)}
-            maxLength={3000}
-            className="mt-1 w-full rounded-lg border border-amber-300 bg-white p-3 text-slate-950 dark:bg-slate-950 dark:text-white"
-          />
-        </label>
-        <button
-          className="queue-button"
-          disabled={evidence.trim().length < 10 || busy}
-          onClick={() => void submit()}
-        >
-          {busy ? 'Saving…' : 'Review and confirm stage'}
-        </button>
-      </fieldset>
-      {ConfirmDialog}
     </section>
   );
 }

@@ -1,8 +1,8 @@
 # WIEZ Master Terms of Service
 
-**Effective Date:** October 19, 2026
+**Effective Date:** October 23, 2026
 
-**Document Version:** 2026.10.19-v1.5
+**Document Version:** 2026.10.23-v1.6
 
 **Applies To:** Web (`wiez.com`, `fthreadly`), Mobile Applications (iOS / Android / `threadly-mobile`), Brand Studio Workspaces, and all platform APIs.
 
@@ -444,7 +444,7 @@ If you have any questions, compliance inquiries, or concerns regarding these Ter
 
 ### Subscription custom-order policy scope and consumer rights
 
-The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.19-v1.5`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.23-v1.6`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
 
 ### Paid waiting queue, timing and priority
 
@@ -475,7 +475,7 @@ Cancelled history, receipt, deductions, refund progress and permitted order mess
 | Aru | 30,000 | 4 | 5 | 1 | Unlimited | Brand opt-in |
 | Igwe | 50,000 | 6 | 5 | 1 | Unlimited | Brand opt-in |
 
-These are recurring monthly brand subscriptions, requiring express recurring-payment authorization; they are not shopper memberships. New brands cannot receive custom orders before first verified payment. Existing eligible brands retain free unlimited Legacy capacity until a paid assignment succeeds; Legacy is not a sold tier and does not include paid jumps. Failed initial or switch payments never create free paid-tier access or erase the previous valid entitlement.
+These are recurring monthly brand subscriptions, requiring express recurring-payment authorization; they are not shopper memberships. All brands require an active paid subscription with a verified payment before receiving new custom orders. Free storefront and standard-commerce access remain available without a custom-order subscription. Failed initial or switch payments never create free paid-tier access or erase the previous valid entitlement.
 
 Existing agreements retain their agreed price snapshot on renewal; a new agreement or tier change uses current pricing. An upgrade applies immediately after verified payment of the difference prorated over the remaining billing period. A downgrade applies at the next renewal, with no refund for the current period. The monthly billing anniversary remains unchanged; a missing calendar day falls back to that month's last day. Billing dates are displayed in Lagos time (Africa/Lagos). Confirm the amount, renewal and effective capacity before payment.
 

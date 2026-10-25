@@ -150,6 +150,12 @@ describe('the brand lockup', () => {
     expect(image.getAttribute('height')).toBe('28');
     expect(image.getAttribute('width')).toBe(`${Math.round(28 * BRAND_ASPECT.wordmark)}`);
     expect(image).toHaveAttribute('alt', PRODUCT_NAME);
+    expect(image).toHaveAttribute('sizes', `${Math.round(28 * BRAND_ASPECT.wordmark)}px`);
+    expect(image.getAttribute('srcset')).toContain(`${BRAND_ASSETS.wordmarkLight160} 160w`);
+    expect(image.getAttribute('srcset')).toContain(`${BRAND_ASSETS.wordmarkLight320} 320w`);
+    expect(image.getAttribute('srcset')).toContain(`${BRAND_ASSETS.wordmarkLight} 720w`);
+    expect(pngSize(BRAND_ASSETS.wordmarkLight160)).toEqual({ width: 160, height: 102 });
+    expect(pngSize(BRAND_ASSETS.wordmarkLight320)).toEqual({ width: 320, height: 205 });
   });
 
   it('lays the mark out at the file’s own ratio', () => {
