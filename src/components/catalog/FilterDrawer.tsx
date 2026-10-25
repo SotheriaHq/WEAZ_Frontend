@@ -161,8 +161,8 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
                             onClick={() => setLocalFilters(prev => ({ ...prev, category: isSelected ? 'ALL' : cat.slug }))}
                             className={`px-3 py-1.5 text-xs rounded-full border transition-all ${
                               isSelected
-                                ? 'bg-purple-600 border-purple-600 text-white shadow-lg shadow-purple-500/25'
-                                : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-purple-300'
+                                ? 'bg-purple-600 border-transparent text-white shadow-inner'
+                                : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-gray-300'
                             }`}
                           >
                             {cat.name}
@@ -264,8 +264,8 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
                               }
                               className={`group relative h-9 w-9 rounded-full border-2 transition-all ${
                                 isSelected
-                                  ? 'border-purple-600 ring-2 ring-purple-300 dark:ring-purple-500/40 scale-110'
-                                  : 'border-gray-200 dark:border-white/20 hover:border-purple-400 hover:scale-105'
+                                  ? 'border-gray-400 ring-2 ring-gray-300 dark:ring-white/20 scale-110'
+                                  : 'border-gray-200 dark:border-white/20 hover:scale-105'
                               }`}
                               style={{ backgroundColor: hex }}
                               aria-label={color}
@@ -304,8 +304,8 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
                               }
                               className={`px-3.5 py-2 text-xs font-medium rounded-xl border transition-all ${
                                 isSelected
-                                  ? 'bg-purple-600 border-purple-600 text-white shadow-lg shadow-purple-500/25'
-                                  : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-purple-300'
+                                  ? 'bg-purple-600 border-transparent text-white shadow-inner'
+                                  : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-gray-300'
                               }`}
                             >
                               {size}

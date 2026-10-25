@@ -90,7 +90,7 @@ const UserAvatar: React.FC<{ user: AdminUser; size?: 'sm' | 'md'; onClick?: () =
   const text = size === 'sm' ? 'text-[9px]' : 'text-[10px]';
   if (avatar) {
     return (
-      <button type="button" onClick={onClick} className={`block ${dim} flex-shrink-0 overflow-hidden rounded-xl ring-1 ring-gray-200 transition-shadow hover:ring-purple-400 dark:ring-white/10`}>
+      <button type="button" onClick={onClick} className={`block ${dim} flex-shrink-0 overflow-hidden rounded-xl ring-1 ring-gray-200 transition-shadow hover:ring-gray-300 dark:ring-white/10 dark:hover:ring-white/20`}>
         <ImageWithFallback src={avatar} alt={`${user.firstName} ${user.lastName}`} fit="cover" rounded="xl" className="h-full w-full object-cover" />
       </button>
     );
@@ -297,7 +297,7 @@ const AccountsPanel: React.FC<AccountsPanelProps> = ({ mode }) => {
                         <td className="py-2.5 pr-3 text-xs text-gray-400 dark:text-gray-500">{new Date(user.createdAt).toLocaleDateString()}</td>
                         {canManage && (
                           <td className="py-2.5">
-                            <button onClick={() => setSelectedUser(user)} className="rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1 text-[11px] font-semibold text-purple-700 hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/15">⚙ Manage</button>
+                            <button onClick={() => setSelectedUser(user)} className="rounded-lg border border-gray-200 bg-purple-50 px-2.5 py-1 text-[11px] font-semibold text-purple-700 hover:bg-purple-100 dark:border-white/10 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/15">⚙ Manage</button>
                           </td>
                         )}
                       </tr>

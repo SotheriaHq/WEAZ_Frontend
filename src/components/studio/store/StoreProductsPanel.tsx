@@ -397,7 +397,7 @@ const CollectionActionsControl: React.FC<{
           aria-haspopup="menu"
           aria-expanded={open}
           aria-label="Collection actions"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-lg font-semibold leading-none text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-purple-50 text-lg font-semibold leading-none text-purple-700 transition-colors hover:bg-purple-100 dark:border-white/10 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
         >
           <span aria-hidden="true">+</span>
         </button>
@@ -442,7 +442,7 @@ const CollectionActionsControl: React.FC<{
             key={item.key}
             type="button"
             onClick={item.onSelect}
-            className="min-h-9 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
+            className="min-h-9 rounded-lg border border-gray-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-white/10 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
           >
             {item.label}
           </button>
@@ -2355,7 +2355,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 onClick={() => setShowFiltersMenu((v) => !v)}
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border shadow-sm transition-all sm:h-11 sm:w-11 lg:hidden ${
                   showFiltersMenu
-                    ? 'border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300'
+                    ? 'border-gray-200 bg-purple-50 text-purple-700 dark:border-white/10 dark:bg-purple-500/10 dark:text-purple-300'
                     : 'border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10'
                 }`}
                 aria-label={showFiltersMenu ? 'Hide refine menu' : 'Refine results'}
@@ -2472,7 +2472,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-all ${
                   filterStatus === opt.value
                     ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-md shadow-purple-500/25'
-                    : 'border border-gray-200/80 bg-white/85 text-gray-600 hover:border-purple-200 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-purple-500/30 dark:hover:text-white'
+                    : 'border border-gray-200/80 bg-white/85 text-gray-600 hover:border-gray-300 hover:text-gray-900 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:border-white/20 dark:hover:text-white'
                 }`}
               >
                 <span>{opt.icon}</span>
@@ -2534,7 +2534,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       type="button"
                       onClick={() => void handleOpenCollectionGallery(activeCollection)}
                       disabled={collectionGalleryLoading}
-                      className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-700 disabled:opacity-50 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300"
+                      className="rounded-lg border border-gray-200 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-700 disabled:opacity-50 dark:border-white/10 dark:bg-purple-500/10 dark:text-purple-300"
                     >
                       {collectionGalleryLoading ? 'Opening gallery...' : 'Open gallery'}
                     </button>
@@ -3190,7 +3190,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     // where four columns of a tall card would be unusable.
                     'group relative aspect-[100/158] overflow-hidden rounded-2xl shadow-sm transition-all duration-300 ease-out lg:aspect-[5/6] lg:rounded-xl',
                     selectedProducts.includes(product.id)
-                      ? 'ring-2 ring-purple-500 border-purple-300 dark:border-purple-500/30'
+                      ? 'ring-2 ring-gray-400 border-gray-300 dark:border-white/20'
                       : 'hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30',
                     layoutMode ? 'cursor-move' : 'cursor-pointer',
                     dropdownManager.openId === ('product-menu-' + product.id) ? 'z-50' : 'z-10'
@@ -3896,7 +3896,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         onClick={() => setCollectionGalleryIndex(index)}
                         className={`shrink-0 overflow-hidden rounded-lg border-2 transition-all ${
                           index === collectionGalleryIndex
-                            ? 'border-purple-500 ring-1 ring-purple-500/40 opacity-100'
+                            ? 'border-gray-400 opacity-100'
                             : 'border-transparent opacity-60 hover:opacity-90'
                         }`}
                         aria-label={`Open image ${index + 1}`}

@@ -2199,7 +2199,7 @@ const CreateDesignInner: React.FC = () => {
                             type="button"
                             onClick={() => setShowTagPicker(true)}
                             disabled={disabled}
-                            className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1.5 text-[12px] font-semibold text-purple-700 transition hover:bg-purple-100 disabled:opacity-50 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+                            className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-gray-200 bg-purple-50 px-3 py-1.5 text-[12px] font-semibold text-purple-700 transition hover:bg-purple-100 disabled:opacity-50 dark:border-white/10 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
                           >
                             🔎 See more hashtags ({selectedTags.length}/10)
                           </button>
@@ -2306,7 +2306,7 @@ const CreateDesignInner: React.FC = () => {
 
               {/* Checkboxes */}
               <div className="grid grid-cols-1 gap-2 mt-3">
-                <label className="surface-card flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors hover:border-purple-500/30">
+                <label className="surface-card flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors hover:border-gray-300 dark:hover:border-white/20">
                   <input
                     type="checkbox"
                     checked={isMadeToOrder}
@@ -2420,8 +2420,8 @@ const CreateDesignInner: React.FC = () => {
                         flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-all
                         ${
                           visibility === option.value
-                            ? "border-purple-400/80 bg-purple-500/10"
-                            : "border-gray-200/70 surface-panel-subtle hover:border-purple-200 dark:border-white/10 dark:hover:border-white/20"
+                            ? "border-gray-300 bg-purple-500/10 dark:border-white/20"
+                            : "border-gray-200/70 surface-panel-subtle hover:border-gray-300 dark:border-white/10 dark:hover:border-white/20"
                         }
                       `}
                     >
@@ -2569,7 +2569,7 @@ const CreateDesignInner: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleCancelPromptChoice("return")}
-                  className="flex-1 px-4 py-3 rounded-xl border border-white/15 bg-white/5 text-white font-medium hover:border-purple-300/40"
+                  className="flex-1 px-4 py-3 rounded-xl border border-white/15 bg-white/5 text-white font-medium hover:border-white/30"
                 >
                   Return to creation
                 </button>
@@ -2809,7 +2809,7 @@ const ActionButton: React.FC<{
     className={`
       surface-control surface-interactive-hover flex items-center gap-2 px-4 py-2 rounded-xl backdrop-blur-md border
       text-sm font-medium transition-all
-      ${active ? "bg-purple-500/20 border-purple-500/50" : ""}
+      ${active ? "bg-purple-500/20 border-gray-400 dark:border-white/30" : ""}
       ${disabled ? "opacity-50 cursor-not-allowed" : ""}
     `}
   >

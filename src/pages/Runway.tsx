@@ -873,7 +873,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
             aria-pressed={active}
             className={`relative shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-95 ${
               active
-                ? 'bg-[color:var(--brand-primary)]/15 text-[color:var(--brand-primary)] shadow-inner ring-1 ring-[color:var(--brand-primary)]/40 font-bold'
+                ? 'bg-[color:var(--brand-primary)]/15 text-[color:var(--brand-primary)] shadow-inner font-bold'
                 : 'text-theme-secondary hover:bg-[color:var(--surface-muted)] hover:text-theme'
             }`}
           >

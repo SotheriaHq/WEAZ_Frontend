@@ -346,7 +346,7 @@ export default function StoreManagement() {
           <button
             type="button"
             onClick={() => navigate(returnTo)}
-            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-purple-300 hover:text-purple-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-purple-500/30 dark:hover:text-white"
+            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-gray-300 hover:text-purple-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-white/20 dark:hover:text-white"
           >
             <span aria-hidden="true">←</span>
             {returnLabel}
@@ -450,7 +450,7 @@ export default function StoreManagement() {
                 <button
                   type="button"
                   onClick={() => navigate('/studio/verification')}
-                  className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-300"
+                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:border-gray-300 hover:bg-sky-100 dark:border-white/10 dark:bg-sky-500/10 dark:text-sky-300"
                   aria-label="Open verification workspace"
                   title={verificationLabel}
                 >
@@ -552,7 +552,7 @@ export default function StoreManagement() {
                 <button
                   type="button"
                   onClick={() => navigate('/settings?tab=notifications')}
-                  className="hidden min-h-10 items-center justify-center rounded-full border border-sky-200 bg-white/80 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-white dark:border-sky-500/20 dark:bg-white/5 dark:text-sky-200 sm:inline-flex"
+                  className="hidden min-h-10 items-center justify-center rounded-full border border-gray-200 bg-white/80 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-gray-300 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-sky-200 sm:inline-flex"
                 >
                   Manage reminders
                 </button>

@@ -277,7 +277,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                                 disabled={disabled}
                                 className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                                   isSelected
-                                    ? "neu-inset-chip selected border-purple-400/70 bg-purple-50 text-purple-700 dark:border-purple-400/60 dark:bg-purple-500/10 dark:text-purple-300"
+                                    ? "neu-inset-chip selected border-[color:var(--neu-border)] bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-300"
                                     : "neu-pressed-button text-gray-700 dark:text-gray-300"
                                 }`}
                               >

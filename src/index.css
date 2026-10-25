@@ -1131,7 +1131,7 @@ html {
   .neu-inset-chip.selected,
   .chip-inset.selected {
     box-shadow: inset 3px 3px 6px var(--neu-shadow-dark), inset -3px -3px 6px var(--neu-shadow-light);
-    border-color: var(--brand-primary);
+    border-color: var(--neu-border);
     color: var(--brand-primary);
     background-color: color-mix(in srgb, var(--brand-primary) 12%, var(--neu-surface-soft));
   }
@@ -1211,7 +1211,7 @@ html {
   .btn-frost-outline {
     @apply neu-pressed-button;
     color: var(--brand-primary);
-    border: 1.5px solid color-mix(in srgb, var(--brand-primary) 38%, var(--border-default));
+    border: 1px solid var(--neu-border);
   }
 
   .btn-frost-outline:hover:not(:disabled) {

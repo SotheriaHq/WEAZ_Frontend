@@ -774,7 +774,7 @@ export default function CatalogShopTab({
       ) : !collectionsLoading && featuredCollections.length === 0 && products.length > 0 && (
         /* Show an exciting prompt to create collections when products exist */
         <section className="mb-8">
-          <div className="relative overflow-hidden rounded-2xl border border-purple-200/50 dark:border-purple-500/20 bg-gradient-to-br from-purple-50 via-white to-fuchsia-50 dark:from-purple-950/30 dark:via-black dark:to-fuchsia-950/20 p-6">
+          <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 dark:border-white/10 bg-gradient-to-br from-purple-50 via-white to-fuchsia-50 dark:from-purple-950/30 dark:via-black dark:to-fuchsia-950/20 p-6">
             {/* Background decoration */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-400/20 to-transparent rounded-full blur-3xl" />
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-fuchsia-400/20 to-transparent rounded-full blur-2xl" />
@@ -914,7 +914,7 @@ export default function CatalogShopTab({
                     }}
                     className={`h-8 w-8 flex-shrink-0 rounded-full border transition-all flex items-center justify-center hover:scale-105 active:scale-95 ${
                       filtersCollapsed
-                        ? 'border-purple-300 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                        ? 'border-gray-200 dark:border-white/10 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400'
                         : 'border-gray-200 dark:border-white/10 bg-white/70 dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-white/10'
                     }`}
                     aria-label={filtersCollapsed ? 'Expand filters' : 'Collapse filters'}
@@ -1014,8 +1014,8 @@ export default function CatalogShopTab({
                             }
                             className={`group relative h-8 w-8 rounded-full border-2 transition-all ${
                               isSelected
-                                ? 'border-purple-600 ring-2 ring-purple-300 dark:ring-purple-500/40 scale-110'
-                                : 'border-gray-200 dark:border-white/20 hover:border-purple-400 hover:scale-105'
+                                ? 'border-gray-400 ring-2 ring-gray-300 dark:ring-white/20 scale-110'
+                                : 'border-gray-200 dark:border-white/20 hover:scale-105'
                             }`}
                             style={{ backgroundColor: hex }}
                             aria-label={color}
@@ -1051,8 +1051,8 @@ export default function CatalogShopTab({
                             }
                             className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
                               isSelected
-                                ? 'bg-purple-600 border-purple-600 text-white shadow-md'
-                                : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-purple-300'
+                                ? 'bg-purple-600 border-transparent text-white shadow-inner'
+                                : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-gray-300'
                             }`}
                           >
                             {size}

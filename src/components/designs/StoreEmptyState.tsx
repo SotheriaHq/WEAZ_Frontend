@@ -222,7 +222,7 @@ const StoreEmptyState: React.FC<StoreEmptyStateProps> = ({
       </p>
 
       {firstTimeGuide.length > 0 ? (
-        <div className="mb-8 w-full max-w-md surface-card rounded-2xl border border-purple-200/70 bg-gradient-to-br from-purple-50 via-fuchsia-50 to-white dark:border-purple-500/20 dark:from-purple-500/10 dark:via-fuchsia-500/10 dark:to-white/5 p-4 text-left">
+        <div className="mb-8 w-full max-w-md surface-card rounded-2xl border border-gray-200/60 bg-gradient-to-br from-purple-50 via-fuchsia-50 to-white dark:border-white/10 dark:from-purple-500/10 dark:via-fuchsia-500/10 dark:to-white/5 p-4 text-left">
           <div className="flex items-center gap-2 text-sm font-semibold text-purple-800 dark:text-purple-200">
             <span aria-hidden="true">🧭</span>
             First-time guide
