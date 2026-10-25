@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useQueryClient } from '@tanstack/react-query';
@@ -11,7 +11,7 @@ import { invalidateStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
 import { fetchBrandProfileQuery } from '@/query/queries';
 import { getActiveBrandId, hasActiveBrandMembership } from '@/lib/brandAccess';
 
-import EditProfileModal from '@/components/profile/EditProfileModal';
+const EditProfileModal = lazy(() => import('@/components/profile/EditProfileModal'));
 
 const BRAND_SETUP_DISMISS_KEY = 'wiez.brandProfileSetup.dismissedUntil';
 
@@ -128,6 +128,7 @@ export const GlobalModalRouter: React.FC = () => {
     }
 
     return (
+      <Suspense fallback={<div role="status" className="fixed inset-x-4 bottom-6 z-50 rounded-2xl bg-[color:var(--surface-primary)] p-4 text-theme shadow-lg">Loading profile…</div>}>
       <EditProfileModal
         isOpen={true}
         user={user}
@@ -158,6 +159,7 @@ export const GlobalModalRouter: React.FC = () => {
           }
         }}
       />
+      </Suspense>
     );
   }
 

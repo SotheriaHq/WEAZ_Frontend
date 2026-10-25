@@ -92,7 +92,7 @@ const ALLOWLIST = {
     { path: 'components/collections/UpdatePriceTagsModal.tsx', reason: 'Phase 9B deferred' },
     { path: 'components/designs/CollectionViewModal.tsx', reason: 'Phase 9B deferred' },
     { path: 'components/designs/DesignCard.tsx', reason: 'Phase 9B deferred' },
-    { path: 'components/designs/DesignViewModal.tsx', reason: 'Phase 9B deferred' },
+    { path: 'components/designs/DesignViewModalContent.tsx', reason: 'Phase 9B deferred' },
     { path: 'components/designs/FilterPanel.tsx', reason: 'Phase 9B deferred' },
     { path: 'components/designs/ProductDetailModal.tsx', reason: 'Phase 9B deferred' },
     { path: 'components/designs/StoreEmptyState.tsx', reason: 'Phase 9B deferred' },

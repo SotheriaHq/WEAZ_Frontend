@@ -8,20 +8,21 @@ import React, {
   useState,
 } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { useLocation } from 'react-router-dom';
 import type { AppDispatch, RootState } from '@/store';
 import { addToCart, fetchCart, fetchCustomBagCount, openCartDrawer } from '@/features/cartSlice';
-import AuthRequiredPrompt from '@/components/auth/AuthRequiredPrompt';
-import { OverlayPortal } from '@/components/ui/OverlayPortal';
+const AuthRequiredPrompt = React.lazy(() => import('@/components/auth/AuthRequiredPrompt'));
 import { showNotice } from '@/components/ui/NoticeModal';
-import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
+import { DeferredOverlay } from '@/components/ui/DeferredOverlay';
+import { useOverlayBackClose } from '@/hooks/useOverlayBackClose';
 import { BagApi, type BagSourceType } from '@/api/BagApi';
 import type { BagDefaultAction, BagStatus } from '@/api/StoreApi';
-import ProductBagSelectorModal from '@/components/bagging/ProductBagSelectorModal';
-import BagFittingsModal from '@/components/bagging/BagFittingsModal';
-import StaleFittingConfirmationModal from '@/components/bagging/StaleFittingConfirmationModal';
+const ProductBagSelectorModal = React.lazy(() => import('@/components/bagging/ProductBagSelectorModal'));
+const BagFittingsModal = React.lazy(() => import('@/components/bagging/BagFittingsModal'));
+const StaleFittingConfirmationModal = React.lazy(() => import('@/components/bagging/StaleFittingConfirmationModal'));
+
+const BagComposerOverlay = React.lazy(() => import('@/components/bagging/BagComposerOverlay'));
 
 type BagProductInput = {
   id: string;
@@ -362,11 +363,16 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
   );
 
   const customConfigurationId = customTarget?.status.custom.configurationId ?? null;
+  useOverlayBackClose(
+    Boolean(pendingAuth || selectorTarget || fittingsTarget || staleTarget || (customTarget && customConfigurationId)),
+    closeActiveFlow,
+  );
 
   return (
     <BagFlowContext.Provider value={value}>
       {children}
 
+      <DeferredOverlay open={Boolean(pendingAuth)}>
       <AuthRequiredPrompt
         isOpen={Boolean(pendingAuth)}
         onClose={closeActiveFlow}
@@ -379,7 +385,9 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
             : undefined
         }
       />
+      </DeferredOverlay>
 
+      <DeferredOverlay open={Boolean(selectorTarget)}>
       <ProductBagSelectorModal
         isOpen={Boolean(selectorTarget)}
         product={selectorTarget?.product ?? null}
@@ -394,7 +402,9 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
           setStaleTarget({ product, status });
         }}
       />
+      </DeferredOverlay>
 
+      <DeferredOverlay open={Boolean(fittingsTarget)}>
       <BagFittingsModal
         isOpen={Boolean(fittingsTarget)}
         product={fittingsTarget?.product ?? null}
@@ -405,7 +415,9 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
           void routeResolvedStatus(fittingsTarget.product, nextStatus);
         }}
       />
+      </DeferredOverlay>
 
+      <DeferredOverlay open={Boolean(staleTarget)}>
       <StaleFittingConfirmationModal
         isOpen={Boolean(staleTarget)}
         product={staleTarget?.product ?? null}
@@ -449,37 +461,11 @@ export function BagFlowProvider({ children }: BagFlowProviderProps) {
           setCustomTarget(target);
         }}
       />
+      </DeferredOverlay>
 
-      <AnimatePresence>
-        {customTarget && customConfigurationId && (
-          <OverlayPortal>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-layer-modal flex items-stretch justify-center bg-black/50 p-0 sm:p-4"
-              onClick={closeActiveFlow}
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.98, y: 16 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.98, y: 16 }}
-                transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-                className="relative flex h-full w-full max-w-6xl overflow-hidden bg-white shadow-2xl sm:h-[92vh] sm:rounded-[28px] dark:bg-slate-950"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <div className="h-full w-full overflow-y-auto">
-                  <LazyCustomOrderComposerPage
-                    configurationIdOverride={customConfigurationId}
-                    embedded
-                    onClose={closeActiveFlow}
-                  />
-                </div>
-              </motion.div>
-            </motion.div>
-          </OverlayPortal>
-        )}
-      </AnimatePresence>
+      <DeferredOverlay open={Boolean(customTarget && customConfigurationId)}>
+        <BagComposerOverlay configurationId={customTarget ? customConfigurationId : null} onClose={closeActiveFlow} />
+      </DeferredOverlay>
     </BagFlowContext.Provider>
   );
 }

@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -9,13 +8,13 @@ import { unwrapApiResponse, type ApiSuccessPayload } from '@/types/auth';
 import type { AppDispatch, RootState } from '@/store';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
 import ProductCardSkeleton from '@/components/designs/ProductCardSkeleton';
-import InlineProductDetail from '@/components/catalog/InlineProductDetail';
+import { DeferredOverlay } from '@/components/ui/DeferredOverlay';
+const MarketProductOverlay = React.lazy(() => import('@/components/market/MarketProductOverlay'));
 import { fetchWishlist } from '@/features/wishlistSlice';
 import MarketTrendingHero from '@/components/market/MarketTrendingHero';
 import MarketSectionRail from '@/components/market/MarketSectionRail';
-import MarketTrendingTodayModal from '@/components/market/MarketTrendingTodayModal';
+const MarketTrendingTodayModal = React.lazy(() => import('@/components/market/MarketTrendingTodayModal'));
 import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
-import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import {
   getProductRecencyTimestamp,
   normalizeMarketProduct,
@@ -75,11 +74,6 @@ export const MarketPlace: React.FC = () => {
 
   const [selectedProduct, setSelectedProduct] = useState<MarketplaceProduct | null>(null);
   useScrollLock(Boolean(selectedProduct));
-  useOverlayBackClose(
-    Boolean(selectedProduct),
-    () => setSelectedProduct(null),
-    isMobileViewportUi,
-  );
 
   // Filter & Sort State
   const [selectedAudienceFilter, setSelectedAudienceFilter] = useState<string>('FOR_YOU');
@@ -88,6 +82,13 @@ export const MarketPlace: React.FC = () => {
   const [sortBy, setSortBy] = useState<string>('EDITORIAL');
 
   const [trendingTodayOpen, setTrendingTodayOpen] = useState(false);
+  // Queue-to-product changes retain a single overlay entry, including while
+  // the requested panel is downloading.
+  useOverlayBackClose(
+    Boolean(selectedProduct || trendingTodayOpen),
+    () => selectedProduct ? setSelectedProduct(null) : setTrendingTodayOpen(false),
+    isMobileViewportUi,
+  );
   const [marketClockMs, setMarketClockMs] = useState<number>(() => Date.now());
   const [hiddenTargetIds] = useState<Set<string>>(() => new Set());
   const { anonymousSessionId, flushMarketSignals, trackMarketSignal } = useMarketSignals('MARKET_HOME');
@@ -652,48 +653,19 @@ export const MarketPlace: React.FC = () => {
       </div>
 
       {/* ── Product Quick Detail Overlay ── */}
-      <AnimatePresence>
-        {selectedProduct && (
-          <OverlayPortal>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-layer-modal bg-black/60 p-3 backdrop-blur-sm sm:p-6 flex items-center justify-center"
-            >
-              <motion.div
-                initial={{ opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 18 }}
-                className="mx-auto max-h-[92vh] w-full max-w-6xl overflow-y-auto overscroll-contain rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-[#120d18] sm:p-6 glass-scrollbar flex flex-col"
-              >
-                <div className="mb-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProduct(null)}
-                    className="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:border-white/20 dark:text-gray-200 dark:hover:bg-white/10"
-                  >
-                    ✖ Close
-                  </button>
-                </div>
-                <InlineProductDetail
-                  product={selectedProduct}
-                  onBack={() => setSelectedProduct(null)}
-                  brandName={selectedProduct.brand?.name}
-                />
-              </motion.div>
-            </motion.div>
-          </OverlayPortal>
-        )}
-      </AnimatePresence>
+      <DeferredOverlay open={Boolean(selectedProduct)}>
+        <MarketProductOverlay product={selectedProduct} onClose={() => setSelectedProduct(null)} />
+      </DeferredOverlay>
 
       {/* ── Full Editorial Queue Modal (Trending Today) ── */}
+      <DeferredOverlay open={trendingTodayOpen}>
       <MarketTrendingTodayModal
         open={trendingTodayOpen}
         products={trendingToday}
         onClose={() => setTrendingTodayOpen(false)}
         onOpenProduct={handleOpenProduct}
       />
+      </DeferredOverlay>
     </div>
   );
 };

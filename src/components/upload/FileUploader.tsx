@@ -1,7 +1,6 @@
 ﻿import React, { useCallback, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import type { MediaItem } from '../../types/media';
 import createMediaItems from './createMediaItems';
-import { FiUpload } from 'react-icons/fi';
 import Button from '../Button';
 
 interface PickerShape {
@@ -35,7 +34,7 @@ interface FileUploaderProps {
 const mapAccepted = (file: File, accept?: string[]) => {
   if (!accept || accept.length === 0) return true;
   return accept.some(a => {
-    if (a.includes('/')) return file.type.startsWith(a.split('/')[0]);
+    if (a.includes('/')) return a.endsWith('/*') ? file.type.startsWith(a.slice(0, -1)) : file.type === a;
     return file.name.toLowerCase().endsWith(a.toLowerCase());
   });
 };
@@ -111,11 +110,15 @@ const FileUploader = forwardRef<FileUploaderHandle, FileUploaderProps>((
     }
 
     let sliced = accepted;
-    if (maxFiles && accepted.length > maxFiles) sliced = accepted.slice(0, maxFiles);
+    if (typeof maxFiles === 'number' && accepted.length > Math.max(0, maxFiles)) {
+      sliced = accepted.slice(0, Math.max(0, maxFiles));
+      errs.push(maxFiles <= 0 ? 'Remove an existing file before adding another.' :
+        `Only the first ${maxFiles} file(s) were added. Additional files were ignored.`);
+    }
 
     if (sliced.length > 0) {
-      setErrors([]);
-      onError?.([]);
+      setErrors(errs);
+      onError?.(errs);
       onFilesUpload(sliced);
       // Also produce MediaItem wrappers and call the optional handler so
       // callers can work with MediaItem objects (ids, types, previewUrl)
@@ -131,9 +134,7 @@ const FileUploader = forwardRef<FileUploaderHandle, FileUploaderProps>((
       setErrors(errs);
       onError?.(errs);
     }
-  // onFilesUpload and onMediaItems are expected to be stable callbacks from callers.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accept, maxFiles, maxSizeBytes, disabled]);
+  }, [accept, maxFiles, maxSizeBytes, disabled, onError, onFilesUpload, onMediaItems]);
 
   const onInputChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
     // User selected files via native dialog
@@ -145,15 +146,13 @@ const FileUploader = forwardRef<FileUploaderHandle, FileUploaderProps>((
 
   // Programmatically open the file dialog. If a shared picker is provided,
   // delegate to it so a single input is reused across components.
-  const openDialog = () => {
+  const openDialog = useCallback(() => {
     if (disabled) return;
     if (picker) picker.open();
     else internalInputRef.current?.click();
-  };
+  }, [disabled, picker]);
 
-  // picker.open is expected to be stable. Avoid listing picker in deps to reduce re-creations.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useImperativeHandle(ref, () => ({ open: openDialog }), []);
+  useImperativeHandle(ref, () => ({ open: openDialog }), [openDialog]);
 
   // Handle native drop events when not using an external picker
   const onDrop: React.DragEventHandler<HTMLDivElement> = (e) => {
@@ -189,12 +188,12 @@ const FileUploader = forwardRef<FileUploaderHandle, FileUploaderProps>((
       <input ref={picker ? picker.inputRef : internalInputRef} type="file" multiple onChange={picker ? picker.handlers.onInputChange : onInputChange} className="hidden" accept={accept?.join(',')} disabled={disabled} />
 
       <div className="flex flex-col items-center justify-center text-center text-gray-600 dark:text-gray-300">
-        <FiUpload className="mb-4 h-10 w-10 text-gray-400 dark:text-gray-500" />
+        <span aria-hidden="true" className="mb-4 text-4xl">📤</span>
         <div className="font-semibold">Drag and drop or click to upload</div>
         <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">{variant === 'large' ? 'Upload images or videos that represent your collection. You can add multiple items.' : 'Add more files to your collection.'}</div>
         <div className="mt-4">
           <Button variant="secondary" onClick={() => { openDialog(); }} disabled={disabled}>
-            <FiUpload className="mr-2" /> Upload Files
+            <span aria-hidden="true" className="mr-2">📤</span> Upload Files
           </Button>
         </div>
         {((picker ? picker.errors : errors) || []).length > 0 && (

@@ -94,6 +94,7 @@ export const uploadBinary = async (
   method: 'POST' | 'PUT',
   file: File,
   fields?: Record<string, string> | null,
+  uploadHeaders?: Record<string, string> | null,
 ) => {
   if (method === 'POST') {
     const formData = new FormData();
@@ -111,7 +112,7 @@ export const uploadBinary = async (
   const response = await fetch(uploadUrl, {
     method: 'PUT',
     body: file,
-    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    headers: uploadHeaders ?? { 'Content-Type': file.type || 'application/octet-stream' },
   });
   if (!response.ok) {
     throw new Error(`Upload failed with status ${response.status}`);

@@ -16,7 +16,6 @@ export interface QueuePresenter {
   canCancel: boolean;
   canResubmit: boolean;
   adminPromotionHeld: boolean;
-  needsLaneReconciliation?: boolean;
   position: number | null;
   waitingCount: number;
   activatedAt?: string | null;
@@ -102,7 +101,6 @@ export const customOrderQueueApi = {
   notices: () => get<{ notices: QueueNotice[]; serverNow: string }>(`${root}/notices`),
 };
 export const adminOrderQueueApi = {
-  reconcileLane: async (id: string, lane: 'ACTIVE' | 'IN_DELIVERY', evidence: string, expectedRevision: number) => (await post<{ queue: QueuePresenter }>(`${admin}/orders/${id}/reconcile-lane`, { lane, evidence, expectedRevision })).queue,
   brand: (id: string) => get<QueueBrandSummary>(`${admin}/brands/${id}`),
   intake: (id: string, blocked: boolean, reason: string) => patch<QueueBrandSummary>(`${admin}/brands/${id}/intake`, { blocked, reason }),
   refundQuote: (id: string) => get<QueueRefundQuote>(`${admin}/orders/${id}/refund-quote`),

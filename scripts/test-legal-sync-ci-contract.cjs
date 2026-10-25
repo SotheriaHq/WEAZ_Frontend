@@ -56,20 +56,24 @@ function readPages(source) {
 }
 
 const pages = readPages(generated);
+const versionSource = fs.readFileSync(path.join(repoRoot, 'src', 'pages', 'legal', 'legalVersion.ts'), 'utf8');
+assert.match(versionSource, /LEGAL_PAGE_VERSION = "2026\.10\.23-v1\.6"/);
+assert.match(versionSource, /LEGAL_PAGE_EFFECTIVE_DATE = "October 23, 2026"/);
+assert.doesNotMatch(versionSource, /LEGAL_PAGES|content:/, 'Checking acceptance must not import policy bodies.');
 assert.equal(pages.length, 9, 'All nine legal policies must be published.');
 for (const page of pages) {
   const fileName = path.basename(page.sourceDocument);
-  const markdown = fs.readFileSync(path.join(repoRoot, 'docs', 'legal', 'user-facing', fileName), 'utf8');
-  assert.equal(page.version, '2026.10.19-v1.5');
-  assert.equal(page.effectiveDate, 'October 19, 2026');
+  const markdown = fs.readFileSync(path.join(repoRoot, 'docs', 'legal', 'user-facing', fileName), 'utf8').replace(/\r\n?/g, '\n');
+  assert.equal(page.version, '2026.10.23-v1.6');
+  assert.equal(page.effectiveDate, 'October 23, 2026');
   assert.equal(page.content, markdown, `${fileName}: published web text must match the isolated-clone source.`);
-  assert.match(markdown, /2026\.10\.19-v1\.5/);
+  assert.match(markdown, /2026\.10\.23-v1\.6/);
   assert.match(markdown, /mandatory consumer rights/);
   assert.match(markdown, /Custom-order subscription queue terms/);
 
   const workspaceSource = path.resolve(repoRoot, '..', 'docs', 'legal', 'user-facing', fileName);
   if (fs.existsSync(workspaceSource)) {
-    assert.equal(markdown, fs.readFileSync(workspaceSource, 'utf8'), `${fileName}: workspace and vendored policy must agree.`);
+    assert.equal(markdown, fs.readFileSync(workspaceSource, 'utf8').replace(/\r\n?/g, '\n'), `${fileName}: workspace and vendored policy must agree.`);
   }
 }
 
@@ -98,7 +102,7 @@ if (fs.existsSync(mobileGeneratedPath)) {
 
 const backendConstants = path.resolve(repoRoot, '..', 'bthreadly', 'src', 'legal', 'legal.constants.ts');
 if (fs.existsSync(backendConstants)) {
-  assert.match(fs.readFileSync(backendConstants, 'utf8'), /LEGAL_VERSION = '2026\.10\.19-v1\.5'/, 'Acceptance version must match published policies.');
+  assert.match(fs.readFileSync(backendConstants, 'utf8'), /LEGAL_VERSION = '2026\.10\.23-v1\.6'/, 'Acceptance version must match published policies.');
 } else {
   console.log('Legal acceptance version parity skipped: sibling backend checkout is absent.');
 }

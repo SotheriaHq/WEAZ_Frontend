@@ -70,6 +70,10 @@ export const BRAND_ASSETS = {
    */
   wordmarkLight: '/brand/wiez-wordmark-light.png',
   wordmarkDark: '/brand/wiez-wordmark-dark.png',
+  wordmarkLight160: '/brand/wiez-wordmark-light-160.png',
+  wordmarkLight320: '/brand/wiez-wordmark-light-320.png',
+  wordmarkDark160: '/brand/wiez-wordmark-dark-160.png',
+  wordmarkDark320: '/brand/wiez-wordmark-dark-320.png',
   /** The symbol alone, for chrome with no room for lettering. */
   markLight: '/brand/wiez-mark-light.png',
   markDark: '/brand/wiez-mark-dark.png',

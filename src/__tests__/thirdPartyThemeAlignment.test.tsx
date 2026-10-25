@@ -27,15 +27,12 @@ describe('third-party theme alignment', () => {
     setSystemDark(false);
   });
 
-  it('loads PrimeReact base CSS before WIEZ app CSS so token overrides win', () => {
+  it('keeps unused component-library styles out of the public entry point', () => {
     const mainTsx = readFileSync(resolve(process.cwd(), 'src/main.tsx'), 'utf8');
 
-    expect(mainTsx.indexOf("import 'primereact/resources/themes/lara-light-blue/theme.css'")).toBeLessThan(
-      mainTsx.indexOf("import './index.css'"),
-    );
-    expect(mainTsx.indexOf("import 'primereact/resources/primereact.min.css'")).toBeLessThan(
-      mainTsx.indexOf("import './index.css'"),
-    );
+    expect(mainTsx).toContain("import './index.css'");
+    expect(mainTsx).not.toContain("import 'primereact/");
+    expect(mainTsx).not.toContain("import 'primeicons/");
   });
 
   it('binds PrimeReact and portal surface selectors to WIEZ semantic tokens', () => {

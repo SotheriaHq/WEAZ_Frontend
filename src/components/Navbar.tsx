@@ -34,7 +34,8 @@ import BrandWordmark from '@/components/brand/BrandWordmark';
 import { PRODUCT_NAME } from '@/brand/identity';
 import { hasActiveBrandMembership, resolveAccountDisplayName } from '@/lib/brandAccess';
 import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
-import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
+import { DeferredOverlay } from '@/components/ui/DeferredOverlay';
+const NotificationsDropdown = React.lazy(() => import('@/components/notifications/NotificationsDropdown'));
 import CountBadge from '@/components/navigation/CountBadge';
 import { useImmersiveNavHidden } from '@/components/navigation/navbarChrome';
 import { MY_BAG_EMOJI, MY_BAG_LABEL } from '@/constants/bagging';
@@ -610,11 +611,13 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
                 <CountBadge count={unreadCount} />
               </button>
               {isMobileViewport ? null : (
-                <NotificationsDropdown
-                  open={showNotificationsDropdown}
-                  onClose={() => setShowNotificationsDropdown(false)}
-                  anchorRef={notificationsButtonRef}
-                />
+                <DeferredOverlay open={showNotificationsDropdown}>
+                  <NotificationsDropdown
+                    open={showNotificationsDropdown}
+                    onClose={() => setShowNotificationsDropdown(false)}
+                    anchorRef={notificationsButtonRef}
+                  />
+                </DeferredOverlay>
               )}
             </div>
           ) : null}

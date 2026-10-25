@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const ts = require('typescript');
 
 const repoRoot = path.resolve(__dirname, '..');
 const failures = [];
@@ -82,16 +83,20 @@ assertOrder(
   'media hook must try public URLs before private signed fallback',
 );
 assertIncludes('src/hooks/useSignedFileUrl.ts', 'retry: false', 'media public denial must not retry into request spam');
-// Same WIEZ_ rename rot as the queryClient assertions above.
-assertIncludes('src/hooks/useSignedFileUrl.ts', 'gcTime: WIEZ_QUERY_STALE_TIME_MS', 'signed media query cache must stay short-lived');
+// Retention and freshness are separate: reuse an inactive capability, but
+// authorize it again when stale/expired and never render an expired URL.
+assertIncludes('src/hooks/useSignedFileUrl.ts', 'gcTime: WIEZ_MEDIA_URL_GC_TIME_MS', 'media queries must use the shared retention window');
+assertIncludes('src/hooks/useSignedFileUrl.ts', 'staleTime: mustRefresh ? 0 : WIEZ_QUERY_STALE_TIME_MS', 'forced refresh must bypass freshness without discarding the retention policy');
+assertIncludes('src/hooks/useSignedFileUrl.ts', '!isUsableMediaUrl(cached)', 'expired cached capabilities must be removed');
+assertIncludes('src/hooks/useSignedFileUrl.ts', 'getMediaUrlExpiryMs(url)', 'mounted media must schedule an expiry refresh');
 
 assertOrder(
-  'src/components/designs/DesignViewModal.tsx',
+  'src/components/designs/DesignViewModalContent.tsx',
   'queryKeys.media.publicUrl(m.fileId)',
   'queryKeys.media.signedUrl(m.fileId)',
   'design modal media hydration must stay public-first',
 );
-assertIncludes('src/components/designs/DesignViewModal.tsx', 'retry: false', 'design modal media fallback must not retry public-denial loops');
+assertIncludes('src/components/designs/DesignViewModalContent.tsx', 'retry: false', 'design modal media fallback must not retry public-denial loops');
 assertIncludes('src/components/ImageWithFallback.tsx', 'isUsableInitialUrl(src)', 'stable public URLs must be used directly');
 assertIncludes('src/components/ImageWithFallback.tsx', 'resolveSignedUrl', 'signed URL resolution must stay deduped');
 
@@ -111,7 +116,17 @@ const walk = (dir) => {
     }
     if (!/\.(ts|tsx|js|jsx|cjs)$/.test(entry.name)) continue;
     const content = read(relative);
-    if (content.includes('/uploads/signed-url')) signedUrlReferences.push(relative);
+    // Inspect executable literals, not documentation comments describing the
+    // centralized API. Both ordinary and interpolated endpoint strings count.
+    const source = ts.createSourceFile(relative, content, ts.ScriptTarget.Latest, true);
+    let referencesEndpoint = false;
+    const visit = (node) => {
+      if ((ts.isStringLiteralLike(node) || node.kind === ts.SyntaxKind.TemplateHead)
+          && node.text.includes('/uploads/signed-url')) referencesEndpoint = true;
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+    if (referencesEndpoint) signedUrlReferences.push(relative);
   }
 };
 walk('src');
@@ -119,6 +134,38 @@ const allowedSignedUrlFiles = new Set(['src/api/BrandApi.ts']);
 for (const relative of signedUrlReferences) {
   if (!allowedSignedUrlFiles.has(relative)) {
     fail(`${relative}: signed URL endpoint calls must stay centralized in BrandApi`);
+  }
+}
+
+// Vite supplies HTML preload paths relative to dist ("assets/..."), not
+// necessarily root-relative. Verify the actual artifact to catch filter drift.
+if (fs.existsSync(path.join(repoRoot, 'dist', 'index.html'))) {
+  const html = read('dist/index.html');
+  const preloadTags = html.match(/<link\b[^>]*rel="modulepreload"[^>]*>/g) ?? [];
+  for (const vendor of ['react-vendor', 'router-vendor', 'redux-vendor']) {
+    if (!preloadTags.some(tag => tag.includes(`/assets/${vendor}-`))) {
+      fail(`dist/index.html: missing ${vendor} module preload; do not introduce an entry-to-vendor request waterfall`);
+    }
+  }
+  if (preloadTags.some(tag => !/\/assets\/(?:react-vendor|router-vendor|redux-vendor)-/.test(tag))) {
+    fail('dist/index.html: public boot must not preload unopened feature/admin routes');
+  }
+  const routeBootstrap = read('dist/boot/route-preload.js');
+  const routesMatch = routeBootstrap.match(/var routes = ([^\n]+);/);
+  if (!routesMatch) fail('dist/boot/route-preload.js: production route hashes were not generated');
+  else {
+    const routes = JSON.parse(routesMatch[1]);
+    for (const route of ['/', '/runway', '/market']) {
+      if (!Array.isArray(routes[route]) || routes[route].length === 0) fail(`Missing initial-route hints for ${route}`);
+      for (const href of routes[route] ?? []) {
+        if (/\/(?:CommentThread|ContentReviewDecisionModal|MarketProductOverlay|InlineProductDetail)-/.test(href)) {
+          fail(`Initial route ${route} loads an unopened interaction: ${href}`);
+        }
+        if (!/^(?:\/assets\/[A-Za-z0-9_.-]+\.(?:js|css)|\/fonts\/wiez-web\/(?:playfair-display-latin|plus-jakarta-sans-latin-ext)-[a-f0-9]{12}\.woff2)$/.test(href) || !fs.existsSync(path.join(repoRoot, 'dist', href.slice(1)))) {
+          fail(`Invalid or missing built initial-route asset: ${href}`);
+        }
+      }
+    }
   }
 }
 
