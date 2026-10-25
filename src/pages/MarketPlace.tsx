@@ -525,10 +525,10 @@ export const MarketPlace: React.FC = () => {
                   type="button"
                   onClick={() => setSelectedAudienceFilter(filter)}
                   aria-pressed={active}
-                  className={`relative whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition-all ${
+                  className={`relative whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition-all chip-inset ${
                     active
-                      ? 'bg-purple-700 text-white shadow-sm'
-                      : 'bg-gray-100/80 text-gray-600 hover:bg-gray-200/70 hover:text-gray-900 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
+                      ? 'bg-[color:var(--text-primary)] text-[color:var(--surface-primary)]'
+                      : 'text-theme-secondary hover:text-theme'
                   }`}
                 >
                   {filter === 'FOR_YOU' && 'Discover •'}
@@ -643,7 +643,7 @@ export const MarketPlace: React.FC = () => {
                 setPriceRangeFilter('ALL');
                 setSortBy('EDITORIAL');
               }}
-              className="mt-5 rounded-full bg-purple-700 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-md transition hover:bg-purple-600 active:scale-95"
+              className="mt-5 rounded-full bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition active:scale-[0.985]"
             >
               Reset Filters
             </button>

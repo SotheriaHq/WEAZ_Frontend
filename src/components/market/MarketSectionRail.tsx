@@ -144,7 +144,7 @@ const SectionItemCard: React.FC<{
       className="group flex w-[280px] sm:w-[320px] shrink-0 cursor-pointer flex-col select-none transition-all duration-300"
     >
       {/* ── Top Media Frame (Image 2 Parity) ── */}
-      <div className="relative aspect-[4/5] w-full overflow-hidden rounded-3xl border border-gray-200/60 bg-[#171220]/5 shadow-sm transition duration-300 group-hover:shadow-xl dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="relative aspect-[4/5] w-full overflow-hidden rounded-3xl border border-gray-200/60 bg-[#171220]/5 transition duration-300 dark:border-white/10 dark:bg-white/[0.03]">
         <ImageWithFallback
           src={mediaUrl}
           alt={item.title}
@@ -158,7 +158,7 @@ const SectionItemCard: React.FC<{
         {/* Top Badges & Clip Button */}
         <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between p-3.5">
           <span
-            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] backdrop-blur-md shadow-sm ${badgeStyle}`}
+            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] backdrop-blur-md ${badgeStyle}`}
           >
             {badgeText}
           </span>
@@ -170,7 +170,7 @@ const SectionItemCard: React.FC<{
             aria-label={clipActionLabel(clipped)}
             className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm backdrop-blur-md transition hover:scale-110 active:scale-95 ${
               clipped
-                ? 'bg-purple-600 text-white shadow-md'
+                ? 'bg-[color:var(--text-primary)] text-[color:var(--surface-primary)]'
                 : 'bg-black/35 text-white/90 border border-white/20 hover:bg-black/55'
             }`}
           >
@@ -184,11 +184,11 @@ const SectionItemCard: React.FC<{
             type="button"
             onClick={handleBagClick}
             disabled={isBagging}
-            className={`w-full rounded-2xl py-2.5 text-xs font-bold uppercase tracking-wider transition duration-200 active:scale-95 flex items-center justify-center gap-1.5 shadow-md ${
+            className={`w-full rounded-2xl py-2.5 text-xs font-bold uppercase tracking-wider transition duration-200 active:scale-95 flex items-center justify-center gap-1.5 ${
               isOutOfStock
                 ? 'bg-gray-800/90 text-white/80 hover:bg-gray-700'
                 : isCustomFit
-                  ? 'bg-purple-700 hover:bg-purple-600 text-white shadow-purple-900/30'
+                  ? 'bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)]'
                   : 'bg-white hover:bg-gray-100 text-gray-900'
             }`}
           >

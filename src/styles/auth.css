@@ -29,7 +29,7 @@
 :root {
   --auth-panel-bg: rgba(255, 255, 255, 0.88);
   --auth-panel-border: rgba(10, 10, 10, 0.10);
-  --auth-panel-shadow: 0 25px 50px -12px rgba(10, 10, 10, 0.18);
+  --auth-panel-shadow: inset 4px 4px 9px var(--neu-shadow-dark), inset -4px -4px 9px var(--neu-shadow-light);
 
   --auth-field-bg: rgba(10, 10, 10, 0.04);
   --auth-field-bg-focus: rgba(10, 10, 10, 0.02);
@@ -60,7 +60,7 @@
 html[data-theme='dark'] {
   --auth-panel-bg: rgba(25, 25, 30, 0.85);
   --auth-panel-border: rgba(255, 255, 255, 0.12);
-  --auth-panel-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  --auth-panel-shadow: inset 4px 4px 9px var(--neu-shadow-dark), inset -4px -4px 9px var(--neu-shadow-light);
 
   --auth-field-bg: rgba(255, 255, 255, 0.06);
   --auth-field-bg-focus: rgba(255, 255, 255, 0.10);
@@ -145,13 +145,11 @@ html[data-theme='dark'] {
   border: 1px solid var(--auth-danger-border);
 }
 
-/* Glass Panel - Brighter version */
+/* Recessed Auth Panel Well - No outer drop-shadows */
 .auth-glass-panel {
-  background: var(--auth-panel-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--auth-panel-border);
-  box-shadow: var(--auth-panel-shadow);
+  background: var(--neu-surface);
+  border: 1px solid var(--neu-border);
+  box-shadow: inset 4px 4px 9px var(--neu-shadow-dark), inset -4px -4px 9px var(--neu-shadow-light);
 }
 
 /* Input Glass Style */
@@ -223,17 +221,23 @@ html[data-theme='dark'] {
   transform: scale(1);
 }
 
-/* Primary Button - Gradient */
+/* Primary Button - Tactile High-Contrast, No Highlights */
 .auth-btn-primary {
-  background: linear-gradient(135deg, #6B21A8 0%, #4c1d95 100%);
-  color: white;
-  transition: all 0.3s ease;
-  box-shadow: 0 10px 25px -5px rgba(107, 33, 168, 0.3);
+  background: var(--text-primary);
+  color: var(--surface-primary);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.15s ease;
+  box-shadow: none;
+  border: 1px solid transparent;
 }
 
 .auth-btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 15px 30px -5px rgba(107, 33, 168, 0.5);
+  opacity: 0.92;
+  box-shadow: none;
+}
+
+.auth-btn-primary:active:not(:disabled) {
+  transform: scale(0.985) translateY(1px);
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.35);
 }
 
 .auth-btn-primary:disabled {
@@ -281,22 +285,16 @@ html[data-theme='dark'] {
 }
 
 .auth-selection-card.active {
-  border-color: var(--brand-gold);
-  background: linear-gradient(145deg, rgba(212, 175, 55, 0.15), rgba(212, 175, 55, 0.05));
-  box-shadow: 0 0 20px rgba(212, 175, 55, 0.1);
+  border-color: var(--neu-border);
+  background-color: var(--neu-surface-soft);
+  box-shadow: inset 3px 3px 7px var(--neu-shadow-dark), inset -3px -3px 7px var(--neu-shadow-light);
   position: relative;
   overflow: hidden;
 }
 
 .auth-selection-card.active::before {
   content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--brand-gold), transparent);
-  animation: shine 2s infinite;
+  display: none;
 }
 
 .auth-selection-card.active .selection-icon {

@@ -128,11 +128,8 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
               <div
                 ref={dialogRef}
                 tabIndex={-1}
-                className="relative w-full max-w-md bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden"
+                className="relative w-full max-w-md surface-card rounded-3xl border border-[color:var(--neu-border)] overflow-hidden"
               >
-                {/* Gradient accent top */}
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500" />
-                
                 {/* Close button */}
                 <button
                   onClick={onClose}
@@ -145,10 +142,9 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
                 <div className="p-5 pt-7 text-center">
                 {/* Icon */}
                 <div className="relative inline-block mb-4">
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 flex items-center justify-center text-purple-500 dark:text-purple-400">
+                  <div className="w-14 h-14 rounded-full bg-[color:var(--surface-muted)] flex items-center justify-center text-[color:var(--text-primary)]">
                     {content.icon}
                   </div>
-                  <div className="absolute inset-0 bg-purple-500/20 blur-xl rounded-full -z-10" />
                 </div>
 
                 {/* Title */}
@@ -165,14 +161,14 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
                 <div className="space-y-3">
                   <button
                     onClick={handleSignIn}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] font-semibold transition-all active:scale-[0.985]"
                   >
                     <LogIn className="w-5 h-5" />
                     Sign In
                   </button>
                   <button
                     onClick={handleSignUp}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold transition-all"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl neu-pressed-button font-semibold transition-all"
                   >
                     <UserPlus className="w-5 h-5" />
                     Create Account
