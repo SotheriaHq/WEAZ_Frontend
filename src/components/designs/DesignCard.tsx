@@ -239,7 +239,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
 
   return (
     <article
-      className={`group relative w-full overflow-hidden rounded-xl transition-all duration-300 hover:shadow-xl cursor-pointer ${className ?? ''}`}
+      className={`group relative w-full overflow-hidden rounded-xl transition-all duration-300 cursor-pointer ${className ?? ''}`}
       onClick={() => {
         if (onOpenView) {
           onOpenView(item);
@@ -459,7 +459,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               <span
                 aria-hidden="true"
                 className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-base leading-none drop-shadow transition-colors sm:h-9 sm:w-9 sm:text-xl ${
-                  resolvedSaved ? 'bg-indigo-600 shadow-lg shadow-indigo-900/40' : 'bg-black/30 backdrop-blur-sm'
+                  resolvedSaved ? 'bg-[color:var(--text-primary)] text-[color:var(--surface-primary)]' : 'bg-black/30 backdrop-blur-sm'
                 }`}
               >
                 {CLIP_EMOJI}

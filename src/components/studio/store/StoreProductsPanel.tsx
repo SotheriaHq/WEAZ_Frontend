@@ -397,7 +397,7 @@ const CollectionActionsControl: React.FC<{
           aria-haspopup="menu"
           aria-expanded={open}
           aria-label="Collection actions"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-lg font-semibold leading-none text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+          className="flex h-9 w-9 items-center justify-center rounded-lg neu-pressed-button text-lg font-semibold leading-none text-theme transition-colors"
         >
           <span aria-hidden="true">+</span>
         </button>
@@ -442,7 +442,7 @@ const CollectionActionsControl: React.FC<{
             key={item.key}
             type="button"
             onClick={item.onSelect}
-            className="min-h-9 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
+            className="min-h-9 rounded-lg neu-pressed-button px-2.5 py-1.5 text-xs font-medium text-theme transition-colors sm:px-3 sm:text-sm"
           >
             {item.label}
           </button>
@@ -2266,7 +2266,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               <button
                 type="button"
                 onClick={() => navigate('/studio/store/collections/new')}
-                className="mt-3 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700"
+                className="mt-3 rounded-lg bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] px-3 py-1.5 text-xs font-semibold"
               >
                 Create collection
               </button>
@@ -2325,10 +2325,10 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               <button
                 type="button"
                 onClick={() => setShowQuickActions((v) => !v)}
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border shadow-sm transition-all sm:h-11 sm:w-11 ${
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl neu-pressed-button transition-all sm:h-11 sm:w-11 ${
                   showQuickActions
-                    ? 'border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300'
-                    : 'border-gray-200 bg-white/80 text-gray-700 hover:bg-purple-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10'
+                    ? 'text-theme font-bold'
+                    : 'text-theme-secondary'
                 }`}
                 aria-expanded={showQuickActions}
                 aria-label={showQuickActions ? 'Hide quick actions' : 'Show quick actions'}
@@ -2341,7 +2341,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               <button
                 type="button"
                 onClick={() => navigate('/studio/store/products/new')}
-                className="hidden items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-purple-500/40 active:scale-95 sm:inline-flex sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
+                className="hidden items-center gap-1.5 whitespace-nowrap rounded-xl bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] px-3 py-2 text-xs font-semibold transition-all active:scale-[0.985] sm:inline-flex sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
                 aria-label={primaryProductActionLabel}
                 title={primaryProductActionLabel}
               >

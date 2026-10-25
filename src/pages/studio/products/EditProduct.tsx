@@ -3500,9 +3500,9 @@ const EditProduct: React.FC = () => {
                     <span
                       className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
                         isActive
-                          ? "bg-purple-600 text-white shadow-md shadow-purple-500/25"
+                          ? "bg-[color:var(--text-primary)] text-[color:var(--surface-primary)]"
                           : s.done
-                            ? "bg-purple-600/15 text-purple-600 dark:text-purple-300"
+                            ? "neu-inset-chip text-theme font-bold"
                             : "surface-control text-theme-secondary"
                       }`}
                     >
@@ -4235,7 +4235,7 @@ const EditProduct: React.FC = () => {
                         <button
                           type="button"
                           onClick={addColorGroup}
-                          className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-semibold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition"
+                          className="px-3 py-1.5 rounded-lg bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] text-xs font-semibold transition"
                         >
                           + Add Color
                         </button>
@@ -5332,8 +5332,8 @@ const EditProduct: React.FC = () => {
                 }
                 className={`relative inline-flex min-h-11 flex-1 items-center justify-center gap-1 rounded-lg px-4 py-2 text-xs font-semibold text-white transition-all md:min-h-10 md:flex-initial md:px-6 md:text-sm ${
                   canAdvanceFromCurrentStep
-                    ? "bg-purple-600 shadow-lg shadow-purple-500/20 hover:bg-purple-500"
-                    : "bg-purple-600/45 shadow-none hover:bg-purple-600/60"
+                    ? "bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] active:scale-[0.985]"
+                    : "bg-[color:var(--surface-muted)] text-theme-muted opacity-60"
                 }`}
               >
                 Continue to {wizardStep === 1 ? "Operations" : "Review"}
@@ -5377,7 +5377,7 @@ const EditProduct: React.FC = () => {
                         .join(", ")}`
                     : undefined
                 }
-                className="relative inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-purple-600/50 disabled:shadow-none md:min-h-10 md:flex-initial md:px-6 md:text-sm"
+                className="relative inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] px-4 py-2 text-xs font-semibold transition-all active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 md:min-h-10 md:flex-initial md:px-6 md:text-sm"
               >
                 {(saving || submitLocked) && saveAction === "publish" && (
                   <span className="absolute inset-0 flex items-center justify-center">

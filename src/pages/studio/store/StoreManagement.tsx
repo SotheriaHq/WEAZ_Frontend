@@ -388,7 +388,7 @@ export default function StoreManagement() {
             <div className="flex flex-wrap items-center gap-2">
             {commerce.data?.canUpgrade && !isEmbeddedMobile ? (
               <button type="button" onClick={() => navigate('/settings?tab=subscription-billing&from=studio')}
-                className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-purple-700 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600">
+                className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] px-4 py-2 text-sm font-semibold transition active:scale-[0.985]">
                 Upgrade
               </button>
             ) : null}
@@ -588,7 +588,7 @@ export default function StoreManagement() {
         <button
           type="button"
           onClick={() => setAnalyticsCollapsed(false)}
-          className={`fixed right-3 z-40 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2 text-sm font-semibold text-white shadow-2xl sm:right-6 ${
+          className={`fixed right-3 z-40 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full bg-[color:var(--text-primary)] text-[color:var(--surface-primary)] border border-[color:var(--neu-border)] px-4 py-2 text-sm font-semibold transition active:scale-95 sm:right-6 ${
             isEmbeddedMobile
               ? 'bottom-[calc(env(safe-area-inset-bottom)+1rem)]'
               : 'bottom-24 lg:bottom-20'
