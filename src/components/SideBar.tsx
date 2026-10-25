@@ -47,7 +47,7 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
           disabled
             ? 'cursor-not-allowed opacity-50'
             : isSelected
-            ? 'bg-[linear-gradient(180deg,rgba(217,70,239,0.12),rgba(255,255,255,0.1))] dark:bg-[linear-gradient(180deg,rgba(168,85,247,0.18),rgba(255,255,255,0.05))]'
+            ? 'neu-pressed-button'
             : 'hover:bg-white/[0.28] dark:hover:bg-white/[0.06]'
         }`}
         title={
@@ -63,7 +63,7 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
           {showBadge && (
             <span
               aria-hidden="true"
-              className="absolute -right-2.5 -top-1 min-w-[16px] rounded-full bg-fuchsia-600 px-1 text-[9px] font-bold leading-4 text-white shadow"
+              className="absolute -right-2.5 -top-1 min-w-[16px] rounded-full bg-fuchsia-600 px-1 text-[9px] font-bold leading-4 text-white"
             >
               {formatBadge(badge)}
             </span>
@@ -93,7 +93,7 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
         disabled
           ? 'cursor-not-allowed opacity-50'
           : isSelected
-          ? 'bg-[linear-gradient(90deg,rgba(217,70,239,0.12),rgba(255,255,255,0.12))] font-semibold text-gray-900 dark:bg-[linear-gradient(90deg,rgba(168,85,247,0.18),rgba(255,255,255,0.04))] dark:text-white'
+          ? 'neu-pressed-button font-semibold text-theme'
           : 'text-gray-700 dark:text-gray-300 hover:bg-white/[0.28] dark:hover:bg-white/5'
       }`}
       title={disabled ? `${label} (locked until store setup is complete)` : isRail ? label : undefined}
@@ -101,7 +101,7 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
       <span className="w-6 shrink-0 text-center text-xl">{emoji}</span>
       <span className="flex-1 truncate text-[17px] font-medium">{label}</span>
       {showBadge && (
-        <span className="ml-auto min-w-[20px] rounded-full bg-fuchsia-600 px-1.5 text-center text-[11px] font-bold leading-5 text-white shadow">
+        <span className="ml-auto min-w-[20px] rounded-full bg-fuchsia-600 px-1.5 text-center text-[11px] font-bold leading-5 text-white">
           {formatBadge(badge)}
         </span>
       )}

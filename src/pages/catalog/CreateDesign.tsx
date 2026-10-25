@@ -2151,7 +2151,7 @@ const CreateDesignInner: React.FC = () => {
                                 selectedTags.length >= 10 ||
                                 !tagSearch.trim()
                               }
-                              className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all disabled:opacity-50 disabled:shadow-none"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] text-xs font-bold uppercase tracking-wider flex items-center gap-1 transition-all disabled:opacity-50"
                               aria-label="Add tag"
                             >
                               <FiPlus className="w-4 h-4" />
@@ -2199,7 +2199,7 @@ const CreateDesignInner: React.FC = () => {
                             type="button"
                             onClick={() => setShowTagPicker(true)}
                             disabled={disabled}
-                            className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1.5 text-[12px] font-semibold text-purple-700 transition hover:bg-purple-100 disabled:opacity-50 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+                            className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-full neu-pressed-button px-3 py-1.5 text-[12px] font-semibold text-theme transition disabled:opacity-50"
                           >
                             🔎 See more hashtags ({selectedTags.length}/10)
                           </button>
@@ -2510,7 +2510,7 @@ const CreateDesignInner: React.FC = () => {
               type="button"
               onClick={handlePublishClick}
               disabled={isSubmitting}
-              className="flex-1 sm:flex-none py-3 px-6 rounded-xl gradient-primary text-white font-medium shadow-lg shadow-purple-500/25 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 sm:flex-none py-3 px-6 rounded-xl bg-[color:var(--text-primary)] text-[color:var(--surface-primary)] font-medium hover:opacity-90 transition-opacity active:scale-[0.985] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isSubmitting && submitIntent === "publish" ? (
                 <MuseLoader size={16} />

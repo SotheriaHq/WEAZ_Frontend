@@ -580,7 +580,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       data-card-branch="product"
       className={`
         group relative cursor-pointer overflow-hidden rounded-2xl
-        bg-transparent shadow-sm transition-all duration-300 ease-out hover:shadow-lg
+        bg-transparent transition-all duration-300 ease-out
         ${className}
       `}
       onClick={handleCardClick}
@@ -703,7 +703,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                 event.stopPropagation();
                 setReviewDecisionOpen(true);
               }}
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold leading-none shadow-sm ${ownerStatus.className} ${needsReviewDecision ? 'cursor-pointer ring-1 ring-white/50' : 'cursor-default'}`}
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold leading-none shadow-sm ${ownerStatus.className} ${needsReviewDecision ? 'cursor-pointer' : 'cursor-default'}`}
               title={needsReviewDecision ? 'View reviewer feedback' : ownerStatus.label}
             >
               {ownerStatus.emoji}
@@ -781,7 +781,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                 event.stopPropagation();
                 onEdit?.(product);
               }}
-              className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 shadow-xl transition-all hover:bg-gray-100 active:scale-95 dark:bg-white/5 dark:text-white"
+              className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 transition-all hover:bg-gray-100 active:scale-95 dark:bg-white/5 dark:text-white"
             >
               Edit Product
             </button>
@@ -790,7 +790,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 
         {isStrictlyOutOfStock ? (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[2px] dark:bg-black/60">
-            <span className="rounded-full bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-xl dark:bg-white dark:text-gray-900">
+            <span className="rounded-full bg-gray-900 px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-gray-900">
               Sold Out
             </span>
           </div>
