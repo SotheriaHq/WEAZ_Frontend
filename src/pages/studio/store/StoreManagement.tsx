@@ -346,7 +346,7 @@ export default function StoreManagement() {
           <button
             type="button"
             onClick={() => navigate(returnTo)}
-            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-purple-300 hover:text-purple-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-purple-500/30 dark:hover:text-white"
+            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:text-theme dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:text-white"
           >
             <span aria-hidden="true">←</span>
             {returnLabel}
@@ -510,7 +510,7 @@ export default function StoreManagement() {
                 }
                 navigate('/profile');
               }}
-              className="group relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-600 shadow-sm transition-all hover:scale-105 hover:bg-purple-50 hover:text-purple-600 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-purple-400"
+              className="group relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-600 shadow-sm transition-all neu-pressed-button active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
               aria-label="Preview as visitor"
             >
               <span className="text-sm">👁️</span>

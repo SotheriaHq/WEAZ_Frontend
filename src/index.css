@@ -1130,7 +1130,8 @@ html {
   }
   .neu-inset-chip.selected,
   .chip-inset.selected {
-    box-shadow: inset 3px 3px 7px var(--neu-shadow-dark), inset -3px -3px 7px var(--neu-shadow-light), 0 0 0 2px var(--brand-primary);
+    box-shadow: inset 4px 4px 8px var(--neu-shadow-dark), inset -4px -4px 8px var(--neu-shadow-light);
+    border-color: var(--text-primary);
   }
 
   .neu-btn-press,

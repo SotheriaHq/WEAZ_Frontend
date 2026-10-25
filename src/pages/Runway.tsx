@@ -859,10 +859,10 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
             key={cat.key}
             onClick={() => startTransition(() => setSelectedCategory(cat.key))}
             aria-pressed={active}
-            className={`relative shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+            className={`relative shrink-0 chip-inset px-3 py-1.5 text-xs font-semibold transition-all ${
               active
-                ? 'bg-[color:var(--brand-primary)]/10 text-[color:var(--brand-primary)]'
-                : 'text-theme-secondary hover:bg-[color:var(--surface-muted)] hover:text-theme'
+                ? 'selected text-theme'
+                : 'text-theme-secondary opacity-75 hover:opacity-100'
             }${isPending ? ' opacity-60' : ''}`}
           >
             {cat.label}
@@ -1084,7 +1084,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
           <button
             type="button"
             onClick={exitPinnedToDefaultFeed}
-            className="shrink-0 rounded-full bg-[color:var(--brand-primary)]/10 px-4 py-2 text-xs font-semibold text-[color:var(--brand-primary)] transition-colors hover:bg-[color:var(--brand-primary)]/20"
+            className="shrink-0 neu-pressed-button px-4 py-2 text-xs font-semibold text-theme transition-colors"
           >
             Continue normal Runway feed
           </button>

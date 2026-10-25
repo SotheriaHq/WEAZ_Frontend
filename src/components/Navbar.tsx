@@ -623,7 +623,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
           ) : null}
 
           {!user ? (
-            <FrostedButton className="btn-frost-outline btn-tight-xs hidden flex-none sm:flex" onClick={() => navigate('/login')}>
+            <FrostedButton variant="outline" className="btn-frost-outline btn-tight-xs hidden flex-none sm:flex" onClick={() => navigate('/login')}>
               Sign In
             </FrostedButton>
           ) : null}
