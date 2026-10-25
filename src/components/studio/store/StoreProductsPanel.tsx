@@ -397,7 +397,7 @@ const CollectionActionsControl: React.FC<{
           aria-haspopup="menu"
           aria-expanded={open}
           aria-label="Collection actions"
-          className="flex h-9 w-9 items-center justify-center rounded-lg neu-pressed-button text-lg font-semibold leading-none text-theme transition-colors"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-lg font-semibold leading-none text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
         >
           <span aria-hidden="true">+</span>
         </button>
@@ -442,7 +442,7 @@ const CollectionActionsControl: React.FC<{
             key={item.key}
             type="button"
             onClick={item.onSelect}
-            className="min-h-9 rounded-lg neu-pressed-button px-2.5 py-1.5 text-xs font-medium text-theme transition-colors sm:px-3 sm:text-sm"
+            className="min-h-9 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 sm:px-3 sm:text-sm"
           >
             {item.label}
           </button>
@@ -2266,7 +2266,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               <button
                 type="button"
                 onClick={() => navigate('/studio/store/collections/new')}
-                className="mt-3 rounded-lg bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] px-3 py-1.5 text-xs font-semibold"
+                className="mt-3 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700"
               >
                 Create collection
               </button>
@@ -2341,7 +2341,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               <button
                 type="button"
                 onClick={() => navigate('/studio/store/products/new')}
-                className="hidden items-center gap-1.5 whitespace-nowrap rounded-xl bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] px-3 py-2 text-xs font-semibold transition-all active:scale-[0.985] sm:inline-flex sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
+                className="hidden items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 active:scale-95 sm:inline-flex sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
                 aria-label={primaryProductActionLabel}
                 title={primaryProductActionLabel}
               >

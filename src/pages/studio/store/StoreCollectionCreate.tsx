@@ -3188,7 +3188,7 @@ const StoreCollectionCreate: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setPreviewProduct(null)}
-                    className="neu-pressed-button px-4 py-2 text-xs font-semibold text-theme-secondary hover:text-theme"
+                    className="rounded-full bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 px-4 py-2 text-xs font-semibold text-theme-secondary hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800 dark:hover:to-pink-800 hover:text-purple-700 dark:hover:text-white transition-all duration-200 active:scale-95"
                   >
                     Close
                   </button>

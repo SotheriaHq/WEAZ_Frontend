@@ -221,23 +221,23 @@ html[data-theme='dark'] {
   transform: scale(1);
 }
 
-/* Primary Button - Tactile High-Contrast, No Highlights */
+/* Primary Button - Original Purple Gradient, Tactile Pressed (No outer glow highlights) */
 .auth-btn-primary {
-  background: var(--text-primary);
-  color: var(--surface-primary);
-  transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.15s ease;
+  background: linear-gradient(135deg, #6B21A8 0%, #4c1d95 100%);
+  color: #ffffff;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.15s ease;
   box-shadow: none;
-  border: 1px solid transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .auth-btn-primary:hover:not(:disabled) {
-  opacity: 0.92;
+  opacity: 0.94;
   box-shadow: none;
 }
 
 .auth-btn-primary:active:not(:disabled) {
   transform: scale(0.985) translateY(1px);
-  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.35);
+  box-shadow: inset 2px 2px 6px rgba(0, 0, 0, 0.45);
 }
 
 .auth-btn-primary:disabled {
@@ -285,9 +285,9 @@ html[data-theme='dark'] {
 }
 
 .auth-selection-card.active {
-  border-color: var(--neu-border);
-  background-color: var(--neu-surface-soft);
-  box-shadow: inset 3px 3px 7px var(--neu-shadow-dark), inset -3px -3px 7px var(--neu-shadow-light);
+  border-color: var(--brand-gold);
+  background: linear-gradient(145deg, rgba(212, 175, 55, 0.15), rgba(212, 175, 55, 0.05));
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.25);
   position: relative;
   overflow: hidden;
 }

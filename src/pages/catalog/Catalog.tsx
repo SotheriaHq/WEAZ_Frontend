@@ -2378,7 +2378,7 @@ const ProfilePage: React.FC = () => {
             onClick={handleOpenStoreSetup}
             disabled={isStoreSetupNavigating}
             aria-busy={isStoreSetupNavigating}
-            className="chip-inset chip-sm inline-flex items-center gap-2 text-theme transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-75"
+            className="glass-chip chip-sm chip-purple inline-flex items-center gap-2 text-purple-700 dark:text-purple-300 bg-purple-100/80 dark:bg-purple-900/30 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-75"
             aria-label="Continue store setup"
           >
             <span className="font-semibold min-w-[9.5rem] text-center">
@@ -2618,7 +2618,7 @@ const ProfilePage: React.FC = () => {
                                       </div>
                                     ) : (
                                       <button
-                                        className="w-full px-6 py-3 rounded-xl bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] font-medium transition active:scale-[0.985]"
+                                        className="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 text-white hover:opacity-90 transition-opacity font-medium active:scale-[0.985]"
                                         onClick={() => {
                                           if (!user) {
                                             const returnTo = `${window.location.pathname}${window.location.search}`;

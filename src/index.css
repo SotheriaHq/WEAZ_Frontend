@@ -1130,8 +1130,10 @@ html {
   }
   .neu-inset-chip.selected,
   .chip-inset.selected {
-    box-shadow: inset 4px 4px 8px var(--neu-shadow-dark), inset -4px -4px 8px var(--neu-shadow-light);
-    border-color: var(--text-primary);
+    box-shadow: inset 3px 3px 6px var(--neu-shadow-dark), inset -3px -3px 6px var(--neu-shadow-light);
+    border-color: var(--brand-primary);
+    color: var(--brand-primary);
+    background-color: color-mix(in srgb, var(--brand-primary) 12%, var(--neu-surface-soft));
   }
 
   .neu-btn-press,
@@ -1180,14 +1182,19 @@ html {
 
   .btn-frost-primary {
     @apply btn-frost;
-    color: var(--surface-primary);
-    background-color: var(--text-primary);
+    color: white;
+    background-color: var(--brand-primary);
     border: 1px solid transparent;
     box-shadow: none;
   }
 
   .btn-frost-primary:hover {
-    opacity: 0.9;
+    opacity: 0.92;
+  }
+
+  .btn-frost-primary:active {
+    box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.35);
+    transform: scale(0.985);
   }
 
   .btn-frost-ghost {
@@ -1203,13 +1210,13 @@ html {
 
   .btn-frost-outline {
     @apply neu-pressed-button;
-    color: var(--neu-text);
-    border: 1px solid var(--neu-border);
+    color: var(--brand-primary);
+    border: 1.5px solid color-mix(in srgb, var(--brand-primary) 38%, var(--border-default));
   }
 
   .btn-frost-outline:hover:not(:disabled) {
-    color: var(--neu-text);
-    background-color: var(--neu-surface-soft);
+    color: var(--brand-primary);
+    background-color: color-mix(in srgb, var(--brand-primary) 10%, var(--neu-surface-soft));
   }
 
   .btn-tight-xs {

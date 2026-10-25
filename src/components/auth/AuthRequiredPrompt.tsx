@@ -142,7 +142,7 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
                 <div className="p-5 pt-7 text-center">
                 {/* Icon */}
                 <div className="relative inline-block mb-4">
-                  <div className="w-14 h-14 rounded-full bg-[color:var(--surface-muted)] flex items-center justify-center text-[color:var(--text-primary)]">
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
                     {content.icon}
                   </div>
                 </div>
@@ -161,7 +161,7 @@ const AuthRequiredPrompt: React.FC<AuthRequiredPromptProps> = ({
                 <div className="space-y-3">
                   <button
                     onClick={handleSignIn}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] font-semibold transition-all active:scale-[0.985]"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold transition-all active:scale-[0.985]"
                   >
                     <LogIn className="w-5 h-5" />
                     Sign In

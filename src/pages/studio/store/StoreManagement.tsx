@@ -346,7 +346,7 @@ export default function StoreManagement() {
           <button
             type="button"
             onClick={() => navigate(returnTo)}
-            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:text-theme dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:text-white"
+            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-purple-300 hover:text-purple-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-purple-500/30 dark:hover:text-white"
           >
             <span aria-hidden="true">←</span>
             {returnLabel}
@@ -388,7 +388,7 @@ export default function StoreManagement() {
             <div className="flex flex-wrap items-center gap-2">
             {commerce.data?.canUpgrade && !isEmbeddedMobile ? (
               <button type="button" onClick={() => navigate('/settings?tab=subscription-billing&from=studio')}
-                className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] px-4 py-2 text-sm font-semibold transition active:scale-[0.985]">
+                className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 text-sm font-semibold transition active:scale-[0.985]">
                 Upgrade
               </button>
             ) : null}
@@ -510,7 +510,7 @@ export default function StoreManagement() {
                 }
                 navigate('/profile');
               }}
-              className="group relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-600 shadow-sm transition-all neu-pressed-button active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
+              className="group relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-600 shadow-sm transition-all hover:bg-purple-50 hover:text-purple-600 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-purple-400"
               aria-label="Preview as visitor"
             >
               <span className="text-sm">👁️</span>
@@ -588,7 +588,7 @@ export default function StoreManagement() {
         <button
           type="button"
           onClick={() => setAnalyticsCollapsed(false)}
-          className={`fixed right-3 z-40 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full bg-[color:var(--text-primary)] text-[color:var(--surface-primary)] border border-[color:var(--neu-border)] px-4 py-2 text-sm font-semibold transition active:scale-95 sm:right-6 ${
+          className={`fixed right-3 z-40 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 text-sm font-semibold transition active:scale-95 sm:right-6 ${
             isEmbeddedMobile
               ? 'bottom-[calc(env(safe-area-inset-bottom)+1rem)]'
               : 'bottom-24 lg:bottom-20'

@@ -222,7 +222,7 @@ const StoreEmptyState: React.FC<StoreEmptyStateProps> = ({
       </p>
 
       {firstTimeGuide.length > 0 ? (
-        <div className="mb-8 w-full max-w-md surface-card rounded-2xl p-4 text-left">
+        <div className="mb-8 w-full max-w-md surface-card rounded-2xl border border-purple-200/70 bg-gradient-to-br from-purple-50 via-fuchsia-50 to-white dark:border-purple-500/20 dark:from-purple-500/10 dark:via-fuchsia-500/10 dark:to-white/5 p-4 text-left">
           <div className="flex items-center gap-2 text-sm font-semibold text-purple-800 dark:text-purple-200">
             <span aria-hidden="true">🧭</span>
             First-time guide
@@ -230,7 +230,7 @@ const StoreEmptyState: React.FC<StoreEmptyStateProps> = ({
           <div className="mt-3 space-y-2 text-sm text-gray-700 dark:text-gray-300">
             {firstTimeGuide.map((step, index) => (
               <div key={step} className="flex items-start gap-2">
-                <span className="mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[color:var(--text-primary)] text-[color:var(--surface-primary)] text-[11px] font-bold">
+                <span className="mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 text-[11px] font-bold text-white">
                   {index + 1}
                 </span>
                 <span>{step}</span>

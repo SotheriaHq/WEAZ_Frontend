@@ -284,6 +284,18 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
   const dispatch = useDispatch();
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>(() => isAuth ? 'discover' : 'explore');
+  const [activeCategory, setActiveCategory] = useState<string>(() => isAuth ? 'discover' : 'explore');
+
+  useEffect(() => {
+    setActiveCategory(selectedCategory);
+  }, [selectedCategory]);
+
+  const handleSelectCategory = (catKey: string) => {
+    setActiveCategory(catKey);
+    startTransition(() => {
+      setSelectedCategory(catKey);
+    });
+  };
   const [viewItem, setViewItem] = useState<MarketItem | null>(null);
   /**
    * The reel whose comments are open, or null.
@@ -326,7 +338,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
   const dismissedRouteOpenKeyRef = useRef<string | null>(null);
   const savedBatchInFlightRef = useRef<string | null>(null);
   const savedBatchLastRunRef = useRef<Record<string, number>>({});
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   // Extra pages for reels infinite scroll (first page still comes from useRunwayFeed).
   const [reelsExtraItems, setReelsExtraItems] = useState<MarketItem[]>([]);
   const [reelsNextCursor, setReelsNextCursor] = useState<string | null>(null);
@@ -852,18 +864,18 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
   const categoryChips = (
     <div className="flex items-center gap-2 border-b border-[color:var(--border-default)]/70 pb-1 text-sm min-w-max justify-start md:justify-center md:mx-auto">
       {feedCategories.map((cat) => {
-        const active = selectedCategory === cat.key;
+        const active = activeCategory === cat.key;
         return (
           <button
             type="button"
             key={cat.key}
-            onClick={() => startTransition(() => setSelectedCategory(cat.key))}
+            onClick={() => handleSelectCategory(cat.key)}
             aria-pressed={active}
-            className={`relative shrink-0 chip-inset px-3 py-1.5 text-xs font-semibold transition-all ${
+            className={`relative shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-95 ${
               active
-                ? 'selected text-theme'
-                : 'text-theme-secondary opacity-75 hover:opacity-100'
-            }${isPending ? ' opacity-60' : ''}`}
+                ? 'bg-[color:var(--brand-primary)]/15 text-[color:var(--brand-primary)] shadow-inner ring-1 ring-[color:var(--brand-primary)]/40 font-bold'
+                : 'text-theme-secondary hover:bg-[color:var(--surface-muted)] hover:text-theme'
+            }`}
           >
             {cat.label}
           </button>
@@ -929,29 +941,18 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
       <div className="flex h-full w-full min-w-0 items-center overflow-x-auto px-2 scrollbar-hide">
         <div className="flex min-w-max items-center gap-1.5">
           {feedCategories.map((cat) => {
-            const active = selectedCategory === cat.key;
+            const active = activeCategory === cat.key;
             return (
               <button
                 type="button"
                 key={cat.key}
-                onClick={() => startTransition(() => setSelectedCategory(cat.key))}
+                onClick={() => handleSelectCategory(cat.key)}
                 aria-pressed={active}
-                /*
-                  The native stage-nav chip, ported.
-
-                  `threadly-mobile` settled this on the same surface: an
-                  unselected chip carries NO fill — a plate behind every label
-                  reads as UI pasted onto the photograph — and the text does the
-                  work, bright white when selected, dimmed white when merely
-                  available. The selected state is a soft white pill, not an
-                  opaque white one, so it sits on the stage instead of punching a
-                  hole in it. See `components/ui/Chip.tsx` → `isStageNav`.
-                */
-                className={`relative shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
+                className={`relative shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
                   active
-                    ? 'bg-white/[0.14] text-white'
+                    ? 'bg-white/[0.22] text-white shadow-inner font-bold'
                     : 'text-white/60 hover:text-white/85'
-                }${isPending ? ' opacity-60' : ''}`}
+                }`}
               >
                 {cat.label}
               </button>
@@ -1084,7 +1085,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
           <button
             type="button"
             onClick={exitPinnedToDefaultFeed}
-            className="shrink-0 neu-pressed-button px-4 py-2 text-xs font-semibold text-theme transition-colors"
+            className="shrink-0 rounded-full bg-[color:var(--brand-primary)]/15 px-4 py-2 text-xs font-semibold text-[color:var(--brand-primary)] transition-all hover:bg-[color:var(--brand-primary)]/25 active:scale-95"
           >
             Continue normal Runway feed
           </button>
