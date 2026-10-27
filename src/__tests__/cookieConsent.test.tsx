@@ -74,6 +74,26 @@ describe('consent-gated third parties', () => {
     window.history.pushState({}, '', '/');
   });
 
+  it('counts the first page once on a returning visit, then one view per route', async () => {
+    window.history.pushState({}, '', '/runway');
+    const consent = await import('@/privacy/consent');
+    consent.saveConsent(consent.OPTIONAL_ON);
+    const { initConsentEffects } = await import('@/privacy/thirdPartyLoaders');
+    const { trackPageView } = await import('@/observability/analytics');
+    initConsentEffects();
+    // The router reports the same first page the loader already counted.
+    trackPageView('/runway');
+    trackPageView('/market');
+    trackPageView('/market?tab=new');
+
+    const pageViews = (window.dataLayer ?? [])
+      .map((entry) => Array.from(entry as ArrayLike<unknown>))
+      .filter((command) => command[0] === 'event' && command[1] === 'page_view')
+      .map((command) => (command[2] as { page_location: string }).page_location);
+    expect(pageViews).toEqual([`${window.location.origin}/runway`, `${window.location.origin}/market`]);
+    window.history.pushState({}, '', '/');
+  });
+
   it('withdrawal stops analytics: disables GA, clears its cookies and reloads', async () => {
     const reload = vi.fn();
     vi.spyOn(window, 'location', 'get').mockReturnValue({
