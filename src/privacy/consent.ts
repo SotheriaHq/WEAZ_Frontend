@@ -13,6 +13,8 @@ import { useSyncExternalStore } from 'react';
  */
 export const CONSENT_VERSION = 1;
 const STORAGE_KEY = 'wiez.consent';
+/** A choice is kept for twelve months, then the visitor is asked again. */
+export const CONSENT_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
 
 export type ConsentChoices = {
   /** Page-view analytics and performance measurement. */
@@ -50,9 +52,11 @@ const readRecord = (): ConsentRecord | null => {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<ConsentRecord>;
     if (parsed?.version !== CONSENT_VERSION) return null;
+    const decidedAt = Date.parse(String(parsed.decidedAt ?? ''));
+    if (!Number.isFinite(decidedAt) || Date.now() - decidedAt > CONSENT_MAX_AGE_MS) return null;
     return {
       version: CONSENT_VERSION,
-      decidedAt: String(parsed.decidedAt ?? ''),
+      decidedAt: String(parsed.decidedAt),
       analytics: parsed.analytics === true,
       thirdPartySignIn: parsed.thirdPartySignIn === true,
     };

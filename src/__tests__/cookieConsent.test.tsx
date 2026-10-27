@@ -93,7 +93,7 @@ describe('consent-gated third parties', () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
-  it('remembers a choice for the next visit, and asks again when the version changes', async () => {
+  it('remembers a choice for the next visit, and asks again when the version changes or a year passes', async () => {
     const first = await import('@/privacy/consent');
     first.saveConsent(first.OPTIONAL_OFF);
     vi.resetModules();
@@ -105,6 +105,13 @@ describe('consent-gated third parties', () => {
     const outdated = await import('@/privacy/consent');
     expect(outdated.getConsentState().decided).toBe(false);
     expect(outdated.isAllowed('analytics')).toBe(false);
+
+    const thirteenMonthsAgo = new Date(Date.now() - 395 * 24 * 60 * 60 * 1000).toISOString();
+    localStorage.setItem('wiez.consent', JSON.stringify({ version: 1, decidedAt: thirteenMonthsAgo, analytics: true }));
+    vi.resetModules();
+    const expired = await import('@/privacy/consent');
+    expect(expired.getConsentState().decided).toBe(false);
+    expect(expired.analyticsPermitted()).toBe(false);
   });
 });
 
