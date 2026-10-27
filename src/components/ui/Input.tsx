@@ -59,21 +59,21 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       ${sizeClasses[inputSize]} font-medium
       ${startIcon ? 'pl-10' : ''}
       ${endIcon ? 'pr-10' : ''}
-      bg-[color:var(--surface-primary)]
+      bg-[color:var(--wiez-surface-page)]
       border rounded-xl
-      text-[color:var(--text-primary)]
-      placeholder:text-[color:var(--text-secondary)]
+      text-[color:var(--wiez-text-primary)]
+      placeholder:text-[color:var(--wiez-text-placeholder)]
       shadow-sm
-      focus:outline-none focus:ring-0 focus:border-transparent
+      focus:outline-none focus:ring-1 focus:ring-[color:var(--wiez-border-focus)] focus:border-[color:var(--wiez-border-focus)]
       transition-all duration-200
       ${
         error
-          ? 'border-red-500 dark:border-red-500'
-          : 'border-[color:var(--border-default)]'
+          ? 'border-[color:var(--wiez-action-danger)]'
+          : 'border-[color:var(--wiez-border-input)] hover:border-[color:var(--wiez-border-default)]'
       }
       ${
         disabled
-          ? 'opacity-60 cursor-not-allowed bg-[color:var(--surface-muted)]'
+          ? 'opacity-60 cursor-not-allowed bg-[color:var(--wiez-surface-subtle)] text-[color:var(--wiez-text-disabled)]'
           : ''
       }
     `;
@@ -85,9 +85,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       <div className={`${fullWidth ? 'w-full' : ''} ${className}`}>
         {/* Label */}
         {label && (
-          <label className="block text-sm font-semibold text-[color:var(--text-secondary)] mb-2">
+          <label className="block text-sm font-semibold text-[color:var(--wiez-text-secondary)] mb-2">
             {label}
-            {required && <span className="text-purple-500 ml-1">*</span>}
+            {required && <span className="text-[color:var(--wiez-brand-accent)] ml-1">*</span>}
           </label>
         )}
 
@@ -95,7 +95,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <div className="relative">
           {/* Start Icon */}
           {startIcon && (
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-secondary)]">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--wiez-text-muted)]">
               {startIcon}
             </div>
           )}
@@ -110,7 +110,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
           {/* End Icon */}
           {endIcon && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--text-secondary)]">
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--wiez-text-muted)]">
               {endIcon}
             </div>
           )}
@@ -121,17 +121,17 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           <div className="flex items-center justify-between mt-1.5 gap-2">
             <div className="flex-1">
               {error ? (
-                <p className="text-xs text-red-500">{error}</p>
+                <p className="text-xs text-[color:var(--wiez-action-danger)]">{error}</p>
               ) : helperText ? (
-                <p className="text-xs text-[color:var(--text-secondary)]">{helperText}</p>
+                <p className="text-xs text-[color:var(--wiez-text-muted)]">{helperText}</p>
               ) : null}
             </div>
             {showCounter && (
               <span
                 className={`text-xs font-medium ${
                   isOverLimit
-                    ? 'text-red-500'
-                    : 'text-[color:var(--text-secondary)]'
+                    ? 'text-[color:var(--wiez-action-danger)]'
+                    : 'text-[color:var(--wiez-text-muted)]'
                 }`}
               >
                 {charCount}/{maxCharCount}
