@@ -37,7 +37,7 @@ const InfoCard: React.FC<{ title: string; children: React.ReactNode; className?:
   className = '',
 }) => (
   <div
-    className={`w-full rounded-2xl border border-gray-200/70 bg-white/95 p-5 shadow-sm backdrop-blur-sm transition dark:border-gray-700/60 dark:bg-gray-900/60 ${className}`}
+    className={`w-full rounded-2xl border border-[var(--wiez-border-subtle,#e5e7eb)] bg-[var(--wiez-surface-card,#ffffff)]/95 p-5 shadow-sm backdrop-blur-sm transition dark:border-white/10 dark:bg-white/5 ${className}`}
   >
     <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.35em] text-gray-500 dark:text-gray-400">
       {title}
@@ -169,10 +169,10 @@ export const AboutBrand: React.FC<AboutBrandProps> = ({ brandData }) => (
           <span>Shipping: Standard &amp; Express available</span>
         </li>
         <li className="flex items-center gap-3">
-          <Ruler className="h-4 w-4 flex-shrink-0 text-purple-500 dark:text-purple-400" />
+          <Ruler className="h-4 w-4 flex-shrink-0 text-[var(--wiez-action-brand,#9333ea)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)]" />
           <Link
             to="/size-charts"
-            className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium hover:underline transition-colors"
+            className="text-[var(--wiez-action-brand,#9333ea)] hover:text-[var(--wiez-brand-accent-hover,#7e22ce)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)] font-medium hover:underline transition-colors"
           >
             View our official Size &amp; Measurement Guide
           </Link>

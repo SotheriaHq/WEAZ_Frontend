@@ -70,7 +70,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
               onClick={() => {
                 if (brandUsername) navigate(`/@${brandUsername}`);
               }}
-              className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline transition"
+              className="text-xs font-medium text-[var(--wiez-action-brand,#9333ea)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)] hover:text-[var(--wiez-brand-accent-hover,#7e22ce)] dark:hover:text-purple-300 hover:underline transition"
             >
               @{brandUsername}
             </button>
