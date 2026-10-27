@@ -130,7 +130,7 @@ We process your personal information only when authorized by law:
 | 4. Tailoring Fit Dispute Forensics | Measurement Profiles, Inspection Photos | **Performance of a Contract** & **Legitimate Interests** (Fairness) |
 | 5. Direct Shopper-Brand Chat | Chat Text, Images, Fitting Notes | **Performance of a Contract** (Order coordination) |
 | 6. Push & Transactional Alerting | Push Tokens, Email, Phone Number | **Performance of a Contract** & **Consent** (Marketing preferences) |
-| 7. Optional Web Analytics | Page addresses with identifiers removed, browser type, a random browser ID, discovery signals sent from your browser | **Consent** (your cookie choice; withdraw at any time) |
+| 7. Optional Analytics (Web and App) | Page addresses with identifiers removed, browser or device type, a random browser or install ID, discovery signals sent from your device, performance timings | **Consent** (your analytics choice; withdraw at any time) |
 
 ### 7.1. Legitimate Interests Balancing Assessment
 Where WIEZ relies on **Legitimate Interests** as the legal basis for processing (particularly for Runway feed personalization, dwell time telemetry, and marketplace signal analytics), we have conducted and documented a balancing assessment confirming that:
@@ -138,7 +138,7 @@ Where WIEZ relies on **Legitimate Interests** as the legal basis for processing 
 * The processing involves only pseudonymized or anonymized first-party engagement signals; it does not create behavioral profiles linked to external activities.
 * The processing creates a direct, proportionate benefit to users through more relevant fashion discovery.
 * Users retain an unconditional right to object to this processing at any time via `privacy@wiez.com` or by resetting their market preferences (web: Settings > Market & Feed; app: Settings > Market preferences), after which feed personalization processing for that user will cease.
-* On the web, discovery signals are stored and sent from your browser only with your consent (row 7 above and our Cookie Policy).
+* On the web and in the app, discovery signals are stored and sent from your device only with your consent (row 7 above and our Cookie Policy).
 
 ---
 
@@ -162,7 +162,7 @@ We do not currently route your payment data to any other gateway. If we enable a
 We do not send SMS messages and we use no SMS provider. Phone numbers are stored for contact and delivery purposes only.
 
 ### 8.4. Reliability & Error Monitoring
-* **Sentry**: application error and performance monitoring, so faults can be diagnosed. Configured NOT to attach personal data to reports (`sendDefaultPii` is disabled); it receives technical diagnostics such as stack traces, request routes, and device or browser type. On the web, query strings, tokens, identifiers, and email addresses are removed from page addresses before a report is sent, and performance tracing runs only if you allow analytics.
+* **Sentry**: application error and performance monitoring, so faults can be diagnosed. Configured NOT to attach personal data to reports (`sendDefaultPii` is disabled); it receives technical diagnostics such as stack traces, request routes, and device or browser type. On the web and in the app, query strings, tokens, identifiers, and email addresses are removed from addresses before a report is sent, and performance tracing runs only if you allow analytics.
 
 ### 8.5. Sign-In and Optional Analytics
 * **Google LLC (Google Sign-In)**: verifies your identity when you choose **Continue with Google**. Receives what your browser sends to Google's sign-in service, and returns your name, email address, and profile photo to us.
@@ -258,9 +258,9 @@ You possess the following statutory rights under applicable global data protecti
 | 3. Right to Erasure ("Right to Be Forgotten") [GDPR Art. 17] | Initiate account deactivation and identifier pseudonymization via Settings > Delete Account. Note: Retention of tax/audit records as per §11.1 applies. |
 | 4. Right to Restriction of Processing [GDPR Art. 18] | Request that WIEZ pauses processing of your personal data (e.g., while accuracy or objection is being contested). Submit request to privacy@wiez.com. |
 | 5. Right to Object [GDPR Art. 21] | Object to processing based on Legitimate Interests (e.g., Runway feed personalization). Where your interests override WIEZ's, processing will be halted for that specific purpose. |
-| 6. Right to Withdraw Consent [GDPR Art. 7(3)] | Where processing is based on your consent (e.g., marketing emails, optional analytics), you may withdraw consent at any time without penalty: marketing messages via Settings > Notifications, optional web analytics via Settings > Privacy > Change cookie settings. |
+| 6. Right to Withdraw Consent [GDPR Art. 7(3)] | Where processing is based on your consent (e.g., marketing emails, optional analytics), you may withdraw consent at any time without penalty: marketing messages via Settings > Notifications; optional analytics on the web via Settings > Privacy > Change cookie settings, and in the app via Settings > Privacy controls > Usage analytics. |
 | 7. Profile & Location Visibility Controls | Switch between Public Profile (UNLOCKED) and Private Profile (LOCKED), and independently toggle "Show my username" and "Show my location" in Settings > Privacy. |
-| 8. Cookie & Signal Queue Reset | Reset your market preferences at any time (web: Settings > Market & Feed; app: Settings > Market preferences). On the web, turning Analytics off also deletes the random browser ID and queued signals. |
+| 8. Cookie & Signal Queue Reset | Reset your market preferences at any time (web: Settings > Market & Feed; app: Settings > Market preferences). Turning analytics off also deletes the random browser or install ID and queued signals. |
 
 **Response Timeline**: WIEZ will acknowledge all privacy rights requests within **72 hours** and fulfill them within **30 days** (extendable by a further 60 days for complex requests, with written notice).
 
