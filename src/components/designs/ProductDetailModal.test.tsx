@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import ProductDetailModal, { ProductDetailData } from './ProductDetailModal';
+import ProductDetailModal, { type ProductDetailData } from './ProductDetailModal';
 
 const mockNavigate = vi.fn();
 const mockDispatch = vi.fn();

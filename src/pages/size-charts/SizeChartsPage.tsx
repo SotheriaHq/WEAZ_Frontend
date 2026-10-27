@@ -53,7 +53,7 @@ const SizeTable: React.FC<{
 
   const cellClassName = (column: string) =>
     column === activeColumn
-      ? 'text-purple-700 dark:text-purple-300 font-semibold'
+      ? 'text-[var(--wiez-action-brand,#9333ea)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)] font-semibold'
       : 'text-slate-700 dark:text-slate-300';
 
   // Helper to convert range strings like "81-85 cm" to inches if unit === 'in'
@@ -84,7 +84,7 @@ const SizeTable: React.FC<{
             {ACTIVE_CHART_EXPLANATION[displayChartFamily]}
           </p>
         </div>
-        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[var(--wiez-brand-subtle,rgba(147,51,234,0.1))] text-[var(--wiez-action-brand,#9333ea)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)] border border-[var(--wiez-border-subtle,#e5e7eb)]">
           Unit: {unit.toUpperCase()}
         </span>
       </div>
@@ -104,7 +104,7 @@ const SizeTable: React.FC<{
           </thead>
           <tbody className="divide-y divide-black/5 dark:divide-white/5">
             {rows.map((row) => (
-              <tr key={`${title}-${row.alpha}`} className="hover:bg-purple-500/5 transition-colors">
+              <tr key={`${title}-${row.alpha}`} className="hover:bg-[var(--wiez-brand-subtle,rgba(147,51,234,0.05))] transition-colors">
                 <td className="py-2.5 pr-4 font-bold text-slate-900 dark:text-slate-100">{row.alpha}</td>
                 <td className={`py-2.5 pr-4 ${cellClassName('uk')}`}>{row.uk}</td>
                 <td className={`py-2.5 pr-4 ${cellClassName('us')}`}>{row.us}</td>
@@ -189,7 +189,7 @@ const SizeChartsPage: React.FC = () => {
         <header className="relative overflow-hidden rounded-[2.5rem] border border-black/10 bg-gradient-to-br from-white via-purple-50/20 to-pink-50/30 p-6 sm:p-8 dark:border-white/10 dark:from-[#151020] dark:via-[#110d18] dark:to-[#1a1228] shadow-sm">
           <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-3xl space-y-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--wiez-border-subtle,#e5e7eb)] bg-[var(--wiez-brand-subtle,rgba(147,51,234,0.1))] px-3 py-1 text-xs font-semibold text-[var(--wiez-action-brand,#9333ea)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)]">
                 <Sparkles className="h-3.5 w-3.5" />
                 <span>ISO 8559-1:2017 Certified Tailoring Standards</span>
               </div>
@@ -209,8 +209,8 @@ const SizeChartsPage: React.FC = () => {
                   onClick={() => setUnit('cm')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                     unit === 'cm'
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : 'text-slate-600 hover:text-purple-600 dark:text-slate-300'
+                      ? 'bg-[var(--wiez-action-brand,#9333ea)] text-white shadow-sm'
+                      : 'text-slate-600 hover:text-[var(--wiez-action-brand,#9333ea)] dark:text-slate-300'
                   }`}
                 >
                   Centimeters (cm)
@@ -220,8 +220,8 @@ const SizeChartsPage: React.FC = () => {
                   onClick={() => setUnit('in')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                     unit === 'in'
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : 'text-slate-600 hover:text-purple-600 dark:text-slate-300'
+                      ? 'bg-[var(--wiez-action-brand,#9333ea)] text-white shadow-sm'
+                      : 'text-slate-600 hover:text-[var(--wiez-action-brand,#9333ea)] dark:text-slate-300'
                   }`}
                 >
                   Inches (in)
@@ -232,7 +232,7 @@ const SizeChartsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate('/profile?tab=fittings')}
-                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:opacity-95 active:scale-95 transition-all"
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[var(--wiez-action-brand,#9333ea)] to-[var(--wiez-brand-mark,#6015e2)] px-4 py-2.5 text-xs font-bold text-white shadow-md hover:opacity-95 active:scale-95 transition-all"
               >
                 <span>Update My Saved Fittings</span>
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -248,7 +248,7 @@ const SizeChartsPage: React.FC = () => {
               onChange={(value) => handleChartPreferenceChange(value as CustomOrderChartFamily)}
               options={DISPLAY_CHART_OPTIONS}
             />
-            <div className="flex items-center rounded-2xl border border-purple-200/60 bg-purple-50/80 px-4 py-3 text-xs text-purple-900 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-100">
+            <div className="flex items-center rounded-2xl border border-[var(--wiez-border-subtle,#e5e7eb)] bg-purple-50/80 px-4 py-3 text-xs text-purple-900 dark:border-[var(--wiez-border-subtle,#e5e7eb)] dark:bg-[var(--wiez-brand-subtle,rgba(147,51,234,0.1))] dark:text-purple-100">
               <div>
                 <span className="font-bold">Active Preference: {activeDisplayLabel}</span>
                 <p className="mt-0.5 opacity-90">
@@ -262,7 +262,7 @@ const SizeChartsPage: React.FC = () => {
         {/* 4 Golden Tailoring Principles Bar */}
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-2xl border border-black/5 bg-white/60 p-4 dark:border-white/5 dark:bg-white/[0.03]">
-            <div className="flex items-center gap-2 text-xs font-bold text-purple-600 dark:text-purple-400">
+            <div className="flex items-center gap-2 text-xs font-bold text-[var(--wiez-action-brand,#9333ea)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)]">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               <span>Use a Flexible Tape</span>
             </div>
@@ -271,7 +271,7 @@ const SizeChartsPage: React.FC = () => {
             </p>
           </div>
           <div className="rounded-2xl border border-black/5 bg-white/60 p-4 dark:border-white/5 dark:bg-white/[0.03]">
-            <div className="flex items-center gap-2 text-xs font-bold text-purple-600 dark:text-purple-400">
+            <div className="flex items-center gap-2 text-xs font-bold text-[var(--wiez-action-brand,#9333ea)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)]">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               <span>Keep Tape Level</span>
             </div>
@@ -280,7 +280,7 @@ const SizeChartsPage: React.FC = () => {
             </p>
           </div>
           <div className="rounded-2xl border border-black/5 bg-white/60 p-4 dark:border-white/5 dark:bg-white/[0.03]">
-            <div className="flex items-center gap-2 text-xs font-bold text-purple-600 dark:text-purple-400">
+            <div className="flex items-center gap-2 text-xs font-bold text-[var(--wiez-action-brand,#9333ea)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)]">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               <span>Natural Stance &amp; Ease</span>
             </div>
@@ -289,7 +289,7 @@ const SizeChartsPage: React.FC = () => {
             </p>
           </div>
           <div className="rounded-2xl border border-black/5 bg-white/60 p-4 dark:border-white/5 dark:bg-white/[0.03]">
-            <div className="flex items-center gap-2 text-xs font-bold text-purple-600 dark:text-purple-400">
+            <div className="flex items-center gap-2 text-xs font-bold text-[var(--wiez-action-brand,#9333ea)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)]">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               <span>Foundation Garments</span>
             </div>
@@ -311,8 +311,8 @@ const SizeChartsPage: React.FC = () => {
                   onClick={() => setActiveCategory(cat.key)}
                   className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
                     activeCategory === cat.key
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : 'border border-black/10 bg-white/70 text-slate-700 hover:border-purple-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-purple-400'
+                      ? 'bg-[var(--wiez-action-brand,#9333ea)] text-white shadow-sm'
+                      : 'border border-black/10 bg-white/70 text-slate-700 hover:border-[var(--wiez-action-brand,#9333ea)] dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-[var(--wiez-brand-mark-on-dark,#af87f4)]'
                   }`}
                 >
                   {cat.label}
@@ -328,7 +328,7 @@ const SizeChartsPage: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search measurement points..."
-                className="w-full rounded-full border border-black/10 bg-white/80 pl-9 pr-4 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                className="w-full rounded-full border border-black/10 bg-white/80 pl-9 pr-4 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-[var(--wiez-action-brand,#9333ea)] focus:outline-none focus:ring-1 focus:ring-[var(--wiez-focus-ring,rgba(147,51,234,0.35))] dark:border-white/10 dark:bg-white/5 dark:text-white"
               />
             </div>
           </div>
@@ -344,10 +344,10 @@ const SizeChartsPage: React.FC = () => {
 
             {/* Active Landmark Spotlight Card */}
             {activeGuide ? (
-              <div className="rounded-3xl border border-purple-500/20 bg-gradient-to-br from-purple-50/40 via-white to-pink-50/20 p-6 dark:border-purple-500/30 dark:from-[#16121f] dark:via-[#110d18] dark:to-[#1a1228] shadow-sm space-y-5">
-                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-purple-500/10 pb-4">
+              <div className="rounded-3xl border border-[var(--wiez-border-subtle,#e5e7eb)] bg-gradient-to-br from-purple-50/40 via-white to-pink-50/20 p-6 dark:border-[var(--wiez-border-subtle,#e5e7eb)] dark:from-[#16121f] dark:via-[#110d18] dark:to-[#1a1228] shadow-sm space-y-5">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--wiez-border-subtle,#e5e7eb)] pb-4">
                   <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--wiez-action-brand,#9333ea)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)]">
                       {activeGuide.categoryLabel}
                     </span>
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
@@ -357,11 +357,11 @@ const SizeChartsPage: React.FC = () => {
                       {activeGuide.summary}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-purple-300/40 bg-purple-500/10 px-3 py-1.5 text-right dark:border-purple-500/40">
-                    <span className="block text-[10px] font-semibold text-purple-600 dark:text-purple-400 uppercase">
+                  <div className="rounded-xl border border-[var(--wiez-border-subtle,#e5e7eb)] bg-[var(--wiez-brand-subtle,rgba(147,51,234,0.1))] px-3 py-1.5 text-right dark:border-[var(--wiez-border-subtle,#e5e7eb)]">
+                    <span className="block text-[10px] font-semibold text-[var(--wiez-action-brand,#9333ea)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)] uppercase">
                       Typical Range
                     </span>
-                    <span className="text-sm font-bold text-purple-900 dark:text-purple-200">
+                    <span className="text-sm font-bold text-[var(--wiez-text-primary,#111827)] dark:text-white">
                       {unit === 'cm'
                         ? `${activeGuide.minCm} – ${activeGuide.maxCm} cm`
                         : `${activeGuide.minInches} – ${activeGuide.maxInches} in`}
@@ -372,13 +372,13 @@ const SizeChartsPage: React.FC = () => {
                 {/* Step-by-Step Instructions */}
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5 mb-2.5">
-                    <BookOpen className="h-3.5 w-3.5 text-purple-600" />
+                    <BookOpen className="h-3.5 w-3.5 text-[var(--wiez-action-brand,#9333ea)]" />
                     <span>How to Measure Step-by-Step</span>
                   </h3>
                   <ol className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
                     {activeGuide.howToMeasure.map((step, idx) => (
                       <li key={step} className="flex items-start gap-2.5">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-600 text-[10px] font-bold text-white">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--wiez-action-brand,#9333ea)] text-[10px] font-bold text-white">
                           {idx + 1}
                         </span>
                         <span className="leading-relaxed">{step}</span>
@@ -418,7 +418,7 @@ const SizeChartsPage: React.FC = () => {
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Layers className="h-5 w-5 text-purple-600" />
+              <Layers className="h-5 w-5 text-[var(--wiez-action-brand,#9333ea)]" />
               <span>Full Measurement Points Directory ({filteredGuides.length})</span>
             </h2>
             <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -435,13 +435,13 @@ const SizeChartsPage: React.FC = () => {
                   onClick={() => setActivePointKey(guide.key)}
                   className={`cursor-pointer rounded-2xl border p-4 transition-all ${
                     isSelected
-                      ? 'border-purple-500 ring-2 ring-purple-500/30 bg-purple-500/5 shadow-md dark:border-purple-400'
-                      : 'border-black/5 bg-white/80 hover:border-purple-300 hover:bg-white dark:border-white/5 dark:bg-white/[0.03] dark:hover:border-purple-500/40'
+                      ? 'border-purple-500 ring-2 ring-purple-500/30 bg-[var(--wiez-brand-subtle,rgba(147,51,234,0.05))] shadow-md dark:border-purple-400'
+                      : 'border-black/5 bg-white/80 hover:border-[var(--wiez-action-brand,#9333ea)] hover:bg-white dark:border-white/5 dark:bg-white/[0.03] dark:hover:border-[var(--wiez-border-subtle,#e5e7eb)]'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--wiez-action-brand,#9333ea)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)]">
                         {guide.categoryLabel}
                       </span>
                       <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -460,7 +460,7 @@ const SizeChartsPage: React.FC = () => {
                   </p>
 
                   <div className="mt-3 flex items-center justify-between border-t border-black/5 pt-2.5 text-[11px] dark:border-white/5">
-                    <span className="text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-1">
+                    <span className="text-[var(--wiez-action-brand,#9333ea)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)] font-semibold flex items-center gap-1">
                       <span>View Steps</span>
                       <ArrowRight className="h-3 w-3" />
                     </span>
@@ -501,13 +501,13 @@ const SizeChartsPage: React.FC = () => {
                 key={method.family}
                 className={`rounded-2xl border px-4 py-3 text-sm transition-all ${
                   method.family === displayChartFamily
-                    ? 'border-purple-400 bg-purple-50/80 text-purple-950 dark:border-purple-500/40 dark:bg-purple-500/10 dark:text-purple-100 shadow-sm'
+                    ? 'border-purple-400 bg-purple-50/80 text-purple-950 dark:border-[var(--wiez-border-subtle,#e5e7eb)] dark:bg-[var(--wiez-brand-subtle,rgba(147,51,234,0.1))] dark:text-purple-100 shadow-sm'
                     : 'border-black/5 bg-black/[0.02] text-slate-700 dark:border-white/5 dark:bg-white/[0.03] dark:text-slate-300'
                 }`}
               >
                 <div className="font-bold flex items-center gap-1.5">
                   {method.family === displayChartFamily ? (
-                    <span className="h-2 w-2 rounded-full bg-purple-600" />
+                    <span className="h-2 w-2 rounded-full bg-[var(--wiez-action-brand,#9333ea)]" />
                   ) : null}
                   <span>
                     {DISPLAY_CHART_OPTIONS.find((option) => option.value === method.family)?.label ?? method.family}
@@ -531,11 +531,11 @@ const SizeChartsPage: React.FC = () => {
                 href={source.url}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-2xl border border-black/5 bg-black/[0.02] px-4 py-3 transition-all hover:border-purple-300 hover:bg-purple-50/50 dark:border-white/5 dark:bg-white/[0.03] dark:hover:border-purple-500/30 dark:hover:bg-purple-500/10"
+                className="rounded-2xl border border-black/5 bg-black/[0.02] px-4 py-3 transition-all hover:border-[var(--wiez-action-brand,#9333ea)] hover:bg-purple-50/50 dark:border-white/5 dark:bg-white/[0.03] dark:hover:border-[var(--wiez-border-subtle,#e5e7eb)] dark:hover:bg-[var(--wiez-brand-subtle,rgba(147,51,234,0.1))]"
               >
                 <div className="font-semibold text-slate-900 dark:text-white">{source.label}</div>
                 <p className="mt-1 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{source.note}</p>
-                <div className="mt-2 text-[11px] font-medium text-purple-600 dark:text-purple-400 truncate">{source.url}</div>
+                <div className="mt-2 text-[11px] font-medium text-[var(--wiez-action-brand,#9333ea)] dark:text-[var(--wiez-brand-mark-on-dark,#af87f4)] truncate">{source.url}</div>
               </a>
             ))}
           </div>
