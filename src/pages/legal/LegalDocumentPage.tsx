@@ -3,6 +3,9 @@ import { Link, Navigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+import Button from '@/components/ui/Button';
+import { openConsentSettings } from '@/privacy/consent';
+
 import { LEGAL_PAGE_BY_SLUG } from './legalDocuments';
 
 /**
@@ -257,6 +260,11 @@ export default function LegalDocumentPage() {
           >
             {document.summary}
           </p>
+          {slug === 'cookies' ? (
+            <Button variant="secondary" size="sm" className="mt-5" onClick={openConsentSettings}>
+              Change cookie settings
+            </Button>
+          ) : null}
         </header>
 
         <div className="lg:flex lg:gap-12">

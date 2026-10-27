@@ -102,9 +102,10 @@ vi.mock('@/components/ui/Modal', () => ({
 }));
 
 import LoginPage from '@/pages/Login';
+import { OPTIONAL_OFF, OPTIONAL_ON, saveConsent } from '@/privacy/consent';
 
 const GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE =
-  'Google sign-in could not start. Check that VITE_GOOGLE_CLIENT_ID matches the Google Console Web client and that this origin is authorized.';
+  'Google sign-in isn’t available right now. Try again, or sign in with your email.';
 
 const renderLogin = () =>
   render(
@@ -140,6 +141,8 @@ const enterEmailAndContinue = async (
 describe('LoginPage Google progressive auth', () => {
   beforeEach(() => {
     localStorage.clear();
+    // These cases are a visitor who accepted optional cookies: Google preloads.
+    saveConsent(OPTIONAL_ON);
     vi.clearAllMocks();
     googleMountState.onToken = undefined;
     googleMountState.onError = undefined;
@@ -279,7 +282,7 @@ describe('LoginPage Google progressive auth', () => {
     googleMountState.onToken?.('google-id-token');
 
     await waitFor(() => {
-      expect(googleAuth).toHaveBeenCalledWith({ idToken: 'google-id-token' });
+      expect(googleAuth).toHaveBeenCalledWith({ idToken: 'google-id-token', intent: 'LOGIN' });
     });
     expect(requestGoogleIdToken).not.toHaveBeenCalled();
   });
@@ -320,7 +323,7 @@ describe('LoginPage Google progressive auth', () => {
 
     resolveAuth();
     await waitFor(() => {
-      expect(googleAuth).toHaveBeenCalledWith({ idToken: 'google-id-token' });
+      expect(googleAuth).toHaveBeenCalledWith({ idToken: 'google-id-token', intent: 'LOGIN' });
     });
   });
 
@@ -335,7 +338,7 @@ describe('LoginPage Google progressive auth', () => {
     expect(container).not.toHaveTextContent('🍎');
   });
 
-  it('shows the Google client/origin diagnostic when Google Identity Services cannot start', async () => {
+  it('shows a plain message, without setup details, when Google sign-in cannot start', async () => {
     mountGoogleSignInButton.mockRejectedValueOnce(new Error(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE));
 
     renderLogin();
@@ -343,6 +346,23 @@ describe('LoginPage Google progressive auth', () => {
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE);
     });
+    expect(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE).not.toMatch(/VITE_|client|origin|console/i);
     expect(googleAuth).not.toHaveBeenCalled();
+  });
+
+  it('loads Google only after the visitor chooses it when optional cookies were declined', async () => {
+    saveConsent(OPTIONAL_OFF);
+    renderLogin();
+
+    // Nothing from Google loads just because the page opened.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mountGoogleSignInButton).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('login-google-button'));
+
+    await waitFor(() => {
+      expect(mountGoogleSignInButton).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText(/Google is ready/i)).toBeInTheDocument();
   });
 });

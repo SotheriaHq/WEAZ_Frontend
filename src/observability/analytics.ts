@@ -1,12 +1,9 @@
-declare global {
-  interface Window {
-    gtag?: (...args: unknown[]) => void;
-  }
-}
+import { analyticsPermitted } from '@/privacy/consent';
 
 export function trackPageView(path: string): void {
   const measurementId = String(import.meta.env.VITE_GA_MEASUREMENT_ID ?? '').trim();
-  if (!measurementId || typeof window.gtag !== 'function') {
+  // gtag exists only after the visitor allowed analytics; check both anyway.
+  if (!measurementId || !analyticsPermitted() || typeof window.gtag !== 'function') {
     return;
   }
 

@@ -189,6 +189,8 @@ export const enqueueWebMarketSignal = (
   event: MarketSignalEvent,
   options: { screenContext: string; sessionId: string },
 ) => {
+  // Discovery signals are first-party analytics: nothing is recorded without consent.
+  if (!analyticsPermitted()) return false;
   hydrateQueue();
   const targetId = String(event.targetId ?? '').trim();
   if (!targetId || !event.targetType || !event.signalType || !event.surface) {
@@ -235,6 +237,7 @@ export const flushWebMarketSignals = async (options?: {
   anonymousSessionId?: string;
   sessionId?: string;
 }) => {
+  if (!analyticsPermitted()) return;
   hydrateQueue();
   if (flushing || queue.length === 0) return;
 

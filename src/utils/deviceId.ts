@@ -32,7 +32,8 @@ const createId = () => {
  * dedupe entirely and inflate every count, so no id is the safer answer.
  */
 export const getWebDeviceId = (): string | null => {
-  if (typeof window === 'undefined') return null;
+  // Without analytics consent this browser behaves like a private window.
+  if (typeof window === 'undefined' || !analyticsPermitted()) return null;
   try {
     const existing = window.localStorage.getItem(WEB_DEVICE_ID_STORAGE_KEY);
     if (existing) return existing;
