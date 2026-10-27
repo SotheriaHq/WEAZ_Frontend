@@ -61,6 +61,7 @@ export default {
           'primary-hover': 'var(--wiez-action-primary-hover)',
           brand: 'var(--wiez-action-brand)',
           'brand-hover': 'var(--wiez-action-brand-hover)',
+          'brand-pressed': 'var(--wiez-action-brand-pressed)',
           secondary: 'var(--wiez-action-secondary)',
           danger: 'var(--wiez-action-danger)',
         },

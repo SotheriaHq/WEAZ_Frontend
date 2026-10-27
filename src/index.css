@@ -296,7 +296,7 @@ html {
     --wiez-brand-mark-strong: #4e11b8;
     --wiez-brand-accent: #9333ea;
     --wiez-brand-accent-hover: #7e22ce;
-    --wiez-brand-accent-pressed: #4e11b8;
+    --wiez-brand-accent-pressed: #6b21a8;
     --wiez-brand-subtle: #f3e8ff;
     --wiez-brand-border: #e9d5ff;
 
@@ -305,6 +305,7 @@ html {
     --wiez-action-primary-text: #ffffff;
     --wiez-action-brand: #9333ea;
     --wiez-action-brand-hover: #7e22ce;
+    --wiez-action-brand-pressed: #6b21a8;
     --wiez-action-secondary: #eff0ed;
     --wiez-action-secondary-text: #252824;
     --wiez-action-danger: #ef4444;
@@ -512,6 +513,7 @@ html {
     --wiez-action-primary-text: #0a0a0a;
     --wiez-action-brand: #9333ea;
     --wiez-action-brand-hover: #c084fc;
+    --wiez-action-brand-pressed: #7e22ce;
     --wiez-action-secondary: #171e29;
     --wiez-action-secondary-text: #e2e8f0;
     --wiez-action-danger: #ef4444;
