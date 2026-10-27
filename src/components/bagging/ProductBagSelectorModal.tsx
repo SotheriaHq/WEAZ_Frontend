@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useBagging } from '@/hooks/useBagging';
+import Button from '@/components/ui/Button';
 import type { BagStatus } from '@/api/StoreApi';
 
 type BagProductInput = {
@@ -161,8 +162,8 @@ const ProductBagSelectorModal: React.FC<ProductBagSelectorModalProps> = ({
                                   onClick={() => setSelectedSize(size)}
                                   className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
                                     selected
-                                      ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
-                                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-200'
+                                      ? 'border-[var(--wiez-action-brand,#9333ea)] bg-[var(--wiez-action-brand,#9333ea)] text-white shadow-sm'
+                                      : 'border-[var(--wiez-border-subtle,#e5e7eb)] bg-white text-slate-700 hover:border-slate-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-200'
                                   }`}
                                 >
                                   {size}
@@ -240,24 +241,27 @@ const ProductBagSelectorModal: React.FC<ProductBagSelectorModalProps> = ({
                     </section>
                   </div>
 
-                  <div className="mt-8 flex items-center gap-3 border-t border-slate-200 pt-5 dark:border-white/10">
-                    <button
+                  <div className="mt-8 flex items-center gap-3 border-t border-[var(--wiez-border-subtle,#e5e7eb)] pt-5 dark:border-white/10">
+                    <Button
                       type="button"
+                      variant="secondary"
+                      size="lg"
                       onClick={onClose}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
+                      className="flex-1"
                     >
-                      <span aria-hidden="true">←</span>
-                      Cancel
-                    </button>
-                    <button
+                      ← Cancel
+                    </Button>
+                    <Button
                       type="button"
-                      onClick={() => void handleSubmit()}
+                      variant="brand"
+                      size="lg"
                       disabled={!canSubmit}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                      loading={isLoading}
+                      onClick={() => void handleSubmit()}
+                      className="flex-1"
                     >
-                      Add to bag
-                      <span aria-hidden="true">→</span>
-                    </button>
+                      Add to bag →
+                    </Button>
                   </div>
                 </div>
               </div>
