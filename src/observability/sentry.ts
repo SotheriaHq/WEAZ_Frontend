@@ -1,4 +1,33 @@
 import * as Sentry from '@sentry/react';
+import { telemetryPath, telemetryUrl } from '@/privacy/telemetryUrl';
+
+type ScrubbableEvent = {
+  request?: { url?: string; query_string?: unknown; headers?: Record<string, string> };
+  transaction?: string;
+};
+
+/** Reports carry the page, never the tokens, emails or references in its URL. */
+const scrubEvent = <T extends ScrubbableEvent>(event: T): T => {
+  if (event.request) {
+    if (event.request.url) event.request.url = telemetryUrl(event.request.url);
+    delete event.request.query_string;
+    if (event.request.headers) {
+      delete event.request.headers.Referer;
+      delete event.request.headers.referer;
+    }
+  }
+  if (event.transaction?.startsWith('/')) event.transaction = telemetryPath(event.transaction);
+  return event;
+};
+
+const scrubBreadcrumb = (breadcrumb: Sentry.Breadcrumb): Sentry.Breadcrumb => {
+  const data = breadcrumb.data;
+  if (!data) return breadcrumb;
+  for (const key of ['url', 'from', 'to'] as const) {
+    if (typeof data[key] === 'string') data[key] = telemetryUrl(data[key] as string);
+  }
+  return breadcrumb;
+};
 
 // Keep the absent configuration statically removable in public builds.
 const dsn = import.meta.env.VITE_SENTRY_DSN?.trim();
@@ -22,6 +51,9 @@ export function initSentry(): void {
     integrations: [],
     tracesSampleRate: Number(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE ?? '0.1'),
     sendDefaultPii: false,
+    beforeSend: (event) => scrubEvent(event),
+    beforeSendTransaction: (event) => scrubEvent(event),
+    beforeBreadcrumb: (breadcrumb) => scrubBreadcrumb(breadcrumb),
   });
 }
 

@@ -1,5 +1,7 @@
+import { trackPageView } from '@/observability/analytics';
 import { enableSentryTracing } from '@/observability/sentry';
 import { analyticsPermitted, subscribeConsent } from './consent';
+import { telemetryUrl } from './telemetryUrl';
 
 /**
  * The only place optional third-party code may start. Each loader runs once,
@@ -43,12 +45,28 @@ const loadGoogleAnalytics = () => {
       // eslint-disable-next-line prefer-rest-params
       window.dataLayer!.push(arguments);
     };
+  // Consent state first, before any command that sends data (Google's ordering
+  // rule). Only analytics was agreed to; nothing advertising-related ever is.
+  window.gtag('consent', 'default', {
+    ad_storage: 'denied',
+    ad_user_data: 'denied',
+    ad_personalization: 'denied',
+    analytics_storage: 'granted',
+  });
   appendScript(
     `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_MEASUREMENT_ID)}`,
   );
   window.gtag('js', new Date());
-  // Page views are sent by the router, so Google never sees one by itself.
-  window.gtag('config', GA_MEASUREMENT_ID, { send_page_view: false });
+  // Page views are sent by the router with a cleaned address, so Google never
+  // sends one by itself or sees a raw URL from this config.
+  window.gtag('config', GA_MEASUREMENT_ID, {
+    send_page_view: false,
+    page_location: telemetryUrl(window.location.href),
+    allow_google_signals: false,
+    allow_ad_personalization_signals: false,
+  });
+  // The page the visitor accepted on counts once; later routes come from SeoHead.
+  trackPageView(window.location.href);
 };
 
 const loadCloudflareWebAnalytics = () => {

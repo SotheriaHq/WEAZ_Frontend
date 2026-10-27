@@ -47,6 +47,33 @@ describe('consent-gated third parties', () => {
     expect(sentry.enableSentryTracing).toHaveBeenCalledTimes(1);
   });
 
+  it('declares consent before config and sends Google only a cleaned address', async () => {
+    window.history.pushState({}, '', '/reset-password?token=secret-reset-token&email=ada@example.com');
+    const consent = await import('@/privacy/consent');
+    const { initConsentEffects } = await import('@/privacy/thirdPartyLoaders');
+    initConsentEffects();
+    consent.saveConsent(consent.OPTIONAL_ON);
+
+    const commands = (window.dataLayer ?? []).map((entry) => Array.from(entry as ArrayLike<unknown>));
+    const names = commands.map((command) => `${command[0]}:${String(command[1])}`);
+    expect(names.indexOf('consent:default')).toBeLessThan(names.findIndex((name) => name.startsWith('config:')));
+    expect(commands.find((command) => command[0] === 'consent')?.[2]).toEqual({
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied',
+      analytics_storage: 'granted',
+    });
+    expect(commands.find((command) => command[0] === 'config')?.[2]).toMatchObject({
+      send_page_view: false,
+      allow_google_signals: false,
+      allow_ad_personalization_signals: false,
+    });
+    const pageView = commands.find((command) => command[0] === 'event' && command[1] === 'page_view');
+    expect((pageView?.[2] as { page_location: string }).page_location).toMatch(/\/reset-password$/);
+    expect(JSON.stringify(commands)).not.toMatch(/secret-reset-token|ada@example\.com/);
+    window.history.pushState({}, '', '/');
+  });
+
   it('withdrawal stops analytics: disables GA, clears its cookies and reloads', async () => {
     const reload = vi.fn();
     vi.spyOn(window, 'location', 'get').mockReturnValue({
@@ -78,6 +105,21 @@ describe('consent-gated third parties', () => {
     const outdated = await import('@/privacy/consent');
     expect(outdated.getConsentState().decided).toBe(false);
     expect(outdated.isAllowed('analytics')).toBe(false);
+  });
+});
+
+describe('telemetry addresses', () => {
+  it('drop queries and fragments and replace ids, tokens and emails in the path', async () => {
+    const { telemetryPath, telemetryUrl } = await import('@/privacy/telemetryUrl');
+    expect(telemetryUrl('https://weaz.me/checkout/return?reference=PAY-123&trxref=x#done')).toBe(
+      'https://weaz.me/checkout/return',
+    );
+    expect(telemetryPath('/orders/123e4567-e89b-12d3-a456-426614174000')).toBe('/orders/:id');
+    expect(telemetryPath('/custom-orders/resume/AbCdEf0123456789AbCdEf0123')).toBe('/custom-orders/resume/:token');
+    expect(telemetryPath('/u/ada%40example.com')).toBe('/u/:token');
+    expect(telemetryPath('/market/ankara-midi-dress')).toBe('/market/ankara-midi-dress');
+    expect(telemetryUrl('')).toBe('');
+    expect(telemetryUrl('http://[broken')).toBe('');
   });
 });
 

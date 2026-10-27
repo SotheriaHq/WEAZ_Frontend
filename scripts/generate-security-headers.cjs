@@ -14,6 +14,10 @@ const apiBaseUrl = String(process.env.VITE_API_BASE_URL ?? 'https://api.weaz.me'
   .replace(/\/+$/, '');
 
 const gaMeasurementId = String(process.env.VITE_GA_MEASUREMENT_ID ?? '').trim();
+// Analytics origins are allowed only when that analytics is configured; the
+// app then loads it only after the visitor accepts (src/privacy). Without a
+// token, the CSP also blocks a beacon Cloudflare injects at the edge.
+const cfWebAnalyticsToken = String(process.env.VITE_CF_WEB_ANALYTICS_TOKEN ?? '').trim();
 
 // This script runs under plain node, which does not load .env like Vite does.
 // The Sentry DSN normally lives only in .env, so fall back to reading it there
@@ -62,11 +66,15 @@ const buildConnectSrc = () => {
     'https://checkout.paystack.com',
     'https://standard.paystack.co',
     'https://js.paystack.co',
-    'https://www.googletagmanager.com',
-    'https://www.google-analytics.com',
-    'https://region1.google-analytics.com',
+    ...(gaMeasurementId
+      ? [
+          'https://www.googletagmanager.com',
+          'https://www.google-analytics.com',
+          'https://region1.google-analytics.com',
+        ]
+      : []),
     // Cloudflare Web Analytics beacon posts RUM data here.
-    'https://cloudflareinsights.com',
+    ...(cfWebAnalyticsToken ? ['https://cloudflareinsights.com'] : []),
   ]);
   if (sentryIngestOrigin) {
     sources.add(sentryIngestOrigin);
@@ -80,9 +88,7 @@ const scriptSrc = [
   'https://js.paystack.co',
   'https://checkout.paystack.com',
   'https://standard.paystack.co',
-  // Cloudflare Pages auto-injects its Web Analytics beacon; without this the
-  // CSP blocks it and every page logs console errors.
-  'https://static.cloudflareinsights.com',
+  ...(cfWebAnalyticsToken ? ['https://static.cloudflareinsights.com'] : []),
   ...(gaMeasurementId ? ['https://www.googletagmanager.com'] : []),
 ].join(' ');
 
