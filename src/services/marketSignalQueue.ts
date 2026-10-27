@@ -1,4 +1,5 @@
 import { marketApi, type MarketSignalEvent } from '@/api/MarketApi';
+import { analyticsPermitted } from '@/privacy/consent';
 import { getWebDeviceId, WEB_DEVICE_ID_STORAGE_KEY } from '@/utils/deviceId';
 
 export const WEB_MARKET_SIGNAL_ANONYMOUS_SESSION_STORAGE_KEY =

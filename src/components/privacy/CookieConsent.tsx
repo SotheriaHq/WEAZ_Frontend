@@ -6,6 +6,7 @@ import Switch from '@/components/ui/Switch';
 import {
   OPTIONAL_OFF,
   OPTIONAL_ON,
+  browserOptsOutOfTracking,
   closeConsentSettings,
   saveConsent,
   useConsent,
@@ -69,6 +70,8 @@ export default function CookieConsent() {
   if (!visible) return null;
 
   const showChoices = view === 'choices';
+  // Do Not Track / Global Privacy Control keep analytics off whatever is chosen.
+  const browserOptOut = browserOptsOutOfTracking();
 
   return (
     <div
@@ -113,27 +116,34 @@ export default function CookieConsent() {
                   describedBy={`${titleId}-essential-text`}
                 />
               </li>
-              {OPTIONAL_PURPOSES.map((purpose) => (
-                <li key={purpose.key} className="flex items-start justify-between gap-4">
-                  <div>
-                    <p id={`${titleId}-${purpose.key}`} className="text-sm font-semibold">
-                      {purpose.title}
-                    </p>
-                    <p
-                      id={`${titleId}-${purpose.key}-text`}
-                      className="mt-0.5 text-sm text-[var(--text-secondary)]"
-                    >
-                      {purpose.description}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={choices[purpose.key]}
-                    onChange={(next) => setChoices((current) => ({ ...current, [purpose.key]: next }))}
-                    labelledBy={`${titleId}-${purpose.key}`}
-                    describedBy={`${titleId}-${purpose.key}-text`}
-                  />
-                </li>
-              ))}
+              {OPTIONAL_PURPOSES.map((purpose) => {
+                const blockedByBrowser = purpose.key === 'analytics' && browserOptOut;
+                return (
+                  <li key={purpose.key} className="flex items-start justify-between gap-4">
+                    <div>
+                      <p id={`${titleId}-${purpose.key}`} className="text-sm font-semibold">
+                        {purpose.title}
+                      </p>
+                      <p
+                        id={`${titleId}-${purpose.key}-text`}
+                        className="mt-0.5 text-sm text-[var(--text-secondary)]"
+                      >
+                        {purpose.description}
+                        {blockedByBrowser
+                          ? ' Your browser asks sites not to track you, so this stays off.'
+                          : ''}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={!blockedByBrowser && choices[purpose.key]}
+                      disabled={blockedByBrowser}
+                      onChange={(next) => setChoices((current) => ({ ...current, [purpose.key]: next }))}
+                      labelledBy={`${titleId}-${purpose.key}`}
+                      describedBy={`${titleId}-${purpose.key}-text`}
+                    />
+                  </li>
+                );
+              })}
             </ul>
             <div className="mt-5 grid grid-cols-2 gap-2">
               <Button variant="primary" size="sm" onClick={() => saveConsent(choices)}>
