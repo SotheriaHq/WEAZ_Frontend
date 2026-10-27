@@ -290,6 +290,45 @@ html {
 /* Unified Dark Theme - YouTube-style consistency */
 @layer base {
   :root {
+    /* WIEZ Design Foundation — Semantic System (Wave 1) */
+    --wiez-brand-mark: #6015e2;
+    --wiez-brand-mark-ondark: #af87f4;
+    --wiez-brand-mark-strong: #4e11b8;
+    --wiez-brand-accent: #9333ea;
+    --wiez-brand-accent-hover: #7e22ce;
+    --wiez-brand-accent-pressed: #4e11b8;
+    --wiez-brand-subtle: #f3e8ff;
+    --wiez-brand-border: #e9d5ff;
+
+    --wiez-action-primary: #0a0a0a;
+    --wiez-action-primary-hover: #171717;
+    --wiez-action-primary-text: #ffffff;
+    --wiez-action-brand: #9333ea;
+    --wiez-action-brand-hover: #7e22ce;
+    --wiez-action-secondary: #eff0ed;
+    --wiez-action-secondary-text: #252824;
+    --wiez-action-danger: #ef4444;
+
+    --wiez-surface-page: #ffffff;
+    --wiez-surface-card: #f5f5f4;
+    --wiez-surface-subtle: #e7e5e4;
+    --wiez-surface-recessed: #eff0ed;
+    --wiez-surface-elevated: #ffffff;
+    --wiez-surface-modal: #eff0ed;
+    --wiez-surface-stage: #080a0f;
+
+    --wiez-text-primary: #0a0a0a;
+    --wiez-text-secondary: #44403c;
+    --wiez-text-muted: #6b6560;
+    --wiez-text-placeholder: #98a4b8;
+    --wiez-text-disabled: #9aa5b5;
+
+    --wiez-border-default: #e5e5e5;
+    --wiez-border-subtle: #f1f5f9;
+    --wiez-border-strong: #d4d4d4;
+    --wiez-border-input: #cfcfcf;
+    --wiez-border-focus: #c084fc;
+
     /* The loader's ink, light ground. `.dark` swaps it.
 
        An eight-tone ramp (--wiez-t0..t7) used to sit here, painting the 2,853
@@ -458,6 +497,45 @@ html {
   }
 
   .dark {
+    /* WIEZ Design Foundation — Semantic System (Wave 1 Dark) */
+    --wiez-brand-mark: #af87f4;
+    --wiez-brand-mark-ondark: #af87f4;
+    --wiez-brand-mark-strong: #c084fc;
+    --wiez-brand-accent: #9333ea;
+    --wiez-brand-accent-hover: #c084fc;
+    --wiez-brand-accent-pressed: #7e22ce;
+    --wiez-brand-subtle: rgba(175, 135, 244, 0.12);
+    --wiez-brand-border: rgba(175, 135, 244, 0.24);
+
+    --wiez-action-primary: #fafafa;
+    --wiez-action-primary-hover: #ffffff;
+    --wiez-action-primary-text: #0a0a0a;
+    --wiez-action-brand: #9333ea;
+    --wiez-action-brand-hover: #c084fc;
+    --wiez-action-secondary: #171e29;
+    --wiez-action-secondary-text: #e2e8f0;
+    --wiez-action-danger: #ef4444;
+
+    --wiez-surface-page: #0a0a0a;
+    --wiez-surface-card: #141414;
+    --wiez-surface-subtle: #1c1c1c;
+    --wiez-surface-recessed: #111620;
+    --wiez-surface-elevated: #202938;
+    --wiez-surface-modal: #111620;
+    --wiez-surface-stage: #080a0f;
+
+    --wiez-text-primary: #fafafa;
+    --wiez-text-secondary: #d4d0cb;
+    --wiez-text-muted: #9d968f;
+    --wiez-text-placeholder: #69758a;
+    --wiez-text-disabled: #6b7789;
+
+    --wiez-border-default: rgba(255, 255, 255, 0.055);
+    --wiez-border-subtle: rgba(255, 255, 255, 0.035);
+    --wiez-border-strong: rgba(255, 255, 255, 0.10);
+    --wiez-border-input: rgba(255, 255, 255, 0.13);
+    --wiez-border-focus: #c084fc;
+
     /* Lighter, and it has to be: the violet that clears white at 7.8:1 sits at
        1.9:1 on ink, which is why the old logo dissolved at night. */
     --wiez-ring: #af87f4;

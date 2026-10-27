@@ -14,6 +14,17 @@ export default {
       '2xl': '1440px',
     },
     extend: {
+      borderRadius: {
+        modal: '28px',
+        '4xl': '28px',
+      },
+      transitionDuration: {
+        instant: '0ms',
+        fast: '150ms',
+        normal: '250ms',
+        slow: '400ms',
+      },
+
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
         serif: ['"Playfair Display"', 'serif'],
@@ -25,6 +36,8 @@ export default {
         background: "var(--surface-primary)",
         foreground: "var(--text-primary)",
         brand: {
+          mark: 'var(--wiez-brand-mark)',
+          'mark-ondark': 'var(--wiez-brand-mark-ondark)',
           primary: 'var(--brand-primary)',
           'primary-strong': 'var(--brand-primary-strong)',
           accent: 'var(--brand-accent)',
@@ -32,9 +45,24 @@ export default {
           gold: '#D4AF37',
         },
         surface: {
+          page: 'var(--wiez-surface-page)',
+          card: 'var(--wiez-surface-card)',
+          subtle: 'var(--wiez-surface-subtle)',
+          recessed: 'var(--wiez-surface-recessed)',
+          elevated: 'var(--wiez-surface-elevated)',
+          modal: 'var(--wiez-surface-modal)',
+          stage: 'var(--wiez-surface-stage)',
           primary: 'var(--surface-primary)',
           secondary: 'var(--surface-secondary)',
           muted: 'var(--surface-muted)',
+        },
+        action: {
+          primary: 'var(--wiez-action-primary)',
+          'primary-hover': 'var(--wiez-action-primary-hover)',
+          brand: 'var(--wiez-action-brand)',
+          'brand-hover': 'var(--wiez-action-brand-hover)',
+          secondary: 'var(--wiez-action-secondary)',
+          danger: 'var(--wiez-action-danger)',
         },
         border: {
           DEFAULT: 'var(--border-default)',
