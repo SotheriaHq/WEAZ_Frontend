@@ -61,15 +61,15 @@ const Button: React.FC<ButtonProps> = ({
     primary:   'bg-[color:var(--wiez-action-primary)] hover:bg-[color:var(--wiez-action-primary-hover)] text-[color:var(--wiez-action-primary-text)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
     // WIEZ interactive accent (Follow, Add to Bag, Subscribe, Publish)
     brand:     'bg-[color:var(--wiez-action-brand)] hover:bg-[color:var(--wiez-action-brand-hover)] active:bg-[color:var(--wiez-action-brand-pressed)] text-white active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
-    // Tactile secondary supporting action
-    secondary: 'neu-pressed-button bg-[color:var(--wiez-action-secondary)] text-[color:var(--wiez-action-secondary-text)]',
-    neumorphic: 'neu-pressed-button bg-[color:var(--wiez-action-secondary)] text-[color:var(--wiez-action-secondary-text)]',
+    // Tactile secondary supporting action (pure approved .neu-pressed-button)
+    secondary: 'neu-pressed-button',
+    neumorphic: 'neu-pressed-button',
     // Bordered low/medium emphasis action
-    outline:   'border-2 border-[color:var(--wiez-border-default)] bg-transparent text-[color:var(--wiez-text-primary)] hover:bg-[color:var(--wiez-surface-card)] hover:border-[color:var(--wiez-border-strong)]',
+    outline:   'border-2 border-[color:var(--wiez-border-default)] bg-transparent text-[color:var(--wiez-text-primary)] hover:bg-[color:var(--wiez-surface-card)] hover:border-[color:var(--wiez-border-strong)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.20)]',
     // Ghost — minimal action in dense UI
     ghost:     'bg-transparent text-[color:var(--wiez-text-secondary)] hover:text-[color:var(--wiez-text-primary)] hover:bg-[color:var(--wiez-surface-subtle)]',
     link:      'bg-transparent hover:underline text-[color:var(--wiez-text-primary)] underline-offset-2',
-    danger:    'bg-[color:var(--wiez-action-danger)] hover:opacity-90 text-white',
+    danger:    'bg-[color:var(--wiez-action-danger)] hover:opacity-90 active:bg-[color:var(--wiez-action-danger-active)] text-white active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
   };
 
   const sizeClasses = {

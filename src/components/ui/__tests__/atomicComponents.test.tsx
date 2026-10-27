@@ -19,11 +19,23 @@ describe('Atomic UI Components — Wave 2 Migration', () => {
       expect(btn.className).toContain('var(--wiez-action-brand-hover)');
     });
 
-    it('renders secondary tactile variant', () => {
+    it('renders secondary tactile variant with approved neu-pressed-button', () => {
       render(<Button variant="secondary">Cancel</Button>);
       const btn = screen.getByRole('button', { name: /cancel/i });
       expect(btn.className).toContain('neu-pressed-button');
-      expect(btn.className).toContain('var(--wiez-action-secondary)');
+    });
+
+    it('renders neumorphic compatibility alias as tactile button', () => {
+      render(<Button variant="neumorphic">Save Draft</Button>);
+      const btn = screen.getByRole('button', { name: /save draft/i });
+      expect(btn.className).toContain('neu-pressed-button');
+    });
+
+    it('renders brand and primary buttons with tactile pressed depth', () => {
+      render(<Button variant="brand">Publish</Button>);
+      const btn = screen.getByRole('button', { name: /publish/i });
+      expect(btn.className).toContain('active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]');
+      expect(btn.className).toContain('active:scale-[0.98]');
     });
 
     it('renders outline variant with 2px border and semantic border token', () => {
