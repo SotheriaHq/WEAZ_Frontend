@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Button from '@/components/ui/Button';
 import { useDispatch, useSelector } from 'react-redux';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
@@ -860,34 +861,39 @@ export default function InlineProductDetail({
             <div className={`mb-3 grid gap-3 ${isCustomOrderProduct && !isCustomOrderOnly ? 'sm:grid-cols-2' : ''}`}>
               {isCustomOrderProduct ? (
                 <span className="block w-full" title={customOrderUnavailableReason ?? undefined}>
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
                     onClick={() => {
                       void handleStartCustomOrder();
                     }}
                     disabled={startingCustomOrder || customOrderAvailability.isLoading || !customOrderAvailability.isAvailable}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-purple-300/60 bg-purple-50 text-sm font-semibold text-purple-700 transition-all hover:border-purple-400 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-200 dark:hover:bg-purple-500/20"
+                    className="w-full h-12 rounded-xl text-sm font-semibold !border-[color:var(--wiez-action-brand)]/40 !text-[color:var(--wiez-action-brand)]"
                   >
                     <span aria-hidden="true">{BAG_IT_EMOJI}</span>
-                    {startingCustomOrder ? 'Bagging as custom order...' : `Custom ${BAG_IT_LABEL}`}
-                  </button>
+                    <span>{startingCustomOrder ? 'Bagging as custom order...' : `Custom ${BAG_IT_LABEL}`}</span>
+                  </Button>
                 </span>
               ) : null}
 
               {!isCustomOrderOnly ? (
-                <button
+                <Button
+                  variant="brand"
+                  size="lg"
+                  fullWidth
                   onClick={handleAddToBag}
                   disabled={isStrictlyOutOfStock || startingCustomOrder || bagButtonLoading}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:scale-100"
+                  className="h-14 rounded-xl text-base font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40"
                 >
-                  <BagPulseIcon
-                    status={bagPulseStatus}
-                    context="detail"
-                    size={32}
-                    disabled={isStrictlyOutOfStock || startingCustomOrder || bagButtonLoading}
-                  />
-                  {bagButtonLoading ? 'Bagging...' : BAG_IT_LABEL}
-                </button>
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <BagPulseIcon
+                      status={bagPulseStatus}
+                      context="detail"
+                      size={32}
+                      disabled={isStrictlyOutOfStock || startingCustomOrder || bagButtonLoading}
+                    />
+                    <span>{bagButtonLoading ? 'Bagging...' : BAG_IT_LABEL}</span>
+                  </span>
+                </Button>
               ) : null}
             </div>
           ) : null}
@@ -895,25 +901,25 @@ export default function InlineProductDetail({
           <div className="flex gap-3 pt-2">
             {!isOwnProduct ? (
               <>
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   onClick={handleToggleWishlist}
                   disabled={wishlistBusy}
-                  className="flex-1 h-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:text-pink-500 hover:border-pink-300 transition-all flex items-center justify-center gap-2 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 h-11 rounded-xl text-sm font-medium flex items-center justify-center gap-2"
                   aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                 >
                   <span aria-hidden="true">{isWishlisted ? '❤️' : '🤍'}</span>
                   <span>{isWishlisted ? 'Wishlisted' : 'Wishlist'}</span>
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="secondary"
                   onClick={handleShare}
-                  className="flex-1 h-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-gray-300 hover:text-purple-500 hover:border-purple-300 transition-all flex items-center justify-center gap-2 font-medium text-sm"
+                  className="flex-1 h-11 rounded-xl text-sm font-medium flex items-center justify-center gap-2"
                   aria-label="Share product"
                 >
                   <span aria-hidden="true">🔗</span>
                   <span>Share</span>
-                </button>
+                </Button>
               </>
             ) : (
               <button
