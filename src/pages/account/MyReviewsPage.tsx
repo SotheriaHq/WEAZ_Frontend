@@ -9,6 +9,7 @@ import reviewApi, {
   type ReviewTargetType,
   type UpdateReviewPayload,
 } from '@/api/ReviewApi';
+import Button from '@/components/ui/Button';
 import { useCachedQuery, cachePolicies } from '@/cache';
 import { queryKeys } from '@/query/queryKeys';
 
@@ -123,16 +124,19 @@ export default function MyReviewsPage() {
       </div>
 
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
+        <div className="rounded-2xl border border-[var(--wiez-border-subtle,#e5e7eb)] bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
           <p className="font-semibold">Reviews could not load</p>
           <p className="mt-1">{error}</p>
-          <button
-            type="button"
-            onClick={() => void loadReviews()}
-            className="mt-3 rounded-full border border-red-200 px-4 py-2 text-xs font-semibold hover:bg-red-100 dark:border-red-500/20 dark:hover:bg-red-500/10"
-          >
-            Retry
-          </button>
+          <div className="mt-3">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => void loadReviews()}
+            >
+              Retry
+            </Button>
+          </div>
         </div>
       ) : null}
 
