@@ -101,10 +101,13 @@ const Tabs: React.FC<TabsProps> = ({
       window.requestAnimationFrame(() => measure());
     };
 
-    const observer = new ResizeObserver(handleMeasure);
-    observer.observe(nav);
-    tabRefs.current.forEach((node) => observer.observe(node));
-    labelRefs.current.forEach((node) => observer.observe(node));
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(handleMeasure);
+      observer.observe(nav);
+      tabRefs.current.forEach((node) => observer?.observe(node));
+      labelRefs.current.forEach((node) => observer?.observe(node));
+    }
 
     window.addEventListener('resize', handleMeasure);
     document.fonts?.ready.then(handleMeasure).catch(() => undefined);
@@ -113,7 +116,7 @@ const Tabs: React.FC<TabsProps> = ({
     const rafId = window.requestAnimationFrame(measure);
 
     return () => {
-      observer.disconnect();
+      observer?.disconnect();
       window.removeEventListener('resize', handleMeasure);
       window.cancelAnimationFrame(rafId);
     };
@@ -122,15 +125,17 @@ const Tabs: React.FC<TabsProps> = ({
   // Keep the selected tab reachable when the strip overflows on small screens
   React.useEffect(() => {
     const active = tabRefs.current.get(activeTab);
-    active?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'nearest',
-      inline: 'nearest',
-    });
+    if (typeof active?.scrollIntoView === 'function') {
+      active.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'nearest',
+      });
+    }
   }, [activeTab]);
 
   return (
-    <div className={`border-b border-gray-200/80 dark:border-white/10 ${className}`}>
+    <div className={`border-b border-[color:var(--wiez-border-subtle)] ${className}`}>
       <nav
         ref={navRef}
         role="tablist"
@@ -161,8 +166,8 @@ const Tabs: React.FC<TabsProps> = ({
                 isSmall ? 'text-xs' : 'text-sm'
               } ${
                 isActive
-                  ? 'font-semibold text-purple-700 dark:text-purple-300'
-                  : 'font-medium text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                  ? 'font-semibold text-[color:var(--wiez-action-brand)]'
+                  : 'font-medium text-[color:var(--wiez-text-secondary)] hover:text-[color:var(--wiez-text-primary)]'
               }`}
             >
               <span
@@ -177,8 +182,8 @@ const Tabs: React.FC<TabsProps> = ({
                     aria-hidden="true"
                     className={`inline-flex shrink-0 items-center justify-center transition-transform duration-150 group-hover:scale-105 ${
                       isActive
-                        ? 'text-purple-700 dark:text-purple-300'
-                        : 'text-gray-400 dark:text-gray-400'
+                        ? 'text-[color:var(--wiez-action-brand)]'
+                        : 'text-[color:var(--wiez-text-tertiary)]'
                     }`}
                   >
                     {icon}
@@ -191,8 +196,8 @@ const Tabs: React.FC<TabsProps> = ({
                   <span
                     className={`ml-1 inline-flex items-center justify-center rounded-full px-1.5 py-0.2 text-[10px] font-bold leading-none ${
                       isActive
-                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-200'
-                        : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'
+                        ? 'bg-[color:var(--wiez-action-brand-subtle,rgba(147,51,234,0.1))] text-[color:var(--wiez-action-brand)]'
+                        : 'bg-[color:var(--wiez-surface-subtle)] text-[color:var(--wiez-text-secondary)]'
                     }`}
                   >
                     {badge}
@@ -206,7 +211,7 @@ const Tabs: React.FC<TabsProps> = ({
         {/* Sliding Active Underline Indicator */}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute bottom-0 h-[2.5px] rounded-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-purple-600 shadow-xs will-change-[transform,width] motion-safe:transition-[transform,width,opacity] motion-safe:duration-300 motion-safe:ease-[cubic-bezier(0.25,1,0.5,1)] dark:from-purple-400 dark:via-fuchsia-400 dark:to-purple-300"
+          className="pointer-events-none absolute bottom-0 h-[2.5px] rounded-full bg-[color:var(--wiez-action-brand)] shadow-xs will-change-[transform,width] motion-safe:transition-[transform,width,opacity] motion-safe:duration-300 motion-safe:ease-[cubic-bezier(0.25,1,0.5,1)]"
           style={{
             left: 0,
             width: `${indicator.width}px`,

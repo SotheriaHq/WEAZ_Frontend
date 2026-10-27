@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { OverlayPortal } from './OverlayPortal';
-import { MuseLoader } from '@/components/loaders/MuseLoader';
+import Button from '@/components/ui/Button';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface ConfirmDialogProps {
@@ -38,13 +38,18 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const iconEmoji = isDestructive ? '⚠️' : 'ℹ️';
   const accentBg = isDestructive
     ? 'bg-red-50 dark:bg-red-500/10 ring-1 ring-red-200/60 dark:ring-red-500/20'
-    : 'bg-purple-50 dark:bg-purple-500/10 ring-1 ring-purple-200/60 dark:ring-purple-500/20';
+    : 'bg-[color:var(--wiez-action-brand-subtle,rgba(147,51,234,0.1))] ring-1 ring-[color:var(--wiez-border-subtle)]';
 
   return (
     <OverlayPortal>
       <div className="fixed inset-0 z-layer-modal flex items-center justify-center px-4">
         {/* Backdrop */}
-        <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onCancel} aria-hidden />
+        <div
+          className="absolute inset-0 bg-black/70 backdrop-blur-md"
+          style={{ backgroundColor: 'var(--wiez-surface-overlay, rgba(0,0,0,0.7))' }}
+          onClick={onCancel}
+          aria-hidden
+        />
         <div
           ref={panelRef}
           role="dialog"
@@ -53,9 +58,9 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           aria-describedby="confirm-message"
           tabIndex={-1}
           className={`
-            relative w-[90%] max-w-md overflow-hidden rounded-3xl
-            bg-white dark:bg-zinc-900
-            shadow-2xl ring-1 ring-black/5 dark:ring-white/10
+            relative w-[90%] max-w-md overflow-hidden rounded-[28px]
+            bg-[color:var(--wiez-surface-modal)] text-[color:var(--wiez-text-primary)]
+            shadow-2xl ring-1 ring-[color:var(--wiez-border-subtle)]
             outline-none
             ${isDestructive ? 'shadow-red-500/10 dark:shadow-red-500/20' : ''}
           `}
@@ -65,44 +70,34 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${accentBg} mb-4`}>
               <span className="text-2xl">{iconEmoji}</span>
             </div>
-            <h2 id="confirm-title" className="text-lg font-bold text-gray-900 dark:text-white text-center">
+            <h2 id="confirm-title" className="text-lg font-bold text-[color:var(--wiez-text-primary)] text-center">
               {title}
             </h2>
-            <p id="confirm-message" className="mt-2 text-sm text-gray-500 dark:text-zinc-400 text-center max-w-xs leading-relaxed">
+            <p id="confirm-message" className="mt-2 text-sm text-[color:var(--wiez-text-secondary)] text-center max-w-xs leading-relaxed">
               {message}
             </p>
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 border-t border-gray-100 dark:border-white/[0.08] bg-gray-50/50 dark:bg-white/[0.02] px-6 py-4 mt-4">
-            <button
+          <div className="flex gap-3 border-t border-[color:var(--wiez-border-subtle)] bg-[color:var(--wiez-surface-subtle)] px-6 py-4 mt-4">
+            <Button
+              variant="secondary"
               onClick={onCancel}
               disabled={isLoading}
-              className="neu-pressed-button flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-gray-700 dark:text-zinc-300 transition-all disabled:opacity-50 active:scale-[0.98]"
+              className="flex-1 py-3 text-sm font-semibold"
             >
               {cancelText}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={isDestructive ? 'danger' : 'primary'}
               onClick={onConfirm}
               autoFocus
+              loading={isLoading}
               disabled={isLoading}
-              className={`
-                flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-white
-                transition-all active:scale-[0.98]
-                disabled:opacity-50 disabled:shadow-none
-                ${isDestructive
-                  ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/25'
-                  : 'bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-500/25'
-                }
-              `}
+              className="flex-1 py-3 text-sm font-semibold"
             >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <MuseLoader size={16} />
-                  Processing...
-                </span>
-              ) : confirmText}
-            </button>
+              {confirmText}
+            </Button>
           </div>
         </div>
       </div>

@@ -23,7 +23,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   rightIcon?: React.ReactNode;
 }
 
-const Button: React.FC<ButtonProps> = ({
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
   children,
   variant = 'primary',
   size = 'md',
@@ -35,7 +35,7 @@ const Button: React.FC<ButtonProps> = ({
   leftIcon,
   rightIcon,
   ...props
-}) => {
+}, ref) => {
   const collectText = (node: React.ReactNode): string => {
     if (typeof node === 'string' || typeof node === 'number') {
       return String(node);
@@ -83,6 +83,7 @@ const Button: React.FC<ButtonProps> = ({
 
   return (
     <button
+      ref={ref}
       className={clsx(
         baseClasses,
         variantClasses[variant],
@@ -106,6 +107,8 @@ const Button: React.FC<ButtonProps> = ({
       ) : null}
     </button>
   );
-};
+});
+
+Button.displayName = 'Button';
 
 export default Button;

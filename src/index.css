@@ -1379,9 +1379,19 @@ html {
 
   /* Unified search input styling — uses system surface so it never clashes with page bg */
   .wiez-search-input {
-    @apply w-full rounded-xl border border-transparent px-4 py-2.5 text-sm placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-0 focus:border-transparent;
-    background-color: var(--surface-secondary);
-    color: var(--text-primary);
+    @apply w-full rounded-xl border px-4 py-2.5 text-sm focus:outline-none transition-all duration-200;
+    background-color: var(--wiez-surface-recessed, var(--surface-secondary));
+    color: var(--wiez-text-primary, var(--text-primary));
+    border-color: var(--wiez-border-input, transparent);
+  }
+
+  .wiez-search-input::placeholder {
+    color: var(--wiez-text-placeholder, #9ca3af);
+  }
+
+  .wiez-search-input:focus {
+    border-color: var(--wiez-border-focus, #9333ea);
+    box-shadow: 0 0 0 2px var(--wiez-focus-ring, rgba(147, 51, 234, 0.2));
   }
 
   .form-input {

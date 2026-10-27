@@ -5,6 +5,7 @@ import { type FilterDimensionOption } from "@/api/BrandApi";
 import { useQuery } from '@tanstack/react-query';
 import { creatorFiltersOptions, EMPTY_CREATOR_FILTERS } from '@/query/creatorMetadataQueries';
 import InfoTooltip from "@/components/ui/InfoTooltip";
+import Button from "@/components/ui/Button";
 import {
   CREATOR_FILTER_DIMENSION_ORDER,
   CREATOR_METADATA_HELP,
@@ -122,7 +123,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
   );
 
   const renderNonBlockingState = (message: string) => (
-    <div className="rounded-lg border border-dashed border-gray-200/70 bg-gray-50/70 px-3 py-2 text-xs text-theme-secondary dark:border-white/10 dark:bg-white/[0.03]">
+    <div className="rounded-lg border border-dashed border-[color:var(--wiez-border-subtle)] bg-[color:var(--wiez-surface-subtle)] px-3 py-2 text-xs text-[color:var(--wiez-text-secondary)]">
       {message}
     </div>
   );
@@ -133,7 +134,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
         {[1, 2, 3].map((index) => (
           <div
             key={index}
-            className="h-10 rounded-lg bg-gray-200/50 dark:bg-white/5"
+            className="h-10 rounded-lg bg-[color:var(--wiez-surface-subtle)]"
           />
         ))}
       </div>
@@ -143,7 +144,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
   if (loadError) {
     return <div className="space-y-2">
       {renderNonBlockingState("Style details could not load. You can save a draft, but choose at least one before going live.")}
-      <button type="button" onClick={() => void refetch()} className="rounded-xl bg-purple-600 px-4 py-2 text-sm font-semibold text-white">Retry style details</button>
+      <Button variant="brand" size="sm" onClick={() => void refetch()}>Retry style details</Button>
     </div>;
   }
 
@@ -156,18 +157,18 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
+        <label className="flex items-center text-sm font-medium text-[color:var(--wiez-text-primary)]">
           Style details
           <InfoTooltip text={CREATOR_METADATA_HELP.style} />
         </label>
         {selectedCount > 0 && (
-          <span className="text-xs font-medium text-purple-600 dark:text-purple-400">
+          <span className="text-xs font-medium text-[color:var(--wiez-action-brand)]">
             {selectedCount} selected
           </span>
         )}
       </div>
 
-      <div className="overflow-hidden neu-recessed-card divide-y divide-gray-200/70 dark:divide-white/10">
+      <div className="overflow-hidden neu-recessed-card divide-y divide-[color:var(--wiez-border-subtle)]">
         {dimensions.map((dim) => {
           const isExpanded = expandedDimensionId === dim.id;
           const selectedValues = value[dim.id] ?? [];
@@ -195,23 +196,23 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <span className="text-sm font-medium text-[color:var(--wiez-text-primary)]">
                         {label}
                       </span>
                       {helpText && <InfoTooltip text={helpText} />}
                       {!dim.isMulti && (
-                        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:bg-white/10 dark:text-gray-500">
+                        <span className="rounded bg-[color:var(--wiez-surface-subtle)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[color:var(--wiez-text-tertiary)]">
                           Single
                         </span>
                       )}
                       {hasSelection && (
-                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-purple-600 px-1 text-[10px] font-bold text-white">
+                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--wiez-action-brand)] px-1 text-[10px] font-bold text-white">
                           {selectedValues.length}
                         </span>
                       )}
                     </div>
                     {hasSelection && (
-                      <p className="mt-0.5 whitespace-normal break-words text-[11px] leading-4 text-gray-500 dark:text-gray-400">
+                      <p className="mt-0.5 whitespace-normal break-words text-[11px] leading-4 text-[color:var(--wiez-text-secondary)]">
                         {selectedLabels.slice(0, 2).join(", ")}
                         {selectedLabels.length > 2
                           ? ` +${selectedLabels.length - 2}`
@@ -220,7 +221,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                     )}
                   </div>
                   <FiChevronDown
-                    className={`h-4 w-4 text-gray-500 transition-transform ${
+                    className={`h-4 w-4 text-[color:var(--wiez-text-tertiary)] transition-transform ${
                       isExpanded ? "rotate-180" : ""
                     }`}
                   />
@@ -230,11 +231,11 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                     type="button"
                     onClick={() => clearDimension(dim.id)}
                     disabled={disabled}
-                    className="rounded-full p-1.5 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:hover:bg-white/20"
+                    className="rounded-full p-1.5 transition-colors hover:bg-[color:var(--wiez-surface-subtle)] disabled:opacity-50"
                     title="Clear selection"
                     aria-label={`Clear ${label}`}
                   >
-                    <FiX className="h-3.5 w-3.5 text-gray-500" />
+                    <FiX className="h-3.5 w-3.5 text-[color:var(--wiez-text-tertiary)]" />
                   </button>
                 )}
               </div>
@@ -248,7 +249,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                     transition={{ duration: 0.18 }}
                     className="overflow-hidden"
                   >
-                    <div className="border-t border-gray-200/60 bg-gray-50/60 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.02]">
+                    <div className="border-t border-[color:var(--wiez-border-subtle)] bg-[color:var(--wiez-surface-subtle)] px-3 py-2.5">
                       {dim.values.length > 8 && (
                         <input
                           type="text"
@@ -260,7 +261,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                             }))
                           }
                           placeholder={`Search ${label.toLowerCase()}...`}
-                          className="mb-2 w-full rounded-lg border border-gray-300/60 bg-white px-2.5 py-1.5 text-xs text-gray-800 placeholder:text-gray-400 focus:border-purple-400 focus:outline-none dark:border-white/15 dark:bg-white/5 dark:text-gray-200"
+                          className="mb-2 w-full rounded-lg border border-[color:var(--wiez-border-default)] bg-[color:var(--wiez-surface-page)] px-2.5 py-1.5 text-xs text-[color:var(--wiez-text-primary)] placeholder:text-[color:var(--wiez-text-placeholder)] focus:border-[color:var(--wiez-border-focus)] focus:outline-none"
                         />
                       )}
                       <div className="max-h-44 overflow-y-auto pr-1 scrollbar-wiez-strong">
@@ -277,15 +278,15 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                                 disabled={disabled}
                                 className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                                   isSelected
-                                    ? "neu-inset-chip selected border-[color:var(--neu-border)] bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-300"
-                                    : "neu-pressed-button text-gray-700 dark:text-gray-300"
+                                    ? "neu-inset-chip selected border-[color:var(--neu-border)] bg-[color:var(--wiez-action-brand-subtle,rgba(147,51,234,0.1))] text-[color:var(--wiez-action-brand,#9333ea)]"
+                                    : "neu-pressed-button text-[color:var(--wiez-text-primary)]"
                                 }`}
                               >
                                 <span
                                   className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border ${
                                     isSelected
-                                      ? "border-purple-500 bg-purple-500 text-white dark:border-purple-400"
-                                      : "border-gray-300 text-transparent dark:border-white/30"
+                                      ? "border-[color:var(--wiez-action-brand)] bg-[color:var(--wiez-action-brand)] text-white"
+                                      : "border-[color:var(--wiez-border-default)] text-transparent"
                                   }`}
                                 >
                                   {isSelected ? (
@@ -299,7 +300,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                         </div>
                       </div>
                       {dim.description && (
-                        <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
+                        <p className="mt-2 text-[11px] text-[color:var(--wiez-text-secondary)]">
                           {dim.description}
                         </p>
                       )}

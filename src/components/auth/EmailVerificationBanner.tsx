@@ -29,7 +29,7 @@ export const EmailVerificationBanner: React.FC<EmailVerificationBannerProps> = (
   <aside
     aria-label="Email verification required"
     aria-live="polite"
-    className="rounded-xl border border-amber-300/60 bg-amber-50 px-3.5 py-3 text-amber-950 shadow-lg shadow-amber-950/10 dark:border-amber-300/25 dark:bg-slate-950/95 dark:text-amber-50 dark:shadow-black/30"
+    className="rounded-xl border border-[color:var(--wiez-feedback-warning-border,rgba(245,158,11,0.4))] bg-[color:var(--wiez-feedback-warning-subtle,rgba(245,158,11,0.08))] px-3.5 py-3 text-amber-950 shadow-lg shadow-amber-950/10 dark:border-amber-300/25 dark:bg-slate-950/95 dark:text-amber-50 dark:shadow-black/30"
   >
     <div className="space-y-3">
       <div className="min-w-0">
@@ -43,7 +43,7 @@ export const EmailVerificationBanner: React.FC<EmailVerificationBannerProps> = (
           type="button"
           onClick={onResend}
           disabled={isResending}
-          className="rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60 active:scale-[0.98]"
         >
           {isResending ? 'Sending...' : resendLabel}
         </button>
