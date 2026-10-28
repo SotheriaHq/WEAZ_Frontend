@@ -44,6 +44,7 @@ import {
 } from '@/utils/notificationSections';
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import { MuseLoader } from '@/components/loaders/MuseLoader';
+import Button from '@/components/ui/Button';
 
 const NOTIFICATIONS_PAGE_SIZE = 30;
 
@@ -198,7 +199,7 @@ const NotificationsPage: React.FC = () => {
         >
           <span aria-hidden="true">←</span>
         </button>
-        <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-[color:var(--text-primary)] sm:text-2xl">
+        <h1 className="min-w-0 flex-1 break-words text-base font-semibold text-[color:var(--text-primary)] sm:text-2xl">
           Notifications
         </h1>
         {unreadCount > 0 ? (
@@ -235,22 +236,25 @@ const NotificationsPage: React.FC = () => {
           <MuseLoader size={28} />
         </div>
       ) : error && normalizedItems.length === 0 ? (
-        <div className="rounded-2xl border border-theme p-6 text-center">
+        <div className="rounded-2xl border border-[var(--wiez-border-subtle,#e5e7eb)] bg-[var(--wiez-surface-card,#ffffff)] p-6 text-center dark:border-white/10 dark:bg-white/5">
           <p className="text-sm text-[color:var(--text-secondary)]">
             We couldn&apos;t load your notifications.
           </p>
-          <button
-            type="button"
-            onClick={() =>
-              void dispatch(fetchNotifications({ limit: NOTIFICATIONS_PAGE_SIZE }))
-            }
-            className="mt-3 rounded-xl px-4 py-2 text-sm font-semibold text-[color:var(--text-primary)] surface-interactive-hover"
-          >
-            Try again
-          </button>
+          <div className="mt-3 flex justify-center">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                void dispatch(fetchNotifications({ limit: NOTIFICATIONS_PAGE_SIZE }))
+              }
+            >
+              Try again
+            </Button>
+          </div>
         </div>
       ) : normalizedItems.length === 0 ? (
-        <div className="rounded-2xl border border-theme p-8 text-center">
+        <div className="rounded-2xl border border-[var(--wiez-border-subtle,#e5e7eb)] bg-[var(--wiez-surface-card,#ffffff)] p-8 text-center dark:border-white/10 dark:bg-white/5">
           <div className="text-3xl" aria-hidden="true">
             🔔
           </div>

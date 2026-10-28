@@ -5,21 +5,25 @@ import { MuseLoader } from '@/components/loaders/MuseLoader';
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
   /**
-   * primary  — black fill, white text. The default action on any page.
-   * brand    — purple fill. Brand-owned CTAs only (follow, shop, subscribe).
-   * secondary — transparent with border. Supporting action alongside primary.
-   * ghost    — no border. Low-emphasis action in dense UI.
-   * link     — inline text action.
-   * danger   — destructive action.
+   * primary   — high-contrast neutral action. The default for Save, Confirm, Continue.
+   * brand     — WIEZ interactive accent (violet). Brand-owned CTAs (follow, bag, subscribe).
+   * secondary — tactile paper / neutral supporting action alongside primary.
+   * outline   — bordered low/medium emphasis action.
+   * ghost     — no border, minimal action in dense UI.
+   * link      — inline text action.
+   * danger    — destructive action.
+   * neumorphic — compatibility alias for tactile secondary action.
    */
-  variant?: 'primary' | 'brand' | 'secondary' | 'ghost' | 'link' | 'danger' | 'neumorphic';
+  variant?: 'primary' | 'brand' | 'secondary' | 'outline' | 'ghost' | 'link' | 'danger' | 'neumorphic';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   fullWidth?: boolean;
   icon?: React.ReactNode;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
 }
 
-const Button: React.FC<ButtonProps> = ({
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
   children,
   variant = 'primary',
   size = 'md',
@@ -28,8 +32,10 @@ const Button: React.FC<ButtonProps> = ({
   disabled,
   className,
   icon,
+  leftIcon,
+  rightIcon,
   ...props
-}) => {
+}, ref) => {
   const collectText = (node: React.ReactNode): string => {
     if (typeof node === 'string' || typeof node === 'number') {
       return String(node);
@@ -48,20 +54,22 @@ const Button: React.FC<ButtonProps> = ({
   const inferredLoading = /\b(saving|loading|submitting|uploading|signing)\b/i.test(inferredText);
   const showLoader = loading || Boolean(disabled && inferredLoading);
 
-  const baseClasses = 'relative inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-0 focus:ring-offset-0 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] active:translate-y-[1px]';
+  const baseClasses = 'relative inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--wiez-border-focus)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] active:translate-y-[1px]';
 
-  const variantClasses = {
-    // Black fill — confident, editorial, fashion-native. Default for all actions.
-    primary:   'bg-[color:var(--text-primary)] hover:opacity-90 text-[color:var(--surface-primary)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
-    // Purple fill — reserved for brand-owned CTAs (follow, shop, subscribe).
-    brand:     'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-strong)] text-white active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
-    // Outline — transparent with border. Supporting action alongside primary.
+  const variantClasses: Record<NonNullable<ButtonProps['variant']>, string> = {
+    // High-contrast neutral action (Save, Continue, Confirm)
+    primary:   'bg-[color:var(--wiez-action-primary)] hover:bg-[color:var(--wiez-action-primary-hover)] text-[color:var(--wiez-action-primary-text)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
+    // WIEZ interactive accent (Follow, Add to Bag, Subscribe, Publish)
+    brand:     'bg-[color:var(--wiez-action-brand)] hover:bg-[color:var(--wiez-action-brand-hover)] active:bg-[color:var(--wiez-action-brand-pressed)] text-white active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
+    // Tactile secondary supporting action (pure approved .neu-pressed-button)
     secondary: 'neu-pressed-button',
     neumorphic: 'neu-pressed-button',
-    // Ghost — no border. Low-emphasis actions in dense UI.
-    ghost:     'bg-transparent surface-interactive-hover text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
-    link:      'bg-transparent hover:underline text-[var(--text-primary)] underline-offset-2',
-    danger:    'bg-red-600 hover:bg-red-700 text-white',
+    // Bordered low/medium emphasis action
+    outline:   'border-2 border-[color:var(--wiez-border-default)] bg-transparent text-[color:var(--wiez-text-primary)] hover:bg-[color:var(--wiez-surface-card)] hover:border-[color:var(--wiez-border-strong)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.20)]',
+    // Ghost — minimal action in dense UI
+    ghost:     'bg-transparent text-[color:var(--wiez-text-secondary)] hover:text-[color:var(--wiez-text-primary)] hover:bg-[color:var(--wiez-surface-subtle)]',
+    link:      'bg-transparent hover:underline text-[color:var(--wiez-text-primary)] underline-offset-2',
+    danger:    'bg-[color:var(--wiez-action-danger)] hover:opacity-90 active:bg-[color:var(--wiez-action-danger-active)] text-white active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
   };
 
   const sizeClasses = {
@@ -71,9 +79,11 @@ const Button: React.FC<ButtonProps> = ({
   };
 
   const widthClass = fullWidth ? 'w-full' : '';
+  const effectiveLeadingIcon = leftIcon ?? icon;
 
   return (
     <button
+      ref={ref}
       className={clsx(
         baseClasses,
         variantClasses[variant],
@@ -86,8 +96,9 @@ const Button: React.FC<ButtonProps> = ({
       {...props}
     >
       <span className={clsx('inline-flex items-center gap-2', showLoader && 'invisible')}>
-        {icon && <span className="shrink-0">{icon}</span>}
+        {effectiveLeadingIcon && <span className="shrink-0">{effectiveLeadingIcon}</span>}
         <span>{children}</span>
+        {rightIcon && <span className="shrink-0">{rightIcon}</span>}
       </span>
       {showLoader ? (
         <span className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
@@ -96,6 +107,8 @@ const Button: React.FC<ButtonProps> = ({
       ) : null}
     </button>
   );
-};
+});
+
+Button.displayName = 'Button';
 
 export default Button;

@@ -3,7 +3,7 @@ import React from 'react';
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   hoverEffect?: boolean;
   glass?: boolean;
-  variant?: 'default' | 'bordered' | 'elevated' | 'recessed';
+  variant?: 'default' | 'surface' | 'bordered' | 'elevated' | 'recessed' | 'interactive';
   padding?: 'none' | 'sm' | 'md' | 'lg';
 }
 
@@ -18,19 +18,23 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
     ...props
   }, ref) => {
     
-    const baseStyles = 'rounded-2xl';
+    const baseStyles = 'rounded-2xl transition-all duration-200';
     
-    // "Glass" style vs "Solid" style
+    // Semantic surface mapping
     const bgStyles = glass
-      ? 'surface-menu backdrop-blur-xl shadow-glass border'
+      ? 'surface-menu backdrop-blur-xl shadow-glass border border-[color:var(--wiez-border-subtle)]'
       : variant === 'bordered'
-        ? 'surface-card shadow-sm border'
+        ? 'bg-[color:var(--wiez-surface-card)] border border-[color:var(--wiez-border-subtle)] shadow-sm'
         : variant === 'elevated'
-          ? 'surface-card shadow-md border'
-          : 'neu-recessed-card';
+          ? 'bg-[color:var(--wiez-surface-elevated)] border border-[color:var(--wiez-border-subtle)] shadow-md'
+          : variant === 'surface'
+            ? 'bg-[color:var(--wiez-surface-card)] border border-[color:var(--wiez-border-subtle)]'
+            : variant === 'interactive'
+              ? 'bg-[color:var(--wiez-surface-card)] border border-[color:var(--wiez-border-subtle)] hover:border-[color:var(--wiez-border-strong)] cursor-pointer'
+              : 'neu-recessed-card';
 
-    const hoverStyles = hoverEffect
-      ? 'transition-all duration-300 hover:-translate-y-1 hover:shadow-glass-hover hover:border-brand-primary/30' 
+    const hoverStyles = hoverEffect || variant === 'interactive'
+      ? 'hover:-translate-y-0.5 hover:shadow-md hover:border-[color:var(--wiez-border-strong)]' 
       : '';
 
     const paddingStyles =

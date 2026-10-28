@@ -6,6 +6,7 @@ import type { SearchEntityType, SearchHighlightOffset, SearchItem } from '@/type
 import { resolveSearchIntent, resolveSearchResultRoute } from '@/lib/searchRouting';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import MarketSuggestionBlocks from '@/components/market/MarketSuggestionBlocks';
+import Button from '@/components/ui/Button';
 
 const TABS: Array<{ key: SearchEntityType | 'all'; label: string }> = [
   { key: 'all', label: 'All' },
@@ -53,7 +54,7 @@ const SearchResultCard: React.FC<{ item: SearchItem; onOpen: () => void }> = ({ 
   <button
     type="button"
     onClick={onOpen}
-    className="flex w-full items-start gap-4 rounded-3xl border border-gray-200 bg-white/90 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-white/10 dark:bg-white/5"
+    className="flex w-full items-start gap-4 rounded-3xl border border-[var(--wiez-border-subtle,#e5e7eb)] bg-[var(--wiez-surface-card,#ffffff)]/90 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-white/10 dark:bg-white/5"
   >
     <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gray-100 text-2xl dark:bg-white/10">
       {item.imageUrl ? (
@@ -77,12 +78,12 @@ const SearchResultCard: React.FC<{ item: SearchItem; onOpen: () => void }> = ({ 
         {item.subtitle ? <span className="text-xs text-gray-500 dark:text-gray-400">{item.subtitle}</span> : null}
       </div>
 
-      <div className="truncate text-lg font-semibold text-gray-900 dark:text-white">
+      <div className="text-lg font-semibold text-gray-900 dark:text-white break-words">
         {renderHighlightedText(item.title, item.highlights?.title)}
       </div>
 
       {item.description ? (
-        <p className="line-clamp-2 text-sm text-gray-600 dark:text-gray-300">
+        <p className="line-clamp-2 text-sm text-gray-600 dark:text-gray-300 break-words">
           {renderHighlightedText(item.description, item.highlights?.description)}
         </p>
       ) : null}
@@ -146,9 +147,9 @@ const SearchResultsPage: React.FC = () => {
       : results?.counts[activeType] || 0;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(249,208,78,0.18),_transparent_28%),linear-gradient(180deg,_#fffdf8_0%,_#f7f3ea_100%)] px-4 pb-20 pt-24 dark:bg-[linear-gradient(180deg,_#080808_0%,_#111111_100%)] sm:px-6 lg:px-10">
+    <div className="min-h-screen bg-[var(--wiez-surface-subtle,#f7f3ea)] px-4 pb-20 pt-24 dark:bg-[var(--wiez-surface-canvas,#080808)] sm:px-6 lg:px-10">
       <div className="mx-auto max-w-6xl space-y-6">
-        <div className="rounded-[2rem] border border-gray-200 bg-white/80 p-5 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-white/5 sm:p-6">
+        <div className="rounded-[2rem] border border-[var(--wiez-border-subtle,#e5e7eb)] bg-[var(--wiez-surface-card,#ffffff)]/80 p-5 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-white/5 sm:p-6">
           <div className="space-y-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Unified Search</p>
@@ -172,8 +173,8 @@ const SearchResultsPage: React.FC = () => {
                   onClick={() => updateType(tab.key)}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                     activeType === tab.key
-                      ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-950'
-                      : 'bg-white text-gray-700 shadow-sm hover:bg-gray-100 dark:bg-white/[0.08] dark:text-gray-200 dark:hover:bg-white/[0.12]'
+                      ? 'bg-[var(--wiez-action-brand,#9333ea)] text-white shadow-sm'
+                      : 'bg-[var(--wiez-surface-card,#ffffff)] text-gray-700 border border-[var(--wiez-border-subtle,#e5e7eb)] hover:bg-[var(--wiez-surface-subtle,#f7f3ea)] dark:bg-white/[0.08] dark:text-gray-200 dark:border-white/10 dark:hover:bg-white/[0.12]'
                   }`}
                 >
                   {tab.label}
@@ -243,14 +244,16 @@ const SearchResultsPage: React.FC = () => {
 
             {results.meta.hasNextPage ? (
               <div className="flex justify-center pt-4">
-                <button
+                <Button
                   type="button"
                   onClick={loadMore}
                   disabled={isLoadingMore}
-                  className="rounded-full bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-gray-950"
+                  loading={isLoadingMore}
+                  variant="secondary"
+                  size="md"
                 >
-                  {isLoadingMore ? 'Loading more...' : 'Load more'}
-                </button>
+                  Load more
+                </Button>
               </div>
             ) : null}
           </div>

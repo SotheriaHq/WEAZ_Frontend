@@ -98,7 +98,7 @@ const SearchField: React.FC<SearchFieldProps> = ({
         <button
           type="button"
           onClick={handleExpand}
-          className="flex items-center justify-center rounded-full p-2 text-xl transition-all duration-200 hover:scale-110 hover:bg-black/5 dark:hover:bg-white/10"
+          className="flex items-center justify-center rounded-full p-2 text-xl transition-all duration-200 hover:scale-110 hover:bg-[color:var(--wiez-surface-subtle)] text-[color:var(--wiez-text-primary)]"
           aria-label={ariaLabel}
         >
           🔎
@@ -111,7 +111,7 @@ const SearchField: React.FC<SearchFieldProps> = ({
   return (
     <div ref={wrapperRef} className={containerClassName} role="search">
       <div className="relative flex items-center transition-all duration-200">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">🔎</span>
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[color:var(--wiez-text-tertiary)]">🔎</span>
         <input
           ref={resolvedInputRef}
           type="text"
@@ -156,14 +156,14 @@ const SearchField: React.FC<SearchFieldProps> = ({
               onChange?.('');
               onClear?.();
             }}
-            className="absolute right-14 rounded-full px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
+            className="absolute right-14 rounded-full px-2 py-1 text-xs text-[color:var(--wiez-text-tertiary)] transition hover:bg-[color:var(--wiez-surface-subtle)] hover:text-[color:var(--wiez-text-primary)]"
             aria-label="Clear search"
           >
             ×
           </button>
         ) : null}
         {isLoading ? (
-          <span className="absolute right-10 text-xs text-gray-400" aria-hidden="true">⏳</span>
+          <span className="absolute right-10 text-xs text-[color:var(--wiez-text-tertiary)]" aria-hidden="true">⏳</span>
         ) : null}
         {hasFilterItems ? (
           <div className="absolute right-2">

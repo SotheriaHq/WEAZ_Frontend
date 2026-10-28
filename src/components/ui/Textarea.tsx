@@ -41,23 +41,23 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     // Base textarea classes
     const baseClasses = `
       ${fullWidth ? 'w-full' : ''}
-      px-4 py-3 text-sm
-      bg-white dark:bg-zinc-900/60
+      px-4 py-3 text-sm font-medium
+      bg-[color:var(--wiez-surface-page)]
       border rounded-xl
-      text-gray-900 dark:text-white
-      placeholder-gray-400 dark:placeholder-zinc-500
+      text-[color:var(--wiez-text-primary)]
+      placeholder:text-[color:var(--wiez-text-placeholder)]
       shadow-sm
-      focus:outline-none focus:ring-0 focus:border-transparent
+      focus:outline-none focus:ring-1 focus:ring-[color:var(--wiez-border-focus)] focus:border-[color:var(--wiez-border-focus)]
       transition-all duration-200
       resize-none
       ${
         error
-          ? 'border-red-500 dark:border-red-500'
-          : 'border-gray-300/80 dark:border-zinc-700/60'
+          ? 'border-[color:var(--wiez-action-danger)]'
+          : 'border-[color:var(--wiez-border-input)] hover:border-[color:var(--wiez-border-default)]'
       }
       ${
         disabled
-          ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-zinc-800/50'
+          ? 'opacity-60 cursor-not-allowed bg-[color:var(--wiez-surface-subtle)] text-[color:var(--wiez-text-disabled)]'
           : ''
       }
     `;
@@ -69,9 +69,9 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       <div className={`${fullWidth ? 'w-full' : ''} ${className}`}>
         {/* Label */}
         {label && (
-          <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-300 mb-2">
+          <label className="block text-sm font-semibold text-[color:var(--wiez-text-secondary)] mb-2">
             {label}
-            {required && <span className="text-purple-500 ml-1">*</span>}
+            {required && <span className="text-[color:var(--wiez-brand-accent)] ml-1">*</span>}
           </label>
         )}
 
@@ -89,17 +89,17 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           <div className="flex items-center justify-between mt-1.5 gap-2">
             <div className="flex-1">
               {error ? (
-                <p className="text-xs text-red-500">{error}</p>
+                <p className="text-xs text-[color:var(--wiez-action-danger)]">{error}</p>
               ) : helperText ? (
-                <p className="text-xs text-gray-500 dark:text-zinc-500">{helperText}</p>
+                <p className="text-xs text-[color:var(--wiez-text-muted)]">{helperText}</p>
               ) : null}
             </div>
             {showCounter && (
               <span
                 className={`text-xs font-medium ${
                   isOverLimit
-                    ? 'text-red-500'
-                    : 'text-gray-400 dark:text-zinc-500'
+                    ? 'text-[color:var(--wiez-action-danger)]'
+                    : 'text-[color:var(--wiez-text-muted)]'
                 }`}
               >
                 {charCount}/{maxCharCount}

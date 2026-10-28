@@ -20,6 +20,7 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 import ProductCardSkeleton from '@/components/designs/ProductCardSkeleton';
 import StoreProductCard from '@/components/designs/StoreProductCard';
+import Button from '@/components/ui/Button';
 import { MarketSectionRail } from '@/components/market/MarketSectionRail';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useMarketSignals } from '@/hooks/useMarketSignals';
@@ -521,7 +522,7 @@ const MarketSectionPage: React.FC = () => {
   return (
     <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 space-y-12">
       {/* Editorial Luxury Header */}
-      <header className="relative overflow-hidden rounded-3xl border border-gray-200/80 bg-gradient-to-br from-white via-stone-50/50 to-stone-100/60 p-6 sm:p-10 shadow-sm dark:border-white/10 dark:from-[#181220] dark:via-[#140e1b] dark:to-[#0f0b14]">
+      <header className="relative overflow-hidden rounded-3xl border border-[var(--wiez-border-subtle,#e5e7eb)] bg-[var(--wiez-surface-card,#ffffff)] p-6 sm:p-10 shadow-sm dark:border-white/10 dark:bg-[var(--wiez-surface-card,#181220)]">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <button
             type="button"
@@ -597,8 +598,8 @@ const MarketSectionPage: React.FC = () => {
                   onClick={() => setActiveFilter(chip.id)}
                   className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
                     activeFilter === chip.id
-                      ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-950 shadow-sm'
-                      : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-white/15 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
+                      ? 'bg-[var(--wiez-action-brand,#9333ea)] text-white shadow-sm'
+                      : 'border border-[var(--wiez-border-subtle,#e5e7eb)] bg-[var(--wiez-surface-card,#ffffff)] text-gray-600 hover:bg-gray-50 dark:border-white/15 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
                   }`}
                 >
                   {chip.label}
@@ -631,18 +632,19 @@ const MarketSectionPage: React.FC = () => {
             ))}
           </div>
         ) : error && items.length === 0 ? (
-          <div className="rounded-3xl border border-gray-200 bg-white p-10 text-center dark:border-white/10 dark:bg-white/[0.04] space-y-4">
+          <div className="rounded-3xl border border-[var(--wiez-border-subtle,#e5e7eb)] bg-[var(--wiez-surface-card,#ffffff)] p-10 text-center dark:border-white/10 dark:bg-white/[0.04] space-y-4">
             <p className="text-base font-semibold text-gray-900 dark:text-white">{error}</p>
-            <button
+            <Button
               type="button"
               onClick={() => void sectionDetailQuery.refetch()}
-              className="rounded-full bg-gray-900 px-6 py-2.5 text-xs font-bold text-white hover:bg-black dark:bg-white dark:text-gray-900 transition"
+              variant="secondary"
+              size="sm"
             >
               Retry Loading Section
-            </button>
+            </Button>
           </div>
         ) : filteredAndSortedItems.length === 0 ? (
-          <div className="rounded-3xl border border-gray-200 bg-white p-12 text-center dark:border-white/10 dark:bg-white/[0.04] space-y-3">
+          <div className="rounded-3xl border border-[var(--wiez-border-subtle,#e5e7eb)] bg-[var(--wiez-surface-card,#ffffff)] p-12 text-center dark:border-white/10 dark:bg-white/[0.04] space-y-3">
             <Compass className="h-8 w-8 mx-auto text-gray-400 opacity-60" />
             <p className="text-base font-bold text-gray-900 dark:text-white">
               No matching pieces found for this filter.
@@ -650,13 +652,14 @@ const MarketSectionPage: React.FC = () => {
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Try switching back to &apos;All&apos; to view all curated pieces in this section.
             </p>
-            <button
+            <Button
               type="button"
               onClick={() => setActiveFilter('ALL')}
-              className="mt-2 inline-flex rounded-full border border-gray-300 px-4 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-100 dark:border-white/20 dark:text-gray-200 dark:hover:bg-white/10"
+              variant="secondary"
+              size="sm"
             >
               Reset Filter
-            </button>
+            </Button>
           </div>
         ) : (
           <>
@@ -698,14 +701,16 @@ const MarketSectionPage: React.FC = () => {
 
             <div className="flex justify-center pt-8 pb-12">
               {hasNextPage ? (
-                <button
+                <Button
                   type="button"
                   disabled={loadingMore}
+                  loading={loadingMore}
                   onClick={() => void loadMore()}
-                  className="rounded-full bg-gray-900 px-8 py-3 text-sm font-bold text-white shadow-md transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-gray-900"
+                  variant="secondary"
+                  size="md"
                 >
-                  {loadingMore ? 'Loading more pieces...' : 'Load more pieces'}
-                </button>
+                  Load more pieces
+                </Button>
               ) : (
                 <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
                   End of Section Catalog

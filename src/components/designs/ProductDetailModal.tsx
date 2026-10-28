@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Button from '@/components/ui/Button';
 import {
   X, Minus, Plus, Star, ChevronRight, AlertTriangle, Check, Share2,
   ChevronDown, Truck, Ruler, Package, Sparkles, Copy
@@ -328,30 +329,29 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               className="fixed inset-0 z-layer-overlay"
               onClick={onClose}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
-              <div className="absolute inset-0 backdrop-blur-xl" />
-              <div className="absolute inset-0 bg-black/40" />
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
             </motion.div>
 
             {/* Modal */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              exit={{ opacity: 0, scale: 1, y: 0 }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="fixed inset-4 md:inset-8 lg:inset-12 z-layer-modal flex items-center justify-center"
               role="dialog"
               aria-modal="true"
               aria-label={product?.name ?? 'Product details'}
             >
-              <div ref={dialogRef} tabIndex={-1} className="w-full max-w-[1360px] max-h-full neu-modal-surface bg-white dark:bg-gray-950 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+              <div ref={dialogRef} tabIndex={-1} className="w-full max-w-[1360px] max-h-full neu-modal-surface bg-[color:var(--wiez-surface-modal)] border border-[color:var(--wiez-border-subtle)] rounded-[28px] shadow-2xl overflow-hidden flex flex-col">
               {/* Close button */}
               <button
                 type="button"
                 onClick={onClose}
-                className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm hover:bg-white dark:hover:bg-gray-900 transition-colors shadow-lg"
+                aria-label="Close product details"
+                className="absolute top-4 right-4 z-10 p-2.5 rounded-full bg-[color:var(--wiez-surface-card)]/90 backdrop-blur-sm border border-[color:var(--wiez-border-subtle)] hover:bg-[color:var(--wiez-surface-card)] text-[color:var(--wiez-text-secondary)] hover:text-[color:var(--wiez-text-primary)] transition-colors shadow-md"
               >
-                <X size={20} className="text-gray-600 dark:text-gray-400" />
+                <X size={20} />
               </button>
 
               {/* Scrollable content */}
@@ -359,7 +359,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 {/* Main content grid */}
                 <div className="grid lg:grid-cols-2 gap-0">
                   {/* Left - Image Gallery */}
-                  <div className="relative bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 p-6">
+                  <div className="relative bg-[color:var(--wiez-surface-subtle)]/40 p-6">
                     {/* Main image */}
                     <div className={`${CONTENT_DISPLAY_FRAME_CLASS} h-[520px] sm:h-[580px] lg:h-[650px] max-h-[70vh] rounded-2xl shadow-lg`}>
                       <MediaRenderer
@@ -387,10 +387,10 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         disabled={isOwnProduct}
                         aria-label={isOwnProduct ? 'Wishlist disabled for your own product' : isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                         title={isOwnProduct ? 'Brands cannot wishlist their own products' : isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-                        className={`absolute top-4 right-4 p-3 rounded-full backdrop-blur-md transition-all duration-200 shadow-lg ${
+                        className={`absolute top-4 right-4 p-3 rounded-full backdrop-blur-md transition-all duration-200 shadow-lg border border-[color:var(--wiez-border-subtle)] ${
                           isWishlisted
-                            ? 'bg-red-500 text-white'
-                            : 'bg-white/90 dark:bg-gray-900/90 text-gray-600 dark:text-gray-400 hover:text-red-500'
+                            ? 'bg-red-500 text-white border-transparent'
+                            : 'bg-white/90 dark:bg-gray-900/90 text-[color:var(--wiez-text-secondary)] hover:text-red-500'
                         } ${isOwnProduct ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <span role="img" aria-hidden="true" className="text-lg leading-none">
@@ -408,8 +408,8 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                             onClick={() => setSelectedImage(i)}
                             className={`flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
                               selectedImage === i
-                                ? 'border-purple-500 ring-2 ring-purple-500/30'
-                                : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+                                ? 'border-[color:var(--wiez-action-brand)] ring-2 ring-[color:var(--wiez-action-brand)]/30'
+                                : 'border-transparent hover:border-[color:var(--wiez-border-default)]'
                             }`}
                           >
                             <MediaRenderer
@@ -430,20 +430,20 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   {/* Right - Product Details */}
                   <div className="p-6 lg:p-8 flex flex-col">
                     {/* Breadcrumb */}
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-4">
-                      <span className="hover:text-purple-500 cursor-pointer">{product.brand.name}</span>
+                    <div className="flex items-center gap-2 text-xs text-[color:var(--wiez-text-muted)] mb-4">
+                      <span className="hover:text-[color:var(--wiez-action-brand)] cursor-pointer">{product.brand.name}</span>
                       <ChevronRight size={12} />
                       {product.collection && (
                         <>
-                          <span className="hover:text-purple-500 cursor-pointer">{product.collection.name}</span>
+                          <span className="hover:text-[color:var(--wiez-action-brand)] cursor-pointer">{product.collection.name}</span>
                           <ChevronRight size={12} />
                         </>
                       )}
-                      <span className="text-gray-700 dark:text-gray-300 truncate">{product.name}</span>
+                      <span className="text-[color:var(--wiez-text-secondary)] truncate">{product.name}</span>
                     </div>
 
                     {/* Title */}
-                    <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>
+                    <h1 className="text-2xl lg:text-3xl font-bold text-[color:var(--wiez-text-primary)] mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>
                       {product.name}
                     </h1>
 
@@ -460,11 +460,11 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                             />
                           ))}
                         </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        <span className="text-sm font-medium text-[color:var(--wiez-text-primary)]">
                           {product.rating.toFixed(1)}
                         </span>
                         {product.reviewsCount && (
-                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                          <span className="text-sm text-[color:var(--wiez-text-muted)]">
                             ({product.reviewsCount} reviews)
                           </span>
                         )}
@@ -473,12 +473,12 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
                     {/* Price */}
                     <div className="flex items-baseline gap-3 mb-6">
-                      <span className="text-3xl font-bold text-gray-900 dark:text-white">
+                      <span className="text-3xl font-bold text-[color:var(--wiez-text-primary)]">
                         {formatPrice(effectivePrice)}
                       </span>
                       {isOnSale && (
                         <>
-                          <span className="text-lg text-gray-400 line-through">
+                          <span className="text-lg text-[color:var(--wiez-text-muted)] line-through">
                             {formatPrice(product.price)}
                           </span>
                           <span className="px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-semibold">
@@ -492,8 +492,8 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     {product.colors.length > 0 && (
                       <div className="mb-6">
                         <div className="flex items-center justify-between mb-3">
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Color: <span className="font-semibold text-gray-900 dark:text-white">{selectedColor}</span>
+                          <span className="text-sm font-medium text-[color:var(--wiez-text-secondary)]">
+                            Color: <span className="font-semibold text-[color:var(--wiez-text-primary)]">{selectedColor}</span>
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -507,8 +507,8 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                                 onClick={() => setSelectedColor(color)}
                                 className={`w-10 h-10 rounded-full border-2 transition-all relative ${
                                   selectedColor === color
-                                    ? 'border-purple-500 ring-2 ring-purple-500/30 scale-110'
-                                    : 'border-gray-300 dark:border-gray-600 hover:border-purple-400'
+                                    ? 'border-[color:var(--wiez-action-brand)] ring-2 ring-[color:var(--wiez-action-brand)]/30 scale-110'
+                                    : 'border-[color:var(--wiez-border-default)] hover:border-[color:var(--wiez-border-strong)]'
                                 }`}
                                 style={{
                                   background: isGradient ? colorStyle : colorStyle,
@@ -529,10 +529,10 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     {product.sizes.length > 0 && (
                       <div className="mb-6">
                         <div className="flex items-center justify-between mb-3">
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Size {selectedSize && <span className="font-semibold text-gray-900 dark:text-white">({selectedSize})</span>}
+                          <span className="text-sm font-medium text-[color:var(--wiez-text-secondary)]">
+                            Size {selectedSize && <span className="font-semibold text-[color:var(--wiez-text-primary)]">({selectedSize})</span>}
                           </span>
-                          <button className="text-sm text-purple-600 hover:text-purple-700 font-medium">
+                          <button className="text-sm text-[color:var(--wiez-action-brand)] hover:underline font-medium">
                             Size Guide
                           </button>
                         </div>
@@ -548,10 +548,10 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                                 disabled={!available}
                                 className={`min-w-[44px] h-11 px-3 rounded-lg border-2 text-sm font-semibold transition-all relative ${
                                   !available
-                                    ? 'border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900 text-gray-400 cursor-not-allowed line-through'
+                                    ? 'border-[color:var(--wiez-border-subtle)] bg-[color:var(--wiez-surface-subtle)] text-[color:var(--wiez-text-muted)] cursor-not-allowed line-through'
                                     : selectedSize === size
-                                    ? 'neu-inset-chip selected border-[color:var(--neu-border)] bg-purple-500 text-white'
-                                    : 'neu-pressed-button text-gray-900 dark:text-white'
+                                    ? 'neu-inset-chip selected border-[color:var(--neu-border)] bg-[color:var(--wiez-action-brand)] text-white'
+                                    : 'neu-pressed-button text-[color:var(--wiez-text-primary)]'
                                 }`}
                               >
                                 {size}
@@ -567,25 +567,27 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
                     {/* Quantity */}
                     <div className="mb-6">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">
+                      <span className="text-sm font-medium text-[color:var(--wiez-text-secondary)] mb-3 block">
                         Quantity
                       </span>
                       <div className="flex items-center gap-4">
-                        <div className="flex items-center rounded-xl border border-gray-300 dark:border-gray-600 overflow-hidden">
+                        <div className="flex items-center rounded-xl border border-[color:var(--wiez-border-default)] bg-[color:var(--wiez-surface-subtle)]/30 overflow-hidden">
                           <button
                             onClick={() => setQuantity(Math.max(1, quantity - 1))}
                             disabled={quantity <= 1}
-                            className="w-12 h-12 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 transition-colors"
+                            className="w-12 h-12 flex items-center justify-center hover:bg-[color:var(--wiez-surface-subtle)] text-[color:var(--wiez-text-primary)] disabled:opacity-40 transition-colors"
+                            aria-label="Decrease quantity"
                           >
                             <Minus size={18} />
                           </button>
-                          <span className="w-12 text-center text-lg font-semibold text-gray-900 dark:text-white">
+                          <span className="w-12 text-center text-lg font-semibold text-[color:var(--wiez-text-primary)]">
                             {quantity}
                           </span>
                           <button
                             onClick={() => setQuantity(Math.min(selectedSizeStock, quantity + 1))}
                             disabled={quantity >= selectedSizeStock}
-                            className="w-12 h-12 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 transition-colors"
+                            className="w-12 h-12 flex items-center justify-center hover:bg-[color:var(--wiez-surface-subtle)] text-[color:var(--wiez-text-primary)] disabled:opacity-40 transition-colors"
+                            aria-label="Increase quantity"
                           >
                             <Plus size={18} />
                           </button>
@@ -610,50 +612,58 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     {/* Bag it & Wishlist */}
                     <div className="flex flex-col gap-2.5 mb-6">
                       {!isOwnProduct ? (
-                        <button
+                        <Button
+                          variant="brand"
+                          size="lg"
+                          fullWidth
                           onClick={handleAddToCart}
                           disabled={isAddingToCart || isOutOfStock || (product.sizes.length > 0 && !selectedSize)}
                           title={BAG_IT_LABEL}
-                          className="w-full h-14 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                          className="h-14 rounded-xl text-base font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40"
                         >
-                          <BagPulseIcon
-                            status={isAddingToCart ? 'bagging' : isOutOfStock ? 'disabled' : 'not_bagged'}
-                            context="detail"
-                            size={32}
-                            disabled={isAddingToCart || isOutOfStock}
-                          />
-                          {isAddingToCart ? 'Bagging...' : `${BAG_IT_EMOJI} ${BAG_IT_LABEL}`}
-                        </button>
+                          <span className="inline-flex items-center justify-center gap-2">
+                            <BagPulseIcon
+                              status={isAddingToCart ? 'bagging' : isOutOfStock ? 'disabled' : 'not_bagged'}
+                              context="detail"
+                              size={32}
+                              disabled={isAddingToCart || isOutOfStock}
+                            />
+                            <span>{isAddingToCart ? 'Bagging...' : `${BAG_IT_EMOJI} ${BAG_IT_LABEL}`}</span>
+                          </span>
+                        </Button>
                       ) : (
-                        <div className="w-full h-14 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 font-medium flex items-center justify-center">
+                        <div className="w-full h-14 rounded-xl border border-[color:var(--wiez-border-default)] bg-[color:var(--wiez-surface-subtle)] text-[color:var(--wiez-text-secondary)] font-medium flex items-center justify-center">
                           Your product
                         </div>
                       )}
 
                       <div className="flex gap-2.5">
-                        <button
+                        <Button
+                          variant="secondary"
                           onClick={handleToggleWishlist}
                           disabled={isOwnProduct}
-                          className={`flex-1 h-12 rounded-xl border font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-200 ${
+                          className={`flex-1 h-12 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 ${
                             isWishlisted
-                              ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
-                              : 'border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400'
-                          } ${isOwnProduct ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              ? '!border-red-300 dark:!border-red-700 !bg-red-50 dark:!bg-red-900/20 !text-red-600 dark:!text-red-400'
+                              : ''
+                          }`}
                         >
                           <span role="img" aria-hidden="true" className="text-base">
                             {isWishlisted ? filledHeartEmoji : outlineHeartEmoji}
                           </span>
-                          {isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
-                        </button>
+                          <span>{isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}</span>
+                        </Button>
 
                         {/* Share button */}
                         <div className="relative" ref={shareMenuRef}>
-                          <button
+                          <Button
+                            variant="secondary"
                             onClick={() => setIsShareMenuOpen(!isShareMenuOpen)}
-                            className="w-12 h-12 rounded-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            className="w-12 h-12 !px-0 rounded-xl flex items-center justify-center"
+                            aria-label="Share product"
                           >
-                            <Share2 size={18} className="text-gray-600 dark:text-gray-400" />
-                          </button>
+                            <Share2 size={18} className="text-[color:var(--wiez-text-secondary)]" />
+                          </Button>
                         
                         {/* Share dropdown menu */}
                         <AnimatePresence>
@@ -663,35 +673,35 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               exit={{ opacity: 0, y: -10, scale: 0.95 }}
                               transition={{ duration: 0.15 }}
-                              className="absolute right-0 top-full mt-2 w-48 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden z-20"
+                              className="absolute right-0 top-full mt-2 w-48 rounded-xl bg-[color:var(--wiez-surface-card)] border border-[color:var(--wiez-border-default)] shadow-xl overflow-hidden z-20"
                             >
                               <button
                                 onClick={handleCopyLink}
-                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[color:var(--wiez-surface-subtle)] transition-colors text-left"
                               >
-                                <Copy size={18} className="text-gray-500 dark:text-gray-400" />
-                                <span className="text-sm text-gray-700 dark:text-gray-300">Copy Link</span>
+                                <Copy size={18} className="text-[color:var(--wiez-text-muted)]" />
+                                <span className="text-sm text-[color:var(--wiez-text-primary)]">Copy Link</span>
                               </button>
                               <button
                                 onClick={handleShareInstagram}
-                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[color:var(--wiez-surface-subtle)] transition-colors text-left"
                               >
                                 <FaInstagram size={18} className="text-pink-500" />
-                                <span className="text-sm text-gray-700 dark:text-gray-300">Instagram</span>
+                                <span className="text-sm text-[color:var(--wiez-text-primary)]">Instagram</span>
                               </button>
                               <button
                                 onClick={handleShareWhatsApp}
-                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[color:var(--wiez-surface-subtle)] transition-colors text-left"
                               >
                                 <FaWhatsapp size={18} className="text-green-500" />
-                                <span className="text-sm text-gray-700 dark:text-gray-300">WhatsApp</span>
+                                <span className="text-sm text-[color:var(--wiez-text-primary)]">WhatsApp</span>
                               </button>
                               <button
                                 onClick={handleShareTwitter}
-                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[color:var(--wiez-surface-subtle)] transition-colors text-left"
                               >
-                                <FaXTwitter size={18} className="text-gray-900 dark:text-white" />
-                                <span className="text-sm text-gray-700 dark:text-gray-300">X (Twitter)</span>
+                                <FaXTwitter size={18} className="text-[color:var(--wiez-text-primary)]" />
+                                <span className="text-sm text-[color:var(--wiez-text-primary)]">X (Twitter)</span>
                               </button>
                             </motion.div>
                           )}
@@ -701,13 +711,13 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     </div>
 
                     {/* Delivery Estimate */}
-                    <div className="flex items-center gap-3 p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800/30 mb-6">
-                      <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-800/40 flex items-center justify-center">
-                        <Truck size={20} className="text-purple-600 dark:text-purple-400" />
+                    <div className="flex items-center gap-3 p-4 rounded-xl bg-[color:var(--wiez-surface-subtle)] border border-[color:var(--wiez-border-subtle)] mb-6">
+                      <div className="w-10 h-10 rounded-full bg-[color:var(--wiez-action-brand)]/10 flex items-center justify-center">
+                        <Truck size={20} className="text-[color:var(--wiez-action-brand)]" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">Estimated Delivery</p>
-                        <p className="text-sm text-purple-600 dark:text-purple-400 font-semibold">{getEstimatedDelivery()}</p>
+                        <p className="text-sm font-medium text-[color:var(--wiez-text-primary)]">Estimated Delivery</p>
+                        <p className="text-sm text-[color:var(--wiez-action-brand)] font-semibold">{getEstimatedDelivery()}</p>
                       </div>
                     </div>
 
@@ -738,7 +748,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                                 transition={{ duration: 0.2 }}
                                 className="overflow-hidden"
                               >
-                                <p className="pb-4 text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                                <p className="pb-4 text-sm text-[color:var(--wiez-text-secondary)] leading-relaxed">
                                   {product.description}
                                 </p>
                               </motion.div>
@@ -748,18 +758,18 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       )}
 
                       {/* Size Guide Accordion */}
-                      <div className="border-b border-gray-200 dark:border-gray-800">
+                      <div className="border-b border-[color:var(--wiez-border-subtle)]">
                         <button
                           onClick={() => toggleSection('sizeGuide')}
                           className="w-full flex items-center justify-between py-4 text-left"
                         >
                           <div className="flex items-center gap-2">
-                            <Ruler size={18} className="text-purple-500" />
-                            <span className="font-semibold text-gray-900 dark:text-white">Size Guide</span>
+                            <Ruler size={18} className="text-[color:var(--wiez-action-brand)]" />
+                            <span className="font-semibold text-[color:var(--wiez-text-primary)]">Size Guide</span>
                           </div>
                           <ChevronDown
                             size={20}
-                            className={`text-gray-500 transition-transform duration-200 ${expandedSections.sizeGuide ? 'rotate-180' : ''}`}
+                            className={`text-[color:var(--wiez-text-muted)] transition-transform duration-200 ${expandedSections.sizeGuide ? 'rotate-180' : ''}`}
                           />
                         </button>
                         <AnimatePresence>
@@ -771,23 +781,23 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                               transition={{ duration: 0.2 }}
                               className="overflow-hidden"
                             >
-                              <div className="pb-4 text-sm text-gray-600 dark:text-gray-400">
+                              <div className="pb-4 text-sm text-[color:var(--wiez-text-secondary)]">
                                 <div className="grid grid-cols-4 gap-2 text-center mb-2">
-                                  <div className="font-semibold text-gray-900 dark:text-white">Size</div>
-                                  <div className="font-semibold text-gray-900 dark:text-white">Chest</div>
-                                  <div className="font-semibold text-gray-900 dark:text-white">Waist</div>
-                                  <div className="font-semibold text-gray-900 dark:text-white">Length</div>
+                                  <div className="font-semibold text-[color:var(--wiez-text-primary)]">Size</div>
+                                  <div className="font-semibold text-[color:var(--wiez-text-primary)]">Chest</div>
+                                  <div className="font-semibold text-[color:var(--wiez-text-primary)]">Waist</div>
+                                  <div className="font-semibold text-[color:var(--wiez-text-primary)]">Length</div>
                                 </div>
-                                <div className="grid grid-cols-4 gap-2 text-center py-1 border-t border-gray-100 dark:border-gray-800">
+                                <div className="grid grid-cols-4 gap-2 text-center py-1 border-t border-[color:var(--wiez-border-subtle)]">
                                   <div>S</div><div>36"</div><div>30"</div><div>27"</div>
                                 </div>
-                                <div className="grid grid-cols-4 gap-2 text-center py-1 border-t border-gray-100 dark:border-gray-800">
+                                <div className="grid grid-cols-4 gap-2 text-center py-1 border-t border-[color:var(--wiez-border-subtle)]">
                                   <div>M</div><div>38"</div><div>32"</div><div>28"</div>
                                 </div>
-                                <div className="grid grid-cols-4 gap-2 text-center py-1 border-t border-gray-100 dark:border-gray-800">
+                                <div className="grid grid-cols-4 gap-2 text-center py-1 border-t border-[color:var(--wiez-border-subtle)]">
                                   <div>L</div><div>40"</div><div>34"</div><div>29"</div>
                                 </div>
-                                <div className="grid grid-cols-4 gap-2 text-center py-1 border-t border-gray-100 dark:border-gray-800">
+                                <div className="grid grid-cols-4 gap-2 text-center py-1 border-t border-[color:var(--wiez-border-subtle)]">
                                   <div>XL</div><div>42"</div><div>36"</div><div>30"</div>
                                 </div>
                               </div>
@@ -797,18 +807,18 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       </div>
 
                       {/* Shipping & Returns Accordion */}
-                      <div className="border-b border-gray-200 dark:border-gray-800">
+                      <div className="border-b border-[color:var(--wiez-border-subtle)]">
                         <button
                           onClick={() => toggleSection('shipping')}
                           className="w-full flex items-center justify-between py-4 text-left"
                         >
                           <div className="flex items-center gap-2">
-                            <Package size={18} className="text-purple-500" />
-                            <span className="font-semibold text-gray-900 dark:text-white">Shipping & Returns</span>
+                            <Package size={18} className="text-[color:var(--wiez-action-brand)]" />
+                            <span className="font-semibold text-[color:var(--wiez-text-primary)]">Shipping & Returns</span>
                           </div>
                           <ChevronDown
                             size={20}
-                            className={`text-gray-500 transition-transform duration-200 ${expandedSections.shipping ? 'rotate-180' : ''}`}
+                            className={`text-[color:var(--wiez-text-muted)] transition-transform duration-200 ${expandedSections.shipping ? 'rotate-180' : ''}`}
                           />
                         </button>
                         <AnimatePresence>
@@ -820,7 +830,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                               transition={{ duration: 0.2 }}
                               className="overflow-hidden"
                             >
-                              <div className="pb-4 text-sm text-gray-600 dark:text-gray-400 space-y-2">
+                              <div className="pb-4 text-sm text-[color:var(--wiez-text-secondary)] space-y-2">
                                 <p>• Free shipping on orders over ₦50,000</p>
                                 <p>• Standard delivery: 5-8 business days</p>
                                 <p>• Express delivery available at checkout</p>
@@ -839,12 +849,12 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                           className="w-full flex items-center justify-between py-4 text-left"
                         >
                           <div className="flex items-center gap-2">
-                            <Sparkles size={18} className="text-purple-500" />
-                            <span className="font-semibold text-gray-900 dark:text-white">Care Instructions</span>
+                            <Sparkles size={18} className="text-[color:var(--wiez-action-brand)]" />
+                            <span className="font-semibold text-[color:var(--wiez-text-primary)]">Care Instructions</span>
                           </div>
                           <ChevronDown
                             size={20}
-                            className={`text-gray-500 transition-transform duration-200 ${expandedSections.care ? 'rotate-180' : ''}`}
+                            className={`text-[color:var(--wiez-text-muted)] transition-transform duration-200 ${expandedSections.care ? 'rotate-180' : ''}`}
                           />
                         </button>
                         <AnimatePresence>
@@ -856,7 +866,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                               transition={{ duration: 0.2 }}
                               className="overflow-hidden"
                             >
-                              <div className="pb-4 text-sm text-gray-600 dark:text-gray-400 space-y-2">
+                              <div className="pb-4 text-sm text-[color:var(--wiez-text-secondary)] space-y-2">
                                 <p>• Machine wash cold with similar colors</p>
                                 <p>• Do not bleach</p>
                                 <p>• Tumble dry low</p>
@@ -873,8 +883,8 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
                 {/* Related Products */}
                 {relatedProducts.length > 0 && (
-                  <div className="px-6 lg:px-8 pb-8 border-t border-gray-200 dark:border-gray-800">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 pt-6">
+                  <div className="px-6 lg:px-8 pb-8 border-t border-[color:var(--wiez-border-subtle)]">
+                    <h3 className="text-lg font-bold text-[color:var(--wiez-text-primary)] mb-4 pt-6">
                       From This Collection
                     </h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -884,7 +894,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                           onClick={() => onViewProduct?.(relProd)}
                           className="text-left group"
                         >
-                          <div className="rounded-xl overflow-y-auto mb-2 group-hover:ring-2 ring-purple-500 transition-all">
+                          <div className="rounded-xl overflow-y-auto mb-2 group-hover:ring-2 ring-[color:var(--wiez-action-brand)] transition-all">
                             <MediaRenderer
                               kind="image"
                               src={relProd.thumbnail || relProd.images[0] || ''}
@@ -894,15 +904,15 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                               mediaClassName="rounded-xl"
                             />
                           </div>
-                          <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          <h4 className="text-sm font-medium text-[color:var(--wiez-text-primary)] truncate">
                             {relProd.name}
                           </h4>
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-gray-900 dark:text-white">
+                            <span className="text-sm font-bold text-[color:var(--wiez-text-primary)]">
                               {formatPrice(relProd.salePrice || relProd.price)}
                             </span>
                             {relProd.salePrice && (
-                              <span className="text-xs text-gray-400 line-through">
+                              <span className="text-xs text-[color:var(--wiez-text-muted)] line-through">
                                 {formatPrice(relProd.price)}
                               </span>
                             )}
@@ -915,15 +925,15 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
 
               {/* Mobile Sticky Footer */}
-              <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] z-20">
+              <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-[color:var(--wiez-surface-card)] border-t border-[color:var(--wiez-border-subtle)] shadow-[0_-4px_20px_rgba(0,0,0,0.1)] z-20">
                 <div className="flex items-center gap-3">
                   {/* Price display */}
                   <div className="flex-shrink-0">
-                    <div className="text-lg font-bold text-gray-900 dark:text-white">
+                    <div className="text-lg font-bold text-[color:var(--wiez-text-primary)]">
                       {formatPrice(effectivePrice)}
                     </div>
                     {isOnSale && (
-                      <div className="text-xs text-gray-400 line-through">
+                      <div className="text-xs text-[color:var(--wiez-text-muted)] line-through">
                         {formatPrice(product.price)}
                       </div>
                     )}
@@ -931,22 +941,26 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   
                   {/* Bag it button */}
                   {!isOwnProduct ? (
-                    <button
+                    <Button
+                      variant="brand"
+                      size="md"
                       onClick={handleAddToCart}
                       disabled={isAddingToCart || isOutOfStock || (product.sizes.length > 0 && !selectedSize)}
                       title={BAG_IT_LABEL}
-                      className="flex-1 h-12 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                      className="flex-1 h-12 rounded-xl font-semibold shadow-lg shadow-purple-500/25"
                     >
-                      <BagPulseIcon
-                        status={isAddingToCart ? 'bagging' : isOutOfStock ? 'disabled' : 'not_bagged'}
-                        context="detail"
-                        size={30}
-                        disabled={isAddingToCart || isOutOfStock}
-                      />
-                      {isAddingToCart ? 'Bagging...' : isOutOfStock ? 'Out of Stock' : `${BAG_IT_EMOJI} ${BAG_IT_LABEL}`}
-                    </button>
+                      <span className="inline-flex items-center justify-center gap-2">
+                        <BagPulseIcon
+                          status={isAddingToCart ? 'bagging' : isOutOfStock ? 'disabled' : 'not_bagged'}
+                          context="detail"
+                          size={30}
+                          disabled={isAddingToCart || isOutOfStock}
+                        />
+                        <span>{isAddingToCart ? 'Bagging...' : isOutOfStock ? 'Out of Stock' : `${BAG_IT_EMOJI} ${BAG_IT_LABEL}`}</span>
+                      </span>
+                    </Button>
                   ) : (
-                    <div className="flex-1 h-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 font-medium flex items-center justify-center">
+                    <div className="flex-1 h-12 rounded-xl border border-[color:var(--wiez-border-default)] bg-[color:var(--wiez-surface-subtle)] text-[color:var(--wiez-text-secondary)] font-medium flex items-center justify-center">
                       Your product
                     </div>
                   )}

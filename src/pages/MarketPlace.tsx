@@ -34,6 +34,7 @@ import { useMarketSurfacePrefetch } from '@/hooks/useMarketSurfacePrefetch';
 import { useOverlayBackClose } from '@/hooks/useOverlayBackClose';
 import { selectIsMobile } from '@/features/uiSlice';
 import { createMixSeed, mixFeedItems } from '@/utils/feedMixer';
+import Button from '@/components/ui/Button';
 
 const BASE_FILTERS = ['FOR_YOU', 'MENSWEAR', 'WOMENSWEAR', 'EVERYBODY', 'ON_SALE'] as const;
 const FRESH_DROP_DAY_MS = 24 * 60 * 60 * 1000;
@@ -496,7 +497,7 @@ export const MarketPlace: React.FC = () => {
         <div className="space-y-4 border-t border-gray-200/70 pt-8 dark:border-white/10">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[color:var(--brand-primary,#9333EA)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--wiez-action-brand,#9333ea)]">
                 DESTINATION CATALOG
               </p>
               <h2 className="mt-1 font-serif text-2xl font-normal tracking-tight text-gray-900 dark:text-white sm:text-3xl">
@@ -527,7 +528,7 @@ export const MarketPlace: React.FC = () => {
                   onClick={() => setSelectedAudienceFilter(filter)}
                   aria-pressed={active}
                   className={`relative whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition-all chip-inset ${
-                    active ? 'bg-purple-700 text-white font-bold shadow-inner' : 'text-theme-secondary hover:text-theme hover:bg-[color:var(--surface-muted)]'
+                    active ? 'bg-[var(--wiez-action-brand,#9333ea)] text-white font-bold shadow-inner' : 'text-theme-secondary hover:text-theme hover:bg-[color:var(--surface-muted)]'
                   }`}
                 >
                   {filter === 'FOR_YOU' && 'Discover •'}
@@ -634,18 +635,20 @@ export const MarketPlace: React.FC = () => {
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               Try switching back to &apos;Discover •&apos; or resetting your craftsmanship and price filters.
             </p>
-            <button
+            <Button
               type="button"
+              variant="brand"
+              size="md"
               onClick={() => {
                 setSelectedAudienceFilter('FOR_YOU');
                 setCraftsmanshipFilter('ALL');
                 setPriceRangeFilter('ALL');
                 setSortBy('EDITORIAL');
               }}
-              className="mt-5 rounded-full bg-purple-700 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-purple-600 active:scale-95"
+              className="mt-5"
             >
               Reset Filters
-            </button>
+            </Button>
           </div>
         )}
       </div>

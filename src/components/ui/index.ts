@@ -5,6 +5,11 @@ export type { CardProps } from './Card';
 export { default as Badge } from './Badge';
 export type { BadgeProps } from './Badge';
 
+export { default as Tag } from './Tag';
+
+export { default as Text } from './Text';
+export type { TextProps, TextVariant, TextTone } from './Text';
+
 export { default as Avatar } from './Avatar';
 export type { AvatarProps } from './Avatar';
 
