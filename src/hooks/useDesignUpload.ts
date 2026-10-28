@@ -33,6 +33,7 @@ type UploadOptions = {
   categoryId?: string;
   subCategoryId?: string;
   categoryTypeId?: string;
+  pendingCategorySuggestionId?: string | null;
   type?: 'MALE' | 'FEMALE' | 'EVERYBODY';
   filterValueIds?: string[];
   coverIndex?: number;
@@ -366,6 +367,7 @@ export const buildDesignUploadMetadata = (
     categoryId: optionalString(options.categoryId),
     subCategoryId: optionalString(options.subCategoryId),
     categoryTypeId: resolvedCategoryTypeId,
+    pendingCategorySuggestionId: options.pendingCategorySuggestionId,
     tags: parsed.tags,
     filterValueIds: options.filterValueIds,
     sizingMode: options.sizingMode,
@@ -545,10 +547,10 @@ export function useDesignUpload() {
       if (normalizedTags.length === 0) {
         throw new Error('Add at least one tag to describe this design.');
       }
-      if (!normalizedCategoryId) {
+      if (!normalizedCategoryId && !parsed.options.pendingCategorySuggestionId) {
         throw new Error('Please select a category before publishing.');
       }
-      if (!normalizedSubCategoryId) {
+      if (!normalizedSubCategoryId && !parsed.options.pendingCategorySuggestionId) {
         throw new Error('Please select a sub-category before publishing.');
       }
     }
@@ -588,6 +590,7 @@ export function useDesignUpload() {
         categoryId: optionalString(parsed.options.categoryId),
         subCategoryId: optionalString(parsed.options.subCategoryId),
         categoryTypeId: optionalString(parsed.options.categoryTypeId),
+        pendingCategorySuggestionId: parsed.options.pendingCategorySuggestionId,
         type: parsed.options.type,
         visibility: parsed.options.visibility,
         filterValueIds: parsed.options.filterValueIds,

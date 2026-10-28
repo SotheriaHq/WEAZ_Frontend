@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { DesignTaxonomyProposalField, type SelectedTaxonomyProposal } from '@/components/categories/DesignTaxonomyProposalField';
+import { useCategorySuggestions } from '@/hooks/useCategorySuggestions';
 import { creatorCategoriesOptions, EMPTY_CREATOR_CATEGORIES } from '@/query/creatorMetadataQueries';
 import React, {
   useEffect,
@@ -309,6 +311,10 @@ const CreateDesignInner: React.FC = () => {
 
   const [categoryId, setCategoryId] = useState<string>("");
   const [categoryTypeId, setCategoryTypeId] = useState<string>("");
+  const [pendingProposal, setPendingProposal] = useState<SelectedTaxonomyProposal | null>(null);
+  const pendingQuery = useCategorySuggestions(Boolean(pendingProposal));
+  const selectedProposal = pendingQuery.data?.pages.flatMap(page => page.items).find(item => item.id === pendingProposal?.id) ?? pendingProposal;
+  const hasPendingTaxonomy = Boolean(selectedProposal?.id && selectedProposal.garmentTypeName && selectedProposal.status !== 'REJECTED');
   const [filterSelection, setFilterSelection] = useState<FilterSelection>({});
   const [type, setType] = useState<"MALE" | "FEMALE" | "EVERYBODY">(
     "EVERYBODY",
@@ -501,6 +507,9 @@ const CreateDesignInner: React.FC = () => {
         setSelectedTags(Array.isArray(d.tags) ? d.tags : []);
         setCategoryId(d.categoryId || "");
         setCategoryTypeId((d as any).subCategoryId || d.categoryTypeId || "");
+        setPendingProposal(d.pendingCategorySuggestionId ? (d.pendingCategorySuggestion ?? {
+          id:d.pendingCategorySuggestionId,name:d.pendingCategoryName ?? 'Saved category request',garmentTypeName:null,status:'PENDING',
+        }) : null);
         setType(d.type || "EVERYBODY");
         setVisibility(d.visibility || "PUBLIC");
         const nextSizingMode = normalizeDesignSizingModeForCreation(d.sizingMode);
@@ -646,8 +655,7 @@ const CreateDesignInner: React.FC = () => {
     files.length <= DESIGN_MAX_MEDIA_COUNT &&
     selectedTags.length > 0 &&
     getSelectedFilterValueIds().length > 0 &&
-    categoryId.trim().length > 0 &&
-    categoryTypeId.trim().length > 0 &&
+    (hasPendingTaxonomy || (categoryId.trim().length > 0 && categoryTypeId.trim().length > 0)) &&
     type.trim().length > 0;
 
   /**
@@ -1004,6 +1012,7 @@ const CreateDesignInner: React.FC = () => {
   }, [files.length, isEditMode, lastSaved, title]);
 
   const handleCategoryChange = (value: string) => {
+    setPendingProposal(null);
     setCategoryId(value);
     const nextCategory = filteredCategories.find((category) => category.id === value);
     setCategoryTypeId(nextCategory?.types?.[0]?.id ?? "");
@@ -1105,6 +1114,7 @@ const CreateDesignInner: React.FC = () => {
           categoryId,
           subCategoryId: categoryTypeId,
           categoryTypeId,
+          pendingCategorySuggestionId: selectedProposal?.id ?? null,
           type,
           visibility,
           filterValueIds: getSelectedFilterValueIds(),
@@ -1160,6 +1170,7 @@ const CreateDesignInner: React.FC = () => {
               categoryId,
               subCategoryId: categoryTypeId,
               categoryTypeId,
+              pendingCategorySuggestionId: selectedProposal?.id ?? null,
               type,
               visibility,
               filterValueIds: getSelectedFilterValueIds(),
@@ -1339,8 +1350,8 @@ const CreateDesignInner: React.FC = () => {
         );
       if (files.length > DESIGN_MAX_MEDIA_COUNT)
         reasons.push(`Use no more than ${DESIGN_MAX_MEDIA_COUNT} media assets.`);
-      if (categoryId.trim().length === 0) reasons.push("Choose what this item is.");
-      if (categoryTypeId.trim().length === 0)
+      if (!hasPendingTaxonomy && categoryId.trim().length === 0) reasons.push("Choose what this item is, or propose a category and garment type.");
+      if (!hasPendingTaxonomy && categoryTypeId.trim().length === 0)
         reasons.push("Choose a garment type.");
       if (type.trim().length === 0) reasons.push("Choose who this item is for.");
       if (!targetAgeGroup) reasons.push("Choose an age group.");
@@ -1427,6 +1438,7 @@ const CreateDesignInner: React.FC = () => {
       const typeSnapshot = type;
       const categoryIdSnapshot = categoryId;
       const categoryTypeIdSnapshot = categoryTypeId;
+      const pendingCategorySuggestionIdSnapshot = selectedProposal?.id ?? null;
       const sizingModeSnapshot = sizingMode;
       const customMeasurementKeysSnapshot = normalizedCustomMeasurementKeys;
       const isMadeToOrderSnapshot = isMadeToOrder;
@@ -1464,6 +1476,7 @@ const CreateDesignInner: React.FC = () => {
         categoryId: categoryIdSnapshot,
         subCategoryId: categoryTypeIdSnapshot,
         categoryTypeId: categoryTypeIdSnapshot,
+        pendingCategorySuggestionId: pendingCategorySuggestionIdSnapshot,
         tags: finalTags,
         filterValueIds: filterValueIdsSnapshot,
         sizingMode: sizingModeSnapshot,
@@ -2074,6 +2087,11 @@ const CreateDesignInner: React.FC = () => {
                           selectedAllowWrap
                         />
                       </div>
+
+                      <DesignTaxonomyProposalField value={selectedProposal} disabled={disabled} onChange={proposal => {
+                        setPendingProposal(proposal);
+                        if (proposal) { setCategoryId(''); setCategoryTypeId(''); }
+                      }} />
 
                       <FilterSelector
                         value={filterSelection}

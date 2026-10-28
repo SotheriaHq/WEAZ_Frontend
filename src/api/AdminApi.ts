@@ -489,14 +489,14 @@ export const adminTaxonomyApi = {
    * still serves these under TAXONOMY_READ. The result was a moderation queue
    * that accrued submissions with no surface anywhere in the admin app.
    */
-  listCategorySuggestions: (status: AdminCategorySuggestionStatus = 'PENDING') =>
-    apiClient.get<AdminCategorySuggestion[]>('/admin/categories/suggestions', {
-      params: { status },
+  listCategorySuggestions: (status: AdminCategorySuggestionStatus = 'PENDING', cursor?: string) =>
+    apiClient.get<{ items: AdminCategorySuggestion[]; nextCursor: string | null }>('/admin/categories/suggestions', {
+      params: { status, cursor, limit: 25 },
     }),
   moderateCategorySuggestion: (
     id: string,
-    data: { status: 'APPROVED' | 'REJECTED'; rejectionReason?: string },
-  ) => apiClient.patch<AdminCategorySuggestion>(`/admin/categories/suggestions/${id}`, data),
+    data: { status: 'APPROVED' | 'REJECTED'; rejectionReason?: string; approvalDescription?: string; approvalGarmentTypeDescription?: string },
+  ) => apiClient.patch<AdminCategorySuggestion>(`/admin/categories/suggestions/${id}`, { decision: data.status === 'APPROVED' ? 'APPROVE' : 'REJECT', rejectionReason: data.rejectionReason, approvalDescription: data.approvalDescription, approvalGarmentTypeDescription: data.approvalGarmentTypeDescription }),
 };
 
 export type AdminCategorySuggestionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -505,12 +505,14 @@ export type AdminCategorySuggestion = {
   id: string;
   name: string;
   slug: string;
+  garmentTypeName?: string | null;
   description?: string | null;
   status: AdminCategorySuggestionStatus;
   proposedByUserId: string;
   proposedByUser?: { id: string; username?: string | null; email?: string | null } | null;
   rejectionReason?: string | null;
   approvedCategoryId?: string | null;
+  approvedCategoryTypeId?: string | null;
   decidedAt?: string | null;
   createdAt: string;
   updatedAt: string;

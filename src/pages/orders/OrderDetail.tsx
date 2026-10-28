@@ -9,6 +9,7 @@ import useCachedResource from '@/hooks/useCachedResource';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { queryClient } from '@/query/queryClient';
+import { describeRefund } from '@/lib/refundPresentation';
 
 const formatCurrency = (amount: number, currency: string) =>
   new Intl.NumberFormat('en-NG', {
@@ -276,6 +277,16 @@ const OrderDetail: React.FC = () => {
         <span>/</span>
         <span className="font-medium text-gray-900 dark:text-white">#{order.id.slice(0, 8)}</span>
       </div>
+
+      {(() => {
+        const refund = describeRefund(order.financeBreakdown?.refund?.status);
+        return refund ? (
+          <section aria-label="Refund status" aria-live="polite" className="space-y-2 break-words">
+            <h2 className="text-lg font-semibold">{refund.title}</h2>
+            <p>{refund.description}</p>
+          </section>
+        ) : null;
+      })()}
 
       <section className="relative overflow-hidden rounded-[2.5rem] border border-white/40 bg-white/50 p-2 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-black/20">
         <div className="relative overflow-hidden rounded-[2rem] bg-white/60 p-6 shadow-sm ring-1 ring-inset ring-black/5 dark:bg-white/[0.02] dark:ring-white/10">

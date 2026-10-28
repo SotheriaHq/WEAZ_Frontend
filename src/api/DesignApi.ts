@@ -57,6 +57,7 @@ export type DesignMetadata = {
   categoryId?: string;
   subCategoryId?: string;
   categoryTypeId?: string;
+  pendingCategorySuggestionId?: string | null;
   tags?: string[];
   filterValueIds?: string[];
   sizingMode?: SizingMode;
@@ -149,13 +150,21 @@ const normalizeInitializeDesignResponse = (payload: unknown): InitializeDesignRe
 // task failures whose drafts actually existed — the cross-device ghost cards.
 const DESIGN_MUTATION_TIMEOUT_MS = 60_000;
 
+const cleanTaxonomyFields = <T extends DesignMetadata>(metadata: T): T => {
+  const result = { ...metadata };
+  for (const key of ['categoryId', 'categoryTypeId', 'subCategoryId', 'pendingCategorySuggestionId'] as const) {
+    if (typeof result[key] === 'string' && !result[key]?.trim()) delete result[key];
+  }
+  return result;
+};
+
 export async function initializeDesignUploads(
   dto: InitializeDesignUploadsDto,
 ): Promise<InitializeDesignResponse> {
   const response = await apiClient.post(
     '/designs/initialize',
     {
-      ...dto,
+      ...cleanTaxonomyFields(dto),
       files: dto.files.map((file, index) => ({
         ...file,
         viewSlot: toBackendMediaViewSlot(file.viewSlot, index),
@@ -191,7 +200,7 @@ export async function finalizeDesignUploads(
       })),
       shouldPublish,
       action: options?.action,
-      designMetadata: options?.designMetadata,
+      designMetadata: options?.designMetadata ? cleanTaxonomyFields(options.designMetadata) : undefined,
       coverMediaId: options?.coverMediaId,
       coverIndex:
         typeof options?.coverIndex === 'number' ? options.coverIndex : undefined,

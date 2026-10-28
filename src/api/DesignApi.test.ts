@@ -28,6 +28,17 @@ describe('DesignApi', () => {
     vi.clearAllMocks();
   });
 
+  it('preserves pending taxonomy through initialize and finalize without sending empty UUID fields', async () => {
+    mockedApiClient.post.mockResolvedValue({data:{data:{id:'design-1',uploads:[]}}});
+    await initializeDesignUploads({title:'Jacket',files:[],categoryId:'',categoryTypeId:'',pendingCategorySuggestionId:'proposal-1'});
+    const initialized = mockedApiClient.post.mock.calls[0][1] as Record<string,unknown>;
+    expect(initialized.pendingCategorySuggestionId).toBe('proposal-1');expect(initialized).not.toHaveProperty('categoryId');
+    await finalizeDesignUploads('design-1',[],true,{action:'publish',designMetadata:{categoryId:'',subCategoryId:'',pendingCategorySuggestionId:'proposal-1',description:''}});
+    const finalized = mockedApiClient.post.mock.calls[1][1] as {designMetadata:Record<string,unknown>};
+    expect(finalized.designMetadata).toMatchObject({pendingCategorySuggestionId:'proposal-1',description:''});
+    expect(finalized.designMetadata).not.toHaveProperty('subCategoryId');
+  });
+
   it('initializes design uploads through the explicit designs endpoint', async () => {
     mockedApiClient.post.mockResolvedValueOnce({
       data: {
@@ -57,7 +68,7 @@ describe('DesignApi', () => {
       files: [],
       tags: ['dress'],
       subCategoryId: 'sub-1',
-    });
+    }, { timeout:60_000 });
   });
 
   it('finalizes with designMetadata instead of collectionMetadata', async () => {
@@ -83,7 +94,7 @@ describe('DesignApi', () => {
           subCategoryId: 'sub-1',
         }),
       }),
-      { headers: { 'Idempotency-Key': 'idem-design-test' } },
+      { headers: { 'Idempotency-Key': 'idem-design-test' }, timeout:60_000 },
     );
     const [, payload] = mockedApiClient.post.mock.calls[0];
     expect(payload).not.toHaveProperty('collectionMetadata');
@@ -116,6 +127,7 @@ describe('DesignApi', () => {
       expect.objectContaining({
         files: [expect.objectContaining({ viewSlot: 'FRONT' })],
       }),
+      { timeout:60_000 },
     );
     expect(mockedApiClient.post).toHaveBeenNthCalledWith(
       2,

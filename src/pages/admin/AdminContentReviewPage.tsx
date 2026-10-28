@@ -520,7 +520,7 @@ const AdminContentReviewPage: React.FC<AdminContentReviewPageProps> = ({ embedde
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Content Review</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Product and design submissions that need media integrity review.
+            Product and design submissions that need media integrity review. Approving content does not approve a proposed category; pending categories stay out of public category search and filters.
           </p>
         </div>
         <button

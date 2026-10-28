@@ -31,7 +31,7 @@ describe('waiting-order actions', () => {
   });
   it('requires a current server quote and reason before cancellation, then displays processing truthfully', async () => {
     vi.mocked(customOrderQueueApi.refundQuote).mockResolvedValue({ orderRevision: 12, currency: 'NGN', capturedAmount: 132500, vatWithheld: 7500, garmentFeeWithheld: 10000, jumpFeeWithheld: 2000, deliveryRefund: 5000, refundAmount: 113000 });
-    vi.mocked(customOrderQueueApi.cancel).mockResolvedValue(makeQueue({ lane: 'TERMINAL', canCancel: false, canRetain: false, canResubmit: true, refundSummary: { status: 'PENDING', amount: 113000, currency: 'NGN' } }));
+    vi.mocked(customOrderQueueApi.cancel).mockResolvedValue(makeQueue({ lane: 'TERMINAL', canCancel: false, canRetain: false, canResubmit: true, refundSummary: { status: 'PROCESSING', amount: 113000, currency: 'NGN' } }));
     const onChanged = vi.fn();
     render(<MemoryRouter><QueueOrderActions orderId="a" queue={makeQueue()} audience="buyer" onChanged={onChanged} /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel waiting order' }));
@@ -41,7 +41,7 @@ describe('waiting-order actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
     await waitFor(() => expect(customOrderQueueApi.cancel).toHaveBeenCalledWith('a', 'Delivery plans changed', 12));
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
-    expect(screen.getByText(/Processing does not mean money has reached your bank/)).toBeVisible();
+    expect(screen.getByText(/Bank credit is not yet confirmed/)).toBeVisible();
   });
   it('does not let an older quote response apply to a different order', async () => {
     let resolveQuote!: (value: { currency: string; orderRevision: number; refundAmount: number }) => void;
