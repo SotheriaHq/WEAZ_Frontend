@@ -19,6 +19,7 @@ import StorePaymentsSettings from '@/components/settings/tabs/StorePaymentsSetti
 import StoreHoursSettings from '@/components/settings/tabs/StoreHoursSettings';
 import ProfileVisibilitySettings from '@/components/settings/tabs/ProfileVisibilitySettings';
 import PrivacySettings from '@/components/settings/tabs/PrivacySettings';
+import CurrencySettings from '@/components/settings/tabs/CurrencySettings';
 import SizeFitSettings from '@/components/settings/tabs/SizeFitSettings';
 import HiddenContentSettings from './HiddenContentSettings';
 import type { RootState } from '@/store';
@@ -190,6 +191,7 @@ const sections: Record<string, React.ReactNode> = {
   privacy: <PrivacySettings />,
   'profile-visibility': <ProfileVisibilitySettings />,
   location: <LocationSettings />,
+  currency: <CurrencySettings />,
   'size-fits': <SizeFitSettings />,
   'market-preferences': <HiddenContentSettings />,
   'hidden-content': <HiddenContentSettings />,

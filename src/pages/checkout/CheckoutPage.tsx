@@ -30,6 +30,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
+import { ChargeCurrencyNotice } from '@/currency/PriceEstimate';
 import BackLink from '@/components/ui/BackLink';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import UniversalSelect from '@/components/forms/UniversalSelect';
@@ -2099,6 +2100,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                   Secure checkout
                 </div>
               </div>
+              <ChargeCurrencyNotice total={grandTotal} currency="NGN" />
 
               <div className="wiez-chrome-surface rounded-[22px] px-4 py-4 text-sm text-slate-700 dark:text-slate-300">
                 <div className="flex gap-3">

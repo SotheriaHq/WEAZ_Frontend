@@ -148,7 +148,7 @@ WIEZ engages trusted third-party technical providers to operate infrastructure s
 
 ### 8.1. Infrastructure & Hosting Sub-Processors
 * **Amazon Web Services (AWS)**: Cloud compute, the managed PostgreSQL database, and encrypted object storage (S3) for all uploaded media and verification documents.
-* **Cloudflare, Inc.**: Content Delivery Network (CDN), DDoS mitigation, SSL/TLS edge termination, media caching, and hosting for our web application.
+* **Cloudflare, Inc.**: Content Delivery Network (CDN), DDoS mitigation, SSL/TLS edge termination, media caching, and hosting for our web application. Cloudflare also tells our web app which country your connection comes from; we use it only to suggest the currency for price estimates and do not store it.
 
 ### 8.2. Payment & Financial Gateways
 * **Paystack Payments Limited** (a Stripe company): our payment gateway, processing card, bank transfer and USSD payments, and holding the saved-card authorizations described in Section 6.1.
