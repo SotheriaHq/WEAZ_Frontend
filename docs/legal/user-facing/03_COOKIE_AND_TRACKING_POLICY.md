@@ -52,6 +52,7 @@ The table below provides a complete, field-by-field register of every cookie, lo
 | `wiez.pendingBagAction.v1` | `sessionStorage` | Web Browser | Until the tab closes | **Functional / Commerce**: Remembers an add-to-bag you started before signing in, so it completes afterwards. Bag CONTENTS are held on our servers, not in your browser. |
 | `wiez.activeBrandId` | `localStorage` | Web Browser | Persistent | **Functional / Merchant**: Active Brand Studio workspace identifier for designers managing several stores. |
 | `vite-ui-theme` (web) / `wiez.theme.mode` (mobile) | `localStorage` / `AsyncStorage` | Web / Mobile | Persistent | **Preferences**: Dark Mode / Light Mode interface display state selection. |
+| `wiez.displayCurrency.v1` | `localStorage` / `AsyncStorage` | Web / Mobile | Until you change it | **Preferences**: The currency you chose to see price estimates in (Settings > Currency). Not set while you use Automatic. You always pay in Naira. |
 | `wiez.profile.` `sizeCategory.v1` | `localStorage` / `AsyncStorage` | Web / Mobile | Persistent | **Preferences**: Which size chart category to show you first. |
 | `wiez.device.id.v1` | `AsyncStorage` | Mobile (iOS/Android) | Until you turn analytics off | **First-Party Analytics (optional)**: Created only after you allow analytics. A random install ID that counts a view once and groups discovery signals. Deleted when you turn analytics off. |
 | `WIEZ_QUERY_CACHE_V1` | `localStorage` / Memory Cache | Web / Mobile | Until logout or eviction | **Performance & Speed**: Client cache for Runway feed lookbooks, catalog grids, and designer profiles, including the signed image URLs they contain. |
@@ -164,7 +165,12 @@ When you complete checkout via Paystack:
 * Payment providers may deploy strictly necessary fraud-prevention and session cookies within their own domain sandboxes.
 * WIEZ has no technical access to, does not read, and does not store the internal security cookies of payment gateways.
 
-### 6.3. Google Sign-In
+### 6.3. Currency Estimates and Location Lists
+To show prices in a familiar currency, WIEZ uses the country your internet connection comes from, as reported by our hosting provider (Cloudflare). We use only the country, only to suggest a currency, and we do not store it. We never ask for your precise location for this. You can choose a currency yourself in **Settings > Currency**. Other currencies are estimates; you always pay in Naira (NGN).
+
+Country, state, and city lists in address and profile forms are provided by WIEZ. Your browser and the app do not contact third-party location services to build them.
+
+### 6.4. Google Sign-In
 Google's sign-in script (`accounts.google.com`) loads when you choose **Continue with Google**. If you allow **Faster Google sign-in** in your cookie choices, it loads as soon as a sign-in page opens, so a single tap is enough. Google may set its own cookies on its domain, under Google's privacy policy.
 
 ---

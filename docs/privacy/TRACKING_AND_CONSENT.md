@@ -131,8 +131,17 @@ phone and desktop), and the provider dashboards.
 
 ## Known gaps
 
-- Country and region pickers call `restcountries.com` and `countriesnow.space`
-  from the browser, flags load from `flagcdn.com`, and the store setup social
-  step calls `unavatar.io`. These are not tracking, but they show the
-  visitor's IP address to those services. Planned: serve location data from
-  the WIEZ API.
+- The store setup social step calls `unavatar.io` from the browser to preview a
+  brand's social avatar. It is not tracking, but it shows that brand member's
+  IP address to unavatar.io. Country, state and city lists now come from the
+  WIEZ API (`/locations/*`) and flags from the self-hosted `/flags/` set.
+
+## Currency suggestion
+
+`functions/api/location.ts` returns the Cloudflare edge country
+(`request.cf.country`, not a client header) with `Cache-Control: private,
+no-store`. `src/currency/displayCurrency.ts` uses it only when the shopper has
+not chosen a currency, to request `GET /payment/fx/display`. Nothing about the
+country is stored; the shopper's own choice is a preference
+(`wiez.displayCurrency.v1`). It is functional, not tracking, so it does not
+wait for analytics consent.
