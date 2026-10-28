@@ -16,6 +16,7 @@ import { NoticeModalHost } from '@/components/ui/NoticeModal';
 import { MuseLoader } from '@/components/loaders/MuseLoader';
 const ErrorPage = lazy(() => import('./pages/ErrorPage'));
 import SeoHead from './components/seo/SeoHead';
+import CookieConsent from './components/privacy/CookieConsent';
 import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
 const NotFound = lazy(() => import('./pages/placeholders/NotFound'));
 const SubscriptionsPlaceholder = lazy(() => import('./pages/placeholders/SubscriptionsPlaceholder'));
@@ -386,6 +387,8 @@ const RootLayout: React.FC = () => {
     <BagFlowProvider>
       <>
         <SeoHead />
+        {/* The native app's own consent covers its web view. */}
+        {!isEmbeddedMobile ? <CookieConsent /> : null}
         {showRouteIntentProgress && (
           <div className="pointer-events-none fixed inset-x-0 top-0 z-[2147483646] h-0.5 overflow-hidden">
             <div className="h-full w-full animate-pulse bg-gradient-to-r from-fuchsia-500 via-indigo-500 to-cyan-500" />

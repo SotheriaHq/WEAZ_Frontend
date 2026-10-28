@@ -1,6 +1,15 @@
 import { isAxiosError } from 'axios';
 
 /**
+ * Wording that names code, storage or framework internals rather than the
+ * person's problem. Shown to nobody: the caller's own sentence replaces it.
+ */
+const TECHNICAL_MESSAGE =
+  /(prisma|\bP\d{4}\b|constraint|violates|foreign key|relation "|column "|exception\b|stack trace|cannot read propert|uuid is expected|should not exist|\bECONN|ENOTFOUND|\bsql\b|query failed)/i;
+
+const isTechnicalMessage = (message: string) => TECHNICAL_MESSAGE.test(message);
+
+/**
  * Transforms technical API errors into clean, human-readable error messages for end users.
  * Never exposes raw internal engineering messages such as "timeout of 15000ms exceeded",
  * "Network Error", "ECONNABORTED", etc.
@@ -37,6 +46,10 @@ export function getFriendlyErrorMessage(
     if (status >= 500) {
       return 'Something went wrong on our server. Please try again in a few moments.';
     }
+    // Sign-in and session failures never say which part was wrong.
+    if (status === 401) {
+      return 'Invalid credentials';
+    }
 
     // 3. Backend custom error messages from payload
     const data = error.response.data as Record<string, unknown> | undefined;
@@ -53,7 +66,7 @@ export function getFriendlyErrorMessage(
         return 'Password must be at least 12 characters.';
       }
       if (typeof firstMsg === 'string' && firstMsg.trim()) {
-        return firstMsg.trim();
+        return isTechnicalMessage(firstMsg) ? fallback : firstMsg.trim();
       }
     }
 
@@ -74,19 +87,12 @@ export function getFriendlyErrorMessage(
         if (msg.includes('ThrottlerException') || lower.includes('too many requests')) {
           return 'Too many requests. Please try again later.';
         }
-        if (
-          lower.includes('invalid') ||
-          lower.includes('unauthorized') ||
-          lower.includes('not found') ||
-          lower.includes('incorrect')
-        ) {
-          return 'Invalid credentials';
-        }
         if (lower.includes('timeout') || lower.includes('econnaborted')) {
           return 'Connection timed out. Please check your internet connection and try again.';
         }
-
-        return msg;
+        // A plain "Refund not found" is the person's answer; it is not a
+        // credentials problem, and only a 401 is treated as one (above).
+        return isTechnicalMessage(msg) ? fallback : msg;
       }
     }
   }
@@ -111,13 +117,6 @@ export function getFriendlyErrorMessage(
   if (lowerRaw.includes('throttlerexception') || lowerRaw.includes('too many requests')) {
     return 'Too many requests. Please try again later.';
   }
-  if (
-    lowerRaw.includes('invalid') ||
-    lowerRaw.includes('unauthorized') ||
-    lowerRaw.includes('incorrect')
-  ) {
-    return 'Invalid credentials';
-  }
 
   // Fall back if message is an ugly technical string or stack artifact
   if (
@@ -125,7 +124,8 @@ export function getFriendlyErrorMessage(
     rawMsg.startsWith('TypeError') ||
     rawMsg.startsWith('ReferenceError') ||
     rawMsg.includes('ms exceeded') ||
-    rawMsg.includes('[object Object]')
+    rawMsg.includes('[object Object]') ||
+    isTechnicalMessage(rawMsg)
   ) {
     return fallback;
   }

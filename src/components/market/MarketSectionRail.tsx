@@ -11,6 +11,7 @@ import {
 } from '@/utils/marketSectionMapper';
 import { useBagging } from '@/hooks/useBagging';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
+import { PriceEstimate } from '@/currency/PriceEstimate';
 import { toast } from 'sonner';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
@@ -225,6 +226,7 @@ const SectionItemCard: React.FC<{
             {isOutOfStock ? 'Waitlist Open (Atelier Queue)' : 'In Stock • Ready'}
           </span>
         </div>
+        <PriceEstimate amount={priceAmount} currency="NGN" />
       </div>
     </article>
   );

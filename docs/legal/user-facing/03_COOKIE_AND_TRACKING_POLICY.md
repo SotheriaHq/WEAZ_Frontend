@@ -27,7 +27,8 @@ When we refer to "Cookies and Storage Technologies," we encompass five distinct 
 
 ### 1.3. Fundamental Tracking & Privacy Commitments
 * **Zero Third-Party Advertising Pixels**: WIEZ **does not** deploy third-party behavioral advertising trackers (such as Meta Pixel, TikTok Pixel, Google Ads Remarketing, or Criteo tags) that follow your browsing across external websites.
-* **First-Party Purpose Limitation**: All cookies, local storage items, and discovery signals are first-party and are used strictly to maintain secure login sessions, persist your multi-vendor shopping bag, cache bespoke tailoring measurements, and power Runway feed recommendations.
+* **Nothing Optional Before You Choose**: On the web, analytics start only after you select **Accept all** or switch **Analytics** on. This covers our first-party discovery signals and, where we have enabled them, Google Analytics and Cloudflare Web Analytics (Section 6.1). In the app, discovery signals and performance tracing start only after you select **Allow**. Rejecting is as easy as accepting, and optional items start switched off.
+* **Purpose Limitation**: Essential storage is used only to keep you signed in, protect your account, complete an add-to-bag you started, and remember your settings and cookie choice.
 
 ---
 
@@ -42,15 +43,18 @@ The table below provides a complete, field-by-field register of every cookie, lo
 | `WIEZ_ACCESS_TOKEN` | Hardware Keychain (SecureStore) on mobile; `localStorage` on web | Mobile (iOS/Android) / Web Browser | Until Logout | **Strictly Necessary**: Access token held for session bootstrap. On mobile this is the iOS Keychain / Android KeyStore. |
 | `WIEZ_REFRESH_TOKEN` | Hardware Keychain (SecureStore) | Mobile (iOS/Android) | Until Logout | **Strictly Necessary**: Hardware-isolated refresh token used for seamless native mobile session renewal. |
 | `WIEZ_USER` | Hardware Keychain (SecureStore) on mobile; `localStorage` on web | Mobile (iOS/Android) / Web Browser | Until Logout | **Strictly Necessary**: Snapshot of authenticated user identity (role, status, email) so the interface can render before the network replies. |
-| `wiez.market.` `anonymousSessionId.v1` | `localStorage` | Web Browser | Persistent | **First-Party Analytics**: Anonymous client ID grouping discovery signals before you log in. |
+| `wiez.consent` | `localStorage` / `AsyncStorage` | Web / Mobile | 12 months, then we ask again | **Strictly Necessary**: Remembers your analytics choice (on the web also Faster Google sign-in) so we do not ask every time. Holds only your choices and the date you made them. |
+| `wiez.market.` `anonymousSessionId.v1` | `localStorage` | Web Browser | Until you turn Analytics off | **First-Party Analytics (optional)**: Created only after you allow analytics. A random browser ID that counts a view once and groups discovery signals before you log in. Deleted when you turn Analytics off. |
+| `_ga`, `_ga_<ID>` | HTTP Cookie (set by Google Analytics) | Web Browser | Up to 2 years; deleted when you turn Analytics off | **Analytics (optional)**: Set only where we have enabled Google Analytics and you allow analytics. Google uses them to distinguish visitors and sessions for page-view statistics. |
 | `wiez.market.` `signalQueue.v1` | `localStorage` / `AsyncStorage` | Web / Mobile | 24 Hours / 5s Flush | **First-Party Analytics**: Client queue buffering discovery events, capped at 100 entries and flushed in batches of at most 25. |
 | `wiez.market.` `signalRecent.v1` | `localStorage` / Memory Map | Web / Mobile | 30 Seconds (Window) | **Performance & Integrity**: Suppresses duplicate noisy impression events (e.g. repeated scroll passes). |
-| `wiez.market.` `signalIdentity.v1`, `signalLastClearedAt.v1` | `localStorage` | Web Browser | Persistent | **First-Party Analytics**: Binds the queue to the current account and records when you last reset your feed signals. |
+| `wiez.market.` `signalIdentity.v1`, `signalLastClearedAt.v1` | `AsyncStorage` | Mobile (iOS/Android) | Persistent | **First-Party Analytics**: Binds the queue to the current account and records when you last reset your feed signals. |
 | `wiez.pendingBagAction.v1` | `sessionStorage` | Web Browser | Until the tab closes | **Functional / Commerce**: Remembers an add-to-bag you started before signing in, so it completes afterwards. Bag CONTENTS are held on our servers, not in your browser. |
 | `wiez.activeBrandId` | `localStorage` | Web Browser | Persistent | **Functional / Merchant**: Active Brand Studio workspace identifier for designers managing several stores. |
 | `vite-ui-theme` (web) / `wiez.theme.mode` (mobile) | `localStorage` / `AsyncStorage` | Web / Mobile | Persistent | **Preferences**: Dark Mode / Light Mode interface display state selection. |
+| `wiez.displayCurrency.v1` | `localStorage` / `AsyncStorage` | Web / Mobile | Until you change it | **Preferences**: The currency you chose to see price estimates in (Settings > Currency). Not set while you use Automatic. You always pay in Naira. |
 | `wiez.profile.` `sizeCategory.v1` | `localStorage` / `AsyncStorage` | Web / Mobile | Persistent | **Preferences**: Which size chart category to show you first. |
-| `wiez.device.id.v1` | Hardware Keychain (SecureStore) | Mobile (iOS/Android) | Until reinstall | **Strictly Necessary**: Stable device identifier used to register and de-duplicate push notification tokens. |
+| `wiez.device.id.v1` | `AsyncStorage` | Mobile (iOS/Android) | Until you turn analytics off | **First-Party Analytics (optional)**: Created only after you allow analytics. A random install ID that counts a view once and groups discovery signals. Deleted when you turn analytics off. |
 | `WIEZ_QUERY_CACHE_V1` | `localStorage` / Memory Cache | Web / Mobile | Until logout or eviction | **Performance & Speed**: Client cache for Runway feed lookbooks, catalog grids, and designer profiles, including the signed image URLs they contain. |
 
 Additional short-lived operational keys are written under the same `wiez.`
@@ -102,6 +106,8 @@ To ensure instant navigation and smooth 60fps media scrolling across fashion loo
 
 WIEZ utilizes a proprietary, client-side first-party telemetry system (`fthreadly/src/services/marketSignalQueue.ts`) to optimize the Runway discovery feed and catalog ranking:
 
+On the web and in the app, this system runs only after you allow analytics (Section 9.2).
+
 A signal passes through four stages before it reaches us:
 
 1. **Client-side capture**: lookbook dwell time, reel completion rate, and zoom and save actions.
@@ -145,14 +151,27 @@ When a mobile designer opens merchant tools, financial dashboards, or advanced l
 
 ## 6. Third-Party Integrations and Payment Sandboxes
 
-### 6.1. Zero Third-Party Advertising Trackers
-WIEZ maintains a strict anti-surveillance standard: **We do not deploy third-party advertising retargeting pixels, tracking beacons, or cross-site tracking scripts**. We do not participate in cross-site ad networks.
+### 6.1. No Advertising Trackers; Optional Analytics Only With Your Consent
+**We do not deploy advertising or retargeting pixels, and we do not take part in cross-site ad networks.** On the web, the following third-party services run only after you allow analytics, and only where we have enabled them:
+* **Google Analytics 4 (Google LLC)**: aggregate page-view statistics. We switch off advertising features, Google signals, and ad personalization. Before a page address reaches Google, we remove query strings and replace account, order, and link identifiers, tokens, and email addresses.
+* **Cloudflare Web Analytics (Cloudflare, Inc.)**: aggregate page-load and performance statistics. Cloudflare states that this service does not use cookies or local storage.
+* **Sentry performance tracing** (web and app): measures how quickly screens respond. Sentry **error** reports are essential and do not depend on this choice. They set no cookies, carry no personal data (`sendDefaultPii` is disabled), and have identifiers and tokens removed from addresses.
+
+If you turn Analytics off on the web, we stop these services, delete the Google Analytics cookies, the anonymous browser ID, and any queued discovery signals, and reload the page so nothing already loaded keeps running. In the app, turning analytics off stops performance tracing and deletes the install ID and any queued discovery signals.
 
 ### 6.2. Payment Gateway Sandboxes (PCI-DSS Level 1)
 When you complete checkout via Paystack:
 * Payment forms and 3D Secure / OTP verification modals are rendered within isolated, PCI-DSS Level 1 compliant iframes.
 * Payment providers may deploy strictly necessary fraud-prevention and session cookies within their own domain sandboxes.
 * WIEZ has no technical access to, does not read, and does not store the internal security cookies of payment gateways.
+
+### 6.3. Currency Estimates and Location Lists
+To show prices in a familiar currency, WIEZ uses the country your internet connection comes from, as reported by our hosting provider (Cloudflare). We use only the country, only to suggest a currency, and we do not store it. We never ask for your precise location for this. You can choose a currency yourself in **Settings > Currency**. Other currencies are estimates; you always pay in Naira (NGN).
+
+Country, state, and city lists in address and profile forms are provided by WIEZ. Your browser and the app do not contact third-party location services to build them.
+
+### 6.4. Google Sign-In
+Google's sign-in script (`accounts.google.com`) loads when you choose **Continue with Google**. If you allow **Faster Google sign-in** in your cookie choices, it loads as soon as a sign-in page opens, so a single tap is enough. Google may set its own cookies on its domain, under Google's privacy policy.
 
 ---
 
@@ -166,6 +185,8 @@ When you complete checkout via Paystack:
 | **Authentication Refresh Tokens** | Persist for seven (7) rolling days from last active use. |
 | **Commerce Cart & Theme State** | Persists in `localStorage` until manually cleared or logout. |
 | **Mobile Hardware Keychains** | Persists until explicit logout, account deletion, or purge. |
+| **Cookie Choice (`wiez.consent`)** | Twelve (12) months, after which we ask again. |
+| **Google Analytics Cookies** | Up to two (2) years; deleted as soon as you turn Analytics off. |
 
 ---
 
@@ -179,7 +200,8 @@ You maintain full control over cookies and client storage through your browser a
 | **2. Apple Safari (macOS & iOS)** | macOS: Safari > Settings > Privacy > Manage Website Data. iOS: Settings > Safari > Advanced > Website Data. |
 | **3. Mozilla Firefox** | Settings > Privacy & Security > Cookies and Site Data > Manage Data > Search "wiez.com". |
 | **4. Mobile Device App Caches** | iOS: Settings > General > iPhone Storage > WIEZ > Offload. Android: Settings > Apps > WIEZ > Storage > Clear Cache. |
-| **5. In-App Discovery Signal Reset** | You can reset your local signal queue and anonymous session identifier at any time via Settings > Privacy > Reset Feed. |
+| **5. Cookie & Analytics Choices** | Web: Settings > Privacy > **Change cookie settings**, or the same button on this page and the **Cookie settings** link on the sign-in pages. App: Settings > Privacy controls > **Usage analytics**. |
+| **6. Discovery Signal Reset** | Web: Settings > Market & Feed > **Reset market preferences**. App: Settings > Market preferences > **Reset market preferences**. Turning analytics off also deletes the random browser or install ID and queued signals. |
 
 *Note: Blocking strictly necessary cookies or local storage will prevent login, bag checkout, bespoke measurement saving, and Brand Studio operations from working.*
 
@@ -197,21 +219,29 @@ You maintain full control over cookies and client storage through your browser a
 WIEZ's storage and cookie architecture is designed to minimize consent friction while respecting your legal rights:
 
 **Strictly Necessary Storage (No Consent Required)**:
-Storage items classified as strictly necessary under ePrivacy Directive Article 5(3) — specifically, authentication tokens (`refreshToken`, `accessToken`, `WIEZ_ACCESS_TOKEN`, `WIEZ_REFRESH_TOKEN`, `WIEZ_USER`) and the pending bag action (`wiez.pendingBagAction.v1`) — are deployed on a strictly-necessary exemption basis. These items cannot be opted out of without losing access to core platform functionality (login, checkout, and bespoke tailoring), and do not require prior consent under applicable law.
+Storage items classified as strictly necessary under ePrivacy Directive Article 5(3) — specifically, authentication tokens (`refreshToken`, `accessToken`, `WIEZ_ACCESS_TOKEN`, `WIEZ_REFRESH_TOKEN`, `WIEZ_USER`) the pending bag action (`wiez.pendingBagAction.v1`), and your cookie choice (`wiez.consent`) — are deployed on a strictly-necessary exemption basis. These items cannot be opted out of without losing access to core platform functionality (login, checkout, and bespoke tailoring), and do not require prior consent under applicable law.
 
-**Functional and Analytics Storage (Consent-Managed)**:
-The market signal telemetry keys (`wiez.market.anonymousSessionId.v1`, `wiez.market.signalQueue.v1`, `wiez.market.signalRecent.v1`) and the TanStack query cache are deployed for platform performance and feed personalization. For users in jurisdictions where prior consent is required for non-essential storage (EU, UK, Nigeria):
-* On first access, WIEZ presents a **Cookie and Privacy Consent Notice** explaining these storage mechanisms and requesting your consent before activating them.
-* You may accept, decline, or customise your consent preferences at any time by accessing **Settings > Privacy > Cookie Preferences** within the WIEZ application.
-* Declining analytics and personalization storage will disable Runway feed personalization (feed will fall back to chronological content) but will not prevent purchase, checkout, or bespoke tailoring functions.
-* Your consent choice is recorded in the WIEZ `LegalAcceptance` database for audit purposes.
+**Optional Analytics (Consent Required)**:
+The discovery-signal keys (`wiez.market.anonymousSessionId.v1`, `wiez.market.signalQueue.v1`, `wiez.market.signalRecent.v1`), the Google Analytics cookies, and the third-party analytics in Section 6.1 are optional. On the web:
+* On your first visit, WIEZ shows a cookie notice with **Accept all**, **Reject optional**, and **Choose what to allow**. Accept and Reject are equally prominent, and every optional switch starts off.
+* Until you choose, nothing optional runs: no analytics script loads, no analytics cookie is set, and no discovery signal is stored or sent.
+* You can change your choice at any time from **Settings > Privacy > Change cookie settings**, from the button on this page, or from the **Cookie settings** link on the sign-in pages. Withdrawing is as easy as giving consent and takes effect at once (Section 6.1).
+* Your choice is stored on your device (`wiez.consent`) for twelve months, after which we ask again. It applies to that browser only and is not sent to our servers. We also ask again if we add a new optional purpose.
+* Declining analytics stops discovery signals from that browser, so recommendations rely on actions you take directly (such as likes, saves, and follows) and may be less tailored. It never prevents purchase, checkout, or bespoke tailoring.
+* Inside the WIEZ app's embedded Brand Studio screens, the web cookie notice is not shown and optional web analytics stay off.
+
+In the app:
+* The first time you open the app, WIEZ asks once whether it may use analytics, with **Allow** and **Don't allow** given equal weight. Until you choose, no discovery signal is recorded, no install ID is created, and performance tracing stays off.
+* You can change your choice at any time in **Settings > Privacy controls > Usage analytics**, signed in or not. Turning analytics off takes effect at once and deletes the install ID and any queued signals.
+* Your choice is stored on your device (`wiez.consent`) for twelve months, after which we ask again.
+* This choice is separate from notification permission, which your phone asks for on its own.
 
 ### 9.3. Do Not Track (DNT) Signal Policy
 
-WIEZ acknowledges browser-level Do Not Track (DNT) signals sent via the `DNT: 1` HTTP request header. Our response policy:
-* **Because WIEZ does not deploy third-party cross-site behavioral advertising trackers**, the technical concern that DNT signals primarily address does not apply to our first-party telemetry architecture.
-* **For first-party analytics**: Activating DNT in your browser is treated by WIEZ as equivalent to declining optional analytics consent. When a DNT signal is detected on web sessions, WIEZ will suppress market signal queue telemetry for that session.
-* **For mobile**: DNT signal controls are not natively supported at the OS level on iOS or Android. Mobile users wishing to opt out of discovery analytics should use the in-app **Settings > Privacy > Reset Feed** option or contact `privacy@wiez.com`.
+WIEZ honours the browser privacy signals **Global Privacy Control (GPC)** and **Do Not Track (DNT)**:
+* **On the web**: when your browser sends either signal, WIEZ treats it as declining optional analytics, even if you selected **Accept all**. Google Analytics, Cloudflare Web Analytics, Sentry performance tracing, and discovery signals stay off, and the cookie notice shows the Analytics switch as off.
+* **Advertising**: WIEZ deploys no cross-site advertising trackers, so there is nothing further for these signals to switch off.
+* **In the app**: iOS and Android do not send these signals to apps. Use **Settings > Privacy controls > Usage analytics**, or contact `privacy@wiez.com`. WIEZ does not link app data with other companies' apps or websites for advertising, or share it with data brokers, so it does not show Apple's App Tracking Transparency prompt.
 
 ---
 

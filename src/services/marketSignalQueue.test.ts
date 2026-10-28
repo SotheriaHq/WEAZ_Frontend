@@ -18,6 +18,7 @@ import {
   WEB_MARKET_SIGNAL_QUEUE_STORAGE_KEY,
   WEB_MARKET_SIGNAL_RECENT_STORAGE_KEY,
 } from './marketSignalQueue';
+import { OPTIONAL_OFF, OPTIONAL_ON, saveConsent } from '@/privacy/consent';
 
 const baseSignal = (targetId: string, overrides: Record<string, unknown> = {}) => ({
   targetType: 'PRODUCT' as const,
@@ -32,8 +33,19 @@ const options = { screenContext: 'MARKET_HOME', sessionId: 'market_session_1' };
 describe('marketSignalQueue', () => {
   beforeEach(() => {
     localStorage.clear();
+    // Signals are first-party analytics: these cases are a visitor who allowed them.
+    saveConsent(OPTIONAL_ON);
     sendMarketSignalBatchMock.mockReset();
     __webMarketSignalQueueTestUtils.reset();
+  });
+
+  it('records and sends nothing without analytics consent', async () => {
+    saveConsent(OPTIONAL_OFF);
+    expect(enqueueWebMarketSignal(baseSignal('product-1'), options)).toBe(false);
+    await flushWebMarketSignals();
+    expect(localStorage.getItem(WEB_MARKET_SIGNAL_QUEUE_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem('wiez.market.anonymousSessionId.v1')).toBeNull();
+    expect(sendMarketSignalBatchMock).not.toHaveBeenCalled();
   });
 
   it('caps persisted signal queue size', () => {

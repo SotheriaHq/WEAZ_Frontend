@@ -18,6 +18,8 @@ import StorePoliciesSettings from '@/components/settings/tabs/StorePoliciesSetti
 import StorePaymentsSettings from '@/components/settings/tabs/StorePaymentsSettings';
 import StoreHoursSettings from '@/components/settings/tabs/StoreHoursSettings';
 import ProfileVisibilitySettings from '@/components/settings/tabs/ProfileVisibilitySettings';
+import PrivacySettings from '@/components/settings/tabs/PrivacySettings';
+import CurrencySettings from '@/components/settings/tabs/CurrencySettings';
 import SizeFitSettings from '@/components/settings/tabs/SizeFitSettings';
 import HiddenContentSettings from './HiddenContentSettings';
 import type { RootState } from '@/store';
@@ -186,14 +188,10 @@ const sections: Record<string, React.ReactNode> = {
   'account-security': <AccountSecuritySettings />,
   notifications: <NotificationSettings />,
   'email-preferences': <EmailPreferencesSettings />,
-  privacy: (
-    <ComingSoon
-      title="Privacy"
-      description="Control who can see your activity, message you, and access your data."
-    />
-  ),
+  privacy: <PrivacySettings />,
   'profile-visibility': <ProfileVisibilitySettings />,
   location: <LocationSettings />,
+  currency: <CurrencySettings />,
   'size-fits': <SizeFitSettings />,
   'market-preferences': <HiddenContentSettings />,
   'hidden-content': <HiddenContentSettings />,

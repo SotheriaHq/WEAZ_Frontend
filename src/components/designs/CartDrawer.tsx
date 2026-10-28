@@ -32,6 +32,7 @@ import {
 import { hasActiveBrandMembership } from '@/lib/brandAccess';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { MY_BAG_EMOJI } from '@/constants/bagging';
+import { ChargeCurrencyNotice } from '@/currency/PriceEstimate';
 
 /**
  * Lazy so the checkout tree (payment flow, card fields, APIs) stays out of the
@@ -687,6 +688,7 @@ const CartDrawer: React.FC = () => {
                       <span className="text-xs font-semibold text-gray-900 dark:text-white">Total</span>
                       <span className="text-sm font-bold text-gray-900 dark:text-white">{formatPrice(total)}</span>
                     </div>
+                    <ChargeCurrencyNotice total={total} currency={currency} />
                   </div>
 
                   {blockedCustomCount > 0 && (

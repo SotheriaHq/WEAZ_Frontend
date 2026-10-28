@@ -10,10 +10,13 @@
  * untrusted input used only to suppress a count. It is deliberately not sent
  * anywhere else and grants no authority.
  *
- * Lives in its own module with no imports so both `httpClient` (which sets the
- * header) and `marketSignalQueue` (which sends it in signal batches) can use it
- * without importing each other.
+ * Lives in its own module so both `httpClient` (which sets the header) and
+ * `marketSignalQueue` (which sends it in signal batches) can use it without
+ * importing each other. The cookie policy lists it as first-party analytics,
+ * so it exists only while the visitor allows analytics.
  */
+import { analyticsPermitted } from '@/privacy/consent';
+
 export const WEB_DEVICE_ID_STORAGE_KEY = 'wiez.market.anonymousSessionId.v1';
 
 export const WIEZ_DEVICE_ID_HEADER = 'x-wiez-device-id';
@@ -32,7 +35,8 @@ const createId = () => {
  * dedupe entirely and inflate every count, so no id is the safer answer.
  */
 export const getWebDeviceId = (): string | null => {
-  if (typeof window === 'undefined') return null;
+  // Without analytics consent this browser behaves like a private window.
+  if (typeof window === 'undefined' || !analyticsPermitted()) return null;
   try {
     const existing = window.localStorage.getItem(WEB_DEVICE_ID_STORAGE_KEY);
     if (existing) return existing;

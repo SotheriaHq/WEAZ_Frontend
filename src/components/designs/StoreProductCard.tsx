@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import type { SizingMode } from '@/types/sizing';
 import type { CatalogEntityType } from '@/constants/catalogDomain';
 import BagPulseIcon from '@/components/bagging/BagPulseIcon';
+import { PriceEstimate } from '@/currency/PriceEstimate';
 import { useBagging } from '@/hooks/useBagging';
 import { BAG_IT_LABEL } from '@/constants/bagging';
 import { CustomOrderIndicator } from '@/components/custom-orders/CustomOrderIndicator';
@@ -828,6 +829,11 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                   {formatPrice(product.price, product.brand.currency)}
                 </span>
               ) : null}
+              <PriceEstimate
+                amount={product.effectivePrice}
+                currency={product.brand.currency}
+                className="text-[11px] text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]"
+              />
             </div>
 
             <div className="flex items-center gap-1.5">
@@ -889,7 +895,12 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               {product.name}
             </h3>
             <span className="text-white/90 leading-none mt-0.5 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]" style={{ fontSize: '12px' }}>
-              {formatPrice(product.effectivePrice, product.brand.currency)}
+              {formatPrice(product.effectivePrice, product.brand.currency)}{' '}
+              <PriceEstimate
+                amount={product.effectivePrice}
+                currency={product.brand.currency}
+                className="text-[10px] text-white/75"
+              />
             </span>
           </div>
           

@@ -46,8 +46,11 @@ declare global {
 
 const GOOGLE_IDENTITY_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 const GOOGLE_PROMPT_TIMEOUT_MS = 90_000;
+// Shown to people. Setup details for developers go to the dev console only
+// (logGoogleClientDiagnostic), never into this text.
 export const GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE =
-  'Google sign-in could not start. Check that VITE_GOOGLE_CLIENT_ID matches the Google Console Web client and that this origin is authorized.';
+  'Google sign-in isn’t available right now. Try again, or sign in with your email.';
+const GOOGLE_NO_CREDENTIAL_MESSAGE = 'Google didn’t finish signing you in. Please try again.';
 
 let googleScriptPromise: Promise<void> | null = null;
 let cancelActivePrompt: (() => void) | null = null;
@@ -111,7 +114,8 @@ export const mountGoogleSignInButton = async (
 ): Promise<() => void> => {
   const normalizedClientId = clientId.trim();
   if (!normalizedClientId || normalizedClientId.startsWith('<')) {
-    throw new Error('Google sign-in is not configured for this environment.');
+    logGoogleClientDiagnostic('google-client-id-missing');
+    throw new Error(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE);
   }
 
   try {
@@ -138,7 +142,7 @@ export const mountGoogleSignInButton = async (
       if (credential) {
         onToken(credential);
       } else {
-        onError?.(new Error('Google did not return an ID token.'));
+        onError?.(new Error(GOOGLE_NO_CREDENTIAL_MESSAGE));
       }
     },
   });
@@ -166,7 +170,8 @@ export const requestGoogleIdToken = async ({
 }): Promise<string> => {
   const normalizedClientId = clientId.trim();
   if (!normalizedClientId || normalizedClientId.startsWith('<')) {
-    throw new Error('Google sign-in is not configured for this environment.');
+    logGoogleClientDiagnostic('google-client-id-missing');
+    throw new Error(GOOGLE_CLIENT_CONFIGURATION_ERROR_MESSAGE);
   }
 
   try {
@@ -219,7 +224,7 @@ export const requestGoogleIdToken = async ({
           if (credential) {
             resolve(credential);
           } else {
-            reject(new Error('Google did not return an ID token.'));
+            reject(new Error(GOOGLE_NO_CREDENTIAL_MESSAGE));
           }
         });
       },
