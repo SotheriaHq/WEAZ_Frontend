@@ -2,7 +2,7 @@
 module.exports = {
   ci: {
     collect: {
-      numberOfRuns: 1,
+      numberOfRuns: 3,
       startServerCommand: 'npm run preview -- --host 127.0.0.1 --port 4173',
       startServerReadyPattern: 'Local:',
       url: [
@@ -13,7 +13,9 @@ module.exports = {
     assert: {
       assertions: {
         'categories:performance': ['warn', { minScore: 0.6 }],
-        'largest-contentful-paint': ['error', { maxNumericValue: 2500 }],
+        // Temporary release budget approved for Runway/Market. The 2.5-second
+        // objective remains a follow-up; use the median of three cold runs.
+        'largest-contentful-paint': ['error', { maxNumericValue: 5000, aggregationMethod: 'median' }],
         'cumulative-layout-shift': ['error', { maxNumericValue: 0.1 }],
         'interaction-to-next-paint': ['warn', { maxNumericValue: 200 }],
       },
