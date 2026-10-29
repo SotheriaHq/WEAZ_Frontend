@@ -313,9 +313,9 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                       }
                     `}
                   >
-                    <div className={`flex ${optionAllowWrap ? 'items-start' : 'items-center'}`}>
+                    <div className={`flex ${optionAllowWrap && option.description ? 'items-start' : 'items-center'}`}>
                       {option.icon && (
-                        <span className={`mr-3 mt-0.5 flex-shrink-0 ${isSelected ? 'text-[color:var(--menu-selected-text)]' : 'text-[color:var(--text-secondary)]'}`}>
+                        <span className={`mr-2.5 flex-shrink-0 inline-flex items-center ${isSelected ? 'text-[color:var(--menu-selected-text)]' : 'text-[color:var(--text-secondary)]'}`}>
                           {option.icon}
                         </span>
                       )}
@@ -400,7 +400,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
             className={`flex min-w-0 ${fitContent ? '' : 'flex-1'} ${selectedAllowWrap ? 'items-start pr-4' : 'items-center'} ${!selectedOption ? 'text-[color:var(--text-secondary)]' : 'text-[color:var(--text-primary)]'}`}
           >
             {selectedOption ? (
-              <span className={`flex min-w-0 ${fitContent ? '' : 'flex-1'} gap-1.5 ${selectedAllowWrap ? 'items-start' : 'items-center'}`}>
+              <span className={`flex min-w-0 ${fitContent ? '' : 'flex-1'} gap-2 items-center`}>
                 {selectedOption.icon && (
                   <span className="flex-shrink-0 text-[color:var(--text-secondary)]">
                     {selectedOption.icon}

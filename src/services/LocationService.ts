@@ -1,5 +1,9 @@
 import { apiClient } from '@/api/httpClient';
 import { getOfflineRegions } from '@/data/countryRegions';
+import { getCitiesForState } from '@/data/locations';
+import { getCountryFlagEmoji } from '@/components/ui/CountryFlag';
+
+export { getCountryFlagEmoji };
 
 /**
  * Location cascade source for profile/settings forms.
@@ -35,12 +39,12 @@ export const LOCATION_FIELD_LABELS = {
     city: 'City / LGA',
 } as const;
 
-const LOCATION_REQUEST_TIMEOUT_MS = 8000;
+const LOCATION_REQUEST_TIMEOUT_MS = 2500;
 
 const toCountryOption = (iso2: string, name: string): CountryOption => ({
     name,
     iso2,
-    flag: '',
+    flag: getCountryFlagEmoji(iso2),
     flagImage: `/flags/${iso2.toLowerCase()}.svg`,
 });
 
@@ -125,27 +129,54 @@ class LocationService {
     }
 
     /**
-     * Cities for a country and state. Cities have no bundled fallback —
-     * callers must accept a typed value when this comes back empty.
+     * Cities/LGAs for a country and state.
+     * Bundled offline data (e.g. Nigeria's 774 LGAs) is checked first for 0ms offline readiness.
+     * Remote calls have a responsive timeout and automatic retry before falling back to manual entry.
      */
     async getCities(countryName: string, stateName: string): Promise<string[]> {
         if (!countryName || !stateName) return [];
         const key = `${countryName}-${stateName}`;
         if (this.citiesCache[key]) return this.citiesCache[key];
 
-        try {
+        // 1. Instant bundled offline check (covers Nigeria's LGAs + major hubs)
+        const offlineCities = getCitiesForState(countryName, stateName);
+        if (offlineCities && offlineCities.length > 0) {
+            this.citiesCache[key] = offlineCities;
+            return offlineCities;
+        }
+
+        // 2. Fetch with responsive timeout and 1 automatic retry
+        const fetchRemote = async (): Promise<string[]> => {
             const response = await apiClient.get('/locations/cities', {
                 params: { country: countryName, state: stateName },
                 timeout: LOCATION_REQUEST_TIMEOUT_MS,
             });
-            const cities = listFrom<unknown>(response).filter(
+            return listFrom<unknown>(response).filter(
                 (name): name is string => typeof name === 'string',
             );
-            if (cities.length > 0) this.citiesCache[key] = cities;
-            return cities;
+        };
+
+        try {
+            const cities = await fetchRemote();
+            if (cities.length > 0) {
+                this.citiesCache[key] = cities;
+                return cities;
+            }
         } catch {
-            return [];
+            // Retry once after brief backoff
+            try {
+                await new Promise((resolve) => setTimeout(resolve, 500));
+                const retryCities = await fetchRemote();
+                if (retryCities.length > 0) {
+                    this.citiesCache[key] = retryCities;
+                    return retryCities;
+                }
+            } catch {
+                // Return empty so caller can offer free-text entry gracefully
+            }
         }
+
+        return [];
     }
 }
 

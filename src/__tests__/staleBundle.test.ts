@@ -71,6 +71,20 @@ describe('recognising a stale bundle', () => {
     isNewBuildAvailable.mockReturnValue(true);
     expect(shouldRecoverFromStaleBundle(unrelated)).toBe(true);
   });
+
+  it('never attempts recovery when navigator is offline', async () => {
+    const { shouldRecoverFromStaleBundle, recoverFromStaleBundle } = await load();
+    const chunkError = new Error('Failed to fetch dynamically imported module: https://weaz.me/assets/x.js');
+
+    const originalOnLine = navigator.onLine;
+    try {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+      expect(shouldRecoverFromStaleBundle(chunkError)).toBe(false);
+      expect(recoverFromStaleBundle('test-key')).toBe(false);
+    } finally {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: originalOnLine });
+    }
+  });
 });
 
 describe('recovering', () => {

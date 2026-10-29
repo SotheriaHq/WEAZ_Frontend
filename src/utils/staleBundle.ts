@@ -66,13 +66,20 @@ export const isStaleBundleError = (value: unknown): boolean => {
  * True when this error should be treated as a stale deploy.
  *
  * Either the message names one, OR the version guard has already seen a newer
- * `buildId` than the one this bundle was stamped with. That second arm matters:
- * once we KNOW the running code is superseded, the specific way it failed is
- * not worth guessing at, and a reload is the right answer for any of them.
- * It is also the only arm that catches a message we have not met yet.
+ * `buildId` than the one this bundle was stamped with.
+ *
+ * CRITICAL GUARD:
+ * If the browser is currently offline (`!navigator.onLine`), this is an offline
+ * connection loss, NOT a stale deploy. Attempting a hard browser reload or
+ * `window.location.replace` while offline unmounts the SPA and crashes straight
+ * into Chrome's native "This site can't be reached" (DNS_PROBE_POSSIBLE) screen.
  */
-export const shouldRecoverFromStaleBundle = (value: unknown): boolean =>
-  isStaleBundleError(value) || isNewBuildAvailable();
+export const shouldRecoverFromStaleBundle = (value: unknown): boolean => {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return false;
+  }
+  return isStaleBundleError(value) || isNewBuildAvailable();
+};
 
 /**
  * Reload onto the current deploy, at most once per session per key.
@@ -84,6 +91,10 @@ export const shouldRecoverFromStaleBundle = (value: unknown): boolean =>
  * visible rather than hidden behind a refresh cycle.
  */
 export const recoverFromStaleBundle = (sessionKey: string): boolean => {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return false;
+  }
+
   try {
     if (sessionStorage.getItem(sessionKey) === '1') return false;
     sessionStorage.setItem(sessionKey, '1');

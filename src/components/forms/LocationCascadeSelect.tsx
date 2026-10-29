@@ -31,6 +31,7 @@ interface LocationCascadeSelectProps {
   emptyMessage: string;
   /** Shown under the free-text fallback so the switch is not mysterious. */
   fallbackHint: string;
+  onRetry?: () => void;
   menuLayer?: 'dropdown' | 'modal';
   className?: string;
 }
@@ -48,6 +49,7 @@ const LocationCascadeSelect: React.FC<LocationCascadeSelectProps> = ({
   searchPlaceholder,
   emptyMessage,
   fallbackHint,
+  onRetry,
   menuLayer = 'modal',
   className = 'w-full',
 }) => {
@@ -61,9 +63,20 @@ const LocationCascadeSelect: React.FC<LocationCascadeSelectProps> = ({
   if (showFreeText) {
     return (
       <div className={className}>
-        <label className="mb-1.5 block text-sm font-semibold text-theme-secondary">
-          {label}
-        </label>
+        <div className="mb-1.5 flex items-center justify-between">
+          <label className="block text-sm font-semibold text-theme-secondary">
+            {label}
+          </label>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="text-xs font-semibold text-[color:var(--brand-primary)] hover:underline active:opacity-75"
+            >
+              Retry
+            </button>
+          )}
+        </div>
         <input
           type="text"
           value={value}

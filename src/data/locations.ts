@@ -1,3 +1,5 @@
+import { getNigeriaLgasForState } from './nigeriaLgas';
+
 export interface LocationStateOption {
   name: string;
   cities: string[];
@@ -68,6 +70,12 @@ export const getCitiesForState = (
 ): string[] => {
   if (!country || !state) {
     return [];
+  }
+
+  const normCountry = country.trim().toLowerCase();
+  if (normCountry === 'nigeria' || normCountry === 'ng') {
+    const lgas = getNigeriaLgasForState(state);
+    if (lgas.length > 0) return lgas;
   }
 
   const states = getStatesForCountry(country);

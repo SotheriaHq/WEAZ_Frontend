@@ -18,7 +18,8 @@ import LocationCascadeSelect from '../forms/LocationCascadeSelect';
 import PhoneNumberField from '../forms/PhoneNumberField';
 import { resolveCountryIso2 } from '@/data/countryRegions';
 import type { CountryCode } from 'libphonenumber-js';
-import MediaRenderer from '@/components/media/MediaRenderer';
+import Button from '@/components/ui/Button';
+import CountryFlag from '@/components/ui/CountryFlag';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import {
@@ -108,14 +109,6 @@ const profileSchema = z
 type ProfileFormValues = z.infer<typeof profileSchema>;
 type SubmitStatus = 'idle' | 'saving' | 'syncing' | 'almost' | 'complete';
 const MAX_TAGS = BRAND_TAG_SELECTION_LIMIT;
-const BRAND_TAG_CHIP_PALETTE = [
-  'bg-gradient-to-r from-fuchsia-500 to-violet-600 text-white shadow-fuchsia-500/25',
-  'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-cyan-500/25',
-  'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-emerald-500/25',
-  'bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 shadow-amber-500/25',
-  'bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-rose-500/25',
-  'bg-gradient-to-r from-indigo-500 to-sky-500 text-white shadow-indigo-500/25',
-];
 const BUSINESS_TYPE_OPTIONS = [
   { value: 'Retailer', label: 'Retailer', disabled: true },
   { value: 'Designer', label: 'Designer' },
@@ -209,7 +202,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [countries, setCountries] = useState<CountryOption[]>([]);
   const [states, setStates] = useState<StateOption[]>([]);
   const [cities, setCities] = useState<string[]>([]);
-  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [loadingCountries, setLoadingCountries] = useState(false);
+  const [loadingStates, setLoadingStates] = useState(false);
+  const [loadingCities, setLoadingCities] = useState(false);
 
   // Tags State
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -303,10 +298,13 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
     if (isInitialOpen) {
       void (async () => {
-        setLoadingLocations(true);
-        const data = await locationService.getCountries();
-        setCountries(data);
-        setLoadingLocations(false);
+        setLoadingCountries(true);
+        try {
+          const data = await locationService.getCountries();
+          setCountries(data);
+        } finally {
+          setLoadingCountries(false);
+        }
       })();
       reset(initialValues);
       setSelectedTags((initialValues.brandTags ?? []).slice(0, MAX_TAGS));
@@ -337,37 +335,43 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   }, [selectedCountry, countries]);
 
   // Cascade: Load States when Country changes
-  useEffect(() => {
-    const loadStates = async () => {
-        if (!selectedCountry) {
-            setStates([]);
-            return;
-        }
-        setLoadingLocations(true);
-        // Pass ISO2 so the offline fallback can resolve the country even when
-        // the remote display name does not match one of its known aliases.
-        const iso2 = countries.find((c) => c.name === selectedCountry)?.iso2;
-        const data = await locationService.getStates(selectedCountry, iso2);
-        setStates(data);
-        setLoadingLocations(false);
-    };
-    void loadStates();
+  const loadStates = useCallback(async () => {
+    if (!selectedCountry) {
+      setStates([]);
+      return;
+    }
+    setLoadingStates(true);
+    try {
+      const iso2 = countries.find((c) => c.name === selectedCountry)?.iso2;
+      const data = await locationService.getStates(selectedCountry, iso2);
+      setStates(data);
+    } finally {
+      setLoadingStates(false);
+    }
   }, [selectedCountry, countries]);
 
-  // Cascade: Load Cities when State changes
   useEffect(() => {
-    const loadCities = async () => {
-        if (!selectedCountry || !selectedState) {
-            setCities([]);
-            return;
-        }
-        setLoadingLocations(true);
-        const data = await locationService.getCities(selectedCountry, selectedState);
-        setCities(data);
-        setLoadingLocations(false);
-    };
-    void loadCities();
+    void loadStates();
+  }, [loadStates]);
+
+  // Cascade: Load Cities / LGAs when State changes
+  const loadCities = useCallback(async () => {
+    if (!selectedCountry || !selectedState) {
+      setCities([]);
+      return;
+    }
+    setLoadingCities(true);
+    try {
+      const data = await locationService.getCities(selectedCountry, selectedState);
+      setCities(data);
+    } finally {
+      setLoadingCities(false);
+    }
   }, [selectedCountry, selectedState]);
+
+  useEffect(() => {
+    void loadCities();
+  }, [loadCities]);
 
   // Scroll Locking
   useEffect(() => {
@@ -453,19 +457,15 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     [setFocus],
   );
 
-  // Country Options for Select
+  // Country Options for Select with minimalist inline CountryFlag
   const countryOptions = useMemo(() => countries.map(c => ({
     value: c.name,
     label: c.name,
     icon: (
-      <MediaRenderer
-        kind="image"
-        src={c.flagImage}
-        alt={c.name}
-        maxHeightClassName="max-h-5"
-        maxWidthClassName="max-w-8"
-        className="rounded-sm"
-        mediaClassName="rounded-sm"
+      <CountryFlag
+        iso2={c.iso2}
+        name={c.name}
+        flagImage={c.flagImage}
       />
     ),
   })), [countries]);
@@ -545,7 +545,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
           <div
             ref={dialogRef}
             tabIndex={-1}
-            className="relative w-full max-w-4xl neu-modal-surface surface-card rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-in border border-theme"
+            className="relative w-full max-w-4xl neu-modal-surface surface-card rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-scale-in border-0"
             style={{ maxHeight: `calc(90vh - ${keyboardInset}px)` }}
           >
 
@@ -571,7 +571,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     type="button"
                     onClick={onSkip}
                     disabled={isSubmitting}
-                    className="px-3 py-2 rounded-lg text-sm font-semibold text-theme-secondary hover:bg-gray-100 dark:hover:bg-white/10 transition"
+                    className="px-3 py-2 rounded-lg text-sm font-semibold text-theme-secondary hover:bg-gray-100 dark:hover:bg-white/10 active:scale-95 transition-all"
                   >
                     Skip
                   </button>
@@ -580,7 +580,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   type="button"
                   onClick={onClose}
                   disabled={isSubmitting}
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10 transition"
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10 active:scale-95 active:shadow-inner transition-all"
                   aria-label="Close"
                 >
                   ✕
@@ -645,8 +645,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </div>
 
             {/* Section: Story & Tags */}
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-               <div className="flex items-center space-x-3 mb-6 pb-4 border-b border-gray-100 dark:border-gray-700">
+            <div className="surface-elevated p-6 rounded-2xl shadow-xs border-0">
+              <div className="flex items-center space-x-3 mb-6 pb-2 border-0">
                 <div className="w-10 h-10 rounded-full bg-pink-100 dark:bg-pink-900/40 flex items-center justify-center text-pink-600 dark:text-pink-400">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 20h9"></path>
@@ -690,11 +690,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                         Brand Tags 
                         <span className="ml-2 text-xs font-normal text-gray-500">(Select up to {MAX_TAGS})</span>
                     </label>
-                    <div className="flex flex-wrap gap-2 p-4 rounded-xl border border-theme surface-subtle/40">
-                      {tagOptions.map((tag, index) => {
+                    <div className="flex flex-wrap gap-2.5 p-4 rounded-xl border-0 surface-subtle/30">
+                      {tagOptions.map((tag) => {
                         const isSelected = selectedTags.includes(tag.value);
-                        const selectedChipColor =
-                          BRAND_TAG_CHIP_PALETTE[index % BRAND_TAG_CHIP_PALETTE.length];
                         return (
                           <button
                             key={tag.value}
@@ -702,10 +700,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                             onClick={() => toggleTag(tag.value)}
                             disabled={isSubmitting}
                             aria-pressed={isSelected}
-                            className={`px-4 py-2 rounded-full text-xs font-semibold transition shadow-sm focus:outline-none focus:ring-2 focus:ring-white/30 disabled:cursor-not-allowed disabled:opacity-70 ${
+                            className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[color:var(--brand-primary)]/40 disabled:cursor-not-allowed disabled:opacity-60 ${
                               isSelected
-                                ? selectedChipColor
-                                : 'surface-card text-theme-secondary border border-theme hover:bg-gray-100 dark:hover:bg-gray-800'
+                                ? 'neu-inset-chip selected font-bold active:scale-95 active:shadow-[inset_3px_3px_6px_rgba(0,0,0,0.35)] shadow-xs'
+                                : 'neu-pressed-button surface-card text-theme-secondary hover:text-theme active:scale-95 active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.25)] border-0'
                             }`}
                           >
                             #{tag.label}
@@ -722,8 +720,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </div>
 
             {/* Section: Contact & Biz */}
-             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-              <div className="flex items-center space-x-3 mb-6 pb-4 border-b border-gray-100 dark:border-gray-700">
+             <div className="surface-elevated p-6 rounded-2xl shadow-xs border-0">
+              <div className="flex items-center space-x-3 mb-6 pb-2 border-0">
                 <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
@@ -755,11 +753,11 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                               clearErrors('brandCountry');
                           }}
                           options={countryOptions}
-                          placeholder={loadingLocations ? "Loading..." : "Select Country"}
+                          placeholder={loadingCountries ? "Loading countries..." : "Select Country"}
                           searchable
                           searchPlaceholder="Search countries..."
                           emptyMessage="No matching country found"
-                          disabled={loadingLocations}
+                          disabled={loadingCountries}
                           className="w-full"
                           menuLayer="modal"
                           optionAllowWrap
@@ -779,11 +777,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           options={stateOptions}
                           parentValue={selectedCountry || ''}
                           parentPlaceholder="Select country first"
-                          loading={loadingLocations}
-                          placeholder="Select state / province"
+                          loading={loadingStates}
+                          placeholder={loadingStates ? "Loading states..." : "Select state / province"}
                           searchPlaceholder="Search states or provinces..."
                           emptyMessage="No matching state or province found"
-                          fallbackHint="We couldn't load the list for this country — type your state or province."
+                          fallbackHint="Type state or province"
+                          onRetry={loadStates}
                       />
                        <LocationCascadeSelect
                           label={LOCATION_FIELD_LABELS.city}
@@ -798,11 +797,12 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           options={cityOptions}
                           parentValue={selectedState || ''}
                           parentPlaceholder="Select state first"
-                          loading={loadingLocations}
-                          placeholder="Select city / LGA"
+                          loading={loadingCities}
+                          placeholder={loadingCities ? "Loading cities/LGAs..." : "Select city / LGA"}
                           searchPlaceholder="Search cities or LGAs..."
                           emptyMessage="No matching city or LGA found"
-                          fallbackHint="We couldn't load the list for this state — type your city or LGA."
+                          fallbackHint="Type city or LGA"
+                          onRetry={loadCities}
                       />
                   </div>
                   {errors.brandCountry && (
@@ -912,32 +912,32 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             <button type="submit" className="hidden" />
 
             {/* Actions (inside body, no separate footer) */}
-            <div className="flex justify-end gap-4 pt-2">
+            <div className="flex items-center justify-end gap-4 pt-2">
               {isSubmitting && submitStatusMessage ? (
                 <div className="mr-auto flex min-h-11 items-center gap-2 rounded-full bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 dark:bg-purple-500/10 dark:text-fuchsia-200" role="status" aria-live="polite">
                   <MuseLoader size={18} />
                   <span>{submitStatusMessage}</span>
                 </div>
               ) : null}
-              <button 
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="px-6 py-3 rounded-lg text-sm font-semibold text-theme-secondary hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition"
+                className="px-6 py-2.5 text-sm"
               >
                 Cancel
-              </button>
-              <button 
+              </Button>
+              <Button
                 type="button"
+                variant="brand"
                 onClick={() => handleSubmit(onSubmit, onInvalid)()}
                 disabled={isSubmitting}
-                aria-busy={isSubmitting}
-                className="min-w-[12rem] px-8 py-3 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg shadow-purple-500/20 transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                loading={isSubmitting}
+                className="min-w-[12rem] px-8 py-2.5 text-sm font-bold"
               >
-                <span className="inline-flex w-full items-center justify-center">
-                  {submitStatusMessage ?? 'Save and Continue'}
-                </span>
-              </button>
+                {submitStatusMessage ?? 'Save and Continue'}
+              </Button>
             </div>
             
           </form>
