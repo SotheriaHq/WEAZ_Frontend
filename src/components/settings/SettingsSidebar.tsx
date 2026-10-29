@@ -136,6 +136,7 @@ const sidebarGroups: SidebarGroup[] = [
     collapsible: true,
     brandOnly: true,
     items: [
+      { key: 'store-category-requests', label: 'Category requests', path: '/settings?tab=store-category-requests', icon: '📝', description: 'Request and track category approval' },
       {
         key: 'store-customers', label: 'Customers', path: '/settings?tab=store-customers',
         icon: '👥', description: 'Customer purchase threshold · paid plans',

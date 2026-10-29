@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildDesignUploadMetadata } from './useDesignUpload';
+import { buildDesignUploadMetadata, resolvePresignedUploadMethod } from './useDesignUpload';
 
 vi.mock('../api/httpClient', () => ({
   apiClient: {
@@ -51,5 +51,12 @@ describe('useDesignUpload contract helpers', () => {
         maxPrice: 45000,
       }),
     );
+  });
+});
+
+describe('R2 PUT upload contract', () => {
+  it('accepts the explicit current upload method', () => expect(resolvePresignedUploadMethod({ method: 'PUT' })).toBe('PUT'));
+  it.each([undefined, 'POST', 'GET'])('refuses an absent or retired method %s', method => {
+    expect(() => resolvePresignedUploadMethod({ method })).toThrow('Upload configuration is invalid');
   });
 });

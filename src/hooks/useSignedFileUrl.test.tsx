@@ -45,13 +45,13 @@ describe('useSignedFileUrl', () => {
       () =>
         useSignedFileUrl(
           'banner-file-id',
-          'https://voguely.s3.eu-north-1.amazonaws.com/BANNER_IMAGE/user/banner.jpg',
+          'https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/wiez-sit-media/BANNER_IMAGE/user/banner.jpg',
         ),
       { wrapper: createWrapper() },
     );
 
     expect(result.current.url).not.toBe(
-      'https://voguely.s3.eu-north-1.amazonaws.com/BANNER_IMAGE/user/banner.jpg',
+      'https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/wiez-sit-media/BANNER_IMAGE/user/banner.jpg',
     );
 
     await waitFor(() => {

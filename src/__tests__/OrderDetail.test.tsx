@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -50,6 +51,12 @@ vi.mock('sonner', () => ({
   },
 }));
 
+function showOrder() {
+  return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <MemoryRouter initialEntries={['/orders/order-1']}><Routes><Route path="/orders/:orderId" element={<OrderDetail />} /></Routes></MemoryRouter>
+  </QueryClientProvider>);
+}
+
 describe('OrderDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -91,20 +98,33 @@ describe('OrderDetail', () => {
 
   it('renders the order detail without the conversation panel', async () => {
     render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter initialEntries={['/orders/order-1']}>
         <Routes>
           <Route path="/orders/:orderId" element={<OrderDetail />} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     await waitFor(() => {
       expect(getMyOrder).toHaveBeenCalledWith('order-1');
     });
 
-    expect(screen.getByText('Order QR Code')).toBeInTheDocument();
+    expect(screen.queryByText('Order QR Code')).not.toBeInTheDocument();
     expect(screen.getByText('Review status')).toBeInTheDocument();
     expect(screen.queryByText('Order conversation')).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Type a message for this order')).not.toBeInTheDocument();
   });
+  it.each([
+    ['PROCESSING', 'Refund processing', 'Bank credit is not yet confirmed'],
+    ['SETTLED', 'Refund processed by the payment provider', 'additional time'],
+    ['NEEDS_ATTENTION', 'Refund needs WIEZ attention', 'request remains recorded'],
+  ])('shows %s from the current refund record', async (status, title, message) => {
+    getMyOrder.mockResolvedValue({ id: 'order-1', status: 'CANCELLED', paymentStatus: 'PAID', totalAmount: 15000, currency: 'NGN', items: [], orderItems: [], createdAt: '2026-10-28T10:00:00Z', financeBreakdown: { refund: { status } } });
+    showOrder();
+    expect(await screen.findByRole('heading', { name: title })).toBeVisible();
+    expect(screen.getByText(new RegExp(message))).toBeVisible();
+  });
+
 });

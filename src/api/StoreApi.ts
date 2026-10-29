@@ -256,6 +256,13 @@ export interface OrderFinanceBreakdown {
   paymentStatus?: string | null;
   paidAt?: string | null;
   escrowStatus?: string | null;
+  refund?: {
+    status: string;
+    amount: number;
+    currency: string;
+    requestedAt: string;
+    processedAt: string | null;
+  } | null;
   commissionRate?: number | null;
   commissionAmount?: number | null;
   netBrandAmount?: number | null;

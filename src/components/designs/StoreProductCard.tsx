@@ -1,3 +1,4 @@
+import { isStorageProviderUrl } from '@/utils/mediaUrlPolicy';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store';
@@ -400,18 +401,16 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 
       const resolved = await Promise.all(
         gallerySources.map(async (source) => {
-          // Prefer signing raw S3 URLs by key first — this is the market/admin
+          // Prefer signing raw R2 URLs by key first — this is the market/admin
           // hot path and does not require ownership of the FileUpload row.
           const rawUrl = source.url ?? '';
-          const isUnsignedS3 =
-            rawUrl.includes('.s3.') ||
-            rawUrl.includes('amazonaws.com');
+          const isUnsignedR2 = isStorageProviderUrl(rawUrl);
           const alreadySigned =
             rawUrl.includes('X-Amz-Signature') ||
             rawUrl.includes('X-Amz-Credential') ||
             rawUrl.includes('Signature=');
 
-          if (rawUrl && isUnsignedS3 && !alreadySigned) {
+          if (rawUrl && isUnsignedR2 && !alreadySigned) {
             try {
               const signed = await brandApi.getSignedS3Url(rawUrl);
               if (signed) return signed;

@@ -37,6 +37,12 @@ const readDotEnvValue = (key) => {
   return '';
 };
 
+const r2Origin = new URL(process.env.VITE_R2_STORAGE_ORIGIN || readDotEnvValue('VITE_R2_STORAGE_ORIGIN') || 'https://d203d3dfbba40e2429de72a848154d3e.r2.cloudflarestorage.com').origin;
+if (!/^https:\/\/[a-f0-9]{32}(?:\.(?:eu|us|fedramp))?\.r2\.cloudflarestorage\.com$/i.test(r2Origin)) throw new Error('VITE_R2_STORAGE_ORIGIN must identify an R2 account API origin');
+const mediaGatewayUrl = new URL(process.env.VITE_MEDIA_GATEWAY_BASE_URL || readDotEnvValue('VITE_MEDIA_GATEWAY_BASE_URL') || 'https://wiez-sit-media-gateway.sotheria-hq.workers.dev');
+if (mediaGatewayUrl.protocol !== 'https:' || mediaGatewayUrl.username || mediaGatewayUrl.password || mediaGatewayUrl.port || mediaGatewayUrl.search || mediaGatewayUrl.hash || /(?:^|\.)(?:amazonaws\.com(?:\.cn)?|cloudfront\.net|r2\.cloudflarestorage\.com|r2\.dev)$/i.test(mediaGatewayUrl.hostname)) throw new Error('VITE_MEDIA_GATEWAY_BASE_URL must identify an authenticated HTTPS media gateway');
+const mediaGatewayOrigin = mediaGatewayUrl.origin;
+
 const sentryDsn = String(process.env.VITE_SENTRY_DSN ?? readDotEnvValue('VITE_SENTRY_DSN')).trim();
 let sentryIngestOrigin = '';
 if (sentryDsn) {
@@ -60,7 +66,8 @@ const buildConnectSrc = () => {
     'ws://127.0.0.1:3040',
     apiBaseUrl,
     apiWsBaseUrl,
-    'https://*.amazonaws.com',
+    r2Origin,
+    mediaGatewayOrigin,
     'https://api.paystack.co',
     'https://checkout.paystack.com',
     'https://standard.paystack.co',
@@ -98,20 +105,13 @@ const csp = [
   "frame-ancestors 'none'",
   `script-src ${scriptSrc}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  // apiBaseUrl: display media is served through the API host's /media/*
-  // reverse proxy (stable cacheable URLs, HTTP/2) instead of per-request
-  // signed S3 URLs — see MEDIA_PUBLIC_BASE_URL in the backend.
-  // media.weaz.me: the same /media/* proxy behind Cloudflare's edge cache.
-  `img-src 'self' data: blob: ${apiBaseUrl} https://media.weaz.me https://*.amazonaws.com https://*.s3.amazonaws.com https://*.cloudfront.net https://res.cloudinary.com https://images.unsplash.com https://lh3.googleusercontent.com https://unavatar.io https://checkout.paystack.com https://standard.paystack.co`,
+  // Current R2 account and authenticated media Worker only.
+  `img-src 'self' data: blob: ${apiBaseUrl} ${r2Origin} ${mediaGatewayOrigin} https://res.cloudinary.com https://images.unsplash.com https://lh3.googleusercontent.com https://unavatar.io https://checkout.paystack.com https://standard.paystack.co`,
   "font-src 'self' data: https://fonts.gstatic.com",
   `connect-src ${buildConnectSrc()}`,
-  // S3 hosts: the admin brand-verification review page previews evidence PDFs
-  // (the signed confirmation letter) in an <iframe> pointed at a short-lived
-  // signed S3 URL. Without these the browser blocked the frame outright and the
-  // reviewer saw "This content is blocked. Contact the site owner to fix the
-  // issue." with no way to read the letter they were being asked to approve.
-  // Scoped to S3 only — not a general framing allowance.
-  'frame-src https://accounts.google.com https://checkout.paystack.com https://standard.paystack.co https://js.paystack.co https://*.amazonaws.com https://*.s3.amazonaws.com',
+  // Private verification documents remain on authorized R2 capabilities.
+  `frame-src https://accounts.google.com https://checkout.paystack.com https://standard.paystack.co https://js.paystack.co ${r2Origin}`,
+  `media-src 'self' blob: ${r2Origin} ${mediaGatewayOrigin}`,
   "form-action 'self' https://checkout.paystack.com https://standard.paystack.co",
   "worker-src 'self' blob:",
   'upgrade-insecure-requests',

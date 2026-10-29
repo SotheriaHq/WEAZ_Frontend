@@ -26,6 +26,7 @@ const {
 
 vi.mock('@/api/AdminApi', () => ({
   adminContentReviewApi: {
+    getBrandAutoPublish: vi.fn(async () => ({ data: { brandId: 'brand-1', enabled: false } })),
     getReasonCodes,
     listSubmissions,
     getSubmission,

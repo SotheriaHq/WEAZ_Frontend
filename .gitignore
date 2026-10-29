@@ -50,3 +50,6 @@ memory-bank/
 # Local discovery/store regression output
 /test-results/discovery/
 /test-results/store-layout-390.png
+
+# Local validation scratch files
+.tmp/

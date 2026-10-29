@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import CategorySuggestionsSettings from './CategorySuggestionsSettings';
 import SubscriptionBillingSettings from './SubscriptionBillingSettings';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -209,6 +210,7 @@ const sections: Record<string, React.ReactNode> = {
 
   // Studio
   'store-general': <StoreGeneralSettings />,
+  'store-category-requests': <CategorySuggestionsSettings />,
   'store-customers': <CustomerSettings />,
   'store-hours': <StoreHoursSettings />,
   'store-social': (

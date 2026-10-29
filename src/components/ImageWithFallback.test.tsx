@@ -35,7 +35,7 @@ describe('ImageWithFallback', () => {
 
   it('does not render a raw private S3 URL when a durable file id can resolve it', async () => {
     const rawS3Url =
-      'https://voguely.s3.eu-north-1.amazonaws.com/BANNER_IMAGE/user/banner.jpg';
+      'https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/wiez-sit-media/BANNER_IMAGE/user/banner.jpg';
     brandApiMock.getSignedFileUrl.mockResolvedValue(
       'https://signed.example.com/banner.jpg',
     );
@@ -65,9 +65,9 @@ describe('ImageWithFallback', () => {
 
   it('resolves an unsigned S3 URL before rendering media', async () => {
     const rawS3Url =
-      'https://voguely.s3.eu-north-1.amazonaws.com/PROFILE_IMAGE/user/avatar.jpg';
+      'https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/wiez-sit-media/PROFILE_IMAGE/user/avatar.jpg';
     const signedUrl =
-      'https://voguely.s3.eu-north-1.amazonaws.com/PROFILE_IMAGE/user/avatar.jpg?X-Amz-Signature=signed';
+      'https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/wiez-sit-media/PROFILE_IMAGE/user/avatar.jpg?X-Amz-Signature=signed';
     brandApiMock.getSignedS3Url.mockResolvedValue(signedUrl);
 
     render(
@@ -96,7 +96,7 @@ describe('ImageWithFallback', () => {
 
   it('falls back without rendering a raw S3 URL when signing fails', async () => {
     const rawS3Url =
-      'https://voguely.s3.eu-north-1.amazonaws.com/PROFILE_IMAGE/user/missing-avatar.jpg';
+      'https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/wiez-sit-media/PROFILE_IMAGE/user/missing-avatar.jpg';
     brandApiMock.getSignedS3Url.mockResolvedValue(null);
 
     render(
@@ -120,7 +120,7 @@ describe('ImageWithFallback', () => {
   it('resolves a raw storage key before rendering media', async () => {
     const rawStorageKey = 'PROFILE_IMAGE/user/key-avatar.jpg';
     const signedUrl =
-      'https://voguely.s3.eu-north-1.amazonaws.com/PROFILE_IMAGE/user/key-avatar.jpg?X-Amz-Signature=signed';
+      'https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/wiez-sit-media/PROFILE_IMAGE/user/key-avatar.jpg?X-Amz-Signature=signed';
     brandApiMock.getSignedS3KeyUrl.mockResolvedValue(signedUrl);
 
     render(
@@ -146,7 +146,7 @@ describe('ImageWithFallback', () => {
   it('renders a still-valid signed S3 URL directly', () => {
     const expires = Math.floor((Date.now() + 10 * 60 * 1000) / 1000);
     const signedUrl =
-      `https://voguely.s3.eu-north-1.amazonaws.com/PROFILE_IMAGE/user/signed-avatar.jpg?X-Amz-Signature=signed&Expires=${expires}`;
+      `https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/wiez-sit-media/PROFILE_IMAGE/user/signed-avatar.jpg?X-Amz-Signature=signed&Expires=${expires}`;
 
     render(
       <ImageWithFallback

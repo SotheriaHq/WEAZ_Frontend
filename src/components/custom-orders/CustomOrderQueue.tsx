@@ -1,4 +1,5 @@
 import { getFriendlyErrorMessage } from '@/utils/errorMessage';
+import { describeRefund } from '@/lib/refundPresentation';
 import { queueServerNow } from '@/features/orders/queueClock';
 import {
   canRetainQueue,
@@ -127,11 +128,11 @@ export function QueueFacts({ queue }: { queue?: QueuePresenter | null }) {
       ) : null}
       {queue.refundSummary ? (
         <p>
-          Refund: {queue.refundSummary.status ?? 'Processing'}
+          {describeRefund(queue.refundSummary.status)?.title ?? 'Refund status being verified'}
           {queue.refundSummary.amount != null
             ? ` | ${money(queue.refundSummary.amount, queue.refundSummary.currency)}`
             : ''}
-          . Processing does not mean money has reached your bank.
+          . {describeRefund(queue.refundSummary.status)?.description ?? 'Refresh the order for the latest status.'}
         </p>
       ) : null}
       {queue.refundSummary?.kind === 'PARTIAL' && !queue.canResubmit ? (
@@ -149,7 +150,7 @@ export function QueueFacts({ queue }: { queue?: QueuePresenter | null }) {
                 {refund.kind === 'PARTIAL'
                   ? 'Partial refund'
                   : 'Cancellation refund'}
-                : {money(refund.amount, refund.currency)} · {refund.status}
+                : {money(refund.amount, refund.currency)} · {describeRefund(refund.status)?.title ?? 'Status being verified'}
               </li>
             ))}
           </ul>

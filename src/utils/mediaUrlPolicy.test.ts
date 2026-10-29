@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getMediaUrlExpiryMs, getMediaUrlIdentity, isStorageProviderUrl, isUsableMediaUrl, mediaUrlCacheExpiresAt } from './mediaUrlPolicy';
+import { getMediaUrlExpiryMs, getMediaUrlIdentity, isStorageProviderUrl, isRenewableMediaUrl, isUsableMediaUrl, mediaUrlCacheExpiresAt } from './mediaUrlPolicy';
 const now = Date.UTC(2026, 9, 22, 12);
 const r2 = 'https://account.r2.cloudflarestorage.com/private/key.jpg';
 const sdk = `${r2}?X-Amz-Date=20261022T120000Z&X-Amz-Expires=300&X-Amz-Signature=abc`;
@@ -38,5 +38,13 @@ describe('media URL capability policy', () => {
   });
   it('caps cache life at the capability expiry', () => {
     expect(mediaUrlCacheExpiresAt(gateway(300), 840_000, now)).toBe(now + 270_000);
+  });
+});
+
+describe('retired AWS storage', () => {
+  it.each(['https://bucket.s3.eu-north-1.amazonaws.com/key.jpg', 'https://old.cloudfront.net/key.jpg'])('refuses display and renewal even with an apparent signature: %s', url => {
+    expect(isUsableMediaUrl(url, now)).toBe(false);
+    expect(isUsableMediaUrl(url + '?X-Amz-Signature=old', now)).toBe(false);
+    expect(isRenewableMediaUrl(url + '?X-Amz-Signature=old')).toBe(false);
   });
 });

@@ -174,23 +174,15 @@ function uploadPresigned(
       if (xhr.status >= 200 && xhr.status < 300) resolve();
       else reject(new Error(`File upload failed with status ${xhr.status}`));
     };
-    const method = entry.method ?? (entry.uploadFields ? 'POST' : 'PUT');
+    const method = entry.method;
+    if (method !== 'PUT') { reject(new Error('Upload configuration is invalid. Please retry.')); return; }
     try {
       xhr.open(method, entry.uploadUrl, true);
     } catch {
-      reject(new Error(`Invalid upload URL: ${entry.uploadUrl}`));
+      reject(new Error('Upload URL is invalid. Please retry.'));
       return;
     }
-    if (method === 'POST') {
-      const form = new FormData();
-      if (entry.uploadFields) {
-        Object.entries(entry.uploadFields).forEach(([k, v]) => form.append(k, v));
-      }
-      form.append('file', file, file.name);
-      xhr.send(form);
-      return;
-    }
-    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    Object.entries(entry.uploadHeaders ?? { 'Content-Type': file.type || 'application/octet-stream' }).forEach(([name, value]) => xhr.setRequestHeader(name, value));
     xhr.send(file);
   });
 }
