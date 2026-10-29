@@ -9,12 +9,12 @@ import { setUser } from '@/features/userSlice';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import type { RootState } from '@/store';
 import { useAuth } from '@/context/AuthContext';
+import { toInternalPath } from '@/utils/internalPath';
 
 type VerifyStatus = 'verifying' | 'success' | 'error' | 'pending';
 
-const sanitizeNextPath = (path: string): string => {
-  if (!path) return '/';
-  if (!path.startsWith('/') || path.startsWith('//')) return '/';
+const sanitizeNextPath = (raw: string): string => {
+  const path = toInternalPath(raw, '/');
   if (path === '/studio/store' || path.startsWith('/studio/store/')) {
     return '/profile';
   }

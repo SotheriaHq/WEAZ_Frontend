@@ -77,6 +77,7 @@ import {
   type CollectionPriceImpact,
 } from "@/api/StoreApi";
 import { emitProductStudioSync } from "@/utils/productStudioEvents";
+import { toInternalPath } from "@/utils/internalPath";
 import { createPublishTask } from "@/utils/publishTracker";
 import { runProductPublishJob } from "@/features/products/productPublishJob";
 import { TourOverlay, type TourStep } from "@/components/ui/TourOverlay";
@@ -538,7 +539,7 @@ const EditProduct: React.FC = () => {
   const { id: productId } = useParams<{ id: string }>();
   const location = useLocation();
   const returnTo = useMemo(
-    () => new URLSearchParams(location.search).get("returnTo"),
+    () => toInternalPath(new URLSearchParams(location.search).get("returnTo")),
     [location.search],
   );
   const returnContext = useMemo(

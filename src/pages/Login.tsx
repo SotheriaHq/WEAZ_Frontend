@@ -37,6 +37,7 @@ import {
 } from '@/components/auth/PasswordPolicyFeedback';
 import { AppleLogoIcon } from '@/components/auth/SocialAuthIcons';
 import { getFriendlyErrorMessage } from '@/utils/errorMessage';
+import { toInternalPath } from '@/utils/internalPath';
 import '../styles/auth.css';
 
 const loginSchema = z.object({
@@ -187,9 +188,7 @@ const LoginPage = () => {
     ? `${fromLocation.pathname}${fromLocation.search ?? ''}${fromLocation.hash ?? ''}`
     : null;
   const redirectFromQuery = useMemo(() => {
-    const params = new URLSearchParams(location.search);
-    const value = params.get('returnTo');
-    return value && value.startsWith('/') ? value : null;
+    return toInternalPath(new URLSearchParams(location.search).get('returnTo'));
   }, [location.search]);
 
   useEffect(() => {
