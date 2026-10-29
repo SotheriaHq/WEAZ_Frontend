@@ -1,36 +1,56 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useBrandCommerceAccess } from "@/hooks/useBrandCommerceAccess";
 import { brandCustomersApi } from "@/api/BrandCustomersApi";
+import Button from "@/components/ui/Button";
 
 export default function CustomerSettings() {
   const navigate = useNavigate();
   const access = useBrandCommerceAccess();
   const client = useQueryClient();
-  const [minimum, setMinimum] = useState("3");
-  const [saving, setSaving] = useState(false);
+  const scope = `${access.actorId}:${access.brandId}`;
+  const currentScope = useRef({ key: scope, epoch: 0, mounted: true });
+  if (currentScope.current.key !== scope) {
+    currentScope.current = { key: scope, epoch: currentScope.current.epoch + 1, mounted: true };
+  }
+  const [draft, setDraft] = useState<{ scope: string; value: string } | null>(null);
+  const minimum = draft?.scope === scope ? draft.value : String(access.data?.customerMinimumOrders ?? 3);
+  const [pendingSave, setPendingSave] = useState<{ scope: string; token: symbol } | null>(null);
+  const saving = pendingSave?.scope === scope;
   useEffect(() => {
-    if (access.data) setMinimum(String(access.data.customerMinimumOrders));
-  }, [access.data]);
+    currentScope.current.mounted = true;
+    setDraft(null);
+    return () => {
+      currentScope.current.mounted = false;
+      currentScope.current.epoch++;
+    };
+  }, [scope]);
   const valid =
     /^\d+$/.test(minimum) && Number(minimum) >= 1 && Number(minimum) <= 1000;
   const enabled = access.data?.canConfigureCustomers === true;
   async function save() {
-    if (!access.brandId || !valid || !enabled || saving) return;
-    setSaving(true);
+    if (!access.canManage || !access.brandId || !valid || !enabled || saving) return;
+    const epoch = currentScope.current.epoch;
+    const token = Symbol("customer-settings-save");
+    const isCurrent = () => currentScope.current.mounted &&
+      currentScope.current.key === scope && currentScope.current.epoch === epoch;
+    setPendingSave({ scope, token });
     try {
-      await brandCustomersApi.update(access.brandId, Number(minimum));
+      const saved = await brandCustomersApi.update(access.brandId, Number(minimum));
+      if (!isCurrent()) return;
+      client.setQueryData(["brand-commerce-access", access.actorId, access.brandId], saved);
+      setDraft(null);
       await Promise.all([
-        client.invalidateQueries({ queryKey: ["brand-commerce-access"] }),
-        client.invalidateQueries({ queryKey: ["brand-customers"] }),
+        client.invalidateQueries({ queryKey: ["brand-commerce-access", access.actorId, access.brandId] }),
+        client.invalidateQueries({ queryKey: ["brand-customers", access.actorId, access.brandId] }),
       ]);
-      toast.success("Customer settings saved");
+      if (isCurrent()) toast.success("Customer settings saved");
     } catch {
-      toast.error("Could not save customer settings. Try again.");
+      if (isCurrent()) toast.error("Could not save customer settings. Try again.");
     } finally {
-      setSaving(false);
+      setPendingSave((pending) => pending?.token === token ? null : pending);
     }
   }
   return (
@@ -48,13 +68,13 @@ export default function CustomerSettings() {
       {access.isError ? (
         <p role="alert">
           Could not load settings.{" "}
-          <button
+          <Button
             type="button"
-            className="min-h-11 font-semibold"
+            variant="secondary"
             onClick={() => void access.refetch()}
           >
             Try again
-          </button>
+          </Button>
         </p>
       ) : null}
       {access.data ? (
@@ -62,7 +82,7 @@ export default function CustomerSettings() {
           {!enabled ? (
             <div className="space-y-3">
               <p className="text-theme-secondary">Free brands see every shopper with a qualifying paid order. A paid subscription enables purchase thresholds.</p>
-              {access.data.canUpgrade ? <button type="button" onClick={() => navigate('/settings?tab=subscription-billing')} className="min-h-11 rounded-2xl bg-purple-600 px-5 font-semibold text-white shadow-md">Upgrade</button> : null}
+              {access.data.canUpgrade ? <Button type="button" variant="brand" onClick={() => navigate('/settings?tab=subscription-billing')}>Upgrade</Button> : null}
             </div>
           ) : null}
           <label className="block space-y-2">
@@ -71,11 +91,13 @@ export default function CustomerSettings() {
             </span>
             <input
               type="number"
+              name="customerMinimumOrders"
+              autoComplete="off"
               min={1}
               max={1000}
               step={1}
               value={minimum}
-              onChange={(event) => setMinimum(event.target.value)}
+              onChange={(event) => setDraft({ scope, value: event.target.value })}
               disabled={!enabled || saving}
               aria-describedby="customer-threshold-help"
               className="block min-h-11 w-full rounded-2xl bg-gray-100 px-4 py-3 text-theme disabled:opacity-50 dark:bg-zinc-900"
@@ -89,14 +111,15 @@ export default function CustomerSettings() {
             downgrade shows all qualifying shoppers and keeps your saved
             threshold for later.
           </p>
-          <button
+          <Button
             type="button"
+            variant="brand"
+            loading={saving}
             onClick={() => void save()}
             disabled={!enabled || !valid || saving}
-            className="min-h-11 rounded-2xl bg-purple-600 px-5 font-semibold text-white shadow-md disabled:bg-gray-200 disabled:text-gray-500 dark:disabled:bg-zinc-800"
           >
             {saving ? "Saving…" : "Save customer settings"}
-          </button>
+          </Button>
         </>
       ) : null}
     </section>
