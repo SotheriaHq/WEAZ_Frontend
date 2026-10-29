@@ -175,7 +175,7 @@ export interface VerificationUploadInstruction {
   uploadUrl: string;
   uploadHeaders?: Record<string, string> | null;
   uploadFields?: Record<string, string> | null;
-  method: 'POST' | 'PUT';
+  method: 'PUT';
   expiresIn?: number;
 }
 

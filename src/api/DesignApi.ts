@@ -36,7 +36,7 @@ export type PresignEntry = {
   uploadUrl: string;
   uploadFields?: Record<string, string> | null;
   uploadHeaders?: Record<string, string> | null;
-  method?: 'POST' | 'PUT';
+  method: 'PUT';
   viewSlot?: MediaViewSlot | string | null;
 };
 

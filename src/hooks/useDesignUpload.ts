@@ -395,6 +395,7 @@ const uploadPresignedFile = async (
       return;
     }
 
+    const method = resolvePresignedUploadMethod(entry);
     const xhr = new XMLHttpRequest();
     activeRequestsRef.current.add(xhr);
     const cleanup = () => {
@@ -410,7 +411,7 @@ const uploadPresignedFile = async (
       addClientDiagnostic('error', 'design-upload', 'Presigned file upload network error', {
         file: fileDiagnostic(file),
         fileId: entry.fileId,
-        method: entry.method ?? (entry.uploadFields ? 'POST' : 'PUT'),
+        method: entry.method,
         host: uploadHost(entry),
         status: xhr.status,
       });
@@ -421,7 +422,7 @@ const uploadPresignedFile = async (
       addClientDiagnostic('warn', 'design-upload', 'Presigned file upload aborted', {
         file: fileDiagnostic(file),
         fileId: entry.fileId,
-        method: entry.method ?? (entry.uploadFields ? 'POST' : 'PUT'),
+        method: entry.method,
         host: uploadHost(entry),
       });
       reject(new Error('Upload cancelled'));
@@ -432,7 +433,7 @@ const uploadPresignedFile = async (
         addClientDiagnostic('info', 'design-upload', 'Presigned file upload completed', {
           file: fileDiagnostic(file),
           fileId: entry.fileId,
-          method: entry.method ?? (entry.uploadFields ? 'POST' : 'PUT'),
+          method: entry.method,
           host: uploadHost(entry),
           status: xhr.status,
         });
@@ -441,7 +442,7 @@ const uploadPresignedFile = async (
         addClientDiagnostic('error', 'design-upload', 'Presigned file upload returned non-2xx', {
           file: fileDiagnostic(file),
           fileId: entry.fileId,
-          method: entry.method ?? (entry.uploadFields ? 'POST' : 'PUT'),
+          method: entry.method,
           host: uploadHost(entry),
           status: xhr.status,
         });
@@ -449,16 +450,16 @@ const uploadPresignedFile = async (
       }
     };
 
-    const method = entry.method ?? (entry.uploadFields ? 'POST' : 'PUT');
     try {
       xhr.open(method, entry.uploadUrl, true);
     } catch {
+      cleanup();
       addClientDiagnostic('error', 'design-upload', 'Invalid presigned upload URL', {
         file: fileDiagnostic(file),
         fileId: entry.fileId,
         method,
       });
-      reject(new Error(`Invalid upload URL: ${entry.uploadUrl}`));
+      reject(new Error('Upload URL is invalid. Please retry.'));
       return;
     }
 
@@ -468,18 +469,6 @@ const uploadPresignedFile = async (
       method,
       host: uploadHost(entry),
     });
-
-    if (method === 'POST') {
-      const form = new FormData();
-      if (entry.uploadFields) {
-        Object.entries(entry.uploadFields).forEach(([key, value]) => {
-          form.append(key, value);
-        });
-      }
-      form.append('file', file, file.name);
-      xhr.send(form);
-      return;
-    }
 
     const headers = entry.uploadHeaders ?? { 'Content-Type': file.type || 'application/octet-stream' };
     Object.entries(headers).forEach(([name, value]) => xhr.setRequestHeader(name, value));
@@ -748,3 +737,8 @@ export function useDesignUpload() {
 }
 
 export default useDesignUpload;
+
+export function resolvePresignedUploadMethod(upload: { method?: unknown }): 'PUT' {
+  if (upload.method !== 'PUT') throw new Error('Upload configuration is invalid. Please retry.');
+  return 'PUT';
+}

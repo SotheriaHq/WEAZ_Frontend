@@ -91,23 +91,12 @@ export const VERIFICATION_STEPS = [
 
 export const uploadBinary = async (
   uploadUrl: string,
-  method: 'POST' | 'PUT',
+  method: 'PUT',
   file: File,
-  fields?: Record<string, string> | null,
+  _fields?: Record<string, string> | null,
   uploadHeaders?: Record<string, string> | null,
 ) => {
-  if (method === 'POST') {
-    const formData = new FormData();
-    Object.entries(fields ?? {}).forEach(([key, value]) => {
-      formData.append(key, value);
-    });
-    formData.append('file', file, file.name);
-    const response = await fetch(uploadUrl, { method: 'POST', body: formData });
-    if (!response.ok) {
-      throw new Error(`Upload failed with status ${response.status}`);
-    }
-    return;
-  }
+  if (method !== 'PUT') throw new Error('Upload configuration is invalid. Please retry.');
 
   const response = await fetch(uploadUrl, {
     method: 'PUT',

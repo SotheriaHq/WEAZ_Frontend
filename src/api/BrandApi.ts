@@ -236,43 +236,15 @@ const clearCollectionReadCache = () => {
   collectionDetailPending.clear();
 };
 
-const extractS3KeyFromMaybeMalformedUrl = (rawS3Url: string): string | null => {
-  const raw = String(rawS3Url ?? '').trim();
-  if (!raw) return null;
-
-  if (!/^https?:\/\//i.test(raw)) {
-    const key = raw.replace(/^\/+/, '');
-    return key || null;
-  }
-
+const extractR2ObjectKey = (source: string): string | null => {
   try {
-    const parsed = new URL(raw);
-    const key = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
-    return key || null;
-  } catch {
-    const compact = raw.replace(/[\r\n\t]+/g, '').trim();
-
-    const marker = 'amazonaws.com/';
-    const markerIndex = compact.toLowerCase().lastIndexOf(marker);
-    if (markerIndex !== -1) {
-      const suffix = compact.slice(markerIndex + marker.length).split('?')[0].trim();
-      if (!suffix) return null;
-      try {
-        return decodeURIComponent(suffix);
-      } catch {
-        return suffix;
-      }
-    }
-
-    const fallbackMatch = compact.match(/\.s3\.[^/]+\/(.+)$/i);
-    const fallback = fallbackMatch?.[1]?.split('?')[0]?.trim();
-    if (!fallback) return null;
-    try {
-      return decodeURIComponent(fallback);
-    } catch {
-      return fallback;
-    }
-  }
+    const url = new URL(source);
+    if (url.protocol !== 'https:' || url.username || url.password || !/^[a-f0-9]{32}(?:\.(?:eu|us|fedramp))?\.r2\.cloudflarestorage\.com$/i.test(url.hostname)) return null;
+    const path = url.pathname.split('/');
+    if (path.length < 3 || !path[1]) return null;
+    const key = decodeURIComponent(path.slice(2).join('/'));
+    return key && !key.split('/').some(part => !part || part === '.' || part === '..') ? key : null;
+  } catch { return null; }
 };
 
 const VERIFICATION_STATUS_TTL_MS = 1500;
@@ -1990,8 +1962,8 @@ export const brandApi = {
 
     const request = (async (): Promise<string | null> => {
       try {
-        // Extract the S3 key from the URL (supports malformed legacy URL snapshots).
-        const s3Key = extractS3KeyFromMaybeMalformedUrl(cacheKey);
+        // Accept only a canonical R2 account URL; never repair retired AWS snapshots.
+        const s3Key = extractR2ObjectKey(cacheKey);
         if (!s3Key) return null;
         return this.resolveSignedUrlForStorageKey(s3Key, cacheKey);
       } catch {

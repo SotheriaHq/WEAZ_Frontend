@@ -32,3 +32,17 @@ describe('source renewal batching', () => {
   expect(await pending).toBeNull();
  });
 });
+
+describe('R2-only raw object resolution', () => {
+ beforeEach(() => { vi.clearAllMocks(); brandApi.invalidateSignedUrlCache(); });
+ it('removes the R2 bucket path while retaining the exact object key', async () => {
+  client.get.mockResolvedValue({ data: { url: 'https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/wiez-sit-media/POST_IMAGE/owner/look.jpg?X-Amz-Signature=current' } });
+  const result = await brandApi.getSignedS3Url('https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com/wiez-sit-media/POST_IMAGE/owner/look.jpg');
+  expect(result).toContain('X-Amz-Signature=current');
+  expect(client.get).toHaveBeenCalledWith('/uploads/public-url-by-key', { params: { key: 'POST_IMAGE/owner/look.jpg' } });
+ });
+ it.each(['https://bucket.s3.eu-north-1.amazonaws.com/look.jpg', 'https://old.cloudfront.net/look.jpg', 'not-an-object-url'])('does not repair or renew retired/malformed sources: %s', async url => {
+  expect(await brandApi.getSignedS3Url(url)).toBeNull();
+  expect(client.get).not.toHaveBeenCalled();
+ });
+});
