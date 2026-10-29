@@ -30,6 +30,9 @@ jobs:
       - name: Legal sync CI contract
         run: npm run test:legal-sync-ci-contract
 
+      - name: App Links (assetlinks.json) contract
+        run: npm run test:app-links-contract
+
       - name: Build
         run: npm run build
 
