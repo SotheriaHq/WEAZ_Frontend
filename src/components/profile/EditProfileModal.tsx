@@ -201,6 +201,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 }) => {
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const originalBodyOverflow = useRef<string | null>(null);
+  const hasUserEditedRef = useRef(false);
+  const hasUserModifiedTagsRef = useRef(false);
+  const prevIsOpenRef = useRef(false);
   
   // Location States
   const [countries, setCountries] = useState<CountryOption[]>([]);
@@ -248,7 +251,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     reset,
     setFocus,
     clearErrors,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: initialValues,
@@ -270,12 +273,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             ? 'Profile saved.'
             : null;
 
-  // Initialize selected tags from profile/user
-  useEffect(() => {
-    setSelectedTags((initialValues.brandTags ?? []).slice(0, MAX_TAGS));
-    setTagError(null);
-  }, [initialValues]);
-
   useEffect(() => {
     if (!isSubmitting) {
       if (submitStatus !== 'idle') setSubmitStatus('idle');
@@ -291,21 +288,40 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     return () => window.clearTimeout(timer);
   }, [isSubmitting, submitStatus]);
 
-  // Load Countries on Mount
+  // Form initialization and location loading on modal open.
+  // Guarded against clobbering user input when async profile updates arrive midway.
   useEffect(() => {
-    const loadCountries = async () => {
+    if (!isOpen) {
+      prevIsOpenRef.current = false;
+      hasUserEditedRef.current = false;
+      hasUserModifiedTagsRef.current = false;
+      return;
+    }
+
+    const isInitialOpen = !prevIsOpenRef.current;
+    prevIsOpenRef.current = true;
+
+    if (isInitialOpen) {
+      void (async () => {
         setLoadingLocations(true);
         const data = await locationService.getCountries();
         setCountries(data);
         setLoadingLocations(false);
-    };
-    if (isOpen) {
-        void loadCountries();
-        reset(initialValues);
-        // Small timeout to allow render before focusing
-        setTimeout(() => descriptionRef.current?.focus(), 50);
+      })();
+      reset(initialValues);
+      setSelectedTags((initialValues.brandTags ?? []).slice(0, MAX_TAGS));
+      setTagError(null);
+      setTimeout(() => descriptionRef.current?.focus(), 50);
+    } else if (!hasUserEditedRef.current && !isDirty) {
+      // Async brandProfile arrived while modal is open, but user has not
+      // started typing or editing. Safely update form defaults without clobbering.
+      reset(initialValues);
+      if (!hasUserModifiedTagsRef.current) {
+        setSelectedTags((initialValues.brandTags ?? []).slice(0, MAX_TAGS));
+        setTagError(null);
+      }
     }
-  }, [isOpen, initialValues, reset]);
+  }, [isOpen, initialValues, reset, isDirty]);
 
   /**
    * Dial code follows the business country when we can map it, so a Ghanaian
@@ -474,6 +490,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   }, [selectedTags]);
 
   const toggleTag = (value: string) => {
+    hasUserEditedRef.current = true;
+    hasUserModifiedTagsRef.current = true;
     setSelectedTags((prev) => {
       if (prev.includes(value)) {
         const next = prev.filter((tag) => tag !== value);
@@ -534,6 +552,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
           {/* Scrollable Content */}
           <form
             ref={formRef}
+            onChange={() => {
+              hasUserEditedRef.current = true;
+            }}
             onSubmit={handleSubmit(onSubmit, onInvalid)}
             className="overflow-y-auto custom-scrollbar p-8 space-y-10 overscroll-contain"
           >
@@ -645,6 +666,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                         className="form-field w-full h-40 p-4 rounded-lg resize-none leading-relaxed"
                         placeholder="Tell the world about your vision, heritage, and what makes your fashion unique..."
                         {...brandDescriptionField}
+                        onChange={(e) => {
+                            hasUserEditedRef.current = true;
+                            brandDescriptionField.onChange(e);
+                        }}
                         ref={(e) => {
                             brandDescriptionField.ref(e);
                             descriptionRef.current = e;
@@ -718,7 +743,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           label={LOCATION_FIELD_LABELS.country}
                           value={selectedCountry || ''}
                           onChange={(val) => {
-                              setValue('brandCountry', val, {
+                              hasUserEditedRef.current = true; setValue('brandCountry', val, {
                                 shouldDirty: true,
                                 shouldValidate: true,
                               });
@@ -744,7 +769,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                           label={LOCATION_FIELD_LABELS.state}
                           value={selectedState || ''}
                           onChange={(val) => {
-                              setValue('brandState', val, {
+                              hasUserEditedRef.current = true; setValue('brandState', val, {
                                 shouldDirty: true,
                                 shouldValidate: true,
                               });
@@ -763,12 +788,13 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                        <LocationCascadeSelect
                           label={LOCATION_FIELD_LABELS.city}
                           value={watch('brandCity') || ''}
-                          onChange={(val) =>
+                          onChange={(val) => {
+                            hasUserEditedRef.current = true;
                             setValue('brandCity', val, {
                               shouldDirty: true,
                               shouldValidate: true,
-                            })
-                          }
+                            });
+                          }}
                           options={cityOptions}
                           parentValue={selectedState || ''}
                           parentPlaceholder="Select state first"
@@ -797,12 +823,13 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                       autoComplete="street-address"
                       maxLength={255}
                       value={watch('brandStreetAddress') || ''}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        hasUserEditedRef.current = true;
                         setValue('brandStreetAddress', event.target.value, {
                           shouldDirty: true,
                           shouldValidate: true,
-                        })
-                      }
+                        });
+                      }}
                       disabled={isSubmitting}
                       placeholder="12 Adeola Odeku St, Victoria Island"
                       className="w-full rounded-lg border border-[color:var(--field-border)] bg-[color:var(--surface-primary)] px-3 py-2.5 text-sm text-theme placeholder:text-theme-muted focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary disabled:opacity-60"
@@ -821,12 +848,13 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   <UniversalSelect
                     label="Business Type"
                     value={watch('businessType') || ''}
-                    onChange={(value) =>
+                    onChange={(value) => {
+                      hasUserEditedRef.current = true;
                       setValue('businessType', value, {
                         shouldDirty: true,
                         shouldValidate: true,
-                      })
-                    }
+                      });
+                    }}
                     options={BUSINESS_TYPE_OPTIONS}
                     placeholder="Select Type"
                     searchable
@@ -845,12 +873,13 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 
                 <PhoneNumberField
                   value={watch('phoneNumber') || ''}
-                  onChange={(next) =>
+                  onChange={(next) => {
+                    hasUserEditedRef.current = true;
                     setValue('phoneNumber', next, {
                       shouldDirty: true,
                       shouldValidate: true,
-                    })
-                  }
+                    });
+                  }}
                   // Seed the dial code from the business country the user just
                   // picked, so most people never touch the country selector.
                   defaultCountry={phoneDefaultCountry}
