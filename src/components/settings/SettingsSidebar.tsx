@@ -72,6 +72,13 @@ const sidebarGroups: SidebarGroup[] = [
         description: 'Share location access',
       },
       {
+        key: 'currency',
+        label: 'Currency',
+        path: '/settings?tab=currency',
+        icon: '💱',
+        description: 'Prices in your currency',
+      },
+      {
         key: 'size-fits',
         label: 'Size & Fittings',
         path: '/settings?tab=size-fits',

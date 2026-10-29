@@ -18,8 +18,11 @@ import { initClientDiagnostics } from './utils/clientDiagnostics';
 import { initBuildVersionGuard } from './utils/buildVersionGuard';
 import { STALE_BUNDLE_SESSION_KEYS, isStaleBundleError } from './utils/staleBundle';
 import { initSentry } from './observability/sentry';
+import { initConsentEffects } from './privacy/thirdPartyLoaders';
 
 initSentry();
+// Optional analytics start only after the visitor's cookie choice allows them.
+initConsentEffects();
 
 const STALE_CHUNK_RELOAD_KEY = 'vite:preloadError:reloadedAt';
 

@@ -1,4 +1,5 @@
 import { marketApi, type MarketSignalEvent } from '@/api/MarketApi';
+import { analyticsPermitted } from '@/privacy/consent';
 import { getWebDeviceId, WEB_DEVICE_ID_STORAGE_KEY } from '@/utils/deviceId';
 
 export const WEB_MARKET_SIGNAL_ANONYMOUS_SESSION_STORAGE_KEY =
@@ -189,6 +190,8 @@ export const enqueueWebMarketSignal = (
   event: MarketSignalEvent,
   options: { screenContext: string; sessionId: string },
 ) => {
+  // Discovery signals are first-party analytics: nothing is recorded without consent.
+  if (!analyticsPermitted()) return false;
   hydrateQueue();
   const targetId = String(event.targetId ?? '').trim();
   if (!targetId || !event.targetType || !event.signalType || !event.surface) {
@@ -235,6 +238,7 @@ export const flushWebMarketSignals = async (options?: {
   anonymousSessionId?: string;
   sessionId?: string;
 }) => {
+  if (!analyticsPermitted()) return;
   hydrateQueue();
   if (flushing || queue.length === 0) return;
 

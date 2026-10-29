@@ -77,4 +77,41 @@ describe('getFriendlyErrorMessage', () => {
     const result = getFriendlyErrorMessage(structuredErr, 'Sign in failed');
     expect(result).toBe('Please enter a valid email address (e.g. name@example.com).');
   });
+
+  const withResponse = (status: number, data: Record<string, unknown>) =>
+    new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
+      status,
+      statusText: '',
+      headers: {},
+      config: {} as any,
+      data,
+    });
+
+  it('keeps sign-in failures vague', () => {
+    expect(getFriendlyErrorMessage(withResponse(401, { message: 'Invalid email or password' }), 'x')).toBe('Invalid credentials');
+    expect(getFriendlyErrorMessage(withResponse(401, { message: 'Malformed refresh token' }), 'x')).toBe('Invalid credentials');
+  });
+
+  it('shows a plain "not found" as written instead of calling it a credentials problem', () => {
+    expect(getFriendlyErrorMessage(withResponse(404, { message: 'Refund not found' }), 'Unable to verify this refund.')).toBe('Refund not found');
+    expect(getFriendlyErrorMessage(withResponse(400, { message: 'Invalid or expired code' }), 'x')).toBe('Invalid or expired code');
+  });
+
+  it('never shows database, framework or validation internals', () => {
+    const fallback = 'Unable to save this tier.';
+    for (const message of [
+      'Unique constraint failed on the fields: (`code`)',
+      'Invalid `prisma.order.update()` invocation',
+      'insert or update on table "Ledger" violates foreign key constraint',
+      'property internalNote should not exist',
+      'Validation failed (uuid is expected)',
+      'HttpException',
+    ]) {
+      expect(getFriendlyErrorMessage(withResponse(400, { message }), fallback)).toBe(fallback);
+    }
+    expect(
+      getFriendlyErrorMessage(withResponse(400, { message: 'Validation failed', errors: [{ property: 'tier', messages: ['property tier should not exist'] }] }), fallback),
+    ).toBe(fallback);
+    expect(getFriendlyErrorMessage(new Error('Cannot read properties of undefined'), fallback)).toBe(fallback);
+  });
 });

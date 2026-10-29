@@ -39,7 +39,8 @@
          (anonymous visitors) — adopted by the app via window.__WIEZ_EARLY__. -->
     <script src="/boot/early-data.js" defer></script>
     <script src="/boot/route-preload.js" async></script>
-    <script src="/boot/analytics.js" defer></script>
+    <!-- No analytics here: they load from src/privacy/thirdPartyLoaders.ts,
+         and only after the visitor accepts them in the cookie banner. -->
     <!-- Identical font families/weights, served with the app. Preload the
          primary Latin subset; CSS requests other scripts only when needed. -->
     <link rel="preload" as="font" type="font/woff2" href="/fonts/wiez-web/plus-jakarta-sans-latin-153fc85b7029.woff2" crossorigin />

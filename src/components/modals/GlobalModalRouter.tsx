@@ -9,6 +9,7 @@ import { brandApi } from '@/api/BrandApi';
 import type { BrandProfileDto } from '@/types/profile';
 import { invalidateStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
 import { fetchBrandProfileQuery } from '@/query/queries';
+import { queryKeys } from '@/query/queryKeys';
 import { getActiveBrandId, hasActiveBrandMembership } from '@/lib/brandAccess';
 
 const EditProfileModal = lazy(() => import('@/components/profile/EditProfileModal'));
@@ -67,7 +68,11 @@ export const GlobalModalRouter: React.FC = () => {
   const isBrandSetupOpen = modal === 'brand-setup' && !suppressCarriedInPromptModal;
   const showSkip = modalOrigin === 'prompt';
 
-  const [brandProfile, setBrandProfile] = useState<BrandProfileDto | null>(null);
+  const activeBrandId = user && hasActiveBrandMembership(user) ? (getActiveBrandId(user) ?? user.id) : null;
+  const [brandProfile, setBrandProfile] = useState<BrandProfileDto | null>(() => {
+    if (!activeBrandId) return null;
+    return queryClient.getQueryData<BrandProfileDto>(queryKeys.brand.profile(activeBrandId)) ?? null;
+  });
 
   const clearCurrentModalParams = useCallback(() => {
     setSearchParams((prev) => clearModalSearchParams(prev), { replace: true });
@@ -85,20 +90,31 @@ export const GlobalModalRouter: React.FC = () => {
     if (!isBrandSetupOpen) return;
     if (!user || !hasActiveBrandMembership(user)) return;
 
+    const brandId = getActiveBrandId(user) ?? user.id;
     let cancelled = false;
     brandApi
-      .getBrandProfile(getActiveBrandId(user) ?? user.id)
+      .getBrandProfile(brandId)
       .then((profile) => {
-        if (!cancelled) setBrandProfile(profile);
+        if (!cancelled && profile) {
+          queryClient.setQueryData(queryKeys.brand.profile(brandId), profile);
+          setBrandProfile((current) => {
+            if (current && JSON.stringify(current) === JSON.stringify(profile)) {
+              return current;
+            }
+            return profile;
+          });
+        }
       })
       .catch(() => {
-        if (!cancelled) setBrandProfile(null);
+        if (!cancelled) {
+          setBrandProfile((current) => current);
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [isBrandSetupOpen, user]);
+  }, [isBrandSetupOpen, user, queryClient]);
 
   useEffect(() => {
     if (!isBrandSetupOpen) {

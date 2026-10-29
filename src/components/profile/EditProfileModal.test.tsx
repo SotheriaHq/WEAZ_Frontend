@@ -240,4 +240,112 @@ describe('EditProfileModal brand setup blocker flow', () => {
     });
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(user));
   });
+  it('does NOT overwrite or reset brand story content typed midway when brandProfile updates asynchronously', async () => {
+    const user = makeBrandUser({ brandDescription: 'Initial placeholder description' });
+    const { rerender } = renderModal({ user, brandProfile: null });
+
+    const storyTextarea = screen.getByPlaceholderText(
+      'Tell the world about your vision, heritage, and what makes your fashion unique...',
+    );
+
+    // User types in the brand story textarea midway
+    fireEvent.change(storyTextarea, {
+      target: { value: 'My custom newly typed fashion brand story in progress...' },
+    });
+
+    expect(storyTextarea).toHaveValue('My custom newly typed fashion brand story in progress...');
+
+    // Simulate async brandProfile arriving from API
+    const incomingProfile = {
+      id: 'brand-1',
+      brandFullName: 'WIEZ Atelier',
+      description: 'Server stored description that should not overwrite user typing',
+      country: 'Nigeria',
+      state: 'Lagos',
+      city: 'Ikeja',
+      tags: ['Couture'],
+    } as any;
+
+    rerender(
+      <EditProfileModal
+        isOpen
+        user={user}
+        brandProfile={incomingProfile}
+        showSkip={false}
+        onSkip={undefined}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    // Content typed by the user must remain intact
+    expect(storyTextarea).toHaveValue('My custom newly typed fashion brand story in progress...');
+  });
+
+  it('does NOT reset user-selected tags when brandProfile updates asynchronously', async () => {
+    const user = makeBrandUser();
+    const { rerender } = renderModal({ user, brandProfile: null });
+
+    // User toggles a tag
+    const ankaraTag = screen.getByRole('button', { name: '#Ankara' });
+    fireEvent.click(ankaraTag);
+    expect(ankaraTag).toHaveAttribute('aria-pressed', 'true');
+
+    // Simulate async brandProfile arriving with different tags
+    const incomingProfile = {
+      id: 'brand-1',
+      brandFullName: 'WIEZ Atelier',
+      description: 'Brand description',
+      tags: ['Couture', 'Bridal'],
+    } as any;
+
+    rerender(
+      <EditProfileModal
+        isOpen
+        user={user}
+        brandProfile={incomingProfile}
+        showSkip={false}
+        onSkip={undefined}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    // User selected tag must still be pressed
+    expect(screen.getByRole('button', { name: '#Ankara' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('updates form defaults when brandProfile arrives if user has not typed yet', async () => {
+    const user = makeBrandUser({ brandDescription: '' });
+    const { rerender } = renderModal({ user, brandProfile: null });
+
+    const storyTextarea = screen.getByPlaceholderText(
+      'Tell the world about your vision, heritage, and what makes your fashion unique...',
+    );
+
+    // User has NOT typed yet
+    const incomingProfile = {
+      id: 'brand-1',
+      brandFullName: 'WIEZ Atelier',
+      description: 'Loaded brand story from database',
+      tags: ['Atelier'],
+    } as any;
+
+    rerender(
+      <EditProfileModal
+        isOpen
+        user={user}
+        brandProfile={incomingProfile}
+        showSkip={false}
+        onSkip={undefined}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    // Form defaults are safely populated with the loaded profile
+    await waitFor(() => {
+      expect(storyTextarea).toHaveValue('Loaded brand story from database');
+    });
+  });
 });

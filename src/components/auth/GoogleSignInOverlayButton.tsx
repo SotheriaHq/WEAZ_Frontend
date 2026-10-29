@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import GoogleSignInButton from './GoogleSignInButton';
 import { mountGoogleSignInButton } from '@/auth/googleIdentity';
 import { env } from '@/config/env';
+import { useConsent } from '@/privacy/consent';
 
 type Props = {
   label?: string;
@@ -28,9 +29,20 @@ export default function GoogleSignInOverlayButton({
   useEffect(() => { onTokenRef.current = onToken; }, [onToken]);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
 
+  /*
+    Google's script is a third party. It loads when the page opens only if the
+    visitor allowed that in the cookie choice; otherwise it loads when they
+    choose this button, and Google's own button replaces ours for the next tap.
+  */
+  const { record } = useConsent();
+  const [requested, setRequested] = useState(false);
+  const [ready, setReady] = useState(false);
+  const armed = record?.thirdPartySignIn === true || requested;
+
   useEffect(() => {
-    if (!env.google.configured || !overlayRef.current || loading) return;
+    if (!armed || !env.google.configured || !overlayRef.current || loading) return;
     const container = overlayRef.current;
+    let active = true;
 
     mountGoogleSignInButton(
       container,
@@ -39,14 +51,18 @@ export default function GoogleSignInOverlayButton({
       (token) => onTokenRef.current(token),
       (err) => onErrorRef.current(err),
     )
-      .then((cleanup) => { cleanupRef.current = cleanup; })
+      .then((cleanup) => {
+        cleanupRef.current = cleanup;
+        if (active) setReady(true);
+      })
       .catch((err) => onErrorRef.current(err instanceof Error ? err : new Error(String(err))));
 
     return () => {
+      active = false;
       cleanupRef.current?.();
       cleanupRef.current = null;
     };
-  }, [context, loading]);
+  }, [armed, context, loading]);
 
   return (
     /*
@@ -57,22 +73,29 @@ export default function GoogleSignInOverlayButton({
       button with no hover state. Hover is driven from this wrapper instead,
       which covers the overlay as well as the button.
     */
-    <div className="auth-social-overlay-host group relative">
-      <GoogleSignInButton
-        label={label}
-        loading={loading}
-        disabled={!env.google.configured || loading}
-        onClick={() => {}}
-        testId={testId}
-      />
-      {env.google.configured && !loading && (
-        <div
-          ref={overlayRef}
-          className="absolute inset-0 overflow-hidden z-10 cursor-pointer"
-          style={{ opacity: 0.001 }}
-          aria-hidden="true"
+    <div>
+      <div className="auth-social-overlay-host group relative">
+        <GoogleSignInButton
+          label={label}
+          loading={loading}
+          disabled={!env.google.configured || loading}
+          onClick={() => {
+            if (!armed) setRequested(true);
+          }}
+          testId={testId}
         />
-      )}
+        {env.google.configured && !loading && armed && (
+          <div
+            ref={overlayRef}
+            className="absolute inset-0 overflow-hidden z-10 cursor-pointer"
+            style={{ opacity: 0.001 }}
+            aria-hidden="true"
+          />
+        )}
+      </div>
+      <p aria-live="polite" className="mt-2 text-center text-xs text-[var(--text-secondary)]">
+        {requested && ready && !loading ? 'Google is ready. Choose “Continue with Google” again.' : ''}
+      </p>
     </div>
   );
 }

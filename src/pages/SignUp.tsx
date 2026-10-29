@@ -11,6 +11,7 @@ import { useDispatch } from 'react-redux';
 import { setUser } from '../features/userSlice';
 import { addLocalNotification } from '../features/notificationsSlice';
 import { useNavigate, Link } from 'react-router-dom';
+import { openConsentSettings } from '@/privacy/consent';
 import { apiClient, persistAccessToken, dropStoredAccessToken } from '../api/httpClient';
 import { AuthApi } from '@/api/AuthApi';
 import { getRequiredLegalAcceptances, LEGAL_SIGNUP_DOCUMENT_KEYS } from '@/api/LegalApi';
@@ -445,6 +446,9 @@ const SignUpPage = () => {
             <Link to="/terms" className="hover:text-[var(--brand-accent)] transition-colors">Terms</Link>
             <Link to="/privacy" className="hover:text-[var(--brand-accent)] transition-colors">Privacy</Link>
             <Link to="/legal" className="hover:text-[var(--brand-accent)] transition-colors">Legal</Link>
+            <button type="button" onClick={openConsentSettings} className="hover:text-[var(--brand-accent)] transition-colors">
+              Cookie settings
+            </button>
           </div>
         </div>
 
