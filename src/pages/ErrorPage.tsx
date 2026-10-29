@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouteError, isRouteErrorResponse, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, RefreshCcw, AlertTriangle, WifiOff, ServerCrash, ShieldX } from 'lucide-react';
+import { toast } from 'sonner';
 import { captureClientException } from '@/observability/sentry';
 import {
   STALE_BUNDLE_SESSION_KEYS,
@@ -54,6 +55,14 @@ const ErrorPage: React.FC = () => {
       });
     }
   }, [error, recovering]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      window.location.reload();
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
 
   if (recovering) {
     // Reload is in flight — a blank surface beats flashing an error page.
@@ -117,16 +126,28 @@ const ErrorPage: React.FC = () => {
     }
   } else if (error instanceof Error) {
     // Network or runtime errors
-    if (error.message.includes('fetch') || error.message.includes('network')) {
+    const isNetworkOrOffline =
+      (typeof navigator !== 'undefined' && !navigator.onLine) ||
+      error.message.includes('fetch') ||
+      error.message.includes('network') ||
+      error.message.includes('Failed to fetch') ||
+      error.message.includes('dynamically imported module') ||
+      error.message.includes('NetworkError');
+
+    if (isNetworkOrOffline) {
+      status = 0;
       title = 'Connection Lost';
-      message = 'Unable to connect to the server. Check your internet connection.';
+      message = "You're currently offline. Please check your internet connection.";
       emoji = '📡';
       Icon = WifiOff;
-      suggestion = 'Check your internet and try again.';
+      suggestion = 'Your session will resume automatically once your connection is restored.';
       accentColor = 'text-blue-400';
       bgGradient = 'from-blue-600/20 via-cyan-600/15 to-teal-600/10';
     } else {
-      message = error.message;
+      message =
+        process.env.NODE_ENV === 'production'
+          ? 'An unexpected error occurred. Please try again.'
+          : error.message;
     }
   }
 
@@ -201,7 +222,13 @@ const ErrorPage: React.FC = () => {
           transition={{ delay: 0.4 }}
         >
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                toast.error("Still offline. Please check your internet connection.");
+                return;
+              }
+              window.location.reload();
+            }}
             className={`flex items-center gap-2 px-6 py-3 rounded-full bg-white text-gray-900 font-medium hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 dark:bg-white/5 dark:text-white`}
           >
             <RefreshCcw className="w-5 h-5" />

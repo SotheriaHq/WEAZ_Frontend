@@ -26,6 +26,7 @@ vi.mock('../../api/BrandApi', () => ({
 }));
 
 vi.mock('../../services/LocationService', () => ({
+  getCountryFlagEmoji: (iso2: string) => (iso2 ? '🇳🇬' : ''),
   locationService: {
     getCountries: vi.fn(async () => [
       {
