@@ -11,6 +11,7 @@ import { invalidateStoreSetupStatusCache } from '@/hooks/useStoreSetupStatus';
 import { fetchBrandProfileQuery } from '@/query/queries';
 import { queryKeys } from '@/query/queryKeys';
 import { getActiveBrandId, hasActiveBrandMembership } from '@/lib/brandAccess';
+import { toInternalPath } from '@/utils/internalPath';
 
 const EditProfileModal = lazy(() => import('@/components/profile/EditProfileModal'));
 
@@ -24,9 +25,9 @@ function clearModalSearchParams(searchParams: URLSearchParams): URLSearchParams 
   return next;
 }
 
-function sanitizeNextPath(path: string): string | null {
+function sanitizeNextPath(raw: string): string | null {
+  const path = toInternalPath(raw);
   if (!path) return null;
-  if (!path.startsWith('/') || path.startsWith('//')) return null;
 
   const [pathAndQuery, hash = ''] = path.split('#', 2);
   const [pathname, query = ''] = pathAndQuery.split('?', 2);

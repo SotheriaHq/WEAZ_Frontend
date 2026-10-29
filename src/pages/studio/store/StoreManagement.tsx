@@ -22,6 +22,7 @@ import {
 } from '@/utils/profileImage';
 import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
 import { buildStorefrontUrl } from '@/utils/publicLinks';
+import { toInternalPath } from '@/utils/internalPath';
 import type { VerificationStatusResponse } from '@/types/verification';
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 import { useCachedResource } from '@/hooks/useCachedResource';
@@ -201,7 +202,7 @@ export default function StoreManagement() {
     () => new URLSearchParams(location.search),
     [location.search],
   );
-  const returnTo = routeSearchParams.get('returnTo');
+  const returnTo = toInternalPath(routeSearchParams.get('returnTo'));
   const returnLabel = routeSearchParams.get('returnLabel') || 'Back';
   const verificationStatus =
     verification?.verificationStatus ??
