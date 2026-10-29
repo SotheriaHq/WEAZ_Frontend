@@ -48,6 +48,8 @@ export default tseslint.config([
             // Static, dimensioned brand artwork is decorative chrome, not uploaded media.
             'src/brand/WiezMark.tsx',
             'src/brand/WiezWordmark.tsx',
+            // Static, dimensioned country flag svgs are decorative chrome, not uploaded media.
+            'src/components/ui/CountryFlag.tsx',
           ],
         },
       ],
