@@ -95,6 +95,22 @@ describe('Customer threshold drafts and saves', () => {
     expect(input().value).toBe('7');
   });
 
+  it('does not accept an old response after switching away and back to the same account', async () => {
+    let finish!: (value: never) => void;
+    vi.mocked(brandCustomersApi.update).mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    const result = render(view());
+    fireEvent.change(input(), { target: { value: '7' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save customer settings' }));
+    state.actorId = 'another-owner';
+    result.rerender(view());
+    state.actorId = 'owner'; state.minimum = 4;
+    result.rerender(view());
+    await act(async () => { finish({ customerMinimumOrders: 7 } as never); });
+    expect(input().value).toBe('4');
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(client.getQueryData(['brand-commerce-access', 'owner', 'brand'])).toBeUndefined();
+  });
+
   it('keeps free controls disabled and only offers a valid upgrade', () => {
     state.canConfigure = false; state.canUpgrade = false;
     const result = render(view());

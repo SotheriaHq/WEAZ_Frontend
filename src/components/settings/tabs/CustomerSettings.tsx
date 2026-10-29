@@ -11,37 +11,46 @@ export default function CustomerSettings() {
   const access = useBrandCommerceAccess();
   const client = useQueryClient();
   const scope = `${access.actorId}:${access.brandId}`;
-  const currentScope = useRef(scope);
-  currentScope.current = scope;
+  const currentScope = useRef({ key: scope, epoch: 0, mounted: true });
+  if (currentScope.current.key !== scope) {
+    currentScope.current = { key: scope, epoch: currentScope.current.epoch + 1, mounted: true };
+  }
   const [draft, setDraft] = useState<{ scope: string; value: string } | null>(null);
   const minimum = draft?.scope === scope ? draft.value : String(access.data?.customerMinimumOrders ?? 3);
-  const [pendingScope, setPendingScope] = useState<string | null>(null);
-  const saving = pendingScope === scope;
+  const [pendingSave, setPendingSave] = useState<{ scope: string; token: symbol } | null>(null);
+  const saving = pendingSave?.scope === scope;
   useEffect(() => {
-    currentScope.current = scope;
+    currentScope.current.mounted = true;
     setDraft(null);
-    return () => { currentScope.current = ""; };
+    return () => {
+      currentScope.current.mounted = false;
+      currentScope.current.epoch++;
+    };
   }, [scope]);
   const valid =
     /^\d+$/.test(minimum) && Number(minimum) >= 1 && Number(minimum) <= 1000;
   const enabled = access.data?.canConfigureCustomers === true;
   async function save() {
     if (!access.canManage || !access.brandId || !valid || !enabled || saving) return;
-    setPendingScope(scope);
+    const epoch = currentScope.current.epoch;
+    const token = Symbol("customer-settings-save");
+    const isCurrent = () => currentScope.current.mounted &&
+      currentScope.current.key === scope && currentScope.current.epoch === epoch;
+    setPendingSave({ scope, token });
     try {
       const saved = await brandCustomersApi.update(access.brandId, Number(minimum));
-      if (currentScope.current !== scope) return;
+      if (!isCurrent()) return;
       client.setQueryData(["brand-commerce-access", access.actorId, access.brandId], saved);
       setDraft(null);
       await Promise.all([
         client.invalidateQueries({ queryKey: ["brand-commerce-access", access.actorId, access.brandId] }),
         client.invalidateQueries({ queryKey: ["brand-customers", access.actorId, access.brandId] }),
       ]);
-      if (currentScope.current === scope) toast.success("Customer settings saved");
+      if (isCurrent()) toast.success("Customer settings saved");
     } catch {
-      if (currentScope.current === scope) toast.error("Could not save customer settings. Try again.");
+      if (isCurrent()) toast.error("Could not save customer settings. Try again.");
     } finally {
-      setPendingScope((pending) => pending === scope ? null : pending);
+      setPendingSave((pending) => pending?.token === token ? null : pending);
     }
   }
   return (
