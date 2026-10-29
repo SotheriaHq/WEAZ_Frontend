@@ -29,7 +29,11 @@
 :root {
   --auth-panel-bg: rgba(255, 255, 255, 0.88);
   --auth-panel-border: rgba(10, 10, 10, 0.10);
-  --auth-panel-shadow: inset 4px 4px 9px var(--neu-shadow-dark), inset -4px -4px 9px var(--neu-shadow-light);
+  --auth-panel-shadow:
+    inset 4px 4px 9px var(--neu-shadow-dark),
+    inset -4px -4px 9px var(--neu-shadow-light),
+    inset -2px -2px 18px 0px rgba(147, 51, 234, 0.03),
+    inset 0 0 28px 0px rgba(168, 85, 247, 0.02);
 
   --auth-field-bg: rgba(10, 10, 10, 0.04);
   --auth-field-bg-focus: rgba(10, 10, 10, 0.02);
@@ -60,7 +64,12 @@
 html[data-theme='dark'] {
   --auth-panel-bg: rgba(25, 25, 30, 0.85);
   --auth-panel-border: rgba(255, 255, 255, 0.12);
-  --auth-panel-shadow: inset 4px 4px 9px var(--neu-shadow-dark), inset -4px -4px 9px var(--neu-shadow-light);
+  --auth-panel-shadow:
+    inset 4px 4px 10px var(--neu-shadow-dark),
+    inset -4px -4px 10px var(--neu-shadow-light),
+    inset -2px -2px 20px 0px rgba(192, 132, 252, 0.05),
+    inset 2px 2px 24px 0px rgba(147, 51, 234, 0.035),
+    inset 0 0 32px 0px rgba(168, 85, 247, 0.03);
 
   --auth-field-bg: rgba(255, 255, 255, 0.06);
   --auth-field-bg-focus: rgba(255, 255, 255, 0.10);
@@ -145,11 +154,11 @@ html[data-theme='dark'] {
   border: 1px solid var(--auth-danger-border);
 }
 
-/* Recessed Auth Panel Well - No outer drop-shadows */
+/* Recessed Auth Panel Well - No outer drop-shadows; subtle ambient light reflection in recessed surface */
 .auth-glass-panel {
   background: var(--neu-surface);
   border: 1px solid var(--neu-border);
-  box-shadow: inset 4px 4px 9px var(--neu-shadow-dark), inset -4px -4px 9px var(--neu-shadow-light);
+  box-shadow: var(--auth-panel-shadow);
 }
 
 /* Input Glass Style */
