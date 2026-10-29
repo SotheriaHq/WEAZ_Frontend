@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/sync-legal-docs.cjs && node scripts/generate-security-headers.cjs && tsc -b && vite build && node scripts/generate-route-preloads.mjs",
+    "build": "node scripts/sync-legal-docs.cjs && node scripts/generate-security-headers.cjs && tsc -b && vite build && node scripts/generate-route-preloads.mjs && node scripts/generate-app-links.cjs",
     "generate:legal-docs": "node scripts/sync-legal-docs.cjs",
     "test:legal-sync-ci-contract": "node scripts/test-legal-sync-ci-contract.cjs",
     "generate:security-headers": "node scripts/generate-security-headers.cjs",
@@ -21,6 +21,7 @@
     "test:admin-permission-contract": "node scripts/test-admin-permission-contract.cjs",
     "test:api-contract": "node scripts/test-api-contract.cjs",
     "test:auth-link-route-contract": "node scripts/test-auth-link-route-contract.cjs",
+    "test:app-links-contract": "node scripts/test-app-links-contract.cjs",
     "test:lifecycle-sync-contract": "node scripts/test-lifecycle-sync-contract.cjs",
     "test:market-signals-contract": "vitest run src/services/marketSignalQueue.test.ts src/auth/sessionCleanup.test.ts",
     "test:watch": "vitest --watch",
