@@ -474,6 +474,13 @@ const LegacyProfileDesignEditRedirect: React.FC = () => {
   );
 };
 
+// Every tab here is account data, so a guest would only see failing requests.
+// Guests change cookie choices from the sign-in and sign-up pages.
+const accountSettingsRoutes = [
+  { path: 'settings', element: <RequireAuthenticated><SettingsHome /></RequireAuthenticated> },
+  { path: 'settings/collections', element: <RequireAuthenticated><CollectionsSettings /></RequireAuthenticated> },
+];
+
 const designEditorRoute = (
   <RequireAuthenticated>
     <RequireBrand>
@@ -543,8 +550,7 @@ const profileChildren = [
     ],
   },
   { path: 'success', element: <Success /> },
-  { path: 'settings', element: <SettingsHome /> },
-  { path: 'settings/collections', element: <CollectionsSettings /> },
+  ...accountSettingsRoutes,
 ];
 
 const router = createBrowserRouter([
@@ -583,8 +589,7 @@ const router = createBrowserRouter([
           { path: 'payment-policy', element: withRouteFallback(<LegalDocumentPage />) },
           { path: 'copyright', element: withRouteFallback(<LegalDocumentPage />) },
           { path: 'account-deletion', element: withRouteFallback(<LegalDocumentPage />) },
-          { path: 'settings', element: <SettingsHome /> },
-          { path: 'settings/collections', element: <CollectionsSettings /> },
+          ...accountSettingsRoutes,
         ],
       },
       {

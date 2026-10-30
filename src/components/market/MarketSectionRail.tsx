@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { CLIP_EMOJI, clipActionLabel } from '@/constants/clipping';
-import { useClipTarget, type ClipTargetType } from '@/features/clipping/useClipTarget';
+import { useClipTarget } from '@/features/clipping/useClipTarget';
 import { useSavedStatusQuery } from '@/query/queries';
 import type { MarketSection, MarketSectionItem, MarketSignalEvent } from '@/api/MarketApi';
 import type { MarketplaceProduct } from '@/utils/marketProductMapper';
 import {
+  getSectionItemClipType,
   getSectionItemTargetId,
   mapSectionProductToMarketplaceProduct,
 } from '@/utils/marketSectionMapper';
@@ -45,7 +46,10 @@ const SectionItemCard: React.FC<{
 
   const { toggleClip } = useClipTarget();
   const targetId = getSectionItemTargetId(item);
-  const statusQuery = useSavedStatusQuery(item.entityType, targetId);
+  const clipType = getSectionItemClipType(item);
+  const statusQuery = useSavedStatusQuery(clipType ?? item.entityType, targetId, {
+    enabled: isAuth && clipType !== null,
+  });
   const clipped = statusQuery.data === true;
 
   const mediaUrl =
@@ -117,14 +121,8 @@ const SectionItemCard: React.FC<{
 
   const handleClipToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!targetId) return;
-    if (
-      item.entityType === 'PRODUCT' ||
-      item.entityType === 'DESIGN' ||
-      item.entityType === 'COLLECTION'
-    ) {
-      void toggleClip({ targetType: item.entityType as ClipTargetType, targetId, clipped });
-    }
+    if (!targetId || !clipType) return;
+    void toggleClip({ targetType: clipType, targetId, clipped });
   };
 
   const brandOrigin = useMemo(() => {
@@ -164,19 +162,21 @@ const SectionItemCard: React.FC<{
             {badgeText}
           </span>
 
-          <button
-            type="button"
-            onClick={handleClipToggle}
-            aria-pressed={clipped}
-            aria-label={clipActionLabel(clipped)}
-            className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm backdrop-blur-md transition hover:scale-110 active:scale-95 ${
-              clipped
-                ? 'bg-[color:var(--text-primary)] text-[color:var(--surface-primary)]'
-                : 'bg-black/35 text-white/90 border border-white/20 hover:bg-black/55'
-            }`}
-          >
-            <span aria-hidden="true">{CLIP_EMOJI}</span>
-          </button>
+          {clipType ? (
+            <button
+              type="button"
+              onClick={handleClipToggle}
+              aria-pressed={clipped}
+              aria-label={clipActionLabel(clipped)}
+              className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm backdrop-blur-md transition hover:scale-110 active:scale-95 ${
+                clipped
+                  ? 'bg-[color:var(--text-primary)] text-[color:var(--surface-primary)]'
+                  : 'bg-black/35 text-white/90 border border-white/20 hover:bg-black/55'
+              }`}
+            >
+              <span aria-hidden="true">{CLIP_EMOJI}</span>
+            </button>
+          ) : null}
         </div>
 
         {/* Bottom Scrim & Action Button Over Photo */}

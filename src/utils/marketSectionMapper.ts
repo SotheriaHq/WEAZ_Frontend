@@ -1,4 +1,5 @@
 import type { MarketSectionItem } from '@/api/MarketApi';
+import type { ClipTargetType } from '@/features/clipping/useClipTarget';
 import {
   normalizeMarketProduct,
   type MarketplaceProduct,
@@ -58,6 +59,14 @@ export const mapSectionProductToMarketplaceProduct = (
 
 export const getSectionItemTargetId = (item: MarketSectionItem) => {
   return String(item.target?.id || item.sourceId || item.id || '').trim();
+};
+
+/** Market rails also carry brands and categories, which cannot be clipped. */
+export const getSectionItemClipType = (item: MarketSectionItem): ClipTargetType | null => {
+  const { entityType } = item;
+  return entityType === 'PRODUCT' || entityType === 'DESIGN' || entityType === 'COLLECTION'
+    ? entityType
+    : null;
 };
 
 export const getSectionItemStableKey = (item: MarketSectionItem) => {
