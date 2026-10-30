@@ -275,7 +275,7 @@ export const MediaSlotGrid: React.FC<MediaSlotGridProps> = ({
                   : isSelected
                     ? 'border-purple-600 ring-2 ring-purple-600/30'
                     : isMissing
-                      ? 'border-amber-400 bg-amber-500/5'
+                      ? 'border-dashed border-purple-500/40 bg-purple-500/5'
                       : 'border-gray-200 dark:border-white/10 surface-subtle hover:border-purple-500/40'
             } ${
               disabled
