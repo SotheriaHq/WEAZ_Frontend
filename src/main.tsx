@@ -16,7 +16,7 @@ import { QueryProvider } from './query/QueryProvider';
 import RootErrorBoundary, { removeBootSplash } from './components/RootErrorBoundary';
 import { initClientDiagnostics } from './utils/clientDiagnostics';
 import { initBuildVersionGuard } from './utils/buildVersionGuard';
-import { STALE_BUNDLE_SESSION_KEYS, isStaleBundleError } from './utils/staleBundle';
+import { STALE_BUNDLE_SESSION_KEYS, installChunkFailureRecovery } from './utils/staleBundle';
 import { initSentry } from './observability/sentry';
 import { initConsentEffects } from './privacy/thirdPartyLoaders';
 
@@ -54,17 +54,7 @@ const reloadForStaleChunks = (): boolean => {
   return true;
 };
 
-window.addEventListener('vite:preloadError', (event) => {
-  event.preventDefault();
-  reloadForStaleChunks();
-});
-
-window.addEventListener('unhandledrejection', (event) => {
-  if (isStaleBundleError(event.reason)) {
-    event.preventDefault();
-    reloadForStaleChunks();
-  }
-});
+installChunkFailureRecovery(reloadForStaleChunks);
 
 const BootSplashCleanup: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useEffect(() => {

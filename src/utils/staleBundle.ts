@@ -62,6 +62,10 @@ export const isStaleBundleError = (value: unknown): boolean => {
   return STALE_BUNDLE_MESSAGES.some((needle) => message.includes(needle));
 };
 
+/** A chunk that cannot load while offline is a lost connection, not a stale deploy. */
+export const isOffline = (): boolean =>
+  typeof navigator !== 'undefined' && navigator.onLine === false;
+
 /**
  * True when this error should be treated as a stale deploy.
  *
@@ -75,10 +79,32 @@ export const isStaleBundleError = (value: unknown): boolean => {
  * into Chrome's native "This site can't be reached" (DNS_PROBE_POSSIBLE) screen.
  */
 export const shouldRecoverFromStaleBundle = (value: unknown): boolean => {
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+  if (isOffline()) {
     return false;
   }
   return isStaleBundleError(value) || isNewBuildAvailable();
+};
+
+/**
+ * Wires the page-wide chunk failure listeners. `reload` is the caller's reload.
+ *
+ * While offline both stay out of the way: the import rejects into ErrorPage,
+ * which keeps the app on screen and reloads itself once the connection returns.
+ * Reloading here would swap the app for the browser's own offline page.
+ */
+export const installChunkFailureRecovery = (reload: () => unknown): void => {
+  window.addEventListener('vite:preloadError', (event) => {
+    if (isOffline()) return;
+    event.preventDefault();
+    reload();
+  });
+
+  window.addEventListener('unhandledrejection', (event) => {
+    if (isStaleBundleError(event.reason) && !isOffline()) {
+      event.preventDefault();
+      reload();
+    }
+  });
 };
 
 /**

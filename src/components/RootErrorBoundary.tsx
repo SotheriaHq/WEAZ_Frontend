@@ -2,6 +2,8 @@ import React from 'react';
 import { captureClientException } from '../observability/sentry';
 import {
   STALE_BUNDLE_SESSION_KEYS,
+  isOffline,
+  isStaleBundleError,
   recoverFromStaleBundle,
   shouldRecoverFromStaleBundle,
 } from '@/utils/staleBundle';
@@ -97,7 +99,25 @@ export class RootErrorBoundary extends React.Component<
     return { error, recovering: false };
   }
 
+  // The route error page is itself a lazy chunk, so a tap on an unloaded route
+  // while offline lands here. That is a lost connection, not a failed start.
+  private isOfflineChunkFailure() {
+    return Boolean(this.state.error && isOffline() && isStaleBundleError(this.state.error));
+  }
+
+  private reloadWhenOnline = () => {
+    window.location.reload();
+  };
+
+  componentWillUnmount() {
+    window.removeEventListener('online', this.reloadWhenOnline);
+  }
+
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    if (this.isOfflineChunkFailure()) {
+      window.addEventListener('online', this.reloadWhenOnline, { once: true });
+      return;
+    }
     captureClientException(error, {
       componentStack: errorInfo.componentStack ?? 'unknown',
       boundary: this.state.recovering
@@ -117,21 +137,24 @@ export class RootErrorBoundary extends React.Component<
     }
 
     if (this.state.error) {
+      const offline = this.isOfflineChunkFailure();
       return (
         <div className="flex min-h-[100dvh] items-center justify-center bg-white px-6 text-center dark:bg-[#0a0a0a]">
-          <div className="max-w-sm space-y-3">
+          <div className="max-w-sm space-y-3" role={offline ? 'status' : undefined}>
             <p className="text-base font-semibold text-gray-900 dark:text-white">
-              WIEZ could not start
+              {offline ? "You're offline" : 'WIEZ could not start'}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              {this.state.error.message || 'Unexpected startup error'}
+              {offline
+                ? 'WIEZ will pick up where you left off when your connection returns.'
+                : this.state.error.message || 'Unexpected startup error'}
             </p>
             <button
               type="button"
               onClick={() => window.location.reload()}
               className="rounded-full bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white"
             >
-              Reload
+              {offline ? 'Try again' : 'Reload'}
             </button>
           </div>
         </div>

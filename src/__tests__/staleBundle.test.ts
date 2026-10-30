@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Recovering from a half-replaced deploy without showing anyone an error.
@@ -84,6 +84,73 @@ describe('recognising a stale bundle', () => {
     } finally {
       Object.defineProperty(navigator, 'onLine', { configurable: true, value: originalOnLine });
     }
+  });
+});
+
+describe('page-wide chunk failure listeners', () => {
+  const setOnline = (value: boolean) =>
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value });
+  const originalOnLine = navigator.onLine;
+  const cleanups: Array<() => void> = [];
+
+  // Listeners are page-wide, so capture them and hand them to each test directly.
+  const install = async () => {
+    const added: Record<string, EventListener> = {};
+    const spy = vi.spyOn(window, 'addEventListener').mockImplementation(((type: string, fn: EventListener) => {
+      added[type] = fn;
+    }) as typeof window.addEventListener);
+    cleanups.push(() => spy.mockRestore());
+    const { installChunkFailureRecovery } = await load();
+    const reload = vi.fn();
+    installChunkFailureRecovery(reload);
+    return { added, reload };
+  };
+
+  const preloadEvent = () => new Event('vite:preloadError', { cancelable: true });
+  const rejection = (reason: unknown) => {
+    const event = new Event('unhandledrejection', { cancelable: true });
+    Object.defineProperty(event, 'reason', { value: reason });
+    return event;
+  };
+
+  afterEach(() => {
+    setOnline(originalOnLine);
+    cleanups.splice(0).forEach((fn) => fn());
+  });
+
+  it('reloads onto the new deploy when a chunk fails online', async () => {
+    setOnline(true);
+    const { added, reload } = await install();
+    const event = preloadEvent();
+    added['vite:preloadError'](event);
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('keeps the app on screen when a chunk fails offline', async () => {
+    setOnline(false);
+    const { added, reload } = await install();
+    const event = preloadEvent();
+    added['vite:preloadError'](event);
+    expect(reload).not.toHaveBeenCalled();
+    // Not prevented, so the import rejects into ErrorPage, which recovers on `online`.
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('does not reload for a stale-bundle rejection while offline', async () => {
+    setOnline(false);
+    const { added, reload } = await install();
+    added.unhandledrejection(rejection(new Error('Failed to fetch dynamically imported module: x.js')));
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('reloads for a stale-bundle rejection online and ignores other rejections', async () => {
+    setOnline(true);
+    const { added, reload } = await install();
+    added.unhandledrejection(rejection(new Error('Network Error')));
+    expect(reload).not.toHaveBeenCalled();
+    added.unhandledrejection(rejection(new Error('Failed to fetch dynamically imported module: x.js')));
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });
 
