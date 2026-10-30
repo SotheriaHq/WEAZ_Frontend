@@ -43,6 +43,7 @@ import MediaSlotGrid, {
   buildMediaSlotMap,
   renderableMediaSlots,
 } from "@/components/media/MediaSlotGrid";
+import MediaRenderer from '@/components/media/MediaRenderer';
 import SizingConfigurator from "@/components/sizing/SizingConfigurator";
 import LocalMediaPreview from "../../components/media/LocalMediaPreview";
 import useFilePicker from "../../components/upload/useFilePicker";
@@ -120,11 +121,11 @@ import { useOneTimeTour } from '@/hooks/useOneTimeTour';
 
 
 
-const DESIGN_SIZING_MODE_OPTIONS = [
+const _DESIGN_SIZING_MODE_OPTIONS = [
   { value: 'NONE', label: 'No size specification' },
   { value: 'CUSTOM', label: 'Custom order only' },
 ] as const;
-type DesignSizingMode = Extract<SizingMode, (typeof DESIGN_SIZING_MODE_OPTIONS)[number]['value']>;
+type DesignSizingMode = Extract<SizingMode, (typeof _DESIGN_SIZING_MODE_OPTIONS)[number]['value']>;
 
 const normalizeDesignSizingModeForCreation = (value?: string | null): DesignSizingMode => {
   if (value === 'CUSTOM' || value === 'RTW_PLUS_FITTINGS' || value === 'RTW_PLUS_CUSTOM') {
@@ -1927,10 +1928,13 @@ const CreateDesignInner: React.FC = () => {
               <div className="rounded-2xl bg-[#090412]/90 p-3 border border-white/5 flex items-center gap-3.5 shadow-inner">
                 <div className="w-16 h-20 rounded-xl overflow-hidden bg-white/5 border border-white/10 flex-shrink-0 flex items-center justify-center">
                   {(coverImageUrl || selectedFile?.url) ? (
-                    <img
+                    <MediaRenderer
+                      kind="image"
                       src={coverImageUrl || selectedFile?.url || ""}
                       alt="Cover preview"
-                      className="w-full h-full object-cover"
+                      fit="cover"
+                      className="w-full h-full"
+                      mediaClassName="w-full h-full object-cover"
                     />
                   ) : (
                     <span className="text-[10px] text-[var(--text-muted)] font-semibold text-center px-1">
