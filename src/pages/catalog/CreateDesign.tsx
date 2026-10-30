@@ -21,7 +21,6 @@ import {
   FiMaximize2,
   FiChevronDown,
   FiChevronUp,
-  FiInfo,
   FiSearch,
   FiX,
   FiFile,
@@ -29,7 +28,6 @@ import {
   FiChevronRight,
   FiZoomIn,
   FiZoomOut,
-  FiPlus,
 } from "react-icons/fi";
 import { HiOutlineSparkles } from "react-icons/hi";
 import CustomOrderConfigurationEditor, {
@@ -349,7 +347,7 @@ const CreateDesignInner: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
   const [fullscreenZoom, setFullscreenZoom] = useState(1);
-  const [expandedSections, setExpandedSections] = useState({
+  const [, setExpandedSections] = useState({
     details: true,
     pricing: false,
     targeting: false,
@@ -358,17 +356,6 @@ const CreateDesignInner: React.FC = () => {
   const [showCancelPrompt, setShowCancelPrompt] = useState(false);
   const [submitIntent, setSubmitIntent] = useState<"draft" | "publish" | null>(
     null,
-  );
-  const tagStylePalette = useMemo(
-    () => [
-      "surface-control border border-theme text-theme backdrop-blur-md shadow-sm",
-      "bg-gradient-to-r from-purple-500/60 to-blue-500/50 text-white shadow-md",
-      "bg-gradient-to-r from-amber-400/70 to-pink-500/70 text-white shadow-md",
-      "surface-control border border-theme text-theme backdrop-blur",
-      "bg-gradient-to-r from-emerald-400/70 to-teal-500/70 text-white shadow-md",
-      "bg-gradient-to-r from-indigo-500/70 to-cyan-500/70 text-white shadow-md",
-    ],
-    [],
   );
   const storeCustomOrderLeadTimeLabel = useMemo(
     () => getStoreProcessingTimeLabel(storeCustomOrderLeadTime || storeProcessingTime),
@@ -963,9 +950,6 @@ const CreateDesignInner: React.FC = () => {
     }
   }, [closeFullscreen, files, fullscreenIndex, isFullscreen]);
 
-  const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
-  };
 
   const addTag = (tag: string) => {
     if (selectedTags.length >= 10) {
@@ -1778,181 +1762,237 @@ const CreateDesignInner: React.FC = () => {
 
         {isEditMode && id ? <ReviewFeedbackBanner designId={id} /> : null}
 
-        <div className="mb-8 grid grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(360px,0.82fr)]">
-          {/* Media Section */}
-          <section id="design-media-section" className="min-w-0">
-            {/*
-              One hidden input for BOTH states. It used to live inside the
-              "has media" branch, because the empty state was a drop zone that
-              carried its own; with the grid on both sides, keeping it there
-              would leave the first slot tap with nothing to click.
-            */}
-            <input
-              ref={picker.inputRef}
-              type="file"
-              multiple
-              onChange={picker.handlers.onInputChange}
-              className="hidden"
-              accept="image/*,video/*"
-              disabled={disabled}
-            />
-            {files.length === 0 ? (
-              /*
-               * The slot grid IS the empty state now. It used to be a drop zone
-               * with a paragraph of instructions, a legend of numbered slot
-               * names, and a footnote about what is required — three pieces of
-               * copy describing a shape the grid simply shows. Product creation
-               * has always done it this way; there was no reason for design
-               * creation to teach a second mental model.
-               */
-              <MediaSlotGrid
-                mediaBySlot={designSlotMedia}
-                maxSlots={DESIGN_MAX_MEDIA_COUNT}
-                missingRequiredSlots={missingRequiredMediaSlots}
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 mb-8">
+          {/* LEFT COLUMN: Sticky Media Stage + Real-Time Live Runway Feed Card (Col 5/12) */}
+          <div className="lg:col-span-5 lg:sticky lg:top-20 space-y-5">
+            {/* Media Section Card */}
+            <section id="design-media-section" className="wiez-studio-card p-4 space-y-4">
+              <input
+                ref={picker.inputRef}
+                type="file"
+                multiple
+                onChange={picker.handlers.onInputChange}
+                className="hidden"
+                accept="image/*,video/*"
                 disabled={disabled}
-                onPickForSlot={openPickerForSlot}
-                enabledEmptySlots={nextFillableDesignSlots}
-                onDropFiles={(_slot, dropped) =>
-                  mediaStore.addFiles(dropped, DESIGN_MAX_MEDIA_COUNT)
-                }
               />
-            ) : (
-              <div className="space-y-4 h-full min-w-0">
-                {/* Main Preview - NO background; media defines layout */}
-                <div className="relative rounded-2xl border border-theme shadow-sm">
-                  {/* Slot label badge on the preview */}
-                  {selectedIndex < 6 && (
-                    <div className="absolute top-3 left-3 z-10 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm">
-                      <span className="text-[10px] font-bold text-white/90 uppercase tracking-wide">
-                        {getMediaViewSlotLabel(
-                          normalizeMediaViewSlot(selectedFile?.viewSlot, selectedIndex),
-                        )}
-                      </span>
-                    </div>
-                  )}
-                  <div className="relative w-full min-h-[280px] sm:min-h-[420px] lg:min-h-[620px] max-h-[85vh] flex items-center justify-center overflow-y-auto">
-                    <AnimatePresence mode="wait">
-                      {selectedFile && (
-                        <motion.div
-                          key={selectedFile.id || selectedFile.url}
-                          className="w-full h-full flex items-center justify-center"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          {selectedFile.url ? (
-                            <LocalMediaPreview
-                              kind={
-                                selectedFile.kind === "video" ? "video" : "image"
-                              }
-                              src={selectedFile.url}
-                              file={selectedFile.file}
-                              alt={selectedFile.file?.name || "Preview"}
-                              className="w-full h-full flex items-center justify-center"
-                              mediaClassName="h-full w-full object-contain"
-                              maxHeightClassName="max-h-[85vh]"
-                              maxWidthClassName="max-w-full"
-                              allowScroll
-                              diagnosticScope="create-design-main-preview"
-                            />
-                          ) : (
-                            <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-sm font-medium text-theme-secondary">
-                              <MuseLoader size={32} label="Optimizing photo for preview" />
-                              Optimizing photo for preview...
-                            </div>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+              
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  Visual Assets ({files.length}/{DESIGN_MAX_MEDIA_COUNT})
+                </span>
+                <span className="text-xs text-purple-300 font-semibold">
+                  {files.length === 0 ? "Upload at least 1 hero look" : `Cover: Slot ${coverIndex + 1}`}
+                </span>
+              </div>
 
-                    {/* Floating Action Bar */}
-                    <div className="absolute bottom-0 left-0 right-0 px-4 py-3 bg-gradient-to-t from-black/80 to-transparent">
-                      <div className="flex items-center justify-center gap-2">
-                        <ActionButton
-                          icon={<FiTrash2 className="w-4 h-4" />}
-                          label="Delete"
-                          onClick={() =>
-                            selectedFile?.id && handleDelete(selectedFile.id)
-                          }
-                          disabled={disabled}
-                        />
-                        <ActionButton
-                          icon={
-                            <FiStar
-                              className={`w-4 h-4 ${coverIndex === selectedIndex ? "fill-purple-400 text-purple-400" : ""}`}
-                            />
-                          }
-                          label={coverIndex === selectedIndex ? "Cover" : "Set as Cover"}
-                          onClick={() => handleSetCover(selectedIndex)}
-                          disabled={disabled}
-                          active={coverIndex === selectedIndex}
-                        />
-                        {/* The "Reorder" button here was permanently disabled
-                            and did nothing; reordering is a long press on a
-                            tile in the grid below. */}
-                        <ActionButton
-                          icon={<FiMaximize2 className="w-4 h-4" />}
-                          label="Fullscreen"
-                          onClick={openFullscreen}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/*
-                  Same grid as the empty state and as product creation. It
-                  replaces the thumbnail strip, where the slot was implied by
-                  position and only discoverable by dragging a grip.
-                */}
+              {files.length === 0 ? (
                 <MediaSlotGrid
                   mediaBySlot={designSlotMedia}
                   maxSlots={DESIGN_MAX_MEDIA_COUNT}
                   missingRequiredSlots={missingRequiredMediaSlots}
-                  selectedId={files[selectedIndex]?.id ?? null}
                   disabled={disabled}
-                  canAddMore={files.length < DESIGN_MAX_MEDIA_COUNT}
                   onPickForSlot={openPickerForSlot}
                   enabledEmptySlots={nextFillableDesignSlots}
-                  onSelect={(item) => {
-                    const index = files.findIndex((file) => file.id === item.id);
-                    if (index !== -1) setSelectedIndex(index);
-                  }}
-                  onDelete={(item) => handleDelete(item.id)}
-                  onSetCover={(item) => {
-                    const index = files.findIndex((file) => file.id === item.id);
-                    if (index !== -1) handleSetCover(index);
-                  }}
-                  onSlotDrop={handleSlotDrop}
                   onDropFiles={(_slot, dropped) =>
                     mediaStore.addFiles(dropped, DESIGN_MAX_MEDIA_COUNT)
                   }
                 />
+              ) : (
+                <div className="space-y-4 min-w-0">
+                  {/* Main Preview */}
+                  <div className="relative rounded-2xl overflow-hidden bg-[#0a0514] border border-white/5 shadow-inner">
+                    {selectedIndex < 6 && (
+                      <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md border border-white/10">
+                        <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                          {getMediaViewSlotLabel(
+                            normalizeMediaViewSlot(selectedFile?.viewSlot, selectedIndex),
+                          )}
+                        </span>
+                      </div>
+                    )}
+                    <div className="relative w-full aspect-[9/16] max-h-[440px] flex items-center justify-center overflow-hidden">
+                      <AnimatePresence mode="wait">
+                        {selectedFile && (
+                          <motion.div
+                            key={selectedFile.id || selectedFile.url}
+                            className="w-full h-full flex items-center justify-center"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            {selectedFile.url ? (
+                              <LocalMediaPreview
+                                kind={
+                                  selectedFile.kind === "video" ? "video" : "image"
+                                }
+                                src={selectedFile.url}
+                                file={selectedFile.file}
+                                alt={selectedFile.file?.name || "Preview"}
+                                className="w-full h-full flex items-center justify-center"
+                                mediaClassName="h-full w-full object-cover"
+                                maxHeightClassName="max-h-[440px]"
+                                maxWidthClassName="max-w-full"
+                                allowScroll
+                                diagnosticScope="create-design-main-preview"
+                              />
+                            ) : (
+                              <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-sm font-medium text-theme-secondary">
+                                <MuseLoader size={32} label="Optimizing photo for preview" />
+                                Optimizing photo for preview...
+                              </div>
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
 
-                {/* Image info */}
-                <p className="text-center text-sm text-theme-secondary">
-                  {selectedFile?.kind === "video" ? "Video" : "Image"}{" "}
-                  {selectedIndex + 1} of {files.length}
-                  {selectedFile?.file?.name && ` • ${selectedFile.file.name}`}
-                  {selectedFile?.file?.size &&
-                    ` • ${(selectedFile.file.size / (1024 * 1024)).toFixed(1)} MB`}
-                </p>
+                      {/* Floating Action Bar */}
+                      <div className="absolute bottom-0 left-0 right-0 px-3 py-2.5 bg-gradient-to-t from-black/85 via-black/40 to-transparent">
+                        <div className="flex items-center justify-center gap-2">
+                          <ActionButton
+                            icon={<FiTrash2 className="w-4 h-4" />}
+                            label="Delete"
+                            onClick={() =>
+                              selectedFile?.id && handleDelete(selectedFile.id)
+                            }
+                            disabled={disabled}
+                          />
+                          <ActionButton
+                            icon={
+                              <FiStar
+                                className={`w-4 h-4 ${coverIndex === selectedIndex ? "fill-purple-400 text-purple-400" : ""}`}
+                              />
+                            }
+                            label={coverIndex === selectedIndex ? "Cover" : "Set as Cover"}
+                            onClick={() => handleSetCover(selectedIndex)}
+                            disabled={disabled}
+                            active={coverIndex === selectedIndex}
+                          />
+                          <ActionButton
+                            icon={<FiMaximize2 className="w-4 h-4" />}
+                            label="Fullscreen"
+                            onClick={openFullscreen}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* MediaSlotGrid Thumbnail Rail */}
+                  <MediaSlotGrid
+                    mediaBySlot={designSlotMedia}
+                    maxSlots={DESIGN_MAX_MEDIA_COUNT}
+                    missingRequiredSlots={missingRequiredMediaSlots}
+                    selectedId={files[selectedIndex]?.id ?? null}
+                    disabled={disabled}
+                    canAddMore={files.length < DESIGN_MAX_MEDIA_COUNT}
+                    onPickForSlot={openPickerForSlot}
+                    enabledEmptySlots={nextFillableDesignSlots}
+                    onSelect={(item) => {
+                      const index = files.findIndex((file) => file.id === item.id);
+                      if (index !== -1) setSelectedIndex(index);
+                    }}
+                    onDelete={(item) => handleDelete(item.id)}
+                    onSetCover={(item) => {
+                      const index = files.findIndex((file) => file.id === item.id);
+                      if (index !== -1) handleSetCover(index);
+                    }}
+                    onSlotDrop={handleSlotDrop}
+                    onDropFiles={(_slot, dropped) =>
+                      mediaStore.addFiles(dropped, DESIGN_MAX_MEDIA_COUNT)
+                    }
+                  />
+
+                  {/* Image info */}
+                  <p className="text-center text-xs text-[var(--text-muted)]">
+                    {selectedFile?.kind === "video" ? "Video" : "Image"}{" "}
+                    {selectedIndex + 1} of {files.length}
+                    {selectedFile?.file?.name && ` • ${selectedFile.file.name}`}
+                  </p>
+                </div>
+              )}
+            </section>
+
+            {/* Live Runway Feed Preview Card */}
+            <div className="wiez-gradient-live-card p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <HiOutlineSparkles className="w-3.5 h-3.5 text-purple-400" />
+                  Live Runway Feed Card
+                </span>
+                <span className="text-[10px] text-[var(--text-muted)]">Real-Time Shopper View</span>
               </div>
-            )}
-          </section>
 
-          {/* Design Details */}
-          <div>
-            <FormSection
-              id="design-details-section"
-              title="Design Details"
-              icon="📝"
-              isOpen={expandedSections.details}
-              onToggle={() => toggleSection("details")}
-              className="!border-gray-200/40 !bg-transparent !shadow-none dark:!border-white/10 lg:max-h-[560px] lg:overflow-y-auto scrollbar-hide"
-            >
-              <div className="space-y-3">
+              <div className="rounded-2xl bg-[#090412]/90 p-3 border border-white/5 flex items-center gap-3.5 shadow-inner">
+                <div className="w-16 h-20 rounded-xl overflow-hidden bg-white/5 border border-white/10 flex-shrink-0 flex items-center justify-center">
+                  {(coverImageUrl || selectedFile?.url) ? (
+                    <img
+                      src={coverImageUrl || selectedFile?.url || ""}
+                      alt="Cover preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-[10px] text-[var(--text-muted)] font-semibold text-center px-1">
+                      No cover look
+                    </span>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                      {isEditMode ? "Drop Update" : "New Drop"}
+                    </span>
+                    {isMadeToOrder && (
+                      <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                        Made to Order
+                      </span>
+                    )}
+                  </div>
+
+                  <h4 className="text-sm font-bold truncate text-white">
+                    {title.trim() || "Untitled Design"}
+                  </h4>
+
+                  <p className="text-xs text-[var(--text-muted)] truncate">
+                    {type || "Audience"} • {filteredCategories.find((c) => c.id === categoryId)?.name || "Category"}
+                    {categoryTypeOptions.find((gt) => gt.id === categoryTypeId)?.name
+                      ? ` · ${categoryTypeOptions.find((gt) => gt.id === categoryTypeId)?.name}`
+                      : ""}
+                  </p>
+
+                  <div className="flex items-center justify-between pt-0.5">
+                    <span className="text-xs font-extrabold text-white">
+                      {minPrice || maxPrice
+                        ? `₦${Number(minPrice || 0).toLocaleString()} – ₦${Number(maxPrice || 0).toLocaleString()}`
+                        : "Price on request"}
+                    </span>
+                    <span className="text-[11px] text-purple-400 font-semibold">
+                      Ready to Order ›
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: Continuous Studio Craft Stream (Col 7/12) */}
+          <div className="lg:col-span-7 space-y-6">
+            
+            {/* 1. Core Identity & Tell Your Story */}
+            <div className="wiez-studio-card p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs font-bold shadow-inner">
+                    1
+                  </span>
+                  <h3 className="text-sm font-bold text-white">Design Title & Story</h3>
+                </div>
+                <span className="text-xs text-[var(--text-muted)]">Core Identity</span>
+              </div>
+
+              <div className="space-y-4">
                 <TextField
                   label="Design Title"
                   value={title}
@@ -1965,512 +2005,488 @@ const CreateDesignInner: React.FC = () => {
                   required
                 />
 
-                <div className="rounded-lg border border-gray-200/40 bg-transparent p-3 dark:border-white/10">
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-theme-secondary">
-                      Creator metadata
-                    </p>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] flex items-center">
+                      Tell Your Story
+                      <InfoTooltip text="Describe the inspiration, mood, and story behind this design. This is visible to buyers browsing the catalog." />
+                    </label>
+                    <span className="text-xs text-[var(--text-muted)]">
+                      {description.length} / 500 characters
+                    </span>
                   </div>
-                  <div className="pr-1 sm:pr-2">
-                    <div className="space-y-3">
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium text-theme flex items-center">
-                          Tell Your Story
-                          <InfoTooltip text="Describe the inspiration, mood, and story behind this design. This is visible to buyers browsing the catalog." />
-                        </label>
-                        <textarea
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          placeholder="Inspired by the warm coastal breeze of Lagos..."
-                          rows={3}
-                          disabled={disabled || titleDescriptionLocked}
-                          className="surface-control placeholder-theme w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none"
-                        />
-                        <p className="text-right text-xs text-theme-secondary">
-                          {description.length} / 500 characters
-                        </p>
-                      </div>
-                      {editingDraft && (
-                        <p className="rounded-lg border border-sky-300/60 bg-sky-50/80 px-3 py-2 text-xs font-medium text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
-                          Drafts can be updated up to 2 times every 24 hours.
-                        </p>
-                      )}
-                      {titleDescriptionLocked && (
-                        <p className="rounded-lg border border-amber-300/60 bg-amber-50/80 px-3 py-2 text-xs font-medium text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-                          Title and description can only be updated once every
-                          30 days.
-                          {nextTitleEditDate
-                            ? ` Next edit available on ${nextTitleEditDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.`
-                            : ""}
-                        </p>
-                      )}
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Inspired by the warm coastal breeze of Lagos..."
+                    rows={3}
+                    disabled={disabled || titleDescriptionLocked}
+                    className="surface-control placeholder-theme w-full px-4 py-3 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none text-sm"
+                  />
+                </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <label className="mb-2 flex items-center text-sm font-medium text-theme">
-                            Who is it for?
-                            <InfoTooltip text={CREATOR_METADATA_HELP.audience} />
-                          </label>
-                          <UniversalSelect
-                            value={type}
-                            onChange={handleAudienceChange}
-                            options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
-                              value: option.value,
-                              label: option.label,
-                            }))}
-                            placeholder="Choose who this item is for"
-                            disabled={disabled}
-                            optionCompact
-                          />
-                        </div>
+                {editingDraft && (
+                  <p className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-200">
+                    Drafts can be updated up to 2 times every 24 hours.
+                  </p>
+                )}
+                {titleDescriptionLocked && (
+                  <p className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300">
+                    Title and description can only be updated once every 30 days.
+                    {nextTitleEditDate
+                      ? ` Next edit available on ${nextTitleEditDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.`
+                      : ""}
+                  </p>
+                )}
+              </div>
+            </div>
 
-                        <UniversalSelect
-                          label="Age group"
-                          required
-                          value={targetAgeGroup}
-                          onChange={handleAgeGroupChange}
-                          options={DESIGN_TARGET_AGE_OPTIONS.map((option) => ({
-                            value: option.value,
-                            label: option.label,
-                          }))}
-                          disabled={disabled}
-                          optionCompact
-                        />
-                      </div>
+            {/* 2. Taxonomy & Garment DNA */}
+            <div className="wiez-studio-card p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs font-bold shadow-inner">
+                    2
+                  </span>
+                  <h3 className="text-sm font-bold text-white">Taxonomy & Garment DNA</h3>
+                </div>
+                <span className="text-xs text-[var(--text-muted)]">Discovery Metadata</span>
+              </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <UniversalSelect
-                          label="What is it?"
-                          required
-                          value={categoryId}
-                          onChange={handleCategoryChange}
-                          options={filteredCategories.map((c) => ({
-                            value: c.id,
-                            label: c.name,
-                          }))}
-                          placeholder={
-                            loadingCategories
-                              ? "Loading..."
-                              : "Choose what this item is"
-                          }
-                          disabled={disabled}
-                          searchable
-                          emptyMessage="No garment categories match this audience yet"
-                          optionAllowWrap
-                          selectedAllowWrap
-                        />
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] flex items-center">
+                      Who is it for? *
+                      <InfoTooltip text={CREATOR_METADATA_HELP.audience} />
+                    </label>
+                    <UniversalSelect
+                      value={type}
+                      onChange={handleAudienceChange}
+                      options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
+                        value: option.value,
+                        label: option.label,
+                      }))}
+                      placeholder="Choose who this item is for"
+                      disabled={disabled}
+                      optionCompact
+                    />
+                  </div>
 
-                        <UniversalSelect
-                          label="Garment type"
-                          required
-                          value={categoryTypeId}
-                          onChange={setCategoryTypeId}
-                          options={categoryTypeOptions.map((categoryType) => ({
-                            value: categoryType.id,
-                            label: categoryType.name,
-                          }))}
-                          placeholder={
-                            loadingCategories
-                              ? "Loading..."
-                              : categoryId
-                                ? categoryTypeOptions.length
-                                  ? "Choose a garment type"
-                                  : "No garment types match this audience"
-                                : "Choose what this item is first"
-                          }
-                          disabled={
-                            disabled || !categoryId || categoryTypeOptions.length === 0
-                          }
-                          searchable
-                          emptyMessage="No garment types match this audience yet"
-                          optionAllowWrap
-                          selectedAllowWrap
-                        />
-                      </div>
+                  <div className="space-y-1.5">
+                    <UniversalSelect
+                      label="Age group"
+                      required
+                      value={targetAgeGroup}
+                      onChange={handleAgeGroupChange}
+                      options={DESIGN_TARGET_AGE_OPTIONS.map((option) => ({
+                        value: option.value,
+                        label: option.label,
+                      }))}
+                      disabled={disabled}
+                      optionCompact
+                    />
+                  </div>
+                </div>
 
-                      <DesignTaxonomyProposalField value={selectedProposal} disabled={disabled} onChange={proposal => {
-                        setPendingProposal(proposal);
-                        if (proposal) { setCategoryId(''); setCategoryTypeId(''); }
-                      }} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <UniversalSelect
+                    label="What is it?"
+                    required
+                    value={categoryId}
+                    onChange={handleCategoryChange}
+                    options={filteredCategories.map((c) => ({
+                      value: c.id,
+                      label: c.name,
+                    }))}
+                    placeholder={
+                      loadingCategories
+                        ? "Loading..."
+                        : "Choose what this item is"
+                    }
+                    disabled={disabled}
+                    searchable
+                    emptyMessage="No garment categories match this audience yet"
+                    optionAllowWrap
+                    selectedAllowWrap
+                  />
 
-                      <FilterSelector
-                        value={filterSelection}
-                        onChange={setFilterSelection}
-                        entityType="DESIGN"
-                        disabled={disabled}
-                        onTagSuggestions={handleFilterTagSuggestions}
-                      />
-                      {(() => {
-                        const styleDetailCount = Object.values(filterSelection).flatMap(
-                          (values) => (Array.isArray(values) ? values : values ? [values] : []),
-                        ).length;
-                        return styleDetailCount > 8 ? (
-                          <p className="text-[11px] font-medium text-amber-600 dark:text-amber-300">
-                            ⚠️ {styleDetailCount} style details selected — fewer, precise
-                            details improve discovery and buyer trust.
-                          </p>
-                        ) : null;
-                      })()}
+                  <UniversalSelect
+                    label="Garment type"
+                    required
+                    value={categoryTypeId}
+                    onChange={setCategoryTypeId}
+                    options={categoryTypeOptions.map((categoryType) => ({
+                      value: categoryType.id,
+                      label: categoryType.name,
+                    }))}
+                    placeholder={
+                      loadingCategories
+                        ? "Loading..."
+                        : categoryId
+                          ? categoryTypeOptions.length
+                            ? "Choose a garment type"
+                            : "No garment types match this audience"
+                          : "Choose what this item is first"
+                    }
+                    disabled={
+                      disabled || !categoryId || categoryTypeOptions.length === 0
+                    }
+                    searchable
+                    emptyMessage="No garment types match this audience yet"
+                    optionAllowWrap
+                    selectedAllowWrap
+                  />
+                </div>
 
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-theme flex items-center">
-                          Hashtags (up to 10)
-                          <InfoTooltip text={CREATOR_METADATA_HELP.hashtags} />
-                        </label>
+                {/* Missing category or garment type proposal toggle */}
+                <DesignTaxonomyProposalField
+                  value={selectedProposal}
+                  disabled={disabled}
+                  onChange={(proposal) => {
+                    setPendingProposal(proposal);
+                    if (proposal) {
+                      setCategoryId('');
+                      setCategoryTypeId('');
+                    }
+                  }}
+                />
+              </div>
+            </div>
 
-                        <div className="rounded-lg border border-gray-200/40 bg-transparent p-3 dark:border-white/10">
-                          {selectedTags.length > 0 && (
-                            <div className="mb-2 flex flex-wrap gap-1.5">
-                              {selectedTags.map((tag, idx) => (
-                                <motion.span
-                                  key={tag}
-                                  initial={{ scale: 0.8, opacity: 0 }}
-                                  animate={{ scale: 1, opacity: 1 }}
-                                  exit={{ scale: 0.8, opacity: 0 }}
-                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-semibold ${tagStylePalette[idx % tagStylePalette.length]}`}
-                                >
-                                  {normalizeHashtagLabel(tag)}
-                                  <button
-                                    type="button"
-                                    onClick={() => removeTag(tag)}
-                                    className="hover:text-purple-200 transition-colors"
-                                  >
-                                    <FiX className="w-3 h-3" />
-                                  </button>
-                                </motion.span>
-                              ))}
-                            </div>
-                          )}
+            {/* 3. Style Details & Hashtags */}
+            <div className="wiez-studio-card p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs font-bold shadow-inner">
+                    3
+                  </span>
+                  <h3 className="text-sm font-bold text-white">Style Details & Hashtags</h3>
+                </div>
+                <span className="text-xs text-[var(--text-muted)]">Rule 2-Column Grid</span>
+              </div>
 
-                          <div className="relative">
-                            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-secondary)]" />
-                            <input
-                              type="text"
-                              value={tagSearch}
-                              onChange={(e) => setTagSearch(e.target.value)}
-                              onKeyDown={handleTagInputKeyDown}
-                              placeholder="Search or create a hashtag..."
-                              disabled={disabled || selectedTags.length >= 10}
-                              className="wiez-search-input pl-10 pr-[5.5rem]"
-                            />
-                            <button
-                              type="button"
-                              onClick={() =>
-                                tagSearch.trim() &&
-                                addTag(
-                                  tagSearch
-                                    .trim()
-                                    .toLowerCase()
-                                    .replace(/\s+/g, "-"),
-                                )
-                              }
-                              disabled={
-                                disabled ||
-                                selectedTags.length >= 10 ||
-                                !tagSearch.trim()
-                              }
-                              className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50"
-                              aria-label="Add tag"
-                            >
-                              <FiPlus className="w-4 h-4" />
-                              Add
-                            </button>
-                          </div>
+              <div className="space-y-4">
+                <FilterSelector
+                  value={filterSelection}
+                  onChange={setFilterSelection}
+                  entityType="DESIGN"
+                  disabled={disabled}
+                  onTagSuggestions={handleFilterTagSuggestions}
+                />
 
-                          {filteredSuggestions.length > 0 ? (
-                            <div className="mt-3">
-                              <p className="text-xs text-theme-secondary mb-2">
-                                {isSearchingTags ? 'Matching hashtags:' : 'Popular hashtags:'}
-                              </p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {filteredSuggestions.map((tag) => {
-                                  const isSelected = selectedTags.some(
-                                    (t) => t.toLowerCase() === tag.toLowerCase(),
-                                  );
-                                  return (
-                                    <button
-                                      key={tag}
-                                      type="button"
-                                      onClick={() => addTag(tag)}
-                                      disabled={disabled || isSelected}
-                                      className={`tag-badge-outline px-2.5 py-1 rounded-full text-[12px] font-medium ${
-                                        isSelected
-                                          ? 'opacity-40 cursor-not-allowed ring-1 ring-purple-400/40'
-                                          : ''
-                                      }`}
-                                    >
-                                      {normalizeHashtagLabel(tag)}
-                                    </button>
-                                  );
-                                })}
-                              </div>
+                {(() => {
+                  const styleDetailCount = Object.values(filterSelection).flatMap(
+                    (values) => (Array.isArray(values) ? values : values ? [values] : []),
+                  ).length;
+                  return styleDetailCount > 8 ? (
+                    <p className="text-xs font-medium text-amber-300">
+                      ⚠️ ${styleDetailCount} style details selected — fewer, precise
+                      details improve discovery and buyer trust.
+                    </p>
+                  ) : null;
+                })()}
 
-                            </div>
-                          ) : isSearchingTags ? (
-                            <p className="mt-3 text-xs text-theme-secondary">
-                              No existing tag matches "{tagSearch.trim()}". Press{' '}
-                              <span className="font-semibold">Add</span> to create it (sent for admin approval).
-                            </p>
-                          ) : null}
+                {/* Hashtags Cloud */}
+                <div className="space-y-2 pt-2 border-t border-white/5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] flex items-center">
+                      Hashtags ({selectedTags.length}/10)
+                      <InfoTooltip text="Add up to 10 hashtags to improve search discovery." />
+                    </label>
+                  </div>
 
+                  {selectedTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {selectedTags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="neu-inset-chip selected inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold"
+                        >
+                          {normalizeHashtagLabel(tag)}
                           <button
                             type="button"
-                            onClick={() => setShowTagPicker(true)}
-                            disabled={disabled}
-                            className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-gray-200 bg-purple-50 px-3 py-1.5 text-[12px] font-semibold text-purple-700 transition hover:bg-purple-100 disabled:opacity-50 dark:border-white/10 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20"
+                            onClick={() => removeTag(tag)}
+                            className="hover:opacity-75 transition-opacity"
+                            aria-label={`Remove ${tag}`}
                           >
-                            🔎 See more hashtags ({selectedTags.length}/10)
+                            <FiX className="w-3 h-3" />
                           </button>
-                          <HashtagPickerModal
-                            open={showTagPicker}
-                            onClose={() => setShowTagPicker(false)}
-                            selected={selectedTags}
-                            onToggle={handleToggleTagFromPicker}
-                            maxTags={10}
-                            extraSuggestions={tagSuggestions}
-                          />
-                        </div>
-                      </div>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Search / Add Hashtags */}
+                  <div className="relative">
+                    <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-secondary" />
+                    <input
+                      type="text"
+                      value={tagSearch}
+                      onChange={(e) => setTagSearch(e.target.value)}
+                      onKeyDown={handleTagInputKeyDown}
+                      placeholder="Search or create a hashtag..."
+                      disabled={disabled || selectedTags.length >= 10}
+                      className="surface-control placeholder-theme w-full pl-10 pr-20 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-xs"
+                    />
+                    {tagSearch.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => addTag(tagSearch)}
+                        disabled={disabled || selectedTags.length >= 10}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 transition"
+                      >
+                        + Add
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Popular Suggestions */}
+                  <div className="space-y-1.5 pt-2">
+                    <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                      Popular suggestions:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {filteredSuggestions.slice(0, 12).map((tag: string) => {
+                        const isSelected = selectedTags.some(
+                          (t) => t.toLowerCase() === tag.toLowerCase(),
+                        );
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => addTag(tag)}
+                            disabled={disabled || isSelected}
+                            className={`neu-pressed-button px-2.5 py-1 text-xs font-medium transition-transform active:scale-95 ${
+                              isSelected
+                                ? 'opacity-40 cursor-not-allowed'
+                                : 'text-theme-secondary hover:text-theme'
+                            }`}
+                          >
+                            {normalizeHashtagLabel(tag)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowTagPicker(true)}
+                    disabled={disabled}
+                    className="mt-2 neu-pressed-button inline-flex items-center gap-1.5 text-xs text-purple-300 py-1.5 px-3"
+                  >
+                    <FiSearch className="w-3.5 h-3.5" />
+                    See all hashtags ({selectedTags.length}/10)
+                  </button>
+
+                  <HashtagPickerModal
+                    open={showTagPicker}
+                    onClose={() => setShowTagPicker(false)}
+                    selected={selectedTags}
+                    onToggle={handleToggleTagFromPicker}
+                    maxTags={10}
+                    extraSuggestions={tagSuggestions}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Commercial & Made to Order (Full Natural Inline Expansion) */}
+            <div className="wiez-studio-card p-5 space-y-5">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs font-bold shadow-inner">
+                    4
+                  </span>
+                  <h3 className="text-sm font-bold text-white">Commercial & Made to Order</h3>
+                </div>
+                <span className="text-xs text-[var(--text-muted)]">Pricing & Custom Orders</span>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-2 flex items-center">
+                    Estimated Price Range (₦)
+                    <InfoTooltip text="An indicative price range for this design. Helps shoppers understand expected cost." />
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] font-bold text-sm">
+                        ₦
+                      </span>
+                      <input
+                        type="number"
+                        value={minPrice}
+                        onChange={(e) => setMinPrice(e.target.value)}
+                        placeholder="15,000"
+                        disabled={disabled}
+                        className="surface-control w-full pl-8 pr-4 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm font-semibold"
+                      />
+                      <span className="block mt-1 text-[11px] text-[var(--text-muted)]">
+                        Minimum Price
+                      </span>
+                    </div>
+
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] font-bold text-sm">
+                        ₦
+                      </span>
+                      <input
+                        type="number"
+                        value={maxPrice}
+                        onChange={(e) => setMaxPrice(e.target.value)}
+                        placeholder="45,000"
+                        disabled={disabled}
+                        className="surface-control w-full pl-8 pr-4 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm font-semibold"
+                      />
+                      <span className="block mt-1 text-[11px] text-[var(--text-muted)]">
+                        Maximum Price
+                      </span>
+                    </div>
+                  </div>
+
+                  {priceRangeError.summary ? (
+                    <p role="alert" className="mt-2 text-xs text-rose-400">
+                      {priceRangeError.summary}
+                    </p>
+                  ) : null}
+                </div>
+
+                {/* Made to Order Toggle Row */}
+                <div
+                  className="rounded-2xl p-4 bg-[#1b122f] border border-white/5 flex items-center justify-between cursor-pointer select-none"
+                  onClick={() => {
+                    if (disabled) return;
+                    const next = !isMadeToOrder;
+                    setIsMadeToOrder(next);
+                    setSizingMode(next ? 'CUSTOM' : 'NONE');
+                  }}
+                >
+                  <div className="space-y-0.5 pr-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">
+                        Enable Made to Order (Custom Order)
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300">
+                        Recommended
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      Allow shoppers to request this design crafted to their custom measurements.
+                    </p>
+                  </div>
+
+                  <div className={`wiez-toggle-switch ${isMadeToOrder ? 'on' : ''}`}>
+                    <div className="wiez-toggle-knob" />
+                  </div>
+                </div>
+
+                {/* Expanded Custom Order Configuration (ZERO INNER SCROLLBOX!) */}
+                {isMadeToOrder && (
+                  <div className="pt-2 space-y-3">
+                    <div className="flex items-center justify-between border-t border-white/5 pt-3">
+                      <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>📐</span> Custom Order Specification Suite
+                      </span>
+                      <span className="text-[11px] text-[var(--text-muted)]">Full Inline View</span>
+                    </div>
+                    <div className="w-full">
+                      <CustomOrderConfigurationEditor
+                        ref={customOrderEditorRef}
+                        sourceType="DESIGN"
+                        sourceId={isEditMode ? id : undefined}
+                        sourceTitle={title}
+                        measurementKeys={customMeasurementKeys}
+                        measurementGender={measurementGender}
+                        defaultBaseCharge={minPrice}
+                        defaultProductionLeadDays={storeDefaultProductionLeadDays}
+                        defaultProductionLeadLabel={storeCustomOrderLeadTimeLabel}
+                        disabled={disabled}
+                        onRequiredMeasurementKeysChange={handleCustomOrderMeasurementKeysChange}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 5. Sizing & Visibility */}
+            <div className="wiez-studio-card p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs font-bold shadow-inner">
+                    5
+                  </span>
+                  <h3 className="text-sm font-bold text-white">Sizing & Visibility</h3>
+                </div>
+                <span className="text-xs text-[var(--text-muted)]">Release Controls</span>
+              </div>
+
+              <div className="space-y-4">
+                <SizingConfigurator
+                  sizingMode={sizingMode}
+                  onSizingModeChange={handleDesignSizingModeChange}
+                  onRtwSizeSystemChange={() => undefined}
+                  showRtwSizeSystem={false}
+                  customMeasurementKeys={customMeasurementKeys}
+                  onCustomMeasurementKeysChange={setCustomMeasurementKeys}
+                  measurementGender={measurementGender}
+                  disabled={disabled}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <UniversalSelect
+                    label="Fit Preference"
+                    required
+                    value={fitPreference}
+                    onChange={(value) => setFitPreference(value as DesignFitPreference)}
+                    options={DESIGN_FIT_PREFERENCE_OPTIONS.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    disabled={disabled}
+                    optionCompact
+                  />
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                      Catalog Visibility
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setVisibility('PUBLIC')}
+                        disabled={disabled}
+                        className={`py-2 px-3 text-xs font-semibold rounded-xl transition-all ${
+                          visibility === 'PUBLIC'
+                            ? 'wiez-gradient-active-indicator text-purple-200 border border-purple-500/30'
+                            : 'neu-pressed-button text-[var(--text-muted)]'
+                        }`}
+                      >
+                        🌐 Public
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVisibility('PRIVATE')}
+                        disabled={disabled}
+                        className={`py-2 px-3 text-xs font-semibold rounded-xl transition-all ${
+                          visibility === 'PRIVATE'
+                            ? 'wiez-gradient-active-indicator text-purple-200 border border-purple-500/30'
+                            : 'neu-pressed-button text-[var(--text-muted)]'
+                        }`}
+                      >
+                        🔒 Private
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
-            </FormSection>
+            </div>
+
           </div>
         </div>
-
-        {/* Form Sections */}
-        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
-          {/* Pricing & Availability */}
-          <FormSection
-            id="design-pricing-section"
-            title="Pricing & Availability"
-            icon="💰"
-            isOpen={expandedSections.pricing}
-            onToggle={() => toggleSection("pricing")}
-            className="self-start"
-          >
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-theme mb-2 flex items-center">
-                  Price Range
-                  <InfoTooltip text="An indicative price range for this design. This is NOT a checkout price — it helps buyers understand the expected cost." />
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-secondary)]">
-                      ₦
-                    </span>
-                    <input
-                      type="number"
-                      value={minPrice}
-                      onChange={(e) => setMinPrice(e.target.value)}
-                      placeholder="15,000"
-                      disabled={disabled}
-                      aria-invalid={priceRangeError.min ? true : undefined}
-                      aria-describedby={priceRangeError.summary ? "design-price-range-error" : undefined}
-                      className={`surface-control placeholder-theme w-full pl-8 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2 ${
-                        priceRangeError.min
-                          ? "border-red-500 focus:ring-red-500/50"
-                          : "focus:ring-purple-500/50"
-                      }`}
-                    />
-                    <span className="absolute -bottom-5 left-0 text-xs text-theme-secondary">
-                      Minimum Price
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-secondary)]">
-                      ₦
-                    </span>
-                    <input
-                      type="number"
-                      value={maxPrice}
-                      onChange={(e) => setMaxPrice(e.target.value)}
-                      placeholder="45,000"
-                      disabled={disabled}
-                      aria-invalid={priceRangeError.max ? true : undefined}
-                      aria-describedby={priceRangeError.summary ? "design-price-range-error" : undefined}
-                      className={`surface-control placeholder-theme w-full pl-8 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2 ${
-                        priceRangeError.max
-                          ? "border-red-500 focus:ring-red-500/50"
-                          : "focus:ring-purple-500/50"
-                      }`}
-                    />
-                    <span className="absolute -bottom-5 left-0 text-xs text-theme-secondary">
-                      Maximum Price
-                    </span>
-                  </div>
-                </div>
-                {priceRangeError.summary ? (
-                  <p
-                    id="design-price-range-error"
-                    role="alert"
-                    className="mt-7 text-xs text-red-600 dark:text-red-400"
-                  >
-                    {priceRangeError.summary}
-                  </p>
-                ) : null}
-              </div>
-
-              {/* Info box */}
-              <div className="mt-7 rounded-xl border border-blue-200 bg-blue-50 p-2.5 text-gray-800 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-100 flex items-start gap-2">
-                <FiInfo className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                <p className="text-xs leading-5">
-                  Setting a price range helps buyers know what to expect. Leave
-                  empty if prices vary significantly.
-                </p>
-              </div>
-
-              {/* Checkboxes */}
-              <div className="grid grid-cols-1 gap-2 mt-3">
-                <label className="surface-card flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors hover:border-gray-300 dark:hover:border-white/20">
-                  <input
-                    type="checkbox"
-                    checked={isMadeToOrder}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setIsMadeToOrder(checked);
-                      setSizingMode(checked ? 'CUSTOM' : 'NONE');
-                    }}
-                    disabled={disabled}
-                    className="w-5 h-5 mt-0.5 rounded border-theme text-purple-600 focus:ring-purple-500 bg-theme"
-                  />
-                  <div>
-                    <span className="text-theme font-medium">
-                      Custom Order
-                    </span>
-                    <p className="text-xs text-theme-secondary">
-                      Allow buyers to request this design with their own measurements.
-                    </p>
-                  </div>
-                </label>
-              </div>
-
-              {isMadeToOrder && (
-                <div className="max-h-none overflow-y-visible rounded-none border-0 bg-transparent p-0 sm:max-h-[38vh] sm:min-h-[260px] sm:overflow-y-auto sm:rounded-2xl sm:border sm:border-[color:var(--border-default)] sm:bg-[color:var(--surface-secondary)]/60 sm:p-2 sm:pr-1 sm:shadow-inner scrollbar-hide">
-                  <CustomOrderConfigurationEditor
-                    ref={customOrderEditorRef}
-                    sourceType="DESIGN"
-                    sourceId={isEditMode ? id : undefined}
-                    sourceTitle={title}
-                    measurementKeys={customMeasurementKeys}
-                    measurementGender={measurementGender}
-                    defaultBaseCharge={minPrice}
-                    defaultProductionLeadDays={storeDefaultProductionLeadDays}
-                    defaultProductionLeadLabel={storeCustomOrderLeadTimeLabel}
-                    disabled={disabled}
-                    onRequiredMeasurementKeysChange={handleCustomOrderMeasurementKeysChange}
-                  />
-                </div>
-              )}
-            </div>
-          </FormSection>
-
-          {/* Sizing & visibility */}
-          <FormSection
-            id="design-targeting-section"
-            title="Sizing & visibility"
-            icon="🎯"
-            isOpen={expandedSections.targeting}
-            onToggle={() => toggleSection("targeting")}
-            className="self-start"
-          >
-            <div className="space-y-3">
-              {/*
-                Same sizing component the product form uses, so designs and
-                products expose an identical measurement-point picker (and the
-                same freeform submission path) instead of designs quietly
-                offering less. The RTW size-system select is hidden here only
-                because the design save payload has no field to persist it.
-              */}
-              <SizingConfigurator
-                sizingMode={sizingMode}
-                onSizingModeChange={handleDesignSizingModeChange}
-                onRtwSizeSystemChange={() => undefined}
-                showRtwSizeSystem={false}
-                customMeasurementKeys={customMeasurementKeys}
-                onCustomMeasurementKeysChange={setCustomMeasurementKeys}
-                measurementGender={measurementGender}
-                disabled={disabled}
-              />
-
-              <div className="grid grid-cols-2 gap-3">
-                <UniversalSelect
-                  label="Fit Preference"
-                          required
-                  value={fitPreference}
-                  onChange={(value) => setFitPreference(value as DesignFitPreference)}
-                  options={DESIGN_FIT_PREFERENCE_OPTIONS.map((option) => ({
-                    value: option.value,
-                    label: option.label,
-                  }))}
-                  disabled={disabled}
-                  optionCompact
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 flex items-center text-sm font-medium text-theme">
-                  Who can see this?
-                  <InfoTooltip text={CREATOR_METADATA_HELP.visibility} />
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(
-                    [
-                      {
-                        value: "PUBLIC",
-                        emoji: "🌍",
-                        label: "Everyone",
-                        desc: "Everyone can see this design",
-                      },
-                      {
-                        value: "PRIVATE",
-                        emoji: "🔒",
-                        label: "Only me",
-                        desc: "Only you and collaborators can see",
-                      },
-                    ] as const
-                  ).map((option) => (
-                    <label
-                      key={option.value}
-                      className={`
-                        flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-all
-                        ${
-                          visibility === option.value
-                            ? "border-gray-300 bg-purple-500/10 dark:border-white/20"
-                            : "border-gray-200/70 surface-panel-subtle hover:border-gray-300 dark:border-white/10 dark:hover:border-white/20"
-                        }
-                      `}
-                    >
-                      <input
-                        type="radio"
-                        name="visibility"
-                        value={option.value}
-                        checked={visibility === option.value}
-                        onChange={() => setVisibility(option.value)}
-                        disabled={disabled}
-                        className="sr-only"
-                      />
-                      <div>
-                        <span
-                          className={`font-medium ${visibility === option.value ? "text-purple-600 dark:text-purple-400" : "text-theme"}`}
-                        >
-                          {option.label}
-                        </span>
-                        <p className="text-xs text-theme-secondary">
-                          {option.desc}
-                        </p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </FormSection>
-        </div>
       </main>
-
       {/* Actions Footer - Integrated into flow */}
       <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 pb-12">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -2514,7 +2530,7 @@ const CreateDesignInner: React.FC = () => {
                 type="button"
                 onClick={handleSaveDraft}
                 disabled={isSubmitting}
-                className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-6 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="neu-pressed-button flex-1 sm:flex-none py-3 px-6 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting && submitIntent === "draft" ? (
                   <MuseLoader size={16} />
@@ -2528,7 +2544,7 @@ const CreateDesignInner: React.FC = () => {
               type="button"
               onClick={handlePublishClick}
               disabled={isSubmitting}
-              className="flex-1 sm:flex-none py-3 px-6 rounded-xl gradient-primary text-white font-medium hover:opacity-90 transition-opacity active:scale-[0.985] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 sm:flex-none py-3 px-7 rounded-full wiez-gradient-btn-primary font-bold active:scale-[0.985] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm shadow-lg"
             >
               {isSubmitting && submitIntent === "publish" ? (
                 <MuseLoader size={16} />
@@ -2758,7 +2774,7 @@ const CreateDesignInner: React.FC = () => {
 /**
  * FormSection - Collapsible card for form sections
  */
-const FormSection: React.FC<{
+export const FormSection: React.FC<{
   title: string;
   icon: string;
   isOpen: boolean;

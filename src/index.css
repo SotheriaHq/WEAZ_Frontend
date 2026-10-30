@@ -936,7 +936,13 @@ html {
       [role='button'],
       [role='combobox'],
       [tabindex]:not([tabindex='-1'])
-    ):focus,
+    ):focus {
+    outline: none;
+    --tw-ring-offset-shadow: 0 0 #0000;
+    --tw-ring-shadow: 0 0 #0000;
+    --tw-ring-color: transparent;
+  }
+
   :where(
       input,
       textarea,
@@ -946,14 +952,8 @@ html {
       [role='button'],
       [role='combobox'],
       [tabindex]:not([tabindex='-1'])
-    ):focus-visible,
-  :where(*):focus-within {
-    outline: none !important;
-    box-shadow: none !important;
-    border-color: transparent !important;
-    --tw-ring-offset-shadow: 0 0 #0000 !important;
-    --tw-ring-shadow: 0 0 #0000 !important;
-    --tw-ring-color: transparent !important;
+    ):focus-visible {
+    outline: none;
   }
 
   .glass-panel {
@@ -1123,6 +1123,147 @@ html {
     border: 1px solid var(--neu-border);
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
   }
+  /* =========================================================================
+     WIEZ LUMINA MULTI-SHADE (7-12 STOPS) GRADIENTS & PHYSICAL LIGHTING SYSTEM
+     Features perceptual non-linear color interpolation + specular reflection
+     ========================================================================= */
+
+  /* 1. Lumina Studio Elevated Card (9-Shade Ramp + Overhead Specular Sheen) */
+  .wiez-studio-card {
+    background-color: var(--surface-card, #140d21);
+    background-image:
+      radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.01) 40%, transparent 70%),
+      linear-gradient(180deg,
+        #171026 0%,
+        #160f24 14%,
+        #140d21 28%,
+        #130c1f 42%,
+        #110a1c 56%,
+        #10091a 70%,
+        #0e0817 84%,
+        #0c0714 100%
+      );
+    border-radius: 1.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    box-shadow: 0 10px 32px -6px rgba(0, 0, 0, 0.72), 0 2px 10px -2px rgba(147, 51, 234, 0.06);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+  }
+  .wiez-studio-card:hover {
+    box-shadow: 0 14px 40px -6px rgba(0, 0, 0, 0.8), 0 4px 14px -2px rgba(168, 85, 247, 0.1);
+  }
+
+  /* 2. Lumina Active Indicator (10-Shade Ramp + Directional Light Flare) */
+  .wiez-gradient-active-indicator {
+    background-image:
+      radial-gradient(circle at 0% 50%, rgba(255, 255, 255, 0.28) 0%, rgba(216, 180, 254, 0.16) 30%, transparent 70%),
+      linear-gradient(90deg,
+        rgba(88, 28, 135, 0.32) 0%,
+        rgba(107, 33, 168, 0.28) 12%,
+        rgba(126, 34, 206, 0.25) 24%,
+        rgba(147, 51, 234, 0.22) 36%,
+        rgba(168, 85, 247, 0.20) 48%,
+        rgba(192, 132, 252, 0.17) 60%,
+        rgba(216, 180, 254, 0.13) 72%,
+        rgba(233, 213, 255, 0.09) 84%,
+        rgba(243, 232, 255, 0.05) 94%,
+        rgba(255, 255, 255, 0.02) 100%
+      );
+  }
+
+  /* 3. Lumina Live Preview Card (8-Shade Deep Velvet + Multi-Corner Lighting) */
+  .wiez-gradient-live-card {
+    background-image:
+      radial-gradient(circle at 100% 0%, rgba(192, 132, 252, 0.14) 0%, transparent 65%),
+      radial-gradient(circle at 0% 100%, rgba(126, 34, 206, 0.12) 0%, transparent 55%),
+      linear-gradient(135deg,
+        #1b122f 0%,
+        #19102b 16%,
+        #170e28 32%,
+        #150c24 48%,
+        #130a20 64%,
+        #11081c 78%,
+        #0e0717 90%,
+        #0b0512 100%
+      );
+    border-radius: 1.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.78), 0 2px 12px 0 rgba(168, 85, 247, 0.08);
+  }
+
+  /* 4. Lumina Brand CTA (12-Shade Saturated Violet-Fuchsia with Specular Crest) */
+  .wiez-gradient-btn-primary {
+    background-image:
+      radial-gradient(ellipse at 50% -10%, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.08) 45%, transparent 75%),
+      linear-gradient(135deg,
+        #4c0519 0%,
+        #3b0764 8%,
+        #581c87 18%,
+        #6b21a8 28%,
+        #7e22ce 39%,
+        #9333ea 50%,
+        #a855f7 61%,
+        #b86cf9 72%,
+        #c084fc 82%,
+        #d8b4fe 91%,
+        #e9d5ff 97%,
+        #faf5ff 100%
+      );
+    color: #ffffff;
+    box-shadow: 0 4px 18px -2px rgba(147, 51, 234, 0.45), inset 0 1px 1px 0 rgba(255, 255, 255, 0.35);
+    transition: all 0.18s ease;
+  }
+  .wiez-gradient-btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+    box-shadow: 0 6px 24px -2px rgba(168, 85, 247, 0.55), inset 0 1px 1px 0 rgba(255, 255, 255, 0.45);
+    transform: translateY(-1px);
+  }
+  .wiez-gradient-btn-primary:active:not(:disabled) {
+    transform: translateY(1px) scale(0.985);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45);
+  }
+
+  /* 5. Lumina Toggle Switch */
+  .wiez-toggle-switch {
+    width: 44px;
+    height: 26px;
+    border-radius: 9999px;
+    background: #1e1533;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    position: relative;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    flex-shrink: 0;
+  }
+  .wiez-toggle-switch.on {
+    background-image:
+      radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.35) 0%, transparent 60%),
+      linear-gradient(135deg,
+        #581c87 0%,
+        #6b21a8 15%,
+        #7e22ce 30%,
+        #9333ea 50%,
+        #a855f7 70%,
+        #b86cf9 85%,
+        #c084fc 100%
+      );
+    border-color: rgba(192, 132, 252, 0.4);
+    box-shadow: 0 2px 10px rgba(168, 85, 247, 0.35);
+  }
+  .wiez-toggle-knob {
+    width: 20px;
+    height: 20px;
+    border-radius: 9999px;
+    background: #ffffff;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  }
+  .wiez-toggle-switch.on .wiez-toggle-knob {
+    transform: translateX(18px);
+  }
 
   .neu-modal-inset {
     background-color: var(--neu-surface-soft);
@@ -1209,7 +1350,9 @@ html {
     box-shadow: inset 4px 4px 8px var(--neu-shadow-dark), inset -4px -4px 8px var(--neu-shadow-light);
   }
   .neu-inset-chip.selected,
-  .chip-inset.selected {
+  .chip-inset.selected,
+  .neu-inset-chip.selected:focus,
+  .chip-inset.selected:focus {
     box-shadow: inset 3px 3px 6px var(--neu-shadow-dark), inset -3px -3px 6px var(--neu-shadow-light);
     border-color: var(--neu-border);
     color: var(--brand-primary);

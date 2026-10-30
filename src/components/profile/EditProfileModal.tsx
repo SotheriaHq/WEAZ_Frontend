@@ -482,9 +482,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
   const tagOptions = useMemo(() => {
     const base = BRAND_TAG_OPTIONS;
-    const baseValues = new Set(base.map((tag) => tag.value));
+    const baseLowerMap = new Map(base.map((tag) => [tag.value.toLowerCase(), tag]));
     const extras = selectedTags
-      .filter((tag) => tag && !baseValues.has(tag))
+      .filter((tag) => tag && !baseLowerMap.has(tag.toLowerCase()))
       .map((tag) => ({ label: tag, value: tag }));
     return [...extras, ...base];
   }, [selectedTags]);
@@ -492,9 +492,11 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const toggleTag = (value: string) => {
     hasUserEditedRef.current = true;
     hasUserModifiedTagsRef.current = true;
+    const valLower = value.toLowerCase();
     setSelectedTags((prev) => {
-      if (prev.includes(value)) {
-        const next = prev.filter((tag) => tag !== value);
+      const matchIndex = prev.findIndex((t) => t.toLowerCase() === valLower);
+      if (matchIndex !== -1) {
+        const next = prev.filter((_, idx) => idx !== matchIndex);
         if (tagError && next.length > 0) setTagError(null);
         return next;
       }
@@ -692,7 +694,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     </label>
                     <div className="flex flex-wrap gap-2.5 p-4 rounded-xl border-0 surface-subtle/30">
                       {tagOptions.map((tag) => {
-                        const isSelected = selectedTags.includes(tag.value);
+                        const isSelected = selectedTags.some((t) => t.toLowerCase() === tag.value.toLowerCase());
                         return (
                           <button
                             key={tag.value}
@@ -700,10 +702,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                             onClick={() => toggleTag(tag.value)}
                             disabled={isSubmitting}
                             aria-pressed={isSelected}
-                            className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[color:var(--brand-primary)]/40 disabled:cursor-not-allowed disabled:opacity-60 ${
+                            className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--brand-primary)]/40 disabled:cursor-not-allowed disabled:opacity-60 ${
                               isSelected
-                                ? 'neu-inset-chip selected font-bold active:scale-95 active:shadow-[inset_3px_3px_6px_rgba(0,0,0,0.35)] shadow-xs'
-                                : 'neu-pressed-button surface-card text-theme-secondary hover:text-theme active:scale-95 active:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.25)] border-0'
+                                ? 'neu-inset-chip selected font-bold active:scale-95'
+                                : 'neu-pressed-button surface-card text-theme-secondary hover:text-theme active:scale-95'
                             }`}
                           >
                             #{tag.label}

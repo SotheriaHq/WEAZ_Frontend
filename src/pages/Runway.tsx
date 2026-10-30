@@ -50,7 +50,6 @@ import {
 import RunwayStageChrome, {
   RUNWAY_STAGE_CONTROLS_HEIGHT_PX,
 } from '@/components/runway/RunwayStageChrome';
-import Button from '@/components/ui/Button';
 
 /**
  * Runway page — Design feed UI.
@@ -250,26 +249,24 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
         {/* Action buttons */}
         <div className="flex flex-col sm:flex-row items-center gap-4">
           {onRetry && (
-            <Button
-              variant="brand"
-              size="lg"
+            <button
+              type="button"
               onClick={onRetry}
-              className="gap-2 shadow-lg"
+              className="flex items-center gap-2 px-6 py-3 rounded-full bg-[color:var(--text-primary)] text-[color:var(--surface-primary)] font-semibold opacity-95 transition-all hover:opacity-85 shadow-lg active:scale-95"
             >
               <RefreshCcw className="w-5 h-5" />
               Try Again
-            </Button>
+            </button>
           )}
           {config.showViewAll && onViewAll && (
-            <Button
-              variant="secondary"
-              size="lg"
+            <button
+              type="button"
               onClick={onViewAll}
-              className="gap-2"
+              className="neu-pressed-button flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-theme-secondary hover:text-theme shadow-sm active:scale-95"
             >
               <TrendingUp className="w-5 h-5" />
               View All Designs
-            </Button>
+            </button>
           )}
         </div>
       </div>

@@ -265,21 +265,22 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
     const isExpanded = group.collapsible ? expanded[group.id] : true;
 
     return (
-      <div key={group.id}>
+      <div key={group.id} className="space-y-0.5">
         {group.collapsible ? (
           <button
+            type="button"
             onClick={() => toggleGroup(group.id)}
-            className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider transition-colors ${
+            className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider transition-colors rounded-lg ${
               isGroupActive
-                ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
-                : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5'
+                ? 'text-primary font-bold'
+                : 'text-theme-muted hover:bg-white/[0.08] dark:hover:bg-white/5 hover:text-theme'
             }`}
           >
             <span>{group.label}</span>
             <span aria-hidden="true">{isExpanded ? '▾' : '▸'}</span>
           </button>
         ) : (
-          <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-theme-muted">
             {group.label}
           </div>
         )}
@@ -288,26 +289,27 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
           <div
             className={
               group.collapsible
-                ? 'ml-2 border-l border-gray-200 dark:border-white/10'
-                : ''
+                ? 'ml-2 space-y-0.5 border-l border-[color:var(--border-default)]/30 pl-1'
+                : 'space-y-0.5'
             }
           >
             {group.items.map(({ key, label, path, icon, danger }) => {
               const isActive = active === key;
               return (
                 <button
+                  type="button"
                   key={key}
                   onClick={() => handleSelect(key, path)}
-                  className={`flex w-full items-center gap-2 py-2.5 text-left text-[11px] leading-snug transition-colors md:gap-2.5 md:py-2 md:text-sm ${
+                  className={`flex w-full items-center gap-2.5 rounded-xl py-2 text-left text-[11px] leading-snug transition-all duration-150 md:text-sm ${
                     group.collapsible
-                      ? 'pl-3 pr-2 md:pl-6 md:pr-4'
-                      : 'px-3 md:px-4'
+                      ? 'pl-2.5 pr-2 md:pl-4 md:pr-3'
+                      : 'px-2.5 md:px-3.5'
                   } ${
                     isActive
-                      ? '-ml-[1px] border-l-[3px] border-primary bg-primary/10 font-medium text-primary'
+                      ? 'bg-[linear-gradient(90deg,rgba(217,70,239,0.12),rgba(255,255,255,0.12))] font-semibold text-gray-900 dark:bg-[linear-gradient(90deg,rgba(168,85,247,0.18),rgba(255,255,255,0.04))] dark:text-white neu-pressed-button'
                       : danger
                         ? 'text-red-500 hover:bg-red-500/10 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-black dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'
+                        : 'text-theme-secondary hover:bg-white/[0.08] dark:hover:bg-white/5 hover:text-theme'
                   }`}
                 >
                   <span
@@ -316,7 +318,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
                   >
                     {icon}
                   </span>
-                  <span className="min-w-0">{label}</span>
+                  <span className="min-w-0 truncate">{label}</span>
                 </button>
               );
             })}
@@ -328,14 +330,14 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
 
   const sidebarContent = (
     <div className="py-4">
-      <h2 className="mb-2 px-2 text-sm font-semibold text-gray-900 md:mb-4 md:px-4 md:text-xl dark:text-white">
+      <h2 className="mb-2 px-3 text-sm font-bold text-theme md:mb-4 md:px-4 md:text-xl">
         Settings
       </h2>
       <nav className="space-y-1">
         {visibleGroups.map((group, index) => (
           <React.Fragment key={group.id}>
             {index > 0 ? (
-              <div className="mx-4 my-3 border-t border-gray-200 dark:border-white/5" />
+              <div className="mx-3 my-2.5 border-t border-[color:var(--border-default)]/40" />
             ) : null}
             {renderGroup(group)}
           </React.Fragment>
@@ -345,8 +347,8 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   );
 
   return (
-    // Scaled fixed sidebar — stays visible on mobile (narrow) and full-width on md+.
-    <aside className="fixed left-0 top-16 z-20 block h-[calc(100vh-64px)] w-[118px] overflow-y-auto border-r border-gray-200 bg-white scrollbar-hide dark:border-white/5 dark:bg-zinc-900 md:w-[220px]">
+    // Scaled fixed sidebar — aligns with main sidebar chrome and theme tokens
+    <aside className="fixed left-0 top-16 z-20 block h-[calc(100vh-64px)] w-[118px] overflow-y-auto border-r border-[color:var(--border-default)]/50 wiez-chrome-surface scrollbar-hide md:w-[220px] px-1 md:px-2">
       {sidebarContent}
     </aside>
   );
