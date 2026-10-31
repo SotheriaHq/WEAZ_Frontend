@@ -11,7 +11,7 @@ interface Props extends React.SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 const variantClasses: Record<SelectVariant, string> = {
-  default: 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500',
+  default: 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-300 dark:border-gray-700 focus:shadow-[0_0_22px_2px_rgba(168,85,247,0.32)] focus:border-transparent',
   glass: 'bg-white/30 dark:bg-white/10 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder-white/70 border-transparent focus:border-transparent focus:ring-0 backdrop-blur-xl shadow-[0_4px_24px_rgba(15,23,42,0.18)]',
   inverted: 'bg-slate-900 text-white border-slate-700 focus:ring-2 focus:ring-purple-400 focus:border-purple-400',
 };
@@ -28,7 +28,7 @@ const SelectField = forwardRef<HTMLSelectElement, Props>(({ label, helperText, e
       <div className="flex items-center">
         <select
           ref={ref}
-          className={`select-wiez flex-1 block w-full rounded-md border px-3 py-2 focus:outline-none ${variantStyle} ${error ? 'border-red-500' : ''}`}
+          className={`select-wiez flex-1 block w-full rounded-md border px-3 py-2 focus:outline-none ${variantStyle} ${error ? 'wiez-field-input-error' : ''}`}
           {...rest}
         >
           {children}

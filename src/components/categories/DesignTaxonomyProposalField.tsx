@@ -19,7 +19,7 @@ export const DesignTaxonomyProposalField: React.FC<{
   const selectable = requests.filter(request => request.status === 'PENDING' && request.garmentTypeName);
 
   return (
-    <div className="rounded-2xl bg-purple-500/[0.04] dark:bg-purple-950/20 p-4 border border-purple-500/15 dark:border-purple-500/25 transition-all space-y-3">
+    <div className="py-2 transition-all space-y-3">
       {/* Toggle Header */}
       <div
         className="flex items-center justify-between cursor-pointer select-none"

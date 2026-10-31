@@ -1691,7 +1691,7 @@ const CreateDesignInner: React.FC = () => {
   return (
     <div className="min-h-screen overflow-x-clip bg-transparent text-[var(--text-primary)] transition-colors duration-300">
       {/* Main Content */}
-      <main className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-24 sm:pb-32">
+      <main className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 py-3 sm:py-4 pb-2 sm:pb-3 flex flex-col flex-1">
         <div className="mb-4 flex items-center justify-between sm:mb-6">
           <button
             type="button"
@@ -1748,9 +1748,9 @@ const CreateDesignInner: React.FC = () => {
 
         {isEditMode && id ? <ReviewFeedbackBanner designId={id} /> : null}
 
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 mb-8">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 mb-2">
           {/* LEFT COLUMN: Height-Bounded Studio Canvas + Real-Time Live Runway Feed Card (Col 5/12) */}
-          <div className="lg:col-span-5 flex flex-col h-[680px] lg:h-[720px] max-h-[calc(100vh-170px)] min-h-[580px] space-y-4">
+          <div className="lg:col-span-5 flex flex-col h-[calc(100vh-210px)] min-h-[580px] space-y-4">
             {/* Visual Assets Studio Card */}
             <section id="design-media-section" className="wiez-studio-card p-4 space-y-4">
               <input
@@ -1810,7 +1810,7 @@ const CreateDesignInner: React.FC = () => {
               ) : (
                 <div className="space-y-3 min-w-0">
                   {/* Main Preview Stage (Bounded max-height, zero unnecessary space) */}
-                  <div className="relative w-full h-[380px] rounded-2xl overflow-hidden flex items-center justify-center border border-purple-500/15 bg-purple-500/[0.03] dark:bg-purple-950/20 mx-auto p-2">
+                  <div className="relative w-full h-[380px] rounded-2xl overflow-hidden flex items-center justify-center border-0 shadow-[0_4px_24px_-4px_rgba(168,85,247,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] dark:shadow-[0_4px_24px_-4px_rgba(147,51,234,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] bg-purple-500/[0.03] dark:bg-purple-950/20 mx-auto p-2">
                     {/* Viewport Frame matching active aspect ratio */}
                     <motion.div
                       layout
@@ -1821,7 +1821,7 @@ const CreateDesignInner: React.FC = () => {
                           : previewAspectRatio === '4:5'
                             ? 'aspect-[4/5]'
                             : 'aspect-square'
-                      } max-w-full rounded-xl overflow-hidden flex items-center justify-center border border-purple-500/25 bg-purple-950/40 shadow-[0_4px_24px_rgba(124,58,237,0.15)] mx-auto`}
+                      } max-w-full rounded-xl overflow-hidden flex items-center justify-center border-0 bg-purple-950/40 shadow-[0_4px_24px_rgba(124,58,237,0.18),inset_0_1px_0_rgba(255,255,255,0.15)] mx-auto`}
                     >
                       {/* Cover / View slot badge */}
                       {selectedIndex < 6 && (
@@ -1984,8 +1984,8 @@ const CreateDesignInner: React.FC = () => {
                 <span className="text-[10px] text-[var(--text-muted)]">Real-Time Shopper View</span>
               </div>
 
-              <div className="rounded-2xl p-3 border border-purple-500/15 bg-white/70 dark:bg-purple-950/30 flex items-center gap-3.5 shadow-sm hover:shadow-md transition-all">
-                <div className="w-14 h-18 rounded-xl overflow-hidden bg-purple-500/5 dark:bg-purple-900/20 border border-purple-500/15 flex-shrink-0 flex items-center justify-center">
+              <div className="rounded-2xl p-3 border-0 bg-white/80 dark:bg-purple-950/40 flex items-center gap-3.5 shadow-[0_4px_16px_-2px_rgba(168,85,247,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] dark:shadow-[0_4px_16px_-2px_rgba(147,51,234,0.22),inset_0_1px_0_rgba(255,255,255,0.12)] hover:scale-[1.01] transition-all">
+                <div className="w-14 h-18 rounded-xl overflow-hidden bg-purple-500/10 dark:bg-purple-900/30 border-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] flex-shrink-0 flex items-center justify-center">
                   {(coverImageUrl || selectedFile?.url) ? (
                     <MediaRenderer
                       kind="image"
@@ -2041,7 +2041,7 @@ const CreateDesignInner: React.FC = () => {
           {/* RIGHT COLUMN: Space-Locked Inspector Studio (Col 7/12) */}
           <div className="lg:col-span-7 flex flex-col h-[680px] lg:h-[720px] max-h-[calc(100vh-170px)] min-h-[580px] px-1 sm:px-3">
             {/* Section Inspector Pills (Consolidated 2 Balanced Tabs, Zero Parent BG/Border/Shadow) */}
-            <div className="shrink-0 flex items-center justify-between border-b border-[var(--border-default)] pb-3 mb-4">
+            <div className="shrink-0 flex items-center justify-between pb-3 mb-2">
               <div className="flex items-center gap-2 flex-wrap">
                 {[
                   { id: 'design', label: '✦ 1. Design & DNA' },
@@ -2089,6 +2089,7 @@ const CreateDesignInner: React.FC = () => {
                 <div className="space-y-4">
                   <TextField
                     label="Design Title"
+                    labelClassName="border-l-2 border-purple-500 pl-2.5 text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]"
                     value={title}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       setTitle(e.target.value)
@@ -2233,7 +2234,7 @@ const CreateDesignInner: React.FC = () => {
                 </div>
 
               {/* Style & Tags Section */}
-                <div className="space-y-4 pt-4 border-t border-[var(--border-default)]">
+                <div className="space-y-4 pt-2">
                   <FilterSelector
                     value={filterSelection}
                     onChange={setFilterSelection}
@@ -2437,7 +2438,7 @@ const CreateDesignInner: React.FC = () => {
 
                   {/* Custom order setup: every design is made to order */}
                   <div className="pt-2 space-y-3">
-                    <div className="flex items-center justify-between border-t border-[var(--border-default)] pt-3">
+                    <div className="flex items-center justify-between pt-2">
                       <span className="text-xs font-bold text-purple-600 dark:text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
                         <span>📐</span> Custom Order Specification Suite
                       </span>
@@ -2492,7 +2493,7 @@ const CreateDesignInner: React.FC = () => {
                           className={`py-2.5 px-3 text-xs font-semibold rounded-xl transition-all ${
                             visibility === 'PUBLIC'
                               ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-purple-700 text-white shadow-[0_2px_10px_rgba(168,85,247,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] font-bold scale-[1.01]'
-                              : 'bg-purple-500/5 hover:bg-purple-500/10 text-[var(--text-secondary)] border border-purple-500/15'
+                              : 'bg-purple-500/5 hover:bg-purple-500/10 text-[var(--text-secondary)] border-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]'
                           }`}
                         >
                           🌐 Public
@@ -2504,7 +2505,7 @@ const CreateDesignInner: React.FC = () => {
                           className={`py-2.5 px-3 text-xs font-semibold rounded-xl transition-all ${
                             visibility === 'PRIVATE'
                               ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-purple-700 text-white shadow-[0_2px_10px_rgba(168,85,247,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] font-bold scale-[1.01]'
-                              : 'bg-purple-500/5 hover:bg-purple-500/10 text-[var(--text-secondary)] border border-purple-500/15'
+                              : 'bg-purple-500/5 hover:bg-purple-500/10 text-[var(--text-secondary)] border-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]'
                           }`}
                         >
                           🔒 Private
@@ -2514,47 +2515,95 @@ const CreateDesignInner: React.FC = () => {
                   </div>
 
                   {/* Readiness Guard */}
-                  <div className="p-4 rounded-xl border border-[var(--border-default)] bg-purple-500/5 dark:bg-purple-500/10">
-                    <h5 className="text-xs font-bold text-[var(--text-primary)] mb-1 flex items-center gap-1.5">
-                      <span>🛡️</span> Publishing Readiness Guard
-                    </h5>
-                    <p className="text-xs text-[var(--text-muted)]">
+                  <div
+                    className={`p-4 rounded-2xl border-0 transition-all ${
+                      isValid
+                        ? 'wiez-card-base wiez-shade-10 shadow-[0_4px_20px_-4px_rgba(168,85,247,0.14),inset_0_1px_0_rgba(255,255,255,0.95)]'
+                        : 'wiez-notice-card shadow-[0_4px_24px_-4px_rgba(245,158,11,0.18),inset_0_1px_0_rgba(255,255,255,0.95)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <h5 className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                        <span>{isValid ? '✨' : '⚠️'}</span> Publishing Readiness Guard
+                      </h5>
+                      <span
+                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                          isValid
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                        }`}
+                      >
+                        {isValid ? 'Ready to Go Live' : 'Action Required'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] mb-2">
                       {isValid
                         ? 'All required fields are complete. Your design is ready for immediate publishing.'
-                        : 'Complete all required fields across both tabs before publishing.'}
+                        : 'Complete all required fields across both tabs before publishing:'}
                     </p>
+                    {!isValid && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {title.trim().length === 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveInspectorSection('design')}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:scale-[1.02] transition-transform cursor-pointer"
+                          >
+                            + Title
+                          </button>
+                        )}
+                        {missingRequiredMediaSlots.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveInspectorSection('design')}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:scale-[1.02] transition-transform cursor-pointer"
+                          >
+                            + Media ({missingRequiredMediaSlots.length} needed)
+                          </button>
+                        )}
+                        {!hasPendingTaxonomy && (categoryId.trim().length === 0 || categoryTypeId.trim().length === 0) && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveInspectorSection('design')}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:scale-[1.02] transition-transform cursor-pointer"
+                          >
+                            + Category &amp; Garment Type
+                          </button>
+                        )}
+                        {type.trim().length === 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveInspectorSection('design')}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:scale-[1.02] transition-transform cursor-pointer"
+                          >
+                            + Who is it for
+                          </button>
+                        )}
+                        {getSelectedFilterValueIds().length === 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveInspectorSection('design')}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:scale-[1.02] transition-transform cursor-pointer"
+                          >
+                            + Style Details
+                          </button>
+                        )}
+                        {selectedTags.length === 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveInspectorSection('design')}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:scale-[1.02] transition-transform cursor-pointer"
+                          >
+                            + Hashtags
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 </motion.div>
               )}
               </AnimatePresence>
-            </div>
-
-            {/* Pinned Bottom Footer (Stepping Controls) */}
-            <div className="shrink-0 flex items-center justify-between pt-4 mt-4 border-t border-[var(--border-default)]">
-              {activeInspectorSection === 'commercial' ? (
-                <button
-                  type="button"
-                  onClick={() => setActiveInspectorSection('design')}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold border border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 text-purple-700 dark:text-purple-300 transition-all hover:scale-[1.01] active:scale-[0.99]"
-                >
-                  ‹ Back to Design & DNA
-                </button>
-              ) : (
-                <span className="text-xs text-[var(--text-muted)]">
-                  Step 1: Fill in design identity & DNA
-                </span>
-              )}
-
-              {activeInspectorSection === 'design' ? (
-                <button
-                  type="button"
-                  onClick={() => setActiveInspectorSection('commercial')}
-                  className="btn-brand-primary py-2 px-5 text-xs font-bold transition-all hover:scale-[1.01] active:scale-[0.99] shadow-[0_2px_10px_rgba(168,85,247,0.35)]"
-                >
-                  Next: Commercial & Sizing ›
-                </button>
-              ) : null}
             </div>
           </div>
         </div>
@@ -2574,31 +2623,44 @@ const CreateDesignInner: React.FC = () => {
               'Create a draft or go live when ready.'
             )}
           </div>
-          <div className="flex gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap justify-end">
+            {activeInspectorSection === 'commercial' && (
+              <button
+                type="button"
+                onClick={() => setActiveInspectorSection('design')}
+                disabled={disabled}
+                className="surface-control surface-interactive-hover py-2.5 px-4 rounded-xl border-0 font-medium text-xs transition-all hover:scale-[1.01] active:scale-[0.99] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                ‹ Back to Design & DNA
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => setShowCancelPrompt(true)}
               disabled={disabled}
-              className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-5 rounded-xl border border-[var(--border-default)] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="surface-control surface-interactive-hover py-2.5 px-5 rounded-xl border-0 font-medium text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
+
             {canWithdrawFromReview(reviewStatus) && (
               <button
                 type="button"
                 onClick={handleWithdrawFromReview}
                 disabled={withdrawingFromReview}
-                className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-5 rounded-xl border border-[var(--border-default)] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="surface-control surface-interactive-hover py-2.5 px-5 rounded-xl border-0 font-medium text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {withdrawingFromReview ? 'Calling back…' : '↩️ Call back'}
               </button>
             )}
+
             {canSaveDraft(reviewStatus) && (
               <button
                 type="button"
                 onClick={handleSaveDraft}
                 disabled={isSubmitting}
-                className="neu-pressed-button flex-1 sm:flex-none py-3 px-6 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="neu-pressed-button py-2.5 px-6 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting && submitIntent === 'draft' ? (
                   <MuseLoader size={16} />
@@ -2608,29 +2670,40 @@ const CreateDesignInner: React.FC = () => {
                 {isSubmitting && submitIntent === 'draft' ? 'Saving…' : 'Save Draft'}
               </button>
             )}
-            <button
-              type="button"
-              onClick={handlePublishClick}
-              disabled={!isValid || isSubmitting}
-              className={`flex-1 sm:flex-none py-3 px-7 rounded-full font-bold active:scale-[0.985] flex items-center justify-center gap-2 text-sm transition-all duration-200 ${
-                !isValid || isSubmitting
-                  ? 'opacity-40 cursor-not-allowed bg-[var(--surface-muted)] text-[var(--text-muted)] border border-[var(--border-default)] shadow-none'
-                  : 'wiez-gradient-btn-primary text-white shadow-[0_4px_16px_rgba(147,51,234,0.35)] hover:scale-[1.01]'
-              }`}
-            >
-              {isSubmitting && submitIntent === 'publish' ? (
-                <MuseLoader size={16} />
-              ) : (
-                <HiOutlineSparkles className="w-5 h-5" />
-              )}
-              {isSubmitting && submitIntent === 'publish'
-                ? primaryActionPendingLabel(reviewStatus)
-                : primaryActionLabel({
-                    status: reviewStatus,
-                    isEditMode,
-                    entity: 'design',
-                  })}
-            </button>
+
+            {activeInspectorSection === 'design' ? (
+              <button
+                type="button"
+                onClick={() => setActiveInspectorSection('commercial')}
+                className="wiez-gradient-btn-primary py-2.5 px-6 rounded-full font-bold text-xs text-white shadow-[0_4px_16px_rgba(147,51,234,0.35)] hover:scale-[1.01] active:scale-[0.985] flex items-center justify-center gap-2 transition-all"
+              >
+                Next: Commercial & Sizing ›
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePublishClick}
+                disabled={!isValid || isSubmitting}
+                className={`py-2.5 px-7 rounded-full font-bold active:scale-[0.985] flex items-center justify-center gap-2 text-xs transition-all duration-200 ${
+                  !isValid || isSubmitting
+                    ? 'opacity-40 cursor-not-allowed bg-[var(--surface-muted)] text-[var(--text-muted)] shadow-none'
+                    : 'wiez-gradient-btn-primary text-white shadow-[0_4px_16px_rgba(147,51,234,0.35)] hover:scale-[1.01]'
+                }`}
+              >
+                {isSubmitting && submitIntent === 'publish' ? (
+                  <MuseLoader size={16} />
+                ) : (
+                  <HiOutlineSparkles className="w-5 h-5" />
+                )}
+                {isSubmitting && submitIntent === 'publish'
+                  ? primaryActionPendingLabel(reviewStatus)
+                  : primaryActionLabel({
+                      status: reviewStatus,
+                      isEditMode,
+                      entity: 'design',
+                    })}
+              </button>
+            )}
           </div>
         </div>
       </div>

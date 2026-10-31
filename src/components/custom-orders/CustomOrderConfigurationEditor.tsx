@@ -390,7 +390,7 @@ const createDefaultForm = (
 });
 
 const fieldClassName =
-  'w-full rounded-xl border border-black/10 bg-white px-2.5 py-1.5 text-xs text-slate-900 outline-none transition focus:border-emerald-400 dark:border-white/10 dark:bg-slate-950 dark:text-white';
+  'wiez-field-input w-full px-3 py-2 text-xs text-slate-900 dark:text-white outline-none transition';
 
 const requiredFieldLabelClassName =
   'mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400';
@@ -1526,7 +1526,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   const getFieldErrorId = (key: keyof FieldErrors) =>
     `custom-order-${key}-error`;
   const getFieldInputClassName = (key: keyof FieldErrors) =>
-    `${fieldClassName} ${fieldErrors[key] ? 'border-rose-400 focus:border-rose-500 dark:border-rose-500/50' : ''}`;
+    `${fieldClassName} ${fieldErrors[key] ? 'wiez-field-input-error' : ''}`;
   /**
    * `*` on a required field's label; rose while that field is the problem.
    *
@@ -1559,19 +1559,19 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
   return (
     <section
       ref={containerRef}
-      className="rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-primary)]/90 p-2.5 shadow-sm dark:border-white/10 dark:bg-white/[0.04]"
+      className="space-y-5 py-1"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <p className="text-xs text-slate-600 dark:text-slate-300">
           Configure the production charge and customer-facing policies.
         </p>
-        <div className="rounded-full border border-black/10 px-2.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200">
+        <div className="neu-pressed-button rounded-xl px-2.5 py-0.5 text-[10px] font-semibold text-purple-700 dark:text-purple-300">
           {configuration ? `Configuration v${configuration.currentVersion}` : 'No config yet'}
         </div>
       </div>
 
       {validationMessage ? (
-        <div className="mb-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-200">
+        <div className="mb-3 rounded-xl bg-rose-500/10 border-l-2 border-rose-500 px-3.5 py-2.5 text-xs font-medium text-rose-700 dark:text-rose-200">
           ⚠️ {validationMessage}
         </div>
       ) : null}
@@ -1579,7 +1579,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       {draftBlockedReason ? (
         <div
           role="status"
-          className="mb-3 rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
+          className="mb-3 rounded-xl bg-amber-500/10 border-l-2 border-amber-500 px-3.5 py-2.5 text-xs text-amber-900 dark:text-amber-100"
         >
           <p className="font-semibold">
             Your draft was saved, but these custom-order settings were not.
@@ -1597,7 +1597,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       ) : null}
 
       {!sourceId ? (
-        <div className="mt-5 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-4 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-500/10 dark:text-amber-100">
+        <div className="mt-3 rounded-xl bg-amber-500/10 border-l-2 border-amber-500 px-3.5 py-3 text-xs text-amber-900 dark:text-amber-100">
           {/* This used to promise the settings "save together with the item".
               They only do once the section is complete — an incomplete
               configuration cannot be stored at all — and saying otherwise is
@@ -1828,7 +1828,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
 
         {/* Left in pool */}
         <div className="mt-3 w-full max-h-none overflow-y-visible rounded-xl border-none p-3 sm:p-4 dark:bg-white/[0.02] sm:max-h-44 sm:overflow-y-auto">
-          <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 border-l-2 border-purple-500 pl-2.5">
             Left in pool
             {selectableMeasurementKeys.length > 0 && (
               <span className="rounded-full bg-black/[0.06] px-1.5 py-0.5 text-[10px] font-bold tabular-nums dark:bg-white/[0.08]">
@@ -1874,7 +1874,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               type="button"
               onClick={() => setShowAllPoolKeys((current) => !current)}
               disabled={disabled}
-              className="mt-2 rounded-full border border-black/10 px-3 py-1 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-black/[0.04] disabled:opacity-60 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.08]"
+              className="mt-2 rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] px-3 py-1 text-[11px] font-semibold text-slate-700 disabled:opacity-60 dark:text-slate-200"
             >
               {showAllPoolKeys ? 'Show less' : `Show more (${poolKeysHiddenCount})`}
             </button>
@@ -1892,13 +1892,13 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             type="button"
             onClick={() => void addManualMeasurementKey()}
             disabled={disabled || isSubmittingManualKey || !manualMeasurementKeyInput.trim()}
-            className="rounded-full border border-black/10 px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:border-white/10 dark:text-slate-200 whitespace-nowrap"
+            className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:text-slate-200 whitespace-nowrap"
           >
             {isSubmittingManualKey ? 'Adding…' : 'Add key'}
           </button>
         </div>
 
-        <div className="mt-4 rounded-xl border border-black/10 p-3 dark:border-white/10">
+        <div className="mt-4 rounded-2xl border-0 p-3.5 wiez-card-base wiez-shade-10">
           <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg px-3 py-2 transition-colors ${showFabricRules ? 'bg-purple-50/70 dark:bg-purple-500/10' : 'bg-slate-50 dark:bg-white/5'}`}>
             <div>
               <p className="text-sm font-semibold text-slate-800 dark:text-white">Add fabric rules</p>
@@ -1950,7 +1950,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                   type="button"
                   onClick={handleCreateBasis}
                   disabled={disabled || saving}
-                  className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white"
+                  className="neu-pressed-button rounded-xl px-4 py-2 text-xs font-semibold text-slate-800 disabled:opacity-60 dark:text-white"
                 >
                   Create basis
                 </button>
@@ -1966,8 +1966,8 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       </div>
 
       {ENABLE_LEGACY_YARD_SETUP_PANEL ? (
-      <details className="mt-4 rounded-2xl border border-black/10 p-3 dark:border-white/10" open>
-        <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+      <details className="mt-4 space-y-3" open>
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white border-l-2 border-purple-500 pl-2.5 select-none">
           Brand yard setup {renderRequiredMark('fabricRuleBasisId')}
           <span className={infoBadgeClassName} title="Set base yard for this outfit and extra yards by computed buyer size.">i</span>
         </summary>
@@ -1996,7 +1996,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               setRuleRows((current) => applyFallbackYardOutput(current, averageBaseYards.trim()));
             }}
             disabled={disabled}
-            className="h-fit self-end rounded-full border border-black/10 px-4 py-2 text-xs font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200"
+            className="h-fit self-end rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
           >
             Use as fallback yard
           </button>
@@ -2038,7 +2038,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                 type="button"
                 onClick={() => setSizeExtraRows((current) => current.filter((_, entryIndex) => entryIndex !== index))}
                 disabled={disabled}
-                className="rounded-full border border-black/10 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200"
+                className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
               >
                 Remove
               </button>
@@ -2048,7 +2048,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             type="button"
             onClick={() => setSizeExtraRows((current) => [...current, { sizeLabel: '', extraYards: '' }])}
             disabled={disabled}
-            className="rounded-full border border-black/10 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-white/10 dark:text-slate-200"
+            className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200"
           >
             Add size row
           </button>
@@ -2056,18 +2056,18 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       </details>
       ) : null}
 
-      <details className="mt-4 overflow-hidden rounded-2xl border border-black/10 dark:border-white/10">
+      <details className="mt-4 overflow-hidden rounded-2xl border-0 wiez-card-base wiez-shade-10">
         <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors">
           <span>Policies, Rush &amp; Notes</span>
           <span className="text-xs font-normal text-slate-400">click to expand</span>
         </summary>
 
-        <div className="space-y-5 border-t border-black/10 p-4 dark:border-white/10">
+        <div className="space-y-5 p-4">
 
           {/* ── Row 1: Rush toggle + Fabric sourcing ── */}
           <div className="grid gap-3 sm:grid-cols-2">
             {/* Rush toggle card */}
-            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl px-4 py-3 transition-colors ${form.rushEnabled ? 'bg-emerald-50/80 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800' : 'bg-slate-50 border border-black/10 dark:bg-white/5 dark:border-white/10'}`}>
+            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl px-4 py-3 transition-colors ${form.rushEnabled ? 'bg-emerald-50/80 border-0 shadow-[0_2px_12px_rgba(16,185,129,0.14),inset_0_1px_0_rgba(255,255,255,0.95)] dark:bg-emerald-950/30' : 'bg-slate-50 border-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:bg-white/5'}`}>
               <div>
                 <p className="text-sm font-semibold text-slate-800 dark:text-white">⚡ Rush ordering</p>
                 <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Allow buyers to request rush production</p>
@@ -2103,7 +2103,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
 
           {/* ── Row 2: Rush fields (conditional) ── */}
           {form.rushEnabled ? (
-            <div className="grid gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-800 dark:bg-emerald-950/20 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 pt-1">
               <label
                 ref={registerFieldErrorRef('rushFee')}
                 tabIndex={-1}
@@ -2274,8 +2274,8 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       </details>
 
       {showFabricRules ? (
-        <details className="mt-4 rounded-2xl border border-black/10 p-3 dark:border-white/10">
-          <summary className="mb-2 flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+        <details className="mt-4 space-y-3">
+          <summary className="mb-2 flex cursor-pointer list-none items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white border-l-2 border-purple-500 pl-2.5 select-none">
             Fabric yard rules builder {renderRequiredMark('fabricRuleBasisId')}
             <span className={infoBadgeClassName} title="Each rule maps buyer measurements to required fabric yards. Fallback is used when no condition rule matches.">i</span>
           </summary>
@@ -2285,14 +2285,14 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
 
           <div className="space-y-3">
             {ruleRows.map((rule, ruleIndex) => (
-              <div key={rule.id} className="rounded-2xl border border-black/10 p-3 dark:border-white/10">
+              <div key={rule.id} className="rounded-2xl border-0 p-3 wiez-card-base wiez-shade-10">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="text-sm font-semibold text-slate-900 dark:text-white">Rule {ruleIndex + 1}</div>
                   <button
                     type="button"
                     onClick={() => removeRuleRow(rule.id)}
                     disabled={disabled}
-                    className="rounded-full border border-black/10 px-3 py-1 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:border-white/10 dark:text-slate-200"
+                    className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] px-3 py-1 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:text-slate-200"
                   >
                     Remove rule
                   </button>
@@ -2310,7 +2310,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                     />
                   </label>
 
-                  <label className="flex items-center gap-3 rounded-2xl border border-black/10 px-4 py-3 text-sm dark:border-white/10">
+                  <label className="flex items-center gap-3 rounded-2xl border-0 surface-control px-4 py-3 text-sm">
                     <input
                       type="checkbox"
                       checked={rule.isFallback}
@@ -2322,7 +2322,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                 </div>
 
                 {!rule.isFallback ? (
-                  <div className="mt-3 rounded-xl border border-black/10 p-3 dark:border-white/10">
+                  <div className="mt-3 rounded-xl border-0 surface-control p-3">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Conditions</div>
                     {rule.conditions.length === 0 ? (
                       <div className="text-xs text-slate-500 dark:text-slate-400">No conditions yet. Add one below.</div>
@@ -2383,7 +2383,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               type="button"
               onClick={addRuleRow}
               disabled={disabled}
-              className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-white/10 dark:text-white"
+              className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:text-white"
             >
               Add yard rule
             </button>

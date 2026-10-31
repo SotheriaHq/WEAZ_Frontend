@@ -163,10 +163,10 @@ const DashboardHome: React.FC = () => {
 
   return (
     <div className={`${isEmbeddedMobile ? 'space-y-4' : 'space-y-5 sm:space-y-8'} animate-in fade-in duration-500`}>
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#1a1a1a]">
+      <div className="overflow-hidden rounded-2xl wiez-card-base wiez-shade-9">
         <div className="flex flex-row items-center justify-between gap-3 px-3 py-3 sm:px-4 md:px-6 md:py-4">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 sm:h-12 sm:w-12">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-[0_2px_8px_rgba(124,58,237,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] sm:h-12 sm:w-12">
               {resolvedLogoUrl ? (
                 <MediaRenderer
                   kind="image"
@@ -185,10 +185,10 @@ const DashboardHome: React.FC = () => {
               <h1 className="flex min-w-0 flex-wrap items-center gap-2 text-base font-bold text-gray-900 dark:text-white sm:text-xl">
                 <span className="min-w-0 truncate">{displayStoreName}</span>
                 <span
-                  className={`flex flex-shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium sm:px-2.5 sm:text-xs ${
+                  className={`flex flex-shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] text-[10px] font-medium sm:px-2.5 sm:text-xs ${
                     resolvedIsLive
-                      ? 'border-green-500/20 bg-green-500/20 text-green-600 dark:text-green-400'
-                      : 'border-yellow-500/20 bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
+                      ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                      : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
                   }`}
                 >
                   <span
@@ -208,7 +208,7 @@ const DashboardHome: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate('/studio/store')}
-            className="flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/50 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:text-gray-900 dark:border-white/10 dark:bg-white/10 dark:text-gray-300 dark:hover:text-white sm:gap-2 sm:px-4 sm:text-sm"
+            className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-white/80 dark:bg-white/10 px-3 py-2 text-xs font-semibold text-purple-900 dark:text-purple-200 shadow-[0_2px_8px_rgba(124,58,237,0.08),inset_0_1px_0_rgba(255,255,255,0.95)] transition-all hover:scale-105 active:scale-95 sm:gap-2 sm:px-4 sm:text-sm"
           >
             <span aria-hidden="true">🏪</span>
             <span className="hidden min-[380px]:inline">View Store</span>
@@ -237,61 +237,69 @@ const DashboardHome: React.FC = () => {
             title="Total Revenue"
             value={formatCurrency(kpis.totalRevenue || 0)}
             marker="💰"
-            markerClassName="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+            markerClassName="bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
             trend="+12%"
             trendUp
+            shadeClass="wiez-shade-1"
           />
           <MetricCard
             title="Orders"
             value={(kpis.totalOrders || 0).toString()}
             marker="📦"
-            markerClassName="bg-blue-500/15 text-blue-600 dark:text-blue-400"
+            markerClassName="bg-blue-500/20 text-blue-700 dark:text-blue-300"
             subtitle="Avg. 5.2/day"
+            shadeClass="wiez-shade-2"
           />
           <MetricCard
             title="Conversion Rate"
             value={`${kpis.conversionRate || 0}%`}
             marker="📈"
-            markerClassName="bg-violet-500/15 text-violet-600 dark:text-violet-400"
+            markerClassName="bg-violet-500/20 text-violet-700 dark:text-violet-300"
             trend="-0.4%"
             trendUp={false}
+            shadeClass="wiez-shade-3"
           />
           <MetricCard
             title="Avg Order Value"
             value={formatCurrency(kpis.avgOrderValue || 0)}
             marker="🧾"
-            markerClassName="bg-orange-500/15 text-orange-600 dark:text-orange-400"
+            markerClassName="bg-orange-500/20 text-orange-700 dark:text-orange-300"
             trend="+5%"
             trendUp
+            shadeClass="wiez-shade-4"
           />
           <MetricCard
             title="Store Views"
             value={formatNumber(kpis.storeViews || 0)}
             marker="👀"
-            markerClassName="bg-pink-500/15 text-pink-600 dark:text-pink-400"
+            markerClassName="bg-pink-500/20 text-pink-700 dark:text-pink-300"
             subtitle="Unique visitors"
+            shadeClass="wiez-shade-5"
           />
           <MetricCard
             title="Patches"
             value={formatNumber(kpis.patches || 0)}
             marker="🤝"
-            markerClassName="bg-indigo-500/15 text-indigo-600 dark:text-indigo-400"
+            markerClassName="bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
             trend="+89 this week"
             trendUp
+            shadeClass="wiez-shade-6"
           />
           <MetricCard
             title="Active Products"
             value={(kpis.activeProducts || 0).toString()}
             marker="🪡"
-            markerClassName="bg-cyan-500/15 text-cyan-600 dark:text-cyan-400"
+            markerClassName="bg-cyan-500/20 text-cyan-700 dark:text-cyan-300"
             subtitle={kpis.activeProducts > 0 ? '3 low stock' : 'Add products'}
+            shadeClass="wiez-shade-7"
           />
           <MetricCard
             title="Reviews"
             value={kpis.reviewScore ? `${kpis.reviewScore} / 5.0` : '0'}
             marker="⭐"
-            markerClassName="bg-amber-500/15 text-amber-600 dark:text-amber-400"
+            markerClassName="bg-amber-500/20 text-amber-700 dark:text-amber-300"
             subtitle={kpis.reviewCount ? `Based on ${kpis.reviewCount} reviews` : 'No reviews yet'}
+            shadeClass="wiez-shade-8"
           />
         </div>
       </section>
@@ -353,8 +361,8 @@ const DashboardHome: React.FC = () => {
       */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
         <div className="space-y-4 lg:space-y-6">
-          <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-[#1a1a1a] sm:p-4 lg:p-6">
-            <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white lg:mb-4">
+          <div className="rounded-2xl p-4 sm:p-5 lg:p-6 wiez-card-base wiez-shade-11">
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white lg:mb-4">
               <span aria-hidden="true">🔔</span>
               Action Required
             </h2>
@@ -374,9 +382,9 @@ const DashboardHome: React.FC = () => {
         </div>
 
         <div className="space-y-4 lg:space-y-6">
-          <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-[#1a1a1a] sm:p-4 lg:p-6">
+          <div className="rounded-2xl p-4 sm:p-5 lg:p-6 wiez-card-base wiez-shade-12">
             <div className="mb-3 flex items-center justify-between lg:mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Store Health</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Store Health</h2>
               <a
                 href="#"
                 className="text-xs text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
@@ -453,27 +461,28 @@ const MetricCard: React.FC<{
   trend?: string;
   trendUp?: boolean;
   subtitle?: string;
-}> = ({ title, value, marker, markerClassName, trend, trendUp, subtitle }) => (
-  <div className="cursor-pointer rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-gray-300 dark:border-white/10 dark:bg-[#1a1a1a] dark:hover:border-white/20 sm:p-4 lg:p-5">
+  shadeClass?: string;
+}> = ({ title, value, marker, markerClassName, trend, trendUp, subtitle, shadeClass = 'wiez-shade-1' }) => (
+  <div className={`cursor-pointer rounded-2xl p-3.5 sm:p-4 lg:p-5 wiez-card-base ${shadeClass}`}>
     <div className="mb-1.5 flex items-start justify-between gap-2 lg:mb-2">
-      <p className="min-w-0 text-xs font-medium leading-4 text-gray-500 dark:text-gray-400 sm:text-sm">{title}</p>
-      <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-sm sm:h-8 sm:w-8 sm:text-base ${markerClassName}`}>
+      <p className="min-w-0 text-xs font-semibold leading-4 text-purple-950/70 dark:text-purple-200/70 sm:text-sm">{title}</p>
+      <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] sm:h-8 sm:w-8 sm:text-base ${markerClassName}`}>
         <span aria-hidden="true">{marker}</span>
       </div>
     </div>
-    <h3 className="mb-1 truncate text-lg font-bold leading-6 text-gray-900 dark:text-white sm:text-xl lg:text-2xl">{value}</h3>
+    <h3 className="mb-1 text-lg font-bold leading-tight text-gray-900 dark:text-white sm:text-xl lg:text-2xl break-words">{value}</h3>
     {trend ? (
       <p
-        className={`flex flex-wrap items-center gap-x-1 text-[11px] leading-4 sm:text-xs ${
-          trendUp ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'
+        className={`flex flex-wrap items-center gap-x-1 text-[11px] font-semibold leading-4 sm:text-xs ${
+          trendUp ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'
         }`}
       >
         <span aria-hidden="true">{trendUp ? '↗' : '↘'}</span>
         {trend}
-        <span className="text-gray-400 dark:text-gray-500 sm:ml-1">vs last month</span>
+        <span className="text-purple-950/50 dark:text-purple-300/50 sm:ml-1 font-normal">vs last month</span>
       </p>
     ) : null}
-    {subtitle ? <p className="truncate text-[11px] leading-4 text-gray-400 dark:text-gray-500 sm:text-xs">{subtitle}</p> : null}
+    {subtitle ? <p className="text-[11px] leading-4 text-purple-950/60 dark:text-purple-300/60 sm:text-xs font-medium break-words">{subtitle}</p> : null}
   </div>
 );
 
@@ -481,18 +490,18 @@ const QuickActionButton: React.FC<{
   marker: string;
   label: string;
   accentClassName: string;
-  hoverClassName: string;
+  hoverClassName?: string;
   onClick?: () => void;
-}> = ({ marker, label, accentClassName, hoverClassName, onClick }) => (
+}> = ({ marker, label, accentClassName, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`group flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white p-3 transition-all hover:-translate-y-0.5 dark:border-white/10 dark:bg-[#1a1a1a] sm:min-h-[92px] sm:gap-3 sm:p-4 ${hoverClassName}`}
+    className="group flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-2xl p-3 wiez-card-base wiez-shade-10 sm:min-h-[92px] sm:gap-3 sm:p-4"
   >
-    <div className={`flex h-8 w-8 items-center justify-center rounded-full text-base transition-colors group-hover:scale-110 sm:h-10 sm:w-10 sm:text-lg ${accentClassName}`}>
+    <div className={`flex h-9 w-9 items-center justify-center rounded-full text-base transition-transform group-hover:scale-110 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] sm:h-11 sm:w-11 sm:text-lg ${accentClassName}`}>
       <span aria-hidden="true">{marker}</span>
     </div>
-    <span className="text-center text-xs font-medium leading-4 text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white sm:text-sm">
+    <span className="text-center text-xs font-semibold leading-4 text-gray-700 group-hover:text-purple-700 dark:text-gray-200 dark:group-hover:text-purple-300 sm:text-sm">
       {label}
     </span>
   </button>
@@ -520,7 +529,7 @@ const AlertItem: React.FC<{
     return 'warning';
   })() as keyof typeof styles;
 
-  const { bg, border, icon, color } = styles[normalizedType];
+  const { bg, icon, color } = styles[normalizedType];
   const derivedTitle = title?.trim() || message?.trim() || 'Action required';
   const derivedDescription = description?.trim() || (
     count
@@ -529,7 +538,7 @@ const AlertItem: React.FC<{
   );
 
   const content = (
-    <div className={`${bg} ${border} flex items-start gap-3 rounded-lg border p-3 transition-colors ${link ? 'hover:border-purple-300/40' : ''}`}>
+    <div className={`${bg} flex items-start gap-3 rounded-xl p-3.5 transition-all shadow-[0_2px_8px_rgba(124,58,237,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] ${link ? 'hover:scale-[1.01]' : ''}`}>
       <span className={`${color} mt-0.5`} aria-hidden="true">{icon}</span>
       <div>
         <p className="text-sm font-medium text-gray-900 dark:text-white">{derivedTitle}</p>
