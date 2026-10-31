@@ -1871,12 +1871,16 @@ const CreateDesignInner: React.FC = () => {
 
                       {/* Ambient blurred backdrop behind media */}
                       {selectedFile?.url && (
-                        <img
-                          src={selectedFile.url}
-                          alt=""
-                          aria-hidden="true"
-                          className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-40 scale-110 pointer-events-none"
-                        />
+                        <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
+                          <MediaRenderer
+                            kind={selectedFile.kind === 'video' ? 'video' : 'image'}
+                            src={selectedFile.url}
+                            alt=""
+                            fit="cover"
+                            className="w-full h-full pointer-events-none"
+                            mediaClassName="w-full h-full object-cover blur-2xl opacity-40 scale-110 pointer-events-none"
+                          />
+                        </div>
                       )}
 
                       <AnimatePresence mode="wait">
@@ -2366,9 +2370,10 @@ const CreateDesignInner: React.FC = () => {
                               whileTap={{ scale: 0.94 }}
                               layout
                               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                              className={`px-2.5 py-1 text-xs font-medium rounded-xl border transition-all ${
+                              className={`px-2.5 py-1 text-xs font-medium rounded-xl border-0 appearance-none transition-all ${
+
                                 isSelected
-                                  ? 'neu-inset-chip selected border-white/30 text-white shadow-[0_2px_10px_rgba(168,85,247,0.35)]'
+                                  ? 'neu-inset-chip selected text-white shadow-[0_2px_10px_rgba(168,85,247,0.35)]'
                                   : 'neu-pressed-button text-theme-secondary hover:text-theme'
                               }`}
                             >

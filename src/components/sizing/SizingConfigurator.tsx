@@ -258,9 +258,9 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
                     type="button"
                     onClick={() => toggleMeasurementKey(point.key)}
                     disabled={disabled}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-purple-400/60 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300 shadow-sm hover:bg-purple-500/20 transition-all"
+                    className="neu-inset-chip selected inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(168,85,247,0.3)] transition-all"
                   >
-                    <span className="truncate max-w-[140px]">{point.label}</span>
+                    <span className="whitespace-normal break-words">{point.label}</span>
                     <span className="text-purple-400 text-[9px]">✕</span>
                   </button>
                 ))}
@@ -273,7 +273,7 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
               Available Points{unselectedPoints.length > 0 && ` (${unselectedPoints.length})`}
             </label>
-            <div className="rounded-lg border border-gray-200/70 dark:border-white/10 p-2">
+            <div className="rounded-xl p-2 bg-purple-500/[0.02] dark:bg-white/[0.02]">
               {isLoading ? (
                 <p className="text-xs text-gray-500">Loading measurement points...</p>
               ) : unselectedPoints.length === 0 ? (
@@ -287,10 +287,10 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
                         type="button"
                         onClick={() => toggleMeasurementKey(point.key)}
                         disabled={disabled}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 shadow-sm hover:border-purple-400 hover:bg-purple-50 hover:text-purple-700 dark:hover:bg-purple-500/10 dark:hover:text-purple-300 transition-all"
+                        className="neu-pressed-button inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-all"
                         title={`Click to select — ${point.label}`}
                       >
-                        <span className="truncate max-w-[140px]">{point.label}</span>
+                        <span className="whitespace-normal break-words">{point.label}</span>
                         <span className="text-[9px] text-gray-400">+</span>
                       </button>
                     ))}

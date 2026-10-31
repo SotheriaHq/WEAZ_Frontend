@@ -168,7 +168,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
         )}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-purple-500/15 divide-y divide-purple-500/10 bg-white/40 dark:bg-purple-950/20 backdrop-blur-md">
+      <div className="overflow-hidden rounded-2xl bg-purple-500/[0.03] dark:bg-purple-950/20 backdrop-blur-md divide-y divide-purple-500/5">
         {dimensions.map((dim) => {
           const isExpanded = expandedDimensionId === dim.id;
           const selectedValues = value[dim.id] ?? [];
@@ -249,7 +249,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                     transition={{ duration: 0.18 }}
                     className="overflow-hidden"
                   >
-                    <div className="border-t border-purple-500/10 bg-purple-500/[0.02] dark:bg-purple-950/10 px-3 py-2.5">
+                    <div className="bg-purple-500/[0.02] dark:bg-purple-950/10 px-3 py-2.5">
                       {dim.values.length > 8 && (
                         <input
                           type="text"
@@ -279,17 +279,17 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                                 whileHover={{ scale: 1.015 }}
                                 whileTap={{ scale: 0.98 }}
                                 transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                                className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${
+                                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-left text-xs transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 appearance-none border-0 ${
                                   isSelected
-                                    ? "neu-inset-chip selected border-white/30 text-white shadow-[0_3px_12px_rgba(168,85,247,0.35)]"
-                                    : "rounded-xl border border-purple-500/15 bg-white/70 dark:bg-white/5 hover:bg-white/95 dark:hover:bg-white/10 text-[color:var(--wiez-text-primary)] hover:border-purple-500/30 shadow-[0_1px_4px_rgba(124,58,237,0.04),inset_0_1px_0_rgba(255,255,255,0.9)]"
+                                    ? "neu-inset-chip selected text-white shadow-[0_3px_12px_rgba(168,85,247,0.35)]"
+                                    : "neu-pressed-button bg-white/80 dark:bg-white/5 hover:bg-white/95 dark:hover:bg-white/10 text-[color:var(--wiez-text-primary)] shadow-[0_1px_4px_rgba(124,58,237,0.04),inset_0_1px_0_rgba(255,255,255,0.9)]"
                                 }`}
                               >
                                 <span
                                   className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
                                     isSelected
                                       ? "bg-white text-purple-700 shadow-[0_1px_4px_rgba(0,0,0,0.18)]"
-                                      : "border border-purple-500/30 bg-purple-500/5 dark:bg-white/10"
+                                      : "bg-purple-500/10 dark:bg-white/10"
                                   }`}
                                 >
                                   {isSelected ? (
