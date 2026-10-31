@@ -1783,7 +1783,7 @@ const CreateDesignInner: React.FC = () => {
 
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 mb-8">
           {/* LEFT COLUMN: Height-Bounded Studio Canvas + Real-Time Live Runway Feed Card (Col 5/12) */}
-          <div className="lg:col-span-5 space-y-4">
+          <div className="lg:col-span-5 flex flex-col h-[680px] lg:h-[720px] max-h-[calc(100vh-170px)] min-h-[580px] space-y-4">
             {/* Visual Assets Studio Card */}
             <section id="design-media-section" className="wiez-studio-card p-4 space-y-4">
               <input
@@ -1843,89 +1843,106 @@ const CreateDesignInner: React.FC = () => {
               ) : (
                 <div className="space-y-3 min-w-0">
                   {/* Main Preview Stage (Bounded max-height, zero unnecessary space) */}
-                  <div
-                    className={`relative w-full ${
-                      previewAspectRatio === '9:16'
-                        ? 'aspect-[9/16] max-h-[360px]'
-                        : previewAspectRatio === '4:5'
-                          ? 'aspect-[4/5] max-h-[360px]'
-                          : 'aspect-square max-h-[360px]'
-                    } rounded-2xl overflow-hidden flex items-center justify-center border border-[var(--border-default)] surface-control shadow-inner mx-auto`}
-                  >
-                    {selectedIndex < 6 && (
-                      <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10">
-                        <span className="text-[10px] font-bold text-white uppercase tracking-wider">
-                          {selectedIndex === coverIndex
-                            ? '⭐ Cover Look'
-                            : getMediaViewSlotLabel(
-                                normalizeMediaViewSlot(selectedFile?.viewSlot, selectedIndex),
-                              )}
-                        </span>
-                      </div>
-                    )}
-                    <AnimatePresence mode="wait">
-                      {selectedFile && (
-                        <motion.div
-                          key={selectedFile.id || selectedFile.url}
-                          className="w-full h-full flex items-center justify-center"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          {selectedFile.url ? (
-                            <LocalMediaPreview
-                              kind={
-                                selectedFile.kind === 'video' ? 'video' : 'image'
-                              }
-                              src={selectedFile.url}
-                              file={selectedFile.file}
-                              alt={selectedFile.file?.name || 'Preview'}
-                              className="w-full h-full flex items-center justify-center"
-                              mediaClassName="h-full w-full object-cover"
-                              maxHeightClassName="max-h-[360px]"
-                            />
-                          ) : (
-                            <div className="text-center p-4">
-                              <p className="text-sm font-semibold text-white">
-                                {selectedFile.file?.name}
-                              </p>
-                              <p className="text-xs text-[var(--text-muted)] mt-1">
-                                Preview not available
-                              </p>
-                            </div>
-                          )}
-                        </motion.div>
+                  <div className="relative w-full h-[380px] rounded-2xl overflow-hidden flex items-center justify-center border border-purple-500/15 bg-purple-500/[0.03] dark:bg-purple-950/20 mx-auto p-2">
+                    {/* Viewport Frame matching active aspect ratio */}
+                    <motion.div
+                      layout
+                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                      className={`relative h-full ${
+                        previewAspectRatio === '9:16'
+                          ? 'aspect-[9/16]'
+                          : previewAspectRatio === '4:5'
+                            ? 'aspect-[4/5]'
+                            : 'aspect-square'
+                      } max-w-full rounded-xl overflow-hidden flex items-center justify-center border border-purple-500/25 bg-purple-950/40 shadow-[0_4px_24px_rgba(124,58,237,0.15)] mx-auto`}
+                    >
+                      {/* Cover / View slot badge */}
+                      {selectedIndex < 6 && (
+                        <div className="absolute top-2.5 left-2.5 z-20 px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10">
+                          <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                            {selectedIndex === coverIndex
+                              ? '⭐ Cover Look'
+                              : getMediaViewSlotLabel(
+                                  normalizeMediaViewSlot(selectedFile?.viewSlot, selectedIndex),
+                                )}
+                          </span>
+                        </div>
                       )}
-                    </AnimatePresence>
 
-                    {/* Action Overlay */}
-                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10">
-                      <button
-                        type="button"
-                        onClick={() => selectedFile && handleDelete(selectedFile.id)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-purple-500/15 bg-white/85 dark:bg-black/70 shadow-[0_2px_10px_rgba(124,58,237,0.12)] backdrop-blur-md text-rose-500 hover:text-rose-600 transition-all hover:scale-105 active:scale-95"
-                      >
-                        <FiTrash2 className="w-3.5 h-3.5" />
-                        Delete
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSetCover(selectedIndex)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-purple-500/15 bg-white/85 dark:bg-black/70 shadow-[0_2px_10px_rgba(124,58,237,0.12)] backdrop-blur-md text-amber-500 hover:text-amber-600 transition-all hover:scale-105 active:scale-95"
-                      >
-                        <FiStar className="w-3.5 h-3.5" />
-                        Cover
-                      </button>
-                      <button
-                        type="button"
-                        onClick={openFullscreen}
-                        className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-purple-500/15 bg-white/85 dark:bg-black/70 shadow-[0_2px_10px_rgba(124,58,237,0.12)] backdrop-blur-md text-purple-600 dark:text-purple-300 transition-all hover:scale-105 active:scale-95"
-                      >
-                        <FiMaximize2 className="w-3.5 h-3.5" />
-                        Full
-                      </button>
-                    </div>
+                      {/* Ambient blurred backdrop behind media */}
+                      {selectedFile?.url && (
+                        <img
+                          src={selectedFile.url}
+                          alt=""
+                          aria-hidden="true"
+                          className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-40 scale-110 pointer-events-none"
+                        />
+                      )}
+
+                      <AnimatePresence mode="wait">
+                        {selectedFile && (
+                          <motion.div
+                            key={selectedFile.id || selectedFile.url}
+                            className="w-full h-full flex items-center justify-center relative z-10"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            {selectedFile.url ? (
+                              <LocalMediaPreview
+                                kind={
+                                  selectedFile.kind === 'video' ? 'video' : 'image'
+                                }
+                                src={selectedFile.url}
+                                file={selectedFile.file}
+                                alt={selectedFile.file?.name || 'Preview'}
+                                className="w-full h-full flex items-center justify-center"
+                                mediaClassName="h-full w-full object-contain"
+                                maxHeightClassName="max-h-[380px]"
+                              />
+                            ) : (
+                              <div className="text-center p-4">
+                                <p className="text-sm font-semibold text-white">
+                                  {selectedFile.file?.name}
+                                </p>
+                                <p className="text-xs text-[var(--text-muted)] mt-1">
+                                  Preview not available
+                                </p>
+                              </div>
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      {/* Action Overlay */}
+                      <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20 p-1 rounded-xl bg-white/85 dark:bg-black/75 shadow-[0_2px_12px_rgba(124,58,237,0.15)] backdrop-blur-md border border-purple-500/20">
+                        <button
+                          type="button"
+                          onClick={() => selectedFile && handleDelete(selectedFile.id)}
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 text-rose-500 hover:text-rose-600 transition-all hover:scale-105 active:scale-95"
+                        >
+                          <FiTrash2 className="w-3.5 h-3.5" />
+                          Delete
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetCover(selectedIndex)}
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 text-amber-500 hover:text-amber-600 transition-all hover:scale-105 active:scale-95"
+                        >
+                          <FiStar className="w-3.5 h-3.5" />
+                          Cover
+                        </button>
+                        <button
+                          type="button"
+                          onClick={openFullscreen}
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 text-purple-600 dark:text-purple-300 transition-all hover:scale-105 active:scale-95"
+                        >
+                          <FiMaximize2 className="w-3.5 h-3.5" />
+                          Full
+                        </button>
+                      </div>
+                    </motion.div>
                   </div>
 
                   {/* 1-Row Compact Thumbnail Rail */}
@@ -1996,8 +2013,8 @@ const CreateDesignInner: React.FC = () => {
                 <span className="text-[10px] text-[var(--text-muted)]">Real-Time Shopper View</span>
               </div>
 
-              <div className="rounded-2xl surface-card p-3 border border-[var(--border-default)] flex items-center gap-3.5 shadow-sm">
-                <div className="w-14 h-18 rounded-xl overflow-hidden surface-control border border-[var(--border-subtle)] flex-shrink-0 flex items-center justify-center">
+              <div className="rounded-2xl p-3 border border-purple-500/15 bg-white/70 dark:bg-purple-950/30 flex items-center gap-3.5 shadow-sm hover:shadow-md transition-all">
+                <div className="w-14 h-18 rounded-xl overflow-hidden bg-purple-500/5 dark:bg-purple-900/20 border border-purple-500/15 flex-shrink-0 flex items-center justify-center">
                   {(coverImageUrl || selectedFile?.url) ? (
                     <MediaRenderer
                       kind="image"
@@ -2008,7 +2025,7 @@ const CreateDesignInner: React.FC = () => {
                       mediaClassName="w-full h-full object-cover"
                     />
                   ) : (
-                    <span className="text-[10px] text-[var(--text-muted)] font-semibold text-center px-1">
+                    <span className="text-[10px] text-purple-600 dark:text-purple-300 font-semibold text-center px-1">
                       No look
                     </span>
                   )}
@@ -2053,15 +2070,14 @@ const CreateDesignInner: React.FC = () => {
           </div>
 
           {/* RIGHT COLUMN: Space-Locked Inspector Studio (Col 7/12) */}
-          <div className="lg:col-span-7 wiez-studio-card p-5 sm:p-7 space-y-6">
-            <div>
-              {/* Section Inspector Pills (Consolidated 2 Balanced Tabs, Zero Void) */}
-              <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-3 mb-5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {[
-                    { id: 'design', label: '✦ 1. Design & Style' },
-                    { id: 'commercial', label: '✦ 2. Commercial & Sizing' },
-                  ].map((tab) => {
+          <div className="lg:col-span-7 flex flex-col h-[680px] lg:h-[720px] max-h-[calc(100vh-170px)] min-h-[580px] px-1 sm:px-3">
+            {/* Section Inspector Pills (Consolidated 2 Balanced Tabs, Zero Parent BG/Border/Shadow) */}
+            <div className="shrink-0 flex items-center justify-between border-b border-[var(--border-default)] pb-3 mb-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                {[
+                  { id: 'design', label: '✦ 1. Design & DNA' },
+                  { id: 'commercial', label: '✦ 2. Commercial & Sizing' },
+                ].map((tab) => {
                     const isActive = activeInspectorSection === tab.id;
                     return (
                       <button
@@ -2089,6 +2105,8 @@ const CreateDesignInner: React.FC = () => {
                 </span>
               </div>
 
+            {/* Middle Scrollable Body (Inline Scrolling, Zero Page Bleed) */}
+            <div className="flex-1 overflow-y-auto pr-1.5 min-h-0 space-y-6 no-scrollbar" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
               <AnimatePresence mode="wait">
               {activeInspectorSection === 'design' && (
                 <motion.div
@@ -2128,7 +2146,7 @@ const CreateDesignInner: React.FC = () => {
                       placeholder="Inspired by the warm coastal breeze of Lagos..."
                       rows={3}
                       disabled={disabled || titleDescriptionLocked}
-                      className="surface-control placeholder-theme w-full px-4 py-3 rounded-xl border border-[var(--border-default)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none text-sm text-[var(--text-primary)]"
+                      className="wiez-field-input placeholder-theme w-full px-4 py-3 resize-none text-sm text-[var(--text-primary)]"
                     />
                   </div>
 
@@ -2278,22 +2296,29 @@ const CreateDesignInner: React.FC = () => {
 
                     {selectedTags.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mb-2">
-                        {selectedTags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="neu-inset-chip selected inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold"
-                          >
-                            {normalizeHashtagLabel(tag)}
-                            <button
-                              type="button"
-                              onClick={() => removeTag(tag)}
-                              className="hover:opacity-75 transition-opacity"
-                              aria-label={`Remove ${tag}`}
+                        <AnimatePresence>
+                          {selectedTags.map((tag) => (
+                            <motion.span
+                              key={tag}
+                              initial={{ opacity: 0, scale: 0.85, y: 4 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.85, y: -4 }}
+                              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                              layout
+                              className="neu-inset-chip selected inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold cursor-pointer"
                             >
-                              <FiX className="w-3 h-3" />
-                            </button>
-                          </span>
-                        ))}
+                              {normalizeHashtagLabel(tag)}
+                              <button
+                                type="button"
+                                onClick={() => removeTag(tag)}
+                                className="hover:scale-125 transition-transform"
+                                aria-label={`Remove ${tag}`}
+                              >
+                                <FiX className="w-3 h-3" />
+                              </button>
+                            </motion.span>
+                          ))}
+                        </AnimatePresence>
                       </div>
                     )}
 
@@ -2307,7 +2332,7 @@ const CreateDesignInner: React.FC = () => {
                         onKeyDown={handleTagInputKeyDown}
                         placeholder="Search or create a hashtag..."
                         disabled={disabled || selectedTags.length >= 10}
-                        className="surface-control placeholder-theme w-full pl-10 pr-20 py-2.5 rounded-xl border border-[var(--border-default)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-xs text-[var(--text-primary)]"
+                        className="wiez-field-input placeholder-theme w-full pl-10 pr-20 py-2.5 text-xs text-[var(--text-primary)]"
                       />
                       {tagSearch.trim() && (
                         <button
@@ -2321,7 +2346,7 @@ const CreateDesignInner: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Popular Suggestions */}
+                    {/* Popular Suggestions with Smooth Toggle */}
                     <div className="space-y-1.5 pt-2">
                       <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                         Popular suggestions:
@@ -2332,19 +2357,23 @@ const CreateDesignInner: React.FC = () => {
                             (t) => t.toLowerCase() === tag.toLowerCase(),
                           );
                           return (
-                            <button
+                            <motion.button
                               key={tag}
                               type="button"
-                              onClick={() => addTag(tag)}
-                              disabled={disabled || isSelected}
-                              className={`neu-pressed-button px-2.5 py-1 text-xs font-medium transition-transform active:scale-95 ${
+                              onClick={() => isSelected ? removeTag(tag) : addTag(tag)}
+                              disabled={disabled}
+                              whileHover={{ scale: 1.04 }}
+                              whileTap={{ scale: 0.94 }}
+                              layout
+                              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                              className={`px-2.5 py-1 text-xs font-medium rounded-xl border transition-all ${
                                 isSelected
-                                  ? 'opacity-40 cursor-not-allowed'
-                                  : 'text-theme-secondary hover:text-theme'
+                                  ? 'neu-inset-chip selected border-white/30 text-white shadow-[0_2px_10px_rgba(168,85,247,0.35)]'
+                                  : 'neu-pressed-button text-theme-secondary hover:text-theme'
                               }`}
                             >
                               {normalizeHashtagLabel(tag)}
-                            </button>
+                            </motion.button>
                           );
                         })}
                       </div>
@@ -2390,35 +2419,39 @@ const CreateDesignInner: React.FC = () => {
                       <InfoTooltip text="An indicative price range for this design. Helps shoppers understand expected cost." />
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] font-bold text-sm">
-                          ₦
-                        </span>
-                        <input
-                          type="number"
-                          value={minPrice}
-                          onChange={(e) => setMinPrice(e.target.value)}
-                          placeholder="15,000"
-                          disabled={disabled}
-                          className="surface-control w-full pl-8 pr-4 py-2.5 rounded-xl border border-[var(--border-default)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm font-semibold text-[var(--text-primary)]"
-                        />
+                      <div>
+                        <div className="wiez-field-input flex items-center px-3.5 py-2.5 gap-2 w-full">
+                          <span className="text-purple-600 dark:text-purple-400 font-bold text-sm select-none leading-none">
+                            ₦
+                          </span>
+                          <input
+                            type="number"
+                            value={minPrice}
+                            onChange={(e) => setMinPrice(e.target.value)}
+                            placeholder="15,000"
+                            disabled={disabled}
+                            className="bg-transparent outline-none w-full text-sm font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-muted)] leading-none"
+                          />
+                        </div>
                         <span className="block mt-1 text-[11px] text-[var(--text-muted)]">
                           Minimum Price
                         </span>
                       </div>
 
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] font-bold text-sm">
-                          ₦
-                        </span>
-                        <input
-                          type="number"
-                          value={maxPrice}
-                          onChange={(e) => setMaxPrice(e.target.value)}
-                          placeholder="45,000"
-                          disabled={disabled}
-                          className="surface-control w-full pl-8 pr-4 py-2.5 rounded-xl border border-[var(--border-default)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm font-semibold text-[var(--text-primary)]"
-                        />
+                      <div>
+                        <div className="wiez-field-input flex items-center px-3.5 py-2.5 gap-2 w-full">
+                          <span className="text-purple-600 dark:text-purple-400 font-bold text-sm select-none leading-none">
+                            ₦
+                          </span>
+                          <input
+                            type="number"
+                            value={maxPrice}
+                            onChange={(e) => setMaxPrice(e.target.value)}
+                            placeholder="45,000"
+                            disabled={disabled}
+                            className="bg-transparent outline-none w-full text-sm font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-muted)] leading-none"
+                          />
+                        </div>
                         <span className="block mt-1 text-[11px] text-[var(--text-muted)]">
                           Maximum Price
                         </span>
@@ -2566,19 +2599,19 @@ const CreateDesignInner: React.FC = () => {
               </AnimatePresence>
             </div>
 
-            {/* Stepping controls between tabs */}
-            <div className="flex items-center justify-between pt-4 mt-6 border-t border-[var(--border-default)]">
+            {/* Pinned Bottom Footer (Stepping Controls) */}
+            <div className="shrink-0 flex items-center justify-between pt-4 mt-4 border-t border-[var(--border-default)]">
               {activeInspectorSection === 'commercial' ? (
                 <button
                   type="button"
                   onClick={() => setActiveInspectorSection('design')}
                   className="px-4 py-2 rounded-xl text-xs font-semibold border border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 text-purple-700 dark:text-purple-300 transition-all hover:scale-[1.01] active:scale-[0.99]"
                 >
-                  ‹ Back to Design & Style
+                  ‹ Back to Design & DNA
                 </button>
               ) : (
                 <span className="text-xs text-[var(--text-muted)]">
-                  Step 1: Fill in design identity & style details
+                  Step 1: Fill in design identity & DNA
                 </span>
               )}
 

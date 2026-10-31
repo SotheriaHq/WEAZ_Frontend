@@ -168,7 +168,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
         )}
       </div>
 
-      <div className="overflow-hidden neu-recessed-card divide-y divide-[color:var(--wiez-border-subtle)]">
+      <div className="overflow-hidden rounded-2xl border border-purple-500/15 divide-y divide-purple-500/10 bg-white/40 dark:bg-purple-950/20 backdrop-blur-md">
         {dimensions.map((dim) => {
           const isExpanded = expandedDimensionId === dim.id;
           const selectedValues = value[dim.id] ?? [];
@@ -249,7 +249,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                     transition={{ duration: 0.18 }}
                     className="overflow-hidden"
                   >
-                    <div className="border-t border-[color:var(--wiez-border-subtle)] bg-[color:var(--wiez-surface-subtle)] px-3 py-2.5">
+                    <div className="border-t border-purple-500/10 bg-purple-500/[0.02] dark:bg-purple-950/10 px-3 py-2.5">
                       {dim.values.length > 8 && (
                         <input
                           type="text"
@@ -261,40 +261,43 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                             }))
                           }
                           placeholder={`Search ${label.toLowerCase()}...`}
-                          className="mb-2 w-full rounded-lg border border-[color:var(--wiez-border-default)] bg-[color:var(--wiez-surface-page)] px-2.5 py-1.5 text-xs text-[color:var(--wiez-text-primary)] placeholder:text-[color:var(--wiez-text-placeholder)] focus:border-[color:var(--wiez-border-focus)] focus:outline-none"
+                          className="mb-2.5 w-full px-3 py-2 text-xs wiez-field-input placeholder:text-[color:var(--text-muted)]"
                         />
                       )}
                       <div className="max-h-44 overflow-y-auto pr-1 scrollbar-wiez-strong">
-                        <div className="grid grid-cols-2 gap-1.5">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                           {filteredValues.map((val) => {
                             const isSelected = selectedValues.includes(val.id);
                             return (
-                              <button
+                              <motion.button
                                 key={val.id}
                                 type="button"
                                 onClick={() =>
                                   toggleValue(dim.id, val.id, dim.isMulti)
                                 }
                                 disabled={disabled}
-                                className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                                whileHover={{ scale: 1.015 }}
+                                whileTap={{ scale: 0.98 }}
+                                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                                className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${
                                   isSelected
-                                    ? "neu-inset-chip selected border-[color:var(--neu-border)] bg-[color:var(--wiez-action-brand-subtle,rgba(147,51,234,0.1))] text-[color:var(--wiez-action-brand,#9333ea)]"
-                                    : "neu-pressed-button text-[color:var(--wiez-text-primary)]"
+                                    ? "neu-inset-chip selected border-white/30 text-white shadow-[0_3px_12px_rgba(168,85,247,0.35)]"
+                                    : "rounded-xl border border-purple-500/15 bg-white/70 dark:bg-white/5 hover:bg-white/95 dark:hover:bg-white/10 text-[color:var(--wiez-text-primary)] hover:border-purple-500/30 shadow-[0_1px_4px_rgba(124,58,237,0.04),inset_0_1px_0_rgba(255,255,255,0.9)]"
                                 }`}
                               >
                                 <span
-                                  className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border ${
+                                  className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
                                     isSelected
-                                      ? "border-[color:var(--wiez-action-brand)] bg-[color:var(--wiez-action-brand)] text-white"
-                                      : "border-[color:var(--wiez-border-default)] text-transparent"
+                                      ? "bg-white text-purple-700 shadow-[0_1px_4px_rgba(0,0,0,0.18)]"
+                                      : "border border-purple-500/30 bg-purple-500/5 dark:bg-white/10"
                                   }`}
                                 >
                                   {isSelected ? (
-                                    <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                                    <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-tr from-purple-700 via-fuchsia-600 to-purple-500" />
                                   ) : null}
                                 </span>
-                                <span className="whitespace-normal break-words leading-tight text-left">{val.name}</span>
-                              </button>
+                                <span className="whitespace-normal break-words leading-tight text-left font-medium">{val.name}</span>
+                              </motion.button>
                             );
                           })}
                         </div>
