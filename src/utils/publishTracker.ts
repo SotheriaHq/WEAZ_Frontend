@@ -331,6 +331,12 @@ export const readPublishTasks = (
     });
 };
 
+/** Work a page reload would lose. Abandoned tasks age out, so this cannot block a reload forever. */
+export const hasInFlightPublishTask = () =>
+  readRawPublishTasks().some(
+    (task) => task.status === 'uploading' || task.status === 'finalizing',
+  );
+
 const writePublishTasks = (tasks: PublishTask[]) => {
   if (typeof window === 'undefined') return;
   const normalized = normalizeTaskList(tasks).map(normalizePublishTaskForStorage);

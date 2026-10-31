@@ -351,6 +351,12 @@ const ConfirmContent: React.FC<{
         value={visibilityLabel[summary.visibility]} 
       />
 
+      {summary.visibility === 'PRIVATE' && (
+        <p className="text-xs text-amber-500">
+          Private stays off the Runway and your Public tab, even after approval.
+        </p>
+      )}
+
       {/* Tags */}
       {summary.tags.length > 0 && (
         <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10">

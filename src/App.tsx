@@ -42,6 +42,7 @@ import { useVerificationStateSync } from '@/hooks/useVerificationStateSync';
 import ScrollRestoreProvider from '@/components/ScrollRestoreProvider';
 import MobileExitGuard from '@/components/navigation/MobileExitGuard';
 import { isNewBuildAvailable } from '@/utils/buildVersionGuard';
+import { hasInFlightPublishTask } from '@/utils/publishTracker';
 import { GenderPrompt } from '@/components/profile/GenderPrompt';
 import { DeferredOverlay } from '@/components/ui/DeferredOverlay';
 import { selectCartIsDrawerOpen } from '@/features/cartSlice';
@@ -254,14 +255,16 @@ const RequireAdminPermission: React.FC<{
 /**
  * Applies a detected new deploy (see utils/buildVersionGuard) on the next
  * route navigation — a full document reload picks up the fresh build before
- * the user can hit a dead lazy chunk. Never fires mid-screen.
+ * the user can hit a dead lazy chunk. Never fires mid-screen, and waits for any
+ * running upload: its job lives in memory, so a reload would lose it. The next
+ * navigation after the upload finishes picks the new build up.
  */
 const BuildVersionReload: React.FC<{ pathname: string }> = ({ pathname }) => {
   const lastPathRef = React.useRef(pathname);
   useEffect(() => {
     if (pathname === lastPathRef.current) return;
     lastPathRef.current = pathname;
-    if (isNewBuildAvailable()) {
+    if (isNewBuildAvailable() && !hasInFlightPublishTask()) {
       window.location.reload();
     }
   }, [pathname]);

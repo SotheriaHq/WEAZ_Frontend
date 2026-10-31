@@ -75,6 +75,54 @@ export function clearRetryableProductPublishJob(taskId: string): void {
   retryableInputs.delete(taskId);
 }
 
+/**
+ * Finishes a launch that a page reload cut off.
+ *
+ * The job lives in memory, so a reload after the uploads loses its final step
+ * and the product stays a draft that no admin ever sees. The media is already on
+ * the server, so submitting needs nothing from the browser. Submitting twice is
+ * safe: the server reuses an open review request. Returns the reason on failure,
+ * or null once the product is with the reviewers.
+ */
+export async function resumeInterruptedProductLaunch(
+  taskId: string,
+  productId: string,
+  scope: { ownerId?: string },
+): Promise<string | null> {
+  if (activeJobs.has(taskId)) return null;
+  activeJobs.add(taskId);
+  try {
+    updatePublishTask(
+      taskId,
+      { status: 'finalizing', progress: 92, message: 'Publishing…', error: undefined },
+      scope,
+    );
+    await productApi.submitProductForReview(productId);
+    updatePublishTask(
+      taskId,
+      { status: 'published', progress: 100, message: 'In review' },
+      scope,
+    );
+    emitProductStudioSync({ productId, reason: 'product-created' });
+    window.setTimeout(() => removePublishTask(taskId, scope), 30_000);
+    return null;
+  } catch (error) {
+    const response = (error as { response?: { data?: { message?: string | string[] } } })
+      ?.response?.data?.message;
+    const reason =
+      (Array.isArray(response) ? response[0] : response) ||
+      (error instanceof Error ? error.message : 'Failed to submit product');
+    updatePublishTask(
+      taskId,
+      { status: 'failed', progress: 100, message: `Launch didn't finish — ${reason}`, error: reason },
+      scope,
+    );
+    return reason;
+  } finally {
+    activeJobs.delete(taskId);
+  }
+}
+
 const clamp = (n: number) => Math.max(0, Math.min(100, n));
 
 async function resolveDraftWithBasis(
