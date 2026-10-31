@@ -203,14 +203,14 @@ export const SizingConfigurator: React.FC<SizingConfiguratorProps> = ({
   };
 
   return (
-    <div className="bg-transparent border border-gray-200/70 dark:border-white/10 rounded-xl p-4 space-y-4">
+    <div className="space-y-4">
       <div>
-        <h2 className="text-base font-medium text-gray-900 dark:text-white">Sizing</h2>
-        <p className="text-xs text-gray-500 mt-1">Custom/Hybrid on products requires buyer measurements at add-to-bag.</p>
+        <h2 className="text-sm font-bold text-[var(--text-primary)]">Sizing</h2>
+        <p className="text-xs text-[var(--text-muted)] mt-0.5">Custom/Hybrid on products requires buyer measurements at add-to-bag.</p>
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
+        <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-1.5">
           Product Sizing Mode
         </label>
         <Select

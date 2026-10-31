@@ -1781,11 +1781,11 @@ const CreateDesignInner: React.FC = () => {
 
         {isEditMode && id ? <ReviewFeedbackBanner designId={id} /> : null}
 
-        <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12 mb-8">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 mb-8">
           {/* LEFT COLUMN: Height-Bounded Studio Canvas + Real-Time Live Runway Feed Card (Col 5/12) */}
-          <div className="lg:col-span-5 flex flex-col justify-between space-y-4">
+          <div className="lg:col-span-5 space-y-4">
             {/* Visual Assets Studio Card */}
-            <section id="design-media-section" className="wiez-studio-card p-4 space-y-3 flex-1 flex flex-col justify-between">
+            <section id="design-media-section" className="wiez-studio-card p-4 space-y-4">
               <input
                 ref={picker.inputRef}
                 type="file"
@@ -1898,6 +1898,34 @@ const CreateDesignInner: React.FC = () => {
                         </motion.div>
                       )}
                     </AnimatePresence>
+
+                    {/* Action Overlay */}
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10">
+                      <button
+                        type="button"
+                        onClick={() => selectedFile && handleDelete(selectedFile.id)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-purple-500/15 bg-white/85 dark:bg-black/70 shadow-[0_2px_10px_rgba(124,58,237,0.12)] backdrop-blur-md text-rose-500 hover:text-rose-600 transition-all hover:scale-105 active:scale-95"
+                      >
+                        <FiTrash2 className="w-3.5 h-3.5" />
+                        Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetCover(selectedIndex)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-purple-500/15 bg-white/85 dark:bg-black/70 shadow-[0_2px_10px_rgba(124,58,237,0.12)] backdrop-blur-md text-amber-500 hover:text-amber-600 transition-all hover:scale-105 active:scale-95"
+                      >
+                        <FiStar className="w-3.5 h-3.5" />
+                        Cover
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openFullscreen}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-purple-500/15 bg-white/85 dark:bg-black/70 shadow-[0_2px_10px_rgba(124,58,237,0.12)] backdrop-blur-md text-purple-600 dark:text-purple-300 transition-all hover:scale-105 active:scale-95"
+                      >
+                        <FiMaximize2 className="w-3.5 h-3.5" />
+                        Full
+                      </button>
+                    </div>
                   </div>
 
                   {/* 1-Row Compact Thumbnail Rail */}
@@ -2025,7 +2053,7 @@ const CreateDesignInner: React.FC = () => {
           </div>
 
           {/* RIGHT COLUMN: Space-Locked Inspector Studio (Col 7/12) */}
-          <div className="lg:col-span-7 wiez-studio-card p-5 sm:p-6 flex flex-col justify-between">
+          <div className="lg:col-span-7 wiez-studio-card p-5 sm:p-7 space-y-6">
             <div>
               {/* Section Inspector Pills (Consolidated 2 Balanced Tabs, Zero Void) */}
               <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-3 mb-5">
@@ -2906,31 +2934,7 @@ export const FormSection: React.FC<{
   </div>
 );
 
-/**
- * ActionButton - Button for the floating action bar
- */
-const ActionButton: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  active?: boolean;
-}> = ({ icon, label, onClick, disabled, active }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    className={`
-      surface-control surface-interactive-hover flex items-center gap-2 px-4 py-2 rounded-xl backdrop-blur-md border
-      text-sm font-medium transition-all
-      ${active ? "bg-purple-500/20 border-gray-400 dark:border-white/30" : ""}
-      ${disabled ? "opacity-50 cursor-not-allowed" : ""}
-    `}
-  >
-    {icon}
-    <span className="hidden sm:inline">{label}</span>
-  </button>
-);
+
 
 /**
  * formatTimeAgo - Format date as relative time
