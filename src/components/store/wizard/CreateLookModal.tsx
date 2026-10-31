@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/Select';
 import React, { useRef, useState, useCallback, useMemo } from 'react';
 import {
   X,
@@ -293,15 +294,14 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
                     Styled By
                   </label>
                   <div className="relative">
-                    <select
+                    <Select
                       value={styledBy}
                       onChange={(e) => setStyledBy(e.target.value)}
-                      className="select-wiez w-full bg-gray-50 dark:bg-slate-950/50 border border-gray-200 dark:border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all cursor-pointer text-gray-900 dark:text-white"
                     >
-                      <option>WIEZ Official</option>
-                      <option>Brand Owner</option>
-                      <option>Guest Stylist</option>
-                    </select>
+                      <option value="WIEZ Official">WIEZ Official</option>
+                      <option value="Brand Owner">Brand Owner</option>
+                      <option value="Guest Stylist">Guest Stylist</option>
+                    </Select>
                   </div>
                 </div>
               </div>

@@ -4,7 +4,6 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
-  ChevronDown,
   Layers,
   Sparkles,
   Compass,
@@ -21,6 +20,7 @@ import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 import ProductCardSkeleton from '@/components/designs/ProductCardSkeleton';
 import StoreProductCard from '@/components/designs/StoreProductCard';
 import Button from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
 import { MarketSectionRail } from '@/components/market/MarketSectionRail';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useMarketSignals } from '@/hooks/useMarketSignals';
@@ -609,17 +609,17 @@ const MarketSectionPage: React.FC = () => {
 
             {/* Sort Menu */}
             <div className="relative ml-auto sm:ml-2">
-              <select
+              <Select
+                variant="filter"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="appearance-none rounded-full border border-gray-200 bg-white py-1.5 pl-3.5 pr-8 text-xs font-bold text-gray-800 shadow-sm transition hover:bg-gray-50 dark:border-white/15 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10 cursor-pointer"
+                fullWidth={false}
               >
                 <option value="trending">Sort: Trending Curation</option>
                 <option value="price_asc">Sort: Price (Low to High)</option>
                 <option value="price_desc">Sort: Price (High to Low)</option>
                 <option value="newest">Sort: Newest Arrivals</option>
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+              </Select>
             </div>
           </div>
         </div>
