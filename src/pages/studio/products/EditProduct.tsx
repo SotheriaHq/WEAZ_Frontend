@@ -2779,8 +2779,6 @@ const EditProduct: React.FC = () => {
     const policy = WEB_UPLOAD_POLICIES.productMedia;
     const maxSizeBytes = policy.maxSizeBytes;
     const targetSizeBytes = policy.preferredSizeBytes ?? maxSizeBytes;
-    const compressionTargetBytes = (file: File) =>
-      Math.max(100 * 1024, Math.min(targetSizeBytes, Math.floor(file.size * 0.1)));
     const isGif = (file: File) =>
       file.type.trim().toLowerCase() === 'image/gif' || /\.gif$/i.test(file.name);
     /*
@@ -2796,9 +2794,9 @@ const EditProduct: React.FC = () => {
 
         try {
           // Aim for the target...
-          const processed = await preprocessImageFile(file, "detail", {
-            maxSizeBytes: targetSizeBytes,
-                minQuality: 0.9,
+          const processed = await preprocessImageFile(file, {
+            maxSizeBytes,
+            preferredSizeBytes: targetSizeBytes,
           });
           // ...but accept anything the API will take.
           if (processed.file.size <= maxSizeBytes) {
@@ -2810,11 +2808,7 @@ const EditProduct: React.FC = () => {
 
         try {
           if (!isGif(file)) {
-            const transcoded = await getNormalizedImageFile(file, {
-              maxWidth: 2048,
-              quality: 99,
-              maxBytes: compressionTargetBytes(file),
-            });
+            const transcoded = await getNormalizedImageFile(file);
             if (transcoded.size <= maxSizeBytes && transcoded.size < file.size) {
               return { ok: true as const, file: transcoded, optimized: true };
             }

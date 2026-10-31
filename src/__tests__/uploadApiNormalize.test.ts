@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '@/api/httpClient';
-import { getNormalizedImageFile, uploadPreviewImage } from '@/api/UploadApi';
+import {
+  getNormalizedImageFile,
+  prepareImageForUpload,
+  uploadPreviewImage,
+} from '@/api/UploadApi';
+import { preprocessImageFile } from '@/utils/imagePreprocess';
+import { WEB_UPLOAD_POLICIES } from '@/utils/uploadValidation';
 
 vi.mock('@/api/httpClient', () => ({
   apiClient: {
@@ -11,7 +17,10 @@ vi.mock('@/api/httpClient', () => ({
   },
 }));
 
+vi.mock('@/utils/imagePreprocess', () => ({ preprocessImageFile: vi.fn() }));
+
 const postMock = vi.mocked(apiClient.post);
+const preprocessMock = vi.mocked(preprocessImageFile);
 
 let objectUrlCounter = 0;
 
@@ -104,7 +113,62 @@ describe('UploadApi server normalization', () => {
     const [, body] = postMock.mock.calls[0];
     const form = body as FormData;
     expect(form.get('maxWidth')).toBe('2048');
-    expect(form.get('quality')).toBe('82');
+    expect(form.get('quality')).toBe('99');
     expect(form.get('maxBytes')).toBe(String(2 * 1024 * 1024));
+    expect(form.get('targetBytes')).toBe(String(1024 * 1024));
+  });
+});
+
+describe('prepareImageForUpload', () => {
+  const policy = WEB_UPLOAD_POLICIES.bannerImage;
+  const MB = 1024 * 1024;
+  const sized = (name: string, type: string, bytes: number) =>
+    new File([new Uint8Array(bytes)], name, { type });
+
+  beforeEach(() => {
+    postMock.mockClear();
+    preprocessMock.mockReset();
+    postMock.mockImplementation(async () => ({
+      data: new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' }),
+    }));
+  });
+
+  it('sends the compressed file without a server round trip', async () => {
+    const compressed = sized('banner.pre.webp', 'image/webp', MB);
+    const original = sized('banner.jpg', 'image/jpeg', 3 * MB);
+    preprocessMock.mockResolvedValue({ file: compressed, originalFile: original, skipped: false });
+
+    await expect(prepareImageForUpload(original, policy)).resolves.toBe(compressed);
+    expect(preprocessMock).toHaveBeenCalledWith(original, {
+      maxSizeBytes: 2 * MB,
+      preferredSizeBytes: MB,
+    });
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the server for a file this browser cannot decode', async () => {
+    preprocessMock.mockRejectedValue(new Error('decode failed'));
+    const heic = sized('camera-heic.jpg', 'image/jpeg', 3 * MB);
+
+    const prepared = await prepareImageForUpload(heic, policy);
+
+    expect(postMock).toHaveBeenCalledTimes(1);
+    expect(prepared.name).toBe('camera-heic.pre.jpg');
+  });
+
+  it('leaves a GIF alone, since flattening it would lose the animation', async () => {
+    const gif = sized('loop.gif', 'image/gif', 3 * MB);
+
+    await expect(prepareImageForUpload(gif, policy)).resolves.toBe(gif);
+    expect(preprocessMock).not.toHaveBeenCalled();
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it('returns the original when nothing worked, so the size check can refuse it', async () => {
+    preprocessMock.mockRejectedValue(new Error('decode failed'));
+    postMock.mockRejectedValue(new Error('offline'));
+    const photo = sized('failed.jpg', 'image/jpeg', 3 * MB);
+
+    await expect(prepareImageForUpload(photo, policy)).resolves.toBe(photo);
   });
 });

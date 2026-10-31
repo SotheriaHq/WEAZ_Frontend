@@ -1,5 +1,16 @@
 const MB = 1024 * 1024;
 
+/*
+ * What the API really enforces is the smaller of `upload.maxSize.*` in
+ * SystemConfig and `DIRECT_UPLOAD_HARD_LIMIT_BYTES`. The policies below used to
+ * copy the hard limits (5, 8, 10MB), while the live setting is 2MB for every
+ * image except product media. A 3MB photo therefore passed every check here and
+ * was refused by the server, and because the compressor only acts above the
+ * policy ceiling it was never compressed at all.
+ */
+const IMAGE_CEILING_BYTES = 2 * MB;
+const IMAGE_TARGET_BYTES = 1 * MB;
+
 export type UploadPolicy = {
   label: string;
   allowedMimeTypes: readonly string[];
@@ -7,9 +18,11 @@ export type UploadPolicy = {
   /**
    * The hard ceiling — above this the upload is refused.
    *
-   * This must not be tighter than the server's own limit for the endpoint
-   * (`DIRECT_UPLOAD_HARD_LIMIT_BYTES` in `bthreadly/src/upload/upload-policy.ts`)
-   * or the client refuses files the API would have accepted.
+   * This must match what the server enforces for the endpoint, which is the
+   * smaller of its `upload.maxSize.*` setting and
+   * `DIRECT_UPLOAD_HARD_LIMIT_BYTES` in `bthreadly/src/upload/upload-policy.ts`.
+   * Tighter refuses files the API would accept; looser lets a file skip
+   * compression and be refused by the API instead.
    */
   maxSizeBytes: number;
   /**
@@ -59,14 +72,16 @@ export const WEB_UPLOAD_POLICIES = {
     label: 'Profile photo',
     allowedMimeTypes: IMAGE_MIME_TYPES,
     allowedExtensions: IMAGE_EXTENSIONS,
-    maxSizeBytes: 5 * MB,
+    maxSizeBytes: IMAGE_CEILING_BYTES,
+    preferredSizeBytes: IMAGE_TARGET_BYTES,
     maxFiles: 1,
   },
   bannerImage: {
     label: 'Banner image',
     allowedMimeTypes: IMAGE_MIME_TYPES,
     allowedExtensions: IMAGE_EXTENSIONS,
-    maxSizeBytes: 5 * MB,
+    maxSizeBytes: IMAGE_CEILING_BYTES,
+    preferredSizeBytes: IMAGE_TARGET_BYTES,
     maxFiles: 1,
   },
   productMedia: {
@@ -77,7 +92,7 @@ export const WEB_UPLOAD_POLICIES = {
     // It was 2MB, which is why "some" product uploads failed: exactly the ones
     // whose photos would not compress that far.
     maxSizeBytes: 8 * MB,
-    preferredSizeBytes: 2 * MB,
+    preferredSizeBytes: IMAGE_TARGET_BYTES,
     // `StoreService.maxProductMediaCount` is 6, and there are exactly 6 view
     // slots (front/back/left/right/detail/on-model) to put them in. 12 here
     // meant the client's own error message quoted a cap the API does not have.
@@ -87,7 +102,8 @@ export const WEB_UPLOAD_POLICIES = {
     label: 'Collection media',
     allowedMimeTypes: [...IMAGE_MIME_TYPES, ...VIDEO_MIME_TYPES],
     allowedExtensions: [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS],
-    maxSizeBytes: 8 * MB,
+    maxSizeBytes: IMAGE_CEILING_BYTES,
+    preferredSizeBytes: IMAGE_TARGET_BYTES,
     videoMaxSizeBytes: 100 * MB,
     maxFiles: 20,
   },
@@ -95,7 +111,8 @@ export const WEB_UPLOAD_POLICIES = {
     label: 'Design media',
     allowedMimeTypes: [...IMAGE_MIME_TYPES, ...VIDEO_MIME_TYPES],
     allowedExtensions: [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS],
-    maxSizeBytes: 8 * MB,
+    maxSizeBytes: IMAGE_CEILING_BYTES,
+    preferredSizeBytes: IMAGE_TARGET_BYTES,
     videoMaxSizeBytes: 100 * MB,
     maxFiles: 20,
   },
@@ -103,7 +120,8 @@ export const WEB_UPLOAD_POLICIES = {
     label: 'Review image',
     allowedMimeTypes: IMAGE_MIME_TYPES,
     allowedExtensions: IMAGE_EXTENSIONS,
-    maxSizeBytes: 10 * MB,
+    maxSizeBytes: IMAGE_CEILING_BYTES,
+    preferredSizeBytes: IMAGE_TARGET_BYTES,
     maxFiles: 4,
   },
   reviewVideo: {
@@ -117,7 +135,8 @@ export const WEB_UPLOAD_POLICIES = {
     label: 'Message image',
     allowedMimeTypes: IMAGE_MIME_TYPES,
     allowedExtensions: IMAGE_EXTENSIONS,
-    maxSizeBytes: 10 * MB,
+    maxSizeBytes: IMAGE_CEILING_BYTES,
+    preferredSizeBytes: IMAGE_TARGET_BYTES,
     maxFiles: 5,
   },
   messageDocument: {
@@ -153,17 +172,20 @@ const resolveSizeLimit = (file: File, policy: UploadPolicy) => {
   return policy.maxSizeBytes;
 };
 
-export const validateUploadFile = (file: File, policy: UploadPolicy): string[] => {
-  const errors: string[] = [];
+const validateUploadType = (file: File, policy: UploadPolicy): string[] => {
   const mimeType = normalizeMimeType(file.type);
   const extension = getExtension(file.name);
   const isAllowedMime = mimeType.length > 0 && policy.allowedMimeTypes.includes(mimeType);
   const isAllowedExtension =
     extension.length > 0 && policy.allowedExtensions.includes(extension);
 
-  if (!isAllowedMime && !isAllowedExtension) {
-    errors.push(`${policy.label} must be a supported file type.`);
-  }
+  return !isAllowedMime && !isAllowedExtension
+    ? [`${policy.label} must be a supported file type.`]
+    : [];
+};
+
+export const validateUploadFile = (file: File, policy: UploadPolicy): string[] => {
+  const errors = validateUploadType(file, policy);
 
   const maxSizeBytes = resolveSizeLimit(file, policy);
   if (typeof file.size === 'number' && file.size > maxSizeBytes) {
@@ -195,6 +217,18 @@ export const validateUploadFiles = (
 
 export const assertValidUploadFile = (file: File, policy: UploadPolicy) => {
   const errors = validateUploadFile(file, policy);
+  if (errors.length > 0) {
+    throw new UploadValidationError(errors);
+  }
+};
+
+/**
+ * For the moment a file is chosen, before compression has had its chance. The
+ * size limit applies to what is sent, so checking it here would refuse a photo
+ * the compressor can bring inside it.
+ */
+export const assertSupportedUploadType = (file: File, policy: UploadPolicy) => {
+  const errors = validateUploadType(file, policy);
   if (errors.length > 0) {
     throw new UploadValidationError(errors);
   }

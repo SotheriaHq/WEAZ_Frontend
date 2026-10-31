@@ -1,6 +1,7 @@
 import { apiClient } from './httpClient';
 import { unwrapApiResponse } from '@/types/auth';
 import { WEB_UPLOAD_POLICIES, assertValidUploadFile } from '@/utils/uploadValidation';
+import { prepareImageForUpload } from '@/api/UploadApi';
 
 export interface MessagingCursor {
   createdAt: string;
@@ -239,12 +240,11 @@ export const messagingApi = {
   async uploadMessageAttachment(file: File) {
     const isDocument =
       file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-    assertValidUploadFile(
-      file,
-      isDocument ? WEB_UPLOAD_POLICIES.messageDocument : WEB_UPLOAD_POLICIES.messageImage,
-    );
+    const policy = isDocument ? WEB_UPLOAD_POLICIES.messageDocument : WEB_UPLOAD_POLICIES.messageImage;
+    const uploadable = isDocument ? file : await prepareImageForUpload(file, policy);
+    assertValidUploadFile(uploadable, policy);
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', uploadable);
 
     const endpoint = isDocument ? '/uploads/message-document' : '/uploads/message-image';
     const response = await apiClient.post(endpoint, formData, {

@@ -1,5 +1,6 @@
 import { apiClient } from './httpClient';
 import { WEB_UPLOAD_POLICIES, assertValidUploadFile } from '@/utils/uploadValidation';
+import { prepareImageForUpload } from '@/api/UploadApi';
 
 const extractData = <T,>(response: { data: unknown }): T => {
   const payload = response.data as { data?: T } | T;
@@ -112,14 +113,15 @@ const uploadReviewFile = async (
   file: File,
   endpoint: 'review-image' | 'review-video',
 ): Promise<UploadedReviewAsset> => {
-  assertValidUploadFile(
-    file,
+  const policy =
     endpoint === 'review-video'
       ? WEB_UPLOAD_POLICIES.reviewVideo
-      : WEB_UPLOAD_POLICIES.reviewImage,
-  );
+      : WEB_UPLOAD_POLICIES.reviewImage;
+  const uploadable =
+    endpoint === 'review-image' ? await prepareImageForUpload(file, policy) : file;
+  assertValidUploadFile(uploadable, policy);
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('file', uploadable);
   const response = await apiClient.post(`/uploads/${endpoint}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });

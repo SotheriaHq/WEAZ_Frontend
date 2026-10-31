@@ -1,6 +1,7 @@
 import { apiClient } from './httpClient';
-import { WEB_UPLOAD_POLICIES } from '@/utils/uploadValidation';
+import { WEB_UPLOAD_POLICIES, type UploadPolicy } from '@/utils/uploadValidation';
 import { fingerprintFileBytes, readBlobBytes } from '@/utils/imageByteSniff';
+import { preprocessImageFile } from '@/utils/imagePreprocess';
 
 /**
  * Server image transcodes upload the ORIGINAL file over a phone uplink —
@@ -23,17 +24,20 @@ const MAX_CACHED_NORMALIZED_BLOBS = 24;
 const NORMALIZED_IMAGE_MAX_WIDTH = 2048;
 const NORMALIZED_IMAGE_QUALITY = 99;
 const NORMALIZED_IMAGE_MAX_BYTES = WEB_UPLOAD_POLICIES.designMedia.maxSizeBytes;
+const NORMALIZED_IMAGE_TARGET_BYTES = WEB_UPLOAD_POLICIES.designMedia.preferredSizeBytes;
 
 export type ImageTranscodeOptions = {
   maxWidth: number;
   quality: number;
   maxBytes: number;
+  targetBytes: number;
 };
 
 const CANONICAL_TRANSCODE_OPTIONS: ImageTranscodeOptions = {
   maxWidth: NORMALIZED_IMAGE_MAX_WIDTH,
   quality: NORMALIZED_IMAGE_QUALITY,
   maxBytes: NORMALIZED_IMAGE_MAX_BYTES,
+  targetBytes: NORMALIZED_IMAGE_TARGET_BYTES,
 };
 
 // Metadata alone is NOT file identity: Android content:// picks can stamp
@@ -49,6 +53,7 @@ const fileCacheKey = async (file: File, options: ImageTranscodeOptions) =>
     options.maxWidth,
     options.quality,
     options.maxBytes,
+    options.targetBytes,
   ].join(':');
 
 let activeTranscodes = 0;
@@ -107,6 +112,7 @@ const requestServerTranscode = async (
       formData.append('maxWidth', String(options.maxWidth));
       formData.append('quality', String(options.quality));
       formData.append('maxBytes', String(options.maxBytes));
+      formData.append('targetBytes', String(options.targetBytes));
 
       const response = await apiClient.post(
         '/uploads/preview-image',
@@ -173,6 +179,35 @@ export const getNormalizedImageFile = async (
   };
   const blob = await requestServerTranscode(file, normalizedOptions);
   return toNormalizedFile(file, blob);
+};
+
+/**
+ * Brings an image inside its policy before the size check guarding the upload.
+ * For uploads with no preparation step of their own: profile photos, banners,
+ * review and message images. Returns the file untouched when nothing worked, so
+ * the caller's check gives the honest refusal.
+ */
+export const prepareImageForUpload = async (
+  file: File,
+  policy: UploadPolicy,
+): Promise<File> => {
+  if (/image\/gif/i.test(file.type) || /\.gif$/i.test(file.name)) return file;
+  try {
+    const processed = await preprocessImageFile(file, {
+      maxSizeBytes: policy.maxSizeBytes,
+      preferredSizeBytes: policy.preferredSizeBytes,
+    });
+    if (processed.file.size <= policy.maxSizeBytes) return processed.file;
+  } catch {
+    // A browser that cannot decode this file (HEIC) is recovered by the server pass.
+  }
+  try {
+    const transcoded = await getNormalizedImageFile(file);
+    if (transcoded.size <= policy.maxSizeBytes) return transcoded;
+  } catch {
+    /* Server normalize unavailable — the caller's check reports the file. */
+  }
+  return file;
 };
 
 /**

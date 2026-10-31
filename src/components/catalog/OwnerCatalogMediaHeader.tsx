@@ -19,7 +19,7 @@ import {
 } from '@/types/profilePhoto';
 import {
   WEB_UPLOAD_POLICIES,
-  assertValidUploadFile,
+  assertSupportedUploadType,
   getUploadValidationMessage,
 } from '@/utils/uploadValidation';
 
@@ -358,7 +358,7 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
     event.target.value = '';
     if (!file) return;
     try {
-      assertValidUploadFile(file, WEB_UPLOAD_POLICIES.profileImage);
+      assertSupportedUploadType(file, WEB_UPLOAD_POLICIES.profileImage);
     } catch (uploadError) {
       toast.error(getUploadValidationMessage(uploadError));
       return;
@@ -371,7 +371,7 @@ const OwnerCatalogMediaHeaderComponent: React.FC<OwnerCatalogMediaHeaderProps> =
     event.target.value = '';
     if (!file) return;
     try {
-      assertValidUploadFile(file, WEB_UPLOAD_POLICIES.bannerImage);
+      assertSupportedUploadType(file, WEB_UPLOAD_POLICIES.bannerImage);
     } catch (uploadError) {
       toast.error(getUploadValidationMessage(uploadError));
       return;
