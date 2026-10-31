@@ -256,7 +256,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
 
   // The image to actually display: hover preview takes priority over resolved cover
   const displaySrc = resolvedHoverSrc || resolvedCover;
-  const resolvedDisplaySrc = displaySrc || (isPublishing ? clientPreviewUrl : undefined);
+  const resolvedDisplaySrc = displaySrc || clientPreviewUrl;
   const [accessOpen, setAccessOpen] = useState(false);
   const [reviewDecisionOpen, setReviewDecisionOpen] = useState(false);
   const needsReviewDecision =
@@ -400,7 +400,7 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
                   {isOffline ? (
                     <div className="text-xs font-medium text-white/70">Upload status unavailable.</div>
                   ) : (
-                    <div className="text-sm font-semibold">{compactStatusLabel}</div>
+                    <div className="text-sm font-semibold">{collection.clientStatusMessage || compactStatusLabel}</div>
                   )}
                   <div className="flex flex-wrap items-center justify-center gap-2">
                     {!isOffline && hasPersistedCollectionId && onEdit ? (
@@ -442,9 +442,20 @@ const CollectionCardComponent: React.FC<CollectionCardProps> = ({
         )}
         {resolvedDisplaySrc ? (
           <div className="relative h-full w-full">
-            {!imgLoaded && (
+            {!imgLoaded && (clientPreviewUrl ? (
+              <MediaRenderer
+                kind="image"
+                src={clientPreviewUrl}
+                alt=""
+                fit="cover"
+                maxHeightClassName="max-h-none"
+                maxWidthClassName="max-w-full"
+                className="absolute inset-0 h-full w-full"
+                mediaClassName="block h-full w-full object-cover"
+              />
+            ) : (
               <div className="absolute inset-0 animate-pulse bg-gray-100 dark:bg-white/10" />
-            )}
+            ))}
 
             {/* Check if video based on extension */}
             {(() => {

@@ -133,12 +133,14 @@ function reducer(state: State, action: Action): State {
 const MediaContext = createContext<{
   state: State;
   dispatch: React.Dispatch<Action>;
+  keepPreview: (id: string) => string | undefined;
 } | null>(null);
 
 export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   const urlRef = useRef<Map<string, string>>(new Map());
+  const keptPreviewsRef = useRef<Set<string>>(new Set());
   const convertingRef = useRef<Set<string>>(new Set());
   const processedRef = useRef<Map<string, File>>(new Map());
   const mountedRef = useRef(true);
@@ -152,6 +154,7 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   useEffect(() => {
     for (const it of state.items) {
       if (it.previewUrl?.startsWith('blob:')) {
+        if (keptPreviewsRef.current.has(it.previewUrl)) continue;
         const previous = urlRef.current.get(it.id);
         if (previous !== it.previewUrl) {
           revokeObjectPreviewUrl(previous);
@@ -271,14 +274,25 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
   }, []);
 
-  const value = useMemo(() => ({ state, dispatch }), [state]);
+  // Hands a preview to something that outlives this store, without a second
+  // decode. Its URL leaves tracking, so the caller now owns revoking it.
+  const keepPreview = useCallback((id: string) => {
+    const url = itemsRef.current.find((item) => item.id === id)?.previewUrl;
+    if (url?.startsWith('blob:')) {
+      keptPreviewsRef.current.add(url);
+      urlRef.current.delete(id);
+    }
+    return url;
+  }, []);
+
+  const value = useMemo(() => ({ state, dispatch, keepPreview }), [keepPreview, state]);
   return <MediaContext.Provider value={value}>{children}</MediaContext.Provider>;
 };
 
 export function useMediaStore() {
   const ctx = useContext(MediaContext);
   if (!ctx) throw new Error('useMediaStore must be used within MediaProvider');
-  const { state, dispatch } = ctx;
+  const { state, dispatch, keepPreview } = ctx;
 
   const addFiles = useCallback(
     (files: File[], maxItems?: number) => dispatch({ type: 'add', files, maxItems }),
@@ -296,7 +310,8 @@ export function useMediaStore() {
     clear,
     set,
     reorder,
-  }), [addFiles, clear, remove, reorder, set, state.items]);
+    keepPreview,
+  }), [addFiles, clear, keepPreview, remove, reorder, set, state.items]);
 }
 
 export default useMediaStore;

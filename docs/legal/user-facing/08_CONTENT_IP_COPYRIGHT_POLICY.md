@@ -32,7 +32,7 @@ By submitting, posting, or displaying content on or through WIEZ, you grant WIEZ
 
 This operational license enables WIEZ to:
 1. Render high-resolution apparel photography and lookbooks across multi-screen client devices (iOS, Android, mobile web, desktop);
-2. Generate CDN-cached previews, video thumbnails, and signed media URLs via secure cloud infrastructure (AES-256 / HMAC-SHA256 authenticated S3 buckets);
+2. Generate CDN-cached previews, video thumbnails, and signed media URLs via secure cloud infrastructure (AES-256 encrypted object storage with HMAC-SHA256 authenticated access);
 3. Index designs, garments, and store collections for Runway algorithm recommendation, Market search filters, and tag discovery;
 4. Feature approved brand collections in platform-wide editorial spotlights, promotional newsletters, and runway curation;
 5. Preserve encrypted transaction snapshots and dispute media records for legal, tax, and escrow compliance audits.
@@ -178,7 +178,7 @@ WIEZ encourages technological innovation while upholding creative provenance:
 
 ## 12. Digital Assets, Media Security, and Scraping Prohibitions
 
-1. **Signed Media URLs**: All private sketches, bespoke client measurement data, and draft design media are protected via time-limited, cryptographically signed AWS S3 URLs. Attempting to bypass URL signatures or access unauthorized media buckets is a criminal violation;
+1. **Signed Media URLs**: All private sketches, bespoke client measurement data, and draft design media are protected via time-limited, cryptographically signed URLs. Attempting to bypass URL signatures or access unauthorized media buckets is a criminal violation;
 2. **Automated Scraping Bar**: Scraping, crawling, harvesting, or bulk-downloading designer lookbooks, garment photography, sizing matrices, or pricing data via automated bots, scripts, or AI scrapers without express written authorization from WIEZ is strictly prohibited under our Terms of Service and Computer Misuse laws.
 
 ---

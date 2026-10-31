@@ -94,6 +94,32 @@ const revokeOwnedPreview = (id: string) => {
   }
 };
 
+/**
+ * Where a finished task leaves this device's copy of its cover, so the card can
+ * keep showing it until the server's image has loaded. Capped so a long session
+ * cannot pin memory behind object URLs.
+ */
+const MAX_LOCAL_DESIGN_COVERS = 12;
+const localCoverByDesignId = new Map<string, string>();
+
+const rememberLocalDesignCover = (designId: string, url: string) => {
+  localCoverByDesignId.delete(designId);
+  localCoverByDesignId.set(designId, url);
+  if (localCoverByDesignId.size <= MAX_LOCAL_DESIGN_COVERS) return;
+  const [oldestId, oldestUrl] = localCoverByDesignId.entries().next().value as [string, string];
+  localCoverByDesignId.delete(oldestId);
+  try {
+    URL.revokeObjectURL(oldestUrl);
+  } catch {
+    // Revocation is best-effort; a stale handle must never break the tracker.
+  }
+};
+
+export const getLocalDesignCover = (designId?: string | null) => {
+  const id = String(designId ?? '').trim();
+  return id ? localCoverByDesignId.get(id) : undefined;
+};
+
 export const setPublishTaskRuntimePreview = (
   taskId: string,
   previewUrl?: string | null,
@@ -406,7 +432,20 @@ export const updatePublishTask = (
 
 export const removePublishTask = (id: string, scope?: PublishTaskScope) => {
   const scopeOwnerId = resolveScopeOwnerId(scope);
-  const next = readRawPublishTasks().filter((task) => {
+  const tasks = readRawPublishTasks();
+  const removing = tasks.find(
+    (task) => task.id === id && taskBelongsToScope(task, scopeOwnerId),
+  );
+  const finishedDesignId =
+    removing?.status === 'saved' || removing?.status === 'published'
+      ? getPublishTaskDesignId(removing)
+      : undefined;
+  const ownedPreview = ownedPreviewTaskIds.has(id) ? runtimePreviewByTaskId.get(id) : undefined;
+  if (finishedDesignId && ownedPreview) {
+    rememberLocalDesignCover(finishedDesignId, ownedPreview);
+    ownedPreviewTaskIds.delete(id);
+  }
+  const next = tasks.filter((task) => {
     if (task.id !== id) return true;
     return !taskBelongsToScope(task, scopeOwnerId);
   });

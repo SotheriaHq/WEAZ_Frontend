@@ -70,6 +70,17 @@ describe('local media preview pipeline', () => {
     expect(mocks.revoke).toHaveBeenCalledWith('blob:local-2');
   });
 
+  it('keeps a handed-over preview alive when the editor closes', async () => {
+    const file = new File(['source'], 'cover.jpg', { type: 'image/jpeg' });
+    const view = render(<MediaProvider><Probe /></MediaProvider>);
+    act(() => store.addFiles([file]));
+    await waitFor(() => expect(store.items[0].previewUrl).toMatch(/^blob:local-/));
+    const url = store.items[0].previewUrl;
+    expect(store.keepPreview(store.items[0].id)).toBe(url);
+    view.unmount();
+    expect(mocks.revoke).not.toHaveBeenCalledWith(url);
+  });
+
   it('discards late normalization after removal without recreating the item or leaking a URL', async () => {
     mocks.sniff.mockResolvedValue('heic');
     const pending = deferred<File>();

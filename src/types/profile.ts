@@ -49,6 +49,7 @@ export interface CollectionDto {
   isSystemGenerated?: boolean;
   tags?: string[];
   isThreaded?: boolean; // Backend includes this for authenticated users
+  draftReason?: string;
   // Client-only status metadata for optimistic publish/progress states
   clientStatus?: 'publishing' | 'publish-failed';
   clientStatusMessage?: string;

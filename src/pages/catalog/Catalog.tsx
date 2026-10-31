@@ -1,4 +1,4 @@
-import { resolveCatalogTaskBucket } from '@/utils/catalogTaskStatus';
+import { collectionListChanged, resolveCatalogTaskBucket } from '@/utils/catalogTaskStatus';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useOptionalReturnTo } from '@/hooks/useReturnTo';
@@ -57,6 +57,7 @@ import {
   getPublishTaskLegacyCollectionId,
   getCompactPublishTaskStatusLabel,
   getPublishTaskRuntimePreview,
+  getLocalDesignCover,
   isLocalPublishTaskId,
   readPublishFailedDesignIds,
   clearPublishFailedDesignId,
@@ -126,6 +127,8 @@ const VISIBILITY_ICONS: Partial<Record<VisibilityFilter, React.ReactNode>> = {
   Rejected: <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-rose-100 text-[10px] font-bold text-rose-800 dark:bg-rose-900/50 dark:text-rose-200">✕</span>,
   Deleted: '🗑️',
 };
+
+const INCOMPLETE_UPLOAD_REASON = 'UPLOAD_INCOMPLETE';
 
 const MODERATION_RESOLVED_STATUSES = new Set([
   'PUBLISHED',
@@ -338,14 +341,6 @@ const ProfilePage: React.FC = () => {
   const [deletedDesigns, setDeletedDesigns] = useState<CollectionDto[]>([]);
   const [deletedDesignsError, setDeletedDesignsError] = useState<string | null>(null);
   const [deletedDesignsInitialized, setDeletedDesignsInitialized] = useState(false);
-
-  const collectionListChanged = useCallback(
-    (current: CollectionDto[], next: CollectionDto[]) => {
-      if (current.length !== next.length) return true;
-      return current.some((entry, index) => entry.id !== next[index]?.id);
-    },
-    [],
-  );
 
   // Sync react-query draft/deleted caches during render so tab switches paint
   // cached data on the first frame — never a blocking skeleton on revisits.
@@ -1041,6 +1036,7 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     const completed = publishTasks.filter(
       (task) =>
+        task.kind !== 'draft' &&
         (task.status === 'published' || task.status === 'saved') &&
         getPublishTaskDesignId(task) &&
         !cleanedCompletedTaskIdsRef.current.has(task.id),
@@ -1053,7 +1049,12 @@ const ProfilePage: React.FC = () => {
         cleanedCompletedTaskIdsRef.current.add(task.id);
         try {
           if (!isVisitorView && user?.id) {
-            await fetchCollections(user.id, { forceRefresh: true });
+            await Promise.all([
+              fetchCollections(user.id, { forceRefresh: true }),
+              // The design left Drafts. Its cached row must not outlive the task
+              // that was covering it.
+              queryClient.invalidateQueries({ queryKey: queryKeys.brand.myDrafts(ownerBrandId) }),
+            ]);
           }
         } catch {
           /* best-effort */
@@ -1075,10 +1076,10 @@ const ProfilePage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [fetchCollections, isVisitorView, publishTaskScope, publishTasks, user?.id]);
+  }, [fetchCollections, isVisitorView, ownerBrandId, publishTaskScope, publishTasks, queryClient, user?.id]);
 
   useEffect(() => {
-    if (!isOwner || visibilityFilter !== 'Drafts') return;
+    if (!isOwner) return;
     const savedDraftTasks = publishTasks.filter((task) => task.kind === 'draft' && task.status === 'saved');
     if (savedDraftTasks.length === 0) return;
 
@@ -1111,7 +1112,7 @@ const ProfilePage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isOwner, ownerBrandId, publishTaskScope, publishTasks, queryClient, visibilityFilter]);
+  }, [isOwner, ownerBrandId, publishTaskScope, publishTasks, queryClient]);
 
   // Auto-clear stale failed publish states for collections that exist on the server
   useEffect(() => {
@@ -1236,15 +1237,28 @@ const ProfilePage: React.FC = () => {
     }, { replace: true });
   }, [setSearchParams]);
 
+  // A task and its server row are one design, so they share one card: the row,
+  // carrying the task's progress and this device's cover.
+  const publishingByDesignId = useMemo(() => {
+    const byDesign = new Map<string, (typeof publishingStates)[string]>();
+    for (const state of Object.values(publishingStates)) {
+      if (state.designId) byDesign.set(state.designId, state);
+    }
+    return byDesign;
+  }, [publishingStates]);
+
   const handleDismissFailedCard = useCallback((id: string) => {
     if (!id) return;
-    const state = publishingStates[id];
+    const state = publishingStates[id] ?? publishingByDesignId.get(id);
     if (state?.taskId) {
       removePublishTask(state.taskId, publishTaskScope);
     }
     if (isLocalPublishTaskId(id)) {
       removePublishTask(id, publishTaskScope);
-    } else if (failedPublishDesignIds.has(id)) {
+    } else if (
+      failedPublishDesignIds.has(id) ||
+      drafts.some((draft) => draft.id === id && draft.draftReason === INCOMPLETE_UPLOAD_REASON)
+    ) {
       // "Remove" on a stranded failed-publish DRAFT means get rid of the draft
       // itself (it never got its media). Drop the failure marker and route into
       // the normal delete confirmation so nothing is destroyed silently.
@@ -1252,16 +1266,16 @@ const ProfilePage: React.FC = () => {
       setCollectionToDelete(id);
     }
     setPublishingStates((prev) => {
-      if (!prev[id]) return prev;
+      const taskKey = state?.taskId;
+      if (!prev[id] && !(taskKey && prev[taskKey])) return prev;
       const next = { ...prev };
-      const state = prev[id];
-      if (state?.taskId) {
-        delete next[state.taskId];
+      if (taskKey) {
+        delete next[taskKey];
       }
       delete next[id];
       return next;
     });
-  }, [publishTaskScope, publishingStates, failedPublishDesignIds]);
+  }, [drafts, publishTaskScope, publishingByDesignId, publishingStates, failedPublishDesignIds]);
 
   const removeCollectionFromView = useCallback((collectionId: string) => {
     if (!collectionId) return;
@@ -1401,17 +1415,19 @@ const ProfilePage: React.FC = () => {
 
   const decoratedCollections = useMemo(() => {
     const decorated = searchAndVisibilityFiltered.map((c) => {
-      const pub = publishingStates[c.id];
+      const pub = publishingStates[c.id] ?? publishingByDesignId.get(c.id);
       if (!pub) {
         // No in-flight state, but this real draft is a marked failed go-live:
         // paint the same "publish-failed" affordance (Open editor / Retry /
-        // Remove) directly on the surviving server-draft card.
+        // Remove) directly on the surviving server-draft card. The server marks
+        // a row whose upload never finished, so every device agrees on that one.
         const status = String(c.publicationStatus ?? c.status ?? '').toUpperCase();
-        if (failedPublishDesignIds.has(c.id) && status !== 'PUBLISHED') {
+        const isIncompleteUpload = c.draftReason === INCOMPLETE_UPLOAD_REASON;
+        if (isIncompleteUpload || (failedPublishDesignIds.has(c.id) && status !== 'PUBLISHED')) {
           return {
             ...c,
             clientStatus: 'publish-failed',
-            clientStatusMessage: "Publish didn't finish",
+            clientStatusMessage: isIncompleteUpload ? "Upload didn't finish" : "Publish didn't finish",
             clientStatusMeta: {
               startedAt: Date.now(),
               attempts: 0,
@@ -1420,7 +1436,13 @@ const ProfilePage: React.FC = () => {
             },
           } as CollectionDto;
         }
-        return c;
+        const localCover = getLocalDesignCover(c.id);
+        return localCover
+          ? ({ ...c, clientStatusMeta: { previewUrl: localCover } } as CollectionDto)
+          : c;
+      }
+      if (pub.status === 'settling') {
+        return { ...c, clientStatusMeta: { previewUrl: pub.previewUrl } } as CollectionDto;
       }
       // If the collection already exists on the server (has real data)
       // and the publish state is failed, the server-side publish actually
@@ -1613,7 +1635,7 @@ const ProfilePage: React.FC = () => {
       });
 
     return [...placeholders, ...decorated];
-  }, [publishingStates, searchAndVisibilityFiltered, searchQuery, user?.id, visibilityFilter, failedPublishDesignIds]);
+  }, [publishingStates, publishingByDesignId, searchAndVisibilityFiltered, searchQuery, user?.id, visibilityFilter, failedPublishDesignIds]);
 
   const hasPendingDraftTask = useMemo(
     () => Object.values(publishingStates).some((state) => state.kind === 'draft' && (state.status === 'publishing' || state.status === 'failed')),

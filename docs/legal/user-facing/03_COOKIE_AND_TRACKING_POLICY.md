@@ -95,7 +95,7 @@ To ensure instant navigation and smooth 60fps media scrolling across fashion loo
 * **TanStack React Query Cache**:
   * Caches catalog queries, lookbook media metadata, and designer profiles in memory and `AsyncStorage`.
   * Reduces server load, minimizes mobile cellular data usage, and enables instantaneous back-button navigation without loading spinners.
-* **Pre-Signed AWS S3 URL Cache**:
+* **Signed Media URL Cache**:
   * Caches time-limited HMAC-SHA256 authenticated media URLs for their 15-minute validity window.
 * **Sandboxed Native Media Disk Cache**:
   * Native iOS and Android devices maintain a sandboxed disk cache of high-resolution lookbook photography and video thumbnails. Caches are managed by the operating system and automatically compacted when storage is constrained.
