@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   WEB_UPLOAD_POLICIES,
   UploadValidationError,
+  assertSupportedUploadType,
   assertValidUploadFile,
   assertValidUploadFiles,
   validateUploadFile,
@@ -16,7 +17,38 @@ describe('uploadValidation', () => {
     const file = makeFile('avatar.png', 'image/png', WEB_UPLOAD_POLICIES.profileImage.maxSizeBytes + 1);
 
     expect(validateUploadFile(file, WEB_UPLOAD_POLICIES.profileImage)).toContain(
-      'Profile photo must be 5 MB or smaller.',
+      'Profile photo must be 2 MB or smaller.',
+    );
+  });
+
+  // These mirror `upload.maxSize.*` on the live server. They once mirrored its
+  // larger hard limits, so a 3MB photo skipped compression and was then refused.
+  it('holds every image kind to the limit the API enforces', () => {
+    const MB = 1024 * 1024;
+    const { productMedia, ...twoMegabyteKinds } = WEB_UPLOAD_POLICIES;
+    const images = Object.values(twoMegabyteKinds).filter((policy) =>
+      policy.allowedMimeTypes.some((type) => type.startsWith('image/')),
+    );
+
+    expect(images).toHaveLength(6);
+    for (const policy of images) {
+      expect(policy.maxSizeBytes).toBe(2 * MB);
+      expect(policy).toHaveProperty('preferredSizeBytes', MB);
+    }
+    expect(productMedia.maxSizeBytes).toBe(8 * MB);
+    expect(productMedia.preferredSizeBytes).toBe(MB);
+  });
+
+  it('checks only the type when a file is chosen, because compression has not run yet', () => {
+    const photo = makeFile('photo.jpg', 'image/jpeg', 3 * 1024 * 1024);
+    const vector = makeFile('avatar.svg', 'image/svg+xml', 1024);
+
+    expect(() => assertSupportedUploadType(photo, WEB_UPLOAD_POLICIES.profileImage)).not.toThrow();
+    expect(() => assertValidUploadFile(photo, WEB_UPLOAD_POLICIES.profileImage)).toThrow(
+      UploadValidationError,
+    );
+    expect(() => assertSupportedUploadType(vector, WEB_UPLOAD_POLICIES.profileImage)).toThrow(
+      UploadValidationError,
     );
   });
 

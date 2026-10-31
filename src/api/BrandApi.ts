@@ -24,6 +24,7 @@ import {
 import { resolveCatalogEntityType } from '../utils/catalogEntity';
 import { filterV1GarmentCategories } from '../utils/v1Taxonomy';
 import { WEB_UPLOAD_POLICIES, assertValidUploadFile } from '../utils/uploadValidation';
+import { prepareImageForUpload } from './UploadApi';
 
 /**
  * What `requestPayout` returns instead of a payout.
@@ -1630,10 +1631,11 @@ export const brandApi = {
 
   // Upload banner image
   async uploadBanner(_brandId: string, file: File): Promise<UploadAssetDto | null> {
-    assertValidUploadFile(file, WEB_UPLOAD_POLICIES.bannerImage);
+    const uploadable = await prepareImageForUpload(file, WEB_UPLOAD_POLICIES.bannerImage);
+    assertValidUploadFile(uploadable, WEB_UPLOAD_POLICIES.bannerImage);
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', uploadable);
 
       const response = await apiClient.post(`/uploads/banner-image`, formData, {
         headers: {
@@ -1649,10 +1651,11 @@ export const brandApi = {
 
   // Upload logo image
   async uploadLogo(_brandId: string, file: File): Promise<UploadAssetDto | null> {
-    assertValidUploadFile(file, WEB_UPLOAD_POLICIES.profileImage);
+    const uploadable = await prepareImageForUpload(file, WEB_UPLOAD_POLICIES.profileImage);
+    assertValidUploadFile(uploadable, WEB_UPLOAD_POLICIES.profileImage);
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', uploadable);
 
       const response = await apiClient.post(`/uploads/profile-image`, formData, {
         headers: {

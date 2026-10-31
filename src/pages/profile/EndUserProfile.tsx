@@ -13,6 +13,7 @@ import { CLIP_EMOJI, CLIPS_TAB_LABEL } from '@/constants/clipping';
 import { PatchesTab } from './tabs/PatchesTab';
 import { OrdersPanel, type OrdersPanelSelection } from './tabs/OrdersPanel';
 import { apiClient } from '@/api/httpClient';
+import { prepareImageForUpload } from '@/api/UploadApi';
 import { ProfilePhotoViewApi } from '@/api/ProfilePhotoViewApi';
 import type { AppDispatch, RootState } from '@/store';
 import { setUser } from '@/features/userSlice';
@@ -54,6 +55,8 @@ import {
 import { queryKeys } from '@/query/queryKeys';
 import {
   WEB_UPLOAD_POLICIES,
+  UploadValidationError,
+  assertSupportedUploadType,
   assertValidUploadFile,
   getUploadValidationMessage,
 } from '@/utils/uploadValidation';
@@ -1003,7 +1006,7 @@ export const EndUserProfile: React.FC = () => {
       if (!file || !currentUser) return;
 
       try {
-        assertValidUploadFile(file, WEB_UPLOAD_POLICIES.profileImage);
+        assertSupportedUploadType(file, WEB_UPLOAD_POLICIES.profileImage);
       } catch (uploadError) {
         toast.error(getUploadValidationMessage(uploadError));
         return;
@@ -1016,11 +1019,13 @@ export const EndUserProfile: React.FC = () => {
       setAvatarSettlingUrl(null);
       setAvatarPreviewUrl(nextPreviewUrl);
 
-      const formData = new FormData();
-      formData.append('file', file);
-
       setAvatarUploading(true);
       try {
+        const uploadable = await prepareImageForUpload(file, WEB_UPLOAD_POLICIES.profileImage);
+        assertValidUploadFile(uploadable, WEB_UPLOAD_POLICIES.profileImage);
+        const formData = new FormData();
+        formData.append('file', uploadable);
+
         const response = await apiClient.post('/uploads/profile-image', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
@@ -1110,7 +1115,11 @@ export const EndUserProfile: React.FC = () => {
         setAvatarPreviewUrl(null);
         setAvatarSettlingUrl(null);
         releaseAvatarBlob();
-        toast.error('Unable to upload profile image right now.');
+        toast.error(
+          err instanceof UploadValidationError
+            ? getUploadValidationMessage(err)
+            : 'Unable to upload profile image right now.',
+        );
       } finally {
         setAvatarUploading(false);
       }

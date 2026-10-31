@@ -139,11 +139,7 @@ const prepareViaServerTranscode = async (
     return null;
   }
   try {
-    const transcoded = await getNormalizedImageFile(file, {
-      maxWidth: 2048,
-      quality: 99,
-      maxBytes: Math.max(100 * 1024, Math.min(maxSizeBytes, Math.floor(file.size * 0.1))),
-    });
+    const transcoded = await getNormalizedImageFile(file);
     if (transcoded.size > maxSizeBytes) return null;
     addClientDiagnostic('info', 'design-upload', 'Server media transcode succeeded', {
       original: fileDiagnostic(file),
@@ -198,9 +194,9 @@ const prepareDesignUploadItems = async (
 
       let localFailureReason: string | undefined;
       try {
-        const processed = await preprocessImageFile(file, 'detail', {
+        const processed = await preprocessImageFile(file, {
           maxSizeBytes,
-          minQuality: 0.9,
+          preferredSizeBytes: WEB_UPLOAD_POLICIES.designMedia.preferredSizeBytes,
         });
         if (processed.file.size <= maxSizeBytes || !isImageUploadFile(file)) {
           return {
