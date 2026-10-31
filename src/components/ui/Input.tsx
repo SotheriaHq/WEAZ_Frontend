@@ -63,14 +63,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       rounded-2xl
       text-[color:var(--wiez-text-primary)]
       placeholder:text-[color:var(--wiez-text-placeholder)]
-      shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.35)]
-      border border-black/[0.04] dark:border-white/[0.06]
-      focus:outline-none focus:shadow-[0_4px_18px_rgba(0,0,0,0.1)] dark:focus:shadow-[0_4px_22px_rgba(0,0,0,0.55)] focus:scale-[1.006] focus:border-black/[0.08] dark:focus:border-white/[0.12]
+      shadow-[0_2px_8px_rgba(124,58,237,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_2px_8px_rgba(124,58,237,0.2),inset_0_1px_0_rgba(255,255,255,0.08)]
+      border border-purple-500/15 dark:border-white/[0.08]
+      focus:outline-none focus:shadow-[0_0_0_1px_rgba(168,85,247,0.22),0_4px_20px_-2px_rgba(168,85,247,0.20),inset_0_1px_0_rgba(255,255,255,1)] dark:focus:shadow-[0_0_0_1px_rgba(192,132,252,0.3),0_6px_24px_-2px_rgba(147,51,234,0.35),inset_0_1px_0_rgba(255,255,255,0.15)] focus:scale-[1.006] focus:border-purple-500/35 dark:focus:border-purple-400/35
       transition-all duration-200
       ${
         error
           ? '!border-[color:var(--wiez-action-danger)] !shadow-[0_2px_12px_rgba(239,68,68,0.2)]'
-          : 'hover:shadow-[0_3px_12px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_3px_12px_rgba(0,0,0,0.45)]'
+          : 'hover:shadow-[0_3px_12px_rgba(124,58,237,0.08)] dark:hover:shadow-[0_3px_12px_rgba(124,58,237,0.3)]'
       }
       ${
         disabled

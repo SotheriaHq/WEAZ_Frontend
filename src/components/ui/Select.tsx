@@ -22,42 +22,42 @@ const variantStyles: Record<SelectVariant, string> = {
   default: `
     px-4 py-3 text-sm font-medium
     bg-[color:var(--surface-primary)]
-    border border-black/[0.04] dark:border-white/[0.06]
+    border border-purple-500/15 dark:border-white/[0.08]
     rounded-2xl
     text-[color:var(--wiez-text-primary,var(--text-primary))]
-    shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.35)]
-    hover:shadow-[0_4px_16px_rgba(0,0,0,0.08),0_1px_4px_rgba(0,0,0,0.04)] dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.55)]
-    hover:border-black/[0.08] dark:hover:border-white/[0.12]
+    shadow-[0_2px_8px_rgba(124,58,237,0.04),inset_0_1px_0_rgba(255,255,255,0.95)] dark:shadow-[0_2px_8px_rgba(124,58,237,0.2),inset_0_1px_0_rgba(255,255,255,0.08)]
+    hover:shadow-[0_4px_16px_rgba(124,58,237,0.08),0_1px_4px_rgba(168,85,247,0.04)] dark:hover:shadow-[0_4px_20px_rgba(147,51,234,0.3)]
+    hover:border-purple-500/30 dark:hover:border-purple-400/30
     hover:scale-[1.005]
-    focus:outline-none focus:ring-0 focus:border-transparent
+    focus:outline-none focus:shadow-[0_0_0_1px_rgba(168,85,247,0.22),0_4px_20px_-2px_rgba(168,85,247,0.20),inset_0_1px_0_rgba(255,255,255,1)]
     transition-all duration-200
     cursor-pointer
   `,
   filter: `
     px-3.5 py-2 text-xs font-semibold
     bg-white/80 dark:bg-[#181322]/80 backdrop-blur-md
-    border border-black/[0.05] dark:border-white/[0.08]
+    border border-purple-500/15 dark:border-white/[0.08]
     rounded-xl
     text-[color:var(--wiez-text-primary,var(--text-primary))]
-    shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.85)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.08)]
-    hover:shadow-[0_4px_14px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.04)] dark:hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)]
+    shadow-[0_2px_8px_rgba(124,58,237,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_2px_8px_rgba(124,58,237,0.2),inset_0_1px_0_rgba(255,255,255,0.08)]
+    hover:shadow-[0_4px_14px_rgba(124,58,237,0.08),0_1px_3px_rgba(168,85,247,0.04)] dark:hover:shadow-[0_4px_18px_rgba(147,51,234,0.3)]
     hover:border-purple-400/40 dark:hover:border-purple-400/30
     hover:scale-[1.01]
     active:scale-[0.99]
-    focus:outline-none focus:ring-0 focus:border-transparent
+    focus:outline-none focus:shadow-[0_0_0_1px_rgba(168,85,247,0.22),0_4px_20px_-2px_rgba(168,85,247,0.20),inset_0_1px_0_rgba(255,255,255,1)]
     transition-all duration-200
     cursor-pointer
   `,
   compact: `
     px-2.5 py-1.5 text-xs font-medium
     bg-white/80 dark:bg-[#181322]/80 backdrop-blur-md
-    border border-black/[0.05] dark:border-white/[0.08]
+    border border-purple-500/15 dark:border-white/[0.08]
     rounded-lg
     text-[color:var(--text-secondary)]
-    shadow-[0_1px_4px_rgba(0,0,0,0.04)] dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)]
-    hover:shadow-[0_3px_10px_rgba(0,0,0,0.07)] dark:hover:shadow-[0_3px_12px_rgba(0,0,0,0.4)]
+    shadow-[0_1px_4px_rgba(124,58,237,0.04)] dark:shadow-[0_1px_4px_rgba(124,58,237,0.18)]
+    hover:shadow-[0_3px_10px_rgba(124,58,237,0.08)] dark:hover:shadow-[0_3px_12px_rgba(147,51,234,0.25)]
     hover:scale-[1.01]
-    focus:outline-none focus:ring-0 focus:border-transparent
+    focus:outline-none focus:shadow-[0_0_0_1px_rgba(168,85,247,0.22),0_4px_20px_-2px_rgba(168,85,247,0.20),inset_0_1px_0_rgba(255,255,255,1)]
     transition-all duration-150
     cursor-pointer
   `,

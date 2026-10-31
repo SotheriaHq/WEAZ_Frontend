@@ -385,14 +385,13 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
           className={`
             relative cursor-pointer text-left transition-all duration-200
             flex items-center ${fitContent ? 'w-auto gap-2' : 'w-full justify-between gap-3'}
-            ${isSmall ? 'rounded-xl px-3 py-2 text-xs font-semibold' : 'rounded-2xl px-4 py-3.5 text-sm'}
-            ${disabled ? 'cursor-not-allowed opacity-60 bg-[color:var(--surface-muted)]' : 'surface-menu backdrop-blur-xl surface-interactive-hover'}
+            ${isSmall ? 'rounded-xl px-3 py-2 text-xs font-semibold' : 'rounded-xl px-4 py-2.5 text-sm'}
+            ${disabled ? 'cursor-not-allowed opacity-60 bg-[color:var(--surface-muted)]' : 'wiez-field-input'}
+            ${isOpen ? 'wiez-field-input-active' : ''}
             ${
               error
-                ? 'border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.10)]'
-                : isSmall
-                  ? 'border border-slate-200/70 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
-                  : 'border border-[color:var(--border-default)] hover:border-[color:var(--border-strong)]'
+                ? '!border-red-500 !shadow-[0_0_0_2px_rgba(239,68,68,0.25)]'
+                : ''
             }
           `}
         >
@@ -428,17 +427,15 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
               </span>
             )}
           </span>
-          <span
-            className={`pointer-events-none flex items-center shrink-0 ${
-              selectedAllowWrap ? 'absolute right-2.5 top-2.5' : 'pl-0.5'
-            }`}
-          >
-            <span
-              aria-hidden="true"
-              className={`leading-none text-[color:var(--text-secondary)] opacity-70 transition-transform duration-200 ${isSmall ? 'text-xs' : 'text-base'} ${isOpen ? 'rotate-180' : ''}`}
+          <span className="pointer-events-none flex items-center justify-center shrink-0 w-6 h-6 rounded-lg bg-purple-500/10 dark:bg-white/10 text-purple-600 dark:text-purple-300 ml-2">
+            <svg
+              className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
             >
-              ⌄
-            </span>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+            </svg>
           </span>
         </button>
 

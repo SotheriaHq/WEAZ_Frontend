@@ -1161,13 +1161,13 @@ html {
       linear-gradient(180deg, #ffffff 0%, #fbfbfe 60%, #f7f5fc 100%);
     border-radius: 1.25rem;
     border: 1px solid var(--border-default, #e2e8f0);
-    box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.08), 0 2px 8px -2px rgba(147, 51, 234, 0.04);
+    box-shadow: 0 8px 24px -4px rgba(124, 58, 237, 0.06), 0 2px 8px -2px rgba(168, 85, 247, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     position: relative;
     color: var(--text-primary);
   }
   .wiez-studio-card:hover {
-    box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(147, 51, 234, 0.08);
+    box-shadow: 0 12px 28px -4px rgba(147, 51, 234, 0.10), 0 4px 12px -2px rgba(168, 85, 247, 0.06), inset 0 1px 0 rgba(255, 255, 255, 1);
   }
   .dark .wiez-studio-card {
     background-color: var(--surface-card, #140d21);
@@ -1216,9 +1216,14 @@ html {
       radial-gradient(circle at 100% 0%, rgba(168, 85, 247, 0.08) 0%, transparent 65%),
       linear-gradient(135deg, #ffffff 0%, #faf8ff 50%, #f3ebfc 100%);
     border-radius: 1.25rem;
-    border: 1px solid var(--border-default, #e2e8f0);
-    box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.08), 0 2px 8px -2px rgba(147, 51, 234, 0.04);
+    border: 1px solid rgba(168, 85, 247, 0.18);
+    box-shadow: 0 8px 24px -4px rgba(124, 58, 237, 0.06), 0 2px 8px -2px rgba(168, 85, 247, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     color: var(--text-primary);
+  }
+  .wiez-gradient-live-card:hover {
+    border-color: rgba(168, 85, 247, 0.28);
+    box-shadow: 0 12px 28px -4px rgba(147, 51, 234, 0.12), 0 4px 10px -2px rgba(168, 85, 247, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1);
   }
   .dark .wiez-gradient-live-card {
     background-color: #140d21;
@@ -1359,33 +1364,36 @@ html {
   }
 
   /* WIEZ Material & Surface Lab: Light-Reflecting Card (Specular Top Edge, Zero Dark Smudges) */
+  /* WIEZ Material & Surface Lab: Light-Reflecting Card (Lumina Purple Reflections, Zero Dark Smudges) */
   .neu-recessed-card,
   .surface-card-recessed,
   .surface-card {
     background-color: var(--surface-card, var(--neu-surface));
     color: var(--neu-text);
     border-radius: 1rem;
-    border: 1px solid rgba(0, 0, 0, 0.05);
-    box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.85);
-    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+    border: 1px solid rgba(168, 85, 247, 0.12);
+    box-shadow: 0 4px 16px -2px rgba(124, 58, 237, 0.05), 0 1px 4px rgba(168, 85, 247, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
   }
   :is(.dark) .neu-recessed-card,
   :is(.dark) .surface-card-recessed,
   :is(.dark) .surface-card {
-    background-color: var(--surface-card, #141414);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    background-color: var(--surface-card, #140d21);
+    border: 1px solid rgba(168, 85, 247, 0.18);
+    box-shadow: 0 4px 20px -2px rgba(124, 58, 237, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   }
   .neu-recessed-card:hover,
   .surface-card-recessed:hover,
   .surface-card:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 16px -2px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    border-color: rgba(168, 85, 247, 0.28);
+    box-shadow: 0 8px 24px -2px rgba(124, 58, 237, 0.09), 0 2px 8px rgba(168, 85, 247, 0.05), inset 0 1px 0 rgba(255, 255, 255, 1);
   }
   :is(.dark) .neu-recessed-card:hover,
   :is(.dark) .surface-card-recessed:hover,
   :is(.dark) .surface-card:hover {
-    box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    border-color: rgba(192, 132, 252, 0.35);
+    box-shadow: 0 8px 28px -2px rgba(124, 58, 237, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
   }
 
   /* WIEZ Material & Surface Lab: Tactile light-reflecting button */
@@ -1398,22 +1406,23 @@ html {
     background-color: var(--neu-surface-soft);
     color: var(--neu-text);
     border-radius: 0.75rem;
-    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    border: 1px solid var(--neu-border);
-    transition: transform 0.14s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.14s ease, filter 0.14s ease, border-color 0.14s ease;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    border: none;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: transform 0.14s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.14s ease, filter 0.14s ease;
     will-change: transform, box-shadow;
   }
   :is(.dark) .neu-pressed-button {
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 12px rgba(124, 58, 237, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
   .neu-pressed-button:hover:not(:disabled) {
     transform: translateY(-1px);
-    border-color: rgba(168, 85, 247, 0.35);
-    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1);
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.10), inset 0 1px 0 rgba(255, 255, 255, 1);
   }
   :is(.dark) .neu-pressed-button:hover:not(:disabled) {
-    border-color: rgba(192, 132, 252, 0.3);
-    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   }
   .neu-pressed-button:active:not(:disabled) {
     transform: translateY(1px) scale(0.98);
@@ -1429,25 +1438,26 @@ html {
     background-color: var(--neu-surface-soft);
     color: var(--neu-text);
     border-radius: 9999px;
-    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    border: 1px solid var(--neu-border);
-    transition: transform 0.14s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.14s ease, background-color 0.14s ease, border-color 0.14s ease;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    border: none;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: transform 0.14s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.14s ease, background-color 0.14s ease;
     will-change: transform, box-shadow;
   }
   :is(.dark) .neu-inset-chip,
   :is(.dark) .chip-inset {
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 12px rgba(124, 58, 237, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
   .neu-inset-chip:hover:not(:disabled),
   .chip-inset:hover:not(:disabled) {
     transform: translateY(-1px);
-    border-color: rgba(168, 85, 247, 0.35);
-    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1);
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.10), inset 0 1px 0 rgba(255, 255, 255, 1);
   }
   :is(.dark) .neu-inset-chip:hover:not(:disabled),
   :is(.dark) .chip-inset:hover:not(:disabled) {
-    border-color: rgba(192, 132, 252, 0.3);
-    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   }
   .neu-inset-chip:active:not(:disabled),
   .chip-inset:active:not(:disabled) {
@@ -1458,20 +1468,27 @@ html {
   .chip-inset.selected,
   .neu-inset-chip.selected:focus,
   .chip-inset.selected:focus {
-    background-image:
-      radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.35) 0%, transparent 60%),
-      linear-gradient(135deg,
-        #581c87 0%,
-        #6b21a8 15%,
-        #7e22ce 30%,
-        #9333ea 50%,
-        #a855f7 70%,
-        #b86cf9 85%,
-        #c084fc 100%
-      );
+    background-image: linear-gradient(135deg,
+      #7c3aed 0%,
+      #853bee 7%,
+      #8e40f0 14%,
+      #9745f2 21%,
+      #a04cf4 28%,
+      #aa54f6 35%,
+      #b45df8 42%,
+      #be66fa 50%,
+      #c770fb 58%,
+      #cf7afd 66%,
+      #d685fe 74%,
+      #de91fe 82%,
+      #e59eff 90%,
+      #edacff 95%,
+      #f3baff 100%
+    );
     color: #ffffff;
-    border-color: rgba(192, 132, 252, 0.4);
-    box-shadow: 0 3px 12px rgba(168, 85, 247, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    border: none;
+    outline: none;
+    box-shadow: 0 4px 16px -2px rgba(168, 85, 247, 0.42), 0 2px 6px rgba(124, 58, 237, 0.22), inset 0 1px 1px rgba(255, 255, 255, 0.45);
     transform: scale(1.02);
   }
 
@@ -3209,3 +3226,36 @@ html[data-embedded-surface="mobile-app"] .border-x { border-left-width: 2px; bor
 html[data-embedded-surface="mobile-app"] .border-y { border-top-width: 2px; border-bottom-width: 2px; }
 html[data-embedded-surface="mobile-app"] .divide-y > :not([hidden]) ~ :not([hidden]) { border-top-width: 2px; }
 html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidden]) { border-left-width: 2px; }
+
+
+/* WIEZ Lumina Input & Field Active State Architecture */
+.wiez-field-input {
+  background-color: var(--surface-control, #fcfaff);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default, rgba(168, 85, 247, 0.14));
+  border-radius: 0.875rem;
+  box-shadow: 0 1px 3px rgba(124, 58, 237, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  transition: box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, background-color 0.2s ease;
+  outline: none;
+}
+.wiez-field-input:focus,
+.wiez-field-input:focus-within,
+.wiez-field-input-active {
+  outline: none !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.22), 0 4px 20px -2px rgba(168, 85, 247, 0.20), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+  transform: translateY(-0.5px);
+  background-color: #ffffff !important;
+}
+:is(.dark) .wiez-field-input {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: rgba(168, 85, 247, 0.22);
+  box-shadow: 0 1px 4px rgba(124, 58, 237, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+:is(.dark) .wiez-field-input:focus,
+:is(.dark) .wiez-field-input:focus-within,
+:is(.dark) .wiez-field-input-active {
+  border-color: rgba(192, 132, 252, 0.45) !important;
+  box-shadow: 0 0 0 1px rgba(192, 132, 252, 0.30), 0 6px 24px -2px rgba(147, 51, 234, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
