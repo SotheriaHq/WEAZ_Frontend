@@ -1160,14 +1160,15 @@ html {
       radial-gradient(ellipse at 50% 0%, rgba(168, 85, 247, 0.04) 0%, transparent 70%),
       linear-gradient(180deg, #ffffff 0%, #fbfbfe 60%, #f7f5fc 100%);
     border-radius: 1.25rem;
-    border: 1px solid var(--border-default, #e2e8f0);
-    box-shadow: 0 8px 24px -4px rgba(124, 58, 237, 0.06), 0 2px 8px -2px rgba(168, 85, 247, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 0 solid transparent;
+    box-shadow: 0 4px 20px -2px rgba(168, 85, 247, 0.08), 0 2px 8px -2px rgba(124, 58, 237, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
     color: var(--text-primary);
   }
   .wiez-studio-card:hover {
-    box-shadow: 0 12px 28px -4px rgba(147, 51, 234, 0.10), 0 4px 12px -2px rgba(168, 85, 247, 0.06), inset 0 1px 0 rgba(255, 255, 255, 1);
+    transform: translateY(-2px) scale(1.012);
+    box-shadow: 0 12px 32px -4px rgba(168, 85, 247, 0.20), 0 4px 12px -2px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1);
   }
   .dark .wiez-studio-card {
     background-color: var(--surface-card, #140d21);
@@ -1183,12 +1184,13 @@ html {
         #0e0817 84%,
         #0c0714 100%
       );
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    box-shadow: 0 10px 32px -6px rgba(0, 0, 0, 0.72), 0 2px 10px -2px rgba(147, 51, 234, 0.06);
+    border: 0 solid transparent;
+    box-shadow: 0 4px 24px -2px rgba(147, 51, 234, 0.22), 0 2px 8px -2px rgba(124, 58, 237, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12);
     color: #ffffff;
   }
   .dark .wiez-studio-card:hover {
-    box-shadow: 0 14px 40px -6px rgba(0, 0, 0, 0.8), 0 4px 14px -2px rgba(168, 85, 247, 0.1);
+    transform: translateY(-2px) scale(1.012);
+    box-shadow: 0 12px 36px -4px rgba(168, 85, 247, 0.32), 0 4px 16px -2px rgba(147, 51, 234, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.18);
   }
 
   /* 2. Lumina Active Indicator (10-Shade Ramp + Directional Light Flare) */
@@ -1216,14 +1218,14 @@ html {
       radial-gradient(circle at 100% 0%, rgba(168, 85, 247, 0.08) 0%, transparent 65%),
       linear-gradient(135deg, #ffffff 0%, #faf8ff 50%, #f3ebfc 100%);
     border-radius: 1.25rem;
-    border: 1px solid rgba(168, 85, 247, 0.18);
-    box-shadow: 0 8px 24px -4px rgba(124, 58, 237, 0.06), 0 2px 8px -2px rgba(168, 85, 247, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    border: 0 solid transparent;
+    box-shadow: 0 4px 20px -2px rgba(168, 85, 247, 0.08), 0 2px 8px -2px rgba(124, 58, 237, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     color: var(--text-primary);
   }
   .wiez-gradient-live-card:hover {
-    border-color: rgba(168, 85, 247, 0.28);
-    box-shadow: 0 12px 28px -4px rgba(147, 51, 234, 0.12), 0 4px 10px -2px rgba(168, 85, 247, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1);
+    transform: translateY(-2px) scale(1.012);
+    box-shadow: 0 12px 32px -4px rgba(168, 85, 247, 0.20), 0 4px 12px -2px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1);
   }
   .dark .wiez-gradient-live-card {
     background-color: #140d21;
@@ -1240,8 +1242,8 @@ html {
         #0e0717 90%,
         #0b0512 100%
       );
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.78), 0 2px 12px 0 rgba(168, 85, 247, 0.08);
+    border: 0 solid transparent;
+    box-shadow: 0 4px 24px -2px rgba(147, 51, 234, 0.22), 0 2px 8px -2px rgba(124, 58, 237, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12);
     color: #ffffff;
   }
 
@@ -3232,30 +3234,172 @@ html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidd
 .wiez-field-input {
   background-color: var(--surface-control, #fcfaff);
   color: var(--text-primary);
-  border: 1px solid var(--border-default, rgba(168, 85, 247, 0.14));
-  border-radius: 0.875rem;
-  box-shadow: 0 1px 3px rgba(124, 58, 237, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  transition: box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, background-color 0.2s ease;
+  border: 0 solid transparent;
   outline: none;
+  border-radius: 0.875rem;
+  box-shadow: 0 2px 8px -1px rgba(168, 85, 247, 0.08), 0 1px 3px rgba(124, 58, 237, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  transition: box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease;
 }
 .wiez-field-input:focus,
 .wiez-field-input:focus-within,
 .wiez-field-input-active {
   outline: none !important;
-  border-color: rgba(168, 85, 247, 0.35) !important;
-  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.22), 0 4px 20px -2px rgba(168, 85, 247, 0.20), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+  border: 0 solid transparent !important;
+  box-shadow: 0 0 22px 2px rgba(168, 85, 247, 0.32), 0 4px 14px -2px rgba(147, 51, 234, 0.18), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
   transform: translateY(-0.5px);
   background-color: #ffffff !important;
 }
 :is(.dark) .wiez-field-input {
   background-color: rgba(255, 255, 255, 0.04);
-  border-color: rgba(168, 85, 247, 0.22);
-  box-shadow: 0 1px 4px rgba(124, 58, 237, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border: 0 solid transparent;
+  box-shadow: 0 2px 10px -2px rgba(147, 51, 234, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 :is(.dark) .wiez-field-input:focus,
 :is(.dark) .wiez-field-input:focus-within,
 :is(.dark) .wiez-field-input-active {
-  border-color: rgba(192, 132, 252, 0.45) !important;
-  box-shadow: 0 0 0 1px rgba(192, 132, 252, 0.30), 0 6px 24px -2px rgba(147, 51, 234, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+  border: 0 solid transparent !important;
+  box-shadow: 0 0 26px 3px rgba(192, 132, 252, 0.38), 0 6px 20px -2px rgba(147, 51, 234, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
   background-color: rgba(255, 255, 255, 0.08) !important;
+}
+.wiez-field-input-error {
+  outline: none !important;
+  border: 0 solid transparent !important;
+  box-shadow: 0 0 22px 2px rgba(244, 63, 94, 0.32), 0 4px 14px -2px rgba(225, 29, 72, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+}
+:is(.dark) .wiez-field-input-error {
+  box-shadow: 0 0 26px 3px rgba(244, 63, 94, 0.40), 0 6px 20px -2px rgba(225, 29, 72, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+}
+
+/* =========================================================================
+   WIEZ STUDIO LUMINA MULTI-SHADE CARD PALETTE (10+ CURATED PURPLE SHADES)
+   Zero physical borders, specular rim lighting, scaling light-reflecting shadows
+   ========================================================================= */
+
+/* Base scaling card architecture */
+.wiez-card-base {
+  border: 0 solid transparent !important;
+  outline: none;
+  position: relative;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 20px -2px rgba(168, 85, 247, 0.08), 0 2px 8px -2px rgba(124, 58, 237, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+.wiez-card-base:hover {
+  transform: translateY(-2px) scale(1.012);
+  box-shadow: 0 12px 32px -4px rgba(168, 85, 247, 0.20), 0 4px 12px -2px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+:is(.dark) .wiez-card-base {
+  box-shadow: 0 4px 24px -2px rgba(147, 51, 234, 0.22), 0 2px 8px -2px rgba(124, 58, 237, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+:is(.dark) .wiez-card-base:hover {
+  box-shadow: 0 12px 36px -4px rgba(168, 85, 247, 0.32), 0 4px 16px -2px rgba(147, 51, 234, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+/* 10+ Curated Purple Shade Variants */
+/* Shade 1: Porcelain Lavender (Total Revenue) */
+.wiez-shade-1 {
+  background: linear-gradient(145deg, #ffffff 0%, #fcfaff 40%, #f3ebfc 100%);
+}
+:is(.dark) .wiez-shade-1 {
+  background: linear-gradient(145deg, #1b102e 0%, #160c26 50%, #10081d 100%);
+}
+
+/* Shade 2: Amethyst Mist (Orders) */
+.wiez-shade-2 {
+  background: linear-gradient(145deg, #ffffff 0%, #fdf9ff 40%, #f1e4fe 100%);
+}
+:is(.dark) .wiez-shade-2 {
+  background: linear-gradient(145deg, #1f1235 0%, #180e2b 50%, #120921 100%);
+}
+
+/* Shade 3: Orchid Pearl (Conversion Rate) */
+.wiez-shade-3 {
+  background: linear-gradient(145deg, #ffffff 0%, #fbf7ff 40%, #ede0fc 100%);
+}
+:is(.dark) .wiez-shade-3 {
+  background: linear-gradient(145deg, #23133c 0%, #1a0f2e 50%, #130a23 100%);
+}
+
+/* Shade 4: Lilac Shimmer (Avg Order Value) */
+.wiez-shade-4 {
+  background: linear-gradient(145deg, #ffffff 0%, #faf5ff 40%, #e9d8fb 100%);
+}
+:is(.dark) .wiez-shade-4 {
+  background: linear-gradient(145deg, #21123a 0%, #190e2d 50%, #110820 100%);
+}
+
+/* Shade 5: Iris Glow (Store Views) */
+.wiez-shade-5 {
+  background: linear-gradient(145deg, #ffffff 0%, #f9f4ff 40%, #e6d3fa 100%);
+}
+:is(.dark) .wiez-shade-5 {
+  background: linear-gradient(145deg, #251442 0%, #1b0f31 50%, #140a25 100%);
+}
+
+/* Shade 6: Heather Silk (Patches) */
+.wiez-shade-6 {
+  background: linear-gradient(145deg, #ffffff 0%, #fcf8ff 40%, #eddcfb 100%);
+}
+:is(.dark) .wiez-shade-6 {
+  background: linear-gradient(145deg, #1d1132 0%, #160d27 50%, #0f081c 100%);
+}
+
+/* Shade 7: Royal Mauve (Active Products) */
+.wiez-shade-7 {
+  background: linear-gradient(145deg, #ffffff 0%, #fbf6ff 40%, #e8d0fa 100%);
+}
+:is(.dark) .wiez-shade-7 {
+  background: linear-gradient(145deg, #271545 0%, #1d1035 50%, #150a27 100%);
+}
+
+/* Shade 8: Luminous Plum (Reviews) */
+.wiez-shade-8 {
+  background: linear-gradient(145deg, #ffffff 0%, #faf3ff 40%, #e5cbfa 100%);
+}
+:is(.dark) .wiez-shade-8 {
+  background: linear-gradient(145deg, #24133e 0%, #1a0e2f 50%, #120922 100%);
+}
+
+/* Shade 9: Celestial Violet (Store Banner / Header) */
+.wiez-shade-9 {
+  background: linear-gradient(135deg, #ffffff 0%, #fcf9ff 35%, #f4e9fe 70%, #ebd6fd 100%);
+}
+:is(.dark) .wiez-shade-9 {
+  background: linear-gradient(135deg, #1f1137 0%, #190d2e 40%, #140924 75%, #0e061a 100%);
+}
+
+/* Shade 10: Lavender Pearl (Quick Action Cards) */
+.wiez-shade-10 {
+  background: linear-gradient(145deg, #ffffff 0%, #fcfaff 50%, #f6f0fd 100%);
+}
+:is(.dark) .wiez-shade-10 {
+  background: linear-gradient(145deg, #190f2b 0%, #140b23 50%, #0e0719 100%);
+}
+
+/* Shade 11: Velvet Amethyst (Action Required Panel) */
+.wiez-shade-11 {
+  background: linear-gradient(145deg, #ffffff 0%, #fdfaff 45%, #f5edfc 100%);
+}
+:is(.dark) .wiez-shade-11 {
+  background: linear-gradient(145deg, #221239 0%, #190d2c 50%, #11081f 100%);
+}
+
+/* Shade 12: Radiant Heliotrope (Store Health Panel) */
+.wiez-shade-12 {
+  background: linear-gradient(145deg, #ffffff 0%, #fcf8ff 45%, #f2e4fc 100%);
+}
+:is(.dark) .wiez-shade-12 {
+  background: linear-gradient(145deg, #201136 0%, #170c29 50%, #10071d 100%);
+}
+
+/* Persistent Action Notice Card */
+.wiez-notice-card {
+  border: 0 solid transparent !important;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(254, 242, 242, 0.95) 0%, rgba(255, 247, 237, 0.9) 50%, rgba(250, 245, 255, 0.95) 100%);
+  box-shadow: 0 4px 20px -2px rgba(244, 63, 94, 0.15), 0 2px 8px -2px rgba(234, 88, 12, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+:is(.dark) .wiez-notice-card {
+  background: linear-gradient(135deg, rgba(69, 10, 10, 0.8) 0%, rgba(67, 20, 7, 0.7) 50%, rgba(38, 16, 60, 0.8) 100%);
+  box-shadow: 0 4px 24px -2px rgba(244, 63, 94, 0.25), 0 2px 8px -2px rgba(234, 88, 12, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }

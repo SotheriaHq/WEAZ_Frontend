@@ -267,7 +267,7 @@ export const DraftExpiryStats: React.FC<{
   expiringToday: number; // < 24 hours
   onViewAll?: () => void;
 }> = ({ total, expiringSoon, expiringToday, onViewAll }) => (
-  <div className="bg-white dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700 rounded-xl p-4">
+  <div className="rounded-2xl p-4 sm:p-5 wiez-card-base wiez-shade-10">
     <div className="flex items-center justify-between mb-4">
       <h3 className="font-semibold text-gray-900 dark:text-white">Draft Status</h3>
       {onViewAll && (

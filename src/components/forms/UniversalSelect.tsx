@@ -390,7 +390,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
             ${isOpen ? 'wiez-field-input-active' : ''}
             ${
               error
-                ? '!border-red-500 !shadow-[0_0_0_2px_rgba(239,68,68,0.25)]'
+                ? 'wiez-field-input-error'
                 : ''
             }
           `}

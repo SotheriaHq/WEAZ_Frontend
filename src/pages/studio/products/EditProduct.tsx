@@ -19,6 +19,7 @@ import {
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { MuseLoader } from '@/components/loaders/MuseLoader';
+import ValidationActionNotice from '@/components/ui/ValidationActionNotice';
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 import { useEmbeddedSurface } from "@/hooks/useEmbeddedSurface";
@@ -765,6 +766,12 @@ const EditProduct: React.FC = () => {
    * BEFORE "Go live" is pressed rather than only as a toast afterwards.
    */
   const [customOrderMissingFields, setCustomOrderMissingFields] = useState<string[]>([]);
+  const [publishValidationNotice, setPublishValidationNotice] = useState<{
+    title: string;
+    description: string;
+    missingFields?: Array<{ label: string; step?: number; onClick?: () => void }>;
+    primaryAction?: { label: string; onClick: () => void };
+  } | null>(null);
   const customOrderEditorRef =
     useRef<CustomOrderConfigurationEditorHandle | null>(null);
 
@@ -795,10 +802,12 @@ const EditProduct: React.FC = () => {
    * scroll only fills in for the case where nothing could be focused.
    */
   const revealCustomOrderProblems = useCallback(() => {
+    setWizardStep((current) => {
+      if (current !== 2) return 2;
+      return current;
+    });
     setShowCustomOrderForm(true);
     const handle = customOrderEditorRef.current;
-    // Not mounted yet (the section was closed until a moment ago) — the scroll
-    // still lands the brand on the section, which is the important half.
     handle?.buildConfigurationDraft();
     requestAnimationFrame(() => {
       customOrderSectionRef.current?.scrollIntoView({
@@ -1932,7 +1941,16 @@ const EditProduct: React.FC = () => {
       }
 
       if (validationError) {
-        toast.error(validationError);
+        setPublishValidationNotice({
+          title: 'Missing Required Information',
+          description: validationError,
+          primaryAction: {
+            label: 'Fix Missing Details',
+            onClick: () => goToStep(1),
+          },
+        });
+        toast.dismiss();
+        toast.error(validationError, { id: 'product-publish-validation' });
         return;
       }
 
@@ -1943,9 +1961,20 @@ const EditProduct: React.FC = () => {
           minRequiredMediaCount,
         );
         if (!mediaValidation.ok) {
-          toast.error(
-            mediaValidation.error || "Please review your media selection",
-          );
+          const errMsg = mediaValidation.error || "Please review your media selection";
+          setPublishValidationNotice({
+            title: 'Media Assets Required',
+            description: errMsg,
+            primaryAction: {
+              label: 'Go to Media Setup',
+              onClick: () => {
+                goToStep(1);
+                focusPublishField('media');
+              },
+            },
+          });
+          toast.dismiss();
+          toast.error(errMsg, { id: 'product-publish-validation' });
           return;
         }
       }
@@ -2005,11 +2034,41 @@ const EditProduct: React.FC = () => {
         : undefined;
 
       if (shouldValidatePublish && form.customOrderEnabled && !pendingCustomOrderDraft) {
-        // Open it, validate it, mark the fields, and scroll there — rather than
-        // naming a section the brand cannot see and leaving them to find it.
         revealCustomOrderProblems();
+        const missingLabels = customOrderMissingFields.length > 0
+          ? customOrderMissingFields
+          : ['Base production charge', 'Fabric cost per yard', 'Production lead time', 'Measurement points'];
+
+        setPublishValidationNotice({
+          title: 'Custom Order Setup Incomplete',
+          description: `Custom orders are enabled, but ${missingLabels.length} required field${missingLabels.length === 1 ? '' : 's'} must be completed before going live:`,
+          missingFields: missingLabels.map((lbl) => ({
+            label: lbl,
+            step: 2,
+            onClick: () => {
+              goToStep(2);
+              setShowCustomOrderForm(true);
+              requestAnimationFrame(() => {
+                customOrderSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              });
+            },
+          })),
+          primaryAction: {
+            label: 'Complete Custom Order Setup',
+            onClick: () => {
+              goToStep(2);
+              setShowCustomOrderForm(true);
+              requestAnimationFrame(() => {
+                customOrderSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              });
+            },
+          },
+        });
+
+        toast.dismiss();
         toast.error(
-          'Custom orders are enabled, so this setup has to be complete before the product goes live. The fields that still need you are highlighted below.',
+          `Custom order setup is incomplete (${missingLabels.length} field${missingLabels.length === 1 ? '' : 's'}). Complete the required fields to publish.`,
+          { id: 'product-publish-validation' }
         );
         return;
       }
@@ -3383,6 +3442,7 @@ const EditProduct: React.FC = () => {
    */
   const handleContinue = () => {
     if (canAdvanceFromCurrentStep) {
+      setPublishValidationNotice(null);
       goToStep((wizardStep + 1) as 1 | 2 | 3);
       return;
     }
@@ -3391,8 +3451,22 @@ const EditProduct: React.FC = () => {
     const firstMissing = currentStepMissing[0];
     if (firstMissing) {
       focusPublishField(firstMissing);
+      setPublishValidationNotice({
+        title: 'Step Incomplete',
+        description: `Complete the required fields below to proceed to the next step:`,
+        missingFields: currentStepMissing.map((f) => ({
+          label: PRODUCT_PUBLISH_FIELD_LABEL[f],
+          onClick: () => focusPublishField(f),
+        })),
+        primaryAction: {
+          label: `Fix ${PRODUCT_PUBLISH_FIELD_LABEL[firstMissing]}`,
+          onClick: () => focusPublishField(firstMissing),
+        },
+      });
+      toast.dismiss();
       toast.error(
         `${PRODUCT_PUBLISH_FIELD_LABEL[firstMissing]} is needed before you continue.`,
+        { id: 'product-publish-validation' }
       );
     }
   };
@@ -3526,6 +3600,19 @@ const EditProduct: React.FC = () => {
           </div>
         </div>
 
+        {/* Persistent Validation Notice */}
+        {publishValidationNotice && (
+          <div className="mx-auto w-full max-w-4xl px-4 pt-2 sm:px-6">
+            <ValidationActionNotice
+              title={publishValidationNotice.title}
+              description={publishValidationNotice.description}
+              missingFields={publishValidationNotice.missingFields}
+              primaryAction={publishValidationNotice.primaryAction}
+              onDismiss={() => setPublishValidationNotice(null)}
+            />
+          </div>
+        )}
+
         {/* STEP 1 — Details: Media + Basic Information */}
         <div className={wizardStep === 1 ? "" : "hidden"}>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
@@ -3576,7 +3663,7 @@ const EditProduct: React.FC = () => {
                     ceiling lets the photograph decide, exactly as design
                     creation does, while still never running off the screen.
                   */}
-                  <div className="relative flex max-h-[85vh] min-h-[300px] w-full items-center justify-center overflow-hidden rounded-xl border border-theme sm:min-h-[440px] lg:min-h-[620px]">
+                  <div className="relative flex max-h-[85vh] min-h-[300px] w-full items-center justify-center overflow-hidden rounded-2xl border-0 shadow-[0_4px_24px_-4px_rgba(168,85,247,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] dark:shadow-[0_4px_24px_-4px_rgba(147,51,234,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] bg-gradient-to-br from-white via-purple-50/20 to-purple-100/30 dark:from-[#171026] dark:to-[#0e0817] sm:min-h-[440px] lg:min-h-[620px]">
                     {mediaUrls[carouselIndex] && (
                       <>
                         <MediaRenderer
@@ -4914,9 +5001,9 @@ const EditProduct: React.FC = () => {
             </div>
 
             {/* Media */}
-            <section className="rounded-2xl border border-theme p-4 space-y-3">
+            <section className="space-y-3 py-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-theme-secondary border-l-2 border-purple-500 pl-2.5">
                   Media
                 </h3>
                 <button
@@ -4961,9 +5048,9 @@ const EditProduct: React.FC = () => {
             </section>
 
             {/* Basic Information */}
-            <section className="rounded-2xl border border-theme p-4 space-y-3">
+            <section className="space-y-3 py-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-theme-secondary border-l-2 border-purple-500 pl-2.5">
                   Basic Information
                 </h3>
                 <button
@@ -5016,9 +5103,9 @@ const EditProduct: React.FC = () => {
             </section>
 
             {/* Pricing */}
-            <section className="rounded-2xl border border-theme p-4 space-y-3">
+            <section className="space-y-3 py-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-theme-secondary border-l-2 border-purple-500 pl-2.5">
                   Pricing
                 </h3>
                 <button
@@ -5062,9 +5149,9 @@ const EditProduct: React.FC = () => {
             </section>
 
             {/* Variants */}
-            <section className="rounded-2xl border border-theme p-4 space-y-3">
+            <section className="space-y-3 py-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-theme-secondary border-l-2 border-purple-500 pl-2.5">
                   Variants
                 </h3>
                 <button
@@ -5104,9 +5191,9 @@ const EditProduct: React.FC = () => {
             </section>
 
             {/* Inventory & Fulfillment */}
-            <section className="rounded-2xl border border-theme p-4 space-y-3">
+            <section className="space-y-3 py-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-theme-secondary border-l-2 border-purple-500 pl-2.5">
                   Inventory &amp; Fulfillment
                 </h3>
                 <button
@@ -5143,15 +5230,37 @@ const EditProduct: React.FC = () => {
                     {!form.customOrderEnabled ? (
                       "Off"
                     ) : customOrderMissingFields.length === 0 ? (
-                      "Enabled"
-                    ) : (
-                      /* The state, not a roll-call. Which fields are missing
-                         is shown by the required mark on each field's own
-                         label in the setup section below — repeating them as a
-                         list here asks the reader to match names to fields. */
-                      <span className="font-semibold text-amber-600 dark:text-amber-400">
-                        Enabled — setup incomplete
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                        Enabled — Ready
                       </span>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <span className="font-semibold text-amber-600 dark:text-amber-400">
+                          Enabled — setup incomplete ({customOrderMissingFields.length} missing)
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {customOrderMissingFields.map((f, i) => (
+                            <span key={i} className="inline-flex items-center rounded-lg bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                              {f}
+                            </span>
+                          ))}
+                        </div>
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              goToStep(2);
+                              setShowCustomOrderForm(true);
+                              requestAnimationFrame(() => {
+                                customOrderSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 underline cursor-pointer"
+                          >
+                            Complete custom order setup now ›
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </dd>
                 </div>
@@ -5159,9 +5268,9 @@ const EditProduct: React.FC = () => {
             </section>
 
             {/* Additional Details */}
-            <section className="rounded-2xl border border-theme p-4 space-y-3">
+            <section className="space-y-3 py-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-theme-secondary border-l-2 border-purple-500 pl-2.5">
                   Additional Details
                 </h3>
                 <button
@@ -5197,7 +5306,7 @@ const EditProduct: React.FC = () => {
 
       {/* Footer */}
       <footer
-        className={`sticky bottom-0 z-20 w-full px-4 pt-2.5 backdrop-blur-md bg-white/95 dark:bg-zinc-900/95 border-t border-gray-200/60 dark:border-white/10 sm:px-6 shadow-lg ${
+        className={`sticky bottom-0 z-20 w-full px-4 pt-2.5 backdrop-blur-[24px] backdrop-saturate-[200%] bg-white/80 dark:bg-[#140d21]/80 border-0 shadow-[0_-4px_24px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.95)] sm:px-6 ${
           isEmbeddedMobile
             ? 'pb-[calc(env(safe-area-inset-bottom)+0.625rem)] -mx-3 w-[calc(100%+1.5rem)] sm:-mx-4 sm:w-[calc(100%+2rem)]'
             : 'pb-2.5'

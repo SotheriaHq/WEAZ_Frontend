@@ -4,6 +4,7 @@ type TextFieldVariant = 'default' | 'glass' | 'inverted';
 
 interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'className'> {
   label?: string;
+  labelClassName?: string;
   helperText?: string;
   error?: string | null;
   addon?: React.ReactNode;
@@ -25,6 +26,7 @@ const TextField = forwardRef<HTMLInputElement, Props>(
   (
     {
       label,
+      labelClassName,
       helperText,
       error,
       addon,
@@ -37,13 +39,13 @@ const TextField = forwardRef<HTMLInputElement, Props>(
   ) => {
     const variantStyle = variantClasses[variant] ?? variantClasses.default;
     const errorStyles = error
-      ? '!border-red-500 !shadow-[0_0_0_2px_rgba(239,68,68,0.25)]'
+      ? 'wiez-field-input-error'
       : '';
 
     return (
       <div className={`w-full ${className}`}>
         {label && (
-          <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
+          <label className={labelClassName || "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200"}>
             {label}
             {rest.required ? <span className="ml-1 text-purple-500">*</span> : null}
           </label>
@@ -61,7 +63,7 @@ const TextField = forwardRef<HTMLInputElement, Props>(
             {helperText}
           </div>
         )}
-        {error && <div className="mt-1 text-xs text-red-600">{error}</div>}
+        {error && <div className="mt-1 text-xs text-rose-500 dark:text-rose-400 font-medium">{error}</div>}
       </div>
     );
   },

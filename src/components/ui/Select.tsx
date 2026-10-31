@@ -140,7 +140,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       ${variantStyles[variant]}
       ${
         error
-          ? "!border-red-500 dark:!border-red-500 !shadow-[0_2px_12px_rgba(239,68,68,0.2)]"
+          ? "!border-0 !border-transparent !shadow-[0_0_22px_2px_rgba(244,63,94,0.32),0_4px_14px_-2px_rgba(225,29,72,0.18),inset_0_1px_0_rgba(255,255,255,0.95)]"
           : ""
       }
       ${disabled ? "opacity-60 cursor-not-allowed bg-[color:var(--surface-muted)]" : ""}
