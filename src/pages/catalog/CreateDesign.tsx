@@ -318,6 +318,10 @@ const CreateDesignInner: React.FC = () => {
   const [type, setType] = useState<"MALE" | "FEMALE" | "EVERYBODY">(
     "EVERYBODY",
   );
+  const [activeInspectorSection, setActiveInspectorSection] = useState<
+    'identity' | 'style' | 'commercial' | 'sizing'
+  >('identity');
+  const [previewAspectRatio, setPreviewAspectRatio] = useState<'9:16' | '4:5' | '1:1'>('9:16');
   const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
   const [sizingMode, setSizingMode] = useState<DesignSizingMode>('NONE');
   const [fitPreference, setFitPreference] = useState<DesignFitPreference>('REGULAR');
@@ -1035,6 +1039,7 @@ const CreateDesignInner: React.FC = () => {
     // details are never enforced for drafts — they are completed later, before
     // publishing. So a draft saves even with Custom Order toggled and no points.
     if (title.trim().length === 0) {
+      setActiveInspectorSection('identity');
       toast.error('Add a title to save your draft');
       addClientDiagnostic('warn', 'create-design', 'Save draft blocked by missing title', {
         fileCount: files.length,
@@ -1328,21 +1333,34 @@ const CreateDesignInner: React.FC = () => {
   const handlePublishClick = () => {
     if (!isValid) {
       const reasons: string[] = [];
-      if (title.trim().length === 0) reasons.push("Add a title.");
+      if (title.trim().length === 0) {
+        reasons.push("Add a title.");
+        setActiveInspectorSection('identity');
+      } else if (!hasPendingTaxonomy && categoryId.trim().length === 0) {
+        reasons.push("Choose what this item is, or propose a category and garment type.");
+        setActiveInspectorSection('identity');
+      } else if (!hasPendingTaxonomy && categoryTypeId.trim().length === 0) {
+        reasons.push("Choose a garment type.");
+        setActiveInspectorSection('identity');
+      } else if (type.trim().length === 0) {
+        reasons.push("Choose who this item is for.");
+        setActiveInspectorSection('identity');
+      } else if (!targetAgeGroup) {
+        reasons.push("Choose an age group.");
+        setActiveInspectorSection('identity');
+      } else if (getSelectedFilterValueIds().length === 0) {
+        reasons.push("Add at least one style detail.");
+        setActiveInspectorSection('style');
+      } else if (selectedTags.length === 0) {
+        reasons.push("Add at least one hashtag.");
+        setActiveInspectorSection('style');
+      }
       if (missingRequiredMediaSlots.length > 0)
         reasons.push(
           `Add ${missingRequiredMediaSlots.map(getMediaViewSlotLabel).join(', ')} media before going live.`,
         );
       if (files.length > DESIGN_MAX_MEDIA_COUNT)
         reasons.push(`Use no more than ${DESIGN_MAX_MEDIA_COUNT} media assets.`);
-      if (!hasPendingTaxonomy && categoryId.trim().length === 0) reasons.push("Choose what this item is, or propose a category and garment type.");
-      if (!hasPendingTaxonomy && categoryTypeId.trim().length === 0)
-        reasons.push("Choose a garment type.");
-      if (type.trim().length === 0) reasons.push("Choose who this item is for.");
-      if (!targetAgeGroup) reasons.push("Choose an age group.");
-      if (getSelectedFilterValueIds().length === 0)
-        reasons.push("Add at least one style detail.");
-      if (selectedTags.length === 0) reasons.push("Add at least one hashtag.");
       toast.error(
         reasons.length > 1
           ? `${reasons[0]} (${reasons.length - 1} more to fix)`
@@ -1360,6 +1378,7 @@ const CreateDesignInner: React.FC = () => {
       const pendingCustomOrderDraft =
         customOrderEditorRef.current?.buildConfigurationDraft() ?? null;
       if (!pendingCustomOrderDraft) {
+        setActiveInspectorSection('commercial');
         // This used to `return` in silence, which is how the primary action
         // came to look broken: an owner answering a change request pressed it
         // and nothing happened at all — no toast, no modal, no error.
@@ -1763,11 +1782,11 @@ const CreateDesignInner: React.FC = () => {
 
         {isEditMode && id ? <ReviewFeedbackBanner designId={id} /> : null}
 
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 mb-8">
-          {/* LEFT COLUMN: Sticky Media Stage + Real-Time Live Runway Feed Card (Col 5/12) */}
-          <div className="lg:col-span-5 lg:sticky lg:top-20 space-y-5">
-            {/* Media Section Card */}
-            <section id="design-media-section" className="wiez-studio-card p-4 space-y-4">
+        <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12 mb-8">
+          {/* LEFT COLUMN: Height-Bounded Studio Canvas + Real-Time Live Runway Feed Card (Col 5/12) */}
+          <div className="lg:col-span-5 flex flex-col justify-between space-y-4">
+            {/* Visual Assets Studio Card */}
+            <section id="design-media-section" className="wiez-studio-card p-4 space-y-3 flex-1 flex flex-col justify-between">
               <input
                 ref={picker.inputRef}
                 type="file"
@@ -1782,9 +1801,41 @@ const CreateDesignInner: React.FC = () => {
                 <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
                   Visual Assets ({files.length}/{DESIGN_MAX_MEDIA_COUNT})
                 </span>
-                <span className="text-xs text-purple-300 font-semibold">
-                  {files.length === 0 ? "Upload at least 1 hero look" : `Cover: Slot ${coverIndex + 1}`}
-                </span>
+                <div className="flex items-center gap-1 p-1 rounded-xl text-xs surface-control border border-[var(--border-subtle)]">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewAspectRatio('9:16')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                      previewAspectRatio === '9:16'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    9:16 Reel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewAspectRatio('4:5')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                      previewAspectRatio === '4:5'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    4:5 Portrait
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewAspectRatio('1:1')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                      previewAspectRatio === '1:1'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    1:1 Square
+                  </button>
+                </div>
               </div>
 
               {files.length === 0 ? (
@@ -1800,87 +1851,95 @@ const CreateDesignInner: React.FC = () => {
                   }
                 />
               ) : (
-                <div className="space-y-4 min-w-0">
-                  {/* Main Preview */}
-                  <div className="relative rounded-2xl overflow-hidden bg-[#0a0514] border border-white/5 shadow-inner">
+                <div className="space-y-3 min-w-0">
+                  {/* Main Preview Stage (Bounded max-height, zero unnecessary space) */}
+                  <div
+                    className={`relative w-full ${
+                      previewAspectRatio === '9:16'
+                        ? 'aspect-[9/16] max-h-[360px]'
+                        : previewAspectRatio === '4:5'
+                          ? 'aspect-[4/5] max-h-[360px]'
+                          : 'aspect-square max-h-[360px]'
+                    } rounded-2xl overflow-hidden flex items-center justify-center border border-[var(--border-default)] surface-control shadow-inner mx-auto`}
+                  >
                     {selectedIndex < 6 && (
-                      <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md border border-white/10">
+                      <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10">
                         <span className="text-[10px] font-bold text-white uppercase tracking-wider">
-                          {getMediaViewSlotLabel(
-                            normalizeMediaViewSlot(selectedFile?.viewSlot, selectedIndex),
-                          )}
+                          {selectedIndex === coverIndex
+                            ? '⭐ Cover Look'
+                            : getMediaViewSlotLabel(
+                                normalizeMediaViewSlot(selectedFile?.viewSlot, selectedIndex),
+                              )}
                         </span>
                       </div>
                     )}
-                    <div className="relative w-full aspect-[9/16] max-h-[440px] flex items-center justify-center overflow-hidden">
-                      <AnimatePresence mode="wait">
-                        {selectedFile && (
-                          <motion.div
-                            key={selectedFile.id || selectedFile.url}
-                            className="w-full h-full flex items-center justify-center"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                          >
-                            {selectedFile.url ? (
-                              <LocalMediaPreview
-                                kind={
-                                  selectedFile.kind === "video" ? "video" : "image"
-                                }
-                                src={selectedFile.url}
-                                file={selectedFile.file}
-                                alt={selectedFile.file?.name || "Preview"}
-                                className="w-full h-full flex items-center justify-center"
-                                mediaClassName="h-full w-full object-cover"
-                                maxHeightClassName="max-h-[440px]"
-                                maxWidthClassName="max-w-full"
-                                allowScroll
-                                diagnosticScope="create-design-main-preview"
-                              />
-                            ) : (
-                              <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-sm font-medium text-theme-secondary">
-                                <MuseLoader size={32} label="Optimizing photo for preview" />
-                                Optimizing photo for preview...
-                              </div>
-                            )}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                    <AnimatePresence mode="wait">
+                      {selectedFile && (
+                        <motion.div
+                          key={selectedFile.id || selectedFile.url}
+                          className="w-full h-full flex items-center justify-center"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          {selectedFile.url ? (
+                            <LocalMediaPreview
+                              kind={
+                                selectedFile.kind === 'video' ? 'video' : 'image'
+                              }
+                              src={selectedFile.url}
+                              file={selectedFile.file}
+                              alt={selectedFile.file?.name || 'Preview'}
+                              className="w-full h-full flex items-center justify-center"
+                              mediaClassName="h-full w-full object-cover"
+                              maxHeightClassName="max-h-[360px]"
+                              maxWidthClassName="max-w-full"
+                              allowScroll
+                              diagnosticScope="create-design-main-preview"
+                            />
+                          ) : (
+                            <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 text-sm font-medium text-theme-secondary">
+                              <MuseLoader size={32} label="Optimizing photo for preview" />
+                              Optimizing photo for preview...
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
-                      {/* Floating Action Bar */}
-                      <div className="absolute bottom-0 left-0 right-0 px-3 py-2.5 bg-gradient-to-t from-black/85 via-black/40 to-transparent">
-                        <div className="flex items-center justify-center gap-2">
-                          <ActionButton
-                            icon={<FiTrash2 className="w-4 h-4" />}
-                            label="Delete"
-                            onClick={() =>
-                              selectedFile?.id && handleDelete(selectedFile.id)
-                            }
-                            disabled={disabled}
-                          />
-                          <ActionButton
-                            icon={
-                              <FiStar
-                                className={`w-4 h-4 ${coverIndex === selectedIndex ? "fill-purple-400 text-purple-400" : ""}`}
-                              />
-                            }
-                            label={coverIndex === selectedIndex ? "Cover" : "Set as Cover"}
-                            onClick={() => handleSetCover(selectedIndex)}
-                            disabled={disabled}
-                            active={coverIndex === selectedIndex}
-                          />
-                          <ActionButton
-                            icon={<FiMaximize2 className="w-4 h-4" />}
-                            label="Fullscreen"
-                            onClick={openFullscreen}
-                          />
-                        </div>
+                    {/* Floating Action Bar */}
+                    <div className="absolute bottom-0 left-0 right-0 px-3 py-2 bg-gradient-to-t from-black/85 via-black/40 to-transparent">
+                      <div className="flex items-center justify-center gap-2">
+                        <ActionButton
+                          icon={<FiTrash2 className="w-3.5 h-3.5" />}
+                          label="Delete"
+                          onClick={() =>
+                            selectedFile?.id && handleDelete(selectedFile.id)
+                          }
+                          disabled={disabled}
+                        />
+                        <ActionButton
+                          icon={
+                            <FiStar
+                              className={`w-3.5 h-3.5 ${coverIndex === selectedIndex ? 'fill-purple-400 text-purple-400' : ''}`}
+                            />
+                          }
+                          label={coverIndex === selectedIndex ? 'Cover' : 'Set Cover'}
+                          onClick={() => handleSetCover(selectedIndex)}
+                          disabled={disabled}
+                          active={coverIndex === selectedIndex}
+                        />
+                        <ActionButton
+                          icon={<FiMaximize2 className="w-3.5 h-3.5" />}
+                          label="Full"
+                          onClick={openFullscreen}
+                        />
                       </div>
                     </div>
                   </div>
 
-                  {/* MediaSlotGrid Thumbnail Rail */}
+                  {/* 1-Row Compact Thumbnail Rail */}
                   <MediaSlotGrid
                     mediaBySlot={designSlotMedia}
                     maxSlots={DESIGN_MAX_MEDIA_COUNT}
@@ -1905,9 +1964,9 @@ const CreateDesignInner: React.FC = () => {
                     }
                   />
 
-                  {/* Image info */}
-                  <p className="text-center text-xs text-[var(--text-muted)]">
-                    {selectedFile?.kind === "video" ? "Video" : "Image"}{" "}
+                  {/* Media Count and File Info */}
+                  <p className="text-center text-[11px] text-[var(--text-muted)]">
+                    {selectedFile?.kind === 'video' ? 'Video' : 'Image'}{' '}
                     {selectedIndex + 1} of {files.length}
                     {selectedFile?.file?.name && ` • ${selectedFile.file.name}`}
                   </p>
@@ -1916,21 +1975,21 @@ const CreateDesignInner: React.FC = () => {
             </section>
 
             {/* Live Runway Feed Preview Card */}
-            <div className="wiez-gradient-live-card p-4 space-y-3">
+            <div className="wiez-gradient-live-card p-4 space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <HiOutlineSparkles className="w-3.5 h-3.5 text-purple-400" />
+                <span className="text-xs font-bold text-purple-600 dark:text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <HiOutlineSparkles className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400" />
                   Live Runway Feed Card
                 </span>
                 <span className="text-[10px] text-[var(--text-muted)]">Real-Time Shopper View</span>
               </div>
 
-              <div className="rounded-2xl bg-[#090412]/90 p-3 border border-white/5 flex items-center gap-3.5 shadow-inner">
-                <div className="w-16 h-20 rounded-xl overflow-hidden bg-white/5 border border-white/10 flex-shrink-0 flex items-center justify-center">
+              <div className="rounded-2xl surface-card p-3 border border-[var(--border-default)] flex items-center gap-3.5 shadow-sm">
+                <div className="w-14 h-18 rounded-xl overflow-hidden surface-control border border-[var(--border-subtle)] flex-shrink-0 flex items-center justify-center">
                   {(coverImageUrl || selectedFile?.url) ? (
                     <MediaRenderer
                       kind="image"
-                      src={coverImageUrl || selectedFile?.url || ""}
+                      src={coverImageUrl || selectedFile?.url || ''}
                       alt="Cover preview"
                       fit="cover"
                       className="w-full h-full"
@@ -1938,41 +1997,41 @@ const CreateDesignInner: React.FC = () => {
                     />
                   ) : (
                     <span className="text-[10px] text-[var(--text-muted)] font-semibold text-center px-1">
-                      No cover look
+                      No look
                     </span>
                   )}
                 </div>
 
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
-                      {isEditMode ? "Drop Update" : "New Drop"}
+                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-600 dark:text-purple-300">
+                      {isEditMode ? 'Drop Update' : 'New Drop'}
                     </span>
                     {isMadeToOrder && (
-                      <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-300">
                         Made to Order
                       </span>
                     )}
                   </div>
 
-                  <h4 className="text-sm font-bold truncate text-white">
-                    {title.trim() || "Untitled Design"}
+                  <h4 className="text-xs font-bold text-[var(--text-primary)] break-words">
+                    {title.trim() || 'Untitled Design'}
                   </h4>
 
-                  <p className="text-xs text-[var(--text-muted)] truncate">
-                    {type || "Audience"} • {filteredCategories.find((c) => c.id === categoryId)?.name || "Category"}
+                  <p className="text-[11px] text-[var(--text-muted)] break-words">
+                    {type || 'Audience'} • {filteredCategories.find((c) => c.id === categoryId)?.name || 'Category'}
                     {categoryTypeOptions.find((gt) => gt.id === categoryTypeId)?.name
                       ? ` · ${categoryTypeOptions.find((gt) => gt.id === categoryTypeId)?.name}`
-                      : ""}
+                      : ''}
                   </p>
 
                   <div className="flex items-center justify-between pt-0.5">
-                    <span className="text-xs font-extrabold text-white">
+                    <span className="text-xs font-extrabold text-[var(--text-primary)]">
                       {minPrice || maxPrice
                         ? `₦${Number(minPrice || 0).toLocaleString()} – ₦${Number(maxPrice || 0).toLocaleString()}`
-                        : "Price on request"}
+                        : 'Price on request'}
                     </span>
-                    <span className="text-[11px] text-purple-400 font-semibold">
+                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold">
                       Ready to Order ›
                     </span>
                   </div>
@@ -1981,528 +2040,549 @@ const CreateDesignInner: React.FC = () => {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Continuous Studio Craft Stream (Col 7/12) */}
-          <div className="lg:col-span-7 space-y-6">
-            
-            {/* 1. Core Identity & Tell Your Story */}
-            <div className="wiez-studio-card p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs font-bold shadow-inner">
-                    1
-                  </span>
-                  <h3 className="text-sm font-bold text-white">Design Title & Story</h3>
-                </div>
-                <span className="text-xs text-[var(--text-muted)]">Core Identity</span>
-              </div>
-
-              <div className="space-y-4">
-                <TextField
-                  label="Design Title"
-                  value={title}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setTitle(e.target.value)
-                  }
-                  placeholder="e.g., Summer Breeze '24"
-                  disabled={disabled || titleDescriptionLocked}
-                  variant="glass"
-                  required
-                />
-
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] flex items-center">
-                      Tell Your Story
-                      <InfoTooltip text="Describe the inspiration, mood, and story behind this design. This is visible to buyers browsing the catalog." />
-                    </label>
-                    <span className="text-xs text-[var(--text-muted)]">
-                      {description.length} / 500 characters
-                    </span>
-                  </div>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Inspired by the warm coastal breeze of Lagos..."
-                    rows={3}
-                    disabled={disabled || titleDescriptionLocked}
-                    className="surface-control placeholder-theme w-full px-4 py-3 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none text-sm"
-                  />
-                </div>
-
-                {editingDraft && (
-                  <p className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-200">
-                    Drafts can be updated up to 2 times every 24 hours.
-                  </p>
-                )}
-                {titleDescriptionLocked && (
-                  <p className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300">
-                    Title and description can only be updated once every 30 days.
-                    {nextTitleEditDate
-                      ? ` Next edit available on ${nextTitleEditDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.`
-                      : ""}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* 2. Taxonomy & Garment DNA */}
-            <div className="wiez-studio-card p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs font-bold shadow-inner">
-                    2
-                  </span>
-                  <h3 className="text-sm font-bold text-white">Taxonomy & Garment DNA</h3>
-                </div>
-                <span className="text-xs text-[var(--text-muted)]">Discovery Metadata</span>
-              </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] flex items-center">
-                      Who is it for? *
-                      <InfoTooltip text={CREATOR_METADATA_HELP.audience} />
-                    </label>
-                    <UniversalSelect
-                      value={type}
-                      onChange={handleAudienceChange}
-                      options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
-                        value: option.value,
-                        label: option.label,
-                      }))}
-                      placeholder="Choose who this item is for"
-                      disabled={disabled}
-                      optionCompact
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <UniversalSelect
-                      label="Age group"
-                      required
-                      value={targetAgeGroup}
-                      onChange={handleAgeGroupChange}
-                      options={DESIGN_TARGET_AGE_OPTIONS.map((option) => ({
-                        value: option.value,
-                        label: option.label,
-                      }))}
-                      disabled={disabled}
-                      optionCompact
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <UniversalSelect
-                    label="What is it?"
-                    required
-                    value={categoryId}
-                    onChange={handleCategoryChange}
-                    options={filteredCategories.map((c) => ({
-                      value: c.id,
-                      label: c.name,
-                    }))}
-                    placeholder={
-                      loadingCategories
-                        ? "Loading..."
-                        : "Choose what this item is"
-                    }
-                    disabled={disabled}
-                    searchable
-                    emptyMessage="No garment categories match this audience yet"
-                    optionAllowWrap
-                    selectedAllowWrap
-                  />
-
-                  <UniversalSelect
-                    label="Garment type"
-                    required
-                    value={categoryTypeId}
-                    onChange={setCategoryTypeId}
-                    options={categoryTypeOptions.map((categoryType) => ({
-                      value: categoryType.id,
-                      label: categoryType.name,
-                    }))}
-                    placeholder={
-                      loadingCategories
-                        ? "Loading..."
-                        : categoryId
-                          ? categoryTypeOptions.length
-                            ? "Choose a garment type"
-                            : "No garment types match this audience"
-                          : "Choose what this item is first"
-                    }
-                    disabled={
-                      disabled || !categoryId || categoryTypeOptions.length === 0
-                    }
-                    searchable
-                    emptyMessage="No garment types match this audience yet"
-                    optionAllowWrap
-                    selectedAllowWrap
-                  />
-                </div>
-
-                {/* Missing category or garment type proposal toggle */}
-                <DesignTaxonomyProposalField
-                  value={selectedProposal}
-                  disabled={disabled}
-                  onChange={(proposal) => {
-                    setPendingProposal(proposal);
-                    if (proposal) {
-                      setCategoryId('');
-                      setCategoryTypeId('');
-                    }
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* 3. Style Details & Hashtags */}
-            <div className="wiez-studio-card p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs font-bold shadow-inner">
-                    3
-                  </span>
-                  <h3 className="text-sm font-bold text-white">Style Details & Hashtags</h3>
-                </div>
-                <span className="text-xs text-[var(--text-muted)]">Rule 2-Column Grid</span>
-              </div>
-
-              <div className="space-y-4">
-                <FilterSelector
-                  value={filterSelection}
-                  onChange={setFilterSelection}
-                  entityType="DESIGN"
-                  disabled={disabled}
-                  onTagSuggestions={handleFilterTagSuggestions}
-                />
-
-                {(() => {
-                  const styleDetailCount = Object.values(filterSelection).flatMap(
-                    (values) => (Array.isArray(values) ? values : values ? [values] : []),
-                  ).length;
-                  return styleDetailCount > 8 ? (
-                    <p className="text-xs font-medium text-amber-300">
-                      ⚠️ ${styleDetailCount} style details selected — fewer, precise
-                      details improve discovery and buyer trust.
-                    </p>
-                  ) : null;
-                })()}
-
-                {/* Hashtags Cloud */}
-                <div className="space-y-2 pt-2 border-t border-white/5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] flex items-center">
-                      Hashtags ({selectedTags.length}/10)
-                      <InfoTooltip text="Add up to 10 hashtags to improve search discovery." />
-                    </label>
-                  </div>
-
-                  {selectedTags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {selectedTags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="neu-inset-chip selected inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold"
-                        >
-                          {normalizeHashtagLabel(tag)}
-                          <button
-                            type="button"
-                            onClick={() => removeTag(tag)}
-                            className="hover:opacity-75 transition-opacity"
-                            aria-label={`Remove ${tag}`}
-                          >
-                            <FiX className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Search / Add Hashtags */}
-                  <div className="relative">
-                    <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-secondary" />
-                    <input
-                      type="text"
-                      value={tagSearch}
-                      onChange={(e) => setTagSearch(e.target.value)}
-                      onKeyDown={handleTagInputKeyDown}
-                      placeholder="Search or create a hashtag..."
-                      disabled={disabled || selectedTags.length >= 10}
-                      className="surface-control placeholder-theme w-full pl-10 pr-20 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-xs"
-                    />
-                    {tagSearch.trim() && (
-                      <button
-                        type="button"
-                        onClick={() => addTag(tagSearch)}
-                        disabled={disabled || selectedTags.length >= 10}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 transition"
-                      >
-                        + Add
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Popular Suggestions */}
-                  <div className="space-y-1.5 pt-2">
-                    <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                      Popular suggestions:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {filteredSuggestions.slice(0, 12).map((tag: string) => {
-                        const isSelected = selectedTags.some(
-                          (t) => t.toLowerCase() === tag.toLowerCase(),
-                        );
-                        return (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() => addTag(tag)}
-                            disabled={disabled || isSelected}
-                            className={`neu-pressed-button px-2.5 py-1 text-xs font-medium transition-transform active:scale-95 ${
-                              isSelected
-                                ? 'opacity-40 cursor-not-allowed'
-                                : 'text-theme-secondary hover:text-theme'
-                            }`}
-                          >
-                            {normalizeHashtagLabel(tag)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
+          {/* RIGHT COLUMN: Space-Locked Inspector Studio (Col 7/12) */}
+          <div className="lg:col-span-7 wiez-studio-card p-5 sm:p-6 flex flex-col justify-between">
+            <div>
+              {/* Section Inspector Pills */}
+              <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-3 mb-5">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
-                    onClick={() => setShowTagPicker(true)}
-                    disabled={disabled}
-                    className="mt-2 neu-pressed-button inline-flex items-center gap-1.5 text-xs text-purple-300 py-1.5 px-3"
+                    onClick={() => setActiveInspectorSection('identity')}
+                    className={`wiez-inspector-pill ${activeInspectorSection === 'identity' ? 'active' : ''}`}
                   >
-                    <FiSearch className="w-3.5 h-3.5" />
-                    See all hashtags ({selectedTags.length}/10)
+                    1. Title & DNA
                   </button>
-
-                  <HashtagPickerModal
-                    open={showTagPicker}
-                    onClose={() => setShowTagPicker(false)}
-                    selected={selectedTags}
-                    onToggle={handleToggleTagFromPicker}
-                    maxTags={10}
-                    extraSuggestions={tagSuggestions}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setActiveInspectorSection('style')}
+                    className={`wiez-inspector-pill ${activeInspectorSection === 'style' ? 'active' : ''}`}
+                  >
+                    2. Style & Tags
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveInspectorSection('commercial')}
+                    className={`wiez-inspector-pill ${activeInspectorSection === 'commercial' ? 'active' : ''}`}
+                  >
+                    3. Pricing & Made to Order
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveInspectorSection('sizing')}
+                    className={`wiez-inspector-pill ${activeInspectorSection === 'sizing' ? 'active' : ''}`}
+                  >
+                    4. Sizing & Visibility
+                  </button>
                 </div>
               </div>
-            </div>
 
-            {/* 4. Commercial & Made to Order (Full Natural Inline Expansion) */}
-            <div className="wiez-studio-card p-5 space-y-5">
-              <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs font-bold shadow-inner">
-                    4
-                  </span>
-                  <h3 className="text-sm font-bold text-white">Commercial & Made to Order</h3>
-                </div>
-                <span className="text-xs text-[var(--text-muted)]">Pricing & Custom Orders</span>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-2 flex items-center">
-                    Estimated Price Range (₦)
-                    <InfoTooltip text="An indicative price range for this design. Helps shoppers understand expected cost." />
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] font-bold text-sm">
-                        ₦
-                      </span>
-                      <input
-                        type="number"
-                        value={minPrice}
-                        onChange={(e) => setMinPrice(e.target.value)}
-                        placeholder="15,000"
-                        disabled={disabled}
-                        className="surface-control w-full pl-8 pr-4 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm font-semibold"
-                      />
-                      <span className="block mt-1 text-[11px] text-[var(--text-muted)]">
-                        Minimum Price
-                      </span>
-                    </div>
-
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] font-bold text-sm">
-                        ₦
-                      </span>
-                      <input
-                        type="number"
-                        value={maxPrice}
-                        onChange={(e) => setMaxPrice(e.target.value)}
-                        placeholder="45,000"
-                        disabled={disabled}
-                        className="surface-control w-full pl-8 pr-4 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm font-semibold"
-                      />
-                      <span className="block mt-1 text-[11px] text-[var(--text-muted)]">
-                        Maximum Price
-                      </span>
-                    </div>
-                  </div>
-
-                  {priceRangeError.summary ? (
-                    <p role="alert" className="mt-2 text-xs text-rose-400">
-                      {priceRangeError.summary}
-                    </p>
-                  ) : null}
-                </div>
-
-                {/* Made to Order Toggle Row */}
-                <div
-                  className="rounded-2xl p-4 bg-[#1b122f] border border-white/5 flex items-center justify-between cursor-pointer select-none"
-                  onClick={() => {
-                    if (disabled) return;
-                    const next = !isMadeToOrder;
-                    setIsMadeToOrder(next);
-                    setSizingMode(next ? 'CUSTOM' : 'NONE');
-                  }}
-                >
-                  <div className="space-y-0.5 pr-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white">
-                        Enable Made to Order (Custom Order)
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300">
-                        Recommended
-                      </span>
-                    </div>
-                    <p className="text-xs text-[var(--text-secondary)]">
-                      Allow shoppers to request this design crafted to their custom measurements.
-                    </p>
-                  </div>
-
-                  <div className={`wiez-toggle-switch ${isMadeToOrder ? 'on' : ''}`}>
-                    <div className="wiez-toggle-knob" />
-                  </div>
-                </div>
-
-                {/* Expanded Custom Order Configuration (ZERO INNER SCROLLBOX!) */}
-                {isMadeToOrder && (
-                  <div className="pt-2 space-y-3">
-                    <div className="flex items-center justify-between border-t border-white/5 pt-3">
-                      <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <span>📐</span> Custom Order Specification Suite
-                      </span>
-                      <span className="text-[11px] text-[var(--text-muted)]">Full Inline View</span>
-                    </div>
-                    <div className="w-full">
-                      <CustomOrderConfigurationEditor
-                        ref={customOrderEditorRef}
-                        sourceType="DESIGN"
-                        sourceId={isEditMode ? id : undefined}
-                        sourceTitle={title}
-                        measurementKeys={customMeasurementKeys}
-                        measurementGender={measurementGender}
-                        defaultBaseCharge={minPrice}
-                        defaultProductionLeadDays={storeDefaultProductionLeadDays}
-                        defaultProductionLeadLabel={storeCustomOrderLeadTimeLabel}
-                        disabled={disabled}
-                        onRequiredMeasurementKeysChange={handleCustomOrderMeasurementKeysChange}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* 5. Sizing & Visibility */}
-            <div className="wiez-studio-card p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs font-bold shadow-inner">
-                    5
-                  </span>
-                  <h3 className="text-sm font-bold text-white">Sizing & Visibility</h3>
-                </div>
-                <span className="text-xs text-[var(--text-muted)]">Release Controls</span>
-              </div>
-
-              <div className="space-y-4">
-                <SizingConfigurator
-                  sizingMode={sizingMode}
-                  onSizingModeChange={handleDesignSizingModeChange}
-                  onRtwSizeSystemChange={() => undefined}
-                  showRtwSizeSystem={false}
-                  customMeasurementKeys={customMeasurementKeys}
-                  onCustomMeasurementKeysChange={setCustomMeasurementKeys}
-                  measurementGender={measurementGender}
-                  disabled={disabled}
-                />
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <UniversalSelect
-                    label="Fit Preference"
+              {/* Pane 1: Title & DNA */}
+              {activeInspectorSection === 'identity' && (
+                <div className="space-y-4">
+                  <TextField
+                    label="Design Title"
+                    value={title}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setTitle(e.target.value)
+                    }
+                    placeholder="e.g., Summer Breeze '24"
+                    disabled={disabled || titleDescriptionLocked}
+                    variant="glass"
                     required
-                    value={fitPreference}
-                    onChange={(value) => setFitPreference(value as DesignFitPreference)}
-                    options={DESIGN_FIT_PREFERENCE_OPTIONS.map((option) => ({
-                      value: option.value,
-                      label: option.label,
-                    }))}
-                    disabled={disabled}
-                    optionCompact
                   />
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                      Catalog Visibility
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setVisibility('PUBLIC')}
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] flex items-center">
+                        Tell Your Story
+                        <InfoTooltip text="Describe the inspiration, mood, and story behind this design. This is visible to buyers browsing the catalog." />
+                      </label>
+                      <span className="text-xs text-[var(--text-muted)]">
+                        {description.length} / 500 characters
+                      </span>
+                    </div>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Inspired by the warm coastal breeze of Lagos..."
+                      rows={3}
+                      disabled={disabled || titleDescriptionLocked}
+                      className="surface-control placeholder-theme w-full px-4 py-3 rounded-xl border border-[var(--border-default)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none text-sm text-[var(--text-primary)]"
+                    />
+                  </div>
+
+                  {editingDraft && (
+                    <p className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-700 dark:text-sky-200">
+                      Drafts can be updated up to 2 times every 24 hours.
+                    </p>
+                  )}
+                  {titleDescriptionLocked && (
+                    <p className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-800 dark:text-amber-300">
+                      Title and description can only be updated once every 30 days.
+                      {nextTitleEditDate
+                        ? ` Next edit available on ${nextTitleEditDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.`
+                        : ""}
+                    </p>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] flex items-center">
+                        Who is it for? *
+                        <InfoTooltip text={CREATOR_METADATA_HELP.audience} />
+                      </label>
+                      <UniversalSelect
+                        value={type}
+                        onChange={handleAudienceChange}
+                        options={CREATOR_AUDIENCE_OPTIONS.map((option) => ({
+                          value: option.value,
+                          label: option.label,
+                        }))}
+                        placeholder="Choose who this item is for"
                         disabled={disabled}
-                        className={`py-2 px-3 text-xs font-semibold rounded-xl transition-all ${
-                          visibility === 'PUBLIC'
-                            ? 'wiez-gradient-active-indicator text-purple-200 border border-purple-500/30'
-                            : 'neu-pressed-button text-[var(--text-muted)]'
-                        }`}
-                      >
-                        🌐 Public
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setVisibility('PRIVATE')}
+                        optionCompact
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <UniversalSelect
+                        label="Age group"
+                        required
+                        value={targetAgeGroup}
+                        onChange={handleAgeGroupChange}
+                        options={DESIGN_TARGET_AGE_OPTIONS.map((option) => ({
+                          value: option.value,
+                          label: option.label,
+                        }))}
                         disabled={disabled}
-                        className={`py-2 px-3 text-xs font-semibold rounded-xl transition-all ${
-                          visibility === 'PRIVATE'
-                            ? 'wiez-gradient-active-indicator text-purple-200 border border-purple-500/30'
-                            : 'neu-pressed-button text-[var(--text-muted)]'
-                        }`}
-                      >
-                        🔒 Private
-                      </button>
+                        optionCompact
+                      />
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <UniversalSelect
+                      label="What is it?"
+                      required
+                      value={categoryId}
+                      onChange={handleCategoryChange}
+                      options={filteredCategories.map((c) => ({
+                        value: c.id,
+                        label: c.name,
+                      }))}
+                      placeholder={
+                        loadingCategories
+                          ? "Loading..."
+                          : "Choose what this item is"
+                      }
+                      disabled={disabled}
+                      searchable
+                      emptyMessage="No garment categories match this audience yet"
+                      optionAllowWrap
+                      selectedAllowWrap
+                    />
+
+                    <UniversalSelect
+                      label="Garment type"
+                      required
+                      value={categoryTypeId}
+                      onChange={setCategoryTypeId}
+                      options={categoryTypeOptions.map((categoryType) => ({
+                        value: categoryType.id,
+                        label: categoryType.name,
+                      }))}
+                      placeholder={
+                        loadingCategories
+                          ? "Loading..."
+                          : categoryId
+                            ? categoryTypeOptions.length
+                              ? "Choose a garment type"
+                              : "No garment types match this audience"
+                            : "Choose what this item is first"
+                      }
+                      disabled={
+                        disabled || !categoryId || categoryTypeOptions.length === 0
+                      }
+                      searchable
+                      emptyMessage="No garment types match this audience yet"
+                      optionAllowWrap
+                      selectedAllowWrap
+                    />
+                  </div>
+
+                  {/* Missing category or garment type proposal toggle */}
+                  <DesignTaxonomyProposalField
+                    value={selectedProposal}
+                    disabled={disabled}
+                    onChange={(proposal) => {
+                      setPendingProposal(proposal);
+                      if (proposal) {
+                        setCategoryId('');
+                        setCategoryTypeId('');
+                      }
+                    }}
+                  />
                 </div>
-              </div>
+              )}
+
+              {/* Pane 2: Style & Tags */}
+              {activeInspectorSection === 'style' && (
+                <div className="space-y-4">
+                  <FilterSelector
+                    value={filterSelection}
+                    onChange={setFilterSelection}
+                    entityType="DESIGN"
+                    disabled={disabled}
+                    onTagSuggestions={handleFilterTagSuggestions}
+                  />
+
+                  {(() => {
+                    const styleDetailCount = Object.values(filterSelection).flatMap(
+                      (values) => (Array.isArray(values) ? values : values ? [values] : []),
+                    ).length;
+                    return styleDetailCount > 8 ? (
+                      <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                        ⚠️ ${styleDetailCount} style details selected — fewer, precise
+                        details improve discovery and buyer trust.
+                      </p>
+                    ) : null;
+                  })()}
+
+                  {/* Hashtags Cloud */}
+                  <div className="space-y-2 pt-2 border-t border-[var(--border-default)]">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] flex items-center">
+                        Hashtags ({selectedTags.length}/10)
+                        <InfoTooltip text="Add up to 10 hashtags to improve search discovery." />
+                      </label>
+                    </div>
+
+                    {selectedTags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {selectedTags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="neu-inset-chip selected inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold"
+                          >
+                            {normalizeHashtagLabel(tag)}
+                            <button
+                              type="button"
+                              onClick={() => removeTag(tag)}
+                              className="hover:opacity-75 transition-opacity"
+                              aria-label={`Remove ${tag}`}
+                            >
+                              <FiX className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Search / Add Hashtags */}
+                    <div className="relative">
+                      <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-secondary" />
+                      <input
+                        type="text"
+                        value={tagSearch}
+                        onChange={(e) => setTagSearch(e.target.value)}
+                        onKeyDown={handleTagInputKeyDown}
+                        placeholder="Search or create a hashtag..."
+                        disabled={disabled || selectedTags.length >= 10}
+                        className="surface-control placeholder-theme w-full pl-10 pr-20 py-2.5 rounded-xl border border-[var(--border-default)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-xs text-[var(--text-primary)]"
+                      />
+                      {tagSearch.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => addTag(tagSearch)}
+                          disabled={disabled || selectedTags.length >= 10}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 transition"
+                        >
+                          + Add
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Popular Suggestions */}
+                    <div className="space-y-1.5 pt-2">
+                      <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                        Popular suggestions:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {filteredSuggestions.slice(0, 12).map((tag: string) => {
+                          const isSelected = selectedTags.some(
+                            (t) => t.toLowerCase() === tag.toLowerCase(),
+                          );
+                          return (
+                            <button
+                              key={tag}
+                              type="button"
+                              onClick={() => addTag(tag)}
+                              disabled={disabled || isSelected}
+                              className={`neu-pressed-button px-2.5 py-1 text-xs font-medium transition-transform active:scale-95 ${
+                                isSelected
+                                  ? 'opacity-40 cursor-not-allowed'
+                                  : 'text-theme-secondary hover:text-theme'
+                              }`}
+                            >
+                              {normalizeHashtagLabel(tag)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowTagPicker(true)}
+                      disabled={disabled}
+                      className="mt-2 neu-pressed-button inline-flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-300 py-1.5 px-3"
+                    >
+                      <FiSearch className="w-3.5 h-3.5" />
+                      See all hashtags ({selectedTags.length}/10)
+                    </button>
+
+                    <HashtagPickerModal
+                      open={showTagPicker}
+                      onClose={() => setShowTagPicker(false)}
+                      selected={selectedTags}
+                      onToggle={handleToggleTagFromPicker}
+                      maxTags={10}
+                      extraSuggestions={tagSuggestions}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Pane 3: Pricing & Made to Order */}
+              {activeInspectorSection === 'commercial' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-2 flex items-center">
+                      Estimated Price Range (₦)
+                      <InfoTooltip text="An indicative price range for this design. Helps shoppers understand expected cost." />
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] font-bold text-sm">
+                          ₦
+                        </span>
+                        <input
+                          type="number"
+                          value={minPrice}
+                          onChange={(e) => setMinPrice(e.target.value)}
+                          placeholder="15,000"
+                          disabled={disabled}
+                          className="surface-control w-full pl-8 pr-4 py-2.5 rounded-xl border border-[var(--border-default)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm font-semibold text-[var(--text-primary)]"
+                        />
+                        <span className="block mt-1 text-[11px] text-[var(--text-muted)]">
+                          Minimum Price
+                        </span>
+                      </div>
+
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] font-bold text-sm">
+                          ₦
+                        </span>
+                        <input
+                          type="number"
+                          value={maxPrice}
+                          onChange={(e) => setMaxPrice(e.target.value)}
+                          placeholder="45,000"
+                          disabled={disabled}
+                          className="surface-control w-full pl-8 pr-4 py-2.5 rounded-xl border border-[var(--border-default)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm font-semibold text-[var(--text-primary)]"
+                        />
+                        <span className="block mt-1 text-[11px] text-[var(--text-muted)]">
+                          Maximum Price
+                        </span>
+                      </div>
+                    </div>
+
+                    {priceRangeError.summary ? (
+                      <p role="alert" className="mt-2 text-xs text-rose-500 dark:text-rose-400">
+                        {priceRangeError.summary}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  {/* Made to Order Toggle Row */}
+                  <div
+                    className="rounded-2xl p-4 surface-control border border-[var(--border-default)] flex items-center justify-between cursor-pointer select-none"
+                    onClick={() => {
+                      if (disabled) return;
+                      const next = !isMadeToOrder;
+                      setIsMadeToOrder(next);
+                      setSizingMode(next ? 'CUSTOM' : 'NONE');
+                    }}
+                  >
+                    <div className="space-y-0.5 pr-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-[var(--text-primary)]">
+                          Enable Made to Order (Custom Order)
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-300">
+                          Recommended
+                        </span>
+                      </div>
+                      <p className="text-xs text-[var(--text-secondary)]">
+                        Allow shoppers to request this design crafted to their custom measurements.
+                      </p>
+                    </div>
+
+                    <div className={`wiez-toggle-switch ${isMadeToOrder ? 'on' : ''}`}>
+                      <div className="wiez-toggle-knob" />
+                    </div>
+                  </div>
+
+                  {/* Expanded Custom Order Configuration (Full Natural Inline Expansion) */}
+                  {isMadeToOrder && (
+                    <div className="pt-2 space-y-3">
+                      <div className="flex items-center justify-between border-t border-[var(--border-default)] pt-3">
+                        <span className="text-xs font-bold text-purple-600 dark:text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                          <span>📐</span> Custom Order Specification Suite
+                        </span>
+                        <span className="text-[11px] text-[var(--text-muted)]">Full Inline View</span>
+                      </div>
+                      <div className="w-full">
+                        <CustomOrderConfigurationEditor
+                          ref={customOrderEditorRef}
+                          sourceType="DESIGN"
+                          sourceId={isEditMode ? id : undefined}
+                          sourceTitle={title}
+                          measurementKeys={customMeasurementKeys}
+                          measurementGender={measurementGender}
+                          defaultBaseCharge={minPrice}
+                          defaultProductionLeadDays={storeDefaultProductionLeadDays}
+                          defaultProductionLeadLabel={storeCustomOrderLeadTimeLabel}
+                          disabled={disabled}
+                          onRequiredMeasurementKeysChange={handleCustomOrderMeasurementKeysChange}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Pane 4: Sizing & Visibility */}
+              {activeInspectorSection === 'sizing' && (
+                <div className="space-y-4">
+                  <SizingConfigurator
+                    sizingMode={sizingMode}
+                    onSizingModeChange={handleDesignSizingModeChange}
+                    onRtwSizeSystemChange={() => undefined}
+                    showRtwSizeSystem={false}
+                    customMeasurementKeys={customMeasurementKeys}
+                    onCustomMeasurementKeysChange={setCustomMeasurementKeys}
+                    measurementGender={measurementGender}
+                    disabled={disabled}
+                  />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <UniversalSelect
+                      label="Fit Preference"
+                      required
+                      value={fitPreference}
+                      onChange={(value) => setFitPreference(value as DesignFitPreference)}
+                      options={DESIGN_FIT_PREFERENCE_OPTIONS.map((option) => ({
+                        value: option.value,
+                        label: option.label,
+                      }))}
+                      disabled={disabled}
+                      optionCompact
+                    />
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                        Catalog Visibility
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setVisibility('PUBLIC')}
+                          disabled={disabled}
+                          className={`py-2 px-3 text-xs font-semibold rounded-xl transition-all ${
+                            visibility === 'PUBLIC'
+                              ? 'wiez-gradient-active-indicator text-purple-700 dark:text-purple-200 border border-purple-500/30 font-bold'
+                              : 'neu-pressed-button text-[var(--text-muted)]'
+                          }`}
+                        >
+                          🌐 Public
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setVisibility('PRIVATE')}
+                          disabled={disabled}
+                          className={`py-2 px-3 text-xs font-semibold rounded-xl transition-all ${
+                            visibility === 'PRIVATE'
+                              ? 'wiez-gradient-active-indicator text-purple-700 dark:text-purple-200 border border-purple-500/30 font-bold'
+                              : 'neu-pressed-button text-[var(--text-muted)]'
+                          }`}
+                        >
+                          🔒 Private
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Readiness Guard */}
+                  <div className="p-4 rounded-xl border border-[var(--border-default)] surface-control">
+                    <h5 className="text-xs font-bold text-[var(--text-primary)] mb-1">
+                      Publishing Readiness Guard
+                    </h5>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {isValid
+                        ? 'All required fields are complete. Your design is ready for immediate publishing.'
+                        : 'Complete all required fields across the tabs before publishing.'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
+            {/* Stepping controls between tabs */}
+            <div className="flex items-center justify-between pt-4 mt-6 border-t border-[var(--border-default)]">
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeInspectorSection === 'sizing') setActiveInspectorSection('commercial');
+                  else if (activeInspectorSection === 'commercial') setActiveInspectorSection('style');
+                  else if (activeInspectorSection === 'style') setActiveInspectorSection('identity');
+                }}
+                disabled={activeInspectorSection === 'identity'}
+                className="neu-pressed-button px-3.5 py-1.5 text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ‹ Previous Tab
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeInspectorSection === 'identity') setActiveInspectorSection('style');
+                  else if (activeInspectorSection === 'style') setActiveInspectorSection('commercial');
+                  else if (activeInspectorSection === 'commercial') setActiveInspectorSection('sizing');
+                }}
+                disabled={activeInspectorSection === 'sizing'}
+                className="btn-brand-primary py-1.5 px-4 text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                Next Tab ›
+              </button>
+            </div>
           </div>
         </div>
       </main>
-      {/* Actions Footer - Integrated into flow */}
+
+      {/* Unified Bottom Action Bar */}
       <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 pb-12">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-sm text-theme-secondary">
             {reviewHint ? (
               <span className="block">{reviewHint}</span>
             ) : lastSaved ? (
-              `${isEditMode ? "Design" : "Draft"} saved locally - Last edit: ${formatTimeAgo(lastSaved)}`
+              `${isEditMode ? 'Design' : 'Draft'} saved locally - Last edit: ${formatTimeAgo(lastSaved)}`
             ) : isEditMode ? (
-              "Unsaved changes"
+              'Unsaved changes'
             ) : (
-              "Create a draft or go live when ready."
+              'Create a draft or go live when ready.'
             )}
           </div>
           <div className="flex gap-3 w-full sm:w-auto">
@@ -2510,21 +2590,16 @@ const CreateDesignInner: React.FC = () => {
               type="button"
               onClick={() => setShowCancelPrompt(true)}
               disabled={disabled}
-              className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-5 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-5 rounded-xl border border-[var(--border-default)] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
-            {/*
-              Withdrawing is an ADDITIONAL action while a submission is pending,
-              never a replacement for Save Draft. Swapping the two is what left
-              owners in a change-request cycle with no way to park their work.
-            */}
             {canWithdrawFromReview(reviewStatus) && (
               <button
                 type="button"
                 onClick={handleWithdrawFromReview}
                 disabled={withdrawingFromReview}
-                className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-5 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="surface-control surface-interactive-hover flex-1 sm:flex-none py-3 px-5 rounded-xl border border-[var(--border-default)] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {withdrawingFromReview ? 'Calling back…' : '↩️ Call back'}
               </button>
@@ -2536,12 +2611,12 @@ const CreateDesignInner: React.FC = () => {
                 disabled={isSubmitting}
                 className="neu-pressed-button flex-1 sm:flex-none py-3 px-6 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {isSubmitting && submitIntent === "draft" ? (
+                {isSubmitting && submitIntent === 'draft' ? (
                   <MuseLoader size={16} />
                 ) : (
                   <FiFile className="w-4 h-4" />
                 )}
-                {isSubmitting && submitIntent === "draft" ? "Saving…" : "Save Draft"}
+                {isSubmitting && submitIntent === 'draft' ? 'Saving…' : 'Save Draft'}
               </button>
             )}
             <button
@@ -2550,12 +2625,12 @@ const CreateDesignInner: React.FC = () => {
               disabled={isSubmitting}
               className="flex-1 sm:flex-none py-3 px-7 rounded-full wiez-gradient-btn-primary font-bold active:scale-[0.985] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm shadow-lg"
             >
-              {isSubmitting && submitIntent === "publish" ? (
+              {isSubmitting && submitIntent === 'publish' ? (
                 <MuseLoader size={16} />
               ) : (
                 <HiOutlineSparkles className="w-5 h-5" />
               )}
-              {isSubmitting && submitIntent === "publish"
+              {isSubmitting && submitIntent === 'publish'
                 ? primaryActionPendingLabel(reviewStatus)
                 : primaryActionLabel({
                     status: reviewStatus,
