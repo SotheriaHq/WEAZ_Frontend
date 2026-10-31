@@ -45,6 +45,7 @@ import {
 } from '@/utils/publishTracker';
 import {
   runProductPublishJob,
+  resumeInterruptedProductLaunch,
   isProductPublishJobRunning,
   getRetryableProductPublishJob,
   clearRetryableProductPublishJob,
@@ -474,6 +475,32 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
     sync();
     return subscribePublishTasks(sync);
   }, [productPublishScope]);
+
+  // A go-live still marked in flight with no job behind it was cut off by a
+  // reload. The quiet period gives a job running in another tab time to report.
+  const resumedLaunchIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const interrupted = productPublishTasks.filter(
+      (task) =>
+        task.kind === 'publish' &&
+        (task.status === 'uploading' || task.status === 'finalizing') &&
+        Boolean(getPublishTaskDesignId(task)) &&
+        !isProductPublishJobRunning(task.id) &&
+        !resumedLaunchIdsRef.current.has(task.id),
+    );
+    if (interrupted.length === 0) return;
+    const quietMs = 20_000;
+    const lastActivity = Math.max(...interrupted.map((task) => task.updatedAt));
+    const timer = window.setTimeout(() => {
+      for (const task of interrupted) {
+        const productId = getPublishTaskDesignId(task);
+        if (!productId) continue;
+        resumedLaunchIdsRef.current.add(task.id);
+        void resumeInterruptedProductLaunch(task.id, productId, productPublishScope);
+      }
+    }, Math.max(0, lastActivity + quietMs - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [productPublishScope, productPublishTasks]);
 
   const [filterStatus, setFilterStatus] = useState<ProductStatusFilter>(() => {
     // Notification deep links preselect a status tab (?status=in_review etc.).
@@ -1377,12 +1404,20 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       }
 
       // No files to resume with — a different device, or a reloaded tab. The
-      // edit screen is then the only way forward, and the product is real.
+      // media may already be on the server, so try to finish first. Only then is
+      // the edit screen the way forward, and the product is real.
       if (productId) {
-        clearRetryableProductPublishJob(task.id);
-        removePublishTask(task.id, productPublishScope);
-        navigate(`/studio/store/products/${productId}/edit`);
-        toast.info('Add the product images here to finish publishing.');
+        void (async () => {
+          const reason =
+            task.kind === 'publish'
+              ? await resumeInterruptedProductLaunch(task.id, productId, productPublishScope)
+              : 'Add the product images here to finish publishing.';
+          if (reason === null) return;
+          clearRetryableProductPublishJob(task.id);
+          removePublishTask(task.id, productPublishScope);
+          navigate(`/studio/store/products/${productId}/edit`);
+          toast.info(reason);
+        })();
         return;
       }
 

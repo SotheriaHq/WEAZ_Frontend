@@ -5,6 +5,7 @@ import {
   getPublishTaskLegacyCollectionId,
   getCompactPublishTaskStatusLabel,
   getLocalDesignCover,
+  hasInFlightPublishTask,
   isLocalPublishTaskId,
   markPublishFailedDesignId,
   readPublishFailedDesignIds,
@@ -257,5 +258,19 @@ describe('local design covers', () => {
     expect(getLocalDesignCover('cap-0')).toBeUndefined();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:cap-0');
     expect(getLocalDesignCover('cap-13')).toBe('blob:cap-13');
+  });
+});
+
+describe('hasInFlightPublishTask', () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it('holds a reload while an upload runs and releases it when the task ends', () => {
+    expect(hasInFlightPublishTask()).toBe(false);
+    const task = createPublishTask({ title: 'The Checks', ownerId: 'owner-1', entity: 'product' });
+    expect(hasInFlightPublishTask()).toBe(true);
+    updatePublishTask(task.id, { status: 'finalizing' }, { ownerId: 'owner-1' });
+    expect(hasInFlightPublishTask()).toBe(true);
+    updatePublishTask(task.id, { status: 'published' }, { ownerId: 'owner-1' });
+    expect(hasInFlightPublishTask()).toBe(false);
   });
 });
