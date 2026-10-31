@@ -3,6 +3,7 @@ export type CatalogVisibilityFilter =
   | 'Private'
   | 'Drafts'
   | 'In Review'
+  | 'Needs Attention'
   | 'Changes Requested'
   | 'Rejected'
   | 'Deleted';
@@ -13,6 +14,8 @@ export const CATALOG_VISIBILITY_QUERY_ALIASES: Record<string, CatalogVisibilityF
   drafts: 'Drafts',
   draft: 'Drafts',
   inreview: 'In Review',
+  needsattention: 'Needs Attention',
+  failed: 'Needs Attention',
   pendingreview: 'In Review',
   changesrequested: 'Changes Requested',
   rejected: 'Rejected',
