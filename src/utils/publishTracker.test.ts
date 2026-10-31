@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createPublishTask,
   getPublishTaskDesignId,
   getPublishTaskLegacyCollectionId,
   getCompactPublishTaskStatusLabel,
+  getLocalDesignCover,
   isLocalPublishTaskId,
   markPublishFailedDesignId,
   readPublishFailedDesignIds,
@@ -12,6 +13,7 @@ import {
   readPublishTasks,
   reconcilePublishTasksWithDraftIds,
   removePublishTask,
+  updatePublishTask,
   type PublishTask,
 } from './publishTracker';
 
@@ -222,5 +224,38 @@ describe('publishTracker failed-publish markers', () => {
       window.localStorage.getItem('wiez.publish.failedDesignIds.v1') || '[]',
     ) as Array<{ designId: string }>;
     expect(stored.filter((entry) => entry.designId === 'design-1')).toHaveLength(1);
+  });
+});
+
+describe('local design covers', () => {
+  const finish = (url: string, designId: string, status: 'saved' | 'failed') => {
+    const task = createPublishTask({ title: designId, ownerId: 'owner-1', coverPreviewUrl: url, ownsCoverPreview: true, kind: 'draft' });
+    updatePublishTask(task.id, { status, designId }, { ownerId: 'owner-1' });
+    removePublishTask(task.id, { ownerId: 'owner-1' });
+  };
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('keeps a saved cover for its design instead of revoking it', () => {
+    finish('blob:cover-saved', 'design-saved', 'saved');
+    expect(getLocalDesignCover('design-saved')).toBe('blob:cover-saved');
+    expect(URL.revokeObjectURL).not.toHaveBeenCalledWith('blob:cover-saved');
+  });
+
+  it('does not keep the cover of a failed save', () => {
+    finish('blob:cover-failed', 'design-failed', 'failed');
+    expect(getLocalDesignCover('design-failed')).toBeUndefined();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:cover-failed');
+  });
+
+  it('caps what a long session can hold', () => {
+    for (let index = 0; index < 14; index += 1) finish(`blob:cap-${index}`, `cap-${index}`, 'saved');
+    expect(getLocalDesignCover('cap-0')).toBeUndefined();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:cap-0');
+    expect(getLocalDesignCover('cap-13')).toBe('blob:cap-13');
   });
 });

@@ -44,7 +44,6 @@ import MediaSlotGrid, {
   renderableMediaSlots,
 } from "@/components/media/MediaSlotGrid";
 import MediaRenderer from '@/components/media/MediaRenderer';
-import SizingConfigurator from "@/components/sizing/SizingConfigurator";
 import LocalMediaPreview from "../../components/media/LocalMediaPreview";
 import useFilePicker from "../../components/upload/useFilePicker";
 import { PrePublishConfirmModal } from "@/components/modals";
@@ -71,7 +70,6 @@ import {
   unlockDocumentScroll,
 } from "@/features/designs/designPublishJob";
 import { saveDesignPublishRecovery } from "@/features/designs/designPublishRecovery";
-import type { SizingMode } from '@/types/sizing';
 import {
   DESIGN_FIT_PREFERENCE_OPTIONS,
   DESIGN_MAX_MEDIA_COUNT,
@@ -120,19 +118,6 @@ import { useOneTimeTour } from '@/hooks/useOneTimeTour';
 
 
 
-
-const _DESIGN_SIZING_MODE_OPTIONS = [
-  { value: 'NONE', label: 'No size specification' },
-  { value: 'CUSTOM', label: 'Custom order only' },
-] as const;
-type DesignSizingMode = Extract<SizingMode, (typeof _DESIGN_SIZING_MODE_OPTIONS)[number]['value']>;
-
-const normalizeDesignSizingModeForCreation = (value?: string | null): DesignSizingMode => {
-  if (value === 'CUSTOM' || value === 'RTW_PLUS_FITTINGS' || value === 'RTW_PLUS_CUSTOM') {
-    return 'CUSTOM';
-  }
-  return 'NONE';
-};
 
 const PROFILE_REVIEW_ROUTES: Record<string, { query: string; toastMessage: string; taskMessage: string }> = {
   IN_REVIEW: {
@@ -299,7 +284,6 @@ const CreateDesignInner: React.FC = () => {
     () => getRangeError(minPrice, maxPrice, { label: "price" }),
     [maxPrice, minPrice],
   );
-  const [isMadeToOrder, setIsMadeToOrder] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>(
     () => [...DEFAULT_HASHTAG_SUGGESTIONS],
@@ -322,7 +306,6 @@ const CreateDesignInner: React.FC = () => {
   const [activeInspectorSection, setActiveInspectorSection] = useState<InspectorTabSection>('design');
   const [previewAspectRatio, setPreviewAspectRatio] = useState<'9:16' | '4:5' | '1:1'>('9:16');
   const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
-  const [sizingMode, setSizingMode] = useState<DesignSizingMode>('NONE');
   const [fitPreference, setFitPreference] = useState<DesignFitPreference>('REGULAR');
   const [targetAgeGroup, setTargetAgeGroup] = useState<DesignTargetAgeGroup>('ADULT');
   const [metadataEditedAt, setMetadataEditedAt] = useState<Date | null>(null);
@@ -503,8 +486,6 @@ const CreateDesignInner: React.FC = () => {
         }) : null);
         setType(d.type || "EVERYBODY");
         setVisibility(d.visibility || "PUBLIC");
-        const nextSizingMode = normalizeDesignSizingModeForCreation(d.sizingMode);
-        setSizingMode(nextSizingMode);
         setFitPreference(
           d.fitPreference === 'SLIM' ||
             d.fitPreference === 'LOOSE' ||
@@ -516,7 +497,6 @@ const CreateDesignInner: React.FC = () => {
         setCustomMeasurementKeys(
           Array.isArray(d.customMeasurementKeys) ? dedupeMeasurementKeysByLabel(d.customMeasurementKeys) : [],
         );
-        setIsMadeToOrder(Boolean((d as any).customOrderEnabled) || nextSizingMode === 'CUSTOM');
         setMetadataEditedAt(
           d.metadataEditedAt ? new Date(d.metadataEditedAt) : null,
         );
@@ -1014,11 +994,10 @@ const CreateDesignInner: React.FC = () => {
     setTargetAgeGroup(value as DesignTargetAgeGroup);
   };
 
-  const handleDesignSizingModeChange = (value: string) => {
-    const nextMode = normalizeDesignSizingModeForCreation(value);
-    setSizingMode(nextMode);
-    setIsMadeToOrder(nextMode === 'CUSTOM');
-  };
+  // The task outlives this editor, so its cover leaves the media store first.
+  // The store revokes every preview it still tracks when the editor closes.
+  const handOverCoverPreview = (item?: MediaItem) =>
+    item?.kind === 'image' ? mediaStore.keepPreview(item.id) : undefined;
 
   const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && tagSearch.trim()) {
@@ -1036,7 +1015,7 @@ const CreateDesignInner: React.FC = () => {
     });
     // Draft rule: a title is the ONLY requirement. Custom-order / measurement
     // details are never enforced for drafts — they are completed later, before
-    // publishing. So a draft saves even with Custom Order toggled and no points.
+    // publishing. So a draft saves even with no measurement points yet.
     if (title.trim().length === 0) {
       setActiveInspectorSection('design');
       toast.error('Add a title to save your draft');
@@ -1075,7 +1054,7 @@ const CreateDesignInner: React.FC = () => {
     setSubmitIntent("draft");
     setIsSubmitting(true);
     try {
-      if (isEditMode && id && isMadeToOrder) {
+      if (isEditMode && id) {
         // Best-effort: persist the custom-order config if it is complete, but
         // never block a draft when it is not (e.g. measurement points
         // unavailable). Publish still enforces a valid config.
@@ -1107,10 +1086,7 @@ const CreateDesignInner: React.FC = () => {
           type,
           visibility,
           filterValueIds: getSelectedFilterValueIds(),
-          sizingMode,
-          rtwSizeSystem: null,
           customMeasurementKeys: normalizedCustomMeasurementKeys,
-          customOrderEnabled: isMadeToOrder,
           fitPreference,
           targetAgeGroup,
         } as any);
@@ -1122,9 +1098,7 @@ const CreateDesignInner: React.FC = () => {
       }
 
       const pendingCustomOrderDraft =
-        isMadeToOrder
-          ? customOrderEditorRef.current?.buildConfigurationDraft({ silent: true }) ?? null
-          : null;
+        customOrderEditorRef.current?.buildConfigurationDraft({ silent: true }) ?? null;
       const filesSnapshot = [...files];
       const coverIndexSnapshot = coverIndex;
       const draftTask = createPublishTask({
@@ -1133,6 +1107,8 @@ const CreateDesignInner: React.FC = () => {
         title: draftTitle,
         visibility: 'PRIVATE',
         message: 'Saving draft...',
+        coverPreviewUrl: handOverCoverPreview(filesSnapshot[coverIndexSnapshot]),
+        ownsCoverPreview: true,
       });
 
       const runDraftSaveTask = async () => {
@@ -1164,12 +1140,16 @@ const CreateDesignInner: React.FC = () => {
               visibility,
               filterValueIds: getSelectedFilterValueIds(),
               coverIndex: coverIndexSnapshot,
-              sizingMode,
-              rtwSizeSystem: undefined,
               customMeasurementKeys: normalizedCustomMeasurementKeys,
-              customOrderEnabled: isMadeToOrder,
               fitPreference,
               targetAgeGroup,
+              onDesignCreated: (designId: string) => {
+                updatePublishTask(
+                  draftTask.id,
+                  { designId, legacyCollectionId: designId, collectionId: designId },
+                  publishTaskScope,
+                );
+              },
             },
             (value: number) => {
               updatePublishTask(
@@ -1373,24 +1353,20 @@ const CreateDesignInner: React.FC = () => {
       return;
     }
 
-    if (isMadeToOrder) {
-      const pendingCustomOrderDraft =
-        customOrderEditorRef.current?.buildConfigurationDraft() ?? null;
-      if (!pendingCustomOrderDraft) {
-        setActiveInspectorSection('commercial');
-        // This used to `return` in silence, which is how the primary action
-        // came to look broken: an owner answering a change request pressed it
-        // and nothing happened at all — no toast, no modal, no error.
-        // A blocked submit must always say what is blocking it.
-        toast.error(
-          'Finish the custom-order setup (measurements and pricing) before submitting.',
-        );
-        addClientDiagnostic('warn', 'create-design', 'Publish blocked by incomplete custom order', {
-          isEditMode,
-          publicationStatus,
-        });
-        return;
-      }
+    if (!customOrderEditorRef.current?.buildConfigurationDraft()) {
+      setActiveInspectorSection('commercial');
+      // This used to `return` in silence, which is how the primary action
+      // came to look broken: an owner answering a change request pressed it
+      // and nothing happened at all — no toast, no modal, no error.
+      // A blocked submit must always say what is blocking it.
+      toast.error(
+        'Finish the custom-order setup (measurements and pricing) before submitting.',
+      );
+      addClientDiagnostic('warn', 'create-design', 'Publish blocked by incomplete custom order', {
+        isEditMode,
+        publicationStatus,
+      });
+      return;
     }
 
     setShowPublishModal(true);
@@ -1402,12 +1378,11 @@ const CreateDesignInner: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const pendingCustomOrderDraft =
-        !isEditMode && isMadeToOrder
-          ? customOrderEditorRef.current?.buildConfigurationDraft() ?? null
-          : null;
+      const pendingCustomOrderDraft = !isEditMode
+        ? customOrderEditorRef.current?.buildConfigurationDraft() ?? null
+        : null;
 
-      if (!isEditMode && isMadeToOrder && !pendingCustomOrderDraft) {
+      if (!isEditMode && !pendingCustomOrderDraft) {
         setIsSubmitting(false);
         setSubmitIntent(null);
         return;
@@ -1442,25 +1417,19 @@ const CreateDesignInner: React.FC = () => {
       const categoryIdSnapshot = categoryId;
       const categoryTypeIdSnapshot = categoryTypeId;
       const pendingCategorySuggestionIdSnapshot = selectedProposal?.id ?? null;
-      const sizingModeSnapshot = sizingMode;
       const customMeasurementKeysSnapshot = normalizedCustomMeasurementKeys;
-      const isMadeToOrderSnapshot = isMadeToOrder;
       const fitPreferenceSnapshot = fitPreference;
       const targetAgeGroupSnapshot = targetAgeGroup;
       const measurementGenderSnapshot = measurementGender;
       const designIdSnapshot = id;
-      const coverPreviewUrl: string | undefined = (() => {
-        const coverItem = files[coverIndexSnapshot];
-        if (coverItem?.previewUrl) return coverItem.previewUrl;
-        return undefined;
-      })();
+      const coverPreviewUrl = handOverCoverPreview(files[coverIndexSnapshot]);
 
       // Go-live always lands on In Review — content integrity review is the
       // server outcome for new publishes. Never send users to Public mid-upload.
       const inReviewCatalogUrl = '/profile?tab=content&contentStatus=in-review';
 
-      // Edit + made-to-order: persist config before leave (needs editor mounted).
-      if (isEditMode && designIdSnapshot && isMadeToOrderSnapshot) {
+      // Edit: persist config before leave (needs editor mounted).
+      if (isEditMode && designIdSnapshot) {
         const saved = await customOrderEditorRef.current?.saveConfiguration({
           silentSuccess: true,
         });
@@ -1482,10 +1451,7 @@ const CreateDesignInner: React.FC = () => {
         pendingCategorySuggestionId: pendingCategorySuggestionIdSnapshot,
         tags: finalTags,
         filterValueIds: filterValueIdsSnapshot,
-        sizingMode: sizingModeSnapshot,
-        rtwSizeSystem: undefined as string | undefined,
         customMeasurementKeys: customMeasurementKeysSnapshot,
-        customOrderEnabled: isMadeToOrderSnapshot,
         fitPreference: fitPreferenceSnapshot,
         targetAgeGroup: targetAgeGroupSnapshot,
       };
@@ -1495,6 +1461,7 @@ const CreateDesignInner: React.FC = () => {
         title: titleSnapshot,
         visibility: visibilitySnapshot,
         coverPreviewUrl,
+        ownsCoverPreview: true,
         designId: isEditMode ? designIdSnapshot : undefined,
         legacyCollectionId: isEditMode ? designIdSnapshot : undefined,
         collectionId: isEditMode ? designIdSnapshot : undefined,
@@ -1674,7 +1641,7 @@ const CreateDesignInner: React.FC = () => {
     videoCount: files.filter((f) => f.kind === "video").length,
     coverImageUrl,
     isAvailableInStore: false,
-    isMadeToOrder,
+    isMadeToOrder: true,
   };
 
   const tourSteps = useMemo<TourStep[]>(
@@ -2019,11 +1986,9 @@ const CreateDesignInner: React.FC = () => {
                     <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-600 dark:text-purple-300">
                       {isEditMode ? 'Drop Update' : 'New Drop'}
                     </span>
-                    {isMadeToOrder && (
-                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-300">
-                        Made to Order
-                      </span>
-                    )}
+                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-300">
+                      Made to Order
+                    </span>
                   </div>
 
                   <h4 className="text-xs font-bold text-[var(--text-primary)] break-words">
@@ -2432,76 +2397,37 @@ const CreateDesignInner: React.FC = () => {
                     ) : null}
                   </div>
 
-                  {/* Made to Order Toggle Row */}
-                  <div
-                    className="rounded-2xl p-4 surface-control border border-[var(--border-default)] flex items-center justify-between cursor-pointer select-none"
-                    onClick={() => {
-                      if (disabled) return;
-                      const next = !isMadeToOrder;
-                      setIsMadeToOrder(next);
-                      setSizingMode(next ? 'CUSTOM' : 'NONE');
-                    }}
-                  >
-                    <div className="space-y-0.5 pr-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-[var(--text-primary)]">
-                          Enable Made to Order (Custom Order)
-                        </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-300">
-                          Recommended
-                        </span>
-                      </div>
-                      <p className="text-xs text-[var(--text-secondary)]">
-                        Allow shoppers to request this design crafted to their custom measurements.
-                      </p>
+                  {/* Custom order setup: every design is made to order */}
+                  <div className="pt-2 space-y-3">
+                    <div className="flex items-center justify-between border-t border-[var(--border-default)] pt-3">
+                      <span className="text-xs font-bold text-purple-600 dark:text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>📐</span> Custom Order Specification Suite
+                      </span>
+                      <span className="text-[11px] text-[var(--text-muted)]">Full Inline View</span>
                     </div>
-
-                    <div className={`wiez-toggle-switch ${isMadeToOrder ? 'on' : ''}`}>
-                      <div className="wiez-toggle-knob" />
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      Every design is made to order. Complete this setup to submit your design and take orders.
+                    </p>
+                    <div className="w-full">
+                      <CustomOrderConfigurationEditor
+                        ref={customOrderEditorRef}
+                        sourceType="DESIGN"
+                        sourceId={isEditMode ? id : undefined}
+                        sourceTitle={title}
+                        measurementKeys={customMeasurementKeys}
+                        measurementGender={measurementGender}
+                        defaultBaseCharge={minPrice}
+                        defaultProductionLeadDays={storeDefaultProductionLeadDays}
+                        defaultProductionLeadLabel={storeCustomOrderLeadTimeLabel}
+                        disabled={disabled}
+                        onRequiredMeasurementKeysChange={handleCustomOrderMeasurementKeysChange}
+                      />
                     </div>
                   </div>
-
-                  {/* Expanded Custom Order Configuration (Full Natural Inline Expansion) */}
-                  {isMadeToOrder && (
-                    <div className="pt-2 space-y-3">
-                      <div className="flex items-center justify-between border-t border-[var(--border-default)] pt-3">
-                        <span className="text-xs font-bold text-purple-600 dark:text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
-                          <span>📐</span> Custom Order Specification Suite
-                        </span>
-                        <span className="text-[11px] text-[var(--text-muted)]">Full Inline View</span>
-                      </div>
-                      <div className="w-full">
-                        <CustomOrderConfigurationEditor
-                          ref={customOrderEditorRef}
-                          sourceType="DESIGN"
-                          sourceId={isEditMode ? id : undefined}
-                          sourceTitle={title}
-                          measurementKeys={customMeasurementKeys}
-                          measurementGender={measurementGender}
-                          defaultBaseCharge={minPrice}
-                          defaultProductionLeadDays={storeDefaultProductionLeadDays}
-                          defaultProductionLeadLabel={storeCustomOrderLeadTimeLabel}
-                          disabled={disabled}
-                          onRequiredMeasurementKeysChange={handleCustomOrderMeasurementKeysChange}
-                        />
-                      </div>
-                    </div>
-                  )}
                   </div>
 
                   {/* Sizing & Visibility Section */}
                   <div className="space-y-4 pt-4 border-t border-[var(--border-default)]">
-                  <SizingConfigurator
-                    sizingMode={sizingMode}
-                    onSizingModeChange={handleDesignSizingModeChange}
-                    onRtwSizeSystemChange={() => undefined}
-                    showRtwSizeSystem={false}
-                    customMeasurementKeys={customMeasurementKeys}
-                    onCustomMeasurementKeysChange={setCustomMeasurementKeys}
-                    measurementGender={measurementGender}
-                    disabled={disabled}
-                  />
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <UniversalSelect
                       label="Fit Preference"

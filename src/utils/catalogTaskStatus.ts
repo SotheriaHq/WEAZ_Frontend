@@ -7,6 +7,27 @@ export function resolveCatalogTaskBucket(task: { status: string; action: 'draft'
   return task.action === 'draft' ? 'DRAFT' : 'IN_REVIEW';
 }
 
+/**
+ * Whether a refetched list changes anything a card paints. The signed cover URL
+ * is left out because it differs on every fetch. Comparing ids alone kept a
+ * stale empty row on screen after its media landed.
+ */
+export function collectionListChanged<
+  T extends { id: string; coverFileId?: string | null; itemCount?: number; title?: string; draftReason?: string | null },
+>(current: readonly T[], next: readonly T[]): boolean {
+  if (current.length !== next.length) return true;
+  return current.some((entry, index) => {
+    const other = next[index];
+    return (
+      entry.id !== other?.id ||
+      entry.coverFileId !== other?.coverFileId ||
+      entry.itemCount !== other?.itemCount ||
+      entry.title !== other?.title ||
+      entry.draftReason !== other?.draftReason
+    );
+  });
+}
+
 export function latestCatalogTasks<T extends { id: string; designId?: string | null; updatedAt: number }>(tasks: readonly T[]): T[] {
   const latest = new Map<string, T>();
   for (const task of tasks) {

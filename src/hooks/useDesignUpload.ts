@@ -45,6 +45,8 @@ type UploadOptions = {
   customOrderEnabled?: boolean;
   fitPreference?: DesignFitPreference;
   targetAgeGroup?: DesignTargetAgeGroup;
+  /** Fires once the server row exists, before any media has uploaded. */
+  onDesignCreated?: (designId: string) => void;
 };
 
 type ParsedUploadArgs = {
@@ -595,6 +597,7 @@ export function useDesignUpload() {
       }
       createdDesignId = designId;
       failureStage = 'upload';
+      parsed.options.onDesignCreated?.(designId);
 
       const uploads = Array.isArray(initResp.uploads) ? initResp.uploads : [];
       addClientDiagnostic('info', 'design-upload', 'Design uploads initialized', {

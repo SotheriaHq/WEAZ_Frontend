@@ -97,7 +97,7 @@ To prevent fraud, counterfeit goods, and money laundering, fashion brands operat
 Brand owners submit: (a) Corporate Affairs Commission (CAC) incorporation certificates or international business registrations, (b) Tax Identification Numbers (TIN), (c) valid government-issued identity documents (National ID, International Passport, or Driver’s License), (d) proof of physical studio address, and (e) verified corporate bank account details.
 
 ### 5.2. Isolated Cloud Vault Storage
-All Brand KYC documents are uploaded via cryptographically signed temporary URLs directly into private, access-restricted AWS S3 storage vaults encrypted with **AES-256 bit Server-Side Encryption (SSE-S3)**.
+All Brand KYC documents are uploaded via cryptographically signed temporary URLs directly into private, access-restricted Cloudflare R2 storage vaults encrypted at rest with **AES-256 bit encryption**.
 
 ### 5.3. Public API Mathematical Redaction
 To protect Brand owners from identity theft, our public backend APIs (`GET /brands/:id`, `GET /brands/username/:handle`) strictly redact all corporate registration numbers, TINs, owner personal emails, and banking coordinates for all public visitor requests.
@@ -147,8 +147,8 @@ Where WIEZ relies on **Legitimate Interests** as the legal basis for processing 
 WIEZ engages trusted third-party technical providers to operate infrastructure services under binding Data Processing Agreements (DPAs):
 
 ### 8.1. Infrastructure & Hosting Sub-Processors
-* **Amazon Web Services (AWS)**: Cloud compute, the managed PostgreSQL database, and encrypted object storage (S3) for all uploaded media and verification documents.
-* **Cloudflare, Inc.**: Content Delivery Network (CDN), DDoS mitigation, SSL/TLS edge termination, media caching, and hosting for our web application. Cloudflare also tells our web app which country your connection comes from; we use it only to suggest the currency for price estimates and do not store it.
+* **Amazon Web Services (AWS)**: Cloud compute and the managed PostgreSQL database.
+* **Cloudflare, Inc.**: Encrypted object storage (R2) for all uploaded media and verification documents, Content Delivery Network (CDN), DDoS mitigation, SSL/TLS edge termination, media caching, and hosting for our web application. Cloudflare also tells our web app which country your connection comes from; we use it only to suggest the currency for price estimates and do not store it.
 
 ### 8.2. Payment & Financial Gateways
 * **Paystack Payments Limited** (a Stripe company): our payment gateway, processing card, bank transfer and USSD payments, and holding the saved-card authorizations described in Section 6.1.
@@ -178,7 +178,7 @@ WIEZ deploys multi-layered technical and organizational security controls:
 | Layer | Technical Implementation & Standard |
 | --- | --- |
 | **1. In-Transit Encryption** | TLS 1.3 / HTTPS across all web domains and mobile APIs. |
-| **2. At-Rest Encryption** | AES-256 bit Server-Side Encryption across databases & S3. |
+| **2. At-Rest Encryption** | AES-256 bit encryption across databases & object storage. |
 | **3. Credential Hashing** | **Argon2id**, the memory-hard algorithm recommended by OWASP, with a per-credential salt. Applied to account passwords, one-time verification codes, and payout authorization codes alike. |
 | **4. Mobile Device Security** | JWT tokens stored in **iOS Keychain** & **Android KeyStore** via hardware-isolated `expo-secure-store`. |
 | **5. Media Access Controls** | Private attachments and KYC files protected via HMAC-SHA256 pre-signed temporary URLs expiring within minutes. |
@@ -287,7 +287,7 @@ For users residing in the European Economic Area (EEA) or United Kingdom:
 Because WIEZ operates a global fashion ecosystem with cloud infrastructure across multiple jurisdictions:
 * **Module 2 Controller-to-Processor SCCs**: Where personal data originating in the EEA is transferred to infrastructure or processors outside the EEA (such as Nigeria or the United States), WIEZ executes **Standard Contractual Clauses (SCCs)** pursuant to European Commission Implementing Decision (EU) 2021/914 (Module 2: Controller-to-Processor).
 * **UK International Data Transfer Addendum**: For transfers originating in the United Kingdom, WIEZ incorporates the UK ICO International Data Transfer Addendum to the EU Commission SCCs (Version B1.0).
-* **Technical Safeguards**: All cross-border data transfers are encrypted in transit using TLS 1.3 and encrypted at rest with AES-256 GCM. Primary European database replicas and media caches are hosted in secure AWS European regions (EU-West-1 Ireland). Users may request an unredacted copy of our standard SCC terms by emailing `privacy@wiez.com`.
+* **Technical Safeguards**: All cross-border data transfers are encrypted in transit using TLS 1.3 and encrypted at rest with AES-256 GCM. Primary European database replicas are hosted in secure AWS European regions (EU-West-1 Ireland), and uploaded media is stored and cached on Cloudflare's network. Users may request an unredacted copy of our standard SCC terms by emailing `privacy@wiez.com`.
 
 ---
 
