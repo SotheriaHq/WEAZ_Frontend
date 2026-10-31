@@ -38,26 +38,27 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     },
     ref
   ) => {
-    // Base textarea classes
+    // Base textarea classes - Google-style elevated, soft shadow, scale on focus, no border lighting
     const baseClasses = `
       ${fullWidth ? 'w-full' : ''}
       px-4 py-3 text-sm font-medium
-      bg-[color:var(--wiez-surface-page)]
-      border rounded-xl
+      bg-[color:var(--surface-primary)]
+      rounded-2xl
       text-[color:var(--wiez-text-primary)]
       placeholder:text-[color:var(--wiez-text-placeholder)]
-      shadow-sm
-      focus:outline-none focus:ring-1 focus:ring-[color:var(--wiez-border-focus)] focus:border-[color:var(--wiez-border-focus)]
+      shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.35)]
+      border border-black/[0.04] dark:border-white/[0.06]
+      focus:outline-none focus:shadow-[0_4px_18px_rgba(0,0,0,0.1)] dark:focus:shadow-[0_4px_22px_rgba(0,0,0,0.55)] focus:scale-[1.006] focus:border-black/[0.08] dark:focus:border-white/[0.12]
       transition-all duration-200
       resize-none
       ${
         error
-          ? 'border-[color:var(--wiez-action-danger)]'
-          : 'border-[color:var(--wiez-border-input)] hover:border-[color:var(--wiez-border-default)]'
+          ? '!border-[color:var(--wiez-action-danger)] !shadow-[0_2px_12px_rgba(239,68,68,0.2)]'
+          : 'hover:shadow-[0_3px_12px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_3px_12px_rgba(0,0,0,0.45)]'
       }
       ${
         disabled
-          ? 'opacity-60 cursor-not-allowed bg-[color:var(--wiez-surface-subtle)] text-[color:var(--wiez-text-disabled)]'
+          ? 'opacity-60 cursor-not-allowed bg-[color:var(--wiez-surface-subtle)] text-[color:var(--wiez-text-disabled)] shadow-none'
           : ''
       }
     `;
@@ -69,7 +70,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       <div className={`${fullWidth ? 'w-full' : ''} ${className}`}>
         {/* Label */}
         {label && (
-          <label className="block text-sm font-semibold text-[color:var(--wiez-text-secondary)] mb-2">
+          <label className="block text-xs font-bold uppercase tracking-wider text-[color:var(--wiez-text-secondary)] mb-2">
             {label}
             {required && <span className="text-[color:var(--wiez-brand-accent)] ml-1">*</span>}
           </label>

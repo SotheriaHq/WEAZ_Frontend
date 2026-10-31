@@ -13,7 +13,11 @@ interface FrostedButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   loading?: boolean;
 }
 
-export const FrostedButton: React.FC<FrostedButtonProps> = ({
+/**
+ * LiquidButton Component (Rule 36: Liquid Glass Architecture)
+ * Supersedes legacy FrostedButton with high saturation, specular rim, and optical depth.
+ */
+export const LiquidButton: React.FC<FrostedButtonProps> = ({
   children,
   className,
   variant = 'primary',
@@ -80,4 +84,5 @@ export const IconButton: React.FC<IconButtonProps> = ({ variant = 'ghost', size 
   </button>
 );
 
-export default FrostedButton;
+export const FrostedButton = LiquidButton;
+export default LiquidButton;

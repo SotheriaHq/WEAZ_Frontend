@@ -444,17 +444,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
 
   return (
     <nav
-      className={`fixed top-0 left-0 z-layer-nav h-16 w-full px-4 transition-transform duration-200 ease-out sm:px-5 ${
-        /*
-          Immersive only: the bar slides out while the feed under it is being
-          scrolled and comes back when it settles (see `navbarChrome`). A solid
-          bar on an ordinary page must never do this — it would take the site's
-          navigation away on every scroll.
-
-          `-translate-y-full` rather than `display:none` so it animates, and
-          `pointer-events-none` so a hidden bar cannot swallow a tap meant for
-          the media behind it.
-        */
+      className={`fixed top-0 left-0 z-layer-nav h-16 w-full px-4 transition-all duration-200 ease-out sm:px-5 ${
         immersive && navHidden ? '-translate-y-full pointer-events-none' : 'translate-y-0'
       } ${
         immersive
@@ -466,10 +456,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
               : 'wiez-nav-surface'
       }`}
       style={
-        isScrolled && !minimal && !immersive
+        !minimal && !immersive
           ? {
-              backdropFilter: 'blur(18px) saturate(140%)',
-              WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+              backdropFilter: 'blur(20px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
             }
           : undefined
       }

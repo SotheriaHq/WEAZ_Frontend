@@ -30,10 +30,9 @@
   --auth-panel-bg: rgba(255, 255, 255, 0.88);
   --auth-panel-border: rgba(10, 10, 10, 0.10);
   --auth-panel-shadow:
-    inset 4px 4px 9px var(--neu-shadow-dark),
-    inset -4px -4px 9px var(--neu-shadow-light),
-    inset -2px -2px 18px 0px rgba(147, 51, 234, 0.03),
-    inset 0 0 28px 0px rgba(168, 85, 247, 0.02);
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
+    0 20px 50px -10px rgba(0, 0, 0, 0.07),
+    0 0 0 1px rgba(0, 0, 0, 0.03);
 
   --auth-field-bg: rgba(10, 10, 10, 0.04);
   --auth-field-bg-focus: rgba(10, 10, 10, 0.02);
@@ -65,11 +64,9 @@ html[data-theme='dark'] {
   --auth-panel-bg: rgba(25, 25, 30, 0.85);
   --auth-panel-border: rgba(255, 255, 255, 0.12);
   --auth-panel-shadow:
-    inset 4px 4px 10px var(--neu-shadow-dark),
-    inset -4px -4px 10px var(--neu-shadow-light),
-    inset -2px -2px 20px 0px rgba(192, 132, 252, 0.05),
-    inset 2px 2px 24px 0px rgba(147, 51, 234, 0.035),
-    inset 0 0 32px 0px rgba(168, 85, 247, 0.03);
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.22),
+    0 25px 60px -15px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
 
   --auth-field-bg: rgba(255, 255, 255, 0.06);
   --auth-field-bg-focus: rgba(255, 255, 255, 0.10);
@@ -176,8 +173,9 @@ html[data-theme='dark'] {
 
 .auth-input:focus {
   background: var(--auth-field-bg-focus);
-  border-color: var(--brand-gold);
-  box-shadow: 0 0 0 3px rgba(var(--brand-accent-rgb), 0.28);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transform: scale(1.008);
   outline: none;
 }
 
@@ -209,7 +207,7 @@ html[data-theme='dark'] {
 }
 
 .auth-field-toggle:focus-visible {
-  outline: 2px solid var(--brand-gold);
+  outline: none; box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.35);
   outline-offset: 2px;
   color: var(--auth-text-strong);
 }
@@ -277,7 +275,7 @@ html[data-theme='dark'] {
 }
 
 .auth-social-btn:focus-visible {
-  outline: 2px solid var(--brand-gold);
+  outline: none; box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.35);
   outline-offset: 2px;
 }
 
@@ -296,7 +294,7 @@ html[data-theme='dark'] {
 .auth-selection-card.active {
   border-color: var(--brand-gold);
   background: linear-gradient(145deg, rgba(212, 175, 55, 0.15), rgba(212, 175, 55, 0.05));
-  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4);
   position: relative;
   overflow: hidden;
 }
@@ -357,7 +355,7 @@ html[data-theme='dark'] {
 }
 
 .auth-checkbox:focus-visible {
-  outline: 2px solid var(--brand-gold);
+  outline: none; box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.35);
   outline-offset: 2px;
 }
 
@@ -536,7 +534,7 @@ html[data-theme='dark'] {
 
 /* Focus Ring */
 .auth-focus-ring:focus-visible {
-  outline: 2px solid var(--brand-gold);
+  outline: none; box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.35);
   outline-offset: 2px;
 }
 /* ============================================================================

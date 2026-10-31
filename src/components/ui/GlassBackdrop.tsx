@@ -69,7 +69,7 @@ const GlassBackdrop: React.FC<GlassBackdropProps> = ({
               onClick={onClick}
             >
               <div className={`absolute inset-0 bg-gradient-to-br ${styles.gradient}`} />
-              <div className="absolute inset-0 backdrop-blur-xl" />
+              <div className="absolute inset-0 backdrop-blur-2xl backdrop-saturate-[190%]" />
               <div className={`absolute inset-0 ${styles.overlay}`} />
             </motion.div>
 
@@ -110,7 +110,7 @@ export const useGlassBackdrop = (variant: 'default' | 'light' | 'dark' = 'defaul
 
   return {
     gradientClass: styles.gradientClass,
-    blurClass: 'backdrop-blur-xl',
+    blurClass: 'backdrop-blur-2xl backdrop-saturate-[190%]',
     overlayClass: styles.overlayClass,
     /**
      * Use these as separate layers:
@@ -128,11 +128,11 @@ export const useGlassBackdrop = (variant: 'default' | 'light' | 'dark' = 'defaul
  */
 export const glassPanelClasses = {
   /** Light mode panel */
-  light: 'bg-white/95 backdrop-blur-2xl border border-white/20 shadow-2xl',
+  light: 'bg-white/80 backdrop-blur-2xl backdrop-saturate-[190%] border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.9)]',
   /** Dark mode panel */
-  dark: 'bg-gray-950/95 backdrop-blur-2xl border border-white/10 shadow-2xl',
+  dark: 'bg-[#100d1c]/80 backdrop-blur-2xl backdrop-saturate-[190%] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.2)]',
   /** Auto mode (responds to theme) */
-  auto: 'bg-white/95 dark:bg-gray-950/95 backdrop-blur-2xl border border-white/20 dark:border-white/10 shadow-2xl',
+  auto: 'bg-white/80 dark:bg-[#100d1c]/80 backdrop-blur-2xl backdrop-saturate-[190%] border border-white/40 dark:border-white/10 shadow-2xl',
 };
 
 export default GlassBackdrop;
