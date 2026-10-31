@@ -7,8 +7,6 @@ import {
   buildVideoPreviewUrl,
   IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
   isPreviewUnavailableDataUrl,
-  MOBILE_PROACTIVE_NORMALIZE_MIN_BYTES,
-  prefersCanvasImagePreview,
   PREVIEW_STRATEGY_TIMEOUT_MS,
   probeImagePreviewUrl,
   revokeObjectPreviewUrl,
@@ -142,11 +140,21 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const urlRef = useRef<Map<string, string>>(new Map());
   const convertingRef = useRef<Set<string>>(new Set());
+  const processedRef = useRef<Map<string, File>>(new Map());
+  const mountedRef = useRef(true);
+  const itemsRef = useRef(state.items);
+  itemsRef.current = state.items;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     for (const it of state.items) {
       if (it.previewUrl?.startsWith('blob:')) {
-        if (!urlRef.current.has(it.id)) {
+        const previous = urlRef.current.get(it.id);
+        if (previous !== it.previewUrl) {
+          revokeObjectPreviewUrl(previous);
           urlRef.current.set(it.id, it.previewUrl);
         }
         continue;
@@ -167,163 +175,99 @@ export const MediaProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         map.delete(k);
       }
     }
+    for (const id of processedRef.current.keys()) {
+      if (!keep.has(id)) processedRef.current.delete(id);
+    }
   }, [state.items]);
 
   useEffect(() => {
-    for (const it of state.items) {
-      if (it.kind !== 'image' || !it.file || convertingRef.current.has(it.id)) {
-        continue;
-      }
-
-      // Instant blob preview already set at add-time. Only re-process when we
-      // must (HEIC / undecodable / large mobile camera JPEG that Android won't paint).
-      const hasInstantBlob =
-        typeof it.previewUrl === 'string' && it.previewUrl.startsWith('blob:');
-      const claimedDisplayable =
-        it.file.type.trim().toLowerCase().startsWith('image/') &&
-        /image\/(jpeg|png|webp|gif|bmp)/i.test(it.file.type) &&
-        it.file.size < MOBILE_PROACTIVE_NORMALIZE_MIN_BYTES;
-
-      // Laptop / small images: keep the instant blob URL, skip sniff/network.
-      if (hasInstantBlob && claimedDisplayable && !prefersCanvasImagePreview()) {
-        continue;
-      }
-
-      convertingRef.current.add(it.id);
-      const itemId = it.id;
-      const file = it.file;
-      const previousPreview = it.previewUrl;
-
+    for (const item of state.items) {
+      if (item.kind !== 'image' || !item.file || convertingRef.current.has(item.id) || processedRef.current.get(item.id) === item.file) continue;
+      const file = item.file;
+      const previousPreview = item.previewUrl;
+      convertingRef.current.add(item.id);
+      const isCurrent = () => mountedRef.current && itemsRef.current.some(
+        (entry) => entry.id === item.id && entry.file === file,
+      );
+      const commit = (action: Extract<Action, { type: 'setPreview' | 'setNormalized' }>) => {
+        if (!isCurrent()) {
+          if (action.previewUrl !== previousPreview) revokeObjectPreviewUrl(action.previewUrl);
+          return;
+        }
+        processedRef.current.set(item.id, action.type === 'setNormalized' ? action.file : file);
+        dispatch(action);
+      };
       void (async () => {
+        let displayable = false;
         try {
-          const sniffedFormat = await sniffImageFormat(file);
-          addClientDiagnostic('info', 'media-store', 'Sniffed selected file', {
-            fileName: file.name,
-            fileType: file.type,
-            fileSize: file.size,
-            sniffedFormat,
-          });
-
-          if (isUnreadableSniff(sniffedFormat)) {
-            if (previousPreview?.startsWith('blob:')) {
-              revokeObjectPreviewUrl(previousPreview);
-            }
-            dispatch({
-              type: 'setPreview',
-              id: itemId,
-              previewUrl: IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
-            });
+          const format = await sniffImageFormat(file);
+          if (!isCurrent()) return;
+          if (isUnreadableSniff(format)) {
+            commit({ type: 'setPreview', id: item.id, previewUrl: IMAGE_PREVIEW_UNAVAILABLE_DATA_URL });
             return;
           }
-
-          if (!isBrowserDisplayableSniff(sniffedFormat)) {
-            const normalized = await getNormalizedImageFile(file);
-            if (previousPreview?.startsWith('blob:')) {
-              revokeObjectPreviewUrl(previousPreview);
-            }
-            dispatch({
-              type: 'setNormalized',
-              id: itemId,
-              file: normalized,
-              previewUrl: URL.createObjectURL(normalized),
-            });
-            return;
-          }
-
-          // Large mobile camera JPEGs: upgrade via server only when needed.
-          if (
-            prefersCanvasImagePreview() &&
-            file.size >= MOBILE_PROACTIVE_NORMALIZE_MIN_BYTES
-          ) {
-            try {
-              const normalized = await getNormalizedImageFile(file);
-              if (previousPreview?.startsWith('blob:')) {
-                revokeObjectPreviewUrl(previousPreview);
-              }
-              dispatch({
-                type: 'setNormalized',
-                id: itemId,
-                file: normalized,
-                previewUrl: URL.createObjectURL(normalized),
-              });
-              return;
-            } catch {
-              // Keep instant blob if server normalize fails.
-              if (hasInstantBlob) return;
-            }
-          }
-
-          // Instant blob already works for most desktop/laptop picks.
-          if (hasInstantBlob) {
+          displayable = isBrowserDisplayableSniff(format);
+          // Native browser decoding is the fast path on phones, tablets and
+          // laptops. File size or pointer type alone must never trigger a
+          // network transcode or replace an already displayable source file.
+          if (displayable && previousPreview?.startsWith('blob:')) {
             try {
               await probeImagePreviewUrl(previousPreview);
+              if (isCurrent()) processedRef.current.set(item.id, file);
+              addClientDiagnostic('info', 'media-store', 'Local preview decoded without server conversion', { fileSize: file.size, fileType: file.type });
               return;
-            } catch {
-              /* fall through to rebuild */
-            }
+            } catch { /* Try local conversion. */ }
           }
-
-          const previewUrl = await Promise.race([
-            buildDisplayableImagePreview(file),
-            new Promise<string>((_, reject) => {
-              setTimeout(
-                () => reject(new Error('Preview generation timed out')),
-                PREVIEW_OVERALL_TIMEOUT_MS,
-              );
-            }),
-          ]);
-
-          if (
-            isPreviewUnavailableDataUrl(previewUrl) ||
-            previewUrl.startsWith('data:')
-          ) {
+          if (!isCurrent()) return;
+          if (displayable) {
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const local = buildDisplayableImagePreview(file);
+            // A timed-out encode can still finish and allocate an object URL.
+            let abandoned = false;
+            void local.then((url) => { if (abandoned) revokeObjectPreviewUrl(url); }, () => undefined);
             try {
-              await probeImagePreviewUrl(previewUrl);
-            } catch {
-              throw new Error('Local preview probe failed');
-            }
+              const previewUrl = await Promise.race([
+                local,
+                new Promise<string>((_, reject) => {
+                  timer = setTimeout(() => { abandoned = true; reject(new Error('Preview generation timed out')); }, PREVIEW_OVERALL_TIMEOUT_MS);
+                }),
+              ]);
+              if (!isPreviewUnavailableDataUrl(previewUrl)) {
+                commit({ type: 'setPreview', id: item.id, previewUrl });
+                return;
+              }
+            } finally { if (timer !== undefined) clearTimeout(timer); }
           }
-
-          if (previousPreview?.startsWith('blob:') && previousPreview !== previewUrl) {
-            revokeObjectPreviewUrl(previousPreview);
+        } catch { /* Server conversion is the final decode fallback. */ }
+        try {
+          if (!isCurrent()) return;
+          addClientDiagnostic('info', 'media-store', 'Using server preview decode fallback', { fileSize: file.size, fileType: file.type });
+          const normalized = await getNormalizedImageFile(file);
+          if (!isCurrent()) return;
+          const previewUrl = URL.createObjectURL(normalized);
+          // JPEG/PNG/WebP preview recovery must not replace the upload master.
+          // Undecodable input formats retain the existing normalization flow.
+          if (displayable) commit({ type: 'setPreview', id: item.id, previewUrl });
+          else commit({ type: 'setNormalized', id: item.id, file: normalized, previewUrl });
+        } catch {
+          if (isCurrent()) processedRef.current.set(item.id, file);
+          if (!previousPreview?.startsWith('blob:')) {
+            commit({ type: 'setPreview', id: item.id, previewUrl: IMAGE_PREVIEW_UNAVAILABLE_DATA_URL });
           }
-          dispatch({ type: 'setPreview', id: itemId, previewUrl });
-        } catch (error) {
-          console.warn('[useMediaStore] preview generation failed', error);
-          try {
-            const normalized = await getNormalizedImageFile(file);
-            if (previousPreview?.startsWith('blob:')) {
-              revokeObjectPreviewUrl(previousPreview);
-            }
-            dispatch({
-              type: 'setNormalized',
-              id: itemId,
-              file: normalized,
-              previewUrl: URL.createObjectURL(normalized),
-            });
-          } catch {
-            if (!hasInstantBlob) {
-              dispatch({
-                type: 'setPreview',
-                id: itemId,
-                previewUrl: IMAGE_PREVIEW_UNAVAILABLE_DATA_URL,
-              });
-            }
-          }
-        } finally {
-          convertingRef.current.delete(itemId);
         }
-      })();
+      })().finally(() => { convertingRef.current.delete(item.id); });
     }
   }, [state.items]);
 
   useEffect(() => {
     const map = urlRef.current;
+    const processed = processedRef.current;
     return () => {
       for (const url of map.values()) {
         revokeObjectPreviewUrl(url);
       }
       map.clear();
+      processed.clear();
     };
   }, []);
 

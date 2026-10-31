@@ -1,3 +1,4 @@
+import { resolveCatalogTaskBucket } from '@/utils/catalogTaskStatus';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useOptionalReturnTo } from '@/hooks/useReturnTo';
@@ -95,18 +96,21 @@ const OWNER_VISIBILITY_FILTERS: VisibilityFilter[] = [
   'Private',
   'Drafts',
   'In Review',
+  'Needs Attention',
   'Changes Requested',
   'Rejected',
   'Deleted',
 ];
 const REVIEW_VISIBILITY_STATUS: Partial<Record<VisibilityFilter, string>> = {
   'In Review': 'IN_REVIEW',
+  'Needs Attention': 'FAILED',
   'Changes Requested': 'CHANGES_REQUESTED',
   Rejected: 'REJECTED',
 };
 
 const VISIBILITY_SHORT_LABELS: Partial<Record<VisibilityFilter, string>> = {
   'In Review': 'Review',
+  'Needs Attention': 'Needs Attention',
   'Changes Requested': 'Changes',
   Rejected: 'Rejected',
   Deleted: 'Deleted',
@@ -116,6 +120,7 @@ const VISIBILITY_ICONS: Partial<Record<VisibilityFilter, React.ReactNode>> = {
   Public: '🌍',
   Private: '🔒',
   Drafts: '📝',
+  'Needs Attention': '🛠️',
   'In Review': <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-amber-100 text-[10px] font-bold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">R</span>,
   'Changes Requested': <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-orange-100 text-[10px] font-bold text-orange-800 dark:bg-orange-900/50 dark:text-orange-200">!</span>,
   Rejected: <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-rose-100 text-[10px] font-bold text-rose-800 dark:bg-rose-900/50 dark:text-rose-200">✕</span>,
@@ -1450,6 +1455,8 @@ const ProfilePage: React.FC = () => {
       const reviewPlaceholders: CollectionDto[] = Object.entries(publishingStates)
         .filter(([key, state]) => {
           if (decoratedIds.has(key)) return false;
+          const bucket = resolveCatalogTaskBucket({ status: state.status, action: state.kind ?? 'publish' });
+          if (bucket === 'FAILED') return targetReviewStatus === 'FAILED';
           if (state.kind === 'draft') return false;
           // 'settling' included: finished upload, server row still in flight.
           // Dropping it here is what blinked the Review-tab card.
@@ -1534,6 +1541,7 @@ const ProfilePage: React.FC = () => {
         ) {
           return false;
         }
+        if (state.status === 'failed') return false;
         if (isDraftView) {
           if (state.kind !== 'draft') return false;
         } else if (state.kind === 'draft') {
