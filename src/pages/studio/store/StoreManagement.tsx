@@ -204,6 +204,7 @@ export default function StoreManagement() {
   );
   const returnTo = toInternalPath(routeSearchParams.get('returnTo'));
   const returnLabel = routeSearchParams.get('returnLabel') || 'Back';
+  const isBrandVerified = (verification?.verificationStatus ?? user?.verificationStatus) === 'APPROVED' || (user as any)?.isBrandVerified === true;
   const verificationStatus =
     verification?.verificationStatus ??
     user?.verificationStatus ??
@@ -387,9 +388,9 @@ export default function StoreManagement() {
 
             </div>
             <div className="flex flex-wrap items-center gap-2">
-            {commerce.data?.canUpgrade && !isEmbeddedMobile ? (
+            {isBrandVerified && commerce.data?.canUpgrade && !isEmbeddedMobile ? (
               <button type="button" onClick={() => navigate('/settings?tab=subscription-billing&from=studio')}
-                className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 text-sm font-semibold transition active:scale-[0.985]">
+                className="neu-pressed-button inline-flex min-h-11 items-center justify-center rounded-2xl bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 text-sm font-semibold transition active:scale-[0.985]">
                 Upgrade
               </button>
             ) : null}

@@ -1,4 +1,4 @@
-﻿import { createContext, useCallback, useContext, useLayoutEffect, useState, useMemo, useEffect, useRef } from 'react';
+import { createContext, useCallback, useContext, useLayoutEffect, useState, useMemo, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import {
   isThemePreference,
@@ -10,8 +10,6 @@ import {
 const THEME_TRANSITION_DURATION_MS = 300;
 const LIGHT_THEME_COLOR = '#ffffff';
 const DARK_THEME_COLOR = '#0a0a0a';
-const EMBEDDED_SURFACE_SESSION_KEY = 'wiez.studio.embeddedSurface';
-const EMBEDDED_THEME_SESSION_KEY = 'wiez.studio.embeddedTheme';
 
 const getEmbeddedTheme = (): ResolvedTheme | null => {
   if (typeof window === 'undefined') return null;
@@ -21,7 +19,10 @@ const getEmbeddedTheme = (): ResolvedTheme | null => {
     !explicitSurface &&
     (() => {
       try {
-        return window.sessionStorage.getItem(EMBEDDED_SURFACE_SESSION_KEY) === 'mobile-app';
+        return (
+          window.sessionStorage.getItem('WIEZ.studio.embeddedSurface') === 'mobile-app' ||
+          window.sessionStorage.getItem('wiez.studio.embeddedSurface') === 'mobile-app'
+        );
       } catch {
         return false;
       }
@@ -30,7 +31,10 @@ const getEmbeddedTheme = (): ResolvedTheme | null => {
   const theme = params.get('theme');
   if (theme === 'light' || theme === 'dark') {
     try {
-      window.sessionStorage.setItem(EMBEDDED_THEME_SESSION_KEY, theme);
+      window.sessionStorage.setItem('WIEZ.studio.embeddedTheme', theme);
+      window.sessionStorage.setItem('wiez.studio.embeddedTheme', theme);
+      window.sessionStorage.setItem('WIEZ.studio.embeddedSurface', 'mobile-app');
+      window.sessionStorage.setItem('wiez.studio.embeddedSurface', 'mobile-app');
     } catch {
       // Storage can be unavailable in restricted WebViews.
     }
@@ -38,7 +42,9 @@ const getEmbeddedTheme = (): ResolvedTheme | null => {
   }
 
   try {
-    const sessionTheme = window.sessionStorage.getItem(EMBEDDED_THEME_SESSION_KEY);
+    const sessionTheme =
+      window.sessionStorage.getItem('WIEZ.studio.embeddedTheme') ||
+      window.sessionStorage.getItem('wiez.studio.embeddedTheme');
     return sessionTheme === 'light' || sessionTheme === 'dark' ? sessionTheme : null;
   } catch {
     return null;
@@ -161,17 +167,17 @@ export function ThemeProvider({
   const resolvedTheme: ResolvedTheme = resolveThemePreference(theme, systemScheme);
 
   const persistThemePreference = useCallback((newTheme: ThemePreference) => {
-    if (embeddedTheme) {
-      setThemeState(newTheme);
-      return;
-    }
     try {
       window.localStorage.setItem(storageKey, newTheme);
+      if (newTheme === 'light' || newTheme === 'dark') {
+        window.sessionStorage.setItem('WIEZ.studio.embeddedTheme', newTheme);
+        window.sessionStorage.setItem('wiez.studio.embeddedTheme', newTheme);
+      }
     } catch {
       // no-op: localStorage can be unavailable in some browsing contexts
     }
     setThemeState(newTheme);
-  }, [embeddedTheme, storageKey]);
+  }, [storageKey]);
 
   useLayoutEffect(() => {
     const root = window.document.documentElement;
@@ -236,9 +242,19 @@ export function ThemeProvider({
     };
     window.addEventListener('storage', onStorage);
 
+    const onThemeChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<{ theme?: ResolvedTheme }>;
+      const next = customEvent.detail?.theme;
+      if (next === 'light' || next === 'dark') {
+        setThemeState(next);
+      }
+    };
+    window.addEventListener('wiez:theme-changed', onThemeChanged);
+
     return () => {
       mql.removeEventListener?.('change', handleMql);
       window.removeEventListener('storage', onStorage);
+      window.removeEventListener('wiez:theme-changed', onThemeChanged);
     };
   }, [defaultTheme, embeddedTheme, storageKey, theme]);
 
@@ -254,6 +270,9 @@ export function ThemeProvider({
       systemScheme,
       setThemePreference,
       syncThemePreferenceFromBackend: (backendTheme: unknown) => {
+        if (getEmbeddedTheme()) {
+          return;
+        }
         persistThemePreference(normalizeThemePreference(backendTheme));
       },
       setTheme: setThemePreference,

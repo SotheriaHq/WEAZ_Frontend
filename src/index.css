@@ -1170,6 +1170,7 @@ html {
     transform: translateY(-2px) scale(1.012);
     box-shadow: 0 12px 32px -4px rgba(168, 85, 247, 0.20), 0 4px 12px -2px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1);
   }
+  :is(.dark, [data-theme="dark"]) .wiez-studio-card,
   .dark .wiez-studio-card {
     background-color: var(--surface-card, #140d21);
     background-image:
@@ -1188,6 +1189,7 @@ html {
     box-shadow: 0 4px 24px -2px rgba(147, 51, 234, 0.22), 0 2px 8px -2px rgba(124, 58, 237, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12);
     color: #ffffff;
   }
+  :is(.dark, [data-theme="dark"]) .wiez-studio-card:hover,
   .dark .wiez-studio-card:hover {
     transform: translateY(-2px) scale(1.012);
     box-shadow: 0 12px 36px -4px rgba(168, 85, 247, 0.32), 0 4px 16px -2px rgba(147, 51, 234, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.18);
@@ -3281,114 +3283,128 @@ html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidd
   outline: none;
   position: relative;
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 4px 20px -2px rgba(168, 85, 247, 0.08), 0 2px 8px -2px rgba(124, 58, 237, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 20px -2px rgba(168, 85, 247, 0.12), 0 2px 8px -1px rgba(124, 58, 237, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.98), inset 0 -1px 0 rgba(168, 85, 247, 0.08);
 }
 .wiez-card-base:hover {
   transform: translateY(-2px) scale(1.012);
-  box-shadow: 0 12px 32px -4px rgba(168, 85, 247, 0.20), 0 4px 12px -2px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1);
+  box-shadow: 0 14px 34px -4px rgba(168, 85, 247, 0.24), 0 6px 14px -2px rgba(124, 58, 237, 0.10), inset 0 1px 0 #ffffff, inset 0 -1px 0 rgba(168, 85, 247, 0.15);
 }
-:is(.dark) .wiez-card-base {
-  box-shadow: 0 4px 24px -2px rgba(147, 51, 234, 0.22), 0 2px 8px -2px rgba(124, 58, 237, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+:is(.dark, [data-theme="dark"]) .wiez-card-base,
+.dark .wiez-card-base {
+  box-shadow: 0 4px 24px -2px rgba(147, 51, 234, 0.28), 0 2px 8px -2px rgba(124, 58, 237, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 -1px 0 rgba(168, 85, 247, 0.12);
 }
-:is(.dark) .wiez-card-base:hover {
-  box-shadow: 0 12px 36px -4px rgba(168, 85, 247, 0.32), 0 4px 16px -2px rgba(147, 51, 234, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+:is(.dark, [data-theme="dark"]) .wiez-card-base:hover,
+.dark .wiez-card-base:hover {
+  box-shadow: 0 14px 38px -4px rgba(168, 85, 247, 0.40), 0 6px 18px -2px rgba(147, 51, 234, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(168, 85, 247, 0.20);
 }
 
-/* 10+ Curated Purple Shade Variants */
+/* 10+ Curated Luminous Purple Shade Variants */
 /* Shade 1: Porcelain Lavender (Total Revenue) */
 .wiez-shade-1 {
-  background: linear-gradient(145deg, #ffffff 0%, #fcfaff 40%, #f3ebfc 100%);
+  background: linear-gradient(145deg, #ffffff 0%, #f7efff 45%, #ecdbff 100%);
 }
-:is(.dark) .wiez-shade-1 {
-  background: linear-gradient(145deg, #1b102e 0%, #160c26 50%, #10081d 100%);
+:is(.dark, [data-theme="dark"]) .wiez-shade-1,
+.dark .wiez-shade-1 {
+  background: linear-gradient(145deg, #201338 0%, #180e2b 50%, #120921 100%);
 }
 
 /* Shade 2: Amethyst Mist (Orders) */
 .wiez-shade-2 {
-  background: linear-gradient(145deg, #ffffff 0%, #fdf9ff 40%, #f1e4fe 100%);
+  background: linear-gradient(145deg, #ffffff 0%, #f9f0ff 45%, #e8d5ff 100%);
 }
-:is(.dark) .wiez-shade-2 {
-  background: linear-gradient(145deg, #1f1235 0%, #180e2b 50%, #120921 100%);
+:is(.dark, [data-theme="dark"]) .wiez-shade-2,
+.dark .wiez-shade-2 {
+  background: linear-gradient(145deg, #24143f 0%, #1a0f30 50%, #130a24 100%);
 }
 
 /* Shade 3: Orchid Pearl (Conversion Rate) */
 .wiez-shade-3 {
-  background: linear-gradient(145deg, #ffffff 0%, #fbf7ff 40%, #ede0fc 100%);
+  background: linear-gradient(145deg, #ffffff 0%, #f6ecff 45%, #e4cbff 100%);
 }
-:is(.dark) .wiez-shade-3 {
-  background: linear-gradient(145deg, #23133c 0%, #1a0f2e 50%, #130a23 100%);
+:is(.dark, [data-theme="dark"]) .wiez-shade-3,
+.dark .wiez-shade-3 {
+  background: linear-gradient(145deg, #281546 0%, #1c0f34 50%, #140a26 100%);
 }
 
 /* Shade 4: Lilac Shimmer (Avg Order Value) */
 .wiez-shade-4 {
-  background: linear-gradient(145deg, #ffffff 0%, #faf5ff 40%, #e9d8fb 100%);
+  background: linear-gradient(145deg, #ffffff 0%, #f8edff 45%, #e6ceff 100%);
 }
-:is(.dark) .wiez-shade-4 {
-  background: linear-gradient(145deg, #21123a 0%, #190e2d 50%, #110820 100%);
+:is(.dark, [data-theme="dark"]) .wiez-shade-4,
+.dark .wiez-shade-4 {
+  background: linear-gradient(145deg, #251341 0%, #1b0e31 50%, #120922 100%);
 }
 
 /* Shade 5: Iris Glow (Store Views) */
 .wiez-shade-5 {
-  background: linear-gradient(145deg, #ffffff 0%, #f9f4ff 40%, #e6d3fa 100%);
+  background: linear-gradient(145deg, #ffffff 0%, #f5e8ff 45%, #e0c2ff 100%);
 }
-:is(.dark) .wiez-shade-5 {
-  background: linear-gradient(145deg, #251442 0%, #1b0f31 50%, #140a25 100%);
+:is(.dark, [data-theme="dark"]) .wiez-shade-5,
+.dark .wiez-shade-5 {
+  background: linear-gradient(145deg, #2c174d 0%, #1e1037 50%, #150a29 100%);
 }
 
 /* Shade 6: Heather Silk (Patches) */
 .wiez-shade-6 {
-  background: linear-gradient(145deg, #ffffff 0%, #fcf8ff 40%, #eddcfb 100%);
+  background: linear-gradient(145deg, #ffffff 0%, #f7eeff 45%, #e7d2ff 100%);
 }
-:is(.dark) .wiez-shade-6 {
-  background: linear-gradient(145deg, #1d1132 0%, #160d27 50%, #0f081c 100%);
+:is(.dark, [data-theme="dark"]) .wiez-shade-6,
+.dark .wiez-shade-6 {
+  background: linear-gradient(145deg, #22123a 0%, #190d2d 50%, #110820 100%);
 }
 
 /* Shade 7: Royal Mauve (Active Products) */
 .wiez-shade-7 {
-  background: linear-gradient(145deg, #ffffff 0%, #fbf6ff 40%, #e8d0fa 100%);
+  background: linear-gradient(145deg, #ffffff 0%, #f4e6ff 45%, #dec0ff 100%);
 }
-:is(.dark) .wiez-shade-7 {
-  background: linear-gradient(145deg, #271545 0%, #1d1035 50%, #150a27 100%);
+:is(.dark, [data-theme="dark"]) .wiez-shade-7,
+.dark .wiez-shade-7 {
+  background: linear-gradient(145deg, #2e1750 0%, #201039 50%, #160a2b 100%);
 }
 
 /* Shade 8: Luminous Plum (Reviews) */
 .wiez-shade-8 {
-  background: linear-gradient(145deg, #ffffff 0%, #faf3ff 40%, #e5cbfa 100%);
+  background: linear-gradient(145deg, #ffffff 0%, #f6e7ff 45%, #e2c5ff 100%);
 }
-:is(.dark) .wiez-shade-8 {
-  background: linear-gradient(145deg, #24133e 0%, #1a0e2f 50%, #120922 100%);
+:is(.dark, [data-theme="dark"]) .wiez-shade-8,
+.dark .wiez-shade-8 {
+  background: linear-gradient(145deg, #291547 0%, #1d0f35 50%, #140a27 100%);
 }
 
 /* Shade 9: Celestial Violet (Store Banner / Header) */
 .wiez-shade-9 {
-  background: linear-gradient(135deg, #ffffff 0%, #fcf9ff 35%, #f4e9fe 70%, #ebd6fd 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f8f0ff 30%, #eee0ff 65%, #e2ccff 100%);
 }
-:is(.dark) .wiez-shade-9 {
-  background: linear-gradient(135deg, #1f1137 0%, #190d2e 40%, #140924 75%, #0e061a 100%);
+:is(.dark, [data-theme="dark"]) .wiez-shade-9,
+.dark .wiez-shade-9 {
+  background: linear-gradient(135deg, #261444 0%, #1d0f35 40%, #150a27 75%, #0f061e 100%);
 }
 
-/* Shade 10: Lavender Pearl (Quick Action Cards) */
+/* Shade 10: Lavender Pearl (Quick Action Cards / Form Surfaces) */
 .wiez-shade-10 {
-  background: linear-gradient(145deg, #ffffff 0%, #fcfaff 50%, #f6f0fd 100%);
+  background: linear-gradient(145deg, #ffffff 0%, #f8f2ff 50%, #eee4fc 100%);
 }
-:is(.dark) .wiez-shade-10 {
-  background: linear-gradient(145deg, #190f2b 0%, #140b23 50%, #0e0719 100%);
+:is(.dark, [data-theme="dark"]) .wiez-shade-10,
+.dark .wiez-shade-10 {
+  background: linear-gradient(145deg, #1e1133 0%, #160c27 50%, #10071d 100%);
 }
 
 /* Shade 11: Velvet Amethyst (Action Required Panel) */
 .wiez-shade-11 {
-  background: linear-gradient(145deg, #ffffff 0%, #fdfaff 45%, #f5edfc 100%);
+  background: linear-gradient(145deg, #ffffff 0%, #f7efff 45%, #ead8fc 100%);
 }
-:is(.dark) .wiez-shade-11 {
-  background: linear-gradient(145deg, #221239 0%, #190d2c 50%, #11081f 100%);
+:is(.dark, [data-theme="dark"]) .wiez-shade-11,
+.dark .wiez-shade-11 {
+  background: linear-gradient(145deg, #271442 0%, #1c0e32 50%, #130823 100%);
 }
 
 /* Shade 12: Radiant Heliotrope (Store Health Panel) */
 .wiez-shade-12 {
-  background: linear-gradient(145deg, #ffffff 0%, #fcf8ff 45%, #f2e4fc 100%);
+  background: linear-gradient(145deg, #ffffff 0%, #f6eeff 45%, #e5d0fc 100%);
 }
-:is(.dark) .wiez-shade-12 {
-  background: linear-gradient(145deg, #201136 0%, #170c29 50%, #10071d 100%);
+:is(.dark, [data-theme="dark"]) .wiez-shade-12,
+.dark .wiez-shade-12 {
+  background: linear-gradient(145deg, #25133f 0%, #1a0d30 50%, #120822 100%);
 }
 
 /* Persistent Action Notice Card */
