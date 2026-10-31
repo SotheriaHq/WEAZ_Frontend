@@ -19,7 +19,7 @@ export const DesignTaxonomyProposalField: React.FC<{
   const selectable = requests.filter(request => request.status === 'PENDING' && request.garmentTypeName);
 
   return (
-    <div className="rounded-2xl bg-[#170e28]/70 dark:bg-[#170e28]/70 p-4 border border-white/5 transition-all space-y-3">
+    <div className="rounded-2xl bg-purple-500/[0.04] dark:bg-purple-950/20 p-4 border border-purple-500/15 dark:border-purple-500/25 transition-all space-y-3">
       {/* Toggle Header */}
       <div
         className="flex items-center justify-between cursor-pointer select-none"
@@ -39,7 +39,7 @@ export const DesignTaxonomyProposalField: React.FC<{
             <HiOutlineSparkles className="w-4 h-4" />
           </div>
           <div>
-            <h5 className="text-xs font-bold text-white">Missing a category or garment type?</h5>
+            <h5 className="text-xs font-bold text-[var(--text-primary)]">Missing a category or garment type?</h5>
             <p className="text-[11px] text-[var(--text-muted)]">
               Suggest custom taxonomy to expand catalog classification
             </p>
@@ -67,12 +67,12 @@ export const DesignTaxonomyProposalField: React.FC<{
                 e.stopPropagation();
                 onChange(null);
               }}
-              className="neu-pressed-button text-[11px] py-1 px-2.5 text-purple-300"
+              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-purple-500/20 bg-purple-500/10 text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 transition-all"
             >
               Choose standard category
             </button>
           </div>
-          <p className="text-white font-medium">
+          <p className="text-[var(--text-primary)] font-medium">
             {value.name} · {value.garmentTypeName}
           </p>
           <p className="text-[11px] text-[var(--text-muted)]">
@@ -83,7 +83,7 @@ export const DesignTaxonomyProposalField: React.FC<{
 
       {/* Expandable Proposal Form & Requests */}
       {open ? (
-        <div className="pt-3 border-t border-white/5 space-y-4">
+        <div className="pt-3 border-t border-[var(--border-subtle)] space-y-4">
           {query.isPending ? (
             <p className="text-xs text-[var(--text-muted)]" role="status">
               Loading your previous suggestions…
@@ -95,7 +95,7 @@ export const DesignTaxonomyProposalField: React.FC<{
               <span>Could not load suggestions at this time.</span>
               <button
                 type="button"
-                className="neu-pressed-button text-[11px] py-1 px-2.5"
+                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300 hover:bg-rose-500/20 transition-all"
                 onClick={() => void query.refetch()}
               >
                 Retry

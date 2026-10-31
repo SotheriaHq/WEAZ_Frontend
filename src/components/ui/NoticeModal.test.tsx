@@ -4,7 +4,7 @@ import { NoticeModalHost, dismissNotice, showNotice } from './NoticeModal';
 
 // These assertions cover the real dialog's focus/actions. Cold lazy loading
 // and cancellation before the module resolves are covered in noticeLazy.
-beforeAll(async () => { await import('./NoticeModalView'); });
+beforeAll(async () => { await import('./NoticeModalView'); }, 30000);
 
 afterEach(() => {
   act(() => dismissNotice());

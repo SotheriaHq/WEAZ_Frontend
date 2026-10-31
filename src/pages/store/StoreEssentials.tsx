@@ -5,6 +5,7 @@ import { ArrowRight, Sparkles, Store, CheckCircle2, Circle } from 'lucide-react'
 import type { RootState } from '@/store';
 import { getStoreWizardPrefill, updateStoreProfile } from '@/api/StoreApi';
 import Input from '@/components/ui/Input';
+import Textarea from '@/components/ui/Textarea';
 import { readStoreProgressLocally, saveStoreProgressLocally } from '@/utils/storeSetup';
 import StoreSetupProgress from '@/components/store/StoreSetupProgress';
 
@@ -345,7 +346,7 @@ const StoreEssentials: React.FC = () => {
         <div className="w-full max-w-2xl">
           {/* Header */}
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full mb-4 shadow-lg">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full mb-4 shadow-lg shadow-purple-500/25">
               <Store className="w-7 h-7 text-white" />
             </div>
             <h1 className="text-3xl sm:text-4xl font-bold text-[color:var(--text-primary)] mb-2">
@@ -358,37 +359,46 @@ const StoreEssentials: React.FC = () => {
             <h2 className="text-xl sm:text-2xl font-semibold text-[color:var(--text-primary)] mb-2">
               Let&apos;s Get Your Store Ready
             </h2>
-            <p className="text-[color:var(--text-secondary)]">Just a few quick details to jumpstart your store</p>
+            <p className="text-[color:var(--text-secondary)] text-sm">Just a few quick details to jumpstart your store</p>
           </div>
 
-          {/* Same rail the wizard shows — setup is one flow across two pages. */}
+          {/* Progress Rail */}
           <StoreSetupProgress current="essentials" className="mb-6" />
 
-          {/* Main card */}
-          <div className="glass-panel rounded-3xl p-6 sm:p-8">
-            <div className="flex items-center gap-2 mb-6 pb-4 border-b border-[color:var(--border-default)]">
-              <Sparkles className="w-4 h-4 text-purple-600" />
-              <span className="text-lg font-semibold text-[color:var(--text-primary)]">Store Essentials</span>
+          {/* Main Card - Elevated Frosted Glass with dual-theme surface, no harsh parent border */}
+          <div className="rounded-3xl p-6 sm:p-10 backdrop-blur-2xl bg-white/85 dark:bg-[#13101f]/85 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.06),0_0_0_1px_rgba(0,0,0,0.04)] dark:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.06)] transition-all duration-300">
+            {/* Step Badge */}
+            <div className="flex items-center justify-between mb-8">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-300 text-xs font-bold tracking-wide">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>STEP 1 OF 3 • STORE ESSENTIALS</span>
+              </div>
+              <span className="text-xs font-medium text-[color:var(--text-muted)]">Core Identity</span>
             </div>
 
             {/* Form */}
             <div className="space-y-6">
-              {/* Brand specialization */}
+              {/* Brand Specialization */}
               <div>
-                <label className="block text-sm font-semibold text-[color:var(--text-primary)] mb-2">
-                  What best describes your brand?{' '}
-                  <span className="text-[color:var(--text-secondary)] font-normal">(Select up to {MAX_SPECIALIZATIONS})</span>
-                </label>
-                <p className="mb-3 text-xs text-[color:var(--text-secondary)]">
-                  Choose up to {MAX_SPECIALIZATIONS}. This helps customers understand your store focus.
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+                    What best describes your brand? <span className="text-purple-500 ml-1">*</span>
+                  </label>
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-300">
+                    {selected.length}/{MAX_SPECIALIZATIONS} selected
+                  </span>
+                </div>
+                <p className="mb-4 text-xs text-[color:var(--text-muted)]">
+                  Select up to {MAX_SPECIALIZATIONS} fashion niches to help shoppers discover your designs.
                 </p>
 
+                {/* 2-column mobile, 4-column desktop responsive grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
                   {isLoading ? (
                     Array.from({ length: 4 }).map((_, index) => (
                       <div
                         key={`cat-skeleton-${index}`}
-                        className="h-[68px] rounded-xl bg-[color:var(--surface-muted)] border border-[color:var(--border-default)] animate-pulse"
+                        className="h-[64px] rounded-2xl bg-[color:var(--surface-muted)] animate-pulse"
                       />
                     ))
                   ) : (
@@ -402,143 +412,145 @@ const StoreEssentials: React.FC = () => {
                           type="button"
                           onClick={() => toggleCategory(cat.value)}
                           disabled={isDisabled || isLoading}
+                          aria-pressed={isSelected}
                           className={
-                            'rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 border-2 ' +
+                            'group relative rounded-2xl px-4 py-3.5 text-sm font-semibold transition-all duration-200 text-center ' +
                             (isSelected
-                              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white border-purple-600 shadow-lg'
+                              ? 'bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 text-white shadow-[0_4px_16px_rgba(168,85,247,0.38),inset_0_1px_0_rgba(255,255,255,0.45)] scale-[1.02] active:scale-[0.98]'
                               : isDisabled
-                                ? 'bg-[color:var(--surface-secondary)] text-[color:var(--text-muted)] border-[color:var(--border-default)] cursor-not-allowed opacity-70'
-                                : 'bg-[color:var(--surface-secondary)] backdrop-blur-sm border-[color:var(--border-default)] text-[color:var(--text-primary)] hover:border-purple-400 hover:bg-purple-500/10')
+                                ? 'bg-black/[0.02] dark:bg-white/[0.02] text-[color:var(--text-muted)] opacity-40 cursor-not-allowed border border-transparent'
+                                : 'bg-white dark:bg-[#1a1727] text-[color:var(--text-primary)] shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.08)] border border-black/[0.03] dark:border-white/[0.04] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_14px_rgba(0,0,0,0.5)] active:scale-[0.98]')
                           }
                         >
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="text-center leading-tight">{cat.label}</span>
-                          </div>
+                          <span className="leading-tight block">{cat.label}</span>
                         </button>
                       );
                     })
                   )}
                 </div>
-
-                <p className="text-sm text-[color:var(--text-secondary)]">{selected.length} of {MAX_SPECIALIZATIONS} selected</p>
               </div>
 
               {/* Tagline */}
               <div>
-                <div className="relative">
-                  <Input
-                    label="Store Tagline"
-                    helperText="This appears below your store name"
-                    maxLength={100}
-                    value={tagline}
-                    disabled={isLoading}
-                    onChange={(e) => setTagline(e.target.value)}
-                    placeholder="Your brand in one line..."
-                    charCount={tagline.length}
-                    maxCharCount={100}
-                  />
-                </div>
+                <Input
+                  label="Store Tagline"
+                  helperText="A punchy one-liner displayed beneath your store name"
+                  maxLength={100}
+                  value={tagline}
+                  disabled={isLoading}
+                  onChange={(e) => setTagline(e.target.value)}
+                  placeholder="e.g. Modern African luxury and bespoke tailoring"
+                  charCount={tagline.length}
+                  maxCharCount={100}
+                />
               </div>
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-semibold text-[color:var(--text-primary)] mb-2">
-                  Store Description <span className="text-purple-500">*</span>
-                </label>
-                <textarea
+                <Textarea
+                  label="Store Description"
+                  required
+                  helperText="Tell shoppers your design philosophy, materials, and brand story."
                   value={description}
                   onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION))}
                   maxLength={MAX_DESCRIPTION}
                   disabled={isLoading}
                   rows={4}
                   placeholder="Tell shoppers what your brand is about..."
-                  className="w-full rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-secondary)] px-4 py-3 text-sm font-medium text-[color:var(--text-primary)] shadow-sm transition-all duration-200 placeholder:text-[color:var(--text-muted)] focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  charCount={description.length}
+                  maxCharCount={MAX_DESCRIPTION}
                 />
-                <div className="mt-1 flex items-center justify-between text-xs text-[color:var(--text-secondary)]">
-                  <span>Required to publish your store.</span>
-                  <span>{description.length}/{MAX_DESCRIPTION}</span>
-                </div>
               </div>
-
             </div>
 
-            {/* Live Preview */}
-            <div className="mt-8 p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl border-2 border-purple-200 dark:border-purple-500/30">
-              <p className="text-xs text-[color:var(--text-secondary)] mb-3 text-center">This is how your store will appear</p>
-              <div className="bg-[color:var(--surface-secondary)] border border-[color:var(--border-default)] rounded-xl shadow-lg overflow-hidden">
-                <div className="h-24 bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400" />
-                <div className="p-4">
+            {/* Live Store Preview */}
+            <div className="mt-8 p-6 rounded-3xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.03] dark:border-white/[0.05]">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-[color:var(--text-muted)]">Live Store Preview</span>
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-300">Shopper View</span>
+              </div>
+              <div className="bg-white dark:bg-[#181524] rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.45)] border border-black/[0.03] dark:border-white/[0.06] overflow-hidden">
+                <div className="h-24 bg-gradient-to-r from-purple-600 via-pink-500 to-amber-400 relative">
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/20 via-transparent to-black/20" />
+                </div>
+                <div className="p-5">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
                       <h3 className="text-lg font-bold text-[color:var(--text-primary)]">{brandName}</h3>
-                      <p className="text-sm text-[color:var(--text-secondary)] mt-1 min-h-[20px]">{tagline.trim() || ''}</p>
+                      <p className="text-sm text-[color:var(--text-secondary)] mt-1 min-h-[20px]">{tagline.trim() || 'Your tagline will appear here'}</p>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-3">
-                    {selectedLabels.map((label) => (
-                      <span
-                        key={label}
-                        className="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full dark:bg-purple-500/20 dark:text-purple-300"
-                      >
-                        {label}
-                      </span>
-                    ))}
+                    {selectedLabels.length > 0 ? (
+                      selectedLabels.map((label) => (
+                        <span
+                          key={label}
+                          className="px-3 py-1 bg-purple-500/10 text-purple-600 dark:text-purple-300 text-xs font-semibold rounded-full border border-purple-500/20"
+                        >
+                          {label}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-[color:var(--text-muted)] italic">Select niches above to preview tags</span>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Readiness */}
-            <div className="mt-6 p-4 bg-transparent rounded-xl border border-[color:var(--border-default)]">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  <span className="text-sm text-[color:var(--text-primary)]">Brand Name</span>
+            {/* Readiness Checklist */}
+            <div className="mt-6 p-5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.03] dark:border-white/[0.05]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span className="text-xs font-semibold text-[color:var(--text-primary)]">Brand Name</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   {canContinue ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                   ) : (
-                    <Circle className="w-4 h-4 text-[color:var(--text-muted)]" />
+                    <Circle className="w-4 h-4 text-[color:var(--text-muted)] shrink-0" />
                   )}
-                  <span className={"text-sm " + (canContinue ? 'text-[color:var(--text-primary)]' : 'text-[color:var(--text-secondary)]')}>
+                  <span className={`text-xs font-semibold ${canContinue ? 'text-[color:var(--text-primary)]' : 'text-[color:var(--text-secondary)]'}`}>
                     Brand focus (at least 1 required)
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   {taglineValid ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                   ) : (
-                    <Circle className="w-4 h-4 text-[color:var(--text-muted)]" />
+                    <Circle className="w-4 h-4 text-[color:var(--text-muted)] shrink-0" />
                   )}
-                  <span className={`text-sm ${taglineValid ? 'text-[color:var(--text-primary)]' : 'text-[color:var(--text-secondary)]'}`}>
+                  <span className={`text-xs font-semibold ${taglineValid ? 'text-[color:var(--text-primary)]' : 'text-[color:var(--text-secondary)]'}`}>
                     Tagline {taglineValid ? '' : '(optional)'}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   {descriptionValid ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                   ) : (
-                    <Circle className="w-4 h-4 text-[color:var(--text-muted)]" />
+                    <Circle className="w-4 h-4 text-[color:var(--text-muted)] shrink-0" />
                   )}
-                  <span className={"text-sm " + (descriptionValid ? 'text-[color:var(--text-primary)]' : 'text-[color:var(--text-secondary)]')}>
+                  <span className={`text-xs font-semibold ${descriptionValid ? 'text-[color:var(--text-primary)]' : 'text-[color:var(--text-secondary)]'}`}>
                     Description
                   </span>
                 </div>
               </div>
 
-              <p className={"text-sm font-semibold mt-3 " + (canContinue ? 'text-green-600 dark:text-green-400' : 'text-[color:var(--text-secondary)]')}>
-                {canContinue ? 'Ready to continue!' : 'Add a description and select at least 1 brand focus'}
-              </p>
+              <div className="mt-4 pt-3 border-t border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between">
+                <p className={`text-xs font-bold ${canContinue ? 'text-emerald-600 dark:text-emerald-400' : 'text-[color:var(--text-secondary)]'}`}>
+                  {canContinue ? '✓ Ready to continue!' : 'Select at least 1 brand focus and add a description'}
+                </p>
+              </div>
             </div>
 
             {/* Actions */}
-            <div className="mt-8 flex flex-row items-center gap-2 sm:gap-4">
+            <div className="mt-8 flex flex-row items-center gap-3 sm:gap-4">
               <button
                 type="button"
                 disabled={!canContinue || isLoading || isSubmitting}
                 onClick={() => void persistAndContinue(false)}
-                className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:py-4 sm:text-base"
+                className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 px-6 py-4 text-sm font-bold text-white shadow-[0_4px_18px_rgba(168,85,247,0.4),inset_0_1px_0_rgba(255,255,255,0.4)] transition-all duration-200 hover:brightness-105 active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 sm:text-base"
               >
                 {isSubmitting ? 'Saving...' : 'Continue to Store Setup'}
                 {!isSubmitting ? <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" /> : null}
@@ -547,7 +559,7 @@ const StoreEssentials: React.FC = () => {
                 type="button"
                 disabled={isLoading || !canSkip || isSubmitting}
                 onClick={() => void persistAndContinue(true)}
-                className="shrink-0 px-3 py-3 text-xs font-medium text-[color:var(--text-secondary)] transition-colors duration-200 hover:text-[color:var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:py-4 sm:text-base"
+                className="shrink-0 px-4 py-4 text-xs font-semibold text-[color:var(--text-secondary)] transition-colors duration-200 hover:text-[color:var(--text-primary)] hover:bg-black/[0.03] dark:hover:bg-white/[0.04] rounded-2xl disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
               >
                 Skip
               </button>

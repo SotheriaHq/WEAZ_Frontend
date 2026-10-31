@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/Select';
 import { useId, useMemo } from 'react';
 import {
   AUTO_CURRENCY,
@@ -46,11 +47,11 @@ export default function CurrencySettings() {
         <label htmlFor={selectId} className="block text-sm font-semibold text-[var(--text-primary)]">
           Show prices in
         </label>
-        <select
+        <Select
           id={selectId}
           value={preference}
           onChange={(event) => void setDisplayCurrencyPreference(event.target.value)}
-          className="w-full max-w-md rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2.5 text-sm text-[var(--text-primary)]"
+          className="max-w-md"
         >
           <option value={AUTO_CURRENCY}>Automatic (based on your country)</option>
           {options.map((option) => (
@@ -58,7 +59,7 @@ export default function CurrencySettings() {
               {option.name} ({option.code})
             </option>
           ))}
-        </select>
+        </Select>
         <p className="text-sm text-[var(--text-secondary)]" aria-live="polite">
           {!data
             ? 'Prices show in Naira while currency estimates load.'

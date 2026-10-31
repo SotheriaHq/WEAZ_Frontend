@@ -35,6 +35,7 @@ import { useOverlayBackClose } from '@/hooks/useOverlayBackClose';
 import { selectIsMobile } from '@/features/uiSlice';
 import { createMixSeed, mixFeedItems } from '@/utils/feedMixer';
 import Button from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
 
 const BASE_FILTERS = ['FOR_YOU', 'MENSWEAR', 'WOMENSWEAR', 'EVERYBODY', 'ON_SALE'] as const;
 const FRESH_DROP_DAY_MS = 24 * 60 * 60 * 1000;
@@ -548,28 +549,30 @@ export const MarketPlace: React.FC = () => {
               <span className="font-medium text-gray-500 dark:text-gray-400">Filter by:</span>
 
               {/* Craftsmanship Type Dropdown */}
-              <select
+              <Select
+                variant="filter"
                 value={craftsmanshipFilter}
                 onChange={(e) => setCraftsmanshipFilter(e.target.value)}
-                className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-medium text-gray-800 shadow-sm transition hover:border-gray-300 dark:border-white/10 dark:bg-[#181322] dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                fullWidth={false}
               >
                 <option value="ALL">All Craftsmanship</option>
                 <option value="READY_TO_WEAR">Ready to Wear</option>
                 <option value="CUSTOM_FIT">Custom Fit / Bespoke</option>
-              </select>
+              </Select>
 
               {/* Price Range Dropdown */}
-              <select
+              <Select
+                variant="filter"
                 value={priceRangeFilter}
                 onChange={(e) => setPriceRangeFilter(e.target.value)}
-                className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-medium text-gray-800 shadow-sm transition hover:border-gray-300 dark:border-white/10 dark:bg-[#181322] dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                fullWidth={false}
               >
                 <option value="ALL">All Price Ranges</option>
                 <option value="UNDER_100K">Under ₦100,000</option>
                 <option value="100K_300K">₦100,000 - ₦300,000</option>
                 <option value="300K_500K">₦300,000 - ₦500,000</option>
                 <option value="ABOVE_500K">Above ₦500,000</option>
-              </select>
+              </Select>
             </div>
 
             <div className="flex items-center gap-3">
@@ -578,17 +581,17 @@ export const MarketPlace: React.FC = () => {
               </span>
               <span>•</span>
               <div className="flex items-center gap-1.5">
-                <span>Sort:</span>
-                <select
+                <Select
+                  variant="filter"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-1 font-semibold text-gray-800 shadow-sm dark:border-white/10 dark:bg-[#181322] dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  fullWidth={false}
                 >
-                  <option value="EDITORIAL">Curated Editorial</option>
-                  <option value="NEWEST">Newest Drops</option>
-                  <option value="PRICE_LOW">Price: Low to High</option>
-                  <option value="PRICE_HIGH">Price: High to Low</option>
-                </select>
+                  <option value="EDITORIAL">Sort: Curated Editorial</option>
+                  <option value="NEWEST">Sort: Newest Drops</option>
+                  <option value="PRICE_LOW">Sort: Price (Low to High)</option>
+                  <option value="PRICE_HIGH">Sort: Price (High to Low)</option>
+                </Select>
               </div>
             </div>
           </div>

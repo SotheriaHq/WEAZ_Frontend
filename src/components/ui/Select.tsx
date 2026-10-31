@@ -22,39 +22,44 @@ const variantStyles: Record<SelectVariant, string> = {
   default: `
     px-4 py-3 text-sm font-medium
     bg-[color:var(--surface-primary)]
-    border rounded-xl
-    text-[color:var(--text-primary)]
-    shadow-sm
+    border border-black/[0.04] dark:border-white/[0.06]
+    rounded-2xl
+    text-[color:var(--wiez-text-primary,var(--text-primary))]
+    shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.35)]
+    hover:shadow-[0_4px_16px_rgba(0,0,0,0.08),0_1px_4px_rgba(0,0,0,0.04)] dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.55)]
+    hover:border-black/[0.08] dark:hover:border-white/[0.12]
+    hover:scale-[1.005]
     focus:outline-none focus:ring-0 focus:border-transparent
-    transition-colors duration-200
-    appearance-none pr-10 cursor-pointer
+    transition-all duration-200
+    cursor-pointer
   `,
   filter: `
-    px-3 py-2 text-sm font-medium
-    bg-[color:var(--surface-primary)]
-    border border-[color:var(--border-default)]
-    rounded-lg
-    text-[color:var(--text-primary)]
-    shadow-sm
-    hover:border-purple-300 dark:hover:border-purple-500/50
+    px-3.5 py-2 text-xs font-semibold
+    bg-white/80 dark:bg-[#181322]/80 backdrop-blur-md
+    border border-black/[0.05] dark:border-white/[0.08]
+    rounded-xl
+    text-[color:var(--wiez-text-primary,var(--text-primary))]
+    shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.85)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.08)]
+    hover:shadow-[0_4px_14px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.04)] dark:hover:shadow-[0_4px_18px_rgba(0,0,0,0.5)]
+    hover:border-purple-400/40 dark:hover:border-purple-400/30
+    hover:scale-[1.01]
+    active:scale-[0.99]
     focus:outline-none focus:ring-0 focus:border-transparent
-    transition-colors duration-200
+    transition-all duration-200
     cursor-pointer
-    appearance-none
-    pr-8
   `,
   compact: `
     px-2.5 py-1.5 text-xs font-medium
-    bg-[color:var(--surface-primary)]
-    border border-[color:var(--border-default)]
-    rounded-md
+    bg-white/80 dark:bg-[#181322]/80 backdrop-blur-md
+    border border-black/[0.05] dark:border-white/[0.08]
+    rounded-lg
     text-[color:var(--text-secondary)]
-    surface-interactive-hover
+    shadow-[0_1px_4px_rgba(0,0,0,0.04)] dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)]
+    hover:shadow-[0_3px_10px_rgba(0,0,0,0.07)] dark:hover:shadow-[0_3px_12px_rgba(0,0,0,0.4)]
+    hover:scale-[1.01]
     focus:outline-none focus:ring-0 focus:border-transparent
-    transition-colors duration-150
+    transition-all duration-150
     cursor-pointer
-    appearance-none
-    pr-6
   `,
 };
 
@@ -135,7 +140,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       ${variantStyles[variant]}
       ${
         error
-          ? "border-red-500 dark:border-red-500"
+          ? "!border-red-500 dark:!border-red-500 !shadow-[0_2px_12px_rgba(239,68,68,0.2)]"
           : ""
       }
       ${disabled ? "opacity-60 cursor-not-allowed bg-[color:var(--surface-muted)]" : ""}
@@ -159,7 +164,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         className={`${fullWidth ? "w-full" : ""} ${variant !== "default" ? "relative inline-block" : ""} ${className}`}
       >
         {label && (
-          <label className="block text-sm font-semibold text-[color:var(--text-secondary)] mb-2">
+          <label className="block text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)] mb-2">
             {label}
             {required && <span className="text-purple-500 ml-1">*</span>}
           </label>
@@ -174,13 +179,22 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             <DropdownTrigger
               type="button"
               disabled={disabled}
-              className={`${baseClasses} flex items-center justify-between gap-3 text-left ${disabled ? "pointer-events-none" : ""}`}
+              className={`${baseClasses} flex items-center justify-between gap-2.5 text-left ${disabled ? "pointer-events-none" : ""}`}
               aria-label={label}
             >
-              <span className="truncate">{selectedLabel}</span>
-              {showChevron ? <span aria-hidden="true" className={`shrink-0 text-[color:var(--text-secondary)] ${variant === "compact" ? 'text-xs' : 'text-base'}`}>{open ? '⌃' : '⌄'}</span> : null}
+              <span className="leading-tight break-words">{selectedLabel}</span>
+              {showChevron ? (
+                <span
+                  aria-hidden="true"
+                  className={`shrink-0 text-[color:var(--text-secondary)] transition-transform duration-200 ${
+                    open ? "rotate-180" : ""
+                  } ${variant === "compact" ? "text-xs" : "text-xs"}`}
+                >
+                  ⌄
+                </span>
+              ) : null}
             </DropdownTrigger>
-            <DropdownMenu className="min-w-[220px]">
+            <DropdownMenu className="min-w-[200px]">
               {options.map((opt) => {
                 const isActive = `${opt.value}` === `${currentValue ?? ""}`;
                 return (

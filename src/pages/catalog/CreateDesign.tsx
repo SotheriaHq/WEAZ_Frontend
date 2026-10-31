@@ -318,9 +318,8 @@ const CreateDesignInner: React.FC = () => {
   const [type, setType] = useState<"MALE" | "FEMALE" | "EVERYBODY">(
     "EVERYBODY",
   );
-  const [activeInspectorSection, setActiveInspectorSection] = useState<
-    'identity' | 'style' | 'commercial' | 'sizing'
-  >('identity');
+  type InspectorTabSection = 'design' | 'commercial';
+  const [activeInspectorSection, setActiveInspectorSection] = useState<InspectorTabSection>('design');
   const [previewAspectRatio, setPreviewAspectRatio] = useState<'9:16' | '4:5' | '1:1'>('9:16');
   const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
   const [sizingMode, setSizingMode] = useState<DesignSizingMode>('NONE');
@@ -1039,7 +1038,7 @@ const CreateDesignInner: React.FC = () => {
     // details are never enforced for drafts — they are completed later, before
     // publishing. So a draft saves even with Custom Order toggled and no points.
     if (title.trim().length === 0) {
-      setActiveInspectorSection('identity');
+      setActiveInspectorSection('design');
       toast.error('Add a title to save your draft');
       addClientDiagnostic('warn', 'create-design', 'Save draft blocked by missing title', {
         fileCount: files.length,
@@ -1335,25 +1334,25 @@ const CreateDesignInner: React.FC = () => {
       const reasons: string[] = [];
       if (title.trim().length === 0) {
         reasons.push("Add a title.");
-        setActiveInspectorSection('identity');
+        setActiveInspectorSection('design');
       } else if (!hasPendingTaxonomy && categoryId.trim().length === 0) {
         reasons.push("Choose what this item is, or propose a category and garment type.");
-        setActiveInspectorSection('identity');
+        setActiveInspectorSection('design');
       } else if (!hasPendingTaxonomy && categoryTypeId.trim().length === 0) {
         reasons.push("Choose a garment type.");
-        setActiveInspectorSection('identity');
+        setActiveInspectorSection('design');
       } else if (type.trim().length === 0) {
         reasons.push("Choose who this item is for.");
-        setActiveInspectorSection('identity');
+        setActiveInspectorSection('design');
       } else if (!targetAgeGroup) {
         reasons.push("Choose an age group.");
-        setActiveInspectorSection('identity');
+        setActiveInspectorSection('design');
       } else if (getSelectedFilterValueIds().length === 0) {
         reasons.push("Add at least one style detail.");
-        setActiveInspectorSection('style');
+        setActiveInspectorSection('design');
       } else if (selectedTags.length === 0) {
         reasons.push("Add at least one hashtag.");
-        setActiveInspectorSection('style');
+        setActiveInspectorSection('design');
       }
       if (missingRequiredMediaSlots.length > 0)
         reasons.push(
@@ -1782,11 +1781,11 @@ const CreateDesignInner: React.FC = () => {
 
         {isEditMode && id ? <ReviewFeedbackBanner designId={id} /> : null}
 
-        <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12 mb-8">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 mb-8">
           {/* LEFT COLUMN: Height-Bounded Studio Canvas + Real-Time Live Runway Feed Card (Col 5/12) */}
-          <div className="lg:col-span-5 flex flex-col justify-between space-y-4">
+          <div className="lg:col-span-5 space-y-4">
             {/* Visual Assets Studio Card */}
-            <section id="design-media-section" className="wiez-studio-card p-4 space-y-3 flex-1 flex flex-col justify-between">
+            <section id="design-media-section" className="wiez-studio-card p-4 space-y-4">
               <input
                 ref={picker.inputRef}
                 type="file"
@@ -1801,40 +1800,30 @@ const CreateDesignInner: React.FC = () => {
                 <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
                   Visual Assets ({files.length}/{DESIGN_MAX_MEDIA_COUNT})
                 </span>
-                <div className="flex items-center gap-1 p-1 rounded-xl text-xs surface-control border border-[var(--border-subtle)]">
-                  <button
-                    type="button"
-                    onClick={() => setPreviewAspectRatio('9:16')}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                      previewAspectRatio === '9:16'
-                        ? 'bg-purple-600 text-white shadow-sm'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    9:16 Reel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewAspectRatio('4:5')}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                      previewAspectRatio === '4:5'
-                        ? 'bg-purple-600 text-white shadow-sm'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    4:5 Portrait
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewAspectRatio('1:1')}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                      previewAspectRatio === '1:1'
-                        ? 'bg-purple-600 text-white shadow-sm'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    1:1 Square
-                  </button>
+                <div className="flex items-center gap-1 text-xs">
+                  {(['9:16', '4:5', '1:1'] as const).map((ratio) => {
+                    const isActive = previewAspectRatio === ratio;
+                    const label = ratio === '9:16' ? '9:16 Reel' : ratio === '4:5' ? '4:5 Portrait' : '1:1 Square';
+                    return (
+                      <button
+                        key={ratio}
+                        type="button"
+                        onClick={() => setPreviewAspectRatio(ratio)}
+                        className="relative px-2.5 py-1 rounded-xl text-[11px] font-bold transition-colors cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      >
+                        {isActive && (
+                          <motion.div
+                            layoutId="previewAspectRatioActivePill"
+                            className="absolute inset-0 rounded-xl bg-purple-600 shadow-[0_2px_8px_rgba(168,85,247,0.35)]"
+                            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                          />
+                        )}
+                        <span className={`relative z-10 ${isActive ? 'text-white' : ''}`}>
+                          {label}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1846,6 +1835,7 @@ const CreateDesignInner: React.FC = () => {
                   disabled={disabled}
                   onPickForSlot={openPickerForSlot}
                   enabledEmptySlots={nextFillableDesignSlots}
+                  onSlotDrop={handleSlotDrop}
                   onDropFiles={(_slot, dropped) =>
                     mediaStore.addFiles(dropped, DESIGN_MAX_MEDIA_COUNT)
                   }
@@ -1894,75 +1884,97 @@ const CreateDesignInner: React.FC = () => {
                               className="w-full h-full flex items-center justify-center"
                               mediaClassName="h-full w-full object-cover"
                               maxHeightClassName="max-h-[360px]"
-                              maxWidthClassName="max-w-full"
-                              allowScroll
-                              diagnosticScope="create-design-main-preview"
                             />
                           ) : (
-                            <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 text-sm font-medium text-theme-secondary">
-                              <MuseLoader size={32} label="Optimizing photo for preview" />
-                              Optimizing photo for preview...
+                            <div className="text-center p-4">
+                              <p className="text-sm font-semibold text-white">
+                                {selectedFile.file?.name}
+                              </p>
+                              <p className="text-xs text-[var(--text-muted)] mt-1">
+                                Preview not available
+                              </p>
                             </div>
                           )}
                         </motion.div>
                       )}
                     </AnimatePresence>
 
-                    {/* Floating Action Bar */}
-                    <div className="absolute bottom-0 left-0 right-0 px-3 py-2 bg-gradient-to-t from-black/85 via-black/40 to-transparent">
-                      <div className="flex items-center justify-center gap-2">
-                        <ActionButton
-                          icon={<FiTrash2 className="w-3.5 h-3.5" />}
-                          label="Delete"
-                          onClick={() =>
-                            selectedFile?.id && handleDelete(selectedFile.id)
-                          }
-                          disabled={disabled}
-                        />
-                        <ActionButton
-                          icon={
-                            <FiStar
-                              className={`w-3.5 h-3.5 ${coverIndex === selectedIndex ? 'fill-purple-400 text-purple-400' : ''}`}
-                            />
-                          }
-                          label={coverIndex === selectedIndex ? 'Cover' : 'Set Cover'}
-                          onClick={() => handleSetCover(selectedIndex)}
-                          disabled={disabled}
-                          active={coverIndex === selectedIndex}
-                        />
-                        <ActionButton
-                          icon={<FiMaximize2 className="w-3.5 h-3.5" />}
-                          label="Full"
-                          onClick={openFullscreen}
-                        />
-                      </div>
+                    {/* Action Overlay */}
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10">
+                      <button
+                        type="button"
+                        onClick={() => selectedFile && handleDelete(selectedFile.id)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-purple-500/15 bg-white/85 dark:bg-black/70 shadow-[0_2px_10px_rgba(124,58,237,0.12)] backdrop-blur-md text-rose-500 hover:text-rose-600 transition-all hover:scale-105 active:scale-95"
+                      >
+                        <FiTrash2 className="w-3.5 h-3.5" />
+                        Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetCover(selectedIndex)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-purple-500/15 bg-white/85 dark:bg-black/70 shadow-[0_2px_10px_rgba(124,58,237,0.12)] backdrop-blur-md text-amber-500 hover:text-amber-600 transition-all hover:scale-105 active:scale-95"
+                      >
+                        <FiStar className="w-3.5 h-3.5" />
+                        Cover
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openFullscreen}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-purple-500/15 bg-white/85 dark:bg-black/70 shadow-[0_2px_10px_rgba(124,58,237,0.12)] backdrop-blur-md text-purple-600 dark:text-purple-300 transition-all hover:scale-105 active:scale-95"
+                      >
+                        <FiMaximize2 className="w-3.5 h-3.5" />
+                        Full
+                      </button>
                     </div>
                   </div>
 
                   {/* 1-Row Compact Thumbnail Rail */}
-                  <MediaSlotGrid
-                    mediaBySlot={designSlotMedia}
-                    maxSlots={DESIGN_MAX_MEDIA_COUNT}
-                    missingRequiredSlots={missingRequiredMediaSlots}
-                    selectedId={files[selectedIndex]?.id ?? null}
-                    disabled={disabled}
-                    canAddMore={files.length < DESIGN_MAX_MEDIA_COUNT}
-                    onPickForSlot={openPickerForSlot}
-                    enabledEmptySlots={nextFillableDesignSlots}
-                    onSelect={(item) => {
-                      const index = files.findIndex((file) => file.id === item.id);
-                      if (index !== -1) setSelectedIndex(index);
-                    }}
-                    onDelete={(item) => handleDelete(item.id)}
-                    onSetCover={(item) => {
-                      const index = files.findIndex((file) => file.id === item.id);
-                      if (index !== -1) handleSetCover(index);
-                    }}
-                    onSlotDrop={handleSlotDrop}
-                    onDropFiles={(_slot, dropped) =>
-                      mediaStore.addFiles(dropped, DESIGN_MAX_MEDIA_COUNT)
-                    }
-                  />
+                  <div className="flex items-center gap-2 overflow-x-auto py-1 px-0.5 no-scrollbar min-w-0">
+                    {files.map((file, idx) => {
+                      const isSelected = idx === selectedIndex;
+                      const isCover = idx === coverIndex;
+                      const slotLabel = getMediaViewSlotLabel(normalizeMediaViewSlot(file.viewSlot, idx));
+                      return (
+                        <button
+                          key={file.id}
+                          type="button"
+                          onClick={() => setSelectedIndex(idx)}
+                          className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden shrink-0 cursor-pointer border-2 transition-all ${
+                            isSelected
+                              ? 'border-purple-600 shadow-[0_2px_12px_rgba(168,85,247,0.4)] scale-105'
+                              : 'border-transparent opacity-80 hover:opacity-100 hover:scale-102'
+                          }`}
+                        >
+                          <LocalMediaPreview
+                            kind={file.kind === 'video' ? 'video' : 'image'}
+                            src={file.previewUrl}
+                            file={file.file}
+                            alt={slotLabel}
+                            className="w-full h-full object-cover"
+                            mediaClassName="h-full w-full object-cover"
+                          />
+                          {isCover && (
+                            <span className="absolute top-1 left-1 px-1 py-0.5 rounded bg-black/75 text-[9px] font-bold text-amber-300">
+                              ★ Cover
+                            </span>
+                          )}
+                          <span className="absolute bottom-1 right-1 px-1.5 py-0.2 rounded bg-black/75 text-[9px] font-bold text-white">
+                            {idx + 1}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {files.length < DESIGN_MAX_MEDIA_COUNT && (
+                      <button
+                        type="button"
+                        onClick={() => openPickerForSlot()}
+                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl border border-dashed border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 flex flex-col items-center justify-center text-purple-600 dark:text-purple-300 text-xs font-semibold cursor-pointer shrink-0 transition-all"
+                      >
+                        <span className="text-base font-bold leading-none">+</span>
+                        <span className="text-[10px] mt-0.5">Add</span>
+                      </button>
+                    )}
+                  </div>
 
                   {/* Media Count and File Info */}
                   <p className="text-center text-[11px] text-[var(--text-muted)]">
@@ -2041,44 +2053,52 @@ const CreateDesignInner: React.FC = () => {
           </div>
 
           {/* RIGHT COLUMN: Space-Locked Inspector Studio (Col 7/12) */}
-          <div className="lg:col-span-7 wiez-studio-card p-5 sm:p-6 flex flex-col justify-between">
+          <div className="lg:col-span-7 wiez-studio-card p-5 sm:p-7 space-y-6">
             <div>
-              {/* Section Inspector Pills */}
+              {/* Section Inspector Pills (Consolidated 2 Balanced Tabs, Zero Void) */}
               <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-3 mb-5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => setActiveInspectorSection('identity')}
-                    className={`wiez-inspector-pill ${activeInspectorSection === 'identity' ? 'active' : ''}`}
-                  >
-                    1. Title & DNA
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveInspectorSection('style')}
-                    className={`wiez-inspector-pill ${activeInspectorSection === 'style' ? 'active' : ''}`}
-                  >
-                    2. Style & Tags
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveInspectorSection('commercial')}
-                    className={`wiez-inspector-pill ${activeInspectorSection === 'commercial' ? 'active' : ''}`}
-                  >
-                    3. Pricing & Made to Order
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveInspectorSection('sizing')}
-                    className={`wiez-inspector-pill ${activeInspectorSection === 'sizing' ? 'active' : ''}`}
-                  >
-                    4. Sizing & Visibility
-                  </button>
+                  {[
+                    { id: 'design', label: '✦ 1. Design & Style' },
+                    { id: 'commercial', label: '✦ 2. Commercial & Sizing' },
+                  ].map((tab) => {
+                    const isActive = activeInspectorSection === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveInspectorSection(tab.id as InspectorTabSection)}
+                        className="relative px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      >
+                        {isActive && (
+                          <motion.div
+                            layoutId="inspectorSectionActivePill"
+                            className="absolute inset-0 rounded-xl bg-purple-600 shadow-[0_2px_10px_rgba(168,85,247,0.35)]"
+                            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+                          />
+                        )}
+                        <span className={`relative z-10 ${isActive ? 'text-white' : ''}`}>
+                          {tab.label}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
+                <span className="text-[11px] font-semibold text-[var(--text-muted)] hidden sm:inline">
+                  {activeInspectorSection === 'design' ? 'Step 1 of 2' : 'Step 2 of 2'}
+                </span>
               </div>
 
-              {/* Pane 1: Title & DNA */}
-              {activeInspectorSection === 'identity' && (
+              <AnimatePresence mode="wait">
+              {activeInspectorSection === 'design' && (
+                <motion.div
+                  key="tab-design"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                  className="space-y-6"
+                >
                 <div className="space-y-4">
                   <TextField
                     label="Design Title"
@@ -2224,11 +2244,9 @@ const CreateDesignInner: React.FC = () => {
                     }}
                   />
                 </div>
-              )}
 
-              {/* Pane 2: Style & Tags */}
-              {activeInspectorSection === 'style' && (
-                <div className="space-y-4">
+              {/* Style & Tags Section */}
+                <div className="space-y-4 pt-4 border-t border-[var(--border-default)]">
                   <FilterSelector
                     value={filterSelection}
                     onChange={setFilterSelection}
@@ -2352,11 +2370,20 @@ const CreateDesignInner: React.FC = () => {
                     />
                   </div>
                 </div>
+                </motion.div>
               )}
 
-              {/* Pane 3: Pricing & Made to Order */}
+              {/* Tab 2: Commercial & Sizing */}
               {activeInspectorSection === 'commercial' && (
-                <div className="space-y-4">
+                <motion.div
+                  key="tab-commercial"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                  className="space-y-6"
+                >
+                  <div className="space-y-4">
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-2 flex items-center">
                       Estimated Price Range (₦)
@@ -2460,12 +2487,10 @@ const CreateDesignInner: React.FC = () => {
                       </div>
                     </div>
                   )}
-                </div>
-              )}
+                  </div>
 
-              {/* Pane 4: Sizing & Visibility */}
-              {activeInspectorSection === 'sizing' && (
-                <div className="space-y-4">
+                  {/* Sizing & Visibility Section */}
+                  <div className="space-y-4 pt-4 border-t border-[var(--border-default)]">
                   <SizingConfigurator
                     sizingMode={sizingMode}
                     onSizingModeChange={handleDesignSizingModeChange}
@@ -2500,10 +2525,10 @@ const CreateDesignInner: React.FC = () => {
                           type="button"
                           onClick={() => setVisibility('PUBLIC')}
                           disabled={disabled}
-                          className={`py-2 px-3 text-xs font-semibold rounded-xl transition-all ${
+                          className={`py-2.5 px-3 text-xs font-semibold rounded-xl transition-all ${
                             visibility === 'PUBLIC'
-                              ? 'wiez-gradient-active-indicator text-purple-700 dark:text-purple-200 border border-purple-500/30 font-bold'
-                              : 'neu-pressed-button text-[var(--text-muted)]'
+                              ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-purple-700 text-white shadow-[0_2px_10px_rgba(168,85,247,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] font-bold scale-[1.01]'
+                              : 'bg-purple-500/5 hover:bg-purple-500/10 text-[var(--text-secondary)] border border-purple-500/15'
                           }`}
                         >
                           🌐 Public
@@ -2512,10 +2537,10 @@ const CreateDesignInner: React.FC = () => {
                           type="button"
                           onClick={() => setVisibility('PRIVATE')}
                           disabled={disabled}
-                          className={`py-2 px-3 text-xs font-semibold rounded-xl transition-all ${
+                          className={`py-2.5 px-3 text-xs font-semibold rounded-xl transition-all ${
                             visibility === 'PRIVATE'
-                              ? 'wiez-gradient-active-indicator text-purple-700 dark:text-purple-200 border border-purple-500/30 font-bold'
-                              : 'neu-pressed-button text-[var(--text-muted)]'
+                              ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-purple-700 text-white shadow-[0_2px_10px_rgba(168,85,247,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] font-bold scale-[1.01]'
+                              : 'bg-purple-500/5 hover:bg-purple-500/10 text-[var(--text-secondary)] border border-purple-500/15'
                           }`}
                         >
                           🔒 Private
@@ -2525,47 +2550,47 @@ const CreateDesignInner: React.FC = () => {
                   </div>
 
                   {/* Readiness Guard */}
-                  <div className="p-4 rounded-xl border border-[var(--border-default)] surface-control">
-                    <h5 className="text-xs font-bold text-[var(--text-primary)] mb-1">
-                      Publishing Readiness Guard
+                  <div className="p-4 rounded-xl border border-[var(--border-default)] bg-purple-500/5 dark:bg-purple-500/10">
+                    <h5 className="text-xs font-bold text-[var(--text-primary)] mb-1 flex items-center gap-1.5">
+                      <span>🛡️</span> Publishing Readiness Guard
                     </h5>
                     <p className="text-xs text-[var(--text-muted)]">
                       {isValid
                         ? 'All required fields are complete. Your design is ready for immediate publishing.'
-                        : 'Complete all required fields across the tabs before publishing.'}
+                        : 'Complete all required fields across both tabs before publishing.'}
                     </p>
                   </div>
                 </div>
+                </motion.div>
               )}
+              </AnimatePresence>
             </div>
 
             {/* Stepping controls between tabs */}
             <div className="flex items-center justify-between pt-4 mt-6 border-t border-[var(--border-default)]">
-              <button
-                type="button"
-                onClick={() => {
-                  if (activeInspectorSection === 'sizing') setActiveInspectorSection('commercial');
-                  else if (activeInspectorSection === 'commercial') setActiveInspectorSection('style');
-                  else if (activeInspectorSection === 'style') setActiveInspectorSection('identity');
-                }}
-                disabled={activeInspectorSection === 'identity'}
-                className="neu-pressed-button px-3.5 py-1.5 text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                ‹ Previous Tab
-              </button>
+              {activeInspectorSection === 'commercial' ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveInspectorSection('design')}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold border border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 text-purple-700 dark:text-purple-300 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                >
+                  ‹ Back to Design & Style
+                </button>
+              ) : (
+                <span className="text-xs text-[var(--text-muted)]">
+                  Step 1: Fill in design identity & style details
+                </span>
+              )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (activeInspectorSection === 'identity') setActiveInspectorSection('style');
-                  else if (activeInspectorSection === 'style') setActiveInspectorSection('commercial');
-                  else if (activeInspectorSection === 'commercial') setActiveInspectorSection('sizing');
-                }}
-                disabled={activeInspectorSection === 'sizing'}
-                className="btn-brand-primary py-1.5 px-4 text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                Next Tab ›
-              </button>
+              {activeInspectorSection === 'design' ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveInspectorSection('commercial')}
+                  className="btn-brand-primary py-2 px-5 text-xs font-bold transition-all hover:scale-[1.01] active:scale-[0.99] shadow-[0_2px_10px_rgba(168,85,247,0.35)]"
+                >
+                  Next: Commercial & Sizing ›
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -2622,8 +2647,12 @@ const CreateDesignInner: React.FC = () => {
             <button
               type="button"
               onClick={handlePublishClick}
-              disabled={isSubmitting}
-              className="flex-1 sm:flex-none py-3 px-7 rounded-full wiez-gradient-btn-primary font-bold active:scale-[0.985] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm shadow-lg"
+              disabled={!isValid || isSubmitting}
+              className={`flex-1 sm:flex-none py-3 px-7 rounded-full font-bold active:scale-[0.985] flex items-center justify-center gap-2 text-sm transition-all duration-200 ${
+                !isValid || isSubmitting
+                  ? 'opacity-40 cursor-not-allowed bg-[var(--surface-muted)] text-[var(--text-muted)] border border-[var(--border-default)] shadow-none'
+                  : 'wiez-gradient-btn-primary text-white shadow-[0_4px_16px_rgba(147,51,234,0.35)] hover:scale-[1.01]'
+              }`}
             >
               {isSubmitting && submitIntent === 'publish' ? (
                 <MuseLoader size={16} />
@@ -2905,31 +2934,7 @@ export const FormSection: React.FC<{
   </div>
 );
 
-/**
- * ActionButton - Button for the floating action bar
- */
-const ActionButton: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  active?: boolean;
-}> = ({ icon, label, onClick, disabled, active }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    className={`
-      surface-control surface-interactive-hover flex items-center gap-2 px-4 py-2 rounded-xl backdrop-blur-md border
-      text-sm font-medium transition-all
-      ${active ? "bg-purple-500/20 border-gray-400 dark:border-white/30" : ""}
-      ${disabled ? "opacity-50 cursor-not-allowed" : ""}
-    `}
-  >
-    {icon}
-    <span className="hidden sm:inline">{label}</span>
-  </button>
-);
+
 
 /**
  * formatTimeAgo - Format date as relative time
