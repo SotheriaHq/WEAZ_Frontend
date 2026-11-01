@@ -560,37 +560,60 @@ export function QueueBrandCounts({ brandId }: { brandId: string }) {
     );
   const summary = query.data;
   return (
-    <section className="queue-section text-slate-900 dark:text-white">
-      <div className="flex flex-wrap justify-between gap-2">
-        <h2 className="font-bold">
-          🧵{' '}
-          {summary.capacity.tierKey
-            ? `${queueTierName(summary.capacity.tierKey)} queue`
-            : 'Custom-order queue'}
-        </h2>
-        <span>
-          {!summary.intakeAllowed
-            ? 'New intake paused'
-            : 'Accepting new orders'}
+    <section className="overflow-hidden rounded-2xl border border-black/5 bg-slate-50/90 p-4 shadow-sm dark:border-white/10 dark:bg-[#120a1f] sm:p-5 text-slate-900 dark:text-white">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 mb-4">
+        <div className="inline-flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-600/15 text-sm dark:bg-violet-400/20">
+            🧵
+          </span>
+          <h2 className="text-sm sm:text-base font-bold tracking-tight">
+            {summary.capacity.tierKey
+              ? `${queueTierName(summary.capacity.tierKey)} Queue`
+              : 'Custom-Order Queue'}
+          </h2>
+        </div>
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+            summary.intakeAllowed
+              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+              : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+          }`}
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+          {!summary.intakeAllowed ? 'New intake paused' : 'Accepting new orders'}
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {Object.entries(summary.counts).map(([lane, count]) => (
-          <div key={lane}>
-            <div className="text-lg font-bold tabular-nums">
-              {count}
-              {lane === 'ACTIVE' && summary.capacity.active !== undefined
-                ? ` / ${summary.capacity.active ?? 'Unlimited'}`
-                : lane === 'IN_DELIVERY' &&
-                    summary.capacity.inDelivery !== undefined
-                  ? ` / ${summary.capacity.inDelivery ?? 'Unlimited'}`
-                  : lane === 'UP_NEXT'
-                    ? ' / 1'
-                    : ''}
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        {Object.entries(summary.counts).map(([lane, count]) => {
+          const denominator =
+            lane === 'ACTIVE' && summary.capacity.active !== undefined
+              ? ` / ${summary.capacity.active ?? 'Unlimited'}`
+              : lane === 'IN_DELIVERY' && summary.capacity.inDelivery !== undefined
+                ? ` / ${summary.capacity.inDelivery ?? 'Unlimited'}`
+                : lane === 'UP_NEXT'
+                  ? ' / 1'
+                  : '';
+          return (
+            <div
+              key={lane}
+              className="rounded-xl bg-white/80 p-3 shadow-xs dark:bg-white/[0.04] dark:border dark:border-white/5"
+            >
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl font-black tabular-nums text-slate-900 dark:text-white sm:text-2xl">
+                  {count}
+                </span>
+                {denominator ? (
+                  <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+                    {denominator}
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {queueLaneLabels[lane]}
+              </div>
             </div>
-            <div className="text-xs">{queueLaneLabels[lane]}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

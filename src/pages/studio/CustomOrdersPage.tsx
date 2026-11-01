@@ -47,14 +47,14 @@ const statusFilterOptions = [
 
 const cardTone = (status: CustomOrderStatus) => {
   if (status === 'DISPUTED' || status === 'DELIVERY_ISSUE_REPORTED') {
-    return 'border-rose-300/70 bg-rose-50/80 dark:border-rose-500/20 dark:bg-rose-500/10';
+    return 'border-rose-300/70 bg-rose-50/80 dark:border-rose-500/30 dark:bg-rose-950/20';
   }
 
   if (status === 'PENDING_PAYMENT' || status === 'PENDING_BRAND_ACCEPTANCE') {
-    return 'border-amber-300/70 bg-amber-50/80 dark:border-amber-500/20 dark:bg-amber-500/10';
+    return 'border-amber-300/70 bg-amber-50/80 dark:border-amber-500/30 dark:bg-amber-950/20';
   }
 
-  return 'border-black/10 bg-white/85 dark:border-white/10 dark:bg-white/[0.04]';
+  return 'border-black/5 bg-white/95 shadow-sm dark:border-white/10 dark:bg-[#160e28]';
 };
 
 const collapseVisibleQueueOrders = (items: CustomOrderListItem[]) => {
@@ -334,7 +334,7 @@ const CustomOrdersPage: React.FC = () => {
       </div>
 
       {brandId ? <><QueueBrandCounts brandId={brandId} /><BrandQueueSettings brandId={brandId} /></> : null}
-      <section className="rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-3 py-4 text-white shadow-sm sm:px-5">
+      <section className="rounded-2xl bg-gradient-to-br from-black via-[#0d0716] to-[#1a102f] border border-white/10 px-3 py-4 text-white shadow-md sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">Studio</div>
@@ -397,7 +397,7 @@ const CustomOrdersPage: React.FC = () => {
       </section>
 
       {brandId && canUpdateOrders(profile, brandId) ? <QueueBulkCancellation brandId={brandId} orders={orders} onChanged={async () => { await customOrdersQuery.refetch(); }} /> : null}
-      <section className="rounded-2xl border border-black/10 bg-white/85 p-3 shadow-[0_24px_80px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-white/[0.04] sm:rounded-[2rem] sm:p-6">
+      <section className="rounded-2xl border border-black/5 bg-white/90 p-3 shadow-sm dark:border-white/10 dark:bg-[#0c0617] sm:rounded-[2rem] sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Studio queue</div>
