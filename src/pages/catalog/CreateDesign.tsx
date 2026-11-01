@@ -1750,7 +1750,7 @@ const CreateDesignInner: React.FC = () => {
 
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 mb-2">
           {/* LEFT COLUMN: Height-Bounded Studio Canvas + Real-Time Live Runway Feed Card (Col 5/12) */}
-          <div className="lg:col-span-5 flex flex-col h-[calc(100vh-210px)] min-h-[580px] space-y-4">
+          <div className="lg:col-span-5 flex flex-col space-y-4 lg:sticky lg:top-6 lg:self-start">
             {/* Visual Assets Studio Card */}
             <section id="design-media-section" className="wiez-studio-card p-4 space-y-4">
               <input
@@ -2039,9 +2039,9 @@ const CreateDesignInner: React.FC = () => {
           </div>
 
           {/* RIGHT COLUMN: Space-Locked Inspector Studio (Col 7/12) */}
-          <div className="lg:col-span-7 flex flex-col h-[680px] lg:h-[720px] max-h-[calc(100vh-170px)] min-h-[580px] px-1 sm:px-3">
+          <div className="lg:col-span-7 flex flex-col space-y-6 px-1 sm:px-3">
             {/* Section Inspector Pills (Consolidated 2 Balanced Tabs, Zero Parent BG/Border/Shadow) */}
-            <div className="shrink-0 flex items-center justify-between pb-3 mb-2">
+            <div className="sticky top-0 z-20 backdrop-blur-xl bg-white/80 dark:bg-[#120a1f]/80 py-2.5 px-2 -mx-2 rounded-2xl flex items-center justify-between transition-colors shadow-[0_2px_12px_-2px_rgba(168,85,247,0.06),inset_0_1px_0_rgba(255,255,255,0.8)] dark:shadow-[0_2px_12px_-2px_rgba(147,51,234,0.15),inset_0_1px_0_rgba(255,255,255,0.08)] mb-2">
               <div className="flex items-center gap-2 flex-wrap">
                 {[
                   { id: 'design', label: '✦ 1. Design & DNA' },
@@ -2075,7 +2075,7 @@ const CreateDesignInner: React.FC = () => {
               </div>
 
             {/* Middle Scrollable Body (Inline Scrolling, Zero Page Bleed) */}
-            <div className="flex-1 overflow-y-auto pr-1.5 min-h-0 space-y-6 no-scrollbar" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+            <div className="space-y-6">
               <AnimatePresence mode="wait">
               {activeInspectorSection === 'design' && (
                 <motion.div
@@ -2102,7 +2102,7 @@ const CreateDesignInner: React.FC = () => {
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] flex items-center">
+                      <label className="border-l-2 border-purple-500 pl-2.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] flex items-center">
                         Tell Your Story
                         <InfoTooltip text="Describe the inspiration, mood, and story behind this design. This is visible to buyers browsing the catalog." />
                       </label>
@@ -2466,7 +2466,7 @@ const CreateDesignInner: React.FC = () => {
                   </div>
 
                   {/* Sizing & Visibility Section */}
-                  <div className="space-y-4 pt-4 border-t border-[var(--border-default)]">
+                  <div className="space-y-4 pt-4 border-t border-purple-500/10 dark:border-white/5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <UniversalSelect
                       label="Fit Preference"

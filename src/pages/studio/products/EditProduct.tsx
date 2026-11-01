@@ -2066,10 +2066,6 @@ const EditProduct: React.FC = () => {
         });
 
         toast.dismiss();
-        toast.error(
-          `Custom order setup is incomplete (${missingLabels.length} field${missingLabels.length === 1 ? '' : 's'}). Complete the required fields to publish.`,
-          { id: 'product-publish-validation' }
-        );
         return;
       }
 
@@ -2454,9 +2450,7 @@ const EditProduct: React.FC = () => {
       // simply did nothing and the dialog sat there.
       setShowPricePreview(false);
       revealCustomOrderProblems();
-      toast.error(
-        'The custom-order setup is incomplete. The fields that still need you are highlighted below.',
-      );
+      toast.dismiss();
       return;
     }
 
@@ -3851,7 +3845,7 @@ const EditProduct: React.FC = () => {
           <div className="space-y-6 lg:col-span-7">
             {/* Basic Info — same collapsible card language as Create Design */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 border-l-2 border-purple-500 pl-2.5">
                 <span className="text-base">📝</span>
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
                   Basic Information
@@ -4164,7 +4158,7 @@ const EditProduct: React.FC = () => {
         <div className={wizardStep === 2 ? "" : "hidden"}>
         <div className="mx-auto w-full max-w-4xl">
             <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 border-l-2 border-purple-500 pl-2.5">
                 <span className="text-base">⚙️</span>
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-theme-secondary">
                   Product Operations
@@ -5305,6 +5299,17 @@ const EditProduct: React.FC = () => {
       </main>
 
       {/* Footer */}
+            {publishValidationNotice && (
+        <div className="mx-auto max-w-6xl px-3 sm:px-4 mb-3">
+          <ValidationActionNotice
+            title={publishValidationNotice.title}
+            description={publishValidationNotice.description}
+            missingFields={publishValidationNotice.missingFields}
+            primaryAction={publishValidationNotice.primaryAction}
+            onDismiss={() => setPublishValidationNotice(null)}
+          />
+        </div>
+      )}
       <footer
         className={`sticky bottom-0 z-20 w-full px-4 pt-2.5 backdrop-blur-[24px] backdrop-saturate-[200%] bg-white/80 dark:bg-[#140d21]/80 border-0 shadow-[0_-4px_24px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.95)] sm:px-6 ${
           isEmbeddedMobile

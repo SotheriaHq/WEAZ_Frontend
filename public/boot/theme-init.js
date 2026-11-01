@@ -23,7 +23,9 @@
   }
 
   try {
-    sessionEmbeddedSurface = sessionStorage.getItem(embeddedSurfaceKey) === 'mobile-app';
+    sessionEmbeddedSurface =
+      sessionStorage.getItem('WIEZ.studio.embeddedSurface') === 'mobile-app' ||
+      sessionStorage.getItem('wiez.studio.embeddedSurface') === 'mobile-app';
   } catch (_error) {
     sessionEmbeddedSurface = false;
   }
@@ -33,12 +35,16 @@
     if (requestedTheme === 'light' || requestedTheme === 'dark') {
       embeddedTheme = requestedTheme;
       try {
-        sessionStorage.setItem(embeddedSurfaceKey, 'mobile-app');
-        sessionStorage.setItem(embeddedThemeKey, requestedTheme);
+        sessionStorage.setItem('WIEZ.studio.embeddedSurface', 'mobile-app');
+        sessionStorage.setItem('wiez.studio.embeddedSurface', 'mobile-app');
+        sessionStorage.setItem('WIEZ.studio.embeddedTheme', requestedTheme);
+        sessionStorage.setItem('wiez.studio.embeddedTheme', requestedTheme);
       } catch (_error) {}
     } else {
       try {
-        var savedEmbeddedTheme = sessionStorage.getItem(embeddedThemeKey);
+        var savedEmbeddedTheme =
+          sessionStorage.getItem('WIEZ.studio.embeddedTheme') ||
+          sessionStorage.getItem('wiez.studio.embeddedTheme');
         embeddedTheme =
           savedEmbeddedTheme === 'light' || savedEmbeddedTheme === 'dark'
             ? savedEmbeddedTheme
