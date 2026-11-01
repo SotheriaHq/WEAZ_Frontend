@@ -2048,12 +2048,12 @@ const MessagingManagementPage: React.FC = () => {
                     actually collide, but the ordering keeps it that way if the
                     read receipt is slow.
                   */
-                  className={`group w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors mb-0.5 border-l-[3px] ${
+                  className={`group w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all mb-0.5 ${
                     isActive
-                      ? 'border-purple-500 bg-purple-100/70 dark:bg-purple-500/15'
+                      ? 'bg-gradient-to-r from-purple-500/18 via-purple-500/10 to-transparent shadow-[0_4px_16px_rgba(168,85,247,0.18)] dark:shadow-[0_4px_20px_rgba(168,85,247,0.25)] font-semibold text-purple-700 dark:text-purple-300'
                       : item.hasUnread
-                        ? 'border-purple-500 bg-gradient-to-r from-purple-50 to-fuchsia-50/40 hover:from-purple-100 hover:to-fuchsia-100/50 dark:from-purple-500/[0.14] dark:to-fuchsia-500/[0.06] dark:hover:from-purple-500/20'
-                        : 'border-transparent hover:bg-gray-50 dark:hover:bg-white/[0.03]'
+                        ? 'bg-gradient-to-r from-purple-50/80 to-fuchsia-50/40 hover:from-purple-100/80 hover:to-fuchsia-100/50 dark:from-purple-500/[0.14] dark:to-fuchsia-500/[0.06] dark:hover:from-purple-500/20 shadow-sm'
+                        : 'hover:bg-purple-500/[0.04] dark:hover:bg-white/[0.03]'
                   }`}
                 >
                   {/* Avatar */}

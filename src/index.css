@@ -1,3 +1,14 @@
+
+/* Global Typography Scaling (Boldness & Legibility Elevation) */
+html {
+  font-size: 16.5px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+:is(html[data-embedded-surface="mobile-app"], html[data-surface="mobile-app"], body.is-embedded-mobile) {
+  font-size: 17.5px;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -3282,8 +3293,13 @@ html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidd
   border: 0 solid transparent !important;
   outline: none;
   position: relative;
+  background: linear-gradient(135deg, #ffffff 0%, #faf5ff 55%, #f3e8ff 100%);
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 4px 20px -2px rgba(168, 85, 247, 0.12), 0 2px 8px -1px rgba(124, 58, 237, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.98), inset 0 -1px 0 rgba(168, 85, 247, 0.08);
+}
+:is(.dark, [data-theme="dark"]) .wiez-card-base,
+.dark .wiez-card-base {
+  background: linear-gradient(135deg, #1e1133 0%, #160d28 50%, #10071e 100%);
 }
 .wiez-card-base:hover {
   transform: translateY(-2px) scale(1.012);

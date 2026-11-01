@@ -84,7 +84,7 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
             <h2 className="text-sm font-bold text-black dark:text-white uppercase tracking-wider">Studio</h2>
           </div>
 
-          <nav className="space-y-1">
+          <nav className="space-y-1 px-3">
             {groups.map((group) => (
               <div key={group.title}>
                 <div className="space-y-1">
@@ -102,17 +102,17 @@ export const StudioSidebar: React.FC<StudioSidebarProps> = ({ active, onSelect }
                             handleSelect(key, path);
                           }
                         }}
-                        className={`group flex w-full items-center gap-2.5 border-l-[3px] px-4 py-2.5 text-left text-sm transition-colors ${
+                        className={`group flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left text-sm transition-all duration-200 ${
                           isLocked
-                            ? 'cursor-not-allowed border-transparent opacity-50'
+                            ? 'cursor-not-allowed opacity-50'
                             : isActive
-                              ? 'border-primary bg-primary/10 font-medium text-primary'
-                              : 'border-transparent text-gray-700 hover:bg-gray-100 hover:text-black dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white'
+                              ? 'bg-gradient-to-r from-purple-500/18 via-purple-500/10 to-transparent font-semibold text-purple-700 dark:text-purple-300 shadow-[0_4px_16px_rgba(168,85,247,0.18)] dark:shadow-[0_4px_20px_rgba(168,85,247,0.25)]'
+                              : 'text-gray-700 hover:bg-purple-500/[0.06] hover:text-black dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white'
                         }`}
                         title={isLocked ? 'Complete store setup to unlock this section' : label}
                       >
                         <span className="shrink-0 text-base leading-none">{emoji}</span>
-                        <span className="flex-1 truncate">{label}</span>
+                        <span className="flex-1 break-words">{label}</span>
                         {key === 'messages' && unreadMessages > 0 && (
                           <span className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
                             {unreadMessages > 99 ? '99+' : unreadMessages}
