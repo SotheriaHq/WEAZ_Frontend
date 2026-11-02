@@ -389,6 +389,9 @@ const RootLayout: React.FC = () => {
   return (
     <BagFlowProvider>
       <>
+        {/* Embedded-surface detection reads the current route. Keep theme sync
+            inside RouterProvider, alongside the other route-aware effects. */}
+        <ThemeBackendSync />
         <SeoHead />
         {/* The native app's own consent covers its web view. */}
         {!isEmbeddedMobile ? <CookieConsent /> : null}
@@ -1117,7 +1120,6 @@ const VerificationStateSync: React.FC = () => {
 
 const App: React.FC = () => (
   <AuthProvider>
-    <ThemeBackendSync />
     <VerificationStateSync />
     <HotRouteChunkPrefetch />
     <ScrollRestoreProvider>

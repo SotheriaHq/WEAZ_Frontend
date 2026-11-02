@@ -1,5 +1,6 @@
 export type StudioNativeEvent =
   | { type: 'READY' }
+  | { type: 'BOOT_FAILED' }
   | { type: 'ROUTE_CHANGED'; path: string }
   | { type: 'AUTH_REQUIRED'; reason?: string }
   | {

@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as renderTree, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeBackendSync } from '@/components/theme/ThemeBackendSync';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
@@ -12,6 +14,7 @@ import type { AuthUserDto } from '@/types/auth';
 import type { ThemePreference } from '@/types/theme';
 
 const authState = vi.hoisted(() => ({ loading: false }));
+const render = (children: ReactNode) => renderTree(<MemoryRouter>{children}</MemoryRouter>);
 const patchMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/context/AuthContext', () => ({
@@ -139,7 +142,9 @@ describe('web theme backend sync', () => {
   });
 
   it('keeps the pre-render boot script on the same storage key and root contract', () => {
-    const indexHtml = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
+    const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
+    expect(html).toContain('src="/boot/theme-init.js"');
+    const indexHtml = readFileSync(resolve(process.cwd(), 'public/boot/theme-init.js'), 'utf8');
 
     expect(indexHtml).toContain("var storageKey = 'vite-ui-theme'");
     expect(indexHtml).toContain("root.dataset.theme = className");

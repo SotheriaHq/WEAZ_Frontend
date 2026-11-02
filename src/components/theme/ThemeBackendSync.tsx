@@ -40,7 +40,7 @@ export const ThemeBackendSync = () => {
 
     lastAppliedKeyRef.current = appliedKey;
     syncThemePreferenceFromBackend(themePreference);
-  }, [isAuthenticated, loading, syncThemePreferenceFromBackend, user]);
+  }, [isAuthenticated, isEmbeddedMobile, loading, syncThemePreferenceFromBackend, user]);
 
   return null;
 };
