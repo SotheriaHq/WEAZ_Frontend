@@ -1329,7 +1329,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
       return failDraftValidation(REQUIRED_FIELDS_SUMMARY, missingFieldErrors);
     }
 
-    const productionLeadDaysValue = Number(form.productionLeadDays);
+    const productionLeadDaysValue = form.productionLeadDays.trim() ? Number(form.productionLeadDays) : (Number(defaultProductionLeadDays) || 7);
     if (
       !Number.isFinite(productionLeadDaysValue) ||
       !Number.isInteger(productionLeadDaysValue) ||
@@ -1653,7 +1653,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             aria-invalid={Boolean(fieldErrors.baseProductionCharge)}
             aria-describedby={fieldErrors.baseProductionCharge ? getFieldErrorId('baseProductionCharge') : undefined}
             className={getFieldInputClassName('baseProductionCharge')}
-            placeholder="120000"
+            placeholder="e.g. 45,000"
           />
           {renderFieldError('baseProductionCharge')}
           {hasEditedBaseCharge &&
@@ -1681,7 +1681,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             aria-invalid={Boolean(fieldErrors.fabricCostPerYard)}
             aria-describedby={fieldErrors.fabricCostPerYard ? getFieldErrorId('fabricCostPerYard') : undefined}
             className={getFieldInputClassName('fabricCostPerYard')}
-            placeholder="10000"
+            placeholder="e.g. 10,000"
           />
           {renderFieldError('fabricCostPerYard')}
         </label>

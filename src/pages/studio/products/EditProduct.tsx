@@ -4508,7 +4508,7 @@ const EditProduct: React.FC = () => {
                                                 : Number(e.target.value),
                                           })
                                         }
-                                        placeholder={String(form.price || 0)}
+                                        placeholder={form.price ? `e.g. ${form.price}` : "e.g. 25,000"}
                                         startIcon={
                                           <span className="text-theme-secondary text-[10px]">
                                             ₦

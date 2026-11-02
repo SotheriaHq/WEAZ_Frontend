@@ -2399,7 +2399,7 @@ const CreateDesignInner: React.FC = () => {
                             type="number"
                             value={minPrice}
                             onChange={(e) => setMinPrice(e.target.value)}
-                            placeholder="15,000"
+                            placeholder="e.g. 15,000"
                             disabled={disabled}
                             className="bg-transparent outline-none w-full text-sm font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-muted)] leading-none"
                           />
@@ -2418,7 +2418,7 @@ const CreateDesignInner: React.FC = () => {
                             type="number"
                             value={maxPrice}
                             onChange={(e) => setMaxPrice(e.target.value)}
-                            placeholder="45,000"
+                            placeholder="e.g. 45,000"
                             disabled={disabled}
                             className="bg-transparent outline-none w-full text-sm font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-muted)] leading-none"
                           />

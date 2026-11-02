@@ -75,8 +75,8 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
                 isProductFormRoute ? 'pb-0' : 'pb-[env(safe-area-inset-bottom)]'
               }`
             : viewportLocked
-              ? 'bg-[color:var(--surface-primary)] px-3 pt-20 sm:px-4 lg:pl-[236px]'
-              : 'min-h-dvh bg-[color:var(--surface-primary)] px-3 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-20 sm:px-4 lg:pb-10 lg:pl-[236px]'
+              ? 'bg-[color:var(--surface-primary)] px-3 pt-[4.25rem] sm:pt-20 sm:px-4 lg:pl-[236px]'
+              : 'min-h-dvh bg-[color:var(--surface-primary)] px-3 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-[4.25rem] sm:pt-20 sm:px-4 lg:pb-10 lg:pl-[236px]'
         }
       >
         <div className="mx-auto max-w-6xl min-w-0">
@@ -87,7 +87,7 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
             </div>
           ) : (
             <>
-              <div className="mb-3 flex justify-end">
+              <div className="empty:hidden [&:not(:empty)]:mb-2.5 flex justify-end">
                 <BrandSwitcher />
               </div>
               {children}

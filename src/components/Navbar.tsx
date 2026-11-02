@@ -165,7 +165,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
   }, [showProfileMenu]);
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
+    const handleScroll = () => setIsScrolled(window.scrollY > 8);
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
@@ -458,8 +458,8 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
       style={
         !minimal && !immersive
           ? {
-              backdropFilter: 'blur(20px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+              backdropFilter: 'blur(28px) saturate(210%)',
+              WebkitBackdropFilter: 'blur(28px) saturate(210%)',
             }
           : undefined
       }

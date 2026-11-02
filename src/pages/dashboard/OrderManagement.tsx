@@ -669,7 +669,7 @@ const OrderManagement: React.FC = () => {
             className={`min-w-0 rounded-xl sm:rounded-2xl p-2 sm:p-4 wiez-card-base ${index === 0 ? 'wiez-shade-2' : index === 1 ? 'wiez-shade-3' : index === 2 ? 'wiez-shade-4' : 'wiez-shade-1'}`}
           >
             <div className="flex items-start justify-between gap-1">
-              <p className="min-w-0 text-[10px] font-semibold uppercase leading-tight tracking-tight text-slate-500 dark:text-slate-400 sm:text-xs sm:tracking-[0.14em]">
+              <p className={`min-w-0 text-[10px] font-bold uppercase leading-tight tracking-tight ${metric.tone} sm:text-xs sm:tracking-[0.14em]`}>
                 {metric.label}
               </p>
               <span className="shrink-0 text-sm leading-none sm:text-lg">{metric.marker}</span>
@@ -677,9 +677,9 @@ const OrderManagement: React.FC = () => {
             <p className="mt-1.5 truncate text-lg font-black tracking-tight sm:mt-3 sm:text-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 dark:from-purple-400 dark:via-indigo-400 dark:to-pink-400 bg-clip-text text-transparent">{metric.value}</p>
             <div className="mt-2 flex items-center gap-2 sm:mt-3">
               <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/5">
-                <div className="h-full rounded-full bg-orange-500" style={{ width: `${metric.progress}%` }} />
+                <div className={`h-full rounded-full ${index === 0 ? 'bg-orange-500' : index === 1 ? 'bg-amber-500' : index === 2 ? 'bg-blue-500' : 'bg-emerald-500'}`} style={{ width: `${metric.progress}%` }} />
               </div>
-              <p className="shrink-0 text-[11px] font-medium text-slate-400 dark:text-slate-500">{metric.helper}</p>
+              <p className={`shrink-0 text-[11px] font-semibold ${metric.tone} opacity-85`}>{metric.helper}</p>
             </div>
           </article>
         ))}

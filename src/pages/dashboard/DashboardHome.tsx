@@ -462,10 +462,11 @@ const MetricCard: React.FC<{
   trendUp?: boolean;
   subtitle?: string;
   shadeClass?: string;
-}> = ({ title, value, marker, markerClassName, trend, trendUp, subtitle, shadeClass = 'wiez-shade-1' }) => (
+  accentColor?: string;
+}> = ({ title, value, marker, markerClassName, trend, trendUp, subtitle, shadeClass = 'wiez-shade-1', accentColor }) => (
   <div className={`cursor-pointer rounded-2xl p-3.5 sm:p-4 lg:p-5 wiez-card-base ${shadeClass}`}>
     <div className="mb-1.5 flex items-start justify-between gap-2 lg:mb-2">
-      <p className="min-w-0 text-xs font-semibold leading-4 text-purple-950/70 dark:text-purple-200/70 sm:text-sm">{title}</p>
+      <p className={`min-w-0 text-xs font-bold leading-4 sm:text-sm ${accentColor || 'text-purple-700 dark:text-purple-300'}`}>{title}</p>
       <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl text-sm shadow-[] sm:h-8 sm:w-8 sm:text-base ${markerClassName}`}>
         <span aria-hidden="true">{marker}</span>
       </div>
@@ -479,10 +480,14 @@ const MetricCard: React.FC<{
       >
         <span aria-hidden="true">{trendUp ? '↗' : '↘'}</span>
         {trend}
-        <span className="text-purple-950/50 dark:text-purple-300/50 sm:ml-1 font-normal">vs last month</span>
+        <span className={`${trendUp ? 'text-emerald-600/75 dark:text-emerald-400/75' : 'text-rose-500/75 dark:text-rose-400/75'} sm:ml-1 font-normal`}>vs last month</span>
       </p>
     ) : null}
-    {subtitle ? <p className="text-[11px] leading-4 text-purple-950/60 dark:text-purple-300/60 sm:text-xs font-medium break-words">{subtitle}</p> : null}
+    {subtitle ? (
+      <p className={`text-[11px] leading-4 sm:text-xs font-semibold break-words ${accentColor ? `${accentColor} opacity-85` : 'text-purple-600/80 dark:text-purple-300/80'}`}>
+        {subtitle}
+      </p>
+    ) : null}
   </div>
 );
 

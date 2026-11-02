@@ -2423,10 +2423,10 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     ? 'bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-300 font-bold'
                     : 'bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10'
                 }`}
-                aria-label={showFiltersMenu ? 'Hide refine menu' : 'Refine results'}
-                title={showFiltersMenu ? 'Hide refine menu' : 'Refine results'}
+                aria-label={showFiltersMenu ? 'Hide filters & sort' : 'Filter & sort products'}
+                title={showFiltersMenu ? 'Hide filters & sort' : 'Filter & sort products'}
               >
-                <span className="text-sm">⚙️</span>
+                <span className="text-sm">🎛️</span>
               </button>
             </div>
           </div>
@@ -2434,36 +2434,56 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           {showFiltersMenu && (
             <div
               ref={filtersMenuRef}
-              className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4.25rem)] z-50 max-h-[min(70vh,26rem)] overflow-y-auto rounded-xl border border-gray-200/90 bg-white/[0.98] p-2.5 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#12121a]/[0.98] sm:absolute sm:inset-x-auto sm:right-4 sm:top-[64px] sm:w-[min(92vw,520px)] sm:p-3 lg:hidden"
+              className="relative w-full mt-2 overflow-hidden rounded-2xl border border-gray-200/90 bg-white/[0.98] p-3 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-[#12121a]/[0.98] animate-in fade-in slide-in-from-top-2 duration-200 lg:hidden"
             >
-              {/* Status used to be repeated here as a chip grid. It is the tab
-                  strip's job now, and having it in two places meant the visible
-                  tab and the menu chip could look like separate controls. */}
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100 dark:border-white/5">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800 dark:text-gray-100">
+                  <span>🎛️</span>
+                  <span>Filter & Sort Products</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFiltersMenu(false)}
+                  className="rounded-lg p-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                  aria-label="Close filters"
+                >
+                  ✕
+                </button>
+              </div>
               <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-3">
-                <FilterDropdown
-                  value={filterCollection}
-                  onChange={setFilterCollection}
-                  disabled={collectionsLoading}
-                  options={[
-                    { value: 'all', label: 'All Collections' },
-                    ...visibleCollections.map((c) => ({ value: c.id, label: c.name })),
-                  ]}
-                />
-                <FilterDropdown
-                  value={filterStock}
-                  onChange={setFilterStock}
-                  options={[
-                    { value: 'all', label: 'All Stock' },
-                    { value: 'in_stock', label: 'In Stock' },
-                    { value: 'low_stock', label: 'Low Stock' },
-                    { value: 'out_of_stock', label: 'Out of Stock' },
-                  ]}
-                />
-                <FilterDropdown
-                  value={productSortBy}
-                  onChange={(value) => setProductSortBy(value as ProductSortBy)}
-                  options={PRODUCT_SORT_OPTIONS}
-                />
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Collection</span>
+                  <FilterDropdown
+                    value={filterCollection}
+                    onChange={setFilterCollection}
+                    disabled={collectionsLoading}
+                    options={[
+                      { value: 'all', label: 'All Collections' },
+                      ...visibleCollections.map((c) => ({ value: c.id, label: c.name })),
+                    ]}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Stock</span>
+                  <FilterDropdown
+                    value={filterStock}
+                    onChange={setFilterStock}
+                    options={[
+                      { value: 'all', label: 'All Stock' },
+                      { value: 'in_stock', label: 'In Stock' },
+                      { value: 'low_stock', label: 'Low Stock' },
+                      { value: 'out_of_stock', label: 'Out of Stock' },
+                    ]}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Sort Order</span>
+                  <FilterDropdown
+                    value={productSortBy}
+                    onChange={(value) => setProductSortBy(value as ProductSortBy)}
+                    options={PRODUCT_SORT_OPTIONS}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -2645,19 +2665,33 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     <button
                       type="button"
                       onClick={() => setCollectionSearchCollapsed(false)}
-                      className="h-11 w-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center shadow-sm"
+                      className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl border-0 bg-white/90 text-gray-700 shadow-md transition-all hover:scale-105 active:scale-95 dark:bg-white/10 dark:text-gray-200 flex items-center justify-center"
                       aria-label="Open collection search"
                     >
-                      <span className="text-base">🔎</span>
+                      <span className="text-sm sm:text-base">🔎</span>
                     </button>
                   ) : (
-                    <SearchField
-                      value={collectionSearch}
-                      onChange={setCollectionSearch}
-                      placeholder="Search collections..."
-                      showFilter={false}
-                      className="!max-w-none w-full shadow-sm border-gray-200 dark:border-white/10 animate-in fade-in slide-in-from-left-2 duration-200"
-                    />
+                    <div className="relative flex items-center w-full">
+                      <SearchField
+                        value={collectionSearch}
+                        onChange={setCollectionSearch}
+                        placeholder="Search collections..."
+                        showFilter={false}
+                        collapsible={false}
+                        className="!max-w-none w-full shadow-md border-0 animate-in fade-in slide-in-from-left-2 duration-200 text-xs sm:text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCollectionSearchCollapsed(true);
+                          setCollectionSearch('');
+                        }}
+                        className="absolute right-2.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
+                        aria-label="Close search"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   )}
                 </div>
                 <FilterDropdown
@@ -3216,7 +3250,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               and `aspect-[100/158]` is the same 1.58, so the two now scale
               together at any phone width.
             */}
-            <div className="grid grid-cols-2 gap-3 transition-all duration-300 min-[520px]:grid-cols-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3.5 sm:gap-4 transition-all duration-300 min-[640px]:grid-cols-3 lg:grid-cols-4">
             {loading && products.length === 0 ? <ProductCardSkeleton count={6} proportion="studio" /> : null}
             {visibleProductFillers.map((task) => (
               <ProductPublishFillerCard
@@ -3239,7 +3273,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 <div
                   key={product.id}
                   className={[
-                    'group relative flex flex-col rounded-2xl bg-white/[0.04] dark:bg-white/[0.03] border-0 overflow-hidden transition-all duration-300 ease-out',
+                    'group relative flex flex-col rounded-2xl bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md shadow-md shadow-purple-950/5 dark:shadow-purple-950/30 border-0 overflow-hidden transition-all duration-300 ease-out hover:shadow-xl hover:shadow-purple-500/15',
                     selectedProducts.includes(product.id)
                       ? 'ring-2 ring-purple-500 shadow-md'
                       : 'hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30',
@@ -3252,7 +3286,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   }}
                 >
                   {/* Dominant Top Media Container (75-80% visual mass) */}
-                  <div className="relative aspect-[100/135] w-full overflow-hidden rounded-2xl bg-gray-100 dark:bg-zinc-800/50">
+                  <div className="relative aspect-[100/148] w-full overflow-hidden rounded-2xl bg-gray-100 dark:bg-zinc-800/50">
                     {/* Full-bleed image */}
                     {(() => {
                       const primaryMedia = product.media?.find((m) => m.isPrimary) ?? product.media?.[0];
@@ -3351,12 +3385,12 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   </div>
 
                   {/* Distinct Lower Area Beneath Media */}
-                  <div className="p-2 sm:p-2.5 flex flex-col gap-1 flex-1 justify-between">
+                  <div className="p-2.5 sm:p-3 pb-3 sm:pb-3.5 flex flex-col gap-1.5 flex-1 justify-between">
                     <div>
                       {/* Title + 3-Dot Overflow Menu Row */}
                       <div className="flex items-start justify-between gap-1.5 relative">
                         <div className="min-w-0 flex-1">
-                          <h3 className="break-words text-xs sm:text-sm font-semibold text-gray-900 dark:text-white leading-tight line-clamp-2 [overflow-wrap:anywhere]">
+                          <h3 className="break-words text-xs sm:text-sm font-bold text-gray-900 dark:text-white leading-snug line-clamp-2 [overflow-wrap:anywhere]">
                             {product.name}
                           </h3>
                           {/* Product publication status with semantic color dot replacing Store Products */}
@@ -3462,7 +3496,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       {/* Price & Stock Line */}
                       <div className="mt-1 flex items-baseline justify-between gap-1 flex-wrap">
                         <div className="flex items-baseline gap-1.5">
-                          <span className="text-xs sm:text-sm font-extrabold bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 dark:from-purple-400 dark:via-indigo-400 dark:to-pink-400 bg-clip-text text-transparent">
+                          <span className="text-sm sm:text-base font-black bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 dark:from-purple-300 dark:via-indigo-300 dark:to-pink-300 bg-clip-text text-transparent tracking-tight">
                             ₦{product.price.toLocaleString()}
                           </span>
                           {typeof product.salePrice === 'number' && product.salePrice > 0 && (

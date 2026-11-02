@@ -1,7 +1,6 @@
 import { memo, useState, useEffect, useMemo, useTransition, useCallback, useRef } from 'react';
 import {
   Bookmark,
-  Search,
   PanelLeftClose,
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
@@ -823,19 +822,33 @@ export default function CatalogShopTab({
               <button
                 type="button"
                 onClick={() => setSearchCollapsed(false)}
-                className="h-11 w-11 rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
+                className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl border-0 bg-white/90 text-gray-700 shadow-md transition-all hover:scale-105 active:scale-95 dark:bg-white/10 dark:text-gray-200 flex items-center justify-center"
                 aria-label="Open search"
               >
-                <Search size={16} />
+                <span className="text-base sm:text-lg">🔎</span>
               </button>
             ) : (
-              <SearchField
-                value={search}
-                onChange={setSearch}
-                placeholder="Search store..."
-                showFilter={false}
-                className="!max-w-none w-full shadow-sm border-gray-200 dark:border-white/10 animate-in fade-in slide-in-from-left-2 duration-200"
-              />
+              <div className="relative flex items-center w-full">
+                <SearchField
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Search store..."
+                  showFilter={false}
+                  collapsible={false}
+                  className="!max-w-none w-full shadow-md border-0 animate-in fade-in slide-in-from-left-2 duration-200 text-xs sm:text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchCollapsed(true);
+                    setSearch('');
+                  }}
+                  className="absolute right-2.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
+                  aria-label="Close search"
+                >
+                  ✕
+                </button>
+              </div>
             )}
           </div>
 
