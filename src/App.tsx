@@ -19,7 +19,7 @@ import SeoHead from './components/seo/SeoHead';
 import CookieConsent from './components/privacy/CookieConsent';
 import LegacyStoreRedirect from './pages/store/LegacyStoreRedirect';
 const NotFound = lazy(() => import('./pages/placeholders/NotFound'));
-const SubscriptionsPlaceholder = lazy(() => import('./pages/placeholders/SubscriptionsPlaceholder'));
+const SubscriptionBillingSettings = lazy(() => import('./pages/settings/SubscriptionBillingSettings'));
 const HistoryPlaceholder = lazy(() => import('./pages/placeholders/HistoryPlaceholder'));
 const WatchLaterPlaceholder = lazy(() => import('./pages/placeholders/WatchLaterPlaceholder'));
 const TrendingPlaceholder = lazy(() => import('./pages/placeholders/TrendingPlaceholder'));
@@ -579,7 +579,7 @@ const router = createBrowserRouter([
           { path: 'market/sections/:sectionKey', element: withRouteFallback(<MarketSectionPage />) },
           { path: 'search', element: withRouteFallback(<SearchResultsPage />) },
           { path: 'diagnostics', element: withRouteFallback(<DiagnosticsPage />) },
-          { path: 'subscriptions', element: withRouteFallback(<SubscriptionsPlaceholder />) },
+          { path: 'subscriptions', element: withRouteFallback(<SubscriptionBillingSettings />) },
           { path: 'history', element: withRouteFallback(<HistoryPlaceholder />) },
           { path: 'watch-later', element: withRouteFallback(<WatchLaterPlaceholder />) },
           { path: 'trending', element: withRouteFallback(<TrendingPlaceholder />) },

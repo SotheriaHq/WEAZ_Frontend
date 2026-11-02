@@ -360,7 +360,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
                   >
                     {icon}
                   </span>
-                  <span className="min-w-0 break-words text-wrap leading-tight text-xs md:text-sm">{label}</span>
+                  <span className={`min-w-0 break-words text-wrap leading-tight ${sidebarWidth < 200 ? "text-[11px]" : sidebarWidth < 260 ? "text-xs" : "text-sm"}`}>{label}</span>
                 </button>
               );
             })}
@@ -392,13 +392,13 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
     // Resizable responsive fixed sidebar with persistent width & zero text truncation
     <aside
       style={{ width: `var(--settings-sidebar-width, ${sidebarWidth}px)` }}
-      className="fixed left-0 top-16 z-20 block h-[calc(100vh-64px)] overflow-y-auto border-r border-[color:var(--border-default)]/50 wiez-chrome-surface scrollbar-hide px-1 md:px-2 transition-[width] duration-75"
+      className="fixed left-0 top-16 z-20 block h-[calc(100vh-64px)] overflow-y-auto border-r border-[color:var(--border-default)]/30 bg-[color:var(--surface-primary,#ffffff)] dark:bg-[color:var(--surface-primary,#12111a)] scrollbar-hide px-1 md:px-2 transition-[width] duration-75"
     >
       {sidebarContent}
-      {/* Resizable right-border drag handle */}
+      {/* Resizable right-border drag handle — invisible touch area, zero purple activator */}
       <div
         onMouseDown={handleDragStart}
-        className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-purple-500/40 active:bg-purple-500/60 transition-colors z-30"
+        className="absolute -right-1 top-0 bottom-0 w-2.5 cursor-col-resize z-30 bg-transparent select-none"
         title="Drag to resize sidebar width"
         aria-label="Drag to resize sidebar width"
       />

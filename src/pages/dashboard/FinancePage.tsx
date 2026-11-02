@@ -768,7 +768,7 @@ const FinancePage: React.FC = () => {
                 {metric.emoji}
               </span>
             </div>
-            <div className="mt-2 text-xl sm:text-2xl font-black text-theme tabular-nums">
+            <div className="mt-2 text-xl sm:text-2xl font-black bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 dark:from-purple-400 dark:via-indigo-400 dark:to-pink-400 bg-clip-text text-transparent tabular-nums">
               {loading ? '—' : formatCurrency(metric.value)}
             </div>
             <div className="mt-1 text-[11px] text-theme-secondary">{metric.note}</div>

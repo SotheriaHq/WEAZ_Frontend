@@ -225,28 +225,6 @@ export default function StoreManagement() {
     verification?.badgeState?.verificationBadgeVisible ??
     user?.verificationBadgeVisible ??
     false;
-  const verificationInProgress =
-    verificationStatus === 'PENDING' ||
-    verificationStatus === 'IN_REVIEW' ||
-    verificationStatus === 'ADDITIONAL_INFO_REQUESTED';
-  const verificationMarker = verificationBadgeVisible
-    ? '✅'
-    : verificationInProgress
-      ? '⏳'
-      : verificationStatus === 'REJECTED'
-        ? '⚠️'
-        : verificationStatus === 'CANCELLED'
-          ? '🛑'
-          : '🪪';
-  const verificationLabel = verificationBadgeVisible
-    ? 'Seller verified'
-    : verificationInProgress
-      ? 'Verification in progress'
-      : verificationStatus === 'REJECTED'
-        ? 'Verification needs attention'
-        : verificationStatus === 'CANCELLED'
-          ? 'Verification cancelled'
-          : 'Open verification workspace';
   const showVerificationPrompt =
     verificationStatus === 'NOT_SUBMITTED' ||
     verificationStatus === 'REJECTED' ||
@@ -368,12 +346,13 @@ export default function StoreManagement() {
         </div>
       ) : null}
 
-      <div className="sticky top-0 z-30">
-        <div className="bg-transparent px-1 py-2 md:py-3">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 sm:gap-3">
-            {/* Left: Avatar + Brand Name (Zero Truncation) + Single Live status + Info Emoji Bio trigger */}
-            <div className="flex items-center gap-2.5 min-w-0 [overflow-wrap:anywhere]">
-              <div className="relative h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 overflow-hidden rounded-xl border-0 shadow-md">
+      <div className="sticky top-0 z-30 bg-surface-primary/95 backdrop-blur-md pb-2 pt-1 border-b border-black/5 dark:border-white/5">
+        <div className="px-2 sm:px-4">
+          {/* Desktop/Tablet: Single cohesive row across the top filling the space; Mobile: Clean Row 1 identity + Row 2 scrollable strip */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+            {/* Brand Identity */}
+            <div className="flex items-center gap-2 min-w-0 [overflow-wrap:anywhere] flex-shrink-0">
+              <div className="relative h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 overflow-hidden rounded-xl border-0 shadow-sm">
                 {avatarUrl ? (
                   <MediaRenderer
                     kind="image"
@@ -385,17 +364,17 @@ export default function StoreManagement() {
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-purple-900/30 p-1">
-                    <WiezMark height={26} />
+                    <WiezMark height={24} />
                   </div>
                 )}
               </div>
 
               <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-1.5 flex-nowrap">
                   <h1 className="break-words [overflow-wrap:anywhere] text-sm sm:text-base font-extrabold leading-tight text-theme">
                     {brandName}
                   </h1>
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0 ${
                     status?.isStoreOpen
                       ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                       : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
@@ -406,7 +385,7 @@ export default function StoreManagement() {
                   <button
                     type="button"
                     onClick={handleOpenBio}
-                    className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-xs opacity-80 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition"
+                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs opacity-80 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition"
                     aria-label="View brand bio"
                     title={brandDescription || "View brand bio"}
                   >
@@ -414,120 +393,131 @@ export default function StoreManagement() {
                   </button>
                 </div>
               </div>
+
+              {/* On Mobile only: QR and Preview buttons placed on the right of brand identity */}
+              <div className="flex lg:hidden items-center gap-1 shrink-0 ml-auto">
+                <button
+                  type="button"
+                  onClick={() => setShowStoreQr(true)}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-gray-700 shadow-sm transition-all hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 dark:bg-white/10 dark:text-gray-200 border-0"
+                  aria-label="Open storefront QR code"
+                  title="Storefront QR code"
+                >
+                  <span className="text-xs">🪪</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isEmbeddedMobile) {
+                      postStudioNativeEvent({
+                        type: 'OPEN_NATIVE_ROUTE',
+                        path: '/profile?tab=Store',
+                      });
+                      return;
+                    }
+                    navigate('/profile');
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-gray-700 shadow-sm transition-all hover:bg-purple-50 hover:text-purple-600 active:scale-95 dark:bg-white/10 dark:text-gray-200 border-0"
+                  aria-label="Preview as visitor"
+                  title="Preview as visitor"
+                >
+                  <span className="text-xs">👁️</span>
+                </button>
+              </div>
             </div>
 
-            {/* Right: Badges, Location, Verification Google-scale, Actions (fills space in single cohesive header) */}
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {/* Badges, Metadata & Actions: Fills the white space opposite the bio area on desktop & iPad! */}
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide py-0.5 text-xs flex-nowrap">
+              {/* Rating */}
+              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/5 px-2 py-1 text-[11px] font-semibold text-theme shrink-0 shadow-sm">
+                <span>⭐</span>
+                <span>{kpis.reviewScore ? kpis.reviewScore.toFixed(1) : '0.0'}</span>
+              </div>
+
+              {/* Location */}
+              {brandLocation ? (
+                <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/5 px-2 py-1 text-[11px] font-medium text-theme-secondary shrink-0 shadow-sm max-w-[170px]">
+                  <span>📍</span>
+                  <span className="truncate">{brandLocation}</span>
+                </div>
+              ) : null}
+
+              {/* Nationwide shipping */}
+              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/5 px-2 py-1 text-[11px] font-medium text-theme-secondary shrink-0 shadow-sm">
+                <span>🚚</span>
+                <span>Nationwide</span>
+              </div>
+
+              {/* Buyer Protection */}
+              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/5 px-2 py-1 text-[11px] font-medium text-theme-secondary shrink-0 shadow-sm">
+                <span>🛡️</span>
+                <span>Protected</span>
+              </div>
+
+              {/* Verification */}
+              {verificationBadgeVisible ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/studio/verification')}
+                  className="inline-flex items-center gap-1 rounded-lg bg-sky-500/10 px-2 py-1 text-[11px] font-bold text-sky-700 dark:text-sky-300 shrink-0 shadow-sm hover:bg-sky-500/20 transition border-0"
+                  aria-label="Verified brand"
+                >
+                  <VerifiedBrandBadge size={14} linkTo={null} />
+                  <span>Verified</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate('/studio/verification')}
+                  className="inline-flex items-center gap-1 rounded-lg bg-sky-50 dark:bg-sky-500/10 px-2 py-1 text-[11px] font-bold text-sky-700 dark:text-sky-300 shrink-0 shadow-sm hover:bg-sky-100 dark:hover:bg-sky-500/20 transition border-0"
+                  aria-label="Open verification workspace"
+                >
+                  <span>🛡️</span>
+                  <span>Get Verified ›</span>
+                </button>
+              )}
+
+              {/* Upgrade if applicable */}
               {isBrandVerified && commerce.data?.canUpgrade && !isEmbeddedMobile ? (
                 <button
                   type="button"
                   onClick={() => navigate('/settings?tab=subscription-billing&from=studio')}
-                  className="neu-pressed-button inline-flex min-h-8 sm:min-h-9 items-center justify-center rounded-xl bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 text-xs font-semibold transition active:scale-[0.985] shadow-sm"
+                  className="neu-pressed-button inline-flex h-7 items-center justify-center rounded-lg bg-purple-600 hover:bg-purple-700 text-white px-2.5 text-[11px] font-semibold transition active:scale-[0.985] shadow-sm shrink-0"
                 >
                   Upgrade
                 </button>
               ) : null}
 
-              <div className="flex flex-wrap items-center gap-1">
-                <div className="group relative">
-                  <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
-                    {kpis.reviewScore ? '⭐' : '☆'}
-                  </span>
-                  <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
-                    {kpis.reviewScore
-                      ? `${kpis.reviewScore.toFixed(1)} (${kpis.reviewCount || 0} reviews)`
-                      : 'No reviews yet'}
-                  </span>
-                </div>
-
-                {brandLocation ? (
-                  <div className="inline-flex max-w-[200px] items-center gap-1 rounded-lg bg-gray-100/90 dark:bg-white/5 px-2.5 py-1 text-[11px] font-medium text-gray-700 dark:text-gray-300 shadow-sm">
-                    <span aria-hidden="true">📍</span>
-                    <span className="break-words" title={brandLocation}>
-                      {brandLocation}
-                    </span>
-                  </div>
-                ) : null}
-
-                <div className="group relative">
-                  <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
-                    🚚
-                  </span>
-                  <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
-                    Ships Nationwide
-                  </span>
-                </div>
-
-                {verificationBadgeVisible ? (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/studio/verification')}
-                    className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 transition bg-sky-500/10 text-sky-700 dark:text-sky-300 shadow-sm hover:bg-sky-500/20"
-                    aria-label="Verified brand — open verification workspace"
-                    title="Verified brand"
-                  >
-                    <VerifiedBrandBadge size={18} linkTo={null} />
-                    <span className="text-[11px] font-semibold">
-                      Verified
-                    </span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/studio/verification')}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100 dark:bg-sky-500/10 dark:text-sky-300 shadow-sm border-0"
-                    aria-label="Open verification workspace"
-                    title={verificationLabel}
-                  >
-                    <span>{verificationMarker}</span>
-                    <span className="break-words">
-                      {verificationLabel}
-                    </span>
-                  </button>
-                )}
-
-                <div className="group relative">
-                  <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
-                    🛡️
-                  </span>
-                  <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
-                    Buyer Protection
-                  </span>
-                </div>
+              {/* Desktop QR & Preview actions */}
+              <div className="hidden lg:flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowStoreQr(true)}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-gray-700 shadow-sm transition-all hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 dark:bg-white/10 dark:text-gray-200 border-0"
+                  aria-label="Open storefront QR code"
+                  title="Storefront QR code"
+                >
+                  <span className="text-xs">🪪</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isEmbeddedMobile) {
+                      postStudioNativeEvent({
+                        type: 'OPEN_NATIVE_ROUTE',
+                        path: '/profile?tab=Store',
+                      });
+                      return;
+                    }
+                    navigate('/profile');
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-gray-700 shadow-sm transition-all hover:bg-purple-50 hover:text-purple-600 active:scale-95 dark:bg-white/10 dark:text-gray-200 border-0"
+                  aria-label="Preview as visitor"
+                  title="Preview as visitor"
+                >
+                  <span className="text-xs">👁️</span>
+                </button>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setShowStoreQr(true)}
-                className="group relative flex h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-600 shadow-sm transition-all hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-emerald-300"
-                aria-label="Open storefront QR code"
-              >
-                <span className="text-xs sm:text-sm">🪪</span>
-                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
-                  Storefront QR code
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (isEmbeddedMobile) {
-                    postStudioNativeEvent({
-                      type: 'OPEN_NATIVE_ROUTE',
-                      path: '/profile?tab=Store',
-                    });
-                    return;
-                  }
-                  navigate('/profile');
-                }}
-                className="group relative flex h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-600 shadow-sm transition-all hover:bg-purple-50 hover:text-purple-600 active:scale-95 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-purple-400"
-                aria-label="Preview as visitor"
-              >
-                <span className="text-xs sm:text-sm">👁️</span>
-                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
-                  Preview as visitor
-                </span>
-              </button>
             </div>
           </div>
         </div>

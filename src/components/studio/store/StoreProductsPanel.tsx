@@ -2333,52 +2333,66 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
       {outletView === 'products' && !inlineProduct && (
       <div className="mb-4 overflow-hidden rounded-2xl sm:mb-6 lg:overflow-visible">
 
-        {/* Header Row */}
-        <div className="relative p-3 pb-3 sm:p-4 lg:p-5 lg:pb-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
-            <div className="min-w-0">
-              <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white sm:text-xl lg:text-2xl">Your Catalog</h2>
-              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">Manage catalog, collections, and drafts in one place.</p>
+        {/* Header Row — Strictly stays on one row, smoothly scales down without rearranging */}
+        <div className="relative p-2.5 sm:p-4 lg:p-5">
+          <div className="flex items-center justify-between gap-2 sm:gap-4 flex-nowrap">
+            <div className="min-w-0 flex-1 transition-all duration-300">
+              <h2 className="text-sm sm:text-xl font-bold tracking-tight text-gray-900 dark:text-white truncate">
+                Your Catalog
+              </h2>
+              <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400">
+                Manage catalog, collections, and drafts in one place.
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              {/* Expandable emoji search */}
+
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* Expandable emoji search — smoothly scales down sibling components without breaking row */}
               <div
                 ref={searchContainerRef}
-                className={`transition-all duration-300 ease-out ${searchCollapsed ? 'w-9 sm:w-11' : 'w-full sm:flex-1 sm:min-w-[220px] sm:max-w-[320px]'}`}
+                className={`transition-all duration-300 ease-out ${
+                  searchCollapsed
+                    ? 'w-9 sm:w-10'
+                    : 'w-44 sm:w-64 max-w-[calc(100vw-130px)]'
+                }`}
               >
                 {searchCollapsed ? (
                   <button
                     type="button"
                     onClick={() => setSearchCollapsed(false)}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl border-0 bg-white/90 text-gray-700 shadow-md transition-all hover:scale-105 hover:bg-purple-50 active:scale-95 dark:bg-white/10 dark:text-gray-200 dark:hover:bg-white/15 sm:h-11 sm:w-11"
+                    className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl border-0 bg-white/90 text-gray-700 shadow-md transition-all hover:scale-105 active:scale-95 dark:bg-white/10 dark:text-gray-200"
                     aria-label="Open search"
                   >
-                    <span className="text-base">🔎</span>
+                    <span className="text-sm sm:text-base">🔎</span>
                   </button>
                 ) : (
-                  <SearchField
-                    value={searchQuery}
-                    onChange={setSearchQuery}
-                    placeholder="Search products..."
-                    showFilter={false}
-                    collapsible={false}
-                    className="!max-w-none w-full shadow-sm border-gray-200 dark:border-white/10 animate-in fade-in slide-in-from-left-2 duration-200"
-                  />
+                  <div className="relative flex items-center">
+                    <SearchField
+                      value={searchQuery}
+                      onChange={setSearchQuery}
+                      placeholder="Search..."
+                      showFilter={false}
+                      collapsible={false}
+                      className="!max-w-none w-full shadow-md border-0 animate-in fade-in slide-in-from-left-2 duration-200 text-xs sm:text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchCollapsed(true);
+                        setSearchQuery('');
+                      }}
+                      className="absolute right-2.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
+                      aria-label="Close search"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 )}
               </div>
-              {/*
-                The bolt sits next to the search, not on a row of its own.
 
-                It used to own a whole strip below the toolbar — one 36pt button
-                and an empty 800px rail — which cost a full row of vertical space
-                on a phone to show a single icon. It is a toolbar control like
-                the two beside it, so it lives in the toolbar; the actions it
-                reveals still expand underneath.
-              */}
               <button
                 type="button"
                 onClick={() => setShowQuickActions((v) => !v)}
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl neu-pressed-button transition-all sm:h-11 sm:w-11 ${
+                className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl neu-pressed-button transition-all border-0 shadow-sm ${
                   showQuickActions
                     ? 'text-theme font-bold'
                     : 'text-theme-secondary'
@@ -2389,32 +2403,30 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               >
                 <span aria-hidden="true" className="text-base">⚡</span>
               </button>
-              {/* Add Product moved to the collections "+" on phones; the inline
-                  button is still the fastest route on a wider screen. */}
+
               <button
                 type="button"
                 onClick={() => navigate('/studio/store/products/new')}
-                className="hidden items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 active:scale-95 sm:inline-flex sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
+                className="hidden items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 active:scale-95 sm:inline-flex sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm border-0 shadow-sm"
                 aria-label={primaryProductActionLabel}
                 title={primaryProductActionLabel}
               >
                 <span aria-hidden="true">➕</span>
                 <span>{primaryProductActionLabel}</span>
               </button>
-              {/* Status now lives in the tab strip below, so this control is
-                  only the three refinements it still owns. */}
+
               <button
                 type="button"
                 onClick={() => setShowFiltersMenu((v) => !v)}
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border shadow-sm transition-all sm:h-11 sm:w-11 lg:hidden ${
+                className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border-0 shadow-sm transition-all lg:hidden ${
                   showFiltersMenu
-                    ? 'border-gray-200 bg-purple-50 text-purple-700 dark:border-white/10 dark:bg-purple-500/10 dark:text-purple-300'
-                    : 'border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10'
+                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-300 font-bold'
+                    : 'bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10'
                 }`}
                 aria-label={showFiltersMenu ? 'Hide refine menu' : 'Refine results'}
                 title={showFiltersMenu ? 'Hide refine menu' : 'Refine results'}
               >
-                ⚙️
+                <span className="text-sm">⚙️</span>
               </button>
             </div>
           </div>
@@ -3224,11 +3236,6 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             {filteredProducts
               .filter((product) => !failedFillerProductIds.has(product.id))
               .map((product) => {
-              const collectionLabel =
-                product.collection?.title ||
-                collections.find((c) => c.id === product.collectionId)?.name ||
-                '—';
-              
               // Determine status for badge
               const productStatus = resolveProductStatus(product);
               const productStatusValue =
@@ -3316,44 +3323,24 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       }}
                       title={favoriteIds.includes(product.id) ? 'Favorited' : 'Save'}
                       aria-label="Save product"
-                      className="absolute right-2.5 top-2.5 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/40 backdrop-blur-md text-white transition hover:scale-110 active:scale-95"
+                      className={`absolute right-2.5 top-2.5 z-20 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full backdrop-blur-md shadow-md transition-all active:scale-90 ${
+                        favoriteIds.includes(product.id)
+                          ? 'bg-gradient-to-tr from-purple-600 via-pink-600 to-rose-600 text-white wiez-heartbeat-active shadow-purple-500/40'
+                          : 'bg-black/45 text-purple-200 hover:text-white wiez-heartbeat-pulse'
+                      }`}
                     >
-                      <span className={`text-xs ${favoriteIds.includes(product.id) ? 'wiez-heartbeat-active text-rose-500' : 'opacity-85'}`}>
-                        {favoriteIds.includes(product.id) ? '❤️' : '🤍'}
-                      </span>
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-3.5 w-3.5 sm:h-4 sm:w-4"
+                        fill={favoriteIds.includes(product.id) ? 'currentColor' : 'none'}
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                      </svg>
                     </button>
-
-                    {/* YouTube Shorts style floating status badge at top-left/corner */}
-                    <div className="absolute left-2.5 bottom-2.5 z-10">
-                      <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide shadow-md backdrop-blur-md ${
-                        productStatus === 'DELETED'
-                          ? 'bg-rose-600/90 text-white'
-                          : productStatus === 'ARCHIVED'
-                            ? 'bg-gray-600/90 text-white'
-                            : productStatus === 'IN_REVIEW' || productStatus === 'FAILED'
-                              ? 'bg-sky-600/90 text-white'
-                            : productStatus === 'CHANGES_REQUESTED'
-                              ? 'bg-amber-600/90 text-white'
-                            : productStatus === 'REJECTED'
-                              ? 'bg-rose-600/90 text-white'
-                            : productStatus === 'DRAFT'
-                              ? 'bg-amber-600/90 text-white' 
-                              : 'bg-black/65 text-white'
-                      }`}>
-                        {productStatus === 'DELETED'
-                          ? 'Deleted'
-                          : productStatus === 'ARCHIVED'
-                            ? 'Archived'
-                            : productStatus === 'DRAFT'
-                              ? 'Draft'
-                              : productStatus === 'IN_REVIEW' ||
-                                  productStatus === 'CHANGES_REQUESTED' ||
-                                  productStatus === 'REJECTED' ||
-                                  productStatus === 'FAILED'
-                                ? getContentStatusLabel(productStatusValue)
-                              : 'New'}
-                      </span>
-                    </div>
 
                     {/* Featured star badge */}
                     {product.isFeatured && (
@@ -3379,11 +3366,52 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           <h3 className="break-words text-xs sm:text-sm font-semibold text-gray-900 dark:text-white leading-tight line-clamp-2 [overflow-wrap:anywhere]">
                             {product.name}
                           </h3>
-                          {collectionLabel !== '—' && (
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                              {collectionLabel}
-                            </p>
-                          )}
+                          {/* Product publication status with semantic color dot replacing Store Products */}
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span
+                              className={`h-2 w-2 rounded-full ${
+                                productStatus === 'ACTIVE' || (!productStatusValue && !product.deletedAt)
+                                  ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]'
+                                  : productStatus === 'IN_REVIEW' || productStatus === 'FAILED'
+                                    ? 'bg-sky-500 shadow-[0_0_6px_rgba(14,165,233,0.5)]'
+                                  : productStatus === 'CHANGES_REQUESTED'
+                                    ? 'bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.5)]'
+                                  : productStatus === 'DRAFT'
+                                    ? 'bg-amber-500'
+                                  : productStatus === 'REJECTED' || productStatus === 'DELETED'
+                                    ? 'bg-rose-500'
+                                    : 'bg-zinc-400'
+                              }`}
+                            />
+                            <span
+                              className={`text-[11px] font-bold tracking-wide ${
+                                productStatus === 'ACTIVE' || (!productStatusValue && !product.deletedAt)
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : productStatus === 'IN_REVIEW' || productStatus === 'FAILED'
+                                    ? 'text-sky-600 dark:text-sky-400'
+                                  : productStatus === 'CHANGES_REQUESTED'
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                  : productStatus === 'DRAFT'
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                  : productStatus === 'REJECTED' || productStatus === 'DELETED'
+                                    ? 'text-rose-600 dark:text-rose-400'
+                                    : 'text-zinc-500 dark:text-zinc-400'
+                              }`}
+                            >
+                              {productStatus === 'DELETED'
+                                ? 'Deleted'
+                                : productStatus === 'ARCHIVED'
+                                  ? 'Archived'
+                                  : productStatus === 'DRAFT'
+                                    ? 'Draft'
+                                    : productStatus === 'IN_REVIEW' ||
+                                        productStatus === 'CHANGES_REQUESTED' ||
+                                        productStatus === 'REJECTED' ||
+                                        productStatus === 'FAILED'
+                                      ? getContentStatusLabel(productStatusValue)
+                                      : 'Published'}
+                            </span>
+                          </div>
                         </div>
                         <div className="shrink-0 relative">
                           <button
@@ -3423,7 +3451,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                               triggerElement={
                                 productMenuTriggerRefs.current[product.id] ?? null
                               }
-                              renderInline
+                              renderInline={false}
                             />
                           )}
                         </div>

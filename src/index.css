@@ -3466,3 +3466,34 @@ html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidd
   transform-origin: center;
   will-change: transform;
 }
+
+
+@keyframes wiezHeartbeatPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  20% {
+    transform: scale(1.15);
+  }
+  40% {
+    transform: scale(1.05);
+  }
+  60% {
+    transform: scale(1.22);
+  }
+  80% {
+    transform: scale(1.08);
+  }
+}
+
+.wiez-heartbeat-pulse {
+  animation: wiezHeartbeatPulse 2.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.wiez-heartbeat-active {
+  animation: wiezHeartbeatPulse 1.4s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  transform-origin: center;
+  will-change: transform;
+}

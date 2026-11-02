@@ -9,7 +9,6 @@ import SettingsSidebar, {
   getItemForKey,
 } from '@/components/settings/SettingsSidebar';
 import PatchesSettings from '@/components/settings/tabs/PatchesSettings';
-import SubscriptionsSettings from '@/components/settings/tabs/SubscriptionsSettings';
 import AccountSecuritySettings from '@/components/settings/tabs/AccountSecuritySettings';
 import NotificationSettings from '@/components/settings/tabs/NotificationSettings';
 import EmailPreferencesSettings from '@/components/settings/tabs/EmailPreferencesSettings';
@@ -206,7 +205,7 @@ const sections: Record<string, React.ReactNode> = {
 
   // Brand
   patches: <PatchesSettings />,
-  subscriptions: <SubscriptionsSettings />,
+  subscriptions: <SubscriptionBillingSettings />,
 
   // Studio
   'store-general': <StoreGeneralSettings />,
@@ -303,7 +302,7 @@ const SettingsHome: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[color:var(--surface-primary,#ffffff)] dark:bg-[color:var(--surface-primary,#12111a)] text-theme">
       <SettingsSidebar active={resolvedActive} onSelect={setActive} />
 
       <div style={{ paddingLeft: "calc(var(--settings-sidebar-width, 240px) + 16px)" }} className="min-h-screen pb-10 pr-3 pt-4 text-[13px] md:pr-4 md:pt-6 md:text-base transition-[padding-left] duration-75">

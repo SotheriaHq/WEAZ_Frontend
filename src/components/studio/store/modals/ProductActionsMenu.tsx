@@ -117,9 +117,11 @@ const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
     };
 
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside as any);
     document.addEventListener('keydown', handleEscape);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside as any);
       document.removeEventListener('keydown', handleEscape);
     };
   }, [isOpen, onClose, triggerElement]);

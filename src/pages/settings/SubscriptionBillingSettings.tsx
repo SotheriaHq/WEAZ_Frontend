@@ -75,12 +75,10 @@ export default function SubscriptionBillingSettings() {
       </div>
     );
 
-  if (!hasActiveBrandMembership(profile))
-    return (
-      <div className="rounded-2xl p-6 text-center text-slate-600 dark:text-slate-300">
-        <p>Billing & subscriptions is available to verified brand owners.</p>
-      </div>
-    );
+  // If not a brand owner yet, still display the plans and tiers for discovery!
+  if (!hasActiveBrandMembership(profile)) {
+    return <BrandSubscriptionContent isGuestView={true} />;
+  }
 
   return (
     <BrandSubscriptionContent
@@ -89,7 +87,7 @@ export default function SubscriptionBillingSettings() {
   );
 }
 
-function BrandSubscriptionContent() {
+function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGuestView?: boolean } = {}) {
   const profile = useSelector((state: RootState) => state.user.profile);
   const [params] = useSearchParams();
   const navigate = useNavigate();
