@@ -561,13 +561,75 @@ function BrandSubscriptionContent() {
               </div>
             </div>
           ) : !billing.isPending && !billing.isError ? (
-            <div className="wiez-card-base wiez-shade-1 rounded-3xl p-6 sm:p-8 text-center space-y-3">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                No Active Paid Tier
-              </h2>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 max-w-lg mx-auto">
-                Select a WIEZ studio tier below to open custom-order intake, set order capacity, and enable fast-track priority queue jumps for your clients.
-              </p>
+            /* Favored Free Tier Hero Card with 4 Mini Cards */
+            <div className="wiez-card-base wiez-shade-9 rounded-3xl p-5 sm:p-7 space-y-5 border-0">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xs font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                      Current Atelier Mode
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      ACTIVE FREE TIER
+                    </span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
+                    WIEZ Creative Free Plan
+                  </h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Essential creative pipeline for independent designers & ateliers.
+                  </p>
+                </div>
+                <div className="text-left sm:text-right">
+                  <span className="text-2xl sm:text-3xl font-black text-purple-900 dark:text-purple-200">
+                    ₦0
+                  </span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400"> / month</span>
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                    ✓ Always free
+                  </p>
+                </div>
+              </div>
+
+              {/* 4 Well-Designed Mini Benefit Cards - Space Managed Tightly */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 pt-2 border-t border-purple-200/50 dark:border-purple-800/40">
+                <div className="rounded-2xl bg-white/60 dark:bg-slate-900/50 p-3 sm:p-3.5 shadow-sm border-0 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs text-purple-600 dark:text-purple-400 mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Intake Capacity</span>
+                    <span>✂️</span>
+                  </div>
+                  <div className="text-sm sm:text-base font-extrabold text-gray-900 dark:text-white">1 Custom Order</div>
+                  <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">Active bespoke slot</div>
+                </div>
+
+                <div className="rounded-2xl bg-white/60 dark:bg-slate-900/50 p-3 sm:p-3.5 shadow-sm border-0 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs text-purple-600 dark:text-purple-400 mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Discovery</span>
+                    <span>✨</span>
+                  </div>
+                  <div className="text-sm sm:text-base font-extrabold text-gray-900 dark:text-white">Runway Feed</div>
+                  <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">Global buyer visibility</div>
+                </div>
+
+                <div className="rounded-2xl bg-white/60 dark:bg-slate-900/50 p-3 sm:p-3.5 shadow-sm border-0 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs text-purple-600 dark:text-purple-400 mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Communication</span>
+                    <span>💬</span>
+                  </div>
+                  <div className="text-sm sm:text-base font-extrabold text-gray-900 dark:text-white">Direct Chat</div>
+                  <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">Unlimited client messaging</div>
+                </div>
+
+                <div className="rounded-2xl bg-white/60 dark:bg-slate-900/50 p-3 sm:p-3.5 shadow-sm border-0 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs text-purple-600 dark:text-purple-400 mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Storefront</span>
+                    <span>🏷️</span>
+                  </div>
+                  <div className="text-sm sm:text-base font-extrabold text-gray-900 dark:text-white">Standard Fee</div>
+                  <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">Pay only when you sell</div>
+                </div>
+              </div>
             </div>
           ) : null}
 
@@ -615,9 +677,17 @@ function BrandSubscriptionContent() {
                 return (
                   <div
                     key={tier.tierKey}
-                    className={`wiez-card-base ${shadeClass} rounded-3xl p-5 flex flex-col justify-between transition-all ${
+                    className={`wiez-card-base ${shadeClass} rounded-3xl p-5 flex flex-col justify-between border-0 transition-all duration-300 hover:scale-[1.015] ${
+                      isIgwe
+                        ? 'bg-gradient-to-br from-amber-500/20 via-yellow-500/15 to-purple-600/20 dark:from-amber-600/35 dark:via-yellow-700/25 dark:to-purple-900/35 shadow-[0_4px_24px_-2px_rgba(245,158,11,0.25)]'
+                        : isAru
+                          ? 'bg-gradient-to-br from-fuchsia-500/20 via-purple-500/20 to-indigo-500/15 dark:from-fuchsia-900/40 dark:via-purple-900/35 dark:to-indigo-900/30 shadow-[0_4px_24px_-2px_rgba(217,70,239,0.25)]'
+                          : tier.tierKey === 'ASO_OKE'
+                            ? 'bg-gradient-to-br from-cyan-500/15 via-blue-500/15 to-purple-500/15 dark:from-cyan-900/35 dark:via-blue-900/30 dark:to-purple-900/25 shadow-[0_4px_20px_-2px_rgba(6,182,212,0.2)]'
+                            : 'bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-transparent dark:from-indigo-900/30 dark:via-purple-900/20 dark:to-transparent'
+                    } ${
                       isSelected
-                        ? 'ring-2 ring-purple-500 shadow-[0_12px_32px_-4px_rgba(168,85,247,0.25)]'
+                        ? 'ring-2 ring-purple-500 shadow-[0_12px_32px_-4px_rgba(168,85,247,0.35)]'
                         : ''
                     }`}
                   >

@@ -6,7 +6,7 @@ html {
   -moz-osx-font-smoothing: grayscale;
 }
 :is(html[data-embedded-surface="mobile-app"], html[data-surface="mobile-app"], body.is-embedded-mobile) {
-  font-size: 15.5px;
+  font-size: 13.5px;
 }
 
 @tailwind base;
@@ -3435,4 +3435,11 @@ html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidd
 :is(.dark) .wiez-notice-card {
   background: linear-gradient(135deg, rgba(69, 10, 10, 0.8) 0%, rgba(67, 20, 7, 0.7) 50%, rgba(38, 16, 60, 0.8) 100%);
   box-shadow: 0 4px 24px -2px rgba(244, 63, 94, 0.25), 0 2px 8px -2px rgba(234, 88, 12, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* No borders on hover/active rule */
+.wiez-card-base:hover,
+.wiez-card-base:focus,
+.wiez-card-base:active {
+  border-color: transparent !important;
 }

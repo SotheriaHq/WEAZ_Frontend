@@ -28,7 +28,18 @@ export type StudioNativeEvent =
   | { type: 'ACTION_COMPLETE'; action?: string; path?: string }
   | { type: 'OPEN_EXTERNAL'; url: string }
   | { type: 'OPEN_NATIVE_ROUTE'; path: string }
-  | { type: 'CLOSE' };
+  | { type: 'CLOSE' }
+  | {
+      type: 'OPEN_BIO_MODAL';
+      payload: {
+        title: string;
+        description?: string;
+        handle?: string;
+        location?: string;
+        avatarUrl?: string | null;
+        tags?: string[];
+      };
+    };
 
 declare global {
   interface Window {

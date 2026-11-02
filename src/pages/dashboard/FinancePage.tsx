@@ -722,57 +722,58 @@ const FinancePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Metric strip */}
-        <div className="grid grid-cols-2 border-t border-white/10 sm:grid-cols-4">
-          {[
-            {
-              label: 'Released',
-              emoji: '🔓',
-              value: overview?.releasedBalance ?? 0,
-              note: 'Unlocked by milestones',
-              accent: 'border-t-2 border-emerald-500 text-emerald-400',
-            },
-            {
-              label: 'Reserved',
-              emoji: '⏳',
-              value: overview?.reservedPayoutBalance ?? 0,
-              note: 'In payout flow',
-              accent: 'border-t-2 border-sky-500 text-sky-400',
-            },
-            {
-              label: 'Paid out',
-              emoji: '🏦',
-              value: overview?.paidOutBalance ?? 0,
-              note: 'Settled to bank',
-              accent: 'border-t-2 border-slate-500 text-slate-200',
-            },
-            {
-              label: 'Incoming',
-              emoji: '💸',
-              value: overview?.incomingCredits ?? totalIncomingAmount,
-              note: `${overview?.totalOrders ?? 0} paid order${(overview?.totalOrders ?? 0) === 1 ? '' : 's'}`,
-              accent: 'border-t-2 border-amber-500 text-amber-400',
-            },
-          ].map((metric, index) => (
-            <div
-              key={metric.label}
-              className={`px-5 py-3.5 ${metric.accent} ${index < 3 ? 'border-b border-white/10 sm:border-b-0 sm:border-r' : ''}`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                  {metric.label}
-                </span>
-                <span className="text-xs" aria-hidden="true">
-                  {metric.emoji}
-                </span>
-              </div>
-              <div className="mt-1 text-lg font-bold tabular-nums">
-                {loading ? '—' : formatCurrency(metric.value)}
-              </div>
-              <div className="mt-0.5 text-[11px] text-slate-500">{metric.note}</div>
+      </div>
+
+      {/* Standalone 4x1 or 2x2 Metric Cards Grid */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+        {[
+          {
+            label: 'Released',
+            emoji: '🔓',
+            value: overview?.releasedBalance ?? 0,
+            note: 'Unlocked by milestones',
+            shade: 'wiez-shade-1',
+          },
+          {
+            label: 'Reserved',
+            emoji: '⏳',
+            value: overview?.reservedPayoutBalance ?? 0,
+            note: 'In payout flow',
+            shade: 'wiez-shade-2',
+          },
+          {
+            label: 'Paid out',
+            emoji: '🏦',
+            value: overview?.paidOutBalance ?? 0,
+            note: 'Settled to bank',
+            shade: 'wiez-shade-3',
+          },
+          {
+            label: 'Incoming',
+            emoji: '💸',
+            value: overview?.incomingCredits ?? totalIncomingAmount,
+            note: `${overview?.totalOrders ?? 0} paid order${(overview?.totalOrders ?? 0) === 1 ? '' : 's'}`,
+            shade: 'wiez-shade-4',
+          },
+        ].map((metric) => (
+          <div
+            key={metric.label}
+            className={`wiez-card-base ${metric.shade} rounded-2xl p-4 sm:p-5 flex flex-col justify-between border-0 shadow-sm`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-theme-secondary">
+                {metric.label}
+              </span>
+              <span className="text-base" aria-hidden="true">
+                {metric.emoji}
+              </span>
             </div>
-          ))}
-        </div>
+            <div className="mt-2 text-xl sm:text-2xl font-black text-theme tabular-nums">
+              {loading ? '—' : formatCurrency(metric.value)}
+            </div>
+            <div className="mt-1 text-[11px] text-theme-secondary">{metric.note}</div>
+          </div>
+        ))}
       </div>
 
       <section className="overflow-hidden rounded-2xl wiez-card-base wiez-shade-11">
@@ -887,7 +888,7 @@ const FinancePage: React.FC = () => {
         </div>
       </section>
 
-      <section className="overflow-hidden neu-recessed-card">
+      <section className="overflow-hidden rounded-2xl wiez-card-base wiez-shade-10">
         <div className="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -1013,7 +1014,7 @@ const FinancePage: React.FC = () => {
         </div>
       </section>
 
-      <section className="overflow-hidden neu-recessed-card">
+      <section className="overflow-hidden rounded-2xl wiez-card-base wiez-shade-10">
         <div className="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
           <h2 className="text-lg font-semibold">Payout History</h2>
         </div>
@@ -1365,7 +1366,7 @@ const FinanceReceiptList: React.FC<{
 
   return (
     <section
-      className={`neu-recessed-card ${
+      className={`wiez-card-base wiez-shade-10 rounded-2xl ${
         compact ? 'p-4' : 'p-5'
       } dark:border-white/10 dark:bg-white/[0.03]`}
     >
@@ -1380,7 +1381,7 @@ const FinanceReceiptList: React.FC<{
         </div>
       ) : null}
 
-      <div className="neu-recessed-card px-4">
+      <div className="wiez-card-base wiez-shade-1 rounded-2xl px-4">
         {rows.map((row, index) => (
           <div
             key={`${row.label}-${index}`}

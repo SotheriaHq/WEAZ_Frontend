@@ -3221,11 +3221,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 <div
                   key={product.id}
                   className={[
-                    // Native parity below `lg`; the desktop grid keeps 5:6,
-                    // where four columns of a tall card would be unusable.
-                    'group relative aspect-[100/158] overflow-hidden rounded-2xl shadow-sm transition-all duration-300 ease-out lg:aspect-[5/6] lg:rounded-xl',
+                    'group relative flex flex-col rounded-2xl bg-white/[0.04] dark:bg-white/[0.03] border-0 overflow-hidden transition-all duration-300 ease-out',
                     selectedProducts.includes(product.id)
-                      ? 'ring-2 ring-gray-400 border-gray-300 dark:border-white/20'
+                      ? 'ring-2 ring-purple-500 shadow-md'
                       : 'hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30',
                     layoutMode ? 'cursor-move' : 'cursor-pointer',
                     dropdownManager.openId === ('product-menu-' + product.id) ? 'z-50' : 'z-10'
@@ -3235,85 +3233,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     navigateToStudioProductDetails(product.id);
                   }}
                 >
-                  {/* Selection checkbox */}
-                  <input
-                    type="checkbox"
-                    checked={selectedProducts.includes(product.id)}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      toggleSelect(product.id);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute left-2 top-2 z-20 h-5 w-5 rounded border-gray-300 bg-white/90 text-purple-600 focus:ring-purple-500/30 dark:border-zinc-600 dark:bg-zinc-800/90 cursor-pointer sm:h-4 sm:w-4"
-                  />
-                  
-                  {/* Actions menu button (replaces star) */}
-                  <div className="absolute right-2 top-2 z-20">
-                    <button
-                      type="button"
-                      ref={(el) => {
-                        productMenuTriggerRefs.current[product.id] = el;
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const menuId = `product-menu-${product.id}`;
-                        dropdownManager.setOpenId(
-                          dropdownManager.openId === menuId ? null : menuId,
-                        );
-                      }}
-                      className={`flex h-9 w-9 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm shadow-sm transition-all duration-200 sm:h-7 sm:w-7 ${
-                        dropdownManager.openId === `product-menu-${product.id}`
-                          ? 'text-white bg-purple-600/80'
-                          : 'text-white hover:bg-black/60'
-                      }`}
-                      title="Actions"
-                    >
-                      <span className="text-lg font-bold">⋯</span>
-                    </button>
-                    
-                    {/* Featured indicator (small badge) */}
-                    {product.isFeatured && (
-                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-amber-400 rounded-full flex items-center justify-center shadow-md" title="Featured product">
-                        <span className="text-xs">⭐</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions dropdown menu — rendered as card overlay */}
-                  {dropdownManager.openId === `product-menu-${product.id}` && (
-                    <ProductActionsMenu
-                      isOpen={true}
-                      onClose={() => dropdownManager.setOpenId(null)}
-                      onAction={(actionId) => handleProductAction(actionId, product)}
-                      actions={getDefaultProductActions(product)}
-                      triggerElement={
-                        productMenuTriggerRefs.current[product.id] ?? null
-                      }
-                      renderInline
-                    />
-                  )}
-
-                  {/*
-                    Edit and delete now live in the copy panel (see below).
-
-                    They used to float on the photograph, pinned to a
-                    `bottom-[5.25rem]` offset measured against the panel's
-                    height — two dark circles sitting on the garment, and an
-                    offset that had to be re-guessed whenever the panel's
-                    contents changed. Inside the panel they sit in the card's
-                    one text surface, and their position follows the layout
-                    instead of being hand-tuned against it.
-                  */}
-
-                  {/* Layout mode drag handle */}
-                  {layoutMode && (
-                    <div className="absolute bottom-4 right-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 dark:bg-zinc-800/90 text-gray-500 dark:text-zinc-400 shadow-lg">
-                      <span className="text-base">⠿</span>
-                    </div>
-                  )}
-
-                  {/* Full-bleed Image Container */}
-                  <div className="absolute inset-0 bg-gray-50 dark:bg-zinc-800/50">
+                  {/* Dominant Top Media Container (75-80% visual mass) */}
+                  <div className="relative aspect-[100/135] w-full overflow-hidden rounded-2xl bg-gray-100 dark:bg-zinc-800/50">
+                    {/* Full-bleed image */}
                     {(() => {
                       const primaryMedia = product.media?.find((m) => m.isPrimary) ?? product.media?.[0];
                       const fallbackValue = product.thumbnail || product.images?.[0] || null;
@@ -3344,154 +3266,188 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         />
                       ) : null;
                     })()}
-                    
+
                     {/* Fallback for missing images */}
                     {!product.thumbnail && !product.images?.[0] && (!product.media || product.media.length === 0) && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-4xl mb-2">📦</span>
-                        <span className="text-xs text-gray-400 dark:text-zinc-500">No image</span>
+                        <span className="text-3xl mb-1">📦</span>
+                        <span className="text-[11px] text-gray-400 dark:text-zinc-500">No image</span>
+                      </div>
+                    )}
+
+                    {/* Selection Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={selectedProducts.includes(product.id)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleSelect(product.id);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute left-2.5 top-2.5 z-20 h-5 w-5 rounded border-gray-300 bg-white/90 text-purple-600 focus:ring-purple-500/30 dark:border-zinc-600 dark:bg-zinc-800/90 cursor-pointer sm:h-4 sm:w-4"
+                    />
+
+                    {/* YouTube Shorts style floating status badge at top-left/corner */}
+                    <div className="absolute left-2.5 bottom-2.5 z-10">
+                      <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide shadow-md backdrop-blur-md ${
+                        productStatus === 'DELETED'
+                          ? 'bg-rose-600/90 text-white'
+                          : productStatus === 'ARCHIVED'
+                            ? 'bg-gray-600/90 text-white'
+                            : productStatus === 'IN_REVIEW' || productStatus === 'FAILED'
+                              ? 'bg-sky-600/90 text-white'
+                            : productStatus === 'CHANGES_REQUESTED'
+                              ? 'bg-amber-600/90 text-white'
+                            : productStatus === 'REJECTED'
+                              ? 'bg-rose-600/90 text-white'
+                            : productStatus === 'DRAFT'
+                              ? 'bg-amber-600/90 text-white' 
+                              : 'bg-black/65 text-white'
+                      }`}>
+                        {productStatus === 'DELETED'
+                          ? 'Deleted'
+                          : productStatus === 'ARCHIVED'
+                            ? 'Archived'
+                            : productStatus === 'DRAFT'
+                              ? 'Draft'
+                              : productStatus === 'IN_REVIEW' ||
+                                  productStatus === 'CHANGES_REQUESTED' ||
+                                  productStatus === 'REJECTED' ||
+                                  productStatus === 'FAILED'
+                                ? getContentStatusLabel(productStatusValue)
+                              : 'New'}
+                      </span>
+                    </div>
+
+                    {/* Featured star badge */}
+                    {product.isFeatured && (
+                      <div className="absolute right-2.5 top-2.5 z-20 w-6 h-6 bg-amber-400/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md" title="Featured product">
+                        <span className="text-xs">⭐</span>
+                      </div>
+                    )}
+
+                    {/* Layout mode drag handle */}
+                    {layoutMode && (
+                      <div className="absolute bottom-2.5 right-2.5 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 dark:bg-zinc-800/90 text-gray-500 dark:text-zinc-400 shadow-lg">
+                        <span className="text-base">⠿</span>
                       </div>
                     )}
                   </div>
 
-                  {/* Gradient overlay for readability */}
-                  <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/20 to-transparent pointer-events-none z-[1]" />
+                  {/* Distinct Lower Area Beneath Media */}
+                  <div className="p-2 sm:p-2.5 flex flex-col gap-1 flex-1 justify-between">
+                    <div>
+                      {/* Title + 3-Dot Overflow Menu Row */}
+                      <div className="flex items-start justify-between gap-1.5 relative">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="break-words text-xs sm:text-sm font-semibold text-gray-900 dark:text-white leading-tight line-clamp-2 [overflow-wrap:anywhere]">
+                            {product.name}
+                          </h3>
+                          {collectionLabel !== '—' && (
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                              {collectionLabel}
+                            </p>
+                          )}
+                        </div>
+                        <div className="shrink-0 relative">
+                          <button
+                            type="button"
+                            ref={(el) => {
+                              productMenuTriggerRefs.current[product.id] = el;
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const menuId = `product-menu-${product.id}`;
+                              dropdownManager.setOpenId(
+                                dropdownManager.openId === menuId ? null : menuId,
+                              );
+                            }}
+                            className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                              dropdownManager.openId === `product-menu-${product.id}`
+                                ? 'bg-purple-600 text-white'
+                                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10'
+                            }`}
+                            title="Actions"
+                          >
+                            <span className="text-base font-bold leading-none">⋮</span>
+                          </button>
 
-                  {/* Status badge inside image area */}
-                  <div className="absolute bottom-[5.25rem] left-2 z-10 sm:bottom-[5.75rem]">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-lg ${
-                      productStatus === 'DELETED'
-                        ? 'bg-rose-500/90 text-white'
-                        : productStatus === 'ARCHIVED'
-                          ? 'bg-gray-500/90 text-white'
-                          : productStatus === 'IN_REVIEW' || productStatus === 'FAILED'
-                            ? 'bg-sky-500/90 text-white'
-                          : productStatus === 'CHANGES_REQUESTED'
-                            ? 'bg-amber-500/90 text-white'
-                          : productStatus === 'REJECTED'
-                            ? 'bg-rose-500/90 text-white'
-                          : productStatus === 'DRAFT'
-                            ? 'bg-amber-500/90 text-white' 
-                            : 'bg-emerald-500/90 text-white'
-                    }`}>
-                      {productStatus === 'DELETED'
-                        ? '🗑️ Deleted'
-                        : productStatus === 'ARCHIVED'
-                          ? '📦 Archived'
-                          : productStatus === 'DRAFT'
-                            ? '📝 Draft'
-                            : productStatus === 'IN_REVIEW' ||
-                                productStatus === 'CHANGES_REQUESTED' ||
-                                productStatus === 'REJECTED' ||
-                                productStatus === 'FAILED'
-                              ? getContentStatusLabel(productStatusValue)
-                            : '✅ Published'}
-                    </span>
-                  </div>
-
-                  {/* Frosted Glass Info Overlay */}
-                  <div className="absolute inset-x-0 bottom-0 z-10 border-t border-white/10 bg-black/35 p-1.5 backdrop-blur-xl sm:p-2">
-                    <div className="flex flex-col gap-0.5 sm:gap-1">
-                      {/* Name and Collection */}
-                      <h3 className="break-words text-xs font-semibold text-white drop-shadow-sm sm:text-sm">{product.name}</h3>
-                      <p className="break-words text-[10px] text-white/60 sm:text-[11px]">{collectionLabel}</p>
-                      
-                      {/* Price Section */}
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-xs font-bold text-white drop-shadow-sm sm:text-sm">
-                          ₦{product.price.toLocaleString()}
-                        </span>
-                        {typeof product.salePrice === 'number' && product.salePrice > 0 && (
-                          <span className="truncate text-[10px] font-medium text-rose-300 sm:text-xs">
-                            🏷️ ₦{product.salePrice.toLocaleString()}
-                          </span>
-                        )}
+                          {/* Actions dropdown menu */}
+                          {dropdownManager.openId === `product-menu-${product.id}` && (
+                            <ProductActionsMenu
+                              isOpen={true}
+                              onClose={() => dropdownManager.setOpenId(null)}
+                              onAction={(actionId) => handleProductAction(actionId, product)}
+                              actions={getDefaultProductActions(product)}
+                              triggerElement={
+                                productMenuTriggerRefs.current[product.id] ?? null
+                              }
+                              renderInline
+                            />
+                          )}
+                        </div>
                       </div>
-                      
-                      {/* Stock info row */}
-                      <div className="mt-0.5 flex items-center justify-between gap-2">
+
+                      {/* Price & Stock Line */}
+                      <div className="mt-1 flex items-baseline justify-between gap-1 flex-wrap">
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">
+                            ₦{product.price.toLocaleString()}
+                          </span>
+                          {typeof product.salePrice === 'number' && product.salePrice > 0 && (
+                            <span className="text-[10px] sm:text-xs font-semibold text-rose-500 line-through">
+                              ₦{product.salePrice.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
                         <span
-                          className={`min-w-0 break-words text-[10px] font-medium cursor-help ${
+                          className={`text-[10px] font-medium ${
                             getProductStockState(product) === 'CUSTOM_ORDER_ONLY'
-                              ? 'text-violet-300'
-                              : getProductStockState(product) === 'OUT_OF_STOCK'
-                                ? 'text-rose-300'
-                                : getProductStockState(product) === 'LOW_STOCK'
-                                  ? 'text-amber-300'
-                                  : 'text-emerald-300'
-                          }`}
-                          title={
-                            isCustomOrderOnlyProduct(product)
-                              ? 'Out of stock, but customers can still bag it while you restock.'
+                              ? 'text-purple-600 dark:text-purple-400'
                               : (product.totalStock ?? 0) === 0
-                                ? 'This product is out of stock and cannot be purchased'
+                                ? 'text-rose-500'
                                 : (product.totalStock ?? 0) <= 5
-                                  ? 'Low stock warning: Consider restocking soon'
-                                  : 'Stock is healthy'
-                          }
+                                  ? 'text-amber-500'
+                                  : 'text-emerald-600 dark:text-emerald-400'
+                          }`}
                         >
                           {isCustomOrderOnlyProduct(product)
-                            ? '✂️ Custom order only'
+                            ? '✂️ Custom'
                             : (product.totalStock ?? 0) === 0
-                              ? '🔴 Out of stock'
-                              : (product.totalStock ?? 0) <= 5
-                                ? `🟡 ${product.totalStock} in stock`
-                                : `🟢 ${product.totalStock} in stock`}
+                              ? 'Out of stock'
+                              : `${product.totalStock} in stock`}
                         </span>
-                        
-                        {/* Edit / delete, at the bottom-right of the text area. */}
-                        {!product.deletedAt && (
-                          <span className="flex shrink-0 items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleProductAction('edit', product);
-                              }}
-                              title="Edit product"
-                              aria-label="Edit product"
-                              className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/15 hover:text-white"
-                            >
-                              <span className="text-xs">✏️</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleProductAction('delete', product);
-                              }}
-                              title="Delete product"
-                              aria-label="Delete product"
-                              className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-rose-500/80 hover:text-white"
-                            >
-                              <span className="text-xs">🗑️</span>
-                            </button>
-                          </span>
-                        )}
-
-                        {/* Creation time */}
-                        {product.createdAt && (
-                          <span 
-                            className="hidden shrink-0 text-[10px] text-white/50 min-[420px]:inline"
-                            title={new Date(product.createdAt).toLocaleString()}
-                          >
-                            {(() => {
-                              const created = new Date(product.createdAt);
-                              const now = new Date();
-                              const diffMs = now.getTime() - created.getTime();
-                              const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                              const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                              const diffMins = Math.floor(diffMs / (1000 * 60));
-                              
-                              if (diffMins < 60) return `${diffMins}m ago`;
-                              if (diffHours < 24) return `${diffHours}h ago`;
-                              if (diffDays < 7) return `${diffDays}d ago`;
-                              if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-                              return created.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                            })()}
-                          </span>
-                        )}
                       </div>
+                    </div>
+
+                    {/* Bottom Primary Buy It Button */}
+                    <div className="pt-1.5 flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigateToStudioProductDetails(product.id);
+                        }}
+                        className="flex-1 py-1.5 px-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs tracking-wide shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1"
+                      >
+                        <span>Buy It</span>
+                        <span aria-hidden="true">›</span>
+                      </button>
+
+                      {!product.deletedAt && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleProductAction('edit', product);
+                          }}
+                          title="Edit product"
+                          aria-label="Edit product"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10 transition-colors"
+                        >
+                          <span className="text-xs">✏️</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

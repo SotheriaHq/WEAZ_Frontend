@@ -17,7 +17,6 @@ import {
   sleep,
 } from '@/utils/storeSetup';
 import {
-  getAvatarFallback,
   resolveProfileImageSource,
 } from '@/utils/profileImage';
 import LazyEntityQrModal from '@/components/qr/LazyEntityQrModal';
@@ -32,6 +31,7 @@ import { getStudioProductsPage } from '@/api/StudioStoreApi';
 import { useBrandCommerceAccess } from '@/hooks/useBrandCommerceAccess';
 import { resolveAccountDisplayName } from '@/lib/brandAccess';
 import VerifiedBrandBadge from '@/components/brand/VerifiedBrandBadge';
+import WiezMark from '@/brand/WiezMark';
 
 export default function StoreManagement() {
   const creatorQueryClient = useQueryClient();
@@ -68,6 +68,25 @@ export default function StoreManagement() {
   const [analyticsCollapsed, setAnalyticsCollapsed] = useState(true);
   const [layoutMode, setLayoutMode] = useState(false);
   const [showStoreQr, setShowStoreQr] = useState(false);
+  const [bioModalOpen, setBioModalOpen] = useState(false);
+
+  const handleOpenBio = () => {
+    if (isEmbeddedMobile) {
+      postStudioNativeEvent({
+        type: 'OPEN_BIO_MODAL',
+        payload: {
+          title: brandName,
+          description: brandDescription,
+          handle: user?.username || undefined,
+          location: brandLocation || undefined,
+          avatarUrl: avatarUrl || undefined,
+          tags: (user as any)?.styleTags || [],
+        },
+      });
+      return;
+    }
+    setBioModalOpen(true);
+  };
 
   // Cached screen data: revisits paint instantly from the shared query cache
   // (skeleton ONLY on the true first load); stale data revalidates silently.
@@ -149,14 +168,7 @@ export default function StoreManagement() {
     resolvedAvatar.fileId,
     resolvedAvatar.src,
   );
-  const avatarFallback = useMemo(
-    () =>
-      getAvatarFallback(
-        resolveAccountDisplayName(user),
-        user?.username,
-      ),
-    [user],
-  );
+  // avatarFallback replaced with WiezMark fallback logo
 
   const brandName = useMemo(() => {
     if (status?.profile?.name) return status.profile.name;
@@ -360,7 +372,7 @@ export default function StoreManagement() {
         <div className="bg-transparent px-1 py-2 md:py-3">
           <div className="flex flex-col gap-3">
             <div className="flex items-start gap-3">
-            <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl border-2 border-white shadow-md dark:border-white/10">
+            <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl border-0 shadow-md">
               {avatarUrl ? (
                 <MediaRenderer
                   kind="image"
@@ -371,19 +383,44 @@ export default function StoreManagement() {
                   mediaClassName="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-600 to-indigo-600 text-sm font-bold text-white">
-                  {avatarFallback}
+                <div className="flex h-full w-full items-center justify-center bg-purple-900/30 p-1">
+                  <WiezMark height={28} />
                 </div>
               )}
             </div>
 
             <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-              <h1 className="break-words text-base font-bold leading-tight text-theme">
-                {brandName}
-              </h1>
-              <p className="mt-0.5 break-words text-sm leading-relaxed text-theme-secondary">
-                {brandDescription}
-              </p>
+              <div className="flex items-center gap-2">
+                <h1 className="break-words text-base font-bold leading-tight text-theme">
+                  {brandName}
+                </h1>
+                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  status?.isStoreOpen
+                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                }`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${status?.isStoreOpen ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                  {status?.isStoreOpen ? 'Live' : 'Draft'}
+                </span>
+              </div>
+              <div className="mt-1 flex items-center gap-1.5 text-xs text-theme-secondary">
+                <span className="truncate max-w-[200px] sm:max-w-md">Bio: {brandDescription}</span>
+                <button
+                  type="button"
+                  onClick={handleOpenBio}
+                  className="shrink-0 font-semibold text-purple-600 hover:text-purple-500 dark:text-purple-400 hover:underline"
+                >
+                  Read ▾
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenBio}
+                  className="shrink-0 text-xs opacity-75 hover:opacity-100 transition"
+                  aria-label="View brand bio"
+                >
+                  ℹ️
+                </button>
+              </div>
             </div>
 
             </div>
@@ -526,39 +563,27 @@ export default function StoreManagement() {
       </div>
 
       {showVerificationPrompt ? (
-        <section className="rounded-2xl border border-sky-200/80 bg-gradient-to-r from-sky-50 via-white to-indigo-50 p-3 shadow-sm dark:border-sky-500/20 dark:from-sky-500/10 dark:via-white/5 dark:to-indigo-500/10 sm:rounded-3xl sm:p-5">
-          <div className="flex flex-row items-center justify-between gap-3 sm:flex-col sm:items-start sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div
-              className={`min-w-0 ${isEmbeddedMobile ? 'max-w-none' : 'sm:max-w-3xl'}`}
-            >
-              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-700 dark:text-sky-200 sm:text-xs">
-                {verificationPrompt.eyebrow}
+        <section className="rounded-2xl border-0 bg-gradient-to-r from-sky-500/15 via-purple-500/10 to-indigo-500/15 p-3 sm:p-4 shadow-sm backdrop-blur-md">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm">🛡️</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300">
+                  {verificationPrompt.eyebrow}
+                </span>
               </div>
-              <h2 className="mt-1 break-words text-sm font-semibold text-theme sm:mt-2 sm:text-xl">
+              <p className="mt-0.5 break-words text-xs font-semibold text-theme sm:text-sm line-clamp-1">
                 {verificationPrompt.title}
-              </h2>
-              <p className="mt-2 hidden text-sm leading-6 text-theme-secondary sm:block">
-                {verificationPrompt.description}
               </p>
             </div>
-
-            <div className="flex shrink-0 flex-wrap items-center gap-3">
+            <div className="flex shrink-0 items-center gap-2">
               <button
                 type="button"
                 onClick={() => navigate('/studio/verification')}
-                className="inline-flex min-h-10 items-center justify-center rounded-full bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700 sm:px-4 sm:py-2.5 sm:text-sm"
+                className="inline-flex min-h-8 items-center justify-center rounded-xl bg-purple-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-purple-500 active:scale-95"
               >
-                {verificationPrompt.primaryLabel}
+                Verify ›
               </button>
-              {verificationStatus === 'NOT_SUBMITTED' ? (
-                <button
-                  type="button"
-                  onClick={() => navigate('/settings?tab=notifications')}
-                  className="hidden min-h-10 items-center justify-center rounded-full border border-gray-200 bg-white/80 px-4 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-gray-300 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-sky-200 sm:inline-flex"
-                >
-                  Manage reminders
-                </button>
-              ) : null}
             </div>
           </div>
         </section>
@@ -750,6 +775,67 @@ export default function StoreManagement() {
           collapsed by default — a captioned "Loading store stats..." slab under
           the product grid was one more thing announcing itself on a screen the
           client already called over-loaded. It resolves silently now. */}
+      {/* Web Bio Sheet Modal Fallback */}
+      {bioModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200"
+          onClick={() => setBioModalOpen(false)}
+        >
+          <div
+            className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl border-0 bg-white/95 dark:bg-[#120822]/95 backdrop-blur-2xl p-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-xl overflow-hidden bg-purple-900/30 flex items-center justify-center border-0">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={brandName} className="h-full w-full object-cover" />
+                  ) : (
+                    <WiezMark height={32} />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-theme">{brandName}</h3>
+                  {user?.username ? (
+                    <p className="text-xs text-theme-secondary">@{user.username}</p>
+                  ) : null}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBioModalOpen(false)}
+                className="h-8 w-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-sm font-bold text-theme hover:bg-black/10 dark:hover:bg-white/20"
+              >
+                ✕
+              </button>
+            </div>
+
+            {brandLocation ? (
+              <div className="flex items-center gap-1.5 text-xs text-theme-secondary">
+                <span>📍</span>
+                <span>{brandLocation}</span>
+              </div>
+            ) : null}
+
+            <div className="space-y-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-theme-secondary">About The Brand</p>
+              <p className="text-sm leading-relaxed text-theme break-words">
+                {brandDescription}
+              </p>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setBioModalOpen(false)}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition active:scale-95"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
