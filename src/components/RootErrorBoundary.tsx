@@ -1,5 +1,6 @@
 import React from 'react';
 import { captureClientException } from '../observability/sentry';
+import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 import {
   STALE_BUNDLE_SESSION_KEYS,
   isOffline,
@@ -126,6 +127,9 @@ export class RootErrorBoundary extends React.Component<
     });
     // Only narrate a failure the user is going to be left looking at.
     if (!this.state.recovering) {
+      // Let the native shell stop its loader instead of hiding this failure
+      // until the handoff watchdog expires. Do not send raw error details.
+      postStudioNativeEvent({ type: 'BOOT_FAILED' });
       showBootFailure(error.message || 'Unexpected startup error');
     }
   }
