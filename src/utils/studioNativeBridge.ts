@@ -40,6 +40,12 @@ declare global {
 
 export function postStudioNativeEvent(event: StudioNativeEvent): void {
   try {
+    // React effects from an earlier route can run after history has already
+    // moved on. Reporting that old route makes the native host navigate back.
+    if (event.type === 'ROUTE_CHANGED') {
+      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (event.path !== current) return;
+    }
     window.ReactNativeWebView?.postMessage(JSON.stringify(event));
   } catch {
     // Native bridge delivery is best-effort only.

@@ -66,6 +66,14 @@ export function useStudioNativeNavBridge(): void {
     const handler = (path: string) => {
       if (typeof path !== 'string' || !path.startsWith('/')) return;
       const target = withEmbeddedSurface(path);
+      const currentUrl = new URL(window.location.href);
+      const targetUrl = new URL(target, currentUrl);
+      if (targetUrl.origin !== currentUrl.origin) return;
+      currentUrl.searchParams.sort();
+      targetUrl.searchParams.sort();
+      // Native chrome can acknowledge the route we just reported. An echo is
+      // not a new navigation and must not create more history notifications.
+      if (currentUrl.href === targetUrl.href) return;
       // `replace` deliberately: the dock is a tab bar, not a trail. Pushing
       // would make the native Back button walk backwards through every section
       // the brand had visited before it left Studio.
