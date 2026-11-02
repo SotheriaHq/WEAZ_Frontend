@@ -647,13 +647,13 @@ const FinancePage: React.FC = () => {
         </div>
       </div>
 
-      <section className="space-y-3 neu-recessed-card p-4 text-slate-900 dark:text-white">
+      <section className="space-y-3 rounded-2xl wiez-card-base wiez-shade-10 p-4 text-slate-900 dark:text-white">
         <h2 className="font-bold">Custom-order queue liabilities</h2>
         <div className="grid grid-cols-2 gap-3"><div><p className="text-xs">Pending and Up Next holds ({overview?.queuedCustomOrderCount ?? 0} orders)</p><p className="font-bold tabular-nums">{formatCurrency(overview?.queuedCustomHeldAmount ?? 0, overview?.currency || 'NGN')}</p></div><div><p className="text-xs">Refunds processing</p><p className="font-bold tabular-nums">{formatCurrency(overview?.pendingRefundAmount ?? 0, overview?.currency || 'NGN')}</p></div></div>
         <p className="text-xs">Waiting-order captures and jump earnings are unavailable for payout until Active. Refund processing does not mean a shopper has received the money. Existing payout controls apply only to eligible balances.</p>
       </section>
       {/* Balance hero + metric strip */}
-      <div className="overflow-hidden neu-recessed-card text-white">
+      <div className="overflow-hidden rounded-2xl wiez-card-base wiez-shade-9 text-white">
         <div className="px-5 py-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -775,7 +775,7 @@ const FinancePage: React.FC = () => {
         </div>
       </div>
 
-      <section className="overflow-hidden neu-recessed-card">
+      <section className="overflow-hidden rounded-2xl wiez-card-base wiez-shade-11">
         <div className="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -1085,7 +1085,7 @@ const FinancePage: React.FC = () => {
       >
         {selectedHeldFund ? (
           <div className="space-y-5">
-            <div className="rounded-2xl border border-gray-200/80 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="rounded-2xl wiez-card-base wiez-shade-10 p-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -1152,7 +1152,7 @@ const FinancePage: React.FC = () => {
             ) : null}
 
             {heldBreakdown?.holdType === 'CUSTOM_ORDER' && !heldDetailLoading ? (
-              <section className="rounded-2xl border border-gray-200/80 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+              <section className="rounded-2xl wiez-card-base wiez-shade-10 p-5">
                 <h4 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
                   Release split
                 </h4>
@@ -1166,7 +1166,7 @@ const FinancePage: React.FC = () => {
             ) : null}
 
             {heldBreakdown?.holdType === 'STANDARD_ORDER' && !heldDetailLoading ? (
-              <section className="rounded-2xl border border-gray-200/80 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+              <section className="rounded-2xl wiez-card-base wiez-shade-10 p-5">
                 <h4 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
                   Standard-order release schedule
                 </h4>
@@ -1219,7 +1219,7 @@ const FinancePage: React.FC = () => {
       >
         {selectedTransaction ? (
           <div className="space-y-6">
-            <div className="rounded-2xl border border-gray-200/80 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="rounded-2xl wiez-card-base wiez-shade-10 p-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -1281,7 +1281,7 @@ const FinancePage: React.FC = () => {
               </div>
             </div>
 
-            <section className="rounded-2xl border border-gray-200/80 bg-white/80 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+            <section className="rounded-2xl wiez-card-base wiez-shade-10 p-5">
               <h4 className="text-sm font-bold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                 Receipt Flow
               </h4>

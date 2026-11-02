@@ -6,7 +6,7 @@ html {
   -moz-osx-font-smoothing: grayscale;
 }
 :is(html[data-embedded-surface="mobile-app"], html[data-surface="mobile-app"], body.is-embedded-mobile) {
-  font-size: 17.5px;
+  font-size: 15.5px;
 }
 
 @tailwind base;
@@ -1183,7 +1183,7 @@ html {
   }
   :is(.dark, [data-theme="dark"]) .wiez-studio-card,
   .dark .wiez-studio-card {
-    background-color: var(--surface-card, #140d21);
+    background: linear-gradient(135deg, #251341 0%, #1a0e31 45%, #130926 100%);
     background-image:
       radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.01) 40%, transparent 70%),
       linear-gradient(180deg,
@@ -1197,7 +1197,7 @@ html {
         #0c0714 100%
       );
     border: 0 solid transparent;
-    box-shadow: 0 4px 24px -2px rgba(147, 51, 234, 0.22), 0 2px 8px -2px rgba(124, 58, 237, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 24px -2px rgba(147, 51, 234, 0.22), 0 2px 8px -2px rgba(124, 58, 237, 0.12), inset 0 1px 0 rgba(216, 180, 254, 0.22);
     color: #ffffff;
   }
   :is(.dark, [data-theme="dark"]) .wiez-studio-card:hover,
@@ -1256,7 +1256,7 @@ html {
         #0b0512 100%
       );
     border: 0 solid transparent;
-    box-shadow: 0 4px 24px -2px rgba(147, 51, 234, 0.22), 0 2px 8px -2px rgba(124, 58, 237, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 24px -2px rgba(147, 51, 234, 0.22), 0 2px 8px -2px rgba(124, 58, 237, 0.12), inset 0 1px 0 rgba(216, 180, 254, 0.22);
     color: #ffffff;
   }
 
@@ -1393,9 +1393,9 @@ html {
   :is(.dark) .neu-recessed-card,
   :is(.dark) .surface-card-recessed,
   :is(.dark) .surface-card {
-    background-color: var(--surface-card, #140d21);
+    background: linear-gradient(135deg, #251341 0%, #1a0e31 45%, #130926 100%);
     border: 1px solid rgba(168, 85, 247, 0.18);
-    box-shadow: 0 4px 20px -2px rgba(124, 58, 237, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 20px -2px rgba(124, 58, 237, 0.20), inset 0 1px 0 rgba(216, 180, 254, 0.22);
   }
   .neu-recessed-card:hover,
   .surface-card-recessed:hover,
@@ -1589,7 +1589,7 @@ html {
   :is(.dark) .btn-frost-ghost {
     background-color: rgba(255, 255, 255, 0.05);
     border-color: rgba(255, 255, 255, 0.08);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 1px 0 rgba(216, 180, 254, 0.22);
   }
 
   .btn-liquid-ghost:hover,
@@ -3299,7 +3299,8 @@ html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidd
 }
 :is(.dark, [data-theme="dark"]) .wiez-card-base,
 .dark .wiez-card-base {
-  background: linear-gradient(135deg, #1e1133 0%, #160d28 50%, #10071e 100%);
+  background: linear-gradient(135deg, #2a1647 0%, #1f1036 30%, #160d28 65%, #0f071c 100%);
+  box-shadow: 0 4px 24px -2px rgba(147, 51, 234, 0.28), 0 2px 8px -2px rgba(124, 58, 237, 0.16), inset 0 1px 0 rgba(216, 180, 254, 0.25), inset 0 -1px 0 rgba(168, 85, 247, 0.12);
 }
 .wiez-card-base:hover {
   transform: translateY(-2px) scale(1.012);

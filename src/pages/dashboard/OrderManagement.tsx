@@ -655,10 +655,10 @@ const OrderManagement: React.FC = () => {
         helper line survive and the whole summary is still on one screen.
       */}
       <section className="grid grid-cols-2 gap-2 py-1 sm:gap-3 lg:grid-cols-4">
-        {metrics.map((metric) => (
+        {metrics.map((metric, index) => (
           <article
             key={metric.label}
-            className="min-w-0 rounded-xl border border-slate-200 bg-white p-2 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03] sm:rounded-2xl sm:p-4"
+            className={`min-w-0 rounded-xl sm:rounded-2xl p-2 sm:p-4 wiez-card-base ${index === 0 ? 'wiez-shade-2' : index === 1 ? 'wiez-shade-3' : index === 2 ? 'wiez-shade-4' : 'wiez-shade-1'}`}
           >
             <div className="flex items-start justify-between gap-1">
               <p className="min-w-0 text-[10px] font-semibold uppercase leading-tight tracking-tight text-slate-500 dark:text-slate-400 sm:text-xs sm:tracking-[0.14em]">
@@ -751,7 +751,7 @@ const OrderManagement: React.FC = () => {
       </section>
 
       {/* Orders List / Table Container */}
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.03] p-2.5 sm:p-0">
+      <section className="overflow-hidden rounded-2xl wiez-card-base wiez-shade-11 p-2.5 sm:p-0">
         {/* Mobile View: Compact grouped cards (<640px) */}
         {/*
           Cards up to `lg`, table above it.
@@ -785,7 +785,7 @@ const OrderManagement: React.FC = () => {
                 <div
                   key={order.id}
                   onClick={() => setSelectedOrder({ id: order.id })}
-                  className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03] space-y-2 transition cursor-pointer hover:border-orange-300 active:scale-[0.99]"
+                  className="rounded-xl wiez-card-base wiez-shade-10 p-3 space-y-2 transition cursor-pointer active:scale-[0.99]"
                 >
                   <div className="flex items-center justify-between gap-2 text-xs">
                     <span className="font-mono font-bold text-orange-600 dark:text-orange-400">
