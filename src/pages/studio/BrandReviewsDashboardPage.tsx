@@ -220,14 +220,14 @@ export default function BrandReviewsDashboardPage() {
           ['Hidden', formatNumber(dashboard.summary.hiddenCount)],
           ['Pending', formatNumber(dashboard.summary.pendingModerationCount)],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.03]">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-            <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+          <div key={label} className="wiez-card-base rounded-2xl p-4 border-0 shadow-sm transition hover:shadow-md">
+            <p className="text-xs font-bold uppercase tracking-wider text-theme-secondary">{label}</p>
+            <p className="mt-2 text-2xl font-black bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 dark:from-purple-400 dark:via-indigo-400 dark:to-pink-400 bg-clip-text text-transparent">{value}</p>
           </div>
         ))}
       </section>
 
-      <section className="rounded-xl border border-gray-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+      <section className="rounded-2xl border-0 bg-white/80 dark:bg-white/[0.04] p-4 shadow-md backdrop-blur-md">
         <div className="grid gap-3 md:grid-cols-3">
           <UniversalSelect
             value={filters.status}
@@ -337,55 +337,64 @@ export default function BrandReviewsDashboardPage() {
             No lifecycle reviews match these filters.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">
-                <tr>
-                  <th className="px-4 py-3">Reviewer</th>
-                  <th className="px-4 py-3">Target</th>
-                  <th className="px-4 py-3">Rating</th>
-                  <th className="px-4 py-3">Review</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Created</th>
-                  <th className="px-4 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-white/[0.08]">
-                {dashboard.items.map((review) => (
-                  <tr key={review.id} className="align-top text-gray-700 dark:text-gray-200">
-                    <td className="px-4 py-3">{review.reviewer?.displayName ?? 'Verified buyer'}</td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{review.targetType}</div>
-                      <div className="text-xs text-gray-500">{targetName(review)}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold">{review.rating}/5</div>
-                      <div className="text-xs text-gray-500">{review.satisfaction}</div>
-                    </td>
-                    <td className="max-w-[320px] px-4 py-3">
-                      <p className="line-clamp-3">{review.reviewText || 'No text review.'}</p>
-                      {review.verifiedPurchase ? (
-                        <span className="mt-1 inline-block rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
-                          Verified purchase
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3">{review.status ?? 'APPROVED'}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500">{formatDate(review.createdAt)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setReportingReview(review)}
-                        disabled={review.status === 'DELETED'}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.08]"
-                      >
-                        Report
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid gap-3 p-3 sm:p-4">
+            {dashboard.items.map((review) => (
+              <div
+                key={review.id}
+                className="wiez-card-base rounded-2xl p-4 sm:p-5 border-0 shadow-sm space-y-3 transition-all hover:shadow-md"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-600/15 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 font-bold text-sm">
+                      {(review.reviewer?.displayName || 'V')[0].toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm text-theme leading-tight break-words">
+                        {review.reviewer?.displayName ?? 'Verified buyer'}
+                      </p>
+                      <p className="text-xs text-theme-secondary">
+                        {review.targetType} • {targetName(review)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex items-center gap-1 bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2.5 py-1 rounded-full text-xs font-bold">
+                      <span>⭐</span>
+                      <span>{review.rating}/5</span>
+                    </div>
+                    {review.satisfaction ? (
+                      <span className="inline-flex rounded-full bg-purple-500/15 px-2.5 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300">
+                        {review.satisfaction}
+                      </span>
+                    ) : null}
+                    {review.verifiedPurchase ? (
+                      <span className="inline-flex rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                        ✓ Verified purchase
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                {review.reviewText ? (
+                  <p className="text-sm text-theme leading-relaxed break-words">
+                    {review.reviewText}
+                  </p>
+                ) : null}
+
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-black/5 dark:border-white/5 text-xs text-theme-secondary">
+                  <span>{formatDate(review.createdAt)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setReportingReview(review)}
+                    disabled={review.status === 'DELETED'}
+                    className="rounded-xl px-3 py-1 font-semibold text-rose-600 hover:bg-rose-500/10 transition active:scale-95 disabled:opacity-40"
+                  >
+                    Report
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </section>

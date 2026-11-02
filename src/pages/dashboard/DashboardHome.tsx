@@ -470,7 +470,7 @@ const MetricCard: React.FC<{
         <span aria-hidden="true">{marker}</span>
       </div>
     </div>
-    <h3 className="mb-1 text-lg font-bold leading-tight text-gray-900 dark:text-white sm:text-xl lg:text-2xl break-words">{value}</h3>
+    <h3 className="mb-1 text-lg font-black leading-tight bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 dark:from-purple-400 dark:via-indigo-400 dark:to-pink-400 bg-clip-text text-transparent sm:text-xl lg:text-2xl break-words">{value}</h3>
     {trend ? (
       <p
         className={`flex flex-wrap items-center gap-x-1 text-[11px] font-semibold leading-4 sm:text-xs ${

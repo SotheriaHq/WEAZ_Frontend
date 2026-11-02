@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
@@ -225,6 +225,48 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   active,
   onSelect,
 }) => {
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('wiez_settings_sidebar_width');
+      return saved ? Math.min(360, Math.max(170, parseInt(saved, 10))) : 240;
+    } catch {
+      return 240;
+    }
+  });
+
+  const isDraggingRef = useRef(false);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--settings-sidebar-width', `${sidebarWidth}px`);
+  }, [sidebarWidth]);
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const newWidth = Math.min(360, Math.max(170, moveEvent.clientX));
+      setSidebarWidth(newWidth);
+      document.documentElement.style.setProperty('--settings-sidebar-width', `${newWidth}px`);
+      try {
+        localStorage.setItem('wiez_settings_sidebar_width', String(newWidth));
+      } catch {}
+    };
+
+    const handleMouseUp = () => {
+      isDraggingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
   const navigate = useNavigate();
   const me = useSelector((state: RootState) => state.user.profile);
   const isBrandUser = hasActiveBrandMembership(me);
@@ -318,7 +360,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
                   >
                     {icon}
                   </span>
-                  <span className="min-w-0 truncate">{label}</span>
+                  <span className="min-w-0 break-words text-wrap leading-tight text-xs md:text-sm">{label}</span>
                 </button>
               );
             })}
@@ -347,9 +389,19 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   );
 
   return (
-    // Scaled fixed sidebar — aligns with main sidebar chrome and theme tokens
-    <aside className="fixed left-0 top-16 z-20 block h-[calc(100vh-64px)] w-[118px] overflow-y-auto border-r border-[color:var(--border-default)]/50 wiez-chrome-surface scrollbar-hide md:w-[220px] px-1 md:px-2">
+    // Resizable responsive fixed sidebar with persistent width & zero text truncation
+    <aside
+      style={{ width: `var(--settings-sidebar-width, ${sidebarWidth}px)` }}
+      className="fixed left-0 top-16 z-20 block h-[calc(100vh-64px)] overflow-y-auto border-r border-[color:var(--border-default)]/50 wiez-chrome-surface scrollbar-hide px-1 md:px-2 transition-[width] duration-75"
+    >
       {sidebarContent}
+      {/* Resizable right-border drag handle */}
+      <div
+        onMouseDown={handleDragStart}
+        className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-purple-500/40 active:bg-purple-500/60 transition-colors z-30"
+        title="Drag to resize sidebar width"
+        aria-label="Drag to resize sidebar width"
+      />
     </aside>
   );
 };

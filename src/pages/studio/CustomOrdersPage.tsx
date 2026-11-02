@@ -16,7 +16,6 @@ import {
   type CustomOrderStatus,
 } from '@/api/CustomOrderApi';
 import { messagingApi, type ThreadSummaryResponse } from '@/api/MessagingApi';
-import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
   CustomOrderBadge,
   formatDateTime,
@@ -31,19 +30,6 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 const formatCurrency = (value: number | undefined, currency = 'NGN') =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(Number(value ?? 0));
 
-const statusFilterOptions = [
-  { value: '', label: 'All statuses' },
-  ...['PENDING', 'UP_NEXT', 'ACTIVE', 'IN_DELIVERY', 'CANCELLED'].map((lane) => ({ value: `queue:${lane}`, label: lane === 'UP_NEXT' ? 'Up Next' : lane === 'IN_DELIVERY' ? 'Delivery' : lane.charAt(0) + lane.slice(1).toLowerCase() })),
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'PENDING_PAYMENT', label: 'Pending payment' },
-  { value: 'PENDING_BRAND_ACCEPTANCE', label: 'Pre-production hold' },
-  { value: 'ACCEPTED', label: 'Accepted' },
-  { value: 'IN_PRODUCTION', label: 'In production' },
-  { value: 'READY_FOR_DISPATCH', label: 'Ready for dispatch' },
-  { value: 'IN_TRANSIT', label: 'In transit' },
-  { value: 'DELIVERED_PENDING_BUYER_CONFIRMATION', label: 'Awaiting buyer confirmation' },
-  { value: 'DISPUTED', label: 'Disputed' },
-];
 
 const cardTone = (status: CustomOrderStatus) => {
   if (status === 'DISPUTED' || status === 'DELIVERY_ISSUE_REPORTED') {
@@ -197,7 +183,7 @@ const StudioCustomOrderCard: React.FC<{
         {/* Desktop Total + placed */}
         <div className="hidden border-l border-black/[0.06] px-4 py-3 dark:border-white/[0.06] lg:block">
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Total</div>
-          <div className="mt-0.5 text-sm font-bold text-slate-900 dark:text-white">
+          <div className="mt-0.5 text-sm font-black bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-purple-400 dark:to-indigo-400 bg-clip-text text-transparent">
             {formatCurrency(order.buyerPriceSummary.grandTotal, order.buyerPriceSummary.currency)}
           </div>
           <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{formatDateTime(order.createdAt)}</div>
@@ -412,21 +398,77 @@ const CustomOrdersPage: React.FC = () => {
           ) : null}
         </div>
 
-        <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_280px]">
-          <input
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search by order title or order code"
-            className="rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm dark:border-white/10 dark:bg-slate-950"
-          />
-          <UniversalSelect
-            value={statusFilter}
-            onChange={setStatusFilter}
-            options={statusFilterOptions}
-          />
-        </div>
+        {/* Responsive Queue Status Tabs & Controls */}
+        <div className="mt-5 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Horizontal Scrollable Status Tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+              {[
+                { id: '', label: 'All' },
+                { id: 'queue:PENDING', label: 'Pending' },
+                { id: 'queue:UP_NEXT', label: 'Up Next' },
+                { id: 'queue:ACTIVE', label: 'Active' },
+                { id: 'queue:IN_DELIVERY', label: 'Delivery' },
+                { id: 'COMPLETED', label: 'Completed' },
+              ].map((tab) => {
+                const isActive = statusFilter === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setStatusFilter(tab.id)}
+                    className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
+                      isActive
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'bg-black/5 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-black/10 dark:hover:bg-white/10'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
 
-        <div className="mt-3"><UniversalSelect label="Queue order" value={sort} onChange={(value) => updateParam('customSort', value)} options={[{ value: 'queue', label: 'Queue sequence' }, { value: 'newest', label: 'Newest placement first' }, { value: 'oldest', label: 'Oldest placement first' }]} /></div>
+            {/* Compact Queue Order Switch & Expandable Search */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Segmented Queue Sequence vs Deadline Pill */}
+              <div className="flex items-center gap-1 rounded-full bg-black/5 dark:bg-white/5 p-1">
+                <button
+                  type="button"
+                  onClick={() => updateParam('customSort', 'queue')}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                    sort === 'queue'
+                      ? 'bg-white text-purple-700 shadow-sm dark:bg-white/15 dark:text-purple-300'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
+                  }`}
+                >
+                  Sequence
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateParam('customSort', 'newest')}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                    sort !== 'queue'
+                      ? 'bg-white text-purple-700 shadow-sm dark:bg-white/15 dark:text-purple-300'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
+                  }`}
+                >
+                  Deadline
+                </button>
+              </div>
+
+              {/* Expandable Search Input with Google-scale shadow & zero border */}
+              <div className="relative">
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search orders..."
+                  className="w-36 focus:w-56 transition-all duration-200 rounded-full border-0 bg-white dark:bg-slate-900 px-3.5 py-1.5 text-xs text-slate-800 dark:text-slate-100 shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
         {customOrdersQuery.error ? <p className="mt-3 text-sm text-rose-700 dark:text-rose-200" role="alert">Unable to refresh this queue. <button className="queue-button" onClick={() => void customOrdersQuery.refetch()}>Retry</button></p> : null}
         <div className="mt-5 space-y-2">
           {loading && orders.length === 0 ? (

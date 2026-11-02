@@ -672,7 +672,7 @@ const FinancePage: React.FC = () => {
                     {availableBalance >= 5000 ? '✓ Ready to payout' : 'Min. ₦5,000 threshold'}
                   </span>
                 </div>
-                <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums">
+                <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums bg-gradient-to-r from-purple-400 via-indigo-300 to-pink-400 bg-clip-text text-transparent">
                   {loading ? '—' : formatCurrency(availableBalance)}
                 </div>
                 {overview?.negativeBalance ? (

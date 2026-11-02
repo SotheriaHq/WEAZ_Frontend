@@ -370,193 +370,164 @@ export default function StoreManagement() {
 
       <div className="sticky top-0 z-30">
         <div className="bg-transparent px-1 py-2 md:py-3">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-start gap-3">
-            <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl border-0 shadow-md">
-              {avatarUrl ? (
-                <MediaRenderer
-                  kind="image"
-                  src={avatarUrl}
-                  alt={brandName}
-                  fit="cover"
-                  className="h-full w-full"
-                  mediaClassName="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-purple-900/30 p-1">
-                  <WiezMark height={28} />
-                </div>
-              )}
-            </div>
-
-            <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-              <div className="flex items-center gap-2">
-                <h1 className="break-words text-base font-bold leading-tight text-theme">
-                  {brandName}
-                </h1>
-                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                  status?.isStoreOpen
-                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                    : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                }`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${status?.isStoreOpen ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                  {status?.isStoreOpen ? 'Live' : 'Draft'}
-                </span>
-              </div>
-              <div className="mt-1 flex items-center gap-1.5 text-xs text-theme-secondary">
-                <span className="truncate max-w-[200px] sm:max-w-md">Bio: {brandDescription}</span>
-                <button
-                  type="button"
-                  onClick={handleOpenBio}
-                  className="shrink-0 font-semibold text-purple-600 hover:text-purple-500 dark:text-purple-400 hover:underline"
-                >
-                  Read ▾
-                </button>
-                <button
-                  type="button"
-                  onClick={handleOpenBio}
-                  className="shrink-0 text-xs opacity-75 hover:opacity-100 transition"
-                  aria-label="View brand bio"
-                >
-                  ℹ️
-                </button>
-              </div>
-            </div>
-
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-            {isBrandVerified && commerce.data?.canUpgrade && !isEmbeddedMobile ? (
-              <button type="button" onClick={() => navigate('/settings?tab=subscription-billing&from=studio')}
-                className="neu-pressed-button inline-flex min-h-11 items-center justify-center rounded-2xl bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 text-sm font-semibold transition active:scale-[0.985]">
-                Upgrade
-              </button>
-            ) : null}
-            <div className="hidden flex-wrap items-center gap-1 sm:flex">
-              <div className="group relative">
-                <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
-                  {kpis.reviewScore ? '⭐' : '☆'}
-                </span>
-                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
-                  {kpis.reviewScore
-                    ? `${kpis.reviewScore.toFixed(1)} (${kpis.reviewCount || 0} reviews)`
-                    : 'No reviews yet'}
-                </span>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 sm:gap-3">
+            {/* Left: Avatar + Brand Name (Zero Truncation) + Single Live status + Info Emoji Bio trigger */}
+            <div className="flex items-center gap-2.5 min-w-0 [overflow-wrap:anywhere]">
+              <div className="relative h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 overflow-hidden rounded-xl border-0 shadow-md">
+                {avatarUrl ? (
+                  <MediaRenderer
+                    kind="image"
+                    src={avatarUrl}
+                    alt={brandName}
+                    fit="cover"
+                    className="h-full w-full"
+                    mediaClassName="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-purple-900/30 p-1">
+                    <WiezMark height={26} />
+                  </div>
+                )}
               </div>
 
-              {brandLocation ? (
-                <div className="inline-flex max-w-[220px] items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
-                  <span aria-hidden="true">📍</span>
-                  <span className="break-words" title={brandLocation}>
-                    {brandLocation}
+              <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <h1 className="break-words [overflow-wrap:anywhere] text-sm sm:text-base font-extrabold leading-tight text-theme">
+                    {brandName}
+                  </h1>
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    status?.isStoreOpen
+                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                  }`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${status?.isStoreOpen ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    {status?.isStoreOpen ? 'Live' : 'Draft'}
                   </span>
+                  <button
+                    type="button"
+                    onClick={handleOpenBio}
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-xs opacity-80 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition"
+                    aria-label="View brand bio"
+                    title={brandDescription || "View brand bio"}
+                  >
+                    ℹ️
+                  </button>
                 </div>
+              </div>
+            </div>
+
+            {/* Right: Badges, Location, Verification Google-scale, Actions (fills space in single cohesive header) */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              {isBrandVerified && commerce.data?.canUpgrade && !isEmbeddedMobile ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/settings?tab=subscription-billing&from=studio')}
+                  className="neu-pressed-button inline-flex min-h-8 sm:min-h-9 items-center justify-center rounded-xl bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 text-xs font-semibold transition active:scale-[0.985] shadow-sm"
+                >
+                  Upgrade
+                </button>
               ) : null}
 
-              <div className="group relative">
-                <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
-                  🚚
-                </span>
-                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
-                  Ships Nationwide
-                </span>
+              <div className="flex flex-wrap items-center gap-1">
+                <div className="group relative">
+                  <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
+                    {kpis.reviewScore ? '⭐' : '☆'}
+                  </span>
+                  <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
+                    {kpis.reviewScore
+                      ? `${kpis.reviewScore.toFixed(1)} (${kpis.reviewCount || 0} reviews)`
+                      : 'No reviews yet'}
+                  </span>
+                </div>
+
+                {brandLocation ? (
+                  <div className="inline-flex max-w-[200px] items-center gap-1 rounded-lg bg-gray-100/90 dark:bg-white/5 px-2.5 py-1 text-[11px] font-medium text-gray-700 dark:text-gray-300 shadow-sm">
+                    <span aria-hidden="true">📍</span>
+                    <span className="break-words" title={brandLocation}>
+                      {brandLocation}
+                    </span>
+                  </div>
+                ) : null}
+
+                <div className="group relative">
+                  <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
+                    🚚
+                  </span>
+                  <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
+                    Ships Nationwide
+                  </span>
+                </div>
+
+                {verificationBadgeVisible ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/studio/verification')}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 transition bg-sky-500/10 text-sky-700 dark:text-sky-300 shadow-sm hover:bg-sky-500/20"
+                    aria-label="Verified brand — open verification workspace"
+                    title="Verified brand"
+                  >
+                    <VerifiedBrandBadge size={18} linkTo={null} />
+                    <span className="text-[11px] font-semibold">
+                      Verified
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/studio/verification')}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100 dark:bg-sky-500/10 dark:text-sky-300 shadow-sm border-0"
+                    aria-label="Open verification workspace"
+                    title={verificationLabel}
+                  >
+                    <span>{verificationMarker}</span>
+                    <span className="break-words">
+                      {verificationLabel}
+                    </span>
+                  </button>
+                )}
+
+                <div className="group relative">
+                  <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
+                    🛡️
+                  </span>
+                  <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
+                    Buyer Protection
+                  </span>
+                </div>
               </div>
 
-              {/*
-                Once the badge is live, show THE BADGE — the same scalloped seal
-                buyers see on the storefront and catalog cards. A sky-blue pill
-                reading "✅ Seller verified" is a label ABOUT the badge, so the
-                owner's own Studio was the one surface that never showed them
-                what they had actually earned.
-
-                Before that point the pill still earns its place: it is a status
-                + call to action ("Verification in progress", "needs attention")
-                that has to be tappable to reach the workspace.
-              */}
-              {verificationBadgeVisible ? (
-                <button
-                  type="button"
-                  onClick={() => navigate('/studio/verification')}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 transition hover:bg-gray-100 dark:hover:bg-white/10"
-                  aria-label="Verified brand — open verification workspace"
-                  title="Verified brand"
-                >
-                  <VerifiedBrandBadge size={20} linkTo={null} />
-                  <span className="text-[11px] font-semibold text-on-surface">
-                    Verified
-                  </span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => navigate('/studio/verification')}
-                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:border-gray-300 hover:bg-sky-100 dark:border-white/10 dark:bg-sky-500/10 dark:text-sky-300"
-                  aria-label="Open verification workspace"
-                  title={verificationLabel}
-                >
-                  <span>{verificationMarker}</span>
-                  <span className="max-w-[140px] break-words">
-                    {verificationLabel}
-                  </span>
-                </button>
-              )}
-
-              <div className="group relative">
-                <span className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/10">
-                  🛡️
-                </span>
+              <button
+                type="button"
+                onClick={() => setShowStoreQr(true)}
+                className="group relative flex h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-600 shadow-sm transition-all hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-emerald-300"
+                aria-label="Open storefront QR code"
+              >
+                <span className="text-xs sm:text-sm">🪪</span>
                 <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
-                  Buyer Protection
+                  Storefront QR code
                 </span>
-              </div>
-            </div>
+              </button>
 
-            <div className="hidden h-6 w-px bg-gray-200 dark:bg-white/10 sm:block" />
-
-            <div
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                status.isStoreOpen
-                  ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300'
-                  : 'border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-300'
-              }`}
-            >
-              <span className="text-xs">
-                {status.isStoreOpen ? '🟢' : '🟡'}
-              </span>
-              {status.isStoreOpen ? 'Live' : 'Draft'}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowStoreQr(true)}
-              className="group relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-600 shadow-sm transition-all hover:scale-105 hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-emerald-300"
-              aria-label="Open storefront QR code"
-            >
-              <span className="text-sm">🪪</span>
-              <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
-                Storefront QR code
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (isEmbeddedMobile) {
-                  postStudioNativeEvent({
-                    type: 'OPEN_NATIVE_ROUTE',
-                    path: '/profile?tab=Store',
-                  });
-                  return;
-                }
-                navigate('/profile');
-              }}
-              className="group relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-gray-600 shadow-sm transition-all hover:bg-purple-50 hover:text-purple-600 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-purple-400"
-              aria-label="Preview as visitor"
-            >
-              <span className="text-sm">👁️</span>
-              <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
-                Preview as visitor
-              </span>
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isEmbeddedMobile) {
+                    postStudioNativeEvent({
+                      type: 'OPEN_NATIVE_ROUTE',
+                      path: '/profile?tab=Store',
+                    });
+                    return;
+                  }
+                  navigate('/profile');
+                }}
+                className="group relative flex h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-600 shadow-sm transition-all hover:bg-purple-50 hover:text-purple-600 active:scale-95 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-purple-400"
+                aria-label="Preview as visitor"
+              >
+                <span className="text-xs sm:text-sm">👁️</span>
+                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 dark:bg-gray-100 dark:text-gray-900">
+                  Preview as visitor
+                </span>
+              </button>
             </div>
           </div>
         </div>

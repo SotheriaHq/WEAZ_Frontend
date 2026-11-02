@@ -306,7 +306,7 @@ const SettingsHome: React.FC = () => {
     <div className="min-h-screen">
       <SettingsSidebar active={resolvedActive} onSelect={setActive} />
 
-      <div className="min-h-screen pb-10 pl-[126px] pr-3 pt-4 text-[13px] md:pl-[236px] md:pr-4 md:pt-6 md:text-base">
+      <div style={{ paddingLeft: "calc(var(--settings-sidebar-width, 240px) + 16px)" }} className="min-h-screen pb-10 pr-3 pt-4 text-[13px] md:pr-4 md:pt-6 md:text-base transition-[padding-left] duration-75">
         <div className="max-w-4xl mx-auto [&_h1]:text-xl [&_h1]:md:text-2xl [&_h2]:text-base [&_h2]:md:text-lg">
           <Breadcrumbs activeKey={resolvedActive} onNavigate={setActive} />
           {resolvedSection ?? (

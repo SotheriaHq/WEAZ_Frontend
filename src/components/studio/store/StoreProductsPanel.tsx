@@ -518,6 +518,24 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery.trim(), 300);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem("wiez_product_favorites");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const toggleFavorite = (productId: string) => {
+    setFavoriteIds((prev) => {
+      const next = prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId];
+      try {
+        localStorage.setItem("wiez_product_favorites", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const [products, setProducts] = useState<BackendProduct[]>([]);
   // NOTE: `loading` and `collectionsLoading` come from useCachedResource below
@@ -2332,7 +2350,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => setSearchCollapsed(false)}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white/80 text-gray-700 shadow-sm transition-all hover:scale-105 hover:bg-purple-50 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10 sm:h-11 sm:w-11"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border-0 bg-white/90 text-gray-700 shadow-md transition-all hover:scale-105 hover:bg-purple-50 active:scale-95 dark:bg-white/10 dark:text-gray-200 dark:hover:bg-white/15 sm:h-11 sm:w-11"
                     aria-label="Open search"
                   >
                     <span className="text-base">🔎</span>
@@ -3275,17 +3293,35 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       </div>
                     )}
 
-                    {/* Selection Checkbox */}
-                    <input
-                      type="checkbox"
-                      checked={selectedProducts.includes(product.id)}
-                      onChange={(e) => {
+                    {/* Selection Checkbox (only rendered during bulk selection mode) */}
+                    {showBulkActions && (
+                      <input
+                        type="checkbox"
+                        checked={selectedProducts.includes(product.id)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          toggleSelect(product.id);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute left-2.5 top-2.5 z-20 h-5 w-5 rounded border-0 bg-white/95 text-purple-600 shadow-md focus:ring-purple-500/30 dark:bg-zinc-800/95 cursor-pointer sm:h-4 sm:w-4"
+                      />
+                    )}
+
+                    {/* Zero-worker GPU CSS heartbeat favorite button (persisted in phone storage) */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
                         e.stopPropagation();
-                        toggleSelect(product.id);
+                        toggleFavorite(product.id);
                       }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute left-2.5 top-2.5 z-20 h-5 w-5 rounded border-gray-300 bg-white/90 text-purple-600 focus:ring-purple-500/30 dark:border-zinc-600 dark:bg-zinc-800/90 cursor-pointer sm:h-4 sm:w-4"
-                    />
+                      title={favoriteIds.includes(product.id) ? 'Favorited' : 'Save'}
+                      aria-label="Save product"
+                      className="absolute right-2.5 top-2.5 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/40 backdrop-blur-md text-white transition hover:scale-110 active:scale-95"
+                    >
+                      <span className={`text-xs ${favoriteIds.includes(product.id) ? 'wiez-heartbeat-active text-rose-500' : 'opacity-85'}`}>
+                        {favoriteIds.includes(product.id) ? '❤️' : '🤍'}
+                      </span>
+                    </button>
 
                     {/* YouTube Shorts style floating status badge at top-left/corner */}
                     <div className="absolute left-2.5 bottom-2.5 z-10">
@@ -3357,19 +3393,24 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
+                              e.preventDefault();
                               const menuId = `product-menu-${product.id}`;
                               dropdownManager.setOpenId(
                                 dropdownManager.openId === menuId ? null : menuId,
                               );
                             }}
-                            className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                            onTouchEnd={(e) => {
+                              e.stopPropagation();
+                            }}
+                            className={`flex min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] items-center justify-center rounded-xl p-2 z-30 transition-colors ${
                               dropdownManager.openId === `product-menu-${product.id}`
                                 ? 'bg-purple-600 text-white'
                                 : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10'
                             }`}
                             title="Actions"
+                            aria-label="Product actions"
                           >
-                            <span className="text-base font-bold leading-none">⋮</span>
+                            <span className="text-lg font-bold leading-none select-none">⋮</span>
                           </button>
 
                           {/* Actions dropdown menu */}
@@ -3391,7 +3432,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       {/* Price & Stock Line */}
                       <div className="mt-1 flex items-baseline justify-between gap-1 flex-wrap">
                         <div className="flex items-baseline gap-1.5">
-                          <span className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">
+                          <span className="text-xs sm:text-sm font-extrabold bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 dark:from-purple-400 dark:via-indigo-400 dark:to-pink-400 bg-clip-text text-transparent">
                             ₦{product.price.toLocaleString()}
                           </span>
                           {typeof product.salePrice === 'number' && product.salePrice > 0 && (
@@ -3420,7 +3461,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       </div>
                     </div>
 
-                    {/* Bottom Primary Buy It Button */}
+                    {/* Bottom Primary Bag It Button + Quick Edit Pencil */}
                     <div className="pt-1.5 flex items-center gap-1.5">
                       <button
                         type="button"
@@ -3428,9 +3469,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           e.stopPropagation();
                           navigateToStudioProductDetails(product.id);
                         }}
-                        className="flex-1 py-1.5 px-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs tracking-wide shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1"
+                        className="neu-pressed-button flex-1 py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs tracking-wide shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1 border-0"
                       >
-                        <span>Buy It</span>
+                        <span>Bag It</span>
                         <span aria-hidden="true">›</span>
                       </button>
 
@@ -3443,7 +3484,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           }}
                           title="Edit product"
                           aria-label="Edit product"
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10 transition-colors"
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10 transition-colors border-0 shadow-sm active:scale-95"
                         >
                           <span className="text-xs">✏️</span>
                         </button>

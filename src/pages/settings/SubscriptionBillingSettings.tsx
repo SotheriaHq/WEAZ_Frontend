@@ -428,32 +428,7 @@ function BrandSubscriptionContent() {
       {/* Plans Section */}
       {section === 'plans' ? (
         <div className="space-y-6">
-          {/* Seller Verification Required Banner if unverified */}
-          {!isBrandVerified ? (
-            <div className="wiez-card-base rounded-2xl p-5 sm:p-6 bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-indigo-500/10 dark:from-amber-900/20 dark:via-purple-900/20 dark:to-indigo-900/20">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🛡️</span>
-                    <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
-                      Brand Verification Required for Upgrades
-                    </h2>
-                  </div>
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 max-w-2xl">
-                    To maintain catalog trust and ensure high fulfillment standards on WIEZ, subscription upgrades and expanded custom order capacity are available exclusively to verified brands.
-                  </p>
-                </div>
-                <Button
-                  variant="brand"
-                  size="sm"
-                  onClick={() => navigate('/studio/verification')}
-                  className="shrink-0"
-                >
-                  Verify Brand
-                </Button>
-              </div>
-            </div>
-          ) : null}
+{/* Top banner replaced with inline minimal notice */}
 
           {/* Current Subscription Overview (ITEM 24) */}
           {subscription ? (
@@ -718,11 +693,11 @@ function BrandSubscriptionContent() {
                         <h3 className="text-base font-bold text-gray-900 dark:text-white">
                           {tier.label ?? tier.tierKey}
                         </h3>
-                        <div className="mt-1 flex items-baseline gap-1">
-                          <span className="text-2xl font-black text-gray-900 dark:text-white">
+                        <div className="mt-1 flex items-baseline gap-1.5 flex-nowrap whitespace-nowrap">
+                          <span className="text-2xl font-black bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 dark:from-purple-400 dark:via-indigo-400 dark:to-pink-400 bg-clip-text text-transparent">
                             {money(tier.monthlyPriceNgn)}
                           </span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                          <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 shrink-0">
                             / month
                           </span>
                         </div>
@@ -765,35 +740,42 @@ function BrandSubscriptionContent() {
                     </div>
 
                     {/* Action Button */}
-                    <div className="pt-5">
+                    <div className="pt-5 relative">
                       {isCurrent ? (
                         <Button
                           variant="secondary"
                           fullWidth
                           size="sm"
                           disabled
-                          className="opacity-75 cursor-default"
+                          className="opacity-75 cursor-default border-0"
                         >
                           Current Plan
                         </Button>
                       ) : !isBrandVerified ? (
-                        <Button
-                          variant="outline"
-                          fullWidth
-                          size="sm"
-                          onClick={() => navigate('/studio/verification')}
-                        >
-                          Verify to Upgrade
-                        </Button>
+                        <div className="space-y-1">
+                          <Button
+                            variant={isAru || isIgwe ? 'brand' : 'primary'}
+                            fullWidth
+                            size="sm"
+                            onClick={() => navigate('/studio/verification')}
+                            className="neu-pressed-button bg-purple-600 hover:bg-purple-500 text-white font-bold border-0"
+                          >
+                            Upgrade
+                          </Button>
+                          <p className="text-[10px] text-center text-amber-600 dark:text-amber-400 font-medium">
+                            Brand verification required for upgrades
+                          </p>
+                        </div>
                       ) : (
                         <Button
-                          variant={isAru || isIgwe ? 'brand' : 'secondary'}
+                          variant={isAru || isIgwe ? 'brand' : 'primary'}
                           fullWidth
                           size="sm"
                           disabled={!canManage || busy}
                           onClick={() => void loadPreview(tier.tierKey)}
+                          className="neu-pressed-button bg-purple-600 hover:bg-purple-500 text-white font-bold border-0"
                         >
-                          {isSelected ? 'Selected' : 'Select Plan'}
+                          {isSelected ? 'Selected' : 'Upgrade'}
                         </Button>
                       )}
                     </div>
