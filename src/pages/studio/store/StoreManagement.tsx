@@ -789,7 +789,14 @@ export default function StoreManagement() {
               <div className="flex items-center gap-3">
                 <div className="h-12 w-12 rounded-xl overflow-hidden bg-purple-900/30 flex items-center justify-center border-0">
                   {avatarUrl ? (
-                    <img src={avatarUrl} alt={brandName} className="h-full w-full object-cover" />
+                    <MediaRenderer
+                      kind="image"
+                      src={avatarUrl}
+                      alt={brandName}
+                      fit="cover"
+                      className="h-full w-full"
+                      mediaClassName="h-full w-full object-cover"
+                    />
                   ) : (
                     <WiezMark height={32} />
                   )}
