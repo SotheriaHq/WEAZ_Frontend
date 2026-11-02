@@ -28,9 +28,7 @@ import { useCachedResource } from '@/hooks/useCachedResource';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 import { getStudioProductsPage } from '@/api/StudioStoreApi';
-import { useBrandCommerceAccess } from '@/hooks/useBrandCommerceAccess';
 import { resolveAccountDisplayName } from '@/lib/brandAccess';
-import VerifiedBrandBadge from '@/components/brand/VerifiedBrandBadge';
 import WiezMark from '@/brand/WiezMark';
 
 export default function StoreManagement() {
@@ -49,8 +47,7 @@ export default function StoreManagement() {
   const isEmbeddedMobile = embeddedSurface === 'mobile-app';
   const showStudioFloatingControls = location.pathname.startsWith('/studio');
 
-  const commerce = useBrandCommerceAccess();
-  const initialStatus = new URLSearchParams(location.search).get('status') || 'all';
+    const initialStatus = new URLSearchParams(location.search).get('status') || 'all';
   useCachedResource({
     queryKey: ['store', 'panel', 'products', user?.id ?? 'anon', 1, 12, 'newest', null, '', 'all', initialStatus],
     enabled: Boolean(user?.id) && new URLSearchParams(location.search).get('view') !== 'collections',
@@ -216,15 +213,10 @@ export default function StoreManagement() {
   );
   const returnTo = toInternalPath(routeSearchParams.get('returnTo'));
   const returnLabel = routeSearchParams.get('returnLabel') || 'Back';
-  const isBrandVerified = (verification?.verificationStatus ?? user?.verificationStatus) === 'APPROVED' || (user as any)?.isBrandVerified === true;
-  const verificationStatus =
+    const verificationStatus =
     verification?.verificationStatus ??
     user?.verificationStatus ??
     'NOT_SUBMITTED';
-  const verificationBadgeVisible =
-    verification?.badgeState?.verificationBadgeVisible ??
-    user?.verificationBadgeVisible ??
-    false;
   const showVerificationPrompt =
     verificationStatus === 'NOT_SUBMITTED' ||
     verificationStatus === 'REJECTED' ||
@@ -348,11 +340,11 @@ export default function StoreManagement() {
 
       <div className="sticky top-0 z-30 bg-surface-primary/95 backdrop-blur-md pb-2 pt-1 border-b border-black/5 dark:border-white/5">
         <div className="px-2 sm:px-4">
-          {/* Desktop/Tablet: Single cohesive row across the top filling the space; Mobile: Clean Row 1 identity + Row 2 scrollable strip */}
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
-            {/* Brand Identity */}
-            <div className="flex items-center gap-2 min-w-0 [overflow-wrap:anywhere] flex-shrink-0">
-              <div className="relative h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 overflow-hidden rounded-xl border-0 shadow-sm">
+          {/* Universal Pristine Single-Row Store Top: Mobile, iPad & Desktop */}
+          <div className="flex items-center justify-between gap-1.5 sm:gap-3 overflow-x-auto scrollbar-hide py-1 flex-nowrap">
+            {/* Left: Brand Avatar, Name (No Truncation), Single Live Pill & Info Bio Modal Button */}
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 flex-nowrap">
+              <div className="relative h-8 w-8 sm:h-9 sm:w-9 shrink-0 overflow-hidden rounded-xl border-0">
                 {avatarUrl ? (
                   <MediaRenderer
                     kind="image"
@@ -364,167 +356,100 @@ export default function StoreManagement() {
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-purple-900/30 p-1">
-                    <WiezMark height={24} />
+                    <WiezMark height={20} />
                   </div>
                 )}
               </div>
 
-              <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-                <div className="flex items-center gap-1.5 flex-nowrap">
-                  <h1 className="break-words [overflow-wrap:anywhere] text-sm sm:text-base font-extrabold leading-tight text-theme">
-                    {brandName}
-                  </h1>
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0 ${
-                    status?.isStoreOpen
-                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                      : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                  }`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${status?.isStoreOpen ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                    {status?.isStoreOpen ? 'Live' : 'Draft'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleOpenBio}
-                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs opacity-80 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition"
-                    aria-label="View brand bio"
-                    title={brandDescription || "View brand bio"}
-                  >
-                    ℹ️
-                  </button>
-                </div>
-              </div>
+              <h1 className="whitespace-nowrap text-xs sm:text-sm font-extrabold leading-tight text-theme shrink-0">
+                {brandName}
+              </h1>
 
-              {/* On Mobile only: QR and Preview buttons placed on the right of brand identity */}
-              <div className="flex lg:hidden items-center gap-1 shrink-0 ml-auto">
-                <button
-                  type="button"
-                  onClick={() => setShowStoreQr(true)}
-                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-gray-700 shadow-sm transition-all hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 dark:bg-white/10 dark:text-gray-200 border-0"
-                  aria-label="Open storefront QR code"
-                  title="Storefront QR code"
-                >
-                  <span className="text-xs">🪪</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isEmbeddedMobile) {
-                      postStudioNativeEvent({
-                        type: 'OPEN_NATIVE_ROUTE',
-                        path: '/profile?tab=Store',
-                      });
-                      return;
-                    }
-                    navigate('/profile');
-                  }}
-                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-gray-700 shadow-sm transition-all hover:bg-purple-50 hover:text-purple-600 active:scale-95 dark:bg-white/10 dark:text-gray-200 border-0"
-                  aria-label="Preview as visitor"
-                  title="Preview as visitor"
-                >
-                  <span className="text-xs">👁️</span>
-                </button>
-              </div>
+              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0 ${
+                status?.isStoreOpen
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+              }`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${status?.isStoreOpen ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                {status?.isStoreOpen ? 'Live' : 'Draft'}
+              </span>
+
+              <button
+                type="button"
+                onClick={handleOpenBio}
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs opacity-80 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition"
+                aria-label="View brand bio"
+                title={brandDescription || "View brand bio"}
+              >
+                ℹ️
+              </button>
             </div>
 
-            {/* Badges, Metadata & Actions: Fills the white space opposite the bio area on desktop & iPad! */}
-            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide py-0.5 text-xs flex-nowrap">
+            {/* Right: Badges, Metadata & Actions filling the top bar on all screens */}
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0 flex-nowrap">
               {/* Rating */}
-              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/5 px-2 py-1 text-[11px] font-semibold text-theme shrink-0 shadow-sm">
+              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/[0.06] px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-theme shrink-0 border-0">
                 <span>⭐</span>
                 <span>{kpis.reviewScore ? kpis.reviewScore.toFixed(1) : '0.0'}</span>
               </div>
 
-              {/* Location */}
+              {/* Location - strictly NO truncation */}
               {brandLocation ? (
-                <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/5 px-2 py-1 text-[11px] font-medium text-theme-secondary shrink-0 shadow-sm max-w-[170px]">
+                <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/[0.06] px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-theme-secondary shrink-0 border-0 whitespace-nowrap">
                   <span>📍</span>
-                  <span className="truncate">{brandLocation}</span>
+                  <span>{brandLocation}</span>
                 </div>
               ) : null}
 
               {/* Nationwide shipping */}
-              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/5 px-2 py-1 text-[11px] font-medium text-theme-secondary shrink-0 shadow-sm">
+              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/[0.06] px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-theme-secondary shrink-0 border-0 whitespace-nowrap">
                 <span>🚚</span>
                 <span>Nationwide</span>
               </div>
 
               {/* Buyer Protection */}
-              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/5 px-2 py-1 text-[11px] font-medium text-theme-secondary shrink-0 shadow-sm">
+              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/[0.06] px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-theme-secondary shrink-0 border-0 whitespace-nowrap">
                 <span>🛡️</span>
                 <span>Protected</span>
               </div>
 
-              {/* Verification */}
-              {verificationBadgeVisible ? (
-                <button
-                  type="button"
-                  onClick={() => navigate('/studio/verification')}
-                  className="inline-flex items-center gap-1 rounded-lg bg-sky-500/10 px-2 py-1 text-[11px] font-bold text-sky-700 dark:text-sky-300 shrink-0 shadow-sm hover:bg-sky-500/20 transition border-0"
-                  aria-label="Verified brand"
-                >
-                  <VerifiedBrandBadge size={14} linkTo={null} />
-                  <span>Verified</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => navigate('/studio/verification')}
-                  className="inline-flex items-center gap-1 rounded-lg bg-sky-50 dark:bg-sky-500/10 px-2 py-1 text-[11px] font-bold text-sky-700 dark:text-sky-300 shrink-0 shadow-sm hover:bg-sky-100 dark:hover:bg-sky-500/20 transition border-0"
-                  aria-label="Open verification workspace"
-                >
-                  <span>🛡️</span>
-                  <span>Get Verified ›</span>
-                </button>
-              )}
+              {/* QR Action */}
+              <button
+                type="button"
+                onClick={() => setShowStoreQr(true)}
+                className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-gray-200 transition-all hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 border-0 shrink-0"
+                aria-label="Open storefront QR code"
+                title="Storefront QR code"
+              >
+                <span className="text-xs">🪪</span>
+              </button>
 
-              {/* Upgrade if applicable */}
-              {isBrandVerified && commerce.data?.canUpgrade && !isEmbeddedMobile ? (
-                <button
-                  type="button"
-                  onClick={() => navigate('/settings?tab=subscription-billing&from=studio')}
-                  className="neu-pressed-button inline-flex h-7 items-center justify-center rounded-lg bg-purple-600 hover:bg-purple-700 text-white px-2.5 text-[11px] font-semibold transition active:scale-[0.985] shadow-sm shrink-0"
-                >
-                  Upgrade
-                </button>
-              ) : null}
-
-              {/* Desktop QR & Preview actions */}
-              <div className="hidden lg:flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowStoreQr(true)}
-                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-gray-700 shadow-sm transition-all hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 dark:bg-white/10 dark:text-gray-200 border-0"
-                  aria-label="Open storefront QR code"
-                  title="Storefront QR code"
-                >
-                  <span className="text-xs">🪪</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isEmbeddedMobile) {
-                      postStudioNativeEvent({
-                        type: 'OPEN_NATIVE_ROUTE',
-                        path: '/profile?tab=Store',
-                      });
-                      return;
-                    }
-                    navigate('/profile');
-                  }}
-                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-gray-700 shadow-sm transition-all hover:bg-purple-50 hover:text-purple-600 active:scale-95 dark:bg-white/10 dark:text-gray-200 border-0"
-                  aria-label="Preview as visitor"
-                  title="Preview as visitor"
-                >
-                  <span className="text-xs">👁️</span>
-                </button>
-              </div>
+              {/* Preview Action */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (isEmbeddedMobile) {
+                    postStudioNativeEvent({
+                      type: 'OPEN_NATIVE_ROUTE',
+                      path: '/profile?tab=Store',
+                    });
+                    return;
+                  }
+                  navigate('/profile');
+                }}
+                className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-gray-200 transition-all hover:bg-purple-50 hover:text-purple-600 active:scale-95 border-0 shrink-0"
+                aria-label="Preview as visitor"
+                title="Preview as visitor"
+              >
+                <span className="text-xs">👁️</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
       {showVerificationPrompt ? (
-        <section className="rounded-2xl border-0 bg-gradient-to-r from-sky-500/15 via-purple-500/10 to-indigo-500/15 p-3 sm:p-4 shadow-sm backdrop-blur-md">
+        <section className="rounded-2xl border-0 bg-gradient-to-r from-sky-500/15 via-purple-500/10 to-indigo-500/15 p-3 sm:p-4 backdrop-blur-md">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
@@ -541,7 +466,7 @@ export default function StoreManagement() {
               <button
                 type="button"
                 onClick={() => navigate('/studio/verification')}
-                className="inline-flex min-h-8 items-center justify-center rounded-xl bg-purple-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-purple-500 active:scale-95"
+                className="inline-flex min-h-8 items-center justify-center rounded-xl bg-purple-600 px-3.5 py-1.5 text-xs font-bold text-white border-0 transition hover:bg-purple-500 active:scale-95"
               >
                 Verify ›
               </button>

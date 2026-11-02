@@ -302,7 +302,7 @@ const SettingsHome: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[color:var(--surface-primary,#ffffff)] dark:bg-[color:var(--surface-primary,#12111a)] text-theme">
+    <div className="min-h-screen bg-surface-primary text-theme">
       <SettingsSidebar active={resolvedActive} onSelect={setActive} />
 
       <div style={{ paddingLeft: "calc(var(--settings-sidebar-width, 240px) + 16px)" }} className="min-h-screen pb-10 pr-3 pt-4 text-[13px] md:pr-4 md:pt-6 md:text-base transition-[padding-left] duration-75">

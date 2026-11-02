@@ -206,7 +206,7 @@ export default function BrandReviewsDashboardPage() {
         <button
           type="button"
           onClick={() => void loadDashboard()}
-          className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
+          className="rounded-xl border-0 bg-white/80 dark:bg-white/[0.06] px-4 py-2 text-xs font-bold text-theme hover:bg-black/5 dark:hover:bg-white/10 shadow-sm transition active:scale-95"
         >
           Refresh
         </button>
@@ -300,7 +300,7 @@ export default function BrandReviewsDashboardPage() {
                   className={`rounded-xl border p-4 text-left transition ${
                     selected
                       ? 'border-gray-300 bg-purple-50 text-purple-900 dark:border-white/20 dark:bg-purple-500/10 dark:text-purple-100'
-                      : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.08]'
+                      : 'border-0 bg-white/80 dark:bg-white/[0.04] hover:bg-white dark:hover:bg-white/[0.08] shadow-sm'
                   }`}
                 >
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{target.targetType}</p>
@@ -319,7 +319,7 @@ export default function BrandReviewsDashboardPage() {
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
           <p className="font-semibold">Reviews could not load</p>
           <p className="mt-1">{error}</p>
-          <button type="button" onClick={() => void loadDashboard()} className="mt-3 rounded-full border border-red-200 px-4 py-2 text-xs font-semibold hover:bg-red-100 dark:border-red-500/20 dark:hover:bg-red-500/10">
+          <button type="button" onClick={() => void loadDashboard()} className="mt-3 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-500 border-0">
             Retry
           </button>
         </div>
@@ -388,7 +388,7 @@ export default function BrandReviewsDashboardPage() {
                     type="button"
                     onClick={() => setReportingReview(review)}
                     disabled={review.status === 'DELETED'}
-                    className="rounded-xl px-3 py-1 font-semibold text-rose-600 hover:bg-rose-500/10 transition active:scale-95 disabled:opacity-40"
+                    className="rounded-xl px-3 py-1 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition active:scale-95 disabled:opacity-40"
                   >
                     Report
                   </button>

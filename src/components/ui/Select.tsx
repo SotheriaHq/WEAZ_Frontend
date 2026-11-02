@@ -25,11 +25,11 @@ const variantStyles: Record<SelectVariant, string> = {
     border border-purple-500/15 dark:border-white/[0.08]
     rounded-2xl
     text-[color:var(--wiez-text-primary,var(--text-primary))]
-    shadow-[0_2px_8px_rgba(124,58,237,0.04),inset_0_1px_0_rgba(255,255,255,0.95)] dark:shadow-[0_2px_8px_rgba(124,58,237,0.2),inset_0_1px_0_rgba(255,255,255,0.08)]
+    shadow-[0_2px_8px_rgba(124,58,237,0.04)] dark:shadow-[0_2px_8px_rgba(124,58,237,0.2)]
     hover:shadow-[0_4px_16px_rgba(124,58,237,0.08),0_1px_4px_rgba(168,85,247,0.04)] dark:hover:shadow-[0_4px_20px_rgba(147,51,234,0.3)]
     hover:border-purple-500/30 dark:hover:border-purple-400/30
     hover:scale-[1.005]
-    focus:outline-none focus:shadow-[0_0_0_1px_rgba(168,85,247,0.22),0_4px_20px_-2px_rgba(168,85,247,0.20),inset_0_1px_0_rgba(255,255,255,1)]
+    focus:outline-none focus:shadow-[0_0_0_1px_rgba(168,85,247,0.22),0_4px_20px_-2px_rgba(168,85,247,0.20)]
     transition-all duration-200
     cursor-pointer
   `,
@@ -39,12 +39,12 @@ const variantStyles: Record<SelectVariant, string> = {
     border border-purple-500/15 dark:border-white/[0.08]
     rounded-xl
     text-[color:var(--wiez-text-primary,var(--text-primary))]
-    shadow-[0_2px_8px_rgba(124,58,237,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_2px_8px_rgba(124,58,237,0.2),inset_0_1px_0_rgba(255,255,255,0.08)]
+    shadow-[0_2px_8px_rgba(124,58,237,0.04)] dark:shadow-[0_2px_8px_rgba(124,58,237,0.2)]
     hover:shadow-[0_4px_14px_rgba(124,58,237,0.08),0_1px_3px_rgba(168,85,247,0.04)] dark:hover:shadow-[0_4px_18px_rgba(147,51,234,0.3)]
     hover:border-purple-400/40 dark:hover:border-purple-400/30
     hover:scale-[1.01]
     active:scale-[0.99]
-    focus:outline-none focus:shadow-[0_0_0_1px_rgba(168,85,247,0.22),0_4px_20px_-2px_rgba(168,85,247,0.20),inset_0_1px_0_rgba(255,255,255,1)]
+    focus:outline-none focus:shadow-[0_0_0_1px_rgba(168,85,247,0.22),0_4px_20px_-2px_rgba(168,85,247,0.20)]
     transition-all duration-200
     cursor-pointer
   `,
@@ -57,7 +57,7 @@ const variantStyles: Record<SelectVariant, string> = {
     shadow-[0_1px_4px_rgba(124,58,237,0.04)] dark:shadow-[0_1px_4px_rgba(124,58,237,0.18)]
     hover:shadow-[0_3px_10px_rgba(124,58,237,0.08)] dark:hover:shadow-[0_3px_12px_rgba(147,51,234,0.25)]
     hover:scale-[1.01]
-    focus:outline-none focus:shadow-[0_0_0_1px_rgba(168,85,247,0.22),0_4px_20px_-2px_rgba(168,85,247,0.20),inset_0_1px_0_rgba(255,255,255,1)]
+    focus:outline-none focus:shadow-[0_0_0_1px_rgba(168,85,247,0.22),0_4px_20px_-2px_rgba(168,85,247,0.20)]
     transition-all duration-150
     cursor-pointer
   `,
@@ -140,7 +140,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       ${variantStyles[variant]}
       ${
         error
-          ? "!border-0 !border-transparent !shadow-[0_0_22px_2px_rgba(244,63,94,0.32),0_4px_14px_-2px_rgba(225,29,72,0.18),inset_0_1px_0_rgba(255,255,255,0.95)]"
+          ? "!border-0 !border-transparent !shadow-[0_0_22px_2px_rgba(244,63,94,0.32),0_4px_14px_-2px_rgba(225,29,72,0.18)]"
           : ""
       }
       ${disabled ? "opacity-60 cursor-not-allowed bg-[color:var(--surface-muted)]" : ""}

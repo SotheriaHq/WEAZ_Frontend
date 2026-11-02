@@ -3657,7 +3657,7 @@ const EditProduct: React.FC = () => {
                     ceiling lets the photograph decide, exactly as design
                     creation does, while still never running off the screen.
                   */}
-                  <div className="relative flex max-h-[85vh] min-h-[300px] w-full items-center justify-center overflow-hidden rounded-2xl border-0 shadow-[0_4px_24px_-4px_rgba(168,85,247,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] dark:shadow-[0_4px_24px_-4px_rgba(147,51,234,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] bg-gradient-to-br from-white via-purple-50/20 to-purple-100/30 dark:from-[#171026] dark:to-[#0e0817] sm:min-h-[440px] lg:min-h-[620px]">
+                  <div className="relative flex max-h-[85vh] min-h-[300px] w-full items-center justify-center overflow-hidden rounded-2xl border-0 shadow-[0_4px_24px_-4px_rgba(168,85,247,0.12)] dark:shadow-[0_4px_24px_-4px_rgba(147,51,234,0.25)] bg-gradient-to-br from-white via-purple-50/20 to-purple-100/30 dark:from-[#171026] dark:to-[#0e0817] sm:min-h-[440px] lg:min-h-[620px]">
                     {mediaUrls[carouselIndex] && (
                       <>
                         <MediaRenderer
@@ -5311,7 +5311,7 @@ const EditProduct: React.FC = () => {
         </div>
       )}
       <footer
-        className={`sticky bottom-0 z-20 w-full px-4 pt-2.5 backdrop-blur-[24px] backdrop-saturate-[200%] bg-white/80 dark:bg-[#140d21]/80 border-0 shadow-[0_-4px_24px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.95)] sm:px-6 ${
+        className={`sticky bottom-0 z-20 w-full px-4 pt-2.5 backdrop-blur-[24px] backdrop-saturate-[200%] bg-white/80 dark:bg-[#140d21]/80 border-0 shadow-[0_-4px_24px_rgba(168,85,247,0.08)] sm:px-6 ${
           isEmbeddedMobile
             ? 'pb-[calc(env(safe-area-inset-bottom)+0.625rem)] -mx-3 w-[calc(100%+1.5rem)] sm:-mx-4 sm:w-[calc(100%+2rem)]'
             : 'pb-2.5'

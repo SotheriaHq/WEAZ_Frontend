@@ -166,6 +166,40 @@ const ProductActionsMenu: React.FC<ProductActionsMenuProps> = ({
     );
   }
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+
+  if (isMobile) {
+    return createPortal(
+      <div
+        className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm p-3 animate-in fade-in duration-200"
+        onClick={onClose}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
+        <div
+          ref={menuRef}
+          className="w-full max-w-sm rounded-3xl bg-white dark:bg-[#130f24] border border-black/10 dark:border-white/10 p-2 shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-250"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mx-auto mb-2 mt-1 h-1.5 w-10 rounded-full bg-black/20 dark:bg-white/20" />
+          <div className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-theme-muted">
+            Product Actions
+          </div>
+          <div className="space-y-1">
+            {menuContent}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-2 w-full rounded-2xl bg-black/5 dark:bg-white/5 py-2.5 text-xs font-bold text-theme hover:bg-black/10 dark:hover:bg-white/10 transition"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
   return createPortal(
     <div className="fixed inset-0 z-layer-dropdown pointer-events-none">
       <div

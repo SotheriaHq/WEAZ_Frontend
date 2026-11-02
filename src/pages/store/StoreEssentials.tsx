@@ -416,10 +416,10 @@ const StoreEssentials: React.FC = () => {
                           className={
                             'group relative rounded-2xl px-4 py-3.5 text-sm font-semibold transition-all duration-200 text-center ' +
                             (isSelected
-                              ? 'bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 text-white shadow-[0_4px_16px_rgba(168,85,247,0.38),inset_0_1px_0_rgba(255,255,255,0.45)] scale-[1.02] active:scale-[0.98]'
+                              ? 'bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 text-white shadow-[0_4px_16px_rgba(168,85,247,0.38)] scale-[1.02] active:scale-[0.98]'
                               : isDisabled
                                 ? 'bg-black/[0.02] dark:bg-white/[0.02] text-[color:var(--text-muted)] opacity-40 cursor-not-allowed border border-transparent'
-                                : 'bg-white dark:bg-[#1a1727] text-[color:var(--text-primary)] shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.08)] border border-black/[0.03] dark:border-white/[0.04] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_14px_rgba(0,0,0,0.5)] active:scale-[0.98]')
+                                : 'bg-white dark:bg-[#1a1727] text-[color:var(--text-primary)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.35)] border border-black/[0.03] dark:border-white/[0.04] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_4px_14px_rgba(0,0,0,0.5)] active:scale-[0.98]')
                           }
                         >
                           <span className="leading-tight block">{cat.label}</span>
@@ -550,7 +550,7 @@ const StoreEssentials: React.FC = () => {
                 type="button"
                 disabled={!canContinue || isLoading || isSubmitting}
                 onClick={() => void persistAndContinue(false)}
-                className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 px-6 py-4 text-sm font-bold text-white shadow-[0_4px_18px_rgba(168,85,247,0.4),inset_0_1px_0_rgba(255,255,255,0.4)] transition-all duration-200 hover:brightness-105 active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 sm:text-base"
+                className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 px-6 py-4 text-sm font-bold text-white shadow-[0_4px_18px_rgba(168,85,247,0.4)] transition-all duration-200 hover:brightness-105 active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50 sm:text-base"
               >
                 {isSubmitting ? 'Saving...' : 'Continue to Store Setup'}
                 {!isSubmitting ? <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" /> : null}

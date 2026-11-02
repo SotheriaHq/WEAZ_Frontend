@@ -542,7 +542,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
   // (true only when no cached data exists) — never re-add useState loaders here.
   const [collections, setCollections] = useState<CollectionOption[]>([]);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(12);
+  const [limit, _setLimit] = useState(12);
   const [total, setTotal] = useState(0);
 
   const [cursorByPage, setCursorByPage] = useState<Record<number, string | null | undefined>>({});
@@ -2622,14 +2622,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                   </>
                 ) : (
                   <>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteAllCollectionsConfirmOpen(true)}
-                      disabled={visibleCollections.length === 0 || deletingAllCollections}
-                      className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300"
-                    >
-                      {deletingAllCollections ? 'Deleting...' : 'Delete all'}
-                    </button>
+                    
                     <button
                       type="button"
                       onClick={() => navigate('/studio/store/collections/new')}
@@ -3326,7 +3319,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       className={`absolute right-2.5 top-2.5 z-20 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full backdrop-blur-md shadow-md transition-all active:scale-90 ${
                         favoriteIds.includes(product.id)
                           ? 'bg-gradient-to-tr from-purple-600 via-pink-600 to-rose-600 text-white wiez-heartbeat-active shadow-purple-500/40'
-                          : 'bg-black/45 text-purple-200 hover:text-white wiez-heartbeat-pulse'
+                          : 'bg-black/45 text-purple-200 hover:text-white'
                       }`}
                     >
                       <svg
@@ -3427,7 +3420,16 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                                 dropdownManager.openId === menuId ? null : menuId,
                               );
                             }}
+                            onTouchStart={(e) => {
+                              e.stopPropagation();
+                            }}
                             onTouchEnd={(e) => {
+                              e.stopPropagation();
+                            }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                            }}
+                            onPointerDown={(e) => {
                               e.stopPropagation();
                             }}
                             className={`flex min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] items-center justify-center rounded-xl p-2 z-30 transition-colors ${
@@ -3490,17 +3492,18 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     </div>
 
                     {/* Bottom Primary Bag It Button + Quick Edit Pencil */}
-                    <div className="pt-1.5 flex items-center gap-1.5">
+                    <div className="pt-1.5 flex items-center gap-2.5">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           navigateToStudioProductDetails(product.id);
                         }}
-                        className="neu-pressed-button flex-1 py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs tracking-wide shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1 border-0"
+                        className="wiez-heartbeat-pulse flex-1 py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs tracking-wide shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 border-0"
                       >
+                        <span className="text-sm leading-none" aria-hidden="true">🛍️</span>
                         <span>Bag It</span>
-                        <span aria-hidden="true">›</span>
+                        <span aria-hidden="true" className="font-bold">›</span>
                       </button>
 
                       {!product.deletedAt && (
@@ -3512,9 +3515,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           }}
                           title="Edit product"
                           aria-label="Edit product"
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-white/10 transition-colors border-0 shadow-sm active:scale-95"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center bg-transparent border-0 shadow-none text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 transition-transform active:scale-90"
                         >
-                          <span className="text-xs">✏️</span>
+                          <span className="text-sm">✏️</span>
                         </button>
                       )}
                     </div>
@@ -3581,39 +3584,15 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           </div>
         </div>
 
-        {/* Pagination — only shown when there is at least one product */}
+        {/* Pagination — clean unified row, zero redundant counts */}
         {products.length > 0 && (
-        <div className="p-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="text-gray-500 dark:text-gray-400 text-sm">Items per page:</span>
-              <Select
-                variant="compact"
-                value={limit}
-                onChange={(e) => {
-                  const next = parseInt(e.target.value, 10);
-                  setPage(1);
-                  setLimit(Number.isFinite(next) ? next : 12);
-                }}
-                fullWidth={false}
-              >
-                <option value={10}>10</option>
-                <option value={12}>12</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </Select>
+        <div className="px-4 py-3 border-t border-black/5 dark:border-white/5">
+          <div className="flex items-center justify-between gap-3 text-xs text-theme-secondary flex-wrap">
+            <div>
+              Showing <span className="font-bold text-theme">{total === 0 ? 0 : (page - 1) * limit + 1}-{Math.min(page * limit, total)}</span> of <span className="font-bold text-theme">{total}</span> products
             </div>
 
-            <div className="text-gray-500 dark:text-gray-400 text-sm">
-              Showing{' '}
-              <span className="text-gray-900 dark:text-white font-semibold">
-                {total === 0 ? 0 : (page - 1) * limit + 1}-{Math.min(page * limit, total)}
-              </span>{' '}
-              of <span className="text-gray-900 dark:text-white font-semibold">{total}</span> products
-            </div>
-
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}

@@ -317,8 +317,8 @@ export default {
         'wiez-breathe': 'wiez-breathe 2.4s ease-in-out infinite',
       },
       boxShadow: {
-        'sm': '0 2px 8px -2px rgba(124, 58, 237, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
-        DEFAULT: '0 4px 14px -2px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
+        'sm': '0 2px 8px -2px rgba(124, 58, 237, 0.06), var(--wiez-shadow-specular, 0 0 #0000)',
+        DEFAULT: '0 4px 14px -2px rgba(124, 58, 237, 0.08), var(--wiez-shadow-specular, 0 0 #0000)',
         'md': '0 6px 20px -3px rgba(124, 58, 237, 0.10), 0 2px 6px -2px rgba(168, 85, 247, 0.06)',
         'lg': '0 10px 28px -4px rgba(124, 58, 237, 0.12), 0 4px 10px -2px rgba(168, 85, 247, 0.08)',
         'xl': '0 16px 36px -6px rgba(124, 58, 237, 0.14), 0 6px 16px -3px rgba(168, 85, 247, 0.10)',

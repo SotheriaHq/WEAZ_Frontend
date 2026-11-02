@@ -1874,7 +1874,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               type="button"
               onClick={() => setShowAllPoolKeys((current) => !current)}
               disabled={disabled}
-              className="mt-2 rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] px-3 py-1 text-[11px] font-semibold text-slate-700 disabled:opacity-60 dark:text-slate-200"
+              className="mt-2 rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08)] px-3 py-1 text-[11px] font-semibold text-slate-700 disabled:opacity-60 dark:text-slate-200"
             >
               {showAllPoolKeys ? 'Show less' : `Show more (${poolKeysHiddenCount})`}
             </button>
@@ -1892,7 +1892,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             type="button"
             onClick={() => void addManualMeasurementKey()}
             disabled={disabled || isSubmittingManualKey || !manualMeasurementKeyInput.trim()}
-            className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:text-slate-200 whitespace-nowrap"
+            className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08)] px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:text-slate-200 whitespace-nowrap"
           >
             {isSubmittingManualKey ? 'Adding…' : 'Add key'}
           </button>
@@ -1996,7 +1996,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               setRuleRows((current) => applyFallbackYardOutput(current, averageBaseYards.trim()));
             }}
             disabled={disabled}
-            className="h-fit self-end rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
+            className="h-fit self-end rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08)] px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
           >
             Use as fallback yard
           </button>
@@ -2038,7 +2038,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                 type="button"
                 onClick={() => setSizeExtraRows((current) => current.filter((_, entryIndex) => entryIndex !== index))}
                 disabled={disabled}
-                className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
+                className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08)] px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
               >
                 Remove
               </button>
@@ -2048,7 +2048,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
             type="button"
             onClick={() => setSizeExtraRows((current) => [...current, { sizeLabel: '', extraYards: '' }])}
             disabled={disabled}
-            className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200"
+            className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08)] px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200"
           >
             Add size row
           </button>
@@ -2067,7 +2067,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
           {/* ── Row 1: Rush toggle + Fabric sourcing ── */}
           <div className="grid gap-3 sm:grid-cols-2">
             {/* Rush toggle card */}
-            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl px-4 py-3 transition-colors ${form.rushEnabled ? 'bg-emerald-50/80 border-0 shadow-[0_2px_12px_rgba(16,185,129,0.14),inset_0_1px_0_rgba(255,255,255,0.95)] dark:bg-emerald-950/30' : 'bg-slate-50 border-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:bg-white/5'}`}>
+            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl px-4 py-3 transition-colors ${form.rushEnabled ? 'bg-emerald-50/80 border-0 shadow-[0_2px_12px_rgba(16,185,129,0.14)] dark:bg-emerald-950/30' : 'bg-slate-50 border-0 shadow-[] dark:bg-white/5'}`}>
               <div>
                 <p className="text-sm font-semibold text-slate-800 dark:text-white">⚡ Rush ordering</p>
                 <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Allow buyers to request rush production</p>
@@ -2292,7 +2292,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
                     type="button"
                     onClick={() => removeRuleRow(rule.id)}
                     disabled={disabled}
-                    className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] px-3 py-1 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:text-slate-200"
+                    className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08)] px-3 py-1 text-xs font-semibold text-slate-700 disabled:opacity-60 dark:text-slate-200"
                   >
                     Remove rule
                   </button>
@@ -2383,7 +2383,7 @@ const CustomOrderConfigurationEditor = forwardRef<CustomOrderConfigurationEditor
               type="button"
               onClick={addRuleRow}
               disabled={disabled}
-              className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:text-white"
+              className="rounded-full surface-control surface-interactive-hover border-0 shadow-[0_2px_8px_rgba(168,85,247,0.08)] px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:text-white"
             >
               Add yard rule
             </button>

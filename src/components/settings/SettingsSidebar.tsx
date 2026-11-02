@@ -235,6 +235,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   });
 
   const isDraggingRef = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--settings-sidebar-width', `${sidebarWidth}px`);
@@ -243,6 +244,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   const handleDragStart = (e: React.MouseEvent) => {
     e.preventDefault();
     isDraggingRef.current = true;
+    setIsDragging(true);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
 
@@ -258,6 +260,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
 
     const handleMouseUp = () => {
       isDraggingRef.current = false;
+      setIsDragging(false);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       window.removeEventListener('mousemove', handleMouseMove);
@@ -348,7 +351,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
                       : 'px-2.5 md:px-3.5'
                   } ${
                     isActive
-                      ? 'bg-[linear-gradient(90deg,rgba(217,70,239,0.12),rgba(255,255,255,0.12))] font-semibold text-gray-900 dark:bg-[linear-gradient(90deg,rgba(168,85,247,0.18),rgba(255,255,255,0.04))] dark:text-white neu-pressed-button'
+                      ? 'bg-purple-500/15 font-bold text-purple-700 dark:text-purple-300'
                       : danger
                         ? 'text-red-500 hover:bg-red-500/10 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300'
                         : 'text-theme-secondary hover:bg-white/[0.08] dark:hover:bg-white/5 hover:text-theme'
@@ -360,7 +363,13 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
                   >
                     {icon}
                   </span>
-                  <span className={`min-w-0 break-words text-wrap leading-tight ${sidebarWidth < 200 ? "text-[11px]" : sidebarWidth < 260 ? "text-xs" : "text-sm"}`}>{label}</span>
+                  <span className={`min-w-0 font-medium whitespace-nowrap leading-tight transition-all ${
+                    label.length > 18 || sidebarWidth < 210
+                      ? 'text-[10px] sm:text-[11px]'
+                      : label.length > 14 || sidebarWidth < 250
+                        ? 'text-[11px] sm:text-xs'
+                        : 'text-xs sm:text-sm'
+                  }`}>{label}</span>
                 </button>
               );
             })}
@@ -392,7 +401,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
     // Resizable responsive fixed sidebar with persistent width & zero text truncation
     <aside
       style={{ width: `var(--settings-sidebar-width, ${sidebarWidth}px)` }}
-      className="fixed left-0 top-16 z-20 block h-[calc(100vh-64px)] overflow-y-auto border-r border-[color:var(--border-default)]/30 bg-[color:var(--surface-primary,#ffffff)] dark:bg-[color:var(--surface-primary,#12111a)] scrollbar-hide px-1 md:px-2 transition-[width] duration-75"
+      className={`fixed left-0 top-16 z-20 block h-[calc(100vh-64px)] overflow-y-auto border-r border-border/40 bg-surface-primary text-theme scrollbar-hide px-1 md:px-2 ${isDragging ? 'transition-none select-none' : 'transition-[width] duration-75'}`}
     >
       {sidebarContent}
       {/* Resizable right-border drag handle — invisible touch area, zero purple activator */}

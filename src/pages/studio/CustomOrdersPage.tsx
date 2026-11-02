@@ -241,6 +241,7 @@ const CustomOrdersPage: React.FC = () => {
   const [params, setParams] = useSearchParams();
   const statusFilter = params.get('customFilter') ?? '';
   const searchQuery = params.get('customQ') ?? '';
+  const [isSearchExpanded, setIsSearchExpanded] = useState(Boolean(searchQuery));
   const page = Math.max(1, Number(params.get('customPage')) || 1);
   const sort = params.get('customSort') ?? 'queue';
   const updateParam = (key: string, value: string) => { const next = new URLSearchParams(params); if (value) next.set(key, value); else next.delete(key); if (key !== 'customPage') next.delete('customPage'); setParams(next, { replace: true }); };
@@ -383,7 +384,7 @@ const CustomOrdersPage: React.FC = () => {
       </section>
 
       {brandId && canUpdateOrders(profile, brandId) ? <QueueBulkCancellation brandId={brandId} orders={orders} onChanged={async () => { await customOrdersQuery.refetch(); }} /> : null}
-      <section className="rounded-2xl border border-black/5 bg-white/90 p-3 shadow-sm dark:border-white/10 dark:bg-[#0c0617] sm:rounded-[2rem] sm:p-6">
+      <section className="rounded-2xl border-0 bg-white/90 p-3 shadow-sm dark:bg-[#0c0617] sm:rounded-[2rem] sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-semibold text-slate-900 dark:text-white">Studio queue</div>
@@ -457,15 +458,40 @@ const CustomOrdersPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* Expandable Search Input with Google-scale shadow & zero border */}
-              <div className="relative">
-                <input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search orders..."
-                  className="w-36 focus:w-56 transition-all duration-200 rounded-full border-0 bg-white dark:bg-slate-900 px-3.5 py-1.5 text-xs text-slate-800 dark:text-slate-100 shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/30"
-                />
-              </div>
+              {/* Expandable Search Input from single 🔎 emoji with Google-scale shadow & zero border */}
+              {!isSearchExpanded && !searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setIsSearchExpanded(true)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-black/5 dark:bg-white/5 text-sm hover:bg-black/10 dark:hover:bg-white/10 transition border-0 shrink-0"
+                  aria-label="Search custom orders"
+                  title="Search orders"
+                >
+                  <span>🔎</span>
+                </button>
+              ) : (
+                <div className="relative flex items-center shrink-0 animate-in fade-in zoom-in-95 duration-150">
+                  <span className="absolute left-2.5 text-xs pointer-events-none">🔎</span>
+                  <input
+                    autoFocus
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Search orders..."
+                    className="w-36 sm:w-52 transition-all duration-200 rounded-full border-0 bg-white dark:bg-slate-900 pl-7 pr-6 py-1.5 text-xs text-slate-800 dark:text-slate-100 shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setIsSearchExpanded(false);
+                    }}
+                    className="absolute right-2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    aria-label="Close search"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

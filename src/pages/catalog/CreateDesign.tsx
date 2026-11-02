@@ -1810,7 +1810,7 @@ const CreateDesignInner: React.FC = () => {
               ) : (
                 <div className="space-y-3 min-w-0">
                   {/* Main Preview Stage (Bounded max-height, zero unnecessary space) */}
-                  <div className="relative w-full h-[380px] rounded-2xl overflow-hidden flex items-center justify-center border-0 shadow-[0_4px_24px_-4px_rgba(168,85,247,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] dark:shadow-[0_4px_24px_-4px_rgba(147,51,234,0.25),inset_0_1px_0_rgba(255,255,255,0.12)] bg-purple-500/[0.03] dark:bg-purple-950/20 mx-auto p-2">
+                  <div className="relative w-full h-[380px] rounded-2xl overflow-hidden flex items-center justify-center border-0 shadow-[0_4px_24px_-4px_rgba(168,85,247,0.12)] dark:shadow-[0_4px_24px_-4px_rgba(147,51,234,0.25)] bg-purple-500/[0.03] dark:bg-purple-950/20 mx-auto p-2">
                     {/* Viewport Frame matching active aspect ratio */}
                     <motion.div
                       layout
@@ -1821,7 +1821,7 @@ const CreateDesignInner: React.FC = () => {
                           : previewAspectRatio === '4:5'
                             ? 'aspect-[4/5]'
                             : 'aspect-square'
-                      } max-w-full rounded-xl overflow-hidden flex items-center justify-center border-0 bg-purple-950/40 shadow-[0_4px_24px_rgba(124,58,237,0.18),inset_0_1px_0_rgba(255,255,255,0.15)] mx-auto`}
+                      } max-w-full rounded-xl overflow-hidden flex items-center justify-center border-0 bg-purple-950/40 shadow-[0_4px_24px_rgba(124,58,237,0.18)] mx-auto`}
                     >
                       {/* Cover / View slot badge */}
                       {selectedIndex < 6 && (
@@ -1984,8 +1984,8 @@ const CreateDesignInner: React.FC = () => {
                 <span className="text-[10px] text-[var(--text-muted)]">Real-Time Shopper View</span>
               </div>
 
-              <div className="rounded-2xl p-3 border-0 bg-white/80 dark:bg-purple-950/40 flex items-center gap-3.5 shadow-[0_4px_16px_-2px_rgba(168,85,247,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] dark:shadow-[0_4px_16px_-2px_rgba(147,51,234,0.22),inset_0_1px_0_rgba(255,255,255,0.12)] hover:scale-[1.01] transition-all">
-                <div className="w-14 h-18 rounded-xl overflow-hidden bg-purple-500/10 dark:bg-purple-900/30 border-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] flex-shrink-0 flex items-center justify-center">
+              <div className="rounded-2xl p-3 border-0 bg-white/80 dark:bg-purple-950/40 flex items-center gap-3.5 shadow-[0_4px_16px_-2px_rgba(168,85,247,0.12)] dark:shadow-[0_4px_16px_-2px_rgba(147,51,234,0.22)] hover:scale-[1.01] transition-all">
+                <div className="w-14 h-18 rounded-xl overflow-hidden bg-purple-500/10 dark:bg-purple-900/30 border-0 shadow-[] flex-shrink-0 flex items-center justify-center">
                   {(coverImageUrl || selectedFile?.url) ? (
                     <MediaRenderer
                       kind="image"
@@ -2041,7 +2041,7 @@ const CreateDesignInner: React.FC = () => {
           {/* RIGHT COLUMN: Space-Locked Inspector Studio (Col 7/12) */}
           <div className="lg:col-span-7 flex flex-col space-y-6 px-1 sm:px-3">
             {/* Section Inspector Pills (Consolidated 2 Balanced Tabs, Zero Parent BG/Border/Shadow) */}
-            <div className="sticky top-0 z-20 backdrop-blur-xl bg-white/80 dark:bg-[#120a1f]/80 py-2.5 px-2 -mx-2 rounded-2xl flex items-center justify-between transition-colors shadow-[0_2px_12px_-2px_rgba(168,85,247,0.06),inset_0_1px_0_rgba(255,255,255,0.8)] dark:shadow-[0_2px_12px_-2px_rgba(147,51,234,0.15),inset_0_1px_0_rgba(255,255,255,0.08)] mb-2">
+            <div className="sticky top-0 z-20 backdrop-blur-xl bg-white/80 dark:bg-[#120a1f]/80 py-2.5 px-2 -mx-2 rounded-2xl flex items-center justify-between transition-colors shadow-[0_2px_12px_-2px_rgba(168,85,247,0.06)] dark:shadow-[0_2px_12px_-2px_rgba(147,51,234,0.15)] mb-2">
               <div className="flex items-center gap-2 flex-wrap">
                 {[
                   { id: 'design', label: '✦ 1. Design & DNA' },
@@ -2492,8 +2492,8 @@ const CreateDesignInner: React.FC = () => {
                           disabled={disabled}
                           className={`py-2.5 px-3 text-xs font-semibold rounded-xl transition-all ${
                             visibility === 'PUBLIC'
-                              ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-purple-700 text-white shadow-[0_2px_10px_rgba(168,85,247,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] font-bold scale-[1.01]'
-                              : 'bg-purple-500/5 hover:bg-purple-500/10 text-[var(--text-secondary)] border-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]'
+                              ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-purple-700 text-white shadow-[0_2px_10px_rgba(168,85,247,0.35)] font-bold scale-[1.01]'
+                              : 'bg-purple-500/5 hover:bg-purple-500/10 text-[var(--text-secondary)] border-0 shadow-[]'
                           }`}
                         >
                           🌐 Public
@@ -2504,8 +2504,8 @@ const CreateDesignInner: React.FC = () => {
                           disabled={disabled}
                           className={`py-2.5 px-3 text-xs font-semibold rounded-xl transition-all ${
                             visibility === 'PRIVATE'
-                              ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-purple-700 text-white shadow-[0_2px_10px_rgba(168,85,247,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] font-bold scale-[1.01]'
-                              : 'bg-purple-500/5 hover:bg-purple-500/10 text-[var(--text-secondary)] border-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]'
+                              ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-purple-700 text-white shadow-[0_2px_10px_rgba(168,85,247,0.35)] font-bold scale-[1.01]'
+                              : 'bg-purple-500/5 hover:bg-purple-500/10 text-[var(--text-secondary)] border-0 shadow-[]'
                           }`}
                         >
                           🔒 Private
@@ -2518,8 +2518,8 @@ const CreateDesignInner: React.FC = () => {
                   <div
                     className={`p-4 rounded-2xl border-0 transition-all ${
                       isValid
-                        ? 'wiez-card-base wiez-shade-10 shadow-[0_4px_20px_-4px_rgba(168,85,247,0.14),inset_0_1px_0_rgba(255,255,255,0.95)]'
-                        : 'wiez-notice-card shadow-[0_4px_24px_-4px_rgba(245,158,11,0.18),inset_0_1px_0_rgba(255,255,255,0.95)]'
+                        ? 'wiez-card-base wiez-shade-10 shadow-[0_4px_20px_-4px_rgba(168,85,247,0.14)]'
+                        : 'wiez-notice-card shadow-[0_4px_24px_-4px_rgba(245,158,11,0.18)]'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1.5">

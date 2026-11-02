@@ -282,7 +282,7 @@ const FilterSelector: React.FC<FilterSelectorProps> = ({
                                 className={`flex items-center gap-2 rounded-xl px-3 py-2 text-left text-xs transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 appearance-none border-0 ${
                                   isSelected
                                     ? "neu-inset-chip selected text-white shadow-[0_3px_12px_rgba(168,85,247,0.35)]"
-                                    : "neu-pressed-button bg-white/80 dark:bg-white/5 hover:bg-white/95 dark:hover:bg-white/10 text-[color:var(--wiez-text-primary)] shadow-[0_1px_4px_rgba(124,58,237,0.04),inset_0_1px_0_rgba(255,255,255,0.9)]"
+                                    : "neu-pressed-button bg-white/80 dark:bg-white/5 hover:bg-white/95 dark:hover:bg-white/10 text-[color:var(--wiez-text-primary)] shadow-[0_1px_4px_rgba(124,58,237,0.04)]"
                                 }`}
                               >
                                 <span

@@ -166,7 +166,7 @@ const DashboardHome: React.FC = () => {
       <div className="overflow-hidden rounded-2xl wiez-card-base wiez-shade-9">
         <div className="flex flex-row items-center justify-between gap-3 px-3 py-3 sm:px-4 md:px-6 md:py-4">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-[0_2px_8px_rgba(124,58,237,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] sm:h-12 sm:w-12">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-[0_2px_8px_rgba(124,58,237,0.12)] sm:h-12 sm:w-12">
               {resolvedLogoUrl ? (
                 <MediaRenderer
                   kind="image"
@@ -185,7 +185,7 @@ const DashboardHome: React.FC = () => {
               <h1 className="flex min-w-0 flex-wrap items-center gap-2 text-base font-bold text-gray-900 dark:text-white sm:text-xl">
                 <span className="min-w-0 truncate">{displayStoreName}</span>
                 <span
-                  className={`flex flex-shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] text-[10px] font-medium sm:px-2.5 sm:text-xs ${
+                  className={`flex flex-shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 shadow-[] text-[10px] font-medium sm:px-2.5 sm:text-xs ${
                     resolvedIsLive
                       ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
                       : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
@@ -208,7 +208,7 @@ const DashboardHome: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate('/studio/store')}
-            className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-white/80 dark:bg-white/10 px-3 py-2 text-xs font-semibold text-purple-900 dark:text-purple-200 shadow-[0_2px_8px_rgba(124,58,237,0.08),inset_0_1px_0_rgba(255,255,255,0.95)] transition-all hover:scale-105 active:scale-95 sm:gap-2 sm:px-4 sm:text-sm"
+            className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-white/80 dark:bg-white/10 px-3 py-2 text-xs font-semibold text-purple-900 dark:text-purple-200 shadow-[0_2px_8px_rgba(124,58,237,0.08)] transition-all hover:scale-105 active:scale-95 sm:gap-2 sm:px-4 sm:text-sm"
           >
             <span aria-hidden="true">🏪</span>
             <span className="hidden min-[380px]:inline">View Store</span>
@@ -466,7 +466,7 @@ const MetricCard: React.FC<{
   <div className={`cursor-pointer rounded-2xl p-3.5 sm:p-4 lg:p-5 wiez-card-base ${shadeClass}`}>
     <div className="mb-1.5 flex items-start justify-between gap-2 lg:mb-2">
       <p className="min-w-0 text-xs font-semibold leading-4 text-purple-950/70 dark:text-purple-200/70 sm:text-sm">{title}</p>
-      <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] sm:h-8 sm:w-8 sm:text-base ${markerClassName}`}>
+      <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl text-sm shadow-[] sm:h-8 sm:w-8 sm:text-base ${markerClassName}`}>
         <span aria-hidden="true">{marker}</span>
       </div>
     </div>
@@ -498,7 +498,7 @@ const QuickActionButton: React.FC<{
     onClick={onClick}
     className="group flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-2xl p-3 wiez-card-base wiez-shade-10 sm:min-h-[92px] sm:gap-3 sm:p-4"
   >
-    <div className={`flex h-9 w-9 items-center justify-center rounded-full text-base transition-transform group-hover:scale-110 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] sm:h-11 sm:w-11 sm:text-lg ${accentClassName}`}>
+    <div className={`flex h-9 w-9 items-center justify-center rounded-full text-base transition-transform group-hover:scale-110 shadow-[] sm:h-11 sm:w-11 sm:text-lg ${accentClassName}`}>
       <span aria-hidden="true">{marker}</span>
     </div>
     <span className="text-center text-xs font-semibold leading-4 text-gray-700 group-hover:text-purple-700 dark:text-gray-200 dark:group-hover:text-purple-300 sm:text-sm">
@@ -538,7 +538,7 @@ const AlertItem: React.FC<{
   );
 
   const content = (
-    <div className={`${bg} flex items-start gap-3 rounded-xl p-3.5 transition-all shadow-[0_2px_8px_rgba(124,58,237,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] ${link ? 'hover:scale-[1.01]' : ''}`}>
+    <div className={`${bg} flex items-start gap-3 rounded-xl p-3.5 transition-all shadow-[0_2px_8px_rgba(124,58,237,0.06)] ${link ? 'hover:scale-[1.01]' : ''}`}>
       <span className={`${color} mt-0.5`} aria-hidden="true">{icon}</span>
       <div>
         <p className="text-sm font-medium text-gray-900 dark:text-white">{derivedTitle}</p>

@@ -190,32 +190,26 @@ const NotificationsPage: React.FC = () => {
         is now the only thing that flexes, and the actions drop to their own
         right-aligned line until there is room for them beside it.
       */}
-      <header className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 px-1 sm:px-0">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="-ml-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg surface-interactive-hover"
-          aria-label="Go back"
-        >
-          <span aria-hidden="true">←</span>
-        </button>
-        <h1 className="min-w-0 flex-1 break-words text-base font-semibold text-[color:var(--text-primary)] sm:text-2xl">
-          Notifications
-        </h1>
-        {unreadCount > 0 ? (
-          <span
-            className="inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white"
-            aria-label={`${unreadCount} unread`}
+      <header className="mb-3 flex items-center justify-between gap-2 px-1 sm:px-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="-ml-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base surface-interactive-hover"
+            aria-label="Go back"
           >
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        ) : null}
-        <div className="flex w-full shrink-0 items-center justify-end gap-1 sm:w-auto">
+            <span aria-hidden="true">👈</span>
+          </button>
+          <h1 className="min-w-0 break-words text-base font-bold text-theme sm:text-2xl">
+            Notifications
+          </h1>
+        </div>
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {unreadCount > 0 ? (
             <button
               type="button"
               onClick={() => void dispatch(markAllNotificationsRead())}
-              className="rounded-xl px-2 py-1.5 text-xs font-semibold text-[color:var(--text-secondary)] surface-interactive-hover sm:px-3 sm:text-sm"
+              className="rounded-xl px-2 py-1 text-xs font-semibold text-theme-secondary hover:text-purple-600 dark:hover:text-purple-400 surface-interactive-hover whitespace-nowrap sm:px-3 sm:text-sm"
             >
               Mark all as read
             </button>

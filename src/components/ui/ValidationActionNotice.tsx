@@ -37,7 +37,7 @@ export const ValidationActionNotice: React.FC<ValidationActionNoticeProps> = ({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shadow-[]">
             <AlertCircle className="h-5 w-5" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
@@ -64,7 +64,7 @@ export const ValidationActionNotice: React.FC<ValidationActionNoticeProps> = ({
                       onClick={onClick}
                       className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
                         onClick
-                          ? 'bg-white/90 text-purple-700 shadow-[0_2px_8px_rgba(168,85,247,0.12),inset_0_1px_0_rgba(255,255,255,1)] hover:scale-105 active:scale-95 hover:bg-white dark:bg-purple-900/40 dark:text-purple-200 cursor-pointer'
+                          ? 'bg-white/90 text-purple-700 shadow-[0_2px_8px_rgba(168,85,247,0.12)] hover:scale-105 active:scale-95 hover:bg-white dark:bg-purple-900/40 dark:text-purple-200 cursor-pointer'
                           : 'bg-white/60 text-gray-700 dark:bg-white/10 dark:text-gray-300 cursor-default'
                       }`}
                     >
@@ -82,7 +82,7 @@ export const ValidationActionNotice: React.FC<ValidationActionNoticeProps> = ({
                 <button
                   type="button"
                   onClick={primaryAction.onClick}
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-[0_4px_16px_rgba(124,58,237,0.3),inset_0_1px_0_rgba(255,255,255,0.4)] transition-all hover:scale-105 active:scale-95"
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-[0_4px_16px_rgba(124,58,237,0.3)] transition-all hover:scale-105 active:scale-95"
                 >
                   <span>{primaryAction.label}</span>
                   <ArrowRight className="h-4 w-4" />

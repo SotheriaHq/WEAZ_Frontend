@@ -348,6 +348,7 @@ const OrderManagement: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
   const [selectedOrder, setSelectedOrder] = useState<{ id: string } | null>(null);
+  const [showInfoModal, setShowInfoModal] = useState(false);
   const [chatOrder, setChatOrder] = useState<{ id: string; customerName?: string } | null>(null);
   /*
      * Seeded from the warm cache so a revisit paints immediately.
@@ -613,28 +614,35 @@ const OrderManagement: React.FC = () => {
 
   return (
     <div className="space-y-8 text-slate-900 dark:text-slate-100">
-      <section className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-500">
+      <section className="flex flex-col gap-4 pt-2 xl:flex-row xl:items-center xl:justify-between">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
             <span>Studio</span>
             <span>/</span>
             <span className="text-orange-500">Orders</span>
           </div>
-          <div>
-            <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Order Management</h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400 sm:text-base">
-              Monitor, fulfill, and review production-critical order metadata from one branded control surface.
-            </p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">Order Management</h1>
+            <button
+              type="button"
+              onClick={() => setShowInfoModal(true)}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-sm hover:bg-black/5 dark:hover:bg-white/10 transition opacity-80 hover:opacity-100"
+              aria-label="Order Management Information"
+              title="Order Management Information"
+            >
+              ℹ️
+            </button>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => downloadCsv(sortedOrders)}
-            className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-orange-500/40 dark:hover:text-white"
+            className="hidden xl:inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white/80 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-orange-500/40 dark:hover:text-white"
           >
-            ⭳ Export CSV
+            <span>⭳</span>
+            <span>Export CSV</span>
           </button>
         </div>
       </section>
@@ -666,7 +674,7 @@ const OrderManagement: React.FC = () => {
               </p>
               <span className="shrink-0 text-sm leading-none sm:text-lg">{metric.marker}</span>
             </div>
-            <p className="mt-1.5 truncate text-lg font-black tracking-tight sm:mt-3 sm:text-2xl">{metric.value}</p>
+            <p className="mt-1.5 truncate text-lg font-black tracking-tight sm:mt-3 sm:text-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 dark:from-purple-400 dark:via-indigo-400 dark:to-pink-400 bg-clip-text text-transparent">{metric.value}</p>
             <div className="mt-2 flex items-center gap-2 sm:mt-3">
               <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/5">
                 <div className="h-full rounded-full bg-orange-500" style={{ width: `${metric.progress}%` }} />
@@ -1091,6 +1099,36 @@ const OrderManagement: React.FC = () => {
           onStatusUpdate={fetchOrders}
         />
       ) : null}
+
+      {showInfoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-150" onClick={() => setShowInfoModal(false)}>
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#130f24] border border-black/10 dark:border-white/10 p-6 shadow-2xl space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">ℹ️</span>
+                <h3 className="text-lg font-bold text-theme">Order Management</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInfoModal(false)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-theme-muted"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-sm text-theme-secondary leading-relaxed">
+              Monitor, fulfill, and review production-critical order metadata from one branded control surface. Track live statuses, custom client specifications, and customer fulfillment records seamlessly.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowInfoModal(false)}
+              className="w-full rounded-2xl bg-purple-600 hover:bg-purple-500 py-2.5 text-sm font-bold text-white transition active:scale-98"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {chatOrder && brandId ? (
         <OrderChatDrawer
