@@ -46,6 +46,8 @@ export type ProductPublishJobInput = {
    * stopped, using the File blobs still held in `retryableInputs`.
    */
   existingProductId?: string | null;
+  /** Completed uploads in input order; retained for an interrupted job's retry. */
+  completedUploadIds?: string[];
   pendingCustomOrderDraft?: Omit<
     CustomOrderConfigurationUpsertInput,
     'sourceId'
@@ -153,6 +155,7 @@ export async function runProductPublishJob(
   const scope = input.publishTaskScope ?? { ownerId: input.ownerId };
   const startedAt = Date.now();
   let productId: string | undefined;
+  const uploadedMediaIds = [...(input.completedUploadIds ?? [])];
 
   let lastWriteAt = 0;
   const setProgress = (
@@ -231,8 +234,7 @@ export async function runProductPublishJob(
       setProgress(20, 'Uploading…');
     }
 
-    const uploadedMediaIds: string[] = [];
-    for (let i = 0; i < input.pendingUploads.length; i += 1) {
+    for (let i = uploadedMediaIds.length; i < input.pendingUploads.length; i += 1) {
       const upload = input.pendingUploads[i];
       /*
        * One retry per file before giving up on the whole submission.
@@ -301,7 +303,7 @@ export async function runProductPublishJob(
       } as Partial<ProductCreateDto>);
     }
 
-    setProgress(100, 'In review', 'published');
+    setProgress(100, finalStatus === 'DRAFT' ? 'Draft saved' : 'In review', 'published');
     // Tell the store panel to pull the freshly-created product into the list.
     emitProductStudioSync({ productId: created.id, reason: 'product-created' });
     input.onComplete?.({ productId: created.id, payload: created });
@@ -322,7 +324,10 @@ export async function runProductPublishJob(
       error: err.message,
     });
     // Retain the snapshot so the store panel's Retry can re-run the exact job.
-    retryableInputs.set(input.taskId, input);
+    retryableInputs.set(input.taskId, { ...input,
+      existingProductId: productId ?? input.existingProductId,
+      completedUploadIds: [...uploadedMediaIds],
+    });
     updatePublishTask(
       input.taskId,
       {
