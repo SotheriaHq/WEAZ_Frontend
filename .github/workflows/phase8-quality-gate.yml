@@ -42,5 +42,8 @@ jobs:
       - name: Focused media and query tests
         run: npm run test:release-boot
 
+      - name: Product draft save and retry regression
+        run: npx vitest run src/features/products/productPublishJob.test.ts
+
       - name: Performance regression guard
         run: npm run check:perf-regressions
