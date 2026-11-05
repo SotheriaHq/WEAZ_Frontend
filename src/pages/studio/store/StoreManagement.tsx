@@ -1,3 +1,4 @@
+import { useBrandCommerceAccess } from '@/hooks/useBrandCommerceAccess';
 import { useQueryClient } from '@tanstack/react-query';
 import { creatorCategoriesOptions, creatorFiltersOptions } from '@/query/creatorMetadataQueries';
 import { useEffect, useMemo, useState } from 'react';
@@ -32,6 +33,7 @@ import { resolveAccountDisplayName } from '@/lib/brandAccess';
 import WiezMark from '@/brand/WiezMark';
 
 export default function StoreManagement() {
+  const commerce = useBrandCommerceAccess();
   const creatorQueryClient = useQueryClient();
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -387,31 +389,28 @@ export default function StoreManagement() {
 
             {/* Right: Badges, Metadata & Actions filling the top bar on all screens */}
             <div className="flex items-center gap-1 sm:gap-2 shrink-0 flex-nowrap">
-              {/* Rating */}
-              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/[0.06] px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-theme shrink-0 border-0">
-                <span>⭐</span>
-                <span>{kpis.reviewScore ? kpis.reviewScore.toFixed(1) : '0.0'}</span>
-              </div>
-
-              {/* Location - strictly NO truncation */}
-              {brandLocation ? (
-                <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/[0.06] px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-theme-secondary shrink-0 border-0 whitespace-nowrap">
-                  <span>📍</span>
-                  <span>{brandLocation}</span>
-                </div>
-              ) : null}
-
-              {/* Nationwide shipping */}
-              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/[0.06] px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-theme-secondary shrink-0 border-0 whitespace-nowrap">
-                <span>🚚</span>
-                <span>Nationwide</span>
-              </div>
-
-              {/* Buyer Protection */}
-              <div className="inline-flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-white/[0.06] px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-theme-secondary shrink-0 border-0 whitespace-nowrap">
-                <span>🛡️</span>
-                <span>Protected</span>
-              </div>
+              {/* Systematic Upgrade CTA if brand needs upgrade */}
+              {commerce?.data?.canUpgrade && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isEmbeddedMobile) {
+                      postStudioNativeEvent({
+                        type: 'OPEN_NATIVE_ROUTE',
+                        path: '/settings/subscriptions',
+                      });
+                      return;
+                    }
+                    navigate('/settings/subscriptions');
+                  }}
+                  className="inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:opacity-90 active:scale-95 transition border-0 shrink-0"
+                  aria-label="Upgrade store plan"
+                  title="Upgrade plan"
+                >
+                  <span className="text-xs">⚡</span>
+                  <span>Upgrade</span>
+                </button>
+              )}
 
               {/* QR Action */}
               <button
