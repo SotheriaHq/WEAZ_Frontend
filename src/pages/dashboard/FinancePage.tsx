@@ -640,7 +640,9 @@ const FinancePage: React.FC = () => {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Finance</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {user?.brandFullName?.trim() || (user?.username ? `@${user.username.replace(/^@/, '')}` : 'Store')} Finance
+          </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Released balances, incoming credits, and payout history.
           </p>
@@ -652,80 +654,48 @@ const FinancePage: React.FC = () => {
         <div className="grid grid-cols-2 gap-3"><div><p className="text-xs">Pending and Up Next holds ({overview?.queuedCustomOrderCount ?? 0} orders)</p><p className="font-bold tabular-nums">{formatCurrency(overview?.queuedCustomHeldAmount ?? 0, overview?.currency || 'NGN')}</p></div><div><p className="text-xs">Refunds processing</p><p className="font-bold tabular-nums">{formatCurrency(overview?.pendingRefundAmount ?? 0, overview?.currency || 'NGN')}</p></div></div>
         <p className="text-xs">Waiting-order captures and jump earnings are unavailable for payout until Active. Refund processing does not mean a shopper has received the money. Existing payout controls apply only to eligible balances.</p>
       </section>
-      {/* Balance hero + metric strip */}
-      <div className="overflow-hidden rounded-2xl wiez-card-base wiez-shade-9 text-white">
-        <div className="px-5 py-5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">
-                    Available balance
-                  </span>
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      availableBalance >= 5000
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                        : 'bg-slate-800 text-slate-300 border border-slate-700'
-                    }`}
-                  >
-                    {availableBalance >= 5000 ? '✓ Ready to payout' : 'Min. ₦5,000 threshold'}
-                  </span>
-                </div>
-                <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums bg-gradient-to-r from-purple-400 via-indigo-300 to-pink-400 bg-clip-text text-transparent">
-                  {loading ? '—' : formatCurrency(availableBalance)}
-                </div>
-                {overview?.negativeBalance ? (
-                  <div className="mt-1 text-xs text-rose-300">
-                    Negative — new releases will offset recovery automatically.
-                  </div>
-                ) : null}
+      {/* Integrated Figure Cards Suite — Available Balance + Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        {/* Primary Available Balance Card */}
+        <div className="sm:col-span-2 wiez-card-base wiez-shade-9 rounded-2xl p-4 sm:p-5 flex flex-col justify-between border-0 shadow-sm text-white">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-purple-200">
+                  Available balance
+                </span>
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    availableBalance >= 5000
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-white/10 text-purple-200 border border-white/10'
+                  }`}
+                >
+                  {availableBalance >= 5000 ? '✓ Ready to payout' : 'Min. ₦5,000 threshold notice'}
+                </span>
               </div>
-              <div className="text-3xl" aria-hidden="true">
-                {overview?.negativeBalance ? '📉' : '💰'}
+              <div className="mt-2 text-2xl sm:text-3xl font-extrabold tracking-tight tabular-nums bg-gradient-to-r from-purple-300 via-indigo-200 to-pink-300 bg-clip-text text-transparent">
+                {loading ? '—' : formatCurrency(availableBalance)}
               </div>
+              {overview?.negativeBalance ? (
+                <div className="mt-1 text-xs text-rose-300">
+                  Negative — new releases will offset recovery automatically.
+                </div>
+              ) : null}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleRequestPayout}
                 disabled={!canRequestPayout}
-                className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-800 dark:text-white"
+                className="rounded-full bg-white px-4 py-2 text-xs font-bold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-purple-600 dark:text-white shadow-md active:scale-95"
               >
-                {requesting ? 'Submitting...' : 'Request payout'}
+                {requesting ? 'Submitting...' : 'Request payout ›'}
               </button>
             </div>
           </div>
-
-          {/* Payout threshold progress bar */}
-          <div className="mt-4 border-t border-white/10 pt-3">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
-              <span>
-                {availableBalance >= 5000
-                  ? `${formatCurrency(availableBalance)} available (100% threshold reached)`
-                  : `${formatCurrency(availableBalance)} of ₦5,000 (${Math.round(Math.min((availableBalance / 5000) * 100, 100))}%) to minimum payout`}
-              </span>
-              <span className={`font-semibold ${availableBalance >= 5000 ? 'text-emerald-400' : 'text-slate-400'}`}>
-                {availableBalance >= 5000
-                  ? 'Eligible for transfer'
-                  : `${formatCurrency(Math.max(5000 - availableBalance, 0))} remaining`}
-              </span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  availableBalance >= 5000 ? 'bg-emerald-400' : 'bg-violet-400'
-                }`}
-                style={{ width: `${Math.min(Math.max((availableBalance / 5000) * 100, 0), 100)}%` }}
-              />
-            </div>
-          </div>
         </div>
-
-      </div>
-
-      {/* Standalone 4x1 or 2x2 Metric Cards Grid */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         {[
           {
             label: 'Released',

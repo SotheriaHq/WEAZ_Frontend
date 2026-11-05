@@ -25,6 +25,8 @@ export function BrandQueueSettings({ brandId }: { brandId: string }) {
   });
   const { confirm, ConfirmDialog } = useQueueConfirm();
   const [busy, setBusy] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
   async function toggle() {
     if (
       !query.data ||
@@ -51,57 +53,146 @@ export function BrandQueueSettings({ brandId }: { brandId: string }) {
       setBusy(false);
     }
   }
+
+  const summary = query.data;
+
   return (
-    <section className="queue-section text-slate-900 dark:text-white">
+    <section className="overflow-hidden rounded-2xl border border-black/5 bg-slate-50/90 shadow-sm dark:border-white/10 dark:bg-[#120a1f] text-slate-900 dark:text-white transition-all">
       {ConfirmDialog}
-      <h2 className="font-bold">🧵 Custom-order subscription and priority</h2>
-      <Link
-        className="queue-button inline-flex"
-        to="/settings?tab=subscription-billing"
+      
+      {/* Clickable Header Bar */}
+      <button
+        type="button"
+        onClick={() => setIsExpanded((prev) => !prev)}
+        className="w-full flex items-center justify-between p-3.5 sm:p-4 text-left hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+        aria-expanded={isExpanded}
+        aria-label={isExpanded ? 'Collapse queue priority settings' : 'Expand queue priority settings'}
       >
-        Manage subscription and billing
-      </Link>
-      {query.isError ? (
-        <p role="alert">
-          Unable to load queue settings.{' '}
-          <button className="queue-button" onClick={() => void query.refetch()}>
-            Retry
-          </button>
-        </p>
-      ) : query.isPending ? (
-        <p role="status">Loading queue settings…</p>
-      ) : (
-        <>
-          <p className="text-sm">
-            Paid queue jumps:{' '}
-            {query.data.queueJumpEnabled ? 'Enabled' : 'Disabled'}. Available
-            only on Aru and Igwe. Existing paid jumps retain their priority if
-            disabled.
-          </p>
-          <button
-            className="queue-button"
-            disabled={
-              !canManage || busy || !query.data.capacity.queueJumpAllowed
-            }
-            onClick={() => void toggle()}
-          >
-            {busy
-              ? 'Saving…'
-              : query.data.queueJumpEnabled
-                ? 'Disable paid jumps'
-                : 'Enable paid jumps'}
-          </button>
-          {!canManage ? (
-            <p className="text-xs">
-              Only the brand owner can manage billing and paid-jump settings.
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-600/15 text-sm dark:bg-violet-400/20 shrink-0">
+            🧵
+          </span>
+          <div className="min-w-0">
+            <div className="text-xs sm:text-sm font-bold tracking-tight text-slate-900 dark:text-white truncate">
+              Custom-Order Priority & Jumps
+            </div>
+            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+              {summary ? (
+                <>
+                  <span className="font-semibold text-violet-700 dark:text-violet-300">
+                    {summary.capacity.tierKey ? `${summary.capacity.tierKey} Tier` : 'Standard Tier'}
+                  </span>
+                  <span>•</span>
+                  <span>
+                    Paid jumps: {summary.queueJumpEnabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </>
+              ) : (
+                <span>Loading priority options…</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="rounded-lg bg-black/[0.04] px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-white/[0.08] dark:text-slate-200">
+            {isExpanded ? 'Collapse ⌃' : 'Configure ⌄'}
+          </span>
+        </div>
+      </button>
+
+      {/* Expanded Accordion Body */}
+      {isExpanded && (
+        <div className="border-t border-black/5 dark:border-white/10 p-3.5 sm:p-5 space-y-4 bg-white/50 dark:bg-black/20 animate-in fade-in duration-200">
+          {query.isError ? (
+            <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">
+              Unable to load queue settings.{' '}
+              <button
+                className="underline font-semibold ml-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void query.refetch();
+                }}
+              >
+                Retry
+              </button>
             </p>
-          ) : !query.data.capacity.queueJumpAllowed ? (
-            <p className="text-xs">
-              Subscribe to Aru or Igwe to enable paid jumps. Legacy has no jump
-              entitlement.
-            </p>
+          ) : query.isPending ? (
+            <p role="status" className="text-xs text-slate-500">Loading queue settings…</p>
+          ) : summary ? (
+            <>
+              <div className="rounded-xl bg-violet-500/[0.06] border border-violet-500/15 p-3 text-xs leading-relaxed text-slate-700 dark:text-slate-200">
+                <span className="font-bold text-violet-800 dark:text-violet-300">How Paid Jumps Work: </span>
+                Buyers can opt to pay a 20% surcharge on their bespoke order to skip ahead in line. Your brand earns 90% of this fee once the order moves into Active production. Up Next is protected to ensure fair progression.
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                <div>
+                  <div className="text-xs font-bold text-slate-900 dark:text-white">
+                    Paid Priority Queue Jumps
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {summary.queueJumpEnabled
+                      ? 'Currently active. Clients can pay to jump the queue.'
+                      : 'Currently disabled. All waiting orders progress strictly standard FIFO.'}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={!canManage || busy || !summary.capacity.queueJumpAllowed}
+                    onClick={() => void toggle()}
+                    className={`rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm ${
+                      summary.queueJumpEnabled
+                        ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-500/15 dark:text-rose-300'
+                        : 'bg-violet-600 text-white hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {busy
+                      ? 'Saving…'
+                      : summary.queueJumpEnabled
+                        ? 'Disable paid jumps'
+                        : 'Enable paid jumps'}
+                  </button>
+                </div>
+              </div>
+
+              {!canManage ? (
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                  Only the brand owner can manage billing and paid-jump settings.
+                </p>
+              ) : !summary.capacity.queueJumpAllowed ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-200">
+                  <span>Subscribe to Aru or Igwe to unlock paid jumps.</span>
+                  <Link
+                    to="/settings?tab=subscription-billing"
+                    className="font-bold underline shrink-0"
+                  >
+                    Upgrade Tier
+                  </Link>
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-between pt-2 border-t border-black/5 dark:border-white/5">
+                <Link
+                  to="/settings?tab=subscription-billing"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-700 hover:text-violet-800 dark:text-violet-300 dark:hover:text-violet-200"
+                >
+                  <span>💳 Manage subscription and billing</span>
+                  <span aria-hidden="true">›</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setIsExpanded(false)}
+                  className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                >
+                  Done
+                </button>
+              </div>
+            </>
           ) : null}
-        </>
+        </div>
       )}
     </section>
   );

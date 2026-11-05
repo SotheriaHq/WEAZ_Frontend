@@ -4,7 +4,9 @@ import { canUpdateOrders } from '@/lib/brandAccess';
 import QueueBulkCancellation from '@/components/custom-orders/QueueBulkCancellation';
 import type { QueueLane } from '@/api/CustomOrderQueueApi';
 import { BrandQueueSettings } from '@/components/custom-orders/QueueBrandControls';
-import { QueueFacts, QueueBrandCounts } from '@/components/custom-orders/CustomOrderQueue';
+import { QueueFacts } from '@/components/custom-orders/CustomOrderQueue';
+import { useQuery } from '@tanstack/react-query';
+import { customOrderQueueApi } from '@/api/CustomOrderQueueApi';
 import React, { useDeferredValue, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getStoreStatus } from '@/api/StoreApi';
@@ -290,6 +292,14 @@ const CustomOrdersPage: React.FC = () => {
   const summaryByOrderId = customOrdersQuery.data?.summaryByOrderId ?? {};
   const loading = customOrdersQuery.isLoading;
 
+  const queueSummaryQuery = useQuery({
+    queryKey: ['custom-order-queue-brand', brandId],
+    queryFn: () => (brandId ? customOrderQueueApi.brand(brandId) : null),
+    enabled: Boolean(brandId),
+    staleTime: 15000,
+  });
+  const queueSummary = queueSummaryQuery.data;
+
   const metrics = useMemo(
     () => ({
       total: orders.length,
@@ -320,12 +330,10 @@ const CustomOrdersPage: React.FC = () => {
         <span className="font-medium">Custom orders</span>
       </div>
 
-      {brandId ? <><QueueBrandCounts brandId={brandId} /><BrandQueueSettings brandId={brandId} /></> : null}
       <section className="rounded-2xl bg-gradient-to-br from-black via-[#0d0716] to-[#1a102f] border border-white/10 px-3 py-4 text-white shadow-md sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">Studio</div>
-            <h1 className="mt-0.5 text-xl font-bold">Custom orders</h1>
+            <h1 className="text-xl font-bold">Custom orders</h1>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -383,6 +391,8 @@ const CustomOrdersPage: React.FC = () => {
         </div>
       </section>
 
+      {brandId ? <BrandQueueSettings brandId={brandId} /> : null}
+
       {brandId && canUpdateOrders(profile, brandId) ? <QueueBulkCancellation brandId={brandId} orders={orders} onChanged={async () => { await customOrdersQuery.refetch(); }} /> : null}
       <section className="rounded-2xl border-0 bg-white/90 p-3 shadow-sm dark:bg-[#0c0617] sm:rounded-[2rem] sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -402,15 +412,15 @@ const CustomOrdersPage: React.FC = () => {
         {/* Responsive Queue Status Tabs & Controls */}
         <div className="mt-5 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            {/* Horizontal Scrollable Status Tabs */}
+            {/* Horizontal Scrollable Status Tabs with Thread Queue Counts */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
               {[
-                { id: '', label: 'All' },
-                { id: 'queue:PENDING', label: 'Pending' },
-                { id: 'queue:UP_NEXT', label: 'Up Next' },
-                { id: 'queue:ACTIVE', label: 'Active' },
-                { id: 'queue:IN_DELIVERY', label: 'Delivery' },
-                { id: 'COMPLETED', label: 'Completed' },
+                { id: '', label: 'All', count: orders.length },
+                { id: 'queue:PENDING', label: 'Pending', count: queueSummary?.counts?.PENDING ?? 0 },
+                { id: 'queue:UP_NEXT', label: 'Up Next', count: queueSummary?.counts?.UP_NEXT ?? 0 },
+                { id: 'queue:ACTIVE', label: 'Active', count: queueSummary?.counts?.ACTIVE ?? 0 },
+                { id: 'queue:IN_DELIVERY', label: 'Delivery', count: queueSummary?.counts?.IN_DELIVERY ?? 0 },
+                { id: 'COMPLETED', label: 'Completed', count: orders.filter((o) => o.status === 'COMPLETED').length },
               ].map((tab) => {
                 const isActive = statusFilter === tab.id;
                 return (
@@ -418,13 +428,22 @@ const CustomOrdersPage: React.FC = () => {
                     key={tab.id}
                     type="button"
                     onClick={() => setStatusFilter(tab.id)}
-                    className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
+                    className={`shrink-0 flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
                       isActive
                         ? 'bg-purple-600 text-white shadow-md'
                         : 'bg-black/5 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-black/10 dark:hover:bg-white/10'
                     }`}
                   >
-                    {tab.label}
+                    <span>{tab.label}</span>
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums ${
+                        isActive
+                          ? 'bg-white/20 text-white'
+                          : 'bg-black/5 dark:bg-white/10 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
                   </button>
                 );
               })}

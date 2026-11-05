@@ -2331,10 +2331,10 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
       {/* ═══ UNIFIED COMMAND CENTER ═══ */}
       {outletView === 'products' && !inlineProduct && (
-      <div className="mb-4 overflow-hidden rounded-2xl sm:mb-6 lg:overflow-visible">
+      <div className="relative z-30 mb-4 overflow-visible rounded-2xl sm:mb-6">
 
         {/* Header Row — Strictly stays on one row, smoothly scales down without rearranging */}
-        <div className="relative p-2.5 sm:p-4 lg:p-5">
+        <div className="relative z-40 p-2.5 sm:p-4 lg:p-5">
           <div className="flex items-center justify-between gap-2 sm:gap-4 flex-nowrap">
             <div className="min-w-0 flex-1 transition-all duration-300">
               <h2 className="text-sm sm:text-xl font-bold tracking-tight text-gray-900 dark:text-white truncate">
@@ -2434,7 +2434,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
           {showFiltersMenu && (
             <div
               ref={filtersMenuRef}
-              className="absolute left-3 right-3 sm:left-auto sm:right-6 sm:w-96 top-full mt-1.5 z-40 overflow-hidden rounded-2xl border border-gray-200/90 bg-white/[0.98] p-3 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#12121a]/[0.98] animate-in fade-in slide-in-from-top-2 duration-200 lg:hidden"
+              className="absolute left-3 right-3 sm:left-auto sm:right-6 sm:w-96 top-full mt-1.5 z-50 rounded-2xl border border-gray-200/90 bg-white/[0.98] p-3 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#12121a]/[0.98] animate-in fade-in slide-in-from-top-2 duration-200 lg:hidden"
             >
               <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100 dark:border-white/5">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800 dark:text-gray-100">
@@ -2514,7 +2514,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
             change (see `listMinHeight`), so a tab with fewer products cannot
             collapse the container and yank the viewport up.
         */}
-        <div className="border-t border-gray-200/80 bg-white/[0.92] backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 lg:hidden">
+        <div className="relative z-10 border-t border-gray-200/80 bg-white/[0.92] backdrop-blur-xl dark:border-white/10 dark:bg-[#111118]/95 lg:hidden">
           <div
             ref={statusTabsRef}
             role="tablist"

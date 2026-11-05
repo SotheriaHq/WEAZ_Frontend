@@ -5,11 +5,8 @@ import type { RootState } from '@/store';
 import { brandApi } from '@/api/BrandApi';
 import { getDraftExpiryStats, type DraftExpiryStats } from '@/api/collectionUploads';
 import { getStoreStatus } from '@/api/StoreApi';
-import MediaRenderer from '@/components/media/MediaRenderer';
 import { Select } from '@/components/ui/Select';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
-import useSignedFileUrl from '@/hooks/useSignedFileUrl';
-import { getAvatarFallback } from '@/utils/profileImage';
 import { DraftExpiryStats as DraftExpiryStatsComponent } from '@/components/collections/DraftExpiryComponents';
 import StudioPageSkeleton from '@/components/studio/StudioPageSkeleton';
 import useCachedResource from '@/hooks/useCachedResource';
@@ -116,20 +113,8 @@ const DashboardHome: React.FC = () => {
 
   const overview = dashboardData?.overview ?? null;
   const draftStats = dashboardData?.draftStats ?? null;
-  const storeOpenStatus = dashboardData?.storeOpenStatus ?? null;
 
   const kpis = overview?.kpis || {};
-  const store = overview?.store || {};
-  const displayStoreName = store.name || user?.brandFullName || 'Store';
-  const logoInitial =
-    user?.profileImage ?? user?.profileImageFile?.s3Url ?? store.logoUrl ?? null;
-  const logoFileId = user?.profileImageId ?? user?.profileImageFile?.id ?? null;
-  const { url: resolvedLogoUrl } = useSignedFileUrl(logoFileId, logoInitial);
-  const resolvedIsLive =
-    storeOpenStatus ??
-    (typeof store?.isStoreOpen === 'boolean' ? store.isStoreOpen : null) ??
-    (typeof store?.isLive === 'boolean' ? store.isLive : null) ??
-    (typeof (user as any)?.isStoreOpen === 'boolean' ? (user as any).isStoreOpen : false);
   const storeHealth = overview?.storeHealth || { score: 0, responseTime: 0, inventory: 0, reviews: 0 };
   const actionRequired = useMemo(
     () => overview?.actionRequired || [],
@@ -152,10 +137,6 @@ const DashboardHome: React.FC = () => {
     return val.toString();
   };
 
-  const avatarFallback = getAvatarFallback(
-    `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim(),
-    user?.username,
-  );
 
   if (loading && !overview) {
     return <StudioPageSkeleton variant="dashboard" />;
@@ -163,58 +144,6 @@ const DashboardHome: React.FC = () => {
 
   return (
     <div className={`${isEmbeddedMobile ? 'space-y-4' : 'space-y-5 sm:space-y-8'} animate-in fade-in duration-500`}>
-      <div className="overflow-hidden rounded-2xl wiez-card-base wiez-shade-9">
-        <div className="flex flex-row items-center justify-between gap-3 px-3 py-3 sm:px-4 md:px-6 md:py-4">
-          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-[0_2px_8px_rgba(124,58,237,0.12)] sm:h-12 sm:w-12">
-              {resolvedLogoUrl ? (
-                <MediaRenderer
-                  kind="image"
-                  src={resolvedLogoUrl}
-                  alt={displayStoreName}
-                  className="h-full w-full"
-                  mediaClassName="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-600 to-indigo-600 text-lg font-bold text-white">
-                  {avatarFallback}
-                </div>
-              )}
-            </div>
-            <div className="min-w-0">
-              <h1 className="flex min-w-0 flex-wrap items-center gap-2 text-base font-bold text-gray-900 dark:text-white sm:text-xl">
-                <span className="min-w-0 truncate">{displayStoreName}</span>
-                <span
-                  className={`flex flex-shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 shadow-[] text-[10px] font-medium sm:px-2.5 sm:text-xs ${
-                    resolvedIsLive
-                      ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                      : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
-                  }`}
-                >
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      resolvedIsLive ? 'bg-green-500' : 'bg-yellow-500'
-                    }`}
-                  />
-                  {resolvedIsLive ? 'LIVE' : 'DRAFT'}
-                </span>
-              </h1>
-              <p className="truncate text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
-                weaz.com/{store.slug || user?.username || 'your-store'}
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => navigate('/studio/store')}
-            className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-white/80 dark:bg-white/10 px-3 py-2 text-xs font-semibold text-purple-900 dark:text-purple-200 shadow-[0_2px_8px_rgba(124,58,237,0.08)] transition-all hover:scale-105 active:scale-95 sm:gap-2 sm:px-4 sm:text-sm"
-          >
-            <span aria-hidden="true">🏪</span>
-            <span className="hidden min-[380px]:inline">View Store</span>
-          </button>
-        </div>
-      </div>
 
       <section>
         <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
