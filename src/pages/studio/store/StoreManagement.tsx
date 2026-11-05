@@ -340,112 +340,42 @@ export default function StoreManagement() {
         </div>
       ) : null}
 
-      <div className="sticky top-0 z-30 bg-surface-primary/95 backdrop-blur-md pb-2 pt-1 border-b border-black/5 dark:border-white/5">
-        <div className="px-2 sm:px-4">
-          {/* Universal Pristine Single-Row Store Top: Mobile, iPad & Desktop */}
-          <div className="flex items-center justify-between gap-1.5 sm:gap-3 overflow-x-auto scrollbar-hide py-1 flex-nowrap">
-            {/* Left: Brand Avatar, Name (No Truncation), Single Live Pill & Info Bio Modal Button */}
-            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 flex-nowrap">
-              <div className="relative h-8 w-8 sm:h-9 sm:w-9 shrink-0 overflow-hidden rounded-xl border-0">
-                {avatarUrl ? (
-                  <MediaRenderer
-                    kind="image"
-                    src={avatarUrl}
-                    alt={brandName}
-                    fit="cover"
-                    className="h-full w-full"
-                    mediaClassName="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-purple-900/30 p-1">
-                    <WiezMark height={20} />
-                  </div>
-                )}
-              </div>
+      {!isEmbeddedMobile && (
+        <div className="flex items-center justify-end gap-2 pb-2">
+          <button
+            type="button"
+            onClick={handleOpenBio}
+            className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-gray-200 transition-all hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 border-0 shrink-0"
+            aria-label="View brand bio"
+            title={brandDescription || 'View brand bio'}
+          >
+            <span className="text-xs">ℹ️</span>
+          </button>
 
-              <h1 className="whitespace-nowrap text-xs sm:text-sm font-extrabold leading-tight text-theme shrink-0">
-                {brandName}
-              </h1>
+          {commerce?.data?.canUpgrade && (
+            <button
+              type="button"
+              onClick={() => navigate('/settings/subscriptions')}
+              className="inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-90 active:scale-95 transition border-0 shrink-0"
+              aria-label="Upgrade store plan"
+              title="Upgrade plan"
+            >
+              <span className="text-xs">⚡</span>
+              <span>Upgrade</span>
+            </button>
+          )}
 
-              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0 ${
-                status?.isStoreOpen
-                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                  : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-              }`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${status?.isStoreOpen ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                {status?.isStoreOpen ? 'Live' : 'Draft'}
-              </span>
-
-              <button
-                type="button"
-                onClick={handleOpenBio}
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs opacity-80 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition"
-                aria-label="View brand bio"
-                title={brandDescription || "View brand bio"}
-              >
-                ℹ️
-              </button>
-            </div>
-
-            {/* Right: Badges, Metadata & Actions filling the top bar on all screens */}
-            <div className="flex items-center gap-1 sm:gap-2 shrink-0 flex-nowrap">
-              {/* Systematic Upgrade CTA if brand needs upgrade */}
-              {commerce?.data?.canUpgrade && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isEmbeddedMobile) {
-                      postStudioNativeEvent({
-                        type: 'OPEN_NATIVE_ROUTE',
-                        path: '/settings/subscriptions',
-                      });
-                      return;
-                    }
-                    navigate('/settings/subscriptions');
-                  }}
-                  className="inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:opacity-90 active:scale-95 transition border-0 shrink-0"
-                  aria-label="Upgrade store plan"
-                  title="Upgrade plan"
-                >
-                  <span className="text-xs">⚡</span>
-                  <span>Upgrade</span>
-                </button>
-              )}
-
-              {/* QR Action */}
-              <button
-                type="button"
-                onClick={() => setShowStoreQr(true)}
-                className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-gray-200 transition-all hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 border-0 shrink-0"
-                aria-label="Open storefront QR code"
-                title="Storefront QR code"
-              >
-                <span className="text-xs">🪪</span>
-              </button>
-
-              {/* Preview Action */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (isEmbeddedMobile) {
-                    postStudioNativeEvent({
-                      type: 'OPEN_NATIVE_ROUTE',
-                      path: '/profile?tab=Store',
-                    });
-                    return;
-                  }
-                  navigate('/profile');
-                }}
-                className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-gray-200 transition-all hover:bg-purple-50 hover:text-purple-600 active:scale-95 border-0 shrink-0"
-                aria-label="Preview as visitor"
-                title="Preview as visitor"
-              >
-                <span className="text-xs">👁️</span>
-              </button>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowStoreQr(true)}
+            className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.06] text-gray-700 dark:text-gray-200 transition-all hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 border-0 shrink-0"
+            aria-label="Open storefront QR code"
+            title="Storefront QR code"
+          >
+            <span className="text-xs">🪪</span>
+          </button>
         </div>
-      </div>
+      )}
 
       {showVerificationPrompt ? (
         <section className="rounded-2xl border-0 bg-gradient-to-r from-sky-500/15 via-purple-500/10 to-indigo-500/15 p-3 sm:p-4 backdrop-blur-md">
