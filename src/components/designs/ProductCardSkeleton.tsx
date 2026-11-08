@@ -1,4 +1,5 @@
 import React from 'react';
+import { ProductTile } from '@/components/commerce/ProductTile';
 
 interface ProductCardSkeletonProps {
   /** Number of skeleton cards to render (when used directly as a grid) */
@@ -21,55 +22,35 @@ interface ProductCardSkeletonProps {
 const ProductCardSkeleton: React.FC<ProductCardSkeletonProps> = ({ 
   count, 
   viewMode: _viewMode = 'grid',
-  proportion = 'catalog',
+  proportion: _proportion = 'catalog',
 }) => {
   // Single skeleton card component
   const SkeletonCard = ({ index }: { index: number }) => (
     /*
-      The skeleton must occupy the card's shape, not a guess at its height.
-
-      `min-h-[320px]` with a TRANSPARENT media placeholder meant the loading
-      state had no body: all that painted was the dark strip at the bottom and
-      the pale bars inside it, so a reloading rail read as a row of floating
-      form fields. And 320px is not the card's height — StoreProductCard is
-      `aspect-[4/5]`, so every card also jumped size the moment real data
-      arrived. Matching the aspect ratio fixes both: the placeholder is the same
-      box the card will be, and it is filled so it reads as a card.
+      The skeleton occupies the card's exact shape — the shared product tile
+      frame, photo on top and a body beneath — so the swap to live content
+      moves nothing. Studio, the Shop tab and Market all render the same tile
+      now, so `proportion` no longer changes the shape; it is kept so existing
+      callers still compile.
     */
-    <div className={`relative w-full overflow-hidden rounded-2xl ${proportion === 'studio' ? 'aspect-[100/158] lg:aspect-[5/6]' : 'aspect-[4/5]'}`}>
-      {/* Full-bleed image skeleton */}
-      <div className="absolute inset-0 overflow-hidden bg-gray-200 dark:bg-white/10">
-        {/* Shimmer effect */}
-        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/10 to-transparent" />
-        
-        {/* Wishlist button placeholder */}
-        <div className="absolute top-3 right-3 w-10 h-10 rounded-full bg-gray-200/60 dark:bg-zinc-700/50" />
-        
-        {/* Badge placeholder (sometimes shown) */}
-        {index % 3 === 0 && (
-          <div className="absolute top-3 left-3 w-14 h-6 rounded-full bg-gray-200/60 dark:bg-zinc-700/50" />
-        )}
-      </div>
-      
-      {/* Liquid gradient blend skeleton */}
-      {/* Mirrors the real card's blended overlay — same ramp, blur and padding — so
-          the swap to live content does not move anything. */}
-      <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/50 via-black/25 to-transparent px-3.5 pb-2.5 pt-7 backdrop-blur-md [mask-image:linear-gradient(to_bottom,transparent_0%,black_24px,black_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_24px,black_100%)]">
-        <div className="flex flex-col gap-2">
-          {/* Title */}
-          <div className="h-4 w-3/4 bg-white/20 rounded-md" />
-          {/* Brand name */}
-          <div className="h-3 w-1/2 bg-white/15 rounded-md" />
-          {/* Price */}
-          <div className="h-4 w-20 bg-white/20 rounded-md" />
-          {/* Stock + action row */}
-          <div className="flex items-center justify-between mt-1">
-            <div className="h-3 w-16 bg-white/15 rounded" />
-            <div className="w-8 h-8 rounded-lg bg-white/15" />
-          </div>
+    <ProductTile.Root aria-hidden="true">
+      <ProductTile.Media className="bg-gray-200 dark:bg-white/10">
+        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 to-transparent dark:via-white/10" />
+        <div className="absolute right-2.5 top-2.5 h-8 w-8 rounded-full bg-gray-100/70 dark:bg-zinc-700/50" />
+        {index % 3 === 0 ? (
+          <div className="absolute left-2.5 top-2.5 h-5 w-12 rounded-full bg-gray-100/70 dark:bg-zinc-700/50" />
+        ) : null}
+      </ProductTile.Media>
+      <ProductTile.Body>
+        <div className="flex flex-col gap-1.5">
+          <div className="h-3.5 w-11/12 rounded-md bg-gray-200 dark:bg-white/10" />
+          <div className="h-3.5 w-2/3 rounded-md bg-gray-200 dark:bg-white/10" />
+          <div className="h-3 w-1/2 rounded-md bg-gray-100 dark:bg-white/[0.06]" />
+          <div className="h-4 w-20 rounded-md bg-gray-200 dark:bg-white/10" />
         </div>
-      </div>
-    </div>
+        <div className="mt-1.5 h-9 w-full rounded-xl bg-gray-200 dark:bg-white/10" />
+      </ProductTile.Body>
+    </ProductTile.Root>
   );
 
   // If count is provided, render a grid of skeletons

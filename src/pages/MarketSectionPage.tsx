@@ -15,13 +15,13 @@ import {
   type MarketSectionDetailResponse,
   type MarketSectionItem,
 } from '@/api/MarketApi';
-import ImageWithFallback from '@/components/ImageWithFallback';
 import InlineProductDetail from '@/components/catalog/InlineProductDetail';
 import ProductCardSkeleton from '@/components/designs/ProductCardSkeleton';
 import StoreProductCard from '@/components/designs/StoreProductCard';
 import Button from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { MarketSectionRail } from '@/components/market/MarketSectionRail';
+import { MarketItemTile } from '@/components/market/MarketEntityCards';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useMarketSignals } from '@/hooks/useMarketSignals';
 import { queryKeys } from '@/query/queryKeys';
@@ -90,23 +90,6 @@ const getItemEffectivePrice = (item: MarketSectionItem): number => {
   );
 };
 
-const formatPriceLabel = (item: MarketSectionItem) => {
-  const currency = item.price?.currency || item.priceRange?.currency || 'NGN';
-  const formatAmount = (amount: number) =>
-    new Intl.NumberFormat('en-NG', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 0,
-    }).format(amount);
-
-  if (item.price?.effectiveAmount) return formatAmount(item.price.effectiveAmount);
-  if (item.priceRange?.min) return `From ${formatAmount(item.priceRange.min)}`;
-  if (item.stats?.products) {
-    return `${item.stats.products} item${item.stats.products === 1 ? '' : 's'}`;
-  }
-  return null;
-};
-
 const mergeUniqueItems = (
   current: MarketSectionItem[],
   next: MarketSectionItem[],
@@ -122,56 +105,6 @@ const mergeUniqueItems = (
     }
   }
   return Array.from(byKey.values());
-};
-
-const GenericSectionCard: React.FC<{
-  item: MarketSectionItem;
-  onOpen: () => void;
-}> = ({ item, onOpen }) => {
-  const mediaUrl = item.media?.thumbnailUrl || item.media?.url || null;
-  const priceLabel = formatPriceLabel(item);
-  const canOpen = Boolean(item.target?.route);
-
-  return (
-    <button
-      type="button"
-      disabled={!canOpen}
-      onClick={onOpen}
-      className="group overflow-hidden rounded-3xl bg-white text-left shadow-sm ring-1 ring-gray-200/70 transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-default dark:bg-white/[0.04] dark:ring-white/10"
-    >
-      {mediaUrl ? (
-        <ImageWithFallback
-          src={mediaUrl}
-          alt={item.media?.alt || item.title}
-          fit="cover"
-          rounded="none"
-          containerClassName="h-56 w-full bg-gray-100 dark:bg-white/5"
-          className="h-full w-full transition-transform duration-500 group-hover:scale-105"
-          maxHeightClassName="max-h-full"
-          fallbackName={item.title}
-        />
-      ) : (
-        <div className="flex h-56 w-full items-center justify-center bg-gray-100 text-3xl dark:bg-white/5">
-          #
-        </div>
-      )}
-      <div className="space-y-1.5 p-4">
-        <p className="text-sm font-bold text-gray-900 dark:text-white leading-snug">
-          {item.title}
-        </p>
-        {item.subtitle || item.brand?.name ? (
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {item.subtitle || item.brand?.name}
-          </p>
-        ) : null}
-        {priceLabel ? (
-          <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">
-            {priceLabel}
-          </p>
-        ) : null}
-      </div>
-    </button>
-  );
 };
 
 const MarketSectionPage: React.FC = () => {
@@ -626,7 +559,7 @@ const MarketSectionPage: React.FC = () => {
 
         {/* Catalog Grid */}
         {loading ? (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3.5 sm:gap-4 min-[640px]:grid-cols-3 lg:grid-cols-4">
             {Array.from({ length: 8 }).map((_, index) => (
               <ProductCardSkeleton key={index} />
             ))}
@@ -663,7 +596,7 @@ const MarketSectionPage: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3.5 sm:gap-4 min-[640px]:grid-cols-3 lg:grid-cols-4">
               {filteredAndSortedItems.map((item, index) => {
                 const signalKey = getSectionItemSignalKey(
                   section?.key ?? normalizedSectionKey,
@@ -686,7 +619,7 @@ const MarketSectionPage: React.FC = () => {
                         onPreviewNavigationActiveChange={() => undefined}
                       />
                     ) : (
-                      <GenericSectionCard item={item} onOpen={() => openItem(item, index)} />
+                      <MarketItemTile item={item} onOpen={() => openItem(item, index)} />
                     )}
                   </div>
                 );

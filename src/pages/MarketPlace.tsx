@@ -424,11 +424,14 @@ export const MarketPlace: React.FC = () => {
       items: MarketSectionItem[];
     }> = [];
 
+    // Labels say what a shopper will find, in their words: the title names the
+    // section, the eyebrow says why it is here. Nothing claims more than the
+    // filter behind it guarantees. Keys are unchanged — they are routes.
     if (newArrivals.length > 0) {
       initialList.push({
         key: 'fresh-drops',
-        title: 'New Arrivals & Master Ateliers',
-        eyebrow: 'HANDPICKED SILHOUETTES',
+        title: 'New arrivals',
+        eyebrow: 'New this week',
         items: newArrivals,
       });
     }
@@ -436,8 +439,8 @@ export const MarketPlace: React.FC = () => {
     if (trendingDrops.length > 0) {
       initialList.push({
         key: 'hot-right-now',
-        title: 'Trending Drops & High Demand',
-        eyebrow: 'COMMUNITY FAVORITES',
+        title: 'Trending now',
+        eyebrow: 'People are checking these out',
         items: trendingDrops,
       });
     }
@@ -445,8 +448,8 @@ export const MarketPlace: React.FC = () => {
     if (customFitPieces.length > 0) {
       initialList.push({
         key: 'custom-fit',
-        title: 'Artisanal & Custom Fit Couture',
-        eyebrow: 'MADE TO MEASURE',
+        title: 'Made to your measurements',
+        eyebrow: 'Custom order ready',
         items: customFitPieces,
       });
     }
@@ -454,8 +457,8 @@ export const MarketPlace: React.FC = () => {
     if (readyToWear.length > 0) {
       initialList.push({
         key: 'almost-gone',
-        title: 'Archive Drops & Ready to Ship',
-        eyebrow: 'IMMEDIATE DISPATCH',
+        title: 'Ready to wear',
+        eyebrow: 'In stock now',
         items: readyToWear,
       });
     }
@@ -599,13 +602,13 @@ export const MarketPlace: React.FC = () => {
 
         {/* ── 3. 100% Section-Driven Rails (Zero Vertical Infinite Grid on Home) ── */}
         {loading ? (
-          <div className="space-y-8">
+          <div className="space-y-12 sm:space-y-14">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="space-y-3">
+              <div key={i} className="space-y-4">
                 <div className="h-6 w-48 animate-pulse rounded-lg bg-gray-200 dark:bg-white/10" />
-                <div className="flex gap-4 overflow-hidden">
-                  {Array.from({ length: 4 }).map((__, j) => (
-                    <div key={j} className="w-[300px] shrink-0">
+                <div className="flex gap-3.5 overflow-hidden sm:gap-4">
+                  {Array.from({ length: 6 }).map((__, j) => (
+                    <div key={j} className="w-[calc((100%-1.75rem)/2.3)] shrink-0 sm:w-[220px] lg:w-[236px]">
                       <ProductCardSkeleton />
                     </div>
                   ))}
@@ -614,7 +617,13 @@ export const MarketPlace: React.FC = () => {
             ))}
           </div>
         ) : processedSections.length > 0 ? (
-          <div className="space-y-10 sm:space-y-12">
+          /*
+            Section rhythm: 48px between sections against 16px between a
+            section's title and its cards. At 3:1 each title unmistakably
+            belongs to the cards under it, so sections read as separate groups
+            without a rule or a box around each one.
+          */
+          <div className="space-y-12 sm:space-y-14">
             {processedSections.map((section) => (
               <MarketSectionRail
                 key={section.key}

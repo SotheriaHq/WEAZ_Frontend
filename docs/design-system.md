@@ -1,5 +1,8 @@
 # WIEZ Web Design System & Token Architecture
 
+> Product cards, the Bag It control and Market section layout follow
+> [market-card-and-section-system.md](./market-card-and-section-system.md).
+
 ## 1. Overview
 
 The WIEZ design system provides a unified, production-grade visual language across Web and Native applications. The architecture establishes semantic consistency and design token parity while respecting platform-specific implementation patterns.
