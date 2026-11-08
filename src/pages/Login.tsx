@@ -940,7 +940,7 @@ const LoginPage = () => {
               >
                 {/* Email */}
                 <div className="space-y-2">
-                  <label className="text-xs font-medium auth-label uppercase tracking-wider ml-1">
+                  <label htmlFor="login-email" className="text-xs font-medium auth-label uppercase tracking-wider ml-1">
                     Email Address
                   </label>
                   <div className="relative">
@@ -948,7 +948,9 @@ const LoginPage = () => {
                       <Mail className="auth-field-icon h-4 w-4" />
                     </div>
                     <input
+                      id="login-email"
                       type="email"
+                      autoComplete="email"
                       {...emailFieldRegistration}
                       placeholder="name@example.com"
                       className="auth-input w-full rounded-xl py-3.5 pl-11 pr-4 text-sm"
@@ -976,7 +978,13 @@ const LoginPage = () => {
                       </div>
                     )}
                   </div>
-                  {errors.email && <p className="auth-error-text text-sm ml-1" role="alert">{errors.email.message}</p>}
+                  <div className="auth-feedback-slot min-h-[1.25rem] mt-1 text-xs flex items-center" aria-live="polite">
+                    {errors.email ? (
+                      <p className="auth-error-text text-xs ml-1" role="alert">{errors.email.message}</p>
+                    ) : (
+                      <span className="invisible select-none pointer-events-none" aria-hidden="true">&nbsp;</span>
+                    )}
+                  </div>
                 </div>
 
                 {loginStep === 'password' && (
@@ -984,7 +992,7 @@ const LoginPage = () => {
                 {/* Password */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center ml-1">
-                    <label className="text-xs font-medium auth-label uppercase tracking-wider">Password</label>
+                    <label htmlFor="login-password" className="text-xs font-medium auth-label uppercase tracking-wider">Password</label>
                     <Link
                       to="/forgot-password"
                       tabIndex={-1}
@@ -998,6 +1006,7 @@ const LoginPage = () => {
                       <Lock className="auth-field-icon h-4 w-4" />
                     </div>
                     <input
+                      id="login-password"
                       type={showPassword ? 'text' : 'password'}
                       {...passwordFieldRegistration}
                       placeholder="••••••••"
@@ -1016,11 +1025,15 @@ const LoginPage = () => {
                       {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                     </button>
                   </div>
-                  {errors.password && (
-                    <p id="login-password-error" className="auth-error-text text-sm ml-1" role="alert">
-                      {errors.password.message}
-                    </p>
-                  )}
+                  <div className="auth-feedback-slot min-h-[1.25rem] mt-1 text-xs flex items-center" aria-live="polite">
+                    {errors.password ? (
+                      <p id="login-password-error" className="auth-error-text text-xs ml-1" role="alert">
+                        {errors.password.message}
+                      </p>
+                    ) : (
+                      <span className="invisible select-none pointer-events-none" aria-hidden="true">&nbsp;</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Remember Me */}

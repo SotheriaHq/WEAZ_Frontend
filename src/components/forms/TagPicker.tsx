@@ -57,6 +57,7 @@ const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom 
   const [query, setQuery] = useState('');
   const [newTagColor, setNewTagColor] = useState<VariantKey>('SLATE');
   const [colorMap, setColorMap] = useState<Record<string, VariantKey>>({});
+  const [tagError, setTagError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -78,45 +79,66 @@ const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom 
     if (!normalized) return;
     
     const validation = validateTag(normalized);
-    if (!validation.valid) return; // silently ignore invalid
+    if (!validation.valid) return;
     
     if (tagExists(normalized, value)) {
       // Remove the tag (case-insensitive match)
       onChange(value.filter((x) => normalizeTag(x) !== normalized));
+      if (tagError) setTagError(null);
     } else if (value.length < max) {
       onChange([...value, normalized]);
+      if (tagError) setTagError(null);
+    } else {
+      setTagError(`Maximum of ${max} tags allowed.`);
     }
   };
 
   const addCustom = () => {
-    const normalized = normalizeTag(query);
-    if (!normalized) return;
-    
-    const validation = validateTag(normalized);
+    const rawInput = query.trim();
+    if (!rawInput) return;
+
+    const validation = validateTag(rawInput);
     if (!validation.valid) {
-      setQuery('');
-      alert(validation.error || 'Invalid tag format');
+      setTagError(validation.error || 'Invalid tag format');
+      return;
+    }
+
+    const normalized = normalizeTag(rawInput);
+    if (tagExists(normalized, value)) {
+      setTagError(`Tag '#${normalized}' already added`);
       return;
     }
     
-    if (tagExists(normalized, value)) {
-      setQuery('');
-      return; // Already exists
+    if (value.length >= max) {
+      setTagError(`Maximum of ${max} tags allowed.`);
+      return;
     }
-    
-    if (value.length < max) {
-      onChange([...value, normalized]);
-      setColorMap((m) => ({ ...m, [normalized]: newTagColor }));
-    }
+
+    onChange([...value, normalized]);
+    setColorMap((m) => ({ ...m, [normalized]: newTagColor }));
     setQuery('');
+    setTagError(null);
   };
 
   return (
     <div className="space-y-3 max-w-full">
       <div className="flex items-center gap-2 max-w-full">
         <input
+          id="tag-picker-input"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (tagError) setTagError(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addCustom();
+            }
+          }}
+          aria-invalid={Boolean(tagError)}
+          aria-describedby={tagError ? 'tag-picker-error' : undefined}
+          aria-label="Add or search tags"
           placeholder="Search or add tag"
           className="wiez-search-input flex-1 min-w-0"
         />
@@ -130,6 +152,16 @@ const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom 
           </button>
         )}
       </div>
+      {tagError && (
+        <p
+          id="tag-picker-error"
+          role="alert"
+          aria-live="assertive"
+          className="text-xs text-rose-500 dark:text-rose-400 mt-1"
+        >
+          {tagError}
+        </p>
+      )}
 
       {allowCustom && (
         <div className="flex flex-wrap gap-2 max-w-full">
