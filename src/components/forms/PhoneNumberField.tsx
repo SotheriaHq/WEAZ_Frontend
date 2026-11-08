@@ -313,15 +313,19 @@ const PhoneNumberField: React.FC<PhoneNumberFieldProps> = ({
         </div>
       </div>
 
-      {visibleError ? (
-        <p className="text-xs font-medium text-red-500">{visibleError}</p>
-      ) : completeness.isValid ? (
-        <p className="text-xs font-medium text-green-600">
-          ✓ Valid number — saved as {completeness.e164}
-        </p>
-      ) : helperText ? (
-        <p className="text-xs text-gray-500">{helperText}</p>
-      ) : null}
+      <div className="min-h-[1.25rem] mt-1 text-xs transition-opacity duration-150 flex items-start" aria-live="polite">
+        {visibleError ? (
+          <p role="alert" className="text-xs font-medium text-rose-500 dark:text-rose-400 leading-4">{visibleError}</p>
+        ) : completeness.isValid ? (
+          <p className="text-xs font-medium text-green-600 dark:text-green-400 leading-4">
+            ✓ Valid number — saved as {completeness.e164}
+          </p>
+        ) : helperText ? (
+          <p className="text-xs text-gray-500 dark:text-gray-400 leading-4">{helperText}</p>
+        ) : (
+          <span className="invisible select-none pointer-events-none leading-4" aria-hidden="true">&nbsp;</span>
+        )}
+      </div>
     </div>
   );
 };

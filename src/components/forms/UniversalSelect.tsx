@@ -442,7 +442,13 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
 
         {dropdown}
       </div>
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      <div className="min-h-[1.25rem] mt-1 text-xs transition-opacity duration-150 flex items-start" aria-live="polite">
+        {error ? (
+          <p role="alert" className="text-xs font-medium text-rose-500 dark:text-rose-400 leading-4">{error}</p>
+        ) : (
+          <span className="invisible select-none pointer-events-none leading-4" aria-hidden="true">&nbsp;</span>
+        )}
+      </div>
     </div>
   );
 };

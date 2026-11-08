@@ -123,6 +123,13 @@ html[data-theme='dark'] {
   color: var(--auth-danger);
 }
 
+.auth-feedback-slot {
+  min-height: 1.25rem;
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: flex-start;
+}
+
 .auth-success-text {
   color: var(--auth-success);
 }

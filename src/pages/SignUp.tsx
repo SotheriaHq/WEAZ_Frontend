@@ -574,7 +574,13 @@ const SignUpPage = () => {
                           <Check className="h-4 w-4" />
                        </div>
                     </div>
-                    {errors.firstName && <p className="auth-error-text text-sm ml-1" role="alert">{errors.firstName.message}</p>}
+                    <div className="auth-feedback-slot min-h-[1.25rem] mt-1 text-xs flex items-center" aria-live="polite">
+                    {errors.firstName ? (
+                      <p className="auth-error-text text-xs ml-1" role="alert">{errors.firstName.message}</p>
+                    ) : (
+                      <span className="invisible select-none pointer-events-none" aria-hidden="true">&nbsp;</span>
+                    )}
+                  </div>
                   </div>
                   <div className="space-y-2">
                     <label htmlFor="signup-lastName" className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
@@ -598,7 +604,13 @@ const SignUpPage = () => {
                           <Check className="h-4 w-4" />
                        </div>
                     </div>
-                    {errors.lastName && <p className="auth-error-text text-sm ml-1" role="alert">{errors.lastName.message}</p>}
+                    <div className="auth-feedback-slot min-h-[1.25rem] mt-1 text-xs flex items-center" aria-live="polite">
+                    {errors.lastName ? (
+                      <p className="auth-error-text text-xs ml-1" role="alert">{errors.lastName.message}</p>
+                    ) : (
+                      <span className="invisible select-none pointer-events-none" aria-hidden="true">&nbsp;</span>
+                    )}
+                  </div>
                   </div>
                 </div>
 
@@ -621,7 +633,13 @@ const SignUpPage = () => {
                         className="auth-input w-full rounded-xl py-3.5 pl-11 pr-4 text-sm"
                       />
                     </div>
-                    {errors.brandFullName && <p className="auth-error-text text-sm ml-1" role="alert">{errors.brandFullName.message}</p>}
+                    <div className="auth-feedback-slot min-h-[1.25rem] mt-1 text-xs flex items-center" aria-live="polite">
+                    {errors.brandFullName ? (
+                      <p className="auth-error-text text-xs ml-1" role="alert">{errors.brandFullName.message}</p>
+                    ) : (
+                      <span className="invisible select-none pointer-events-none" aria-hidden="true">&nbsp;</span>
+                    )}
+                  </div>
                   </div>
                 )}
 
@@ -648,7 +666,13 @@ const SignUpPage = () => {
                        <Check className="h-4 w-4" />
                     </div>
                   </div>
-                  {errors.email && <p className="auth-error-text text-sm ml-1" role="alert">{errors.email.message}</p>}
+                  <div className="auth-feedback-slot min-h-[1.25rem] mt-1 text-xs flex items-center" aria-live="polite">
+                    {errors.email ? (
+                      <p className="auth-error-text text-xs ml-1" role="alert">{errors.email.message}</p>
+                    ) : (
+                      <span className="invisible select-none pointer-events-none" aria-hidden="true">&nbsp;</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Password */}
@@ -685,7 +709,13 @@ const SignUpPage = () => {
                     password={watchPassword}
                    
                   />
-                  {errors.password && <p className="auth-error-text text-sm ml-1" role="alert">{errors.password.message}</p>}
+                  <div className="auth-feedback-slot min-h-[1.25rem] mt-1 text-xs flex items-center" aria-live="polite">
+                    {errors.password ? (
+                      <p className="auth-error-text text-xs ml-1" role="alert">{errors.password.message}</p>
+                    ) : (
+                      <span className="invisible select-none pointer-events-none" aria-hidden="true">&nbsp;</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Confirm Password */}
@@ -725,7 +755,13 @@ const SignUpPage = () => {
                     confirmPassword={watchConfirmPassword}
                    
                   />
-                  {errors.confirmPassword && <p className="auth-error-text text-sm ml-1" role="alert">{errors.confirmPassword.message}</p>}
+                  <div className="auth-feedback-slot min-h-[1.25rem] mt-1 text-xs flex items-center" aria-live="polite">
+                    {errors.confirmPassword ? (
+                      <p className="auth-error-text text-xs ml-1" role="alert">{errors.confirmPassword.message}</p>
+                    ) : (
+                      <span className="invisible select-none pointer-events-none" aria-hidden="true">&nbsp;</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Terms Agreement */}

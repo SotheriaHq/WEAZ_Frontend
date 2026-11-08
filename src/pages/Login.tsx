@@ -978,7 +978,13 @@ const LoginPage = () => {
                       </div>
                     )}
                   </div>
-                  {errors.email && <p className="auth-error-text text-sm ml-1" role="alert">{errors.email.message}</p>}
+                  <div className="auth-feedback-slot min-h-[1.25rem] mt-1 text-xs flex items-center" aria-live="polite">
+                    {errors.email ? (
+                      <p className="auth-error-text text-xs ml-1" role="alert">{errors.email.message}</p>
+                    ) : (
+                      <span className="invisible select-none pointer-events-none" aria-hidden="true">&nbsp;</span>
+                    )}
+                  </div>
                 </div>
 
                 {loginStep === 'password' && (
@@ -1019,11 +1025,15 @@ const LoginPage = () => {
                       {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                     </button>
                   </div>
-                  {errors.password && (
-                    <p id="login-password-error" className="auth-error-text text-sm ml-1" role="alert">
-                      {errors.password.message}
-                    </p>
-                  )}
+                  <div className="auth-feedback-slot min-h-[1.25rem] mt-1 text-xs flex items-center" aria-live="polite">
+                    {errors.password ? (
+                      <p id="login-password-error" className="auth-error-text text-xs ml-1" role="alert">
+                        {errors.password.message}
+                      </p>
+                    ) : (
+                      <span className="invisible select-none pointer-events-none" aria-hidden="true">&nbsp;</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Remember Me */}

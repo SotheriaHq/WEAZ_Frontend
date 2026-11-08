@@ -58,12 +58,15 @@ const TextField = forwardRef<HTMLInputElement, Props>(
           />
           {addon && <div className="ml-2">{addon}</div>}
         </div>
-        {helperText && !error && (
-          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {helperText}
-          </div>
-        )}
-        {error && <div className="mt-1 text-xs text-rose-500 dark:text-rose-400 font-medium">{error}</div>}
+        <div className="min-h-[1.25rem] mt-1 text-xs transition-opacity duration-150 flex items-start" aria-live="polite">
+          {error ? (
+            <div role="alert" className="text-rose-500 dark:text-rose-400 font-medium leading-4">{error}</div>
+          ) : helperText ? (
+            <div className="text-gray-500 dark:text-gray-400 leading-4">{helperText}</div>
+          ) : (
+            <span className="invisible select-none pointer-events-none leading-4" aria-hidden="true">&nbsp;</span>
+          )}
+        </div>
       </div>
     );
   },

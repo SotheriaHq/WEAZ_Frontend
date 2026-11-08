@@ -117,29 +117,29 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
         </div>
 
-        {/* Bottom row: helper/error text + character counter */}
-        {(helperText || error || showCounter) && (
-          <div className="flex items-center justify-between mt-1.5 gap-2">
-            <div className="flex-1">
-              {error ? (
-                <p className="text-xs text-[color:var(--wiez-action-danger)]">{error}</p>
-              ) : helperText ? (
-                <p className="text-xs text-[color:var(--wiez-text-muted)]">{helperText}</p>
-              ) : null}
-            </div>
-            {showCounter && (
-              <span
-                className={`text-xs font-medium ${
-                  isOverLimit
-                    ? 'text-[color:var(--wiez-action-danger)]'
-                    : 'text-[color:var(--wiez-text-muted)]'
-                }`}
-              >
-                {charCount}/{maxCharCount}
-              </span>
+        {/* Bottom row: helper/error text + character counter with reserved stability space */}
+        <div className="flex items-start justify-between min-h-[1.25rem] mt-1.5 gap-2 text-xs" aria-live="polite">
+          <div className="flex-1">
+            {error ? (
+              <p role="alert" className="text-xs text-[color:var(--wiez-action-danger)] leading-4 font-medium">{error}</p>
+            ) : helperText ? (
+              <p className="text-xs text-[color:var(--wiez-text-muted)] leading-4">{helperText}</p>
+            ) : (
+              <span className="invisible select-none pointer-events-none leading-4" aria-hidden="true">&nbsp;</span>
             )}
           </div>
-        )}
+          {showCounter && (
+            <span
+              className={`text-xs font-medium ${
+                isOverLimit
+                  ? 'text-[color:var(--wiez-action-danger)]'
+                  : 'text-[color:var(--wiez-text-muted)]'
+              }`}
+            >
+              {charCount}/{maxCharCount}
+            </span>
+          )}
+        </div>
       </div>
     );
   }
