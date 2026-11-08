@@ -2217,6 +2217,11 @@ const CreateDesignInner: React.FC = () => {
                       optionAllowWrap
                       selectedAllowWrap
                     />
+                    {!categoryId && !selectedProposal && (
+                      <p className="text-[11px] text-gray-500 dark:text-white/50 mt-1">
+                        Select a category in &quot;What is it?&quot; above to choose a garment type.
+                      </p>
+                    )}
                   </div>
 
                   {/* Missing category or garment type proposal toggle */}

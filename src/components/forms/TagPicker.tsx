@@ -57,6 +57,7 @@ const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom 
   const [query, setQuery] = useState('');
   const [newTagColor, setNewTagColor] = useState<VariantKey>('SLATE');
   const [colorMap, setColorMap] = useState<Record<string, VariantKey>>({});
+  const [tagError, setTagError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -94,10 +95,10 @@ const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom 
     
     const validation = validateTag(normalized);
     if (!validation.valid) {
-      setQuery('');
-      alert(validation.error || 'Invalid tag format');
+      setTagError(validation.error || 'Invalid tag format');
       return;
     }
+    setTagError(null);
     
     if (tagExists(normalized, value)) {
       setQuery('');
@@ -130,6 +131,9 @@ const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom 
           </button>
         )}
       </div>
+      {tagError && (
+        <p className="text-xs text-rose-500 dark:text-rose-400">{tagError}</p>
+      )}
 
       {allowCustom && (
         <div className="flex flex-wrap gap-2 max-w-full">

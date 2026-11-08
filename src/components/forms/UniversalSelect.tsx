@@ -61,7 +61,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
   disabled = false,
   className = '',
   error,
-  searchable = false,
+  searchable,
   searchPlaceholder = 'Search options...',
   emptyMessage = 'No matching options',
   optionCompact = false,
@@ -85,6 +85,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
   fitContent = false,
 }) => {
   const isSmall = compact || size === 'sm';
+  const isSearchable = searchable !== undefined ? searchable : options.length > 10;
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties | null>(null);
@@ -94,7 +95,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
   const selectedOption = options.find((opt) => opt.value === value);
 
   const filteredOptions = useMemo(() => {
-    if (!searchable) return options;
+    if (!isSearchable) return options;
     const query = normalizeSearchText(searchTerm);
     if (!query) return options;
 
@@ -106,7 +107,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
       );
       return queryTokens.every((token) => haystack.includes(token));
     });
-  }, [options, searchable, searchTerm]);
+  }, [options, isSearchable, searchTerm]);
 
   const updateMenuPosition = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -136,7 +137,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
       : optionCompact
         ? 42
         : 50;
-    const searchHeight = searchable ? 58 : 0;
+    const searchHeight = isSearchable ? 58 : 0;
     const contentHeight =
       searchHeight +
       (filteredOptions.length > 0 ? filteredOptions.length * optionRowHeight : 48) +
@@ -180,7 +181,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
           ? 'calc(var(--z-modal) + 1)'
           : 'var(--z-dropdown)',
     });
-  }, [filteredOptions.length, menuLayer, optionAllowWrap, optionCompact, searchable]);
+  }, [filteredOptions.length, menuLayer, optionAllowWrap, optionCompact, isSearchable]);
 
   useEffect(() => {
     // Pointer events cover mouse + touch (iPad/iOS Safari often misses mousedown-only).
@@ -258,7 +259,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
             style={menuStyle}
             className={`${menuLayer === 'modal' ? 'z-layer-modal' : 'z-layer-dropdown'} overflow-hidden rounded-2xl border border-[color:var(--border-default)] glass-menu p-1.5 shadow-2xl animate-slideDown focus-within:border-[color:var(--border-strong)] focus:outline-none`}
           >
-            {searchable && (
+            {isSearchable && (
               <div className="sticky top-0 z-10 rounded-xl bg-[color:var(--surface-primary)] px-2 py-2 backdrop-blur-xl">
                 <input
                   type="text"

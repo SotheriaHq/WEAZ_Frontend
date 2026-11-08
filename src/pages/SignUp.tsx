@@ -553,7 +553,7 @@ const SignUpPage = () => {
                 {/* Full Name */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
+                    <label htmlFor="signup-firstName" className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
                       First Name
                     </label>
                     <div className="relative">
@@ -561,7 +561,9 @@ const SignUpPage = () => {
                         <User className="h-4 w-4 text-[var(--text-secondary)]" />
                       </div>
                       <input
+                        id="signup-firstName"
                         type="text"
+                        autoComplete="given-name"
                         {...register('firstName')}
                         placeholder="John"
                         className={`auth-input w-full rounded-xl py-3.5 pl-11 pr-10 text-sm ${
@@ -575,7 +577,7 @@ const SignUpPage = () => {
                     {errors.firstName && <p className="auth-error-text text-sm ml-1" role="alert">{errors.firstName.message}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
+                    <label htmlFor="signup-lastName" className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
                       Last Name
                     </label>
                     <div className="relative">
@@ -583,7 +585,9 @@ const SignUpPage = () => {
                         <User className="h-4 w-4 text-[var(--text-secondary)]" />
                       </div>
                       <input
+                        id="signup-lastName"
                         type="text"
+                        autoComplete="family-name"
                         {...register('lastName')}
                         placeholder="Doe"
                         className={`auth-input w-full rounded-xl py-3.5 pl-11 pr-10 text-sm ${
@@ -601,7 +605,7 @@ const SignUpPage = () => {
                 {/* Brand Full Name - Only for Brand accounts */}
                 {watchUserType === 'BRAND' && (
                   <div className="space-y-2">
-                    <label className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
+                    <label htmlFor="signup-brandFullName" className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
                       Brand Full Name
                     </label>
                     <div className="relative">
@@ -609,7 +613,9 @@ const SignUpPage = () => {
                         <Scissors className="h-4 w-4 text-[var(--text-secondary)]" />
                       </div>
                       <input
+                        id="signup-brandFullName"
                         type="text"
+                        autoComplete="organization"
                         {...register('brandFullName')}
                         placeholder="Your Brand Name"
                         className="auth-input w-full rounded-xl py-3.5 pl-11 pr-4 text-sm"
@@ -621,7 +627,7 @@ const SignUpPage = () => {
 
                 {/* Email */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
+                  <label htmlFor="signup-email" className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
                     Email Address
                   </label>
                   <div className="relative">
@@ -629,7 +635,9 @@ const SignUpPage = () => {
                       <Mail className="auth-field-icon h-4 w-4" />
                     </div>
                     <input
+                      id="signup-email"
                       type="email"
+                      autoComplete="email"
                       {...register('email')}
                       placeholder="name@example.com"
                       className={`auth-input w-full rounded-xl py-3.5 pl-11 pr-10 text-sm ${
@@ -645,7 +653,7 @@ const SignUpPage = () => {
 
                 {/* Password */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
+                  <label htmlFor="signup-password" className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
                     Password
                   </label>
                   <div className="relative">
@@ -653,7 +661,9 @@ const SignUpPage = () => {
                       <Lock className="auth-field-icon h-4 w-4" />
                     </div>
                     <input
+                      id="signup-password"
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       {...register('password')}
                       minLength={PASSWORD_POLICY_MIN_LENGTH}
                       aria-describedby="signup-password-policy"
@@ -680,7 +690,7 @@ const SignUpPage = () => {
 
                 {/* Confirm Password */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
+                  <label htmlFor="signup-confirmPassword" className="text-xs font-bold auth-label uppercase tracking-widest ml-1">
                     Confirm Password
                   </label>
                   <div className="relative">
@@ -688,7 +698,9 @@ const SignUpPage = () => {
                       <Lock className="auth-field-icon h-4 w-4" />
                     </div>
                     <input
+                      id="signup-confirmPassword"
                       type={showConfirmPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       {...register('confirmPassword')}
                       minLength={PASSWORD_POLICY_MIN_LENGTH}
                       placeholder="••••••••"
