@@ -79,45 +79,66 @@ const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom 
     if (!normalized) return;
     
     const validation = validateTag(normalized);
-    if (!validation.valid) return; // silently ignore invalid
+    if (!validation.valid) return;
     
     if (tagExists(normalized, value)) {
       // Remove the tag (case-insensitive match)
       onChange(value.filter((x) => normalizeTag(x) !== normalized));
+      if (tagError) setTagError(null);
     } else if (value.length < max) {
       onChange([...value, normalized]);
+      if (tagError) setTagError(null);
+    } else {
+      setTagError(`Maximum of ${max} tags allowed.`);
     }
   };
 
   const addCustom = () => {
-    const normalized = normalizeTag(query);
-    if (!normalized) return;
-    
-    const validation = validateTag(normalized);
+    const rawInput = query.trim();
+    if (!rawInput) return;
+
+    const validation = validateTag(rawInput);
     if (!validation.valid) {
       setTagError(validation.error || 'Invalid tag format');
       return;
     }
-    setTagError(null);
-    
+
+    const normalized = normalizeTag(rawInput);
     if (tagExists(normalized, value)) {
-      setQuery('');
-      return; // Already exists
+      setTagError(`Tag '#${normalized}' already added`);
+      return;
     }
     
-    if (value.length < max) {
-      onChange([...value, normalized]);
-      setColorMap((m) => ({ ...m, [normalized]: newTagColor }));
+    if (value.length >= max) {
+      setTagError(`Maximum of ${max} tags allowed.`);
+      return;
     }
+
+    onChange([...value, normalized]);
+    setColorMap((m) => ({ ...m, [normalized]: newTagColor }));
     setQuery('');
+    setTagError(null);
   };
 
   return (
     <div className="space-y-3 max-w-full">
       <div className="flex items-center gap-2 max-w-full">
         <input
+          id="tag-picker-input"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (tagError) setTagError(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addCustom();
+            }
+          }}
+          aria-invalid={Boolean(tagError)}
+          aria-describedby={tagError ? 'tag-picker-error' : undefined}
+          aria-label="Add or search tags"
           placeholder="Search or add tag"
           className="wiez-search-input flex-1 min-w-0"
         />
@@ -132,7 +153,14 @@ const TagPicker: React.FC<Props> = ({ suggestions, value, onChange, allowCustom 
         )}
       </div>
       {tagError && (
-        <p className="text-xs text-rose-500 dark:text-rose-400">{tagError}</p>
+        <p
+          id="tag-picker-error"
+          role="alert"
+          aria-live="assertive"
+          className="text-xs text-rose-500 dark:text-rose-400 mt-1"
+        >
+          {tagError}
+        </p>
       )}
 
       {allowCustom && (

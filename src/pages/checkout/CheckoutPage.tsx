@@ -1588,6 +1588,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <Input
                   label="First name"
+                  autoComplete="given-name"
                   value={address.firstName}
                   onChange={(e) => updateField('firstName', e.target.value)}
                   error={shippingErrors.firstName}
@@ -1596,6 +1597,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 />
                 <Input
                   label="Last name"
+                  autoComplete="family-name"
                   value={address.lastName}
                   onChange={(e) => updateField('lastName', e.target.value)}
                   error={shippingErrors.lastName}
@@ -1606,6 +1608,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
               <Input
                 label="Street address"
+                autoComplete="street-address"
                 value={address.street}
                 onChange={(e) => updateField('street', e.target.value)}
                 placeholder="e.g. 12 Admiralty Way"
@@ -1616,6 +1619,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
               <Input
                 label="Apartment / Suite (optional)"
+                autoComplete="address-line2"
                 value={address.apartment ?? ''}
                 onChange={(e) => updateField('apartment', e.target.value)}
                 placeholder="Apt 4B"
@@ -1625,6 +1629,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <Input
                   label="City"
+                  autoComplete="address-level2"
                   value={address.city}
                   onChange={(e) => updateField('city', e.target.value)}
                   placeholder="e.g. Lekki"
@@ -1650,6 +1655,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <Input
                   label="Postal code (optional)"
+                  autoComplete="postal-code"
                   value={address.postalCode ?? ''}
                   onChange={(e) => updateField('postalCode', e.target.value)}
                   placeholder="100001"
@@ -1658,6 +1664,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 <Input
                   label="Phone number"
                   type="tel"
+                  autoComplete="tel"
                   value={address.phone}
                   onChange={(e) =>
                     updateField('phone', sanitizePhoneInput(e.target.value))
