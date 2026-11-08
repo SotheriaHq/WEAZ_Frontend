@@ -3491,3 +3491,73 @@ html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidd
   transform-origin: center;
   will-change: transform;
 }
+
+/* ── Bag It: one mark, one heartbeat, on every product card ──────────────────
+   The chip is the Shop tab's bag mark: the shopping-bags emoji on a light
+   plate, sized on its own so it never shrinks to the label's text size. The
+   font stack names colour-emoji faces first so no installed symbol font can
+   substitute a monochrome outline glyph for U+1F6CD.
+
+   The heartbeat is a double beat then a rest — the rhythm reads as "alive",
+   which is the point: it is what draws a shopper's eye to the control. It only
+   animates `transform` on the button and `opacity` on a pre-painted glow
+   layer, so a grid of thirty pulsing cards stays on the compositor instead of
+   repainting a box-shadow every frame (which is what `wiezHeartbeatPulse`
+   does, and why it is not reused here). */
+.wiez-bag-it-chip {
+  display: inline-flex;
+  height: 22px;
+  width: 22px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+  font-family: 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.wiez-bag-heartbeat {
+  animation: wiezBagHeartbeat 1.9s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  transform-origin: center;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.wiez-bag-heartbeat::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.45), 0 6px 18px 2px rgba(168, 85, 247, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  animation: wiezBagHeartbeatGlow 1.9s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  will-change: opacity;
+}
+
+@keyframes wiezBagHeartbeat {
+  0%, 56%, 100% { transform: scale(1); }
+  14% { transform: scale(1.045); }
+  28% { transform: scale(1.005); }
+  42% { transform: scale(1.06); }
+}
+
+@keyframes wiezBagHeartbeatGlow {
+  0%, 56%, 100% { opacity: 0; }
+  14% { opacity: 0.7; }
+  28% { opacity: 0.2; }
+  42% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wiez-bag-heartbeat,
+  .wiez-bag-heartbeat::after {
+    animation: none;
+  }
+  .wiez-bag-heartbeat::after {
+    opacity: 0.6;
+  }
+}

@@ -7,7 +7,6 @@ import { brandApi } from '@/api/BrandApi';
 import { toast } from 'sonner';
 import type { SizingMode } from '@/types/sizing';
 import type { CatalogEntityType } from '@/constants/catalogDomain';
-import BagPulseIcon from '@/components/bagging/BagPulseIcon';
 import { PriceEstimate } from '@/currency/PriceEstimate';
 import { useBagging } from '@/hooks/useBagging';
 import { BAG_IT_LABEL } from '@/constants/bagging';
@@ -24,8 +23,12 @@ import {
   type ContentPublicationStatus,
 } from '@/utils/contentIntegrity';
 import { DeferredOverlay } from '@/components/ui/DeferredOverlay';
+import {
+  BagItButton,
+  PRODUCT_TILE_IMAGE_CLASS,
+  ProductTile,
+} from '@/components/commerce/ProductTile';
 const ContentReviewDecisionModal = React.lazy(() => import('@/components/content-integrity/ContentReviewDecisionModal'));
-import { SYSTEM_TILE_ASPECT } from '@/components/catalog/ContentTile';
 
 export interface StoreProduct {
   id: string;
@@ -108,49 +111,14 @@ type GallerySource = {
   key: string;
   fileId?: string;
   url?: string | null;
-  aspectRatio?: number | null;
 };
 
 type ResolvedGalleryImage = {
   key: string;
   url: string;
-  aspectRatio?: number | null;
 };
 
 const MAX_GALLERY_ITEMS = 6;
-const MIN_CARD_ASPECT_RATIO = 0.45;
-const MAX_CARD_ASPECT_RATIO = 2.2;
-
-const resolveCardAspectRatio = (value?: number | null): number | null => {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-    return null;
-  }
-  return Math.min(MAX_CARD_ASPECT_RATIO, Math.max(MIN_CARD_ASPECT_RATIO, value));
-};
-
-/**
- * The single frame ratio every market card renders into, portrait because that
- * is what most fashion media is shot in and it gives the tallest usable image
- * for a given row height.
- *
- * Fixed on purpose: cards previously inherited each image's own ratio, which is
- * what made rails ragged and grids gappy. Media is letterboxed into this frame
- * with `object-contain` so nothing is ever cropped or stretched.
- */
-const CARD_FRAME_ASPECT_RATIO = 4 / 5;
-
-const aspectRatioFromDimensions = (
-  width?: number | null,
-  height?: number | null,
-): number | null =>
-  typeof width === 'number' &&
-  Number.isFinite(width) &&
-  width > 0 &&
-  typeof height === 'number' &&
-  Number.isFinite(height) &&
-  height > 0
-    ? width / height
-    : null;
 
 const normalizeGalleryUrl = (value?: string | null) => {
   const raw = String(value ?? '').trim();
@@ -162,6 +130,48 @@ const normalizeGalleryUrl = (value?: string | null) => {
   } catch {
     return raw.split('?')[0] || raw;
   }
+};
+
+/**
+ * Turn one gallery source into a URL the browser can load.
+ *
+ * Every lookup goes through `brandApi`'s signed-URL cache, which also folds
+ * concurrent requests for the same source into one, so a product shown in
+ * three rails at once still costs one request.
+ */
+const resolveGallerySource = async (source: GallerySource): Promise<string | null> => {
+  // Prefer signing raw R2 URLs by key first — this is the market/admin hot
+  // path and does not require ownership of the FileUpload row.
+  const rawUrl = source.url ?? '';
+  const isUnsignedR2 = isStorageProviderUrl(rawUrl);
+  const alreadySigned =
+    rawUrl.includes('X-Amz-Signature') ||
+    rawUrl.includes('X-Amz-Credential') ||
+    rawUrl.includes('Signature=');
+
+  if (rawUrl && isUnsignedR2 && !alreadySigned) {
+    try {
+      const signed = await brandApi.getSignedS3Url(rawUrl);
+      if (signed) return signed;
+    } catch {
+      /* fall through */
+    }
+  }
+
+  if (alreadySigned && rawUrl) {
+    return rawUrl;
+  }
+
+  if (source.fileId) {
+    try {
+      const signed = await brandApi.getSignedFileUrl(source.fileId);
+      if (signed) return signed;
+    } catch {
+      /* fall through */
+    }
+  }
+
+  return source.url ?? null;
 };
 
 export const StoreProductCard: React.FC<StoreProductCardProps> = ({
@@ -182,6 +192,16 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 
   const [imgError, setImgError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  /**
+   * Only the cover is fetched until someone hovers the card.
+   *
+   * Every card used to resolve up to six gallery images the moment it
+   * mounted, although only the first is ever painted without a hover. A rail
+   * of twelve cards therefore asked for up to seventy-two signed URLs to show
+   * twelve pictures, and touch devices — which never hover — paid for all of
+   * them. The rest of the gallery is now requested on the first hover.
+   */
+  const [galleryRequested, setGalleryRequested] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [failedGalleryKeys, setFailedGalleryKeys] = useState<string[]>([]);
@@ -199,6 +219,9 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
   const stockState = getProductStockState(product);
   const cartLoading = Boolean(loadingByProductId[product.id]);
   const pulseStatus = getPulseStatus(product.id, isStrictlyOutOfStock || isOwnProduct);
+  // `getPulseStatus` already folds in brand accounts, sold-out and own
+  // products, so the button can take its live/still state from it directly.
+  const bagUnavailable = pulseStatus === 'disabled';
   const ownerStatus = (() => {
     if (!isOwnerView) return null;
     if (product.deletedAt) {
@@ -278,8 +301,10 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     }
   };
 
-  const handleQuickAddToCart = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleQuickAddToCart = async () => {
+    // A second tap while the first request is in flight must not send a
+    // second bag request; the button is also inert while busy.
+    if (cartLoading) return;
     if (isOwnProduct) {
       toast.info('Brands cannot bag their own products.');
       return;
@@ -326,11 +351,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       return undefined;
     };
 
-    const appendSource = (source: {
-      fileId?: string;
-      url?: string | null;
-      aspectRatio?: number | null;
-    }) => {
+    const appendSource = (source: { fileId?: string; url?: string | null }) => {
       const fileId = typeof source.fileId === 'string' && source.fileId.trim().length > 0
         ? source.fileId.trim()
         : undefined;
@@ -345,7 +366,6 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         key,
         fileId,
         url: source.url ?? normalizedUrl,
-        aspectRatio: resolveCardAspectRatio(source.aspectRatio),
       });
     };
 
@@ -357,27 +377,15 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     appendSource({
       fileId: resolveMediaFileId(primaryMedia),
       url: primaryMedia?.url || product.thumbnail || product.images[0] || null,
-      aspectRatio:
-        resolveCardAspectRatio(primaryMedia?.aspectRatio) ??
-        aspectRatioFromDimensions(primaryMedia?.width, primaryMedia?.height),
     });
 
     appendSource({
       fileId: resolveMediaFileId(secondaryMedia),
       url: secondaryMedia?.url || (product.images.length > 1 ? product.images[1] : null),
-      aspectRatio:
-        resolveCardAspectRatio(secondaryMedia?.aspectRatio) ??
-        aspectRatioFromDimensions(secondaryMedia?.width, secondaryMedia?.height),
     });
 
     product.media?.forEach((item) => {
-      appendSource({
-        fileId: resolveMediaFileId(item),
-        url: item.url,
-        aspectRatio:
-          resolveCardAspectRatio(item.aspectRatio) ??
-          aspectRatioFromDimensions(item.width, item.height),
-      });
+      appendSource({ fileId: resolveMediaFileId(item), url: item.url });
     });
 
     // mediaIds are ProductMedia row ids, NOT FileUpload ids — do not pass them
@@ -388,64 +396,37 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     });
 
     return sources.slice(0, MAX_GALLERY_ITEMS);
-  }, [product.images, product.media, product.mediaIds, product.thumbnail]);
+  }, [product.images, product.media, product.thumbnail]);
+
+  const requestedSources = useMemo(
+    () => (galleryRequested ? gallerySources : gallerySources.slice(0, 1)),
+    [galleryRequested, gallerySources],
+  );
 
   useEffect(() => {
+    // `alive` drops a response that lands after the card has moved on to a
+    // different product or a different source list, so a slow request for the
+    // previous product can never paint over the current one.
     let alive = true;
 
     const resolveImages = async () => {
-      if (gallerySources.length === 0) {
+      if (requestedSources.length === 0) {
         setResolvedGalleryImages([]);
         return;
       }
 
-      const resolved = await Promise.all(
-        gallerySources.map(async (source) => {
-          // Prefer signing raw R2 URLs by key first — this is the market/admin
-          // hot path and does not require ownership of the FileUpload row.
-          const rawUrl = source.url ?? '';
-          const isUnsignedR2 = isStorageProviderUrl(rawUrl);
-          const alreadySigned =
-            rawUrl.includes('X-Amz-Signature') ||
-            rawUrl.includes('X-Amz-Credential') ||
-            rawUrl.includes('Signature=');
-
-          if (rawUrl && isUnsignedR2 && !alreadySigned) {
-            try {
-              const signed = await brandApi.getSignedS3Url(rawUrl);
-              if (signed) return signed;
-            } catch {
-              /* fall through */
-            }
-          }
-
-          if (alreadySigned && rawUrl) {
-            return rawUrl;
-          }
-
-          if (source.fileId) {
-            try {
-              const signed = await brandApi.getSignedFileUrl(source.fileId);
-              if (signed) return signed;
-            } catch {
-              /* fall through */
-            }
-          }
-
-          return source.url ?? null;
-        }),
-      );
+      const resolved = await Promise.all(requestedSources.map(resolveGallerySource));
 
       if (!alive) return;
 
       setResolvedGalleryImages(
         resolved.reduce<ResolvedGalleryImage[]>((acc, candidate, index) => {
           if (!candidate) return acc;
-          const source = gallerySources[index];
+          const source = requestedSources[index];
           if (!source || acc.some((entry) => entry.key === source.key)) {
             return acc;
           }
-          acc.push({ key: source.key, url: candidate, aspectRatio: source.aspectRatio });
+          acc.push({ key: source.key, url: candidate });
           return acc;
         }, []),
       );
@@ -456,7 +437,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     return () => {
       alive = false;
     };
-  }, [gallerySources]);
+  }, [requestedSources]);
 
   const galleryImages = useMemo(
     () => resolvedGalleryImages.filter((entry) => !failedGalleryKeys.includes(entry.key)),
@@ -474,30 +455,6 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
       ? galleryImages[1]
       : galleryImages[0] ?? null;
   const hasDisplayImage = Boolean(activeImage?.url || desiredImage?.url);
-  // The media's own ratio is still read, but it NO LONGER drives the frame.
-  //
-  // It used to: `aspectRatio: cardAspectRatio` made every card as tall as its
-  // own image, so a rail of mixed portrait/square/landscape products rendered as
-  // a ragged row of different-height cards, and the Explore grid opened gaps
-  // wherever a short card sat next to a tall one. Worse, the frame then rendered
-  // `object-cover` on top, so the card was inconsistent AND cropping at the same
-  // time — the two failure modes we least wanted together.
-  //
-  // Now the frame is a fixed portrait ratio and the media is `object-contain`
-  // inside it. Content keeps its true shape (nothing is cropped or stretched),
-  // and the leftover space becomes a deliberate dark matte rather than a gap in
-  // the layout. That is the "dark shade support" the native app already uses.
-  const mediaAspectRatio =
-    activeImage?.aspectRatio ??
-    desiredImage?.aspectRatio ??
-    galleryImages[0]?.aspectRatio ??
-    null;
-  // Only used to decide whether bars will actually appear, so the matte can stay
-  // fully transparent for media that fills the frame edge to edge.
-  const fillsFrameExactly =
-    mediaAspectRatio != null &&
-    Math.abs(mediaAspectRatio - CARD_FRAME_ASPECT_RATIO) < 0.02;
-  const mediaFrameStyle = activeImage?.url ? undefined : { minHeight: 240 };
 
   useEffect(() => {
     if (!isHovered || !hoverGalleryEnabled) {
@@ -554,6 +511,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     setPreviewIndex(0);
     setActiveImage(null);
     setImgError(false);
+    setGalleryRequested(false);
   }, [product.id]);
 
   const movePreview = useCallback((direction: -1 | 1) => {
@@ -573,54 +531,36 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     });
   }, [galleryImages.length, hoverGalleryEnabled]);
 
+  const bagTitle = isOwnProduct
+    ? 'Brands cannot bag their own products'
+    : isStrictlyOutOfStock
+      ? 'Item is out of stock'
+      : isCustomOrderOnly
+        ? 'Bag as a custom order'
+        : BAG_IT_LABEL;
+
   return (
     <>
-    <article
+    <ProductTile.Root
       data-entity-type={product.entityType ?? 'PRODUCT'}
       data-card-branch="product"
-      className={`
-        group relative cursor-pointer overflow-hidden rounded-2xl
-        bg-transparent transition-all duration-300 ease-out
-        ${className}
-      `}
+      className={`cursor-pointer ${className}`}
       onClick={handleCardClick}
-      onMouseEnter={() => setIsHovered(true)}
+      onMouseEnter={() => {
+        setIsHovered(true);
+        if (gallerySources.length > 1) setGalleryRequested(true);
+      }}
       onMouseLeave={() => {
         setIsHovered(false);
         onPreviewNavigationActiveChange?.(false);
       }}
     >
-      {/* Fixed portrait frame + dark matte. The matte is what turns leftover
-          space from "a gap in the layout" into deliberate depth behind the
-          content, and it is skipped entirely when the media already fills the
-          frame so those cards stay pixel-identical to before. */}
-      <div
-        /* SYSTEM_TILE_ASPECT: the phone takes the native app's 1:1.58 so a
-           product looks like the same product in the browser and in the app;
-           `sm:` and up keeps the 4:5 this card has always been. */
-        className={`relative ${SYSTEM_TILE_ASPECT} w-full overflow-hidden ${
-          fillsFrameExactly ? 'bg-transparent' : 'bg-neutral-900/60 dark:bg-neutral-950'
-        }`}
-        style={mediaFrameStyle}
-      >
-        {!imgError && activeImage?.url && !fillsFrameExactly ? (
-          <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-            <MediaRenderer
-              kind="image"
-              fit="cover"
-              src={activeImage.url}
-              alt=""
-              className="h-full w-full"
-              mediaClassName="h-full w-full object-cover blur-2xl scale-125 opacity-40 dark:opacity-30"
-            />
-            <div className="absolute inset-0 bg-black/10 dark:bg-black/30" />
-          </div>
-        ) : null}
-
+      {/* The photograph owns the top of the card, edge to edge and at full
+          colour. Nothing is laid across it except small corner controls; all
+          reading copy sits in the body below. */}
+      <ProductTile.Media>
         {hasDisplayImage && !activeImage?.url && !imgError ? (
-          <div className="absolute inset-0 animate-pulse">
-            <div className="h-full min-h-[240px] w-full bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 dark:from-zinc-900/60 dark:via-zinc-800/50 dark:to-zinc-900/60" />
-          </div>
+          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 dark:from-zinc-900/60 dark:via-zinc-800/50 dark:to-zinc-900/60" />
         ) : null}
 
         {!imgError && activeImage?.url ? (
@@ -628,9 +568,9 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
             kind="image"
             src={activeImage.url}
             alt={product.name}
-            fit="contain"
+            fit="cover"
             className="absolute inset-0 block h-full w-full max-w-full"
-            mediaClassName={`block h-full w-full object-contain transition-transform duration-500 ease-out ${isHovered ? 'scale-[1.02]' : 'scale-100'}`}
+            mediaClassName={PRODUCT_TILE_IMAGE_CLASS}
             maxHeightClassName="max-h-none"
             loading={priority ? 'eager' : 'lazy'}
             fetchPriority={priority ? 'high' : 'low'}
@@ -646,12 +586,12 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               }
             }}
           />
-        ) : (
-          <div className="flex min-h-[240px] flex-col items-center justify-center bg-transparent">
+        ) : !hasDisplayImage || imgError ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="mb-1.5 text-3xl">🖼️</span>
             <span className="text-xs text-gray-400 dark:text-zinc-500">No image</span>
           </div>
-        )}
+        ) : null}
 
         {hoverGalleryEnabled && isHovered ? (
           <div
@@ -693,7 +633,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
           </div>
         ) : null}
 
-        <div className="absolute left-2.5 top-2.5 z-10 flex flex-col gap-1.5">
+        <div className="absolute left-2.5 top-2.5 z-10 flex flex-col items-start gap-1.5">
           {ownerStatus ? (
             <button
               type="button"
@@ -773,7 +713,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         ) : null}
 
         {isOwnerView && onEdit ? (
-          <div className="hidden md:flex absolute inset-0 z-20 items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute inset-0 z-20 hidden items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100 md:flex">
             <button
               type="button"
               onClick={(event) => {
@@ -797,132 +737,81 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         ) : null}
 
         {isCustomOrderOnly ? (
-          <div className="absolute inset-x-0 top-3 z-20 flex justify-center px-4">
+          <div className="absolute inset-x-0 bottom-3 z-20 flex justify-center px-4">
             <CustomOrderIndicator
               pointsCount={product.customMeasurementKeys?.length}
               size="sm"
             />
           </div>
         ) : null}
+      </ProductTile.Media>
 
-        {/*
-          Liquid gradient blend: seamlessly ramps into the media without any
-          sharp top border line, feathering blur and tint smoothly into the photograph.
-        */}
-        <div className="hidden md:block absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/50 via-black/25 to-transparent px-3.5 pb-2.5 pt-7 backdrop-blur-md backdrop-saturate-150 [mask-image:linear-gradient(to_bottom,transparent_0%,black_24px,black_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_24px,black_100%)]">
-          <h3 className="line-clamp-1 text-sm font-semibold leading-snug text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]">
-            {product.name}
-          </h3>
-
-          <p className="mt-0.5 line-clamp-1 text-[11px] text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">
-            {product.brand.name}
-          </p>
-
-          <div className="mt-1 flex items-center justify-between">
-            <div className="flex items-baseline gap-1.5">
-              <span className={`text-sm font-bold [text-shadow:0_1px_3px_rgba(0,0,0,0.85)] ${product.isOnSale ? 'text-rose-300' : 'text-white'}`}>
-                {formatPrice(product.effectivePrice, product.brand.currency)}
+      <ProductTile.Body>
+        <div className="min-w-0">
+          <ProductTile.Title>{product.name}</ProductTile.Title>
+          <ProductTile.Meta className="mt-0.5">
+            {isOwnerView ? (
+              <span className="inline-flex items-center gap-1">
+                <span role="img" aria-hidden="true">👁️</span>
+                {product.viewsCount} views
               </span>
-              {product.isOnSale && product.salePrice ? (
-                <span className="text-[11px] text-white/50 line-through">
-                  {formatPrice(product.price, product.brand.currency)}
-                </span>
-              ) : null}
-              <PriceEstimate
-                amount={product.effectivePrice}
-                currency={product.brand.currency}
-                className="text-[11px] text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]"
+            ) : (
+              <span className="truncate">{product.brand.name}</span>
+            )}
+          </ProductTile.Meta>
+
+          <div className="mt-1 flex items-center justify-between gap-1.5">
+            <ProductTile.Price
+              price={formatPrice(product.effectivePrice, product.brand.currency)}
+              compareAt={
+                product.isOnSale && product.salePrice
+                  ? formatPrice(product.price, product.brand.currency)
+                  : null
+              }
+            />
+            {isCustomAvailable ? (
+              <CustomOrderIndicator
+                pointsCount={product.customMeasurementKeys?.length}
+                size="sm"
               />
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              {isCustomAvailable ? (
-                <CustomOrderIndicator
-                  pointsCount={product.customMeasurementKeys?.length}
-                  size="sm"
-                />
-              ) : null}
-
-              {!isOwnerView ? (
-                <button
-                  type="button"
-                  onClick={handleQuickAddToCart}
-                  disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
-                  aria-label={BAG_IT_LABEL}
-                  title={
-                    isOwnProduct
-                      ? 'Brands cannot bag their own products'
-                      : isStrictlyOutOfStock
-                        ? 'Item is out of stock'
-                        : isCustomOrderOnly
-                          ? 'Bag as a custom order'
-                          : BAG_IT_LABEL
-                  }
-                  className={`
-                    flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200
-                    ${isStrictlyOutOfStock || isOwnProduct ? 'cursor-not-allowed text-white/30' : 'text-white/80 hover:bg-white/15 hover:text-white active:scale-95'}
-                    ${cartLoading ? 'cursor-wait opacity-70' : ''}
-                  `}
-                >
-                  <BagPulseIcon
-                    status={pulseStatus}
-                    context="multi_card"
-                    size={28}
-                    disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
-                  />
-                </button>
-              ) : (
-                <div className="flex items-center gap-2 text-[10px] text-white/50">
-                  <span className="inline-flex items-center gap-0.5">
-                    <span role="img" aria-hidden="true">👁️</span>
-                    {product.viewsCount}
-                  </span>
-                </div>
-              )}
-            </div>
+            ) : null}
           </div>
+          <PriceEstimate
+            amount={product.effectivePrice}
+            currency={product.brand.currency}
+            className="text-[11px] text-gray-500 dark:text-zinc-400"
+          />
         </div>
 
-        {/* Mobile View Bottom Overlay */}
-        {/* Liquid gradient blend: smoothly merges into the photograph without a sharp top border. */}
-        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/50 via-black/25 to-transparent backdrop-blur-md backdrop-saturate-150 [mask-image:linear-gradient(to_bottom,transparent_0%,black_8px,black_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_8px,black_100%)] z-10 flex items-center justify-between min-h-[32px] max-h-[38px]" onClick={(e) => e.stopPropagation()}>
-          <div className="flex-1 min-w-0 flex flex-col justify-center pl-1">
-            <h3
-              className="font-bold text-white truncate leading-none uppercase [text-shadow:0_1px_3px_rgba(0,0,0,0.85)]"
-              style={{ fontSize: '12px' }}
-            >
-              {product.name}
-            </h3>
-            <span className="text-white/90 leading-none mt-0.5 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]" style={{ fontSize: '12px' }}>
-              {formatPrice(product.effectivePrice, product.brand.currency)}{' '}
-              <PriceEstimate
-                amount={product.effectivePrice}
-                currency={product.brand.currency}
-                className="text-[10px] text-white/75"
-              />
-            </span>
+        {!isOwnerView ? (
+          <div className="flex items-center pt-1.5">
+            <BagItButton
+              onClick={() => {
+                void handleQuickAddToCart();
+              }}
+              busy={cartLoading}
+              disabled={bagUnavailable}
+              title={bagTitle}
+            />
           </div>
-          
-          {/* Mobile Bag It feature inline in the bottom bar */}
-          {!isOwnerView && (
+        ) : onEdit ? (
+          <div className="flex items-center pt-1.5">
             <button
               type="button"
-              className="flex items-center justify-center p-0.5 text-white hover:scale-110 transition-transform mr-1 shrink-0"
-              onClick={handleQuickAddToCart}
-              disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
-              aria-label={BAG_IT_LABEL}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onEdit(product);
+              }}
+              className="flex min-h-[36px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-800 transition-colors hover:bg-gray-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
             >
-              <BagPulseIcon
-                status={pulseStatus}
-                context="multi_card"
-                size={24}
-                disabled={cartLoading || isStrictlyOutOfStock || isOwnProduct}
-              />
+              <span aria-hidden="true">✏️</span>
+              <span>Edit</span>
             </button>
-          )}
-        </div>
-      </div>
-    </article>
+          </div>
+        ) : null}
+      </ProductTile.Body>
+    </ProductTile.Root>
     <DeferredOverlay open={reviewDecisionOpen}>
     <ContentReviewDecisionModal
       open={reviewDecisionOpen}
@@ -938,4 +827,3 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 };
 
 export default StoreProductCard;
-

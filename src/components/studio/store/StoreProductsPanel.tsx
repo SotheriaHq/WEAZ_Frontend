@@ -52,6 +52,11 @@ import {
 } from '@/features/products/productPublishJob';
 import { ProductPublishFillerCard } from '@/components/studio/store/ProductPublishFillerCard';
 import {
+  BagItButton,
+  PRODUCT_TILE_IMAGE_CLASS,
+  ProductTile,
+} from '@/components/commerce/ProductTile';
+import {
   getProductStockState,
   isCustomOrderOnlyProduct,
 } from '@/lib/productAvailability';
@@ -3270,13 +3275,10 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                 (productStatus === 'ACTIVE' ? 'PUBLISHED' : productStatus);
 
               return (
-                <div
+                <ProductTile.Root
                   key={product.id}
+                  selected={selectedProducts.includes(product.id)}
                   className={[
-                    'group relative flex flex-col rounded-2xl bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md shadow-md shadow-purple-950/5 dark:shadow-purple-950/30 border-0 overflow-hidden transition-all duration-300 ease-out hover:shadow-xl hover:shadow-purple-500/15',
-                    selectedProducts.includes(product.id)
-                      ? 'ring-2 ring-purple-500 shadow-md'
-                      : 'hover:shadow-xl hover:shadow-black/[0.08] dark:hover:shadow-black/30',
                     layoutMode ? 'cursor-move' : 'cursor-pointer',
                     dropdownManager.openId === ('product-menu-' + product.id) ? 'z-50' : 'z-10'
                   ].join(' ')}
@@ -3285,8 +3287,9 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                     navigateToStudioProductDetails(product.id);
                   }}
                 >
-                  {/* Dominant Top Media Container (75-80% visual mass) */}
-                  <div className="relative aspect-[100/148] w-full overflow-hidden rounded-2xl bg-gray-100 dark:bg-zinc-800/50">
+                  {/* Same product tile as the Shop tab and Market: photo on top,
+                      owner controls in the corners, copy beneath. */}
+                  <ProductTile.Media>
                     {/* Full-bleed image */}
                     {(() => {
                       const primaryMedia = product.media?.find((m) => m.isPrimary) ?? product.media?.[0];
@@ -3312,7 +3315,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                           fileId={resolvedFileId ?? undefined}
                           alt={product.name}
                           fit="cover"
-                          className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                          className={PRODUCT_TILE_IMAGE_CLASS}
                           containerClassName="h-full w-full"
                           rounded="none"
                         />
@@ -3382,17 +3385,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         <span className="text-base">⠿</span>
                       </div>
                     )}
-                  </div>
+                  </ProductTile.Media>
 
-                  {/* Distinct Lower Area Beneath Media */}
-                  <div className="p-2.5 sm:p-3 pb-3 sm:pb-3.5 flex flex-col gap-1.5 flex-1 justify-between">
+                  <ProductTile.Body>
                     <div>
                       {/* Title + 3-Dot Overflow Menu Row */}
                       <div className="flex items-start justify-between gap-1.5 relative">
                         <div className="min-w-0 flex-1">
-                          <h3 className="break-words text-xs sm:text-sm font-bold text-gray-900 dark:text-white leading-snug line-clamp-2 [overflow-wrap:anywhere]">
-                            {product.name}
-                          </h3>
+                          <ProductTile.Title>{product.name}</ProductTile.Title>
                           {/* Product publication status with semantic color dot replacing Store Products */}
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span
@@ -3495,16 +3495,14 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
 
                       {/* Price & Stock Line */}
                       <div className="mt-1 flex items-baseline justify-between gap-1 flex-wrap">
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="text-sm sm:text-base font-black bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 dark:from-purple-300 dark:via-indigo-300 dark:to-pink-300 bg-clip-text text-transparent tracking-tight">
-                            ₦{product.price.toLocaleString()}
-                          </span>
-                          {typeof product.salePrice === 'number' && product.salePrice > 0 && (
-                            <span className="text-[10px] sm:text-xs font-semibold text-rose-500 line-through">
-                              ₦{product.salePrice.toLocaleString()}
-                            </span>
-                          )}
-                        </div>
+                        <ProductTile.Price
+                          price={`₦${product.price.toLocaleString()}`}
+                          compareAt={
+                            typeof product.salePrice === 'number' && product.salePrice > 0
+                              ? `₦${product.salePrice.toLocaleString()}`
+                              : null
+                          }
+                        />
                         <span
                           className={`text-[10px] font-medium ${
                             getProductStockState(product) === 'CUSTOM_ORDER_ONLY'
@@ -3525,20 +3523,16 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                       </div>
                     </div>
 
-                    {/* Bottom Primary Bag It Button + Quick Edit Pencil */}
+                    {/* Bottom Primary Bag It Button + Quick Edit Pencil.
+                        The shared button: same bag mark and heartbeat as the
+                        Shop tab and Market. Here it previews the product page
+                        a shopper bags from, since a brand cannot bag its own
+                        product. */}
                     <div className="pt-1.5 flex items-center gap-2.5">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigateToStudioProductDetails(product.id);
-                        }}
-                        className="wiez-heartbeat-pulse flex-1 py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs tracking-wide shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 border-0"
-                      >
-                        <span className="text-sm leading-none" aria-hidden="true">🛍️</span>
-                        <span>Bag It</span>
-                        <span aria-hidden="true" className="font-bold">›</span>
-                      </button>
+                      <BagItButton
+                        onClick={() => navigateToStudioProductDetails(product.id)}
+                        title="Preview the product page shoppers bag from"
+                      />
 
                       {!product.deletedAt && (
                         <button
@@ -3555,8 +3549,8 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
                         </button>
                       )}
                     </div>
-                  </div>
-                </div>
+                  </ProductTile.Body>
+                </ProductTile.Root>
               );
             })}
             {showDraftCollectionsInProductArea && (

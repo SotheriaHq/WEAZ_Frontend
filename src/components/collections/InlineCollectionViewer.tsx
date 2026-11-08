@@ -25,6 +25,8 @@ import { buildDesignRoute } from '@/utils/catalogRoutes';
 import LazyCustomOrderComposerPage from '@/components/custom-orders/LazyCustomOrderComposerPage';
 import { OverlayPortal } from '@/components/ui/OverlayPortal';
 import { useBagging } from '@/hooks/useBagging';
+import { BagItButton } from '@/components/commerce/ProductTile';
+import { BAG_IT_EMOJI } from '@/constants/bagging';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import {
   fetchActiveCustomOrderConfigurationQuery,
@@ -70,7 +72,7 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
   const me = useSelector((s: RootState) => s.user.profile);
   const isAuth = useSelector((s: RootState) => s.user.isAuthenticated);
   const dispatch = useDispatch<AppDispatch>();
-  const { bagProduct } = useBagging();
+  const { bagProduct, loadingByProductId } = useBagging();
   const [resolvedItems, setResolvedItems] = useState<CarouselMediaItem[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [requestingAccess, setRequestingAccess] = useState(false);
@@ -738,13 +740,14 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                       </button>
                       <div className="px-3 pb-3">
                         {canQuickAdd ? (
-                          <button
-                            type="button"
-                            onClick={() => handleAddProductToCart(product.id)}
-                            className="w-full rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold py-2"
-                          >
-                            🛍️ Bag it
-                          </button>
+                          <div className="flex">
+                            <BagItButton
+                              onClick={() => {
+                                void handleAddProductToCart(product.id);
+                              }}
+                              busy={Boolean(loadingByProductId[product.id])}
+                            />
+                          </div>
                         ) : (
                         <button
                           type="button"
@@ -822,7 +825,8 @@ export const InlineCollectionViewer: React.FC<InlineCollectionViewerProps> = ({
                 disabled={openingCustomComposer}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition hover:from-purple-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <span aria-hidden="true">👜</span>
+                {/* The one bag mark used on every Bag It control. */}
+                <span className="wiez-bag-it-chip" aria-hidden="true">{BAG_IT_EMOJI}</span>
                 {openingCustomComposer ? 'Loading...' : 'Bag this design'}
               </button>
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
