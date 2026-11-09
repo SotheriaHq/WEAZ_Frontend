@@ -255,6 +255,9 @@ export const PRIVATE_QUERY_ROOTS = new Set<string>([
   'queue-admin-campaigns',
   'queue-admin-notices',
   'brand-runway-queue-notices',
+  // Studio dashboard and analytics (inline keys in DashboardHome and
+  // AnalyticsPage). Brand-private, and now persisted, so logout must purge it.
+  'dashboard',
 ]);
 
 /**
@@ -274,6 +277,20 @@ export const PRIVATE_QUERY_ROOTS = new Set<string>([
  */
 export const isPersistableWiezQueryKey = (queryKey: readonly unknown[]) => {
   const [root, scope] = queryKey;
+  /*
+    Studio's own screens. Inside the app, Studio is a WebView whose document
+    starts fresh after every app launch (and after Android reclaims the app
+    overnight); with none of these on disk the brand saw the dashboard and the
+    store skeleton on every first entry. Store status, the product panel, a
+    product being edited, and the dashboard/analytics figures carry no personal
+    data. Orders (`studio`), customers, messages and finance stay memory-only.
+  */
+  if (root === 'store') {
+    return scope === 'management' || scope === 'panel' || scope === 'product';
+  }
+  if (root === 'dashboard') {
+    return scope === 'home' || scope === 'analytics';
+  }
   if (root === 'brand') {
     return (
       scope === 'profile' ||

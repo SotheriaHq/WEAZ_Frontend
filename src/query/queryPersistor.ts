@@ -1,4 +1,4 @@
-import { defaultShouldDehydrateQuery } from '@tanstack/react-query';
+import { defaultShouldDehydrateQuery, hydrate, type QueryClient } from '@tanstack/react-query';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 import type { PersistedClient } from '@tanstack/react-query-persist-client';
 
@@ -85,8 +85,57 @@ export const wiezQueryPersister = createSyncStoragePersister({
   serialize: serializeWithinBudget,
 });
 
+/**
+ * Data a screen shows only because nothing real has loaded yet (marked
+ * `isFallback: true`, e.g. the Studio dashboard's empty overview) is never
+ * written to disk — rehydrating it would show zeros as if they were real.
+ */
+const isFallbackData = (data: unknown) =>
+  typeof data === 'object' && data !== null && (data as { isFallback?: unknown }).isFallback === true;
+
 export const shouldDehydrateWiezQuery: typeof defaultShouldDehydrateQuery = (query) =>
-  defaultShouldDehydrateQuery(query) && isPersistableWiezQueryKey(query.queryKey);
+  defaultShouldDehydrateQuery(query) &&
+  isPersistableWiezQueryKey(query.queryKey) &&
+  !isFallbackData(query.state.data);
+
+let primed = false;
+
+/**
+ * Put the persisted cache into the query client BEFORE the first render.
+ *
+ * `PersistQueryClientProvider` restores asynchronously: the app renders once
+ * with an empty cache, then the restore lands. With a synchronous store
+ * (localStorage) that gap is a single frame, but it is a frame of empty
+ * screen — inside the Studio WebView, where every app launch starts a fresh
+ * document, it read as a flash before cached content appeared.
+ *
+ * Same acceptance rules as the provider's own restore (buster, maxAge), so the
+ * provider's later restore finds the same data and changes nothing. Any
+ * failure leaves the cache empty and the provider path as before.
+ */
+export function primeWiezQueryCacheFromStorage(
+  client: QueryClient,
+  now: number = Date.now(),
+): boolean {
+  if (primed) return false;
+  primed = true;
+  try {
+    const restored = wiezQueryPersister.restoreClient();
+    if (!restored || typeof (restored as Promise<unknown>).then === 'function') return false;
+    const persisted = restored as PersistedClient;
+    if (persisted.buster !== WIEZ_QUERY_CACHE_BUSTER) return false;
+    if (!persisted.timestamp || now - persisted.timestamp > WIEZ_QUERY_CACHE_MAX_AGE_MS) return false;
+    hydrate(client, persisted.clientState);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Tests only. */
+export function resetWiezQueryCachePrimeForTests() {
+  primed = false;
+}
 
 export const purgeWebPersistedQueryCache = () => {
   try {
