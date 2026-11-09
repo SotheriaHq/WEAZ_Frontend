@@ -3,6 +3,8 @@ import { useDispatch } from 'react-redux';
 import { useLocation } from 'react-router-dom';
 
 import { apiClient, persistAccessToken } from '@/api/httpClient';
+import { clearWebPrivateCaches, readStoredWebUserId } from '@/auth/sessionCleanup';
+import { queryClient } from '@/query/queryClient';
 import type { AppDispatch } from '@/store';
 import { setUser } from '@/features/userSlice';
 import type { AuthProfileResponse, AuthUserDto } from '@/types/auth';
@@ -192,6 +194,8 @@ export const StudioHandoffGate: React.FC<StudioHandoffGateProps> = ({ children }
         hasHandoffCode: true,
       });
 
+      // Read before the exchange: the account this document held until now.
+      const previousUserId = readStoredWebUserId();
       let failureStage = 'exchange';
       try {
         const { user } = await exchangeStudioHandoffOnce(
@@ -201,6 +205,14 @@ export const StudioHandoffGate: React.FC<StudioHandoffGateProps> = ({ children }
             failureStage = stage;
           },
         );
+        // A different account was handed over (another brand signed in on the
+        // phone). The previous one's Studio caches are still in memory, primed
+        // from disk at boot, and on disk. Drop them before the new account
+        // renders, so nothing of it outlives the switch. Same account: keep
+        // everything, which is what makes re-entry instant.
+        if (previousUserId && previousUserId !== user.id) {
+          clearWebPrivateCaches(queryClient);
+        }
         dispatch(setUser(user));
         postStudioNativeEvent({ type: 'READY' });
         if (mounted) setStatus('ready');

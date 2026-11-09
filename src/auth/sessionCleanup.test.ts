@@ -106,4 +106,72 @@ describe('clearWebPrivateSessionState', () => {
     await clearWebPrivateSessionState({ client });
     for (const root of roots) expect(client.getQueryData([root, 'previous-account'])).toBeUndefined();
   });
+
+  it('purges the Studio roots that used to outlive a sign-out', async () => {
+    const { clearWebPrivateSessionState } = await loadCleanupModule();
+    const client = new QueryClient();
+    const roots = ['brand-customers', 'brand-commerce-access', 'brand-verification-status',
+      'verification', 'admin', 'category-suggestions', 'design-create'];
+    for (const root of roots) client.setQueryData([root, 'previous-account'], { customerEmail: 'a@b.c' });
+    await clearWebPrivateSessionState({ client });
+    for (const root of roots) expect(client.getQueryData([root, 'previous-account'])).toBeUndefined();
+  });
+});
+
+describe('account change without a sign-out (Studio handoff)', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  it('drops the previous account caches but keeps the new credentials', async () => {
+    const { clearWebPrivateCaches } = await loadCleanupModule();
+    const client = new QueryClient();
+    client.setQueryData(['store', 'management', 'status', 'previous-user'], { brandId: 'brand-a' });
+    client.setQueryData(['dashboard', 'home', 'previous-user'], { revenue: 900 });
+    client.setQueryData(['config', 'uploadLimits'], { maxBytes: 1_000_000 });
+    localStorage.setItem('WIEZ_ACCESS_TOKEN', 'new-token');
+    localStorage.setItem('WIEZ_USER', JSON.stringify({ id: 'previous-user' }));
+    localStorage.setItem('WIEZ_QUERY_CACHE_V1', JSON.stringify({ private: true }));
+    localStorage.setItem('wiez.activeBrandId', 'brand-a');
+
+    clearWebPrivateCaches(client);
+
+    expect(client.getQueryData(['store', 'management', 'status', 'previous-user'])).toBeUndefined();
+    expect(client.getQueryData(['dashboard', 'home', 'previous-user'])).toBeUndefined();
+    expect(client.getQueryData(['config', 'uploadLimits'])).toEqual({ maxBytes: 1_000_000 });
+    expect(localStorage.getItem('WIEZ_QUERY_CACHE_V1')).toBeNull();
+    expect(localStorage.getItem('wiez.activeBrandId')).toBeNull();
+    // The handoff just stored these for the NEW account; they must survive.
+    expect(localStorage.getItem('WIEZ_ACCESS_TOKEN')).toBe('new-token');
+    expect(dropStoredAccessTokenMock).not.toHaveBeenCalled();
+    expect(disconnectSocketMock).not.toHaveBeenCalled();
+  });
+
+  it('reads the stored account id, tolerating missing or broken storage', async () => {
+    const { readStoredWebUserId } = await loadCleanupModule();
+    expect(readStoredWebUserId()).toBeNull();
+    localStorage.setItem('WIEZ_USER', '{not json');
+    expect(readStoredWebUserId()).toBeNull();
+    localStorage.setItem('WIEZ_USER', JSON.stringify({ id: 'user-1' }));
+    expect(readStoredWebUserId()).toBe('user-1');
+  });
+
+  it('the Studio handoff purges only when a DIFFERENT account arrives', async () => {
+    const gateSource = await readFile(
+      path.resolve(process.cwd(), 'src/components/studio/StudioHandoffGate.tsx'),
+      'utf8',
+    );
+    const readAt = gateSource.indexOf('const previousUserId = readStoredWebUserId()');
+    const exchangeAt = gateSource.indexOf('await exchangeStudioHandoffOnce(');
+    const purgeAt = gateSource.indexOf('clearWebPrivateCaches(queryClient)');
+    const setUserAt = gateSource.indexOf('dispatch(setUser(user))');
+    expect(readAt).toBeGreaterThan(-1);
+    expect(readAt).toBeLessThan(exchangeAt);
+    expect(exchangeAt).toBeLessThan(purgeAt);
+    expect(purgeAt).toBeLessThan(setUserAt);
+    expect(gateSource).toContain('if (previousUserId && previousUserId !== user.id)');
+  });
 });
