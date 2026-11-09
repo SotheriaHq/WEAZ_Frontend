@@ -11,6 +11,9 @@ const requiredHeaders = [
   'Referrer-Policy',
   'Permissions-Policy',
   'X-Content-Type-Options',
+  // ZAP (SIT, 2026-11): weaz.me served no HSTS, so a first visit typed as
+  // http:// could be intercepted before the redirect to https.
+  'Strict-Transport-Security',
 ];
 
 const requiredCspTokens = [
