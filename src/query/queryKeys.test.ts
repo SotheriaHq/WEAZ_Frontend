@@ -45,6 +45,22 @@ describe('isPersistableWiezQueryKey', () => {
     expect(isPersistableWiezQueryKey(queryKeys.messaging.inbox('user_1'))).toBe(false);
   });
 
+  it("persists Studio's own screens so a fresh WebView document paints them", () => {
+    // Inside the app every launch starts a fresh Studio document; without these
+    // on disk the dashboard and store skeletoned on every first entry.
+    expect(isPersistableWiezQueryKey(['store', 'management', 'status', 'user_1'])).toBe(true);
+    expect(isPersistableWiezQueryKey(['store', 'panel', 'products', 'user_1', 1, 12])).toBe(true);
+    expect(isPersistableWiezQueryKey(['store', 'product', 'product_1'])).toBe(true);
+    expect(isPersistableWiezQueryKey(['dashboard', 'home', 'user_1', '30d'])).toBe(true);
+    expect(isPersistableWiezQueryKey(['dashboard', 'analytics', 'user_1', '30d'])).toBe(true);
+  });
+
+  it("keeps Studio orders, customers and messages off disk", () => {
+    expect(isPersistableWiezQueryKey(['studio', 'orders', 'brand_1', 1, 'all', ''])).toBe(false);
+    expect(isPersistableWiezQueryKey(['store', 'customers', 'brand_1'])).toBe(false);
+    expect(isPersistableWiezQueryKey(['dashboard', 'customers', 'user_1'])).toBe(false);
+  });
+
   it('does not persist per-card saved probes', () => {
     // Hundreds of tiny entries would crowd real content out of the 4MB budget.
     expect(isPersistableWiezQueryKey(queryKeys.saved.status('DESIGN', 'd_1'))).toBe(false);
@@ -62,6 +78,10 @@ describe('isPersistableWiezQueryKey', () => {
       queryKeys.brand.myDrafts('user_1'),
       queryKeys.brand.collections('user_1', { visibility: 'private' }),
       queryKeys.brand.profile('brand_1'),
+      ['store', 'management', 'status', 'user_1'],
+      ['store', 'panel', 'products', 'user_1'],
+      ['dashboard', 'home', 'user_1', '30d'],
+      ['dashboard', 'analytics', 'user_1', '30d'],
     ];
 
     for (const key of persistablePrivateSamples) {

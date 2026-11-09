@@ -4,11 +4,16 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
 import { queryClient } from './queryClient';
 import {
+  primeWiezQueryCacheFromStorage,
   shouldDehydrateWiezQuery,
   WIEZ_QUERY_CACHE_BUSTER,
   WIEZ_QUERY_CACHE_MAX_AGE_MS,
   wiezQueryPersister,
 } from './queryPersistor';
+
+// Once, at load, before anything renders: cached screens paint on the first
+// frame instead of after the provider's async restore. See the function.
+primeWiezQueryCacheFromStorage(queryClient);
 
 export function QueryProvider({ children }: PropsWithChildren) {
   return (

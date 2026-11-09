@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import type { RootState } from '@/store';
@@ -45,7 +46,11 @@ const DashboardHome: React.FC = () => {
     overview: any;
     draftStats: DraftExpiryStats | null;
     storeOpenStatus: boolean | null;
+    /** Zeros shown because nothing real has loaded yet. Never persisted. */
+    isFallback?: boolean;
   };
+  const queryClient = useQueryClient();
+  const dashboardKey = ['dashboard', 'home', user?.id, range] as const;
 
   const buildFallbackOverview = () => ({
     kpis: {
@@ -77,7 +82,7 @@ const DashboardHome: React.FC = () => {
   });
 
   const { data: dashboardData, loading } = useCachedResource<DashboardHomeData>({
-    queryKey: ['dashboard', 'home', user?.id, range],
+    queryKey: dashboardKey,
     queryFn: async () => {
       if (!user?.id) throw new Error('No user ID');
 
@@ -98,11 +103,24 @@ const DashboardHome: React.FC = () => {
           storeOpenStatus: statusData?.isStoreOpen ?? null,
         };
       } catch (error) {
-        console.warn('Failed to fetch dashboard data, using demo data', error);
+        /*
+          A failed refresh keeps the numbers already on screen.
+
+          This used to return all-zero "demo data" on ANY failure, including
+          the 20-second poll — so one dropped request blanked a real dashboard
+          to zeros until the next poll, and once the cache is persisted those
+          zeros would come back on the next cold start too. Throwing lets the
+          query keep its last good data; zeros only stand in when there has
+          never been anything real to show.
+        */
+        const previous = queryClient.getQueryData<DashboardHomeData>(dashboardKey);
+        if (previous && !previous.isFallback) throw error;
+        console.warn('Failed to fetch dashboard data, showing empty overview', error);
         return {
           overview: buildFallbackOverview(),
           draftStats: null,
           storeOpenStatus: null,
+          isFallback: true,
         };
       }
     },
