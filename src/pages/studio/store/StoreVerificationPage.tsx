@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useCachedResource } from '@/hooks/useCachedResource';
 import Button from '@/components/ui/Button';
 import type { RootState } from '@/store';
 import { setUser } from '@/features/userSlice';
@@ -23,6 +25,21 @@ import { showNotice } from '@/components/ui/NoticeModal';
 const VERIFICATION_JOURNEY_STEPS = [1, 2, 3, 4] as const;
 const TOTAL_VERIFICATION_STEPS = VERIFICATION_JOURNEY_STEPS.length;
 
+/** True when the brand has started an application (autosaved or typed). */
+function draftHasValues(
+  draft: { lastSavedAt?: string | null; draftData?: object | null } | null | undefined,
+): boolean {
+  if (draft?.lastSavedAt) return true;
+  return Object.values(draft?.draftData ?? {}).some((value: unknown) => {
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (typeof value === 'number') return Number.isFinite(value);
+    if (!value || typeof value !== 'object') return false;
+    return Object.values(value as Record<string, unknown>).some((nested) =>
+      typeof nested === 'string' ? nested.trim().length > 0 : nested != null,
+    );
+  });
+}
+
 export default function StoreVerificationPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -30,9 +47,46 @@ export default function StoreVerificationPage() {
   const user = useSelector((state: RootState) => state.user.profile);
   const brandId = user?.id;
 
-  const [status, setStatus] = useState<VerificationStatusResponse | null>(null);
-  const [hasDraft, setHasDraft] = useState(false);
-  const [loading, setLoading] = useState(true);
+  /*
+    Cached, not fetched per visit (Item 3, Nov 2026). The page used to start at
+    `loading = true` on every mount, so each return showed the skeleton and
+    fetched twice (once more after it synced the badge into the user). The
+    status shares the Store tab's cache entry — same request — so opening it
+    from Store paints at once and refreshes silently.
+  */
+  const queryClient = useQueryClient();
+  const verificationKey = useMemo(
+    () => ['store', 'management', 'verification', brandId ?? 'anon'] as const,
+    [brandId],
+  );
+  const statusResource = useCachedResource<VerificationStatusResponse | null>({
+    queryKey: verificationKey,
+    retainPreviousData: false,
+    enabled: Boolean(brandId),
+    queryFn: () => brandApi.getVerificationStatus(brandId!),
+  });
+  const draftResource = useCachedResource<boolean>({
+    queryKey: ['store', 'verification', 'hasDraft', brandId ?? 'anon'],
+    retainPreviousData: false,
+    enabled: Boolean(brandId),
+    queryFn: async () => draftHasValues(await brandApi.getVerificationDraft(brandId!)),
+  });
+  const status = statusResource.data ?? null;
+  const hasDraft = draftResource.data ?? false;
+  const loading = statusResource.loading || draftResource.loading;
+  const setStatus = useCallback(
+    (
+      next:
+        | VerificationStatusResponse
+        | null
+        | ((current: VerificationStatusResponse | null) => VerificationStatusResponse | null),
+    ) => {
+      queryClient.setQueryData<VerificationStatusResponse | null>(verificationKey, (current) =>
+        typeof next === 'function' ? next(current ?? null) : next,
+      );
+    },
+    [queryClient, verificationKey],
+  );
   const [saving, setSaving] = useState(false);
   const [countdownNow, setCountdownNow] = useState(() => Date.now());
 
@@ -46,66 +100,35 @@ export default function StoreVerificationPage() {
     };
   }, []);
 
+  // Keep the signed-in user's badge in step with the status the page shows.
   useEffect(() => {
-    if (!brandId) return;
+    if (!user || !status) return;
+    if (
+      user.verificationStatus !== status.verificationStatus ||
+      user.isVerifiedBrand !== status.badgeState.isVerifiedBrand ||
+      user.verificationBadgeVisible !== status.badgeState.verificationBadgeVisible ||
+      user.verifiedExplanationUrl !== status.badgeState.verifiedExplanationUrl
+    ) {
+      dispatch(
+        setUser({
+          ...user,
+          verificationStatus: status.verificationStatus,
+          isVerifiedBrand: status.badgeState.isVerifiedBrand,
+          verificationBadgeVisible: status.badgeState.verificationBadgeVisible,
+          verifiedExplanationUrl: status.badgeState.verifiedExplanationUrl,
+        }),
+      );
+    }
+  }, [dispatch, status, user]);
 
-    let active = true;
-    const load = async () => {
-      try {
-        setLoading(true);
-        const [data, draft] = await Promise.all([
-          brandApi.getVerificationStatus(brandId),
-          brandApi.getVerificationDraft(brandId),
-        ]);
-        if (!active) return;
-        setStatus(data);
-        const draftData = draft?.draftData;
-        const draftHasValues =
-          !!draft?.lastSavedAt ||
-          Object.values(draftData ?? {}).some((value) => {
-            if (typeof value === 'string') return value.trim().length > 0;
-            if (typeof value === 'number') return Number.isFinite(value);
-            if (!value || typeof value !== 'object') return false;
-            return Object.values(value as Record<string, unknown>).some((nested) =>
-              typeof nested === 'string' ? nested.trim().length > 0 : nested != null,
-            );
-          });
-        setHasDraft(draftHasValues);
-        if (
-          user &&
-          (
-            user.verificationStatus !== data.verificationStatus ||
-            user.isVerifiedBrand !== data.badgeState.isVerifiedBrand ||
-            user.verificationBadgeVisible !== data.badgeState.verificationBadgeVisible ||
-            user.verifiedExplanationUrl !== data.badgeState.verifiedExplanationUrl
-          )
-        ) {
-          dispatch(
-            setUser({
-              ...user,
-              verificationStatus: data.verificationStatus,
-              isVerifiedBrand: data.badgeState.isVerifiedBrand,
-              verificationBadgeVisible: data.badgeState.verificationBadgeVisible,
-              verifiedExplanationUrl: data.badgeState.verifiedExplanationUrl,
-            }),
-          );
-        }
-      } catch (error: any) {
-        if (!active) return;
-        toast.error(
-          error?.response?.data?.message ||
-            'Unable to load verification status',
-        );
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [brandId, dispatch, user]);
+  const loadError = statusResource.error ?? draftResource.error;
+  useEffect(() => {
+    if (!loadError) return;
+    toast.error(
+      (loadError as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Unable to load verification status',
+    );
+  }, [loadError]);
 
   const callToAction = useMemo(
     () =>

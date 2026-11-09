@@ -258,6 +258,16 @@ export const PRIVATE_QUERY_ROOTS = new Set<string>([
   // Studio dashboard and analytics (inline keys in DashboardHome and
   // AnalyticsPage). Brand-private, and now persisted, so logout must purge it.
   'dashboard',
+  // Inline-keyed roots that were missing, so they outlived a sign-out or an
+  // account switch in memory (Studio audit, Nov 2026). Memory-only, but the
+  // customer list carries names and contacts, and the rest is one account's.
+  'brand-customers',
+  'brand-commerce-access',
+  'brand-verification-status',
+  'verification',
+  'admin',
+  'category-suggestions',
+  'design-create',
 ]);
 
 /**

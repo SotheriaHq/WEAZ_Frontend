@@ -52,13 +52,17 @@ export const clearWebRealtimeSession = () => {
   disconnectSocket();
 };
 
-export const clearWebPrivateSessionState = async ({
-  client,
-}: {
-  client?: QueryClient;
-} = {}) => {
-  dropStoredAccessToken();
-
+/**
+ * Everything one account cached, in memory and on disk, minus the credentials.
+ *
+ * Shared by sign-out and by an account change that arrives WITHOUT a sign-out
+ * in this document: the app's Studio WebView is handed an account by code, so
+ * when a different brand signs in on the phone, the WebView still holds the
+ * previous brand's Studio caches (primed from disk at boot) and its selected
+ * brand. Keys carry the user id, so nothing rendered across, but the previous
+ * account's data must not stay on the device under the new one.
+ */
+export const clearWebPrivateCaches = (client?: QueryClient) => {
   if (client) {
     purgeWebPrivateQueryCache(client);
   }
@@ -67,17 +71,35 @@ export const clearWebPrivateSessionState = async ({
   brandApi.invalidateSignedUrlCache();
   clearSignedFileUrlSessionCache();
   clearWebMarketSignalQueue();
-  clearWebRealtimeSession();
 
-  removeLocalStorageKeys([
-    env.tokenStorageKey,
-    env.userStorageKey,
-    ACTIVE_BRAND_STORAGE_KEY,
-    WIEZ_QUERY_CACHE_STORAGE_KEY,
-  ]);
+  removeLocalStorageKeys([ACTIVE_BRAND_STORAGE_KEY, WIEZ_QUERY_CACHE_STORAGE_KEY]);
   removeSessionStorageKeys([
     SIGNED_URL_SESSION_STORAGE_KEY,
     PENDING_BAG_ACTION_SESSION_STORAGE_KEY,
     UNIFIED_CHECKOUT_QUEUE_SESSION_STORAGE_KEY,
   ]);
+};
+
+/** The account stored in this document before a handoff, if any. */
+export const readStoredWebUserId = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(env.userStorageKey);
+    if (!raw) return null;
+    const id = (JSON.parse(raw) as { id?: unknown } | null)?.id;
+    return typeof id === 'string' && id.trim() ? id : null;
+  } catch {
+    return null;
+  }
+};
+
+export const clearWebPrivateSessionState = async ({
+  client,
+}: {
+  client?: QueryClient;
+} = {}) => {
+  dropStoredAccessToken();
+  clearWebPrivateCaches(client);
+  clearWebRealtimeSession();
+  removeLocalStorageKeys([env.tokenStorageKey, env.userStorageKey]);
 };

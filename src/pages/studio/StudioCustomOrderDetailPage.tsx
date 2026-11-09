@@ -11,7 +11,9 @@ import {
   type CustomOrderProgressStage,
   type CustomOrderStatus,
 } from '@/api/CustomOrderApi';
-import { getStoreStatus } from '@/api/StoreApi';
+import { getStoreStatus, type StoreStatusResponse } from '@/api/StoreApi';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCachedResource } from '@/hooks/useCachedResource';
 import OrderChatDrawer from '@/components/messaging/OrderChatDrawer';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import {
@@ -294,10 +296,49 @@ const StudioCustomOrderDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [brandId, setBrandId] = useState<string | null>(null);
-  const [order, setOrder] = useState<CustomOrderDetail | null>(null);
   const profile = useSelector((state: RootState) => state.user.profile);
-  const [loading, setLoading] = useState(true);
+  /*
+    Cached, not fetched per visit (Item 3, Nov 2026). The page fetched the
+    store status, then the order, then — because `loadOrder` changed with the
+    brand id — both again, behind a skeleton on every open. The status shares
+    the Store tab's entry; the order is cached per brand and order, in memory
+    only (contact and shipping details never go to disk). Actions below write
+    the server's answer straight into the cache, so the page updates in place.
+  */
+  const queryClient = useQueryClient();
+  const storeStatusResource = useCachedResource<StoreStatusResponse>({
+    queryKey: ['store', 'management', 'status', profile?.id ?? 'anon'],
+    retainPreviousData: false,
+    enabled: Boolean(profile?.id),
+    staleTime: 60_000,
+    queryFn: () => getStoreStatus(),
+  });
+  const brandId = storeStatusResource.data?.brandId ?? null;
+  const orderKey = useMemo(
+    () => ['customOrders', 'studioDetail', brandId ?? 'none', orderId ?? 'none'] as const,
+    [brandId, orderId],
+  );
+  const orderResource = useCachedResource<CustomOrderDetail>({
+    queryKey: orderKey,
+    retainPreviousData: false,
+    enabled: Boolean(brandId && orderId),
+    queryFn: () => customOrdersBrandApi.getById(brandId!, orderId!),
+  });
+  const order = orderResource.data ?? null;
+  const setOrder = useCallback(
+    (
+      next:
+        | CustomOrderDetail
+        | null
+        | ((current: CustomOrderDetail | null) => CustomOrderDetail | null),
+    ) => {
+      queryClient.setQueryData<CustomOrderDetail | null>(orderKey, (current) =>
+        typeof next === 'function' ? next(current ?? null) : next,
+      );
+    },
+    [orderKey, queryClient],
+  );
+  const loading = storeStatusResource.loading || orderResource.loading;
   const [busy, setBusy] = useState(false);
   const [activeTab, setActiveTab] = useState<StudioDetailTab>('overview');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -311,45 +352,27 @@ const StudioCustomOrderDetailPage: React.FC = () => {
   const [disputeResponses, setDisputeResponses] = useState<Record<string, string>>({});
   const highlightMessageId = searchParams.get('messageId');
 
-  const loadOrder = useCallback(async (resolvedBrandId?: string | null) => {
-    if (!orderId) return;
-    const effectiveBrandId = resolvedBrandId ?? brandId;
-    if (!effectiveBrandId) return;
-
-    setLoading(true);
-    try {
-      const data = await customOrdersBrandApi.getById(effectiveBrandId, orderId);
-      setOrder(data);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Unable to load custom order');
-      navigate('/studio?tab=orders&orderTab=custom');
-    } finally {
-      setLoading(false);
-    }
-  }, [brandId, navigate, orderId]);
-
+  const storeStatusError = storeStatusResource.error;
   useEffect(() => {
-    let cancelled = false;
+    if (!storeStatusError) return;
+    toast.error(
+      (storeStatusError as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Unable to load studio custom order',
+    );
+  }, [storeStatusError]);
 
-    const run = async () => {
-      try {
-        const status = await getStoreStatus();
-        if (cancelled) return;
-        setBrandId(status.brandId);
-        await loadOrder(status.brandId);
-      } catch (error: any) {
-        if (!cancelled) {
-          setLoading(false);
-          toast.error(error?.response?.data?.message || 'Unable to load studio custom order');
-        }
-      }
-    };
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [loadOrder]);
+  // A failed first load leaves for the queue, as before. A failed background
+  // refresh of an order already on screen keeps it there.
+  const orderError = orderResource.error;
+  const hasOrder = Boolean(order);
+  useEffect(() => {
+    if (!orderError || hasOrder) return;
+    toast.error(
+      (orderError as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Unable to load custom order',
+    );
+    navigate('/studio?tab=orders&orderTab=custom');
+  }, [hasOrder, navigate, orderError]);
 
   useEffect(() => {
     const nextTab = hashToTab(location.hash);
