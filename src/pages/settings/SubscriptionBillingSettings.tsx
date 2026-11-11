@@ -1,5 +1,6 @@
 import { LEGAL_PAGE_VERSION } from '@/pages/legal/legalVersion';
 import { getFriendlyErrorMessage } from '@/utils/errorMessage';
+import { subscriptionQuoteRemainingMs } from '@/api/subscriptionQuote';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
@@ -133,6 +134,17 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
   >('plans');
   const [selectedTier, setSelectedTier] = useState('');
   const [preview, setPreview] = useState<SubscriptionPreview | null>(null);
+  const [quoteExpired, setQuoteExpired] = useState(false);
+  const previewEpoch = useRef(0);
+  useEffect(() => {
+    setQuoteExpired(false);
+    if (!preview) return;
+    const expire = () => { setQuoteExpired(true); setConsent(false); };
+    const remaining = subscriptionQuoteRemainingMs(preview);
+    if (remaining <= 0) { expire(); return; }
+    const timer = setTimeout(expire, remaining);
+    return () => clearTimeout(timer);
+  }, [preview]);
   const [pending, setPending] = useState<SubscriptionCheckout | null>(null);
   const [busy, setBusy] = useState(false);
   const mounted = useRef(true);
@@ -198,18 +210,21 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
 
   async function loadPreview(tierKey: string) {
     if (!brandId) return;
+    const epoch = ++previewEpoch.current;
     setSelectedTier(tierKey);
     setPreview(null);
     setConsent(false);
     setBusy(true);
     try {
-      setPreview(await brandSubscriptionApi.preview(brandId, tierKey));
+      const quote = await brandSubscriptionApi.preview(brandId, tierKey);
+      if (mounted.current && epoch === previewEpoch.current) setPreview(quote);
     } catch (error: unknown) {
+      if (!mounted.current || epoch !== previewEpoch.current) return;
       toast.error(
         getFriendlyErrorMessage(error, 'Unable to preview the subscription change.'),
       );
     } finally {
-      setBusy(false);
+      if (mounted.current && epoch === previewEpoch.current) setBusy(false);
     }
   }
 
@@ -240,7 +255,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
   }
 
   async function checkout() {
-    if (!brandId || !preview || !consent || !canManage) return;
+    if (!brandId || !preview || !consent || !canManage || quoteExpired) return;
     if (
       !(await confirm({
         title: 'Confirm subscription change',
@@ -264,10 +279,12 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
         brandId,
         selectedTier,
         callback.toString(),
-        preview.amountNgn,
+        preview,
         selectedCard || undefined,
       );
       if (!mounted.current) return;
+      setPreview(null);
+      setConsent(false);
       setPending(result);
       if (
         result.action === 'SCHEDULED_DOWNGRADE' ||
@@ -430,7 +447,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
 
           {/* Current Subscription Overview (ITEM 24) */}
           {subscription ? (
-            <div className="wiez-card-base wiez-shade-9 rounded-3xl p-5 sm:p-7 space-y-5">
+            <div data-settings-section className="space-y-5 py-5">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2.5">
@@ -500,6 +517,14 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
               </div>
 
               {/* Recovery Banner if Past Due */}
+              {subscription.pendingTierKey ? (
+                <p>
+                  Next renewal: {queueTierName(subscription.pendingTierKey)}
+                  {typeof subscription.pendingMonthlyPriceNgn === 'number'
+                    ? ` at ${money(subscription.pendingMonthlyPriceNgn)} monthly, as approved.`
+                    : '. Review the approved renewal price before paying.'}
+                </p>
+              ) : null}
               {subscription.recoveryUntil ? (
                 <div className="rounded-xl bg-amber-500/10 p-3.5 text-xs text-amber-800 dark:text-amber-200">
                   <p className="font-semibold">⚠️ Payment Recovery Period Active</p>
@@ -866,7 +891,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
 
           {/* Checkout & Plan Review Drawer (ITEM 28) */}
           {preview ? (
-            <div className="wiez-card-base wiez-shade-11 rounded-3xl p-5 sm:p-7 space-y-5 animate-in fade-in duration-300">
+            <div data-settings-section className="space-y-5 py-5 animate-in fade-in duration-300">
               <div className="flex items-center justify-between">
                 <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
                   Review & Confirm Plan Change: {queueTierName(selectedTier)}
@@ -899,6 +924,10 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
                 </div>
               </div>
 
+              <p role="status" aria-live="polite">
+                {quoteExpired ? 'This price quote expired. Review a fresh price before paying.' : 'This price is held for up to five minutes while you verify your identity.'}
+              </p>
+              <Button variant="secondary" disabled={busy} onClick={() => void loadPreview(selectedTier)}>Review fresh price</Button>
               <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
                 Upgrades take effect immediately upon payment confirmation with the difference prorated to the second for your remaining billing cycle. Downgrades take effect on your next Lagos billing anniversary without refunding the current period.
               </p>
@@ -930,6 +959,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
                   type="checkbox"
                   className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                   checked={consent}
+                  disabled={busy || quoteExpired}
                   onChange={(event) => setConsent(event.target.checked)}
                 />
                 <span>
@@ -969,7 +999,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
                 <Button
                   variant="brand"
                   size="lg"
-                  disabled={!consent || busy || !canManage}
+                  disabled={!consent || busy || !canManage || quoteExpired}
                   loading={busy}
                   onClick={() => void checkout()}
                 >

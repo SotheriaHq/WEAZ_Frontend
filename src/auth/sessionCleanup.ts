@@ -95,11 +95,14 @@ export const readStoredWebUserId = (): string | null => {
 
 export const clearWebPrivateSessionState = async ({
   client,
+  preserveSharedAuthStorage = false,
 }: {
   client?: QueryClient;
+  preserveSharedAuthStorage?: boolean;
 } = {}) => {
   dropStoredAccessToken();
   clearWebPrivateCaches(client);
   clearWebRealtimeSession();
-  removeLocalStorageKeys([env.tokenStorageKey, env.userStorageKey]);
+  if (!preserveSharedAuthStorage)
+    removeLocalStorageKeys([env.tokenStorageKey, env.userStorageKey]);
 };

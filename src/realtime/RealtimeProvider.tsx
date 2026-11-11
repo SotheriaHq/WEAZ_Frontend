@@ -1,9 +1,11 @@
-import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useCallback, useSyncExternalStore } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { env } from '@/config/env';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { wsApplied, incrementCommentCount, decrementCommentCount } from '@/features/engagementSlice';
+import { getApiSecurityIdentity, subscribeAccessToken } from '@/api/httpClient';
+import { bindWebSessionSocket } from './webSessionSocket';
 
 interface ThreadEventPayload {
   contentType: string;
@@ -67,6 +69,8 @@ const buildUrl = () => {
 export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const dispatch = useDispatch();
   const userId = useSelector((state: RootState) => state.user.profile?.id);
+  const identity = useSyncExternalStore(subscribeAccessToken, getApiSecurityIdentity, () => null);
+  const previousUserId = useRef<string | undefined>(undefined);
   const socketRef = useRef<Socket | null>(null);
   const threadSubs = useRef<SubscriptionMap<ThreadHandler>>({});
   const commentSubs = useRef<SubscriptionMap<CommentHandler>>({});
@@ -109,6 +113,15 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     pendingJoinTimeouts.current.clear();
   }, []);
 
+  // Clear the previous account before child passive subscription effects bind
+  // the new account. Ordinary token rotation keeps the existing subscriptions.
+  useLayoutEffect(() => {
+    if (previousUserId.current && previousUserId.current !== userId) {
+      desiredRooms.current.clear(); threadSubs.current = {}; commentSubs.current = {};
+    }
+    previousUserId.current = userId;
+  }, [userId]);
+
   // Establish socket
   useEffect(() => {
     if (!userId) {
@@ -128,6 +141,9 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
       setDegraded(false);
       return;
     }
+    // Persisted profile state may precede cookie restoration. Never connect as
+    // another tab's cookie identity while this tab still shows the old user.
+    if (!identity || identity.split(':')[0] !== userId) return;
 
     // Drop any other user's room from a previous session on this tab.
     for (const room of [...desiredRooms.current]) {
@@ -145,7 +161,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     const s = io(url, {
       withCredentials: true,
       transports: ['polling', 'websocket'],
-      autoConnect: true,
+      autoConnect: false,
       timeout: 10000,
       reconnection: true,
       reconnectionDelay: 1000,
@@ -153,6 +169,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
       randomizationFactor: 0.5,
     });
     socketRef.current = s;
+    const unbindSession = bindWebSessionSocket(s);
     const onConnect = () => {
       setSocketConnected(true);
       failureCountRef.current = 0;
@@ -188,23 +205,10 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     s.on('reconnect_failed', onConnErr);
     s.on('error', onConnErr);
 
-    // When the network returns or the tab becomes visible again, reconnect
-    // immediately instead of waiting out the backoff window.
-    const nudgeReconnect = () => {
-      const current = socketRef.current;
-      if (current && !current.connected) {
-        current.connect();
-      }
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') nudgeReconnect();
-    };
-    window.addEventListener('online', nudgeReconnect);
-    document.addEventListener('visibilitychange', onVisibility);
+    s.connect();
 
     return () => {
-      window.removeEventListener('online', nudgeReconnect);
-      document.removeEventListener('visibilitychange', onVisibility);
+      unbindSession();
       s.off('connect', onConnect);
       s.off('connect_error', onConnErr);
       s.off('reconnect_error', onConnErr);
@@ -214,26 +218,19 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
       s.removeAllListeners();
       s.disconnect();
       clearAllPendingJoins();
-      threadSubs.current = {};
-      commentSubs.current = {};
       if (socketRef.current === s) {
         socketRef.current = null;
       }
       setSocketConnected(false);
     };
-  }, [clearAllPendingJoins, userId]);
+  }, [clearAllPendingJoins, userId, identity]);
 
   const safeJoin = useCallback((room: string) => {
-    if (!room) return;
+    if (!room || room.length > 64) return;
     // Validate basic room formats to avoid backend errors
-    const [type, id] = room.split(':');
+    const [type, id, extra] = room.split(':');
     const uuidRe = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-    if (!type || !id) return;
-    if (type === 'USER') {
-      if (!id.trim()) return;
-    } else if (type === 'COLLECTION' || type === 'COLLECTION_MEDIA' || type === 'COMMENT') {
-      if (!uuidRe.test(id)) return; // discard malformed
-    }
+    if (extra || !['USER', 'POST', 'COLLECTION', 'COLLECTION_MEDIA', 'DESIGN', 'PRODUCT', 'COMMENT'].includes(type) || !uuidRe.test(id)) return;
     // Record intent even while disconnected: the connect handler flushes
     // desired rooms, so a join requested during an outage still lands.
     desiredRooms.current.add(room);
@@ -273,6 +270,11 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
   const joinCollectionMedia = useCallback((mediaId: string) => safeJoin(`COLLECTION_MEDIA:${mediaId}`), [safeJoin]);
   const joinUser = useCallback((userId: string) => safeJoin(`USER:${userId}`), [safeJoin]);
   const joinComment = useCallback((commentId: string) => safeJoin(`COMMENT:${commentId}`), [safeJoin]);
+  const releaseRoom = useCallback((room: string) => {
+    if (threadSubs.current[room]?.size || commentSubs.current[room]?.size) return;
+    desiredRooms.current.delete(room); clearPendingJoin(room);
+    if (socketRef.current?.connected) socketRef.current.emit('leave', { room });
+  }, [clearPendingJoin]);
 
   // Generic event router.
   // Keyed to `socketConnected` for the same reason as the on* subscribers above:
@@ -326,32 +328,32 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
         s.off(ev);
       }
     };
-  }, [dispatch, socketConnected]);
+  }, [dispatch, socketConnected, identity]);
 
   const onThread = useCallback((contentType: string, contentId: string, handler: ThreadHandler) => {
+    if (!userId) return () => undefined;
     const room = `${contentType}:${contentId}`;
     if (!threadSubs.current[room]) threadSubs.current[room] = new Set();
     threadSubs.current[room].add(handler);
-    if (contentType === 'COLLECTION') {
-      joinCollection(contentId);
-    } else if (contentType === 'COLLECTION_MEDIA') {
-      joinCollectionMedia(contentId);
-    }
+    safeJoin(room);
     return () => {
       threadSubs.current[room]?.delete(handler);
       if (threadSubs.current[room]?.size === 0) delete threadSubs.current[room];
+      releaseRoom(room);
     };
-  }, [joinCollection, joinCollectionMedia]);
+  }, [safeJoin, releaseRoom, userId]);
 
   const onComment = useCallback((room: string, handler: CommentHandler) => {
+    if (!userId) return () => undefined;
     if (!commentSubs.current[room]) commentSubs.current[room] = new Set();
     commentSubs.current[room].add(handler);
     safeJoin(room);
     return () => {
       commentSubs.current[room]?.delete(handler);
       if (commentSubs.current[room]?.size === 0) delete commentSubs.current[room];
+      releaseRoom(room);
     };
-  }, [safeJoin]);
+  }, [safeJoin, releaseRoom, userId]);
 
   // These three read socketRef at call time and no-op when it is still null.
   // Child effects run BEFORE the provider's own socket effect on first mount, so
@@ -367,7 +369,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     // socketConnected is the intentional resubscribe trigger; the rule cannot
     // see the socketRef read that makes it load-bearing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socketConnected]);
+  }, [socketConnected, identity]);
 
   const onNotificationDeleted = useCallback((handler: (payload: any) => void) => {
     const s = socketRef.current;
@@ -377,7 +379,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     // socketConnected is the intentional resubscribe trigger; the rule cannot
     // see the socketRef read that makes it load-bearing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socketConnected]);
+  }, [socketConnected, identity]);
 
   const onMessageEvent = useCallback((event: string, handler: (payload: any) => void) => {
     const s = socketRef.current;
@@ -387,7 +389,7 @@ export const RealtimeProvider: React.FC<React.PropsWithChildren> = ({ children }
     // socketConnected is the intentional resubscribe trigger; the rule cannot
     // see the socketRef read that makes it load-bearing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socketConnected]);
+  }, [socketConnected, identity]);
 
   const value = React.useMemo<RealtimeContextValue>(() => ({
     joinCollection,

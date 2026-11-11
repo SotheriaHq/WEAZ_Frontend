@@ -8,6 +8,7 @@ import { Layout } from './components/Layout';
 import ProtectedRoute, { RequireAuthenticated } from './components/ProtectedRoute';
 import GuestRoute from './components/GuestRoute';
 import { AuthProvider } from './context/AuthContext';
+import { MfaVerificationDialog } from '@/components/settings/MfaSettingsPanel';
 import { DropdownManagerProvider } from './context/DropdownManagerContext';
 import { BrandPatchProvider } from './context/BrandPatchContext';
 import RequireBrand from './components/RequireBrand';
@@ -50,6 +51,7 @@ import { selectWishlistIsDrawerOpen } from '@/features/wishlistSlice';
 
 const SettingsHome = lazy(() => import('./pages/settings/SettingsHome'));
 const CollectionsSettings = lazy(() => import('./pages/settings/CollectionsSettings'));
+const MfaRecoveryPage = lazy(() => import('./pages/settings/MfaRecoveryPage'));
 const SignupPage = lazy(() => import('./pages/SignUp'));
 const Success = lazy(() => import('./pages/Success'));
 const LoginPage = lazy(() => import('./pages/Login'));
@@ -105,6 +107,7 @@ const DiagnosticsPage = lazy(() => import('./pages/DiagnosticsPage'));
 const AdminScaffold = lazy(() => import('./components/admin/AdminScaffold'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
+const AdminMfaRecoveryPage = lazy(() => import('./pages/admin/AdminMfaRecoveryPage'));
 const AdminBrandVerificationReviewPage = lazy(() => import('./pages/admin/AdminBrandVerificationReviewPage'));
 const AdminContentManagementPage = lazy(() => import('./pages/admin/AdminContentManagementPage'));
 const AdminTaxonomyPage = lazy(() => import('./pages/admin/AdminTaxonomyPage'));
@@ -416,6 +419,7 @@ const RootLayout: React.FC = () => {
         </Suspense>
         <GenderPrompt />
         <SubscriptionNotice />
+        <MfaVerificationDialog />
       </>
     </BagFlowProvider>
   );
@@ -485,6 +489,7 @@ const LegacyProfileDesignEditRedirect: React.FC = () => {
 const accountSettingsRoutes = [
   { path: 'settings', element: <RequireAuthenticated><SettingsHome /></RequireAuthenticated> },
   { path: 'settings/collections', element: <RequireAuthenticated><CollectionsSettings /></RequireAuthenticated> },
+  { path: 'settings/mfa-recovery', element: <RequireAuthenticated>{withRouteFallback(<MfaRecoveryPage />)}</RequireAuthenticated> },
 ];
 
 const designEditorRoute = (
@@ -1002,6 +1007,7 @@ const router = createBrowserRouter([
           { path: 'custom-orders', element: <RequireAdminPermission permission="MODERATION_READ"><AdminCustomOrdersPage /></RequireAdminPermission> },
           { path: 'custom-orders/:orderId', element: <RequireAdminPermission permission="MODERATION_READ"><AdminCustomOrderDetailPage /></RequireAdminPermission> },
           { path: 'users', element: <RequireAdminPermission permission={['USERS_READ', 'BRANDS_READ', 'BRANDS_VERIFY']}><AdminUsersPage /></RequireAdminPermission> },
+          { path: 'security/mfa-recovery', element: <RequireAdminPermission permission="USERS_MFA_RECOVER">{withRouteFallback(<AdminMfaRecoveryPage />)}</RequireAdminPermission> },
           // Brands + Verification are now tabs inside the unified Users console.
           { path: 'brands', element: <Navigate to="/admin/users?tab=brands" replace /> },
           { path: 'verification', element: <Navigate to="/admin/users?tab=in-review" replace /> },

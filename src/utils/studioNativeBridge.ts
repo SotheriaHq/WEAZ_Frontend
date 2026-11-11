@@ -3,6 +3,8 @@ export type StudioNativeEvent =
   | { type: 'BOOT_FAILED' }
   | { type: 'ROUTE_CHANGED'; path: string }
   | { type: 'AUTH_REQUIRED'; reason?: string }
+  | { type: 'VERIFY_PHONE_SESSION'; requestId: string; parentSessionId: string }
+  | { type: 'CANCEL_PHONE_SESSION_VERIFICATION'; requestId: string; parentSessionId: string }
   | {
       type: 'HANDOFF_FAILED';
       reason?: string;

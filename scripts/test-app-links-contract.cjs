@@ -1,5 +1,5 @@
 // assetlinks.json names only real signing keys, is written into the build
-// output under /.well-known, and is absent when no key is configured.
+// output under /.well-known, using the versioned release association by default.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -20,7 +20,7 @@ const statements = buildAssetLinks({
 });
 assert.deepEqual(statements, [
   {
-    relation: ['delegate_permission/common.handle_all_urls'],
+    relation: ['delegate_permission/common.handle_all_urls', 'delegate_permission/common.get_login_creds'],
     target: {
       namespace: 'android_app',
       package_name: 'com.wiez.wiez',
@@ -39,7 +39,8 @@ assert.throws(
   /package name/,
 );
 
-// The CLI writes dist/.well-known/assetlinks.json, and writes nothing unset.
+// The CLI writes dist/.well-known/assetlinks.json. An explicit reviewed signer
+// list overrides the versioned public release association; omission is safe.
 const script = path.join(__dirname, 'generate-app-links.cjs');
 const run = (env, dir) =>
   execFileSync(process.execPath, [script, dir], { env: { ...process.env, ANDROID_APP_LINK_CERT_SHA256: '', ...env } });
@@ -51,7 +52,10 @@ assert.deepEqual(written[0].target.sha256_cert_fingerprints, [release]);
 
 const withoutKey = fs.mkdtempSync(path.join(os.tmpdir(), 'app-links-'));
 run({}, withoutKey);
-assert.equal(fs.existsSync(path.join(withoutKey, '.well-known')), false);
+const versioned = JSON.parse(fs.readFileSync(path.join(__dirname, '../public/.well-known/assetlinks.json'), 'utf8'));
+const defaultWritten = JSON.parse(fs.readFileSync(path.join(withoutKey, '.well-known/assetlinks.json'), 'utf8'));
+assert.deepEqual(defaultWritten, versioned);
+assert.deepEqual(buildAssetLinks({ ANDROID_APP_LINK_CERT_SHA256: versioned[0].target.sha256_cert_fingerprints.join(',') }), versioned);
 
 // The production build runs it after Vite has emptied dist.
 const pkg = require('../package.json');

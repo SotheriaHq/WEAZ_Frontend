@@ -347,6 +347,11 @@ export async function deleteDesignMedia(designId: string, mediaId: string) {
   clearDesignDetailCache(designId);
 }
 
+export async function deleteDesign(designId: string) {
+  await apiClient.delete(`/designs/${designId}`);
+  clearDesignDetailCache(designId);
+}
+
 export async function startDesignDraftSession(
   designId: string,
   options?: { deviceName?: string; forceNew?: boolean; existingToken?: string },
@@ -376,6 +381,7 @@ export const DesignApi = {
   acknowledgeContentPolicy,
   reorderDesignMedia,
   deleteDesignMedia,
+  deleteDesign,
   startDesignDraftSession,
   getDesignCustomOrderConfiguration,
   resolveDesignId,

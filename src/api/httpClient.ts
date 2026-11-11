@@ -1,3 +1,8 @@
+import { getSecurityDeviceId } from '@/auth/securityDevice';
+import { securityChallenges, securityIdentityFromToken, SecurityVerificationCancelled } from '@/auth/securityChallenge';
+import { verifyChallengedRequest, type SecurityRequestState } from '@/auth/securityRequestRetry';
+import { withSessionRefreshLock } from '@/auth/sessionRefreshLock';
+import { isPasswordSessionRotation } from '@/auth/passwordSessionRotation';
 import axios, { AxiosError, AxiosHeaders } from 'axios';
 import type {
   AxiosHeaderValue,
@@ -15,6 +20,30 @@ import { getWebDeviceId, WIEZ_DEVICE_ID_HEADER } from '../utils/deviceId';
 let consecutiveRefreshFailures = 0;
 let lastRefreshFailureAt = 0;
 let volatileAccessToken: string | null = null;
+const securityIdentity = (token: string | null) => securityIdentityFromToken(token, value => atob(value));
+const currentSecurityIdentity = () => securityIdentity(volatileAccessToken);
+export const getApiSecurityIdentity = currentSecurityIdentity;
+const tokenListeners = new Set<() => void>();
+export const subscribeAccessToken = (listener: () => void) => {
+  tokenListeners.add(listener);
+  return () => { tokenListeners.delete(listener); };
+};
+const notifyTokenListeners = () => {
+  for (const listener of tokenListeners) {
+    try { listener(); } catch { /* One observer must not break credential storage. */ }
+  }
+};
+// A session generation survives routine JWT rotation, but never sign-out or a
+// different sign-in. Retried requests keep their original generation.
+let authScope = 0;
+type SessionRequest = InternalAxiosRequestConfig & { _authScope?: number; _logoutToken?: string | null; _sessionLogout?: boolean };
+const isBoundLogout = (config: SessionRequest) => Boolean(config._sessionLogout &&
+  config.url === '/auth/logout' && String(config.method).toUpperCase() === 'POST');
+const assertCurrentScope = (config: SessionRequest) => {
+  if (isBoundLogout(config)) return;
+  if (config._authScope !== undefined && config._authScope !== authScope)
+    throw new SecurityVerificationCancelled('Your sign-in session changed. Start this action again.');
+};
 
 const getHeaders = (config: AxiosRequestConfig): AxiosHeaders => {
   if (!config.headers) {
@@ -59,6 +88,12 @@ const resetIdentityScopedCaches = () => {
 };
 
 export const persistAccessToken = (token: string) => {
+  if (securityIdentity(token) !== currentSecurityIdentity() ||
+    (!securityIdentity(token) && volatileAccessToken !== token)) {
+    authScope++;
+    refreshPromise = null;
+    securityChallenges.cancel();
+  }
   const changedIdentity = volatileAccessToken !== token;
   consecutiveRefreshFailures = 0;
   lastRefreshFailureAt = 0;
@@ -67,17 +102,40 @@ export const persistAccessToken = (token: string) => {
   // subject needs the flush, but distinguishing the two here is not worth the
   // risk of getting it wrong, and a flush is cheap.
   if (changedIdentity) resetIdentityScopedCaches();
+  if (changedIdentity) notifyTokenListeners();
 };
 
+export function acceptPasswordSessionRotation(previousToken: string | null, replacementToken: string): void {
+  if (!previousToken || currentSecurityIdentity() !== securityIdentity(previousToken) ||
+    !isPasswordSessionRotation(previousToken, replacementToken, value => atob(value)))
+    throw new SecurityVerificationCancelled('Your password may have changed, but your sign-in session changed too. Sign in with the new password.');
+  // Adoption happens only after the entire password/MFA request has resolved.
+  // Ordinary refresh retains its strict same-revision identity check.
+  persistAccessToken(replacementToken);
+}
+
 export const dropStoredAccessToken = () => {
+  authScope++;
+  refreshPromise = null;
+  securityChallenges.cancel();
   volatileAccessToken = null;
   consecutiveRefreshFailures = 0;
   lastRefreshFailureAt = 0;
   resetIdentityScopedCaches();
+  notifyTokenListeners();
 };
 
 export const apiClient: AxiosInstance = axios.create(env.api.defaultConfig);
 const refreshClient: AxiosInstance = axios.create(env.api.defaultConfig);
+
+/** Capture the outgoing credential before asynchronous local cleanup. Never
+ * renew logout as the account that signs in next. */
+export const logoutCurrentSession = () => {
+  const outgoing = volatileAccessToken;
+  // During cookie bootstrap the access cookie may exist before the in-memory
+  // token. Queue logout anyway, after the pending rotation and before sign-in.
+  return apiClient.post('/auth/logout', {}, { _sessionLogout: true, _logoutToken: outgoing } as AxiosRequestConfig);
+};
 
 /* ══════════════════════════════════════════════════════════════════════════
    GET coalescing at the transport.
@@ -115,7 +173,7 @@ const buildGetDedupeKey = (config: any): string | null => {
   } catch {
     return null;
   }
-  return `${config?.baseURL ?? ''}|${config?.url ?? ''}|${params}`;
+  return `${config?._authScope ?? authScope}|${config?.baseURL ?? ''}|${config?.url ?? ''}|${params}`;
 };
 
 export const invalidateGetDedupe = (urlFragment?: string) => {
@@ -148,6 +206,15 @@ try {
 if (resolvedBaseAdapter) {
   const send = resolvedBaseAdapter;
   apiClient.defaults.adapter = async function dedupingAdapter(config: any) {
+    // A discarded response cannot retract an HttpOnly Set-Cookie. Serialize
+    // sign-in/sign-out with refresh so a late rotation cannot overwrite them.
+    if (String(config.url ?? '').startsWith('/auth/') &&
+      String(config.method ?? 'get').toUpperCase() !== 'GET') {
+      return withSessionRefreshLock(() => {
+        assertCurrentScope(config);
+        return send(config);
+      });
+    }
     const key = buildGetDedupeKey(config);
     if (!key) return send(config);
 
@@ -163,7 +230,7 @@ if (resolvedBaseAdapter) {
 
     const promise = send(config)
       .then((response: unknown) => {
-        getDedupeEntries.set(key, {
+        if (getDedupeEntries.get(key)?.inFlight === promise) getDedupeEntries.set(key, {
           inFlight: null,
           response,
           settledAt: Date.now(),
@@ -171,7 +238,7 @@ if (resolvedBaseAdapter) {
         return response;
       })
       .catch((err: unknown) => {
-        getDedupeEntries.delete(key);
+        if (getDedupeEntries.get(key)?.inFlight === promise) getDedupeEntries.delete(key);
         throw err;
       });
 
@@ -217,9 +284,9 @@ refreshClient.interceptors.response.use(
 
 let refreshPromise: Promise<string | null> | null = null;
 
-const dispatchAuthExpired = () => {
+const dispatchAuthExpired = (preserveSharedAuthStorage = false) => {
   try {
-    window.dispatchEvent(new CustomEvent('auth:expired'));
+    window.dispatchEvent(new CustomEvent('auth:expired', { detail: { preserveSharedAuthStorage } }));
   } catch {
     // Browser globals can be unavailable in tests or SSR-like contexts.
   }
@@ -234,28 +301,48 @@ export const refreshAccessToken = async (): Promise<string | null> => {
     return null;
   }
   if (!refreshPromise) {
-    refreshPromise = (async () => {
+    const expectedScope = authScope;
+    // Cookie restoration has not established ownership of shared localStorage.
+    // Its rejection may clear this tab, never another tab's saved identity.
+    const preserveSharedAuthStorage = !currentSecurityIdentity();
+    const stillCurrent = () => expectedScope === authScope;
+    const operation = (async () => {
       try {
-        const response = await refreshClient.post('/auth/refresh', {});
+        const response = await withSessionRefreshLock(() => {
+          if (!stillCurrent()) throw new SecurityVerificationCancelled();
+          return refreshClient.post('/auth/refresh', {});
+        });
+        if (!stillCurrent()) return null;
         const payload = unwrapApiResponse<AuthTokensResponse>(response.data);
         const token = payload?.accessToken ?? null;
+        if (currentSecurityIdentity() && securityIdentity(token) !== currentSecurityIdentity()) {
+          // Another tab may have replaced the cookie session. Never import its
+          // identity into this tab's existing private state.
+          dropStoredAccessToken();
+          dispatchAuthExpired(true);
+          return null;
+        }
         if (token) {
           persistAccessToken(token);
         } else {
           dropStoredAccessToken();
-          dispatchAuthExpired();
+          dispatchAuthExpired(preserveSharedAuthStorage);
         }
         return token;
-      } catch {
+      } catch (error) {
+        if (!stillCurrent()) return null;
         consecutiveRefreshFailures += 1;
         lastRefreshFailureAt = Date.now();
-        dropStoredAccessToken();
-        dispatchAuthExpired();
+        const status = Number((error as AxiosError)?.response?.status ?? 0);
+        if (status === 401 || status === 403) {
+          dropStoredAccessToken();
+          dispatchAuthExpired(preserveSharedAuthStorage);
+        }
         return null;
-      } finally {
-        refreshPromise = null;
       }
     })();
+    refreshPromise = operation;
+    void operation.then(() => { if (refreshPromise === operation) refreshPromise = null; });
   }
 
   return refreshPromise;
@@ -277,22 +364,36 @@ const attachRequestMetadata = (config: InternalAxiosRequestConfig) => {
     if (deviceId) headers.set(WIEZ_DEVICE_ID_HEADER, deviceId);
   }
 
-  const token = volatileAccessToken;
+  if (String(config.url ?? '').startsWith('/auth/')) {
+    const device = getSecurityDeviceId();
+    if (device) headers.set('x-wiez-security-device', device);
+  }
+  const token = isBoundLogout(config as SessionRequest)
+    ? (config as SessionRequest)._logoutToken : volatileAccessToken;
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
+  } else if (isBoundLogout(config as SessionRequest)) {
+    headers.delete('Authorization');
   }
 
   config.headers = headers;
   return config;
 };
 
-apiClient.interceptors.request.use((config) =>
-  startNetworkTrace(attachRequestMetadata(config)),
-);
+apiClient.interceptors.request.use((config) => {
+  const state = config as SessionRequest & SecurityRequestState;
+  state._authScope ??= authScope;
+  assertCurrentScope(state);
+  if (state._securityIdentity && state._securityIdentity !== currentSecurityIdentity())
+    throw new SecurityVerificationCancelled('Your sign-in session changed. Start this action again.');
+  state._securityStartedAt = performance.now();
+  return startNetworkTrace(attachRequestMetadata(config));
+});
 
 apiClient.interceptors.response.use(
   (response) => {
     finishNetworkTrace(response.config, response);
+    assertCurrentScope(response.config as SessionRequest);
 
     /*
       A successful write invalidates the read cache. All of it.
@@ -320,12 +421,27 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     finishNetworkTrace(error.config, error.response, error);
     const { response, config } = error;
+    if (config) assertCurrentScope(config as SessionRequest);
     if (!response || !config) {
       return Promise.reject(error);
     }
 
     const status = response.status;
-    const originalRequest = config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const originalRequest = config as InternalAxiosRequestConfig & SecurityRequestState & { _retry?: boolean };
+    if (isBoundLogout(originalRequest as SessionRequest)) return Promise.reject(error);
+    const sentToken = String(getHeaders(originalRequest).get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+    const sentIdentity = securityIdentity(sentToken);
+    if (status === 428) {
+      const verified = await verifyChallengedRequest(originalRequest, response.data, sentIdentity,
+        currentSecurityIdentity, originalRequest.signal);
+      if (verified) {
+        const headers = getHeaders(originalRequest);
+        headers.delete('x-wiez-action-proof');
+        if (verified.proof) headers.set('x-wiez-action-proof', verified.proof);
+        // Preserve the serialized body, quote and idempotency key exactly as sent.
+        return apiClient(originalRequest);
+      }
+    }
 
     if (
       status === 401 &&
@@ -333,13 +449,22 @@ apiClient.interceptors.response.use(
       !originalRequest.url?.includes('/auth/login')
     ) {
       originalRequest._retry = true;
+      if (sentIdentity && sentIdentity !== currentSecurityIdentity())
+        throw new SecurityVerificationCancelled();
 
       try {
         const newToken = await refreshAccessToken();
+        // Cookie-backed bootstrap starts without an access token. Only its own
+        // successful refresh may move this request into the restored session.
+        if (newToken && !sentToken && newToken === volatileAccessToken)
+          (originalRequest as SessionRequest)._authScope = authScope;
+        assertCurrentScope(originalRequest as SessionRequest);
 
         if (!newToken) {
           return Promise.reject(error);
         }
+        if (sentIdentity && sentIdentity !== securityIdentity(newToken))
+          throw new SecurityVerificationCancelled();
 
         const headers = getHeaders(originalRequest);
         headers.set('Authorization', `Bearer ${newToken}`);
@@ -347,6 +472,7 @@ apiClient.interceptors.response.use(
 
         return apiClient(originalRequest);
       } catch (refreshError) {
+        if (refreshError instanceof SecurityVerificationCancelled) return Promise.reject(refreshError);
         dispatchAuthExpired();
         return Promise.reject(refreshError);
       }

@@ -90,9 +90,19 @@ describe('clearWebPrivateSessionState', () => {
     );
 
     expect(authContextSource).toContain('clearWebPrivateSessionState');
-    expect(authContextSource).toContain('const onAuthExpired = () =>');
+    expect(authContextSource).toContain('const onAuthExpired = (event: Event) =>');
     expect(authContextSource).toContain('void clearPrivateSession()');
     expect(authContextSource).toContain('const logout = () =>');
+  });
+
+  it('isolates a receiving tab without deleting the sender’s shared sign-in snapshot', async () => {
+    const { clearWebPrivateSessionState } = await loadCleanupModule();
+    const client = new QueryClient(); client.setQueryData(['auth', 'profile'], { id: 'old' });
+    localStorage.setItem('WIEZ_USER', 'new-sign-in');
+    await clearWebPrivateSessionState({ client, preserveSharedAuthStorage: true });
+    expect(localStorage.getItem('WIEZ_USER')).toBe('new-sign-in');
+    expect(client.getQueryData(['auth', 'profile'])).toBeUndefined();
+    expect(dropStoredAccessTokenMock).toHaveBeenCalledOnce();
   });
 
   it('removes all queue and billing data before another account can render it', async () => {

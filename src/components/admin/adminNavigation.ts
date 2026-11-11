@@ -28,6 +28,7 @@ export interface AdminRouteAccess {
 }
 
 export const ADMIN_ROUTE_ACCESS: AdminRouteAccess[] = [
+  { prefix: '/admin/security/mfa-recovery', permissions: ['USERS_MFA_RECOVER'] },
   { prefix: '/admin/custom-orders', permissions: ['MODERATION_READ'] },
   // Brands and verification are tabs inside the unified Users console; the old
   // paths redirect there, so they must carry the same requirement or the
@@ -98,6 +99,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { key: 'dashboard', label: 'Dashboard', path: '/admin', emoji: '📊' },
   { key: 'orders', label: 'Orders', path: '/admin/orders', emoji: '🧾' },
   { key: 'users', label: 'Users', path: '/admin/users', emoji: '👤' },
+  { key: 'mfa-recovery', label: 'Verification recovery', path: '/admin/security/mfa-recovery', emoji: '🔐' },
   {
     key: 'content',
     label: 'Content Management',

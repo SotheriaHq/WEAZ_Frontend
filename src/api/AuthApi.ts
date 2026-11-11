@@ -1,4 +1,4 @@
-import { apiClient } from './httpClient';
+import { apiClient, getStoredAccessToken, acceptPasswordSessionRotation } from './httpClient';
 import type { ApiSuccessPayload } from '@/types/auth';
 import { unwrapApiResponse } from '@/types/auth';
 import type { AuthTokensResponse, AuthUserType } from '@/types/auth';
@@ -153,8 +153,11 @@ export class AuthApi {
   }
 
   static async changePassword(payload: PasswordChangePayload): Promise<MessageResponse> {
+    const previous = getStoredAccessToken();
     const response = await apiClient.post('/auth/change-password', payload);
-    return unwrapMessageResponse(response.data);
+    const result = unwrapApiResponse<MessageResponse & { accessToken: string }>(response.data);
+    acceptPasswordSessionRotation(previous, result.accessToken);
+    return { message: result.message };
   }
 
   static async requestEmailChange(payload: RequestEmailChangePayload): Promise<MessageResponse & { pendingEmail?: string }> {

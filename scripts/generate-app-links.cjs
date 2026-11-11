@@ -1,6 +1,7 @@
 /**
  * Writes /.well-known/assetlinks.json into the build so Android opens emailed
- * WIEZ links in the installed app (App Links) and in the browser when the app
+ * WIEZ links in the installed app (App Links), permits Android Credential
+ * Manager to use WIEZ passkeys, and leaves links in the browser when the app
  * is not installed. The app claims the paths; this file is the site's half of
  * the handshake, naming which signed app may open them.
  *
@@ -10,7 +11,8 @@
  *                                 once on Google Play, the Play app-signing key.
  *   ANDROID_APP_LINK_PACKAGE      Defaults to com.wiez.wiez.
  *
- * Unset, no file is written and every link keeps opening in the browser.
+ * The versioned public association names the verified release/EAS signer.
+ * An explicit build variable can supply a reviewed rotation/Play signer list.
  *
  * The React Native template's debug key is refused. It ships with every new
  * project, so anyone can sign an app with it; naming it here would let any
@@ -55,7 +57,7 @@ function buildAssetLinks(env = process.env) {
 
   return [
     {
-      relation: ['delegate_permission/common.handle_all_urls'],
+      relation: ['delegate_permission/common.handle_all_urls', 'delegate_permission/common.get_login_creds'],
       target: {
         namespace: 'android_app',
         package_name: packageName,
@@ -67,10 +69,18 @@ function buildAssetLinks(env = process.env) {
 
 function main() {
   const outDir = path.resolve(process.cwd(), process.argv[2] ?? 'dist');
-  const statements = buildAssetLinks();
+  let statements = buildAssetLinks();
   if (!statements) {
-    console.log('[app-links] ANDROID_APP_LINK_CERT_SHA256 is not set: no assetlinks.json, links open in the browser.');
-    return;
+    const source = JSON.parse(fs.readFileSync(path.join(__dirname, '../public/.well-known/assetlinks.json'), 'utf8'));
+    if (!Array.isArray(source) || source.length !== 1 || source[0]?.target?.namespace !== 'android_app' ||
+      source[0]?.target?.package_name !== 'com.wiez.wiez' || !Array.isArray(source[0]?.target?.sha256_cert_fingerprints))
+      throw new Error('Invalid versioned Android release association.');
+    statements = buildAssetLinks({
+      ANDROID_APP_LINK_PACKAGE: source[0].target.package_name,
+      ANDROID_APP_LINK_CERT_SHA256: source[0].target.sha256_cert_fingerprints.join(','),
+    });
+    if (!statements || JSON.stringify(statements) !== JSON.stringify(source))
+      throw new Error('The versioned Android association must use the validated release contract.');
   }
   const target = path.join(outDir, '.well-known', 'assetlinks.json');
   fs.mkdirSync(path.dirname(target), { recursive: true });

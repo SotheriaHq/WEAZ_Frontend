@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.wiez.wiez",
+      "sha256_cert_fingerprints": [
+        "69:15:9A:7F:5B:76:C4:FE:16:F0:8C:4F:39:A1:11:72:38:F4:43:65:8E:2D:F7:DE:B3:7C:E3:2D:4F:2D:9E:04"
+      ]
+    }
+  }
+]

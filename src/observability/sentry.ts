@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/react';
 import { telemetryPath, telemetryUrl } from '@/privacy/telemetryUrl';
+import { scrubSecurityTelemetry } from '@/auth/securityTelemetry';
 
 type ScrubbableEvent = {
   request?: { url?: string; query_string?: unknown; headers?: Record<string, string> };
@@ -17,16 +18,16 @@ const scrubEvent = <T extends ScrubbableEvent>(event: T): T => {
     }
   }
   if (event.transaction?.startsWith('/')) event.transaction = telemetryPath(event.transaction);
-  return event;
+  return scrubSecurityTelemetry(event);
 };
 
 const scrubBreadcrumb = (breadcrumb: Sentry.Breadcrumb): Sentry.Breadcrumb => {
   const data = breadcrumb.data;
-  if (!data) return breadcrumb;
+  if (!data) return scrubSecurityTelemetry(breadcrumb);
   for (const key of ['url', 'from', 'to'] as const) {
     if (typeof data[key] === 'string') data[key] = telemetryUrl(data[key] as string);
   }
-  return breadcrumb;
+  return scrubSecurityTelemetry(breadcrumb);
 };
 
 // Keep the absent configuration statically removable in public builds.

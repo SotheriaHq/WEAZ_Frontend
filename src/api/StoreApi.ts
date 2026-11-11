@@ -1,4 +1,4 @@
-import { apiClient } from './httpClient';
+import { apiClient, getStoredAccessToken } from './httpClient';
 import type { LegalAcceptancePayload } from '@/api/LegalApi';
 import type { AxiosResponse } from 'axios';
 import { createIdempotencyKey } from './idempotency';
@@ -789,8 +789,8 @@ export interface StorePaymentAccountSummary {
  * a backstop for changes made in another tab or by an admin.
  */
 const STORE_STATUS_TTL_MS = 10 * 60 * 1000;
-let storeStatusCache: { data: StoreStatusResponse; expiresAt: number } | null = null;
-let storeStatusPending: Promise<StoreStatusResponse> | null = null;
+let storeStatusCache: { data: StoreStatusResponse; expiresAt: number; scope: string } | null = null;
+let storeStatusPending: { scope: string; promise: Promise<StoreStatusResponse> } | null = null;
 
 const clearStoreStatusCache = () => {
   storeStatusCache = null;
@@ -1051,33 +1051,30 @@ export const updateStoreName = async (payload: {
  * state from this instead means a warm cache costs no render at all.
  */
 export const getCachedStoreStatus = (): StoreStatusResponse | null => {
-  if (storeStatusCache && storeStatusCache.expiresAt > Date.now()) {
+  if (getStoredAccessToken() && storeStatusCache?.scope === getStoredAccessToken() && storeStatusCache.expiresAt > Date.now()) {
     return storeStatusCache.data;
   }
   return null;
 };
 
 export const getStoreStatus = async (options?: { forceRefresh?: boolean }): Promise<StoreStatusResponse> => {
+  const scope = getStoredAccessToken();
   const forceRefresh = options?.forceRefresh === true;
-  if (!forceRefresh && storeStatusCache && storeStatusCache.expiresAt > Date.now()) {
-    return storeStatusCache.data;
-  }
-  if (!forceRefresh && storeStatusPending) {
-    return storeStatusPending;
-  }
-
-  storeStatusPending = (async () => {
+  if (!forceRefresh && scope && storeStatusCache?.scope === scope && storeStatusCache.expiresAt > Date.now()) return storeStatusCache.data;
+  if (!forceRefresh && scope && storeStatusPending?.scope === scope) return storeStatusPending.promise;
+  const pending = { scope: scope ?? '', promise: Promise.resolve(null as unknown as StoreStatusResponse) };
+  pending.promise = (async () => {
     const res = await apiClient.get('/store/status');
     const data = extractData<StoreStatusResponse>(res);
-    storeStatusCache = { data, expiresAt: Date.now() + STORE_STATUS_TTL_MS };
+    // A late answer from a signed-out identity must never replace the next account's cache.
+    if (scope && getStoredAccessToken() === scope && storeStatusPending === pending) {
+      storeStatusCache = { data, scope, expiresAt: Date.now() + STORE_STATUS_TTL_MS };
+    }
     return data;
   })();
-
-  try {
-    return await storeStatusPending;
-  } finally {
-    storeStatusPending = null;
-  }
+  storeStatusPending = pending;
+  try { return await pending.promise; }
+  finally { if (storeStatusPending === pending) storeStatusPending = null; }
 };
 
 export type OpenStorePayload = {
@@ -1099,9 +1096,12 @@ export const closeStore = async (): Promise<{ success: boolean; message: string;
 };
 
 export const updateStoreProfile = async (data: StoreProfileUpdateData): Promise<StoreStatusResponse> => {
+  const scope = getStoredAccessToken();
   const res = await apiClient.patch('/store/profile', data);
   const status = extractData<StoreStatusResponse>(res);
-  storeStatusCache = { data: status, expiresAt: Date.now() + STORE_STATUS_TTL_MS };
+  if (scope && getStoredAccessToken() === scope) {
+    storeStatusCache = { data: status, scope, expiresAt: Date.now() + STORE_STATUS_TTL_MS };
+  }
   return status;
 };
 
