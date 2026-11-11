@@ -22,7 +22,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
     
     // Semantic surface mapping
     const bgStyles = glass
-      ? 'surface-menu backdrop-blur-xl shadow-glass border border-[color:var(--wiez-border-subtle)]'
+      ? 'wiez-lg-surface wiez-lg-prominent shadow-glass'
       : variant === 'bordered'
         ? 'bg-[color:var(--wiez-surface-card)] border border-[color:var(--wiez-border-subtle)] shadow-sm'
         : variant === 'elevated'

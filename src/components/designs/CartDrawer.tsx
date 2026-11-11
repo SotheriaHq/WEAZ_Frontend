@@ -293,14 +293,14 @@ const CartDrawer: React.FC = () => {
             >
               {isCheckoutView ? (
                 <>
-                  <div className="absolute inset-0 backdrop-blur-md" />
+                  <div className="absolute inset-0 backdrop-blur-md wiez-lg-backdrop" />
                   <div className="absolute inset-0 bg-slate-900/30 dark:bg-black/45" />
                 </>
               ) : (
                 <>
                   <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
                   <div className="absolute inset-0 bg-gradient-to-tr from-violet-600/20 via-transparent to-cyan-600/20" />
-                  <div className="absolute inset-0 backdrop-blur-xl" />
+                  <div className="absolute inset-0 backdrop-blur-xl wiez-lg-backdrop" />
                   <div className="absolute inset-0 bg-black/30" />
                 </>
               )}
@@ -320,7 +320,7 @@ const CartDrawer: React.FC = () => {
               aria-label="My Bag"
             >
               {/* Glass panel */}
-              <div className="h-full bg-white/[0.98] dark:bg-gray-950/[0.98] backdrop-blur-2xl border-l border-white/30 dark:border-white/10 shadow-2xl flex flex-col">
+              <div className="h-full bg-white/[0.98] dark:bg-gray-950/[0.98] backdrop-blur-2xl wiez-lg-backdrop border-l border-white/30 dark:border-white/10 shadow-2xl flex flex-col">
               {drawerView === 'checkout' ? (
                 <div className="h-full overflow-y-auto">
                   <Suspense
@@ -354,7 +354,7 @@ const CartDrawer: React.FC = () => {
                   type="button"
                   onClick={() => dispatch(closeCartDrawer())}
                   aria-label="Close bag"
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition-colors border border-black/10 dark:border-white/10 shadow-sm"
+                  className="wiez-lg-surface wiez-lg-subtle wiez-lg-interactive flex h-8 w-8 items-center justify-center rounded-full"
                 >
                   <span className="text-sm leading-none select-none font-bold">✖️</span>
                 </button>
@@ -662,7 +662,7 @@ const CartDrawer: React.FC = () => {
 
               {/* Footer - only show when cart has items */}
               {hasBagItems && (
-                <div className="border-t border-gray-200/60 dark:border-gray-800/60 bg-white/40 dark:bg-gray-950/40 backdrop-blur-2xl px-3 py-1.5">
+                <div className="wiez-lg-surface wiez-lg-regular border-0 border-t border-theme px-3 py-1.5">
                   {/* Order Summary */}
                   <div className="space-y-0.5 mb-1.5">
                     <div className="flex items-center justify-between text-xs">

@@ -27,3 +27,17 @@ export type { TextareaProps } from './Textarea';
 
 export { default as Select } from './Select';
 export type { SelectProps } from './Select';
+
+export {
+  default as LiquidGlass,
+  liquidGlassClasses,
+  LIQUID_GLASS_OPTICAL_SPEC,
+} from './LiquidGlass';
+export type {
+  LiquidGlassProps,
+  LiquidGlassClassOptions,
+  LiquidGlassIntensity,
+  LiquidGlassTone,
+  LiquidGlassShape,
+  LiquidGlassElement,
+} from './LiquidGlass';

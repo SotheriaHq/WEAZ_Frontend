@@ -218,7 +218,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
 
         <DropdownMenu
           maxHeight="min(80dvh, 30rem)"
-          className="surface-menu w-[min(17rem,calc(100vw-1rem))] !shadow-none !ring-0 outline-none sm:w-[19rem]"
+          className="w-[min(17rem,calc(100vw-1rem))] !ring-0 outline-none sm:w-[19rem]"
         >
           <div className="flex items-center gap-3 px-3.5 pb-3 pt-3.5">
             <div className="h-14 w-14 overflow-hidden rounded-xl border border-theme">
@@ -455,14 +455,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
               ? 'wiez-nav-surface-muted'
               : 'wiez-nav-surface'
       }`}
-      style={
-        !minimal && !immersive
-          ? {
-              backdropFilter: 'blur(28px) saturate(210%)',
-              WebkitBackdropFilter: 'blur(28px) saturate(210%)',
-            }
-          : undefined
-      }
     >
       {/* Readability scrim: over edge-filled media the bar has no surface of
           its own, so the controls need this to stay legible. Extends past the

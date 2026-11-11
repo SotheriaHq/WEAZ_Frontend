@@ -168,7 +168,7 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
                     }
                   }}
                   className={
-                    `cursor-pointer rounded-full bg-white/90 px-5 py-2 text-xs font-semibold uppercase tracking-wide text-gray-800 shadow-lg transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 dark:bg-gray-900/85 dark:text-gray-100 ` +
+                    `wiez-lg-surface wiez-lg-regular wiez-lg-stage wiez-lg-interactive cursor-pointer rounded-full px-5 py-2 text-xs font-semibold uppercase tracking-wide focus:outline-none ` +
                     (bannerLoading ? 'pointer-events-none opacity-70' : '')
                   }
                   aria-disabled={bannerLoading}
@@ -400,7 +400,7 @@ const ProfileHeaderComponent: React.FC<ProfileHeaderProps> = ({
               <button
                 type="button"
                 onClick={onShowQrCode}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-lg text-gray-900 shadow-lg transition hover:scale-105 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 dark:bg-gray-900/85 dark:text-gray-100"
+                className="wiez-lg-surface wiez-lg-regular wiez-lg-interactive inline-flex h-10 w-10 items-center justify-center rounded-full text-lg focus:outline-none"
                 aria-label="Show brand QR code"
                 title="Show QR code"
               >

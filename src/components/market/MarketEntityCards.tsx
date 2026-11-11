@@ -172,7 +172,7 @@ export function MarketCollectionCard({ item, onOpen, productImages, className = 
           ))
         )}
         {pieces ? (
-          <span className="absolute bottom-2 right-2 rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+          <span className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage absolute bottom-2 right-2 rounded-full px-2.5 py-1 text-[11px] font-bold">
             {pieces}
           </span>
         ) : null}

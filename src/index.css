@@ -507,6 +507,60 @@ html {
     --neu-border: rgba(168, 85, 247, 0.18); /* Delicate violet border */
     --neu-shadow-dark: rgba(255, 255, 255, 0.85); /* Reflects light instead of dark smudges */
     --neu-shadow-light: #ffffff;
+
+    /* WIEZ Liquid Glass v4 Optical Material Tokens (Light) */
+    --wiez-lg-blur-subtle: 14px;
+    --wiez-lg-blur-regular: 20px;
+    --wiez-lg-blur-prominent: 26px;
+    --wiez-lg-sat-subtle: 180%;
+    --wiez-lg-sat-regular: 195%;
+    --wiez-lg-sat-prominent: 210%;
+    --wiez-lg-tint-subtle: rgba(255, 255, 255, 0.40);
+    --wiez-lg-tint-regular: rgba(255, 255, 255, 0.56);
+    --wiez-lg-tint-prominent: rgba(255, 255, 255, 0.76);
+    --wiez-lg-menu-bg: rgba(255, 255, 255, 0.92);
+    --wiez-lg-nav-bg: rgba(255, 255, 255, 0.68);
+    --wiez-lg-nav-scrolled-bg: rgba(255, 255, 255, 0.82);
+    --wiez-lg-hover-tint: rgba(255, 255, 255, 0.72);
+    --wiez-lg-pressed-overlay: rgba(255, 255, 255, 0.24);
+    --wiez-lg-sheen: linear-gradient(
+      148deg,
+      rgba(255, 255, 255, 0.54) 0%,
+      rgba(255, 255, 255, 0.08) 46%,
+      rgba(255, 255, 255, 0.22) 100%
+    );
+    --wiez-lg-border: rgba(20, 20, 24, 0.10);
+    --wiez-lg-border-hover: rgba(147, 51, 234, 0.26);
+    --wiez-lg-specular-top: rgba(255, 255, 255, 0.94);
+    --wiez-lg-specular-bottom: rgba(20, 20, 24, 0.06);
+    --wiez-lg-shadow: 0 8px 28px -6px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.04);
+    --wiez-lg-shadow-hover: 0 12px 32px -6px rgba(124, 58, 237, 0.16), 0 4px 12px rgba(15, 23, 42, 0.06);
+    --wiez-lg-shadow-elevated: 0 20px 48px -8px rgba(15, 23, 42, 0.14), 0 4px 14px rgba(15, 23, 42, 0.06);
+    --wiez-lg-active-bg: linear-gradient(
+      150deg,
+      rgba(168, 85, 247, 0.24) 0%,
+      rgba(147, 51, 234, 0.10) 100%
+    );
+    --wiez-lg-active-border: rgba(168, 85, 247, 0.44);
+    --wiez-lg-active-text: #6b21a8;
+    --wiez-lg-active-shadow: 0 4px 14px -2px rgba(147, 51, 234, 0.34);
+    --wiez-lg-focus-ring: 0 0 0 2px rgba(255, 255, 255, 0.95), 0 0 0 4px rgba(147, 51, 234, 0.72);
+    --wiez-lg-fallback-bg: rgba(255, 255, 255, 0.92);
+    --wiez-lg-reduced-bg: rgba(255, 255, 255, 0.97);
+    --wiez-lg-stage-tint: rgba(16, 16, 20, 0.34);
+    --wiez-lg-stage-hover-tint: rgba(24, 24, 32, 0.50);
+    --wiez-lg-stage-border: rgba(255, 255, 255, 0.24);
+    --wiez-lg-stage-specular-top: rgba(255, 255, 255, 0.42);
+    --wiez-lg-stage-specular-bottom: rgba(255, 255, 255, 0.10);
+    --wiez-lg-stage-sheen: linear-gradient(
+      148deg,
+      rgba(255, 255, 255, 0.18) 0%,
+      rgba(255, 255, 255, 0.02) 48%,
+      rgba(255, 255, 255, 0.08) 100%
+    );
+    --wiez-lg-stage-shadow: 0 8px 26px -6px rgba(0, 0, 0, 0.42), 0 2px 6px rgba(0, 0, 0, 0.22);
+    --wiez-lg-stage-fallback-bg: rgba(18, 18, 24, 0.84);
+    --wiez-lg-stage-reduced-bg: rgba(14, 14, 20, 0.93);
   }
 
   .dark {
@@ -666,6 +720,40 @@ html {
     --menu-selected-text: #e9d5ff;
     --menu-border: color-mix(in srgb, var(--brand-primary) 24%, var(--border-default));
     --profile-photo-ring-viewed: color-mix(in srgb, var(--text-secondary) 48%, var(--surface-muted));
+
+    /* WIEZ Liquid Glass v4 Optical Material Tokens (Dark) */
+    --wiez-lg-tint-subtle: rgba(20, 20, 24, 0.46);
+    --wiez-lg-tint-regular: rgba(20, 20, 24, 0.58);
+    --wiez-lg-tint-prominent: rgba(16, 15, 22, 0.78);
+    --wiez-lg-menu-bg: rgba(18, 16, 28, 0.91);
+    --wiez-lg-nav-bg: rgba(14, 12, 22, 0.68);
+    --wiez-lg-nav-scrolled-bg: rgba(14, 12, 22, 0.80);
+    --wiez-lg-hover-tint: rgba(32, 30, 42, 0.72);
+    --wiez-lg-pressed-overlay: rgba(255, 255, 255, 0.14);
+    --wiez-lg-sheen: linear-gradient(
+      148deg,
+      rgba(255, 255, 255, 0.14) 0%,
+      rgba(255, 255, 255, 0.02) 48%,
+      rgba(255, 255, 255, 0.06) 100%
+    );
+    --wiez-lg-border: rgba(255, 255, 255, 0.14);
+    --wiez-lg-border-hover: rgba(192, 132, 252, 0.34);
+    --wiez-lg-specular-top: rgba(255, 255, 255, 0.28);
+    --wiez-lg-specular-bottom: rgba(0, 0, 0, 0.36);
+    --wiez-lg-shadow: 0 10px 30px -6px rgba(0, 0, 0, 0.58), 0 2px 8px rgba(0, 0, 0, 0.32);
+    --wiez-lg-shadow-hover: 0 14px 36px -6px rgba(0, 0, 0, 0.70), 0 4px 12px rgba(168, 85, 247, 0.18);
+    --wiez-lg-shadow-elevated: 0 24px 56px -8px rgba(0, 0, 0, 0.72), 0 4px 16px rgba(0, 0, 0, 0.42);
+    --wiez-lg-active-bg: linear-gradient(
+      150deg,
+      rgba(192, 132, 252, 0.30) 0%,
+      rgba(168, 85, 247, 0.14) 100%
+    );
+    --wiez-lg-active-border: rgba(216, 180, 254, 0.42);
+    --wiez-lg-active-text: #f3e8ff;
+    --wiez-lg-active-shadow: 0 4px 16px -2px rgba(168, 85, 247, 0.50);
+    --wiez-lg-focus-ring: 0 0 0 2px rgba(18, 16, 28, 0.96), 0 0 0 4px rgba(192, 132, 252, 0.85);
+    --wiez-lg-fallback-bg: rgba(18, 16, 28, 0.92);
+    --wiez-lg-reduced-bg: rgba(14, 12, 22, 0.97);
   }
 
 }
@@ -980,37 +1068,46 @@ html {
   }
 
   .glass-menu {
-    -webkit-backdrop-filter: blur(24px) saturate(200%) brightness(104%);
-    backdrop-filter: blur(24px) saturate(200%) brightness(104%);
+    -webkit-backdrop-filter: blur(var(--wiez-lg-blur-prominent)) saturate(var(--wiez-lg-sat-prominent)) brightness(103%);
+    backdrop-filter: blur(var(--wiez-lg-blur-prominent)) saturate(var(--wiez-lg-sat-prominent)) brightness(103%);
     border-radius: 1rem;
     color: var(--text-primary);
-    background-color: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.7);
+    background-color: var(--wiez-lg-menu-bg);
+    background-image: var(--wiez-lg-sheen);
+    border: 1px solid var(--wiez-lg-border);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.95),
-      inset 0 -1px 0 rgba(147, 51, 234, 0.04),
-      0 20px 48px -8px rgba(124, 58, 237, 0.12),
-      0 4px 14px rgba(15, 23, 42, 0.06);
+      inset 0 1px 0 var(--wiez-lg-specular-top),
+      inset 0 -1px 0 var(--wiez-lg-specular-bottom),
+      var(--wiez-lg-shadow-elevated);
   }
 
   :is(.dark) .glass-menu {
-    background-color: rgba(19, 15, 36, 0.9);
-    border: 1px solid rgba(192, 132, 252, 0.16);
+    background-color: var(--wiez-lg-menu-bg);
+    background-image: var(--wiez-lg-sheen);
+    border: 1px solid var(--wiez-lg-border);
     box-shadow:
-      inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-      0 24px 56px -8px rgba(0, 0, 0, 0.6),
-      0 4px 16px rgba(0, 0, 0, 0.35);
+      inset 0 1px 0 var(--wiez-lg-specular-top),
+      inset 0 -1px 0 var(--wiez-lg-specular-bottom),
+      var(--wiez-lg-shadow-elevated);
   }
 
   .glass-menu-soft {
-    @apply backdrop-blur-xl rounded-2xl border shadow-xl;
+    @apply rounded-2xl border;
+    -webkit-backdrop-filter: blur(var(--wiez-lg-blur-regular)) saturate(var(--wiez-lg-sat-regular));
+    backdrop-filter: blur(var(--wiez-lg-blur-regular)) saturate(var(--wiez-lg-sat-regular));
     color: var(--text-primary);
-    border-color: var(--border-default);
-    background-color: color-mix(in srgb, var(--surface-primary) 84%, transparent);
+    border-color: var(--wiez-lg-border);
+    background-color: var(--wiez-lg-tint-prominent);
+    background-image: var(--wiez-lg-sheen);
+    box-shadow:
+      inset 0 1px 0 var(--wiez-lg-specular-top),
+      inset 0 -1px 0 var(--wiez-lg-specular-bottom),
+      var(--wiez-lg-shadow);
   }
 
   :is(.dark) .glass-menu-soft {
-    background-color: color-mix(in srgb, var(--surface-primary) 92%, transparent);
+    background-color: var(--wiez-lg-tint-prominent);
+    border-color: var(--wiez-lg-border);
   }
 
   .glass-chip {
@@ -1079,45 +1176,304 @@ html {
     rule and a blur. The change on scroll is now a border and a tint appearing,
     rather than the entire bar appearing.
   */
-  /* WIEZ Liquid Glass Architecture (Rule 36 - Strictly No Frosted Glass) */
+  /* WIEZ Liquid Glass v4 Web Surface System */
   .wiez-liquid-glass,
   .wiez-nav-surface {
-    background-color: rgba(255, 255, 255, 0.70);
-    backdrop-filter: blur(24px) saturate(200%) brightness(104%);
-    -webkit-backdrop-filter: blur(24px) saturate(200%) brightness(104%);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-    box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.85), inset 0 -1px 1px 0 rgba(255, 255, 255, 0.12);
-    transition: box-shadow 0.25s ease, background-color 0.25s ease;
+    background-color: var(--wiez-lg-nav-bg);
+    background-image: var(--wiez-lg-sheen);
+    backdrop-filter: blur(var(--wiez-lg-blur-regular)) saturate(var(--wiez-lg-sat-regular)) brightness(102%);
+    -webkit-backdrop-filter: blur(var(--wiez-lg-blur-regular)) saturate(var(--wiez-lg-sat-regular)) brightness(102%);
+    border-bottom: 1px solid var(--wiez-lg-border);
+    box-shadow:
+      inset 0 1px 0 var(--wiez-lg-specular-top),
+      inset 0 -1px 0 var(--wiez-lg-specular-bottom);
+    transition: box-shadow 0.25s ease, background-color 0.25s ease, border-color 0.25s ease;
   }
 
   .wiez-liquid-glass.scrolled,
   .wiez-nav-surface-muted {
-    background-color: rgba(255, 255, 255, 0.78);
-    backdrop-filter: blur(28px) saturate(210%) brightness(105%);
-    -webkit-backdrop-filter: blur(28px) saturate(210%) brightness(105%);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.07);
-    box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), 0 4px 20px -2px rgba(0, 0, 0, 0.06);
-    transition: box-shadow 0.25s ease, background-color 0.25s ease;
+    background-color: var(--wiez-lg-nav-scrolled-bg);
+    background-image: var(--wiez-lg-sheen);
+    backdrop-filter: blur(var(--wiez-lg-blur-prominent)) saturate(var(--wiez-lg-sat-prominent)) brightness(103%);
+    -webkit-backdrop-filter: blur(var(--wiez-lg-blur-prominent)) saturate(var(--wiez-lg-sat-prominent)) brightness(103%);
+    border-bottom: 1px solid var(--wiez-lg-border);
+    box-shadow:
+      inset 0 1px 0 var(--wiez-lg-specular-top),
+      inset 0 -1px 0 var(--wiez-lg-specular-bottom),
+      0 6px 24px -4px rgba(15, 23, 42, 0.08);
+    transition: box-shadow 0.25s ease, background-color 0.25s ease, border-color 0.25s ease;
   }
 
   :is(.dark) .wiez-liquid-glass,
   :is(.dark) .wiez-nav-surface {
-    background-color: rgba(10, 8, 18, 0.70);
-    backdrop-filter: blur(24px) saturate(200%) brightness(104%);
-    -webkit-backdrop-filter: blur(24px) saturate(200%) brightness(104%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 1px 0 rgba(255, 255, 255, 0.04);
-    transition: box-shadow 0.25s ease, background-color 0.25s ease;
+    background-color: var(--wiez-lg-nav-bg);
+    border-bottom-color: var(--wiez-lg-border);
+    box-shadow:
+      inset 0 1px 0 var(--wiez-lg-specular-top),
+      inset 0 -1px 0 var(--wiez-lg-specular-bottom);
   }
 
   :is(.dark) .wiez-liquid-glass.scrolled,
   :is(.dark) .wiez-nav-surface-muted {
-    background-color: rgba(12, 10, 20, 0.78);
-    backdrop-filter: blur(28px) saturate(210%) brightness(105%);
-    -webkit-backdrop-filter: blur(28px) saturate(210%) brightness(105%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.10);
-    box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), 0 4px 24px -2px rgba(0, 0, 0, 0.5);
-    transition: box-shadow 0.25s ease, background-color 0.25s ease;
+    background-color: var(--wiez-lg-nav-scrolled-bg);
+    border-bottom-color: var(--wiez-lg-border);
+    box-shadow:
+      inset 0 1px 0 var(--wiez-lg-specular-top),
+      inset 0 -1px 0 var(--wiez-lg-specular-bottom),
+      0 8px 28px -4px rgba(0, 0, 0, 0.55);
+  }
+
+  /* Canonical Liquid Glass Primitive Classes (v4 optical baseline) */
+  .wiez-lg-surface {
+    --wiez-lg-local-bg: var(--wiez-lg-tint-regular);
+    --wiez-lg-local-hover-bg: var(--wiez-lg-hover-tint);
+    --wiez-lg-local-sheen: var(--wiez-lg-sheen);
+    --wiez-lg-local-border: var(--wiez-lg-border);
+    --wiez-lg-local-spec-top: var(--wiez-lg-specular-top);
+    --wiez-lg-local-spec-bottom: var(--wiez-lg-specular-bottom);
+    --wiez-lg-local-shadow: var(--wiez-lg-shadow);
+    color: var(--text-primary);
+    background-color: var(--wiez-lg-local-bg);
+    background-image: var(--wiez-lg-local-sheen);
+    border: 1px solid var(--wiez-lg-local-border);
+    backdrop-filter: blur(var(--wiez-lg-blur-regular)) saturate(var(--wiez-lg-sat-regular)) brightness(102%);
+    -webkit-backdrop-filter: blur(var(--wiez-lg-blur-regular)) saturate(var(--wiez-lg-sat-regular)) brightness(102%);
+    box-shadow:
+      inset 0 1px 0 var(--wiez-lg-local-spec-top),
+      inset 0 -1px 0 var(--wiez-lg-local-spec-bottom),
+      var(--wiez-lg-local-shadow);
+    background-clip: padding-box;
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
+      color 150ms ease;
+  }
+
+  .wiez-lg-subtle {
+    --wiez-lg-local-bg: var(--wiez-lg-tint-subtle);
+    backdrop-filter: blur(var(--wiez-lg-blur-subtle)) saturate(var(--wiez-lg-sat-subtle)) brightness(102%);
+    -webkit-backdrop-filter: blur(var(--wiez-lg-blur-subtle)) saturate(var(--wiez-lg-sat-subtle)) brightness(102%);
+  }
+
+  .wiez-lg-regular {
+    --wiez-lg-local-bg: var(--wiez-lg-tint-regular);
+    backdrop-filter: blur(var(--wiez-lg-blur-regular)) saturate(var(--wiez-lg-sat-regular)) brightness(103%);
+    -webkit-backdrop-filter: blur(var(--wiez-lg-blur-regular)) saturate(var(--wiez-lg-sat-regular)) brightness(103%);
+  }
+
+  .wiez-lg-prominent {
+    --wiez-lg-local-bg: var(--wiez-lg-tint-prominent);
+    --wiez-lg-local-shadow: var(--wiez-lg-shadow-elevated);
+    backdrop-filter: blur(var(--wiez-lg-blur-prominent)) saturate(var(--wiez-lg-sat-prominent)) brightness(103%);
+    -webkit-backdrop-filter: blur(var(--wiez-lg-blur-prominent)) saturate(var(--wiez-lg-sat-prominent)) brightness(103%);
+  }
+
+  /* Explicit scheme overrides for surfaces that sit on forced light or dark canvases */
+  .wiez-lg-light {
+    --wiez-lg-local-bg: rgba(255, 255, 255, 0.54);
+    --wiez-lg-local-hover-bg: rgba(255, 255, 255, 0.72);
+    --wiez-lg-local-sheen: linear-gradient(148deg, rgba(255, 255, 255, 0.54) 0%, rgba(255, 255, 255, 0.08) 46%, rgba(255, 255, 255, 0.22) 100%);
+    --wiez-lg-local-border: rgba(20, 20, 24, 0.10);
+    --wiez-lg-local-spec-top: rgba(255, 255, 255, 0.94);
+    --wiez-lg-local-spec-bottom: rgba(20, 20, 24, 0.06);
+    --wiez-lg-local-shadow: 0 8px 28px -6px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.04);
+    color: #141416;
+  }
+
+  .wiez-lg-dark {
+    --wiez-lg-local-bg: rgba(20, 20, 24, 0.58);
+    --wiez-lg-local-hover-bg: rgba(32, 30, 42, 0.72);
+    --wiez-lg-local-sheen: linear-gradient(148deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.02) 48%, rgba(255, 255, 255, 0.06) 100%);
+    --wiez-lg-local-border: rgba(255, 255, 255, 0.14);
+    --wiez-lg-local-spec-top: rgba(255, 255, 255, 0.28);
+    --wiez-lg-local-spec-bottom: rgba(0, 0, 0, 0.36);
+    --wiez-lg-local-shadow: 0 10px 30px -6px rgba(0, 0, 0, 0.58), 0 2px 8px rgba(0, 0, 0, 0.32);
+    color: #ffffff;
+  }
+
+  /* High-contrast glass calibrated for photography, video stages, and dark media viewers in both themes */
+  .wiez-lg-surface.wiez-lg-stage {
+    --wiez-lg-local-bg: var(--wiez-lg-stage-tint);
+    --wiez-lg-local-hover-bg: var(--wiez-lg-stage-hover-tint);
+    --wiez-lg-local-sheen: var(--wiez-lg-stage-sheen);
+    --wiez-lg-local-border: var(--wiez-lg-stage-border);
+    --wiez-lg-local-spec-top: var(--wiez-lg-stage-specular-top);
+    --wiez-lg-local-spec-bottom: var(--wiez-lg-stage-specular-bottom);
+    --wiez-lg-local-shadow: var(--wiez-lg-stage-shadow);
+    color: #ffffff;
+  }
+
+  .wiez-lg-interactive {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  @media (hover: hover) {
+    .wiez-lg-interactive:hover:not(:disabled):not([aria-disabled='true']) {
+      background-color: var(--wiez-lg-local-hover-bg);
+      border-color: var(--wiez-lg-border-hover);
+      box-shadow:
+        inset 0 1px 0 var(--wiez-lg-local-spec-top),
+        inset 0 -1px 0 var(--wiez-lg-local-spec-bottom),
+        var(--wiez-lg-shadow-hover);
+      translate: 0 -0.5px;
+    }
+
+    .wiez-lg-interactive.wiez-lg-stage:hover:not(:disabled):not([aria-disabled='true']) {
+      background-color: var(--wiez-lg-stage-hover-tint);
+      border-color: rgba(255, 255, 255, 0.38);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -1px 0 var(--wiez-lg-stage-specular-bottom),
+        0 10px 28px -4px rgba(0, 0, 0, 0.55);
+    }
+  }
+
+  .wiez-lg-interactive:active:not(:disabled):not([aria-disabled='true']) {
+    scale: 0.975;
+  }
+
+  .wiez-lg-interactive:focus-visible {
+    box-shadow:
+      inset 0 1px 0 var(--wiez-lg-local-spec-top),
+      inset 0 -1px 0 var(--wiez-lg-local-spec-bottom),
+      var(--wiez-lg-focus-ring);
+  }
+
+  .wiez-lg-interactive.wiez-lg-stage:focus-visible {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      0 0 0 2px rgba(255, 255, 255, 0.92),
+      0 0 0 4px rgba(168, 85, 247, 0.85);
+  }
+
+  .wiez-lg-surface.wiez-lg-active {
+    background-color: transparent;
+    background-image: var(--wiez-lg-active-bg);
+    border-color: var(--wiez-lg-active-border);
+    color: var(--wiez-lg-active-text);
+    box-shadow:
+      inset 0 1px 0 var(--wiez-lg-local-spec-top),
+      var(--wiez-lg-active-shadow);
+  }
+
+  .wiez-lg-surface.wiez-lg-stage.wiez-lg-active {
+    background-color: rgba(168, 85, 247, 0.34);
+    background-image: linear-gradient(150deg, rgba(255, 255, 255, 0.24) 0%, rgba(168, 85, 247, 0.14) 100%);
+    border-color: rgba(233, 213, 255, 0.62);
+    color: #ffffff;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      0 4px 16px -2px rgba(168, 85, 247, 0.50);
+  }
+
+  .wiez-lg-borderless {
+    border-width: 0 !important;
+  }
+
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .wiez-lg-surface,
+    .glass-menu,
+    .glass-menu-soft,
+    .glass-light,
+    .wiez-liquid-glass,
+    .wiez-nav-surface,
+    .wiez-nav-surface-muted,
+    .btn-liquid-ghost,
+    .btn-frost-ghost,
+    .btn-liquid-outline,
+    .btn-frost-outline {
+      background-color: var(--wiez-lg-fallback-bg);
+      background-image: none;
+    }
+
+    .wiez-lg-surface.wiez-lg-active {
+      background-color: color-mix(in srgb, var(--brand-primary) 18%, var(--surface-primary));
+      background-image: var(--wiez-lg-active-bg);
+    }
+
+    .wiez-lg-surface.wiez-lg-stage {
+      background-color: var(--wiez-lg-stage-fallback-bg);
+      background-image: none;
+    }
+
+    .wiez-lg-light {
+      background-color: rgba(255, 255, 255, 0.92);
+    }
+
+    .wiez-lg-dark {
+      background-color: rgba(18, 16, 28, 0.92);
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .wiez-lg-surface,
+    .glass-menu,
+    .glass-menu-soft,
+    .glass-light,
+    .wiez-liquid-glass,
+    .wiez-nav-surface,
+    .wiez-nav-surface-muted,
+    .btn-liquid,
+    .btn-frost,
+    .wiez-lg-backdrop {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
+    .wiez-lg-surface,
+    .glass-menu,
+    .glass-menu-soft,
+    .glass-light,
+    .wiez-liquid-glass,
+    .wiez-nav-surface,
+    .wiez-nav-surface-muted,
+    .btn-liquid-ghost,
+    .btn-frost-ghost,
+    .btn-liquid-outline,
+    .btn-frost-outline {
+      background-color: var(--wiez-lg-reduced-bg) !important;
+      background-image: none !important;
+    }
+
+    .wiez-lg-surface.wiez-lg-active {
+      background-color: color-mix(in srgb, var(--brand-primary) 22%, var(--surface-primary)) !important;
+      background-image: none !important;
+    }
+
+    .wiez-lg-surface.wiez-lg-stage {
+      background-color: var(--wiez-lg-stage-reduced-bg) !important;
+      background-image: none !important;
+      border-color: rgba(255, 255, 255, 0.42);
+    }
+
+    .wiez-lg-surface.wiez-lg-stage.wiez-lg-active {
+      background-color: rgba(126, 34, 206, 0.90) !important;
+      background-image: none !important;
+    }
+
+    .wiez-lg-light {
+      background-color: rgba(255, 255, 255, 0.97) !important;
+    }
+
+    .wiez-lg-dark {
+      background-color: rgba(14, 12, 22, 0.97) !important;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wiez-lg-surface,
+    .wiez-lg-interactive {
+      transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease !important;
+    }
+
+    .wiez-lg-interactive:hover,
+    .wiez-lg-interactive:active {
+      translate: none !important;
+      scale: none !important;
+    }
   }
 
   /* mobile liquid glass enabled */
@@ -1535,13 +1891,17 @@ html {
     }
   }
 
-  /* Tactile pressed buttons (formerly frosted): neutral, no colored border highlights */
-  /* WIEZ Liquid Glass Buttons (Rule 36 - Replaces Frosted Buttons) */
+  /* Tactile Liquid Glass buttons with specular rim and reduced-transparency fallback */
   .btn-liquid,
   .btn-frost {
     @apply inline-flex items-center justify-center rounded-xl font-medium transition-all duration-200 focus:outline-none focus:ring-0 focus:ring-offset-0;
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    backdrop-filter: blur(var(--wiez-lg-blur-subtle)) saturate(var(--wiez-lg-sat-subtle));
+    -webkit-backdrop-filter: blur(var(--wiez-lg-blur-subtle)) saturate(var(--wiez-lg-sat-subtle));
+  }
+
+  .btn-liquid:focus-visible,
+  .btn-frost:focus-visible {
+    box-shadow: var(--wiez-lg-focus-ring);
   }
 
   .btn-liquid-primary,
@@ -1549,7 +1909,7 @@ html {
     @apply btn-liquid;
     color: white;
     background: linear-gradient(135deg, #6b21a8 0%, #9333ea 50%, #a855f7 100%);
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.28);
     box-shadow: 0 4px 14px rgba(147, 51, 234, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.45);
   }
 
@@ -1570,46 +1930,58 @@ html {
   .btn-frost-ghost {
     @apply btn-liquid;
     color: var(--text-primary);
-    background-color: rgba(255, 255, 255, 0.4);
-    border: 1px solid rgba(0, 0, 0, 0.05);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    background-color: var(--wiez-lg-tint-subtle);
+    background-image: var(--wiez-lg-sheen);
+    border: 1px solid var(--wiez-lg-border);
+    box-shadow:
+      inset 0 1px 0 var(--wiez-lg-specular-top),
+      inset 0 -1px 0 var(--wiez-lg-specular-bottom);
   }
   :is(.dark) .btn-liquid-ghost,
   :is(.dark) .btn-frost-ghost {
-    background-color: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 0 #0000;
+    background-color: var(--wiez-lg-tint-subtle);
+    border-color: var(--wiez-lg-border);
+    box-shadow:
+      inset 0 1px 0 var(--wiez-lg-specular-top),
+      inset 0 -1px 0 var(--wiez-lg-specular-bottom);
   }
 
   .btn-liquid-ghost:hover,
   .btn-frost-ghost:hover {
-    background-color: rgba(255, 255, 255, 0.65);
+    background-color: var(--wiez-lg-hover-tint);
+    border-color: var(--wiez-lg-border-hover);
     transform: translateY(-1px);
   }
   :is(.dark) .btn-liquid-ghost:hover,
   :is(.dark) .btn-frost-ghost:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: var(--wiez-lg-hover-tint);
   }
 
   .btn-liquid-outline,
   .btn-frost-outline {
     @apply btn-liquid;
     color: var(--brand-primary);
-    background-color: rgba(255, 255, 255, 0.5);
-    border: 1px solid rgba(147, 51, 234, 0.25);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    background-color: var(--wiez-lg-tint-regular);
+    background-image: var(--wiez-lg-sheen);
+    border: 1px solid rgba(147, 51, 234, 0.28);
+    box-shadow:
+      0 2px 8px rgba(15, 23, 42, 0.05),
+      inset 0 1px 0 var(--wiez-lg-specular-top);
   }
   :is(.dark) .btn-liquid-outline,
   :is(.dark) .btn-frost-outline {
-    background-color: rgba(18, 14, 28, 0.5);
-    border-color: rgba(192, 132, 252, 0.3);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    background-color: var(--wiez-lg-tint-regular);
+    border-color: rgba(192, 132, 252, 0.34);
+    box-shadow:
+      0 2px 10px rgba(0, 0, 0, 0.38),
+      inset 0 1px 0 var(--wiez-lg-specular-top);
   }
 
   .btn-liquid-outline:hover:not(:disabled),
   .btn-frost-outline:hover:not(:disabled) {
     color: var(--brand-primary);
-    background-color: rgba(147, 51, 234, 0.08);
+    background-color: rgba(147, 51, 234, 0.12);
+    border-color: rgba(168, 85, 247, 0.48);
     transform: translateY(-1px);
   }
 
@@ -1987,8 +2359,11 @@ body.modal-open {
 }
 
 .glass-light {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(16px);
+  background-color: var(--wiez-lg-tint-subtle);
+  background-image: var(--wiez-lg-sheen);
+  backdrop-filter: blur(var(--wiez-lg-blur-subtle)) saturate(var(--wiez-lg-sat-subtle));
+  -webkit-backdrop-filter: blur(var(--wiez-lg-blur-subtle)) saturate(var(--wiez-lg-sat-subtle));
+  box-shadow: inset 0 1px 0 var(--wiez-lg-specular-top);
 }
 
 .gradient-primary {

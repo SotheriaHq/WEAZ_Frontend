@@ -165,8 +165,8 @@ export default function ImageLightbox({
     >
       {/* Top Navigation Bar */}
       <div className="w-full flex items-center justify-between z-50">
-        <div className="flex items-center gap-4 bg-white/5 px-4 py-2 rounded-full border border-white/10 backdrop-blur-sm">
-          <span className="text-white/60 text-sm font-medium tracking-wider">
+        <div className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage flex items-center gap-4 px-4 py-2 rounded-full">
+          <span className="text-white/75 text-sm font-medium tracking-wider">
             {currentIndex + 1} / {images.length}
           </span>
           <div className="h-4 w-[1px] bg-white/20" />
@@ -177,7 +177,7 @@ export default function ImageLightbox({
         <button 
           type="button"
           onClick={onClose}
-          className="size-12 rounded-full flex items-center justify-center bg-white/5 border border-white/10 backdrop-blur-sm hover:bg-white/20 transition-all active:scale-95 group"
+          className="wiez-lg-surface wiez-lg-regular wiez-lg-stage wiez-lg-interactive size-12 rounded-full flex items-center justify-center group"
           aria-label="Close lightbox"
         >
           <X className="text-white transition-transform group-hover:rotate-90" size={20} />
@@ -196,7 +196,7 @@ export default function ImageLightbox({
           <button
             type="button"
             onClick={onPrevious}
-            className="absolute left-0 z-10 size-12 md:size-14 rounded-full flex items-center justify-center bg-white/10 border border-white/10 backdrop-blur-sm hover:bg-purple-600/20 hover:border-purple-600/50 transition-all -translate-x-2 md:-translate-x-8 opacity-80 hover:opacity-100 focus:opacity-100"
+            className="wiez-lg-surface wiez-lg-regular wiez-lg-stage wiez-lg-interactive absolute left-0 z-10 size-12 md:size-14 rounded-full flex items-center justify-center -translate-x-2 md:-translate-x-8 opacity-85 hover:opacity-100 focus:opacity-100"
             aria-label="Previous image"
           >
             <ChevronLeft className="text-white" size={28} />
@@ -213,7 +213,7 @@ export default function ImageLightbox({
           <button
             type="button"
             onClick={onNext}
-            className="absolute right-0 z-10 size-12 md:size-14 rounded-full flex items-center justify-center bg-white/10 border border-white/10 backdrop-blur-sm hover:bg-purple-600/20 hover:border-purple-600/50 transition-all translate-x-2 md:translate-x-8 opacity-80 hover:opacity-100 focus:opacity-100"
+            className="wiez-lg-surface wiez-lg-regular wiez-lg-stage wiez-lg-interactive absolute right-0 z-10 size-12 md:size-14 rounded-full flex items-center justify-center translate-x-2 md:translate-x-8 opacity-85 hover:opacity-100 focus:opacity-100"
             aria-label="Next image"
           >
             <ChevronRight className="text-white" size={28} />
@@ -239,7 +239,7 @@ export default function ImageLightbox({
         <div className="flex flex-col items-center gap-4 md:gap-6">
           {/* Thumbnails */}
           {images.length > 1 && (
-            <div className="flex gap-3 md:gap-4 p-2 bg-white/5 border border-white/10 backdrop-blur-sm rounded-2xl overflow-x-auto scrollbar-none scroll-smooth">
+            <div className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage flex gap-3 md:gap-4 p-2 rounded-2xl overflow-x-auto scrollbar-none scroll-smooth">
               {images.map((img, idx) => (
                 <LightboxThumbnail
                   key={img.id || idx}

@@ -460,10 +460,10 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
             count read as detached from its icon. A negative margin closes that
             padding without shrinking the touch target.
           */}
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/25 backdrop-blur-sm">
+          <span className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage flex h-10 w-10 items-center justify-center rounded-full">
             <MessageCircle className="h-5 w-5 text-purple-300" aria-hidden />
           </span>
-          <span className="-mt-1 text-[10px] font-bold text-purple-200 drop-shadow">
+          <span className="mt-0.5 text-[10px] font-bold text-purple-200 drop-shadow">
             {commentCount > 0 ? commentCount : '·'}
           </span>
         </button>
@@ -479,13 +479,13 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
           aria-label={clipActionHint(isSaved)}
           title={clipActionHint(isSaved)}
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/25 backdrop-blur-sm">
+          <span className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage flex h-10 w-10 items-center justify-center rounded-full">
             <Bookmark
               className={`h-5 w-5 ${isSaved ? 'fill-white' : ''}`}
               aria-hidden
             />
           </span>
-          <span className="-mt-1 text-[10px] font-bold drop-shadow">{clipActionLabel(isSaved)}</span>
+          <span className="mt-0.5 text-[10px] font-bold drop-shadow">{clipActionLabel(isSaved)}</span>
         </button>
 
         {/* Patch is NOT here any more — it moved onto the brand avatar in the
@@ -562,7 +562,7 @@ export const RunwayReelsItem: React.FC<RunwayReelsItemProps> = ({
                   className={`absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border text-[10px] leading-none shadow transition-transform active:scale-90 disabled:opacity-60 ${
                     isPatched
                       ? 'border-emerald-400 bg-emerald-500 text-white'
-                      : 'border-white/40 bg-black/70 text-white'
+                      : 'wiez-lg-surface wiez-lg-subtle wiez-lg-stage text-white'
                   }`}
                   aria-label={isPatched ? 'Unpatch brand' : 'Patch brand'}
                   aria-pressed={isPatched}

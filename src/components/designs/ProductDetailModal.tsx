@@ -349,7 +349,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 type="button"
                 onClick={onClose}
                 aria-label="Close product details"
-                className="absolute top-4 right-4 z-10 p-2.5 rounded-full bg-[color:var(--wiez-surface-card)]/90 backdrop-blur-sm border border-[color:var(--wiez-border-subtle)] hover:bg-[color:var(--wiez-surface-card)] text-[color:var(--wiez-text-secondary)] hover:text-[color:var(--wiez-text-primary)] transition-colors shadow-md"
+                className="wiez-lg-surface wiez-lg-regular wiez-lg-interactive absolute top-4 right-4 z-10 p-2.5 rounded-full"
               >
                 <X size={20} />
               </button>
@@ -387,10 +387,10 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         disabled={isOwnProduct}
                         aria-label={isOwnProduct ? 'Wishlist disabled for your own product' : isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                         title={isOwnProduct ? 'Brands cannot wishlist their own products' : isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-                        className={`absolute top-4 right-4 p-3 rounded-full backdrop-blur-md transition-all duration-200 shadow-lg border border-[color:var(--wiez-border-subtle)] ${
+                        className={`absolute top-4 right-4 p-3 rounded-full transition-all duration-200 ${
                           isWishlisted
-                            ? 'bg-red-500 text-white border-transparent'
-                            : 'bg-white/90 dark:bg-gray-900/90 text-[color:var(--wiez-text-secondary)] hover:text-red-500'
+                            ? 'bg-red-500 text-white border border-transparent shadow-lg'
+                            : 'wiez-lg-surface wiez-lg-regular wiez-lg-interactive'
                         } ${isOwnProduct ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <span role="img" aria-hidden="true" className="text-lg leading-none">

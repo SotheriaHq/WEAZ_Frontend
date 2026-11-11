@@ -141,7 +141,7 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
             <button
               type="button"
               onClick={handlePrev}
-              className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-40 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md shadow-lg flex items-center justify-center"
+              className="wiez-lg-surface wiez-lg-regular wiez-lg-stage wiez-lg-interactive absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-40 w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center"
               aria-label="Previous"
             >
               <ChevronLeft size={18} />
@@ -149,7 +149,7 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
             <button
               type="button"
               onClick={handleNext}
-              className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-40 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md shadow-lg flex items-center justify-center"
+              className="wiez-lg-surface wiez-lg-regular wiez-lg-stage wiez-lg-interactive absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-40 w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center"
               aria-label="Next"
             >
               <ChevronRight size={18} />
@@ -187,8 +187,8 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
                 <button
                   type="button"
                   onClick={() => onSetCover?.(activeItem)}
-                  className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-semibold shadow backdrop-blur-md transition
-                  ${coverMediaId === activeItem.id ? 'bg-emerald-600 text-white' : 'bg-black/50 text-white hover:bg-black/70'}`}
+                  className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-semibold transition
+                  ${coverMediaId === activeItem.id ? 'bg-emerald-600 text-white shadow' : 'wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-interactive'}`}
                 >
                   {coverMediaId === activeItem.id ? 'Cover Set' : 'Set As Cover'}
                 </button>
@@ -205,7 +205,7 @@ export const StackedCarousel: React.FC<StackedCarouselProps> = ({
                       video.pause();
                     }
                   }}
-                  className="absolute bottom-4 right-4 p-2.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition backdrop-blur-sm"
+                  className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-interactive absolute bottom-4 right-4 p-2.5 rounded-full"
                 >
                   {videoRefs.current.get(activeItem.id)?.paused ? (
                     <Play size={18} />

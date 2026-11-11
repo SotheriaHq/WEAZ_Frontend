@@ -608,12 +608,12 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               }}
               onFocus={() => onPreviewNavigationActiveChange?.(true)}
               onBlur={() => onPreviewNavigationActiveChange?.(false)}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-lg text-white shadow-lg backdrop-blur-sm transition hover:bg-black/70"
+              className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-interactive flex h-10 w-10 items-center justify-center rounded-full text-lg"
               aria-label="Show previous preview"
             >
               ←
             </button>
-            <div className="rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+            <div className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage rounded-full px-3 py-1 text-[11px] font-semibold">
               {safePreviewIndex + 1}/{galleryImages.length}
             </div>
             <button
@@ -625,7 +625,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
               }}
               onFocus={() => onPreviewNavigationActiveChange?.(true)}
               onBlur={() => onPreviewNavigationActiveChange?.(false)}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-lg text-white shadow-lg backdrop-blur-sm transition hover:bg-black/70"
+              className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-interactive flex h-10 w-10 items-center justify-center rounded-full text-lg"
               aria-label="Show next preview"
             >
               →
@@ -694,8 +694,8 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
                   : 'Add to wishlist'
             }
             className={`
-              absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur-sm transition-all duration-200 ease-out dark:bg-black/40
-              ${wishlistLoading || isOwnProduct ? 'cursor-not-allowed opacity-50' : 'active:scale-95 hover:scale-110'}
+              wiez-lg-surface wiez-lg-subtle wiez-lg-interactive absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full
+              ${wishlistLoading || isOwnProduct ? 'cursor-not-allowed opacity-50' : ''}
             `}
           >
             <span role="img" aria-hidden="true" className="text-sm leading-none">

@@ -96,10 +96,8 @@ const ClipButton: React.FC<{ product: StoreProduct }> = ({ product }) => {
       aria-pressed={clipped}
       aria-label={clipActionLabel(clipped)}
       title={clipActionLabel(clipped)}
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-base backdrop-blur-md transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-95 ${
-        clipped
-          ? 'bg-purple-600 text-white shadow-md hover:bg-purple-500'
-          : 'bg-black/40 text-white border border-white/15 hover:bg-black/60'
+      className={`wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-interactive inline-flex h-9 w-9 items-center justify-center rounded-full text-base ${
+        clipped ? 'wiez-lg-active' : ''
       }`}
     >
       <span aria-hidden="true">{CLIP_EMOJI}</span>
@@ -205,7 +203,7 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
       </div>
 
       {/* Two-Column Layout */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.85fr)_minmax(0,1.15fr)] lg:gap-6">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.85fr)_minmax(0,1.15fr)] xl:gap-6">
         {/* ── Left Hero Card (Image 1 Parity) ── */}
         <div
           className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-gray-200/60 bg-[#120d18] text-white shadow-xl dark:border-white/10 min-h-[460px] sm:min-h-[500px] lg:min-h-[520px]"
@@ -214,7 +212,7 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
         >
           {/* Top Pill & Action Bar */}
           <div className="relative z-20 flex items-center justify-between p-4 sm:p-6">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/90 backdrop-blur-md">
+            <span className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em]">
               <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
               {badgeLabel}
             </span>
@@ -257,7 +255,7 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
                 type="button"
                 aria-label="Previous view"
                 onClick={() => stepFrame(-1)}
-                className="absolute left-3 top-1/2 z-20 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white opacity-0 backdrop-blur-md transition hover:bg-black/70 focus-visible:opacity-100 group-hover:opacity-100 sm:flex"
+                className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-interactive absolute left-3 top-1/2 z-20 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full opacity-0 transition focus-visible:opacity-100 group-hover:opacity-100 sm:flex"
               >
                 <span aria-hidden="true" className="text-lg leading-none">‹</span>
               </button>
@@ -265,7 +263,7 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
                 type="button"
                 aria-label="Next view"
                 onClick={() => stepFrame(1)}
-                className="absolute right-3 top-1/2 z-20 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white opacity-0 backdrop-blur-md transition hover:bg-black/70 focus-visible:opacity-100 group-hover:opacity-100 sm:flex"
+                className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-interactive absolute right-3 top-1/2 z-20 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full opacity-0 transition focus-visible:opacity-100 group-hover:opacity-100 sm:flex"
               >
                 <span aria-hidden="true" className="text-lg leading-none">›</span>
               </button>
@@ -306,7 +304,7 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
                 <button
                   type="button"
                   onClick={() => onOpenProduct(active, { source: 'market_hero_details' })}
-                  className="rounded-full border border-white/25 bg-white/5 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white backdrop-blur-sm transition hover:bg-white/15 active:scale-95"
+                  className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-interactive rounded-full px-4 py-2.5 text-xs font-bold uppercase tracking-wider"
                 >
                   DETAILS
                 </button>
@@ -338,9 +336,9 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
         </div>
 
         {/* ── Right Column: Up Next in Discovery (Image 1 Parity) ── */}
-        <div className="flex flex-col justify-between rounded-3xl border border-gray-200/70 bg-white/70 p-5 shadow-sm dark:border-white/10 dark:bg-[#15101c]/80 backdrop-blur-md">
+        <div className="wiez-lg-surface wiez-lg-regular flex flex-col justify-between rounded-3xl p-5">
           <div>
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3 dark:border-white/10">
+            <div className="flex items-center justify-between border-b border-theme pb-3">
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-purple-600" />
                 <h3 className="text-sm font-bold tracking-tight text-gray-900 dark:text-white">
@@ -375,7 +373,7 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
                         onOpenProduct(product, { source: 'market_hero_up_next' });
                       }
                     }}
-                    className="group flex cursor-pointer items-center gap-3.5 rounded-2xl border border-gray-100 bg-white/80 p-3 transition hover:border-purple-300 hover:shadow-md dark:border-white/5 dark:bg-white/[0.03] dark:hover:border-purple-500/30"
+                    className="group flex cursor-pointer items-center gap-3.5 rounded-2xl border border-theme surface-card p-3 transition hover:border-purple-400/60 hover:shadow-md"
                   >
                     {/* Thumbnail with Rank Badge (#2, #3, #4) */}
                     <div className="relative h-18 w-18 sm:h-20 sm:w-20 shrink-0 overflow-hidden rounded-xl bg-purple-50/50 dark:bg-white/5">
@@ -396,13 +394,13 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
 
                     {/* Meta Details */}
                     <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400 truncate">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400 break-words [overflow-wrap:anywhere]">
                         {product.brand?.name || 'WIEZ ATELIER'}
                       </p>
-                      <h4 className="font-serif text-sm font-semibold leading-snug text-gray-900 dark:text-white line-clamp-1 group-hover:text-purple-600 dark:group-hover:text-purple-400">
+                      <h4 className="font-serif text-sm font-semibold leading-snug text-gray-900 dark:text-white break-words group-hover:text-purple-600 dark:group-hover:text-purple-400">
                         {product.name}
                       </h4>
-                      <div className="mt-1 flex items-center justify-between gap-2">
+                      <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                         <span className="text-xs font-bold text-gray-900 dark:text-white">
                           {priceOf(product)}
                         </span>

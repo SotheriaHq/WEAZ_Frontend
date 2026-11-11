@@ -48,7 +48,7 @@ const ScrollAssist: React.FC = () => {
   if (!showUp && !showDown) return null;
 
   const buttonClass =
-    'flex h-10 w-10 items-center justify-center rounded-full bg-white/85 text-base shadow-lg ring-1 ring-black/10 backdrop-blur transition hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 dark:bg-gray-900/85 dark:ring-white/15';
+    'wiez-lg-surface wiez-lg-regular wiez-lg-interactive flex h-10 w-10 items-center justify-center rounded-full text-base focus:outline-none';
 
   return (
     <div className="fixed bottom-36 right-3 z-[55] flex flex-col gap-2">

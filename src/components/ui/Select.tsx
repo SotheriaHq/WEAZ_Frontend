@@ -34,32 +34,16 @@ const variantStyles: Record<SelectVariant, string> = {
     cursor-pointer
   `,
   filter: `
+    wiez-lg-surface wiez-lg-subtle wiez-lg-interactive
     px-3.5 py-2 text-xs font-semibold
-    bg-white/80 dark:bg-[#181322]/80 backdrop-blur-md
-    border border-purple-500/15 dark:border-white/[0.08]
     rounded-xl
     text-[color:var(--wiez-text-primary,var(--text-primary))]
-    shadow-[0_2px_8px_rgba(124,58,237,0.04)] dark:shadow-[0_2px_8px_rgba(124,58,237,0.2)]
-    hover:shadow-[0_4px_14px_rgba(124,58,237,0.08),0_1px_3px_rgba(168,85,247,0.04)] dark:hover:shadow-[0_4px_18px_rgba(147,51,234,0.3)]
-    hover:border-purple-400/40 dark:hover:border-purple-400/30
-    hover:scale-[1.01]
-    active:scale-[0.99]
-    focus:outline-none focus:shadow-[0_0_0_1px_rgba(168,85,247,0.22),0_4px_20px_-2px_rgba(168,85,247,0.20)]
-    transition-all duration-200
-    cursor-pointer
   `,
   compact: `
+    wiez-lg-surface wiez-lg-subtle wiez-lg-interactive
     px-2.5 py-1.5 text-xs font-medium
-    bg-white/80 dark:bg-[#181322]/80 backdrop-blur-md
-    border border-purple-500/15 dark:border-white/[0.08]
     rounded-lg
     text-[color:var(--text-secondary)]
-    shadow-[0_1px_4px_rgba(124,58,237,0.04)] dark:shadow-[0_1px_4px_rgba(124,58,237,0.18)]
-    hover:shadow-[0_3px_10px_rgba(124,58,237,0.08)] dark:hover:shadow-[0_3px_12px_rgba(147,51,234,0.25)]
-    hover:scale-[1.01]
-    focus:outline-none focus:shadow-[0_0_0_1px_rgba(168,85,247,0.22),0_4px_20px_-2px_rgba(168,85,247,0.20)]
-    transition-all duration-150
-    cursor-pointer
   `,
 };
 

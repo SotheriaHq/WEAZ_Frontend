@@ -39,7 +39,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
         {/* Back Button */}
         <button
           onClick={handleBack}
-          className="flex-shrink-0 w-9 h-9 rounded-lg bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200/60 dark:border-gray-700/60 flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 hover:scale-105 transition-all shadow-sm"
+          className="wiez-lg-surface wiez-lg-subtle wiez-lg-interactive flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center"
           aria-label="Go back"
         >
           <ArrowLeft className="w-4 h-4" />

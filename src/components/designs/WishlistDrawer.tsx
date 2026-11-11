@@ -218,7 +218,7 @@ const WishlistDrawer: React.FC = () => {
               onClick={handleClose}
             >
               <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40" />
-              <div className="absolute inset-0 backdrop-blur-xl" />
+              <div className="absolute inset-0 backdrop-blur-xl wiez-lg-backdrop" />
               <div className="absolute inset-0 surface-overlay-strong" />
             </motion.div>
 
@@ -232,7 +232,7 @@ const WishlistDrawer: React.FC = () => {
               aria-modal="true"
               aria-label="Wishlist"
             >
-              <div className="surface-modal h-full backdrop-blur-2xl shadow-2xl border-l flex flex-col">
+              <div className="surface-modal h-full backdrop-blur-2xl wiez-lg-backdrop shadow-2xl border-l flex flex-col">
                 <div className="flex items-center justify-between p-4 border-b border-theme">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-xl bg-gradient-to-br from-pink-500 to-red-500 shadow-lg shadow-pink-500/30">
@@ -249,7 +249,8 @@ const WishlistDrawer: React.FC = () => {
                   </div>
                   <button
                     onClick={handleClose}
-                    className="surface-interactive-hover p-2 rounded-full transition-colors"
+                    aria-label="Close wishlist"
+                    className="wiez-lg-surface wiez-lg-subtle wiez-lg-interactive p-2 rounded-full"
                   >
                     <X size={22} className="text-[color:var(--text-secondary)]" />
                   </button>

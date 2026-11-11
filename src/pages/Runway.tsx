@@ -875,7 +875,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
             aria-pressed={active}
             className={`relative shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-95 ${
               active
-                ? 'bg-[color:var(--brand-primary)]/15 text-[color:var(--brand-primary)] shadow-inner font-bold'
+                ? 'wiez-lg-surface wiez-lg-subtle wiez-lg-active wiez-lg-interactive font-bold'
                 : 'text-theme-secondary hover:bg-[color:var(--surface-muted)] hover:text-theme'
             }`}
           >
@@ -952,8 +952,8 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
                 aria-pressed={active}
                 className={`relative shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
                   active
-                    ? 'bg-white/[0.22] text-white shadow-inner font-bold'
-                    : 'text-white/60 hover:text-white/85'
+                    ? 'wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-active font-bold'
+                    : 'text-white/75 hover:bg-white/10 hover:text-white'
                 }`}
               >
                 {cat.label}
@@ -1037,7 +1037,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
                   <button
                     type="button"
                     onClick={exitPinnedToDefaultFeed}
-                    className="shrink-0 rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-semibold text-black"
+                    className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-interactive shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold text-white"
                   >
                     Exit pin
                   </button>
@@ -1077,7 +1077,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
     return (
       <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-6 px-4">
       <RunwayQueueNotices />
-        <div className="sticky top-16 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border-default)]/70 bg-[color:var(--surface-muted)]/60 px-4 py-3 backdrop-blur">
+        <div className="wiez-lg-surface wiez-lg-regular sticky top-16 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-theme-secondary">
               Pinned to your search
@@ -1087,7 +1087,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
           <button
             type="button"
             onClick={exitPinnedToDefaultFeed}
-            className="shrink-0 rounded-full bg-[color:var(--brand-primary)]/15 px-4 py-2 text-xs font-semibold text-[color:var(--brand-primary)] transition-all hover:bg-[color:var(--brand-primary)]/25 active:scale-95"
+            className="wiez-lg-surface wiez-lg-subtle wiez-lg-active wiez-lg-interactive shrink-0 rounded-full px-4 py-2 text-xs font-semibold"
           >
             Continue normal Runway feed
           </button>

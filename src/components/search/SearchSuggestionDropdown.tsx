@@ -135,7 +135,7 @@ const SearchSuggestionDropdown: React.FC<SearchSuggestionDropdownProps> = ({
     <div
       id={dropdownId}
       role="listbox"
-      className="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-[120] w-full max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl glass-menu shadow-2xl backdrop-blur-xl"
+      className="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-[120] w-full max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl glass-menu"
     >
       <div className="max-h-[min(28rem,calc(100vh-8rem))] overflow-y-auto py-1">
         {error ? (

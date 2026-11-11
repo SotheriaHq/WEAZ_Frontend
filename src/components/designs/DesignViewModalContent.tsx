@@ -808,7 +808,7 @@ const DesignViewModal: React.FC<DesignViewModalProps> = ({
               type="button"
               onClick={onClose}
               aria-label={backLabel ? `Back to ${backLabel}` : 'Close'}
-              className={`absolute right-3 top-3 z-30 flex h-9 items-center justify-center gap-1 rounded-full bg-black/50 text-white ${
+              className={`wiez-lg-surface wiez-lg-regular wiez-lg-stage wiez-lg-interactive absolute right-3 top-3 z-30 flex h-9 items-center justify-center gap-1 rounded-full ${
                 backLabel ? 'px-3' : 'w-9'
               }`}
             >
@@ -862,7 +862,7 @@ const DesignViewModal: React.FC<DesignViewModalProps> = ({
                   <button
                     type="button"
                     aria-label="Previous image"
-                    className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
+                    className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-interactive absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full"
                     onClick={(e) => {
                       e.stopPropagation();
                       stepMedia(-1);
@@ -873,7 +873,7 @@ const DesignViewModal: React.FC<DesignViewModalProps> = ({
                   <button
                     type="button"
                     aria-label="Next image"
-                    className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white"
+                    className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-interactive absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full"
                     onClick={(e) => {
                       e.stopPropagation();
                       stepMedia(1);
@@ -881,7 +881,7 @@ const DesignViewModal: React.FC<DesignViewModalProps> = ({
                   >
                     <span aria-hidden="true" className="text-lg">›</span>
                   </button>
-                  <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
+                  <div className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full px-3 py-1 text-xs">
                     {activeMediaIndex + 1} / {mediaItems.length}
                   </div>
                 </>
@@ -1193,7 +1193,7 @@ const DesignViewModal: React.FC<DesignViewModalProps> = ({
         >
           <button
             onClick={onClose}
-            className={`absolute top-3 right-3 z-50 inline-flex h-9 items-center justify-center gap-1 rounded-full neu-modal-inset ${
+            className={`wiez-lg-surface wiez-lg-regular wiez-lg-interactive absolute top-3 right-3 z-50 inline-flex h-9 items-center justify-center gap-1 rounded-full ${
               backLabel ? 'px-3' : 'w-9'
             }`}
             aria-label={backLabel ? `Back to ${backLabel}` : 'Close'}
@@ -1257,7 +1257,7 @@ const DesignViewModal: React.FC<DesignViewModalProps> = ({
                   <button
                     type="button"
                     aria-label="Previous image"
-                    className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white transition hover:bg-black/60"
+                    className="wiez-lg-surface wiez-lg-regular wiez-lg-stage wiez-lg-interactive absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full"
                     onClick={(e) => {
                       e.stopPropagation();
                       stepMedia(-1);
@@ -1268,7 +1268,7 @@ const DesignViewModal: React.FC<DesignViewModalProps> = ({
                   <button
                     type="button"
                     aria-label="Next image"
-                    className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white transition hover:bg-black/60"
+                    className="wiez-lg-surface wiez-lg-regular wiez-lg-stage wiez-lg-interactive absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full"
                     onClick={(e) => {
                       e.stopPropagation();
                       stepMedia(1);
@@ -1276,7 +1276,7 @@ const DesignViewModal: React.FC<DesignViewModalProps> = ({
                   >
                     <span aria-hidden="true" className="text-lg">›</span>
                   </button>
-                  <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
+                  <div className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full px-3 py-1 text-xs">
                     {activeMediaIndex + 1} / {mediaItems.length}
                   </div>
                 </>

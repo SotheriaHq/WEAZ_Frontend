@@ -531,8 +531,10 @@ export const MarketPlace: React.FC = () => {
                   type="button"
                   onClick={() => setSelectedAudienceFilter(filter)}
                   aria-pressed={active}
-                  className={`relative whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition-all chip-inset ${
-                    active ? 'bg-[var(--wiez-action-brand,#9333ea)] text-white font-bold shadow-inner' : 'text-theme-secondary hover:text-theme hover:bg-[color:var(--surface-muted)]'
+                  className={`relative whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition-all ${
+                    active
+                      ? 'wiez-lg-surface wiez-lg-subtle wiez-lg-active wiez-lg-interactive font-bold'
+                      : 'chip-inset text-theme-secondary hover:text-theme hover:bg-[color:var(--surface-muted)]'
                   }`}
                 >
                   {filter === 'FOR_YOU' && 'Discover •'}

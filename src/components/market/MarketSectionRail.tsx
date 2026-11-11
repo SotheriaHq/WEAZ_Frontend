@@ -216,7 +216,7 @@ export const MarketSectionRail: React.FC<MarketSectionRailProps> = ({
               disabled={!canScrollLeft}
               onClick={() => scrollBy(-1)}
               aria-label={`Scroll ${title} left`}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm text-gray-700 shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10 dark:hover:bg-white/10"
+              className="wiez-lg-surface wiez-lg-subtle wiez-lg-interactive flex h-8 w-8 items-center justify-center rounded-full text-sm disabled:cursor-not-allowed disabled:opacity-30"
             >
               ‹
             </button>
@@ -225,7 +225,7 @@ export const MarketSectionRail: React.FC<MarketSectionRailProps> = ({
               disabled={!canScrollRight}
               onClick={() => scrollBy(1)}
               aria-label={`Scroll ${title} right`}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm text-gray-700 shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10 dark:hover:bg-white/10"
+              className="wiez-lg-surface wiez-lg-subtle wiez-lg-interactive flex h-8 w-8 items-center justify-center rounded-full text-sm disabled:cursor-not-allowed disabled:opacity-30"
             >
               ›
             </button>

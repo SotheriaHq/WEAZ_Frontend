@@ -80,7 +80,7 @@ export const MarketTrendingTodayModal: React.FC<MarketTrendingTodayModalProps> =
       role="dialog"
       aria-modal="true"
       aria-labelledby="trending-today-heading"
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/55 backdrop-blur-sm sm:items-center sm:p-6"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/55 backdrop-blur-sm wiez-lg-backdrop sm:items-center sm:p-6"
       onClick={onClose}
     >
       <div
@@ -107,7 +107,7 @@ export const MarketTrendingTodayModal: React.FC<MarketTrendingTodayModalProps> =
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[0.05] text-lg leading-none text-[color:var(--text-secondary)] transition hover:bg-black/[0.09] dark:bg-white/10 dark:hover:bg-white/20"
+            className="wiez-lg-surface wiez-lg-subtle wiez-lg-interactive inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg leading-none"
           >
             <span aria-hidden="true">×</span>
           </button>

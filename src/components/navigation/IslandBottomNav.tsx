@@ -307,15 +307,11 @@ const ITEM_BASE_CLASS =
  * off, and this is what is left.
  */
 const ITEM_SELECTED_CLASS =
-  'bg-gradient-to-b from-purple-500/25 to-fuchsia-500/10 text-purple-700 ' +
-  'shadow-[inset_0_0_0_1px_rgba(168,85,247,0.45),0_2px_12px_-2px_rgba(147,51,234,0.45)] backdrop-blur-sm ' +
-  'dark:from-purple-400/30 dark:to-fuchsia-400/10 dark:text-purple-100 ' +
-  'dark:shadow-[inset_0_0_0_1px_rgba(216,180,254,0.40),0_2px_14px_-2px_rgba(168,85,247,0.55)]';
+  'wiez-lg-surface wiez-lg-subtle wiez-lg-active wiez-lg-borderless';
 
 const ITEM_IDLE_CLASS =
-  'text-gray-600 dark:text-gray-300 ' +
-  '[@media(hover:hover)]:hover:bg-gray-100/90 [@media(hover:hover)]:hover:text-gray-900 ' +
-  'dark:[@media(hover:hover)]:hover:bg-white/10 dark:[@media(hover:hover)]:hover:text-white';
+  'text-theme-secondary ' +
+  '[@media(hover:hover)]:hover:bg-[color:var(--surface-muted)] [@media(hover:hover)]:hover:text-theme';
 
 export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
   items,
@@ -493,7 +489,7 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
       */}
       {moreOpen ? (
         <div
-          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px] lg:hidden"
+          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px] wiez-lg-backdrop lg:hidden"
           onClick={() => setMoreOpen(false)}
           aria-hidden
         />
@@ -510,7 +506,7 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
               // `max-h` + scroll so a dock that grows past what the screen can
               // show above the pill stays reachable rather than running off the
               // top of the viewport.
-              'pointer-events-auto mb-2 max-h-[55dvh] w-[calc(100vw-32px)] overflow-y-auto scrollbar-hide rounded-3xl border border-gray-200/70 bg-white/95 p-1.5 shadow-[0_18px_50px_rgba(15,23,42,0.22)] backdrop-blur-2xl motion-safe:animate-slide-up-fade dark:border-white/10 dark:bg-black/85',
+              'wiez-lg-surface wiez-lg-prominent pointer-events-auto mb-2 max-h-[55dvh] w-[calc(100vw-32px)] overflow-y-auto scrollbar-hide rounded-3xl p-1.5 motion-safe:animate-slide-up-fade',
               maxWidthClassName,
             )}
           >
@@ -557,7 +553,7 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
 
         <div
           className={clsx(
-            'pointer-events-auto h-14 w-[calc(100vw-32px)] overflow-hidden rounded-full border-0 bg-white/90 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_12px_36px_rgba(15,23,42,0.14)] backdrop-blur-2xl dark:bg-black/75 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_18px_45px_rgba(0,0,0,0.85)]',
+            'wiez-lg-surface wiez-lg-prominent wiez-lg-borderless pointer-events-auto h-14 w-[calc(100vw-32px)] overflow-hidden rounded-full border-0 p-1.5',
             maxWidthClassName,
           )}
         >

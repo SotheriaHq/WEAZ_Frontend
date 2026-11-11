@@ -311,7 +311,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
           {showTags && item.tags && item.tags.length > 0 && (
             <div className="absolute top-8 left-0 flex flex-wrap gap-1 w-48 animate-in fade-in zoom-in-95 duration-100">
                {item.tags.map(tag => (
-                 <span key={tag} className="px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-white text-[10px] font-medium border border-white/10">
+                 <span key={tag} className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage rounded-full px-2.5 py-0.5 text-[10px] font-medium">
                    #{tag}
                  </span>
                ))}
@@ -344,7 +344,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
           </button>
           
           {showMenu && (
-            <div className="absolute right-0 mt-1 w-40 rounded-lg bg-white/90 dark:bg-black/80 backdrop-blur-md border border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right z-40">
+            <div className="glass-menu absolute right-0 mt-1 w-40 rounded-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right z-40">
               {isCustomAvailable && (
                 <>
                   <div className="w-full px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
@@ -459,7 +459,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
               <span
                 aria-hidden="true"
                 className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-base leading-none drop-shadow transition-colors sm:h-9 sm:w-9 sm:text-xl ${
-                  resolvedSaved ? 'bg-[color:var(--text-primary)] text-[color:var(--surface-primary)]' : 'bg-black/30 backdrop-blur-sm'
+                  resolvedSaved ? 'bg-[color:var(--text-primary)] text-[color:var(--surface-primary)]' : 'wiez-lg-surface wiez-lg-subtle wiez-lg-stage'
                 }`}
               >
                 {CLIP_EMOJI}
@@ -593,7 +593,7 @@ export const DesignCard: React.FC<DesignCardProps> = ({
         </div>
 
         {/* Mobile View Bottom Overlay */}
-        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/50 via-black/25 to-transparent backdrop-blur-md [mask-image:linear-gradient(to_bottom,transparent_0%,black_8px,black_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_8px,black_100%)] z-10 flex items-center justify-between min-h-[32px] max-h-[38px]" onClick={(e) => e.stopPropagation()}>
+        <div className="md:hidden absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/50 via-black/25 to-transparent backdrop-blur-md wiez-lg-backdrop [mask-image:linear-gradient(to_bottom,transparent_0%,black_8px,black_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,black_8px,black_100%)] z-10 flex items-center justify-between min-h-[32px] max-h-[38px]" onClick={(e) => e.stopPropagation()}>
           <div className="flex-1 min-w-0 flex flex-col justify-center pl-1">
             <h3 
               className="font-bold text-white truncate leading-none uppercase"

@@ -14,8 +14,9 @@ interface FrostedButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 /**
- * LiquidButton Component (Rule 36: Liquid Glass Architecture)
- * Supersedes legacy FrostedButton with high saturation, specular rim, and optical depth.
+ * LiquidButton Component
+ * Implements WIEZ Liquid Glass button treatments with optical clarity,
+ * specular edge definition, and tactile state feedback.
  */
 export const LiquidButton: React.FC<FrostedButtonProps> = ({
   children,
@@ -30,7 +31,7 @@ export const LiquidButton: React.FC<FrostedButtonProps> = ({
 }) => (
   <button
     className={clsx(
-      'relative',
+      'relative disabled:opacity-55 disabled:cursor-not-allowed',
       variant === 'primary' && 'btn-frost-primary',
       variant === 'ghost' && 'btn-frost-ghost',
       variant === 'outline' && 'btn-frost-outline',

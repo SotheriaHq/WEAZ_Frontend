@@ -619,7 +619,7 @@ export default function InlineProductDetail({
                     event.stopPropagation();
                     moveImage(-1);
                   }}
-                  className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-black/10 bg-white/90 text-lg text-gray-900 shadow-lg backdrop-blur transition hover:scale-[1.03] dark:border-white/10 dark:bg-black/55 dark:text-white"
+                  className="wiez-lg-surface wiez-lg-regular wiez-lg-interactive absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-lg"
                   aria-label="Show previous image"
                 >
                   ←
@@ -630,7 +630,7 @@ export default function InlineProductDetail({
                     event.stopPropagation();
                     moveImage(1);
                   }}
-                  className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-black/10 bg-white/90 text-lg text-gray-900 shadow-lg backdrop-blur transition hover:scale-[1.03] dark:border-white/10 dark:bg-black/55 dark:text-white"
+                  className="wiez-lg-surface wiez-lg-regular wiez-lg-interactive absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-lg"
                   aria-label="Show next image"
                 >
                   →
@@ -639,7 +639,7 @@ export default function InlineProductDetail({
             ) : null}
             
             {/* Zoom hint */}
-            <div className="absolute bottom-4 right-4 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-sm text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="wiez-lg-surface wiez-lg-subtle wiez-lg-stage absolute bottom-4 right-4 px-3 py-1.5 rounded-full text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
               Click to zoom
             </div>
           </div>
@@ -1061,7 +1061,7 @@ export default function InlineProductDetail({
                 type="button"
                 aria-label="Close custom order composer"
                 onClick={() => setCustomOrderComposerOpen(false)}
-                className="sticky top-2 float-right z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white/80 text-slate-700 shadow-sm hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+                className="wiez-lg-surface wiez-lg-regular wiez-lg-interactive sticky top-2 float-right z-10 inline-flex h-9 w-9 items-center justify-center rounded-full"
               >
                 <span aria-hidden="true" className="text-base">×</span>
               </button>

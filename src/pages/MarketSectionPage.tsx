@@ -467,7 +467,7 @@ const MarketSectionPage: React.FC = () => {
                 navigate('/market');
               }
             }}
-            className="group inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-4 py-2 text-xs font-bold text-gray-700 shadow-sm backdrop-blur transition hover:bg-gray-100 dark:border-white/15 dark:bg-white/10 dark:text-gray-200 dark:hover:bg-white/20"
+            className="wiez-lg-surface wiez-lg-subtle wiez-lg-interactive group inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold"
           >
             <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
             {parentKey ? 'Back to parent section' : 'Back to Market'}
@@ -529,10 +529,11 @@ const MarketSectionPage: React.FC = () => {
                   key={chip.id}
                   type="button"
                   onClick={() => setActiveFilter(chip.id)}
+                  aria-pressed={activeFilter === chip.id}
                   className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
                     activeFilter === chip.id
-                      ? 'bg-[var(--wiez-action-brand,#9333ea)] text-white shadow-sm'
-                      : 'border border-[var(--wiez-border-subtle,#e5e7eb)] bg-[var(--wiez-surface-card,#ffffff)] text-gray-600 hover:bg-gray-50 dark:border-white/15 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
+                      ? 'wiez-lg-surface wiez-lg-subtle wiez-lg-active wiez-lg-interactive'
+                      : 'wiez-lg-surface wiez-lg-subtle wiez-lg-interactive text-theme-secondary'
                   }`}
                 >
                   {chip.label}
@@ -699,19 +700,19 @@ const MarketSectionPage: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-layer-modal bg-black/60 p-3 backdrop-blur-sm sm:p-6 flex items-center justify-center"
+              className="fixed inset-0 z-layer-modal bg-black/60 p-3 backdrop-blur-sm wiez-lg-backdrop sm:p-6 flex items-center justify-center"
             >
               <motion.div
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 18 }}
-                className="mx-auto max-h-[92vh] w-full max-w-6xl overflow-y-auto overscroll-contain rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-[#120d18] sm:p-6 glass-scrollbar flex flex-col"
+                className="mx-auto max-h-[92vh] w-full max-w-6xl overflow-y-auto overscroll-contain rounded-3xl border border-theme bg-[color:var(--surface-primary)] p-4 shadow-2xl sm:p-6 glass-scrollbar flex flex-col"
               >
                 <div className="mb-3 flex justify-end">
                   <button
                     type="button"
                     onClick={() => setSelectedProduct(null)}
-                    className="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:border-white/20 dark:text-gray-200 dark:hover:bg-white/10"
+                    className="wiez-lg-surface wiez-lg-subtle wiez-lg-interactive rounded-full px-3 py-1.5 text-xs font-semibold"
                   >
                     Close
                   </button>

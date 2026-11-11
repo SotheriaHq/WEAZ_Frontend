@@ -7,6 +7,7 @@ import { toggleSidebar } from '@/features/uiSlice';
 import BrandWordmark from '@/components/brand/BrandWordmark';
 import CountBadge from '@/components/navigation/CountBadge';
 import { RUNWAY_CHIPS_HEIGHT_PX } from '@/components/navigation/navbarChrome';
+import { liquidGlassClasses } from '@/components/ui/LiquidGlass';
 
 /**
  * The only chrome on the phone Runway besides the category chips.
@@ -125,7 +126,13 @@ const RunwayStageChrome: React.FC = () => {
         <button
           type="button"
           onClick={() => dispatch(toggleSidebar())}
-          className="flex h-10 items-center gap-2 rounded-full pl-3 pr-3.5 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          className={liquidGlassClasses({
+            intensity: 'subtle',
+            tone: 'stage',
+            shape: 'pill',
+            interactive: true,
+            className: 'flex h-10 items-center gap-2 pl-3 pr-3.5 text-white focus-visible:outline-none',
+          })}
           aria-label={
             unreadCount > 0
               ? `Open menu, ${unreadCount} unread notifications`
@@ -173,7 +180,13 @@ const RunwayStageChrome: React.FC = () => {
       <button
         type="button"
         onClick={() => navigate('/search')}
-        className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${GLYPH_LEGIBILITY}`}
+        className={liquidGlassClasses({
+          intensity: 'subtle',
+          tone: 'stage',
+          shape: 'circle',
+          interactive: true,
+          className: `pointer-events-auto flex h-10 w-10 items-center justify-center text-white focus-visible:outline-none ${GLYPH_LEGIBILITY}`,
+        })}
         aria-label="Search"
       >
         <span aria-hidden="true" className="text-base leading-none">
