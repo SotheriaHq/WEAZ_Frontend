@@ -31,7 +31,7 @@ import {
  * which ends the whole attempt, so it is confirmed rather than instant.
  */
 
-type Mode = 'idle' | 'reschedule' | 'decline';
+type Mode = 'idle' | 'reschedule' | 'decline' | 'video';
 
 /** Fixed so the row cannot change height between its states. */
 const ACTION_ROW = 'flex min-h-[40px] flex-wrap items-center gap-2';
@@ -116,6 +116,33 @@ export const VisitSchedulePanel: React.FC = () => {
     [note, refetch, visit],
   );
 
+  /*
+    Free plan: verify on a live video call instead of a visit (owner, Nov
+    2026). Any visit times on the table are dropped and the reviewer sends
+    call times with a link.
+  */
+  const askForVideoCall = useCallback(async () => {
+    if (!visit) return;
+    setBusy(true);
+    try {
+      await physicalVerificationApi.requestVideoCall(
+        visit.id,
+        note.trim() || undefined,
+      );
+      await refetch();
+      setMode('idle');
+      setNote('');
+      setSlot(null);
+      toast.success('Video call requested. You will get call times and a link here.');
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ?? 'Could not ask for a video call.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }, [note, refetch, visit]);
+
   // Nothing to show before the document step passes. Rendering an empty
   // bordered box here would add a rectangle to a page that has enough.
   if (!loading && !visit) return null;
@@ -131,7 +158,8 @@ export const VisitSchedulePanel: React.FC = () => {
   }
   if (!visit) return null;
 
-  const headline = brandVisitHeadline(visit.status);
+  const isVideoCall = visit.mode === 'VIDEO_CALL';
+  const headline = brandVisitHeadline(visit.status, visit.mode);
   const canRespond = visit.canRespond && !busy;
   const slots = visit.proposedSlots ?? [];
 
@@ -156,10 +184,20 @@ export const VisitSchedulePanel: React.FC = () => {
 
       {visit.selectedSlotAt && visit.status === 'SCHEDULE_CONFIRMED' ? (
         <div className={`${INSET} mt-4 px-3.5 py-3`}>
-          <p className={FIELD_LABEL}>Your appointment</p>
+          <p className={FIELD_LABEL}>{isVideoCall ? 'Your video call' : 'Your appointment'}</p>
           <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
             {formatSlot(visit.selectedSlotAt)}
           </p>
+          {isVideoCall && visit.meetingUrl ? (
+            <a
+              href={visit.meetingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${BTN_PRIMARY} mt-3`}
+            >
+              Join the call
+            </a>
+          ) : null}
         </div>
       ) : null}
 
@@ -175,7 +213,11 @@ export const VisitSchedulePanel: React.FC = () => {
       {visit.canRespond && slots.length > 0 ? (
         <div className="mt-4">
           <p className={FIELD_LABEL}>
-            {mode === 'reschedule' ? 'Which of these suits you?' : 'Offered times'}
+            {mode === 'reschedule'
+              ? 'Which of these suits you?'
+              : isVideoCall
+                ? 'Offered call times'
+                : 'Offered times'}
           </p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {slots.map((option) => (
@@ -209,7 +251,9 @@ export const VisitSchedulePanel: React.FC = () => {
         </div>
       ) : null}
 
-      {visit.canRespond ? (
+      {/* The video-call step has its own buttons below; this row would
+          otherwise read the 'video' mode as its decline branch. */}
+      {visit.canRespond && mode !== 'video' ? (
         <div className={`${ACTION_ROW} mt-4`}>
           {mode === 'idle' ? (
             <>
@@ -298,6 +342,56 @@ export const VisitSchedulePanel: React.FC = () => {
           {visit.remainingReschedules} reschedule
           {visit.remainingReschedules === 1 ? '' : 's'} left.
         </p>
+      ) : null}
+
+      {/* Free plan only, and only before the check takes place. */}
+      {visit.canRequestVideoCall && (mode === 'idle' || mode === 'video') ? (
+        <div className={`${INSET} mt-4 px-3.5 py-3`}>
+          <p className="text-sm font-semibold text-slate-900 dark:text-white">
+            Can't make a visit, or prefer a video call?
+          </p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            On the free plan you can verify on a live video call instead. Show
+            your workstation, your tools and your work on camera; the reviewer
+            takes screenshots as proof.
+          </p>
+          <div className={`${ACTION_ROW} mt-3`}>
+            {mode === 'video' ? (
+              <>
+                <button
+                  type="button"
+                  className={BTN_PRIMARY}
+                  disabled={busy}
+                  onClick={() => void askForVideoCall()}
+                >
+                  {busy ? 'Saving…' : 'Ask for a video call'}
+                </button>
+                <button
+                  type="button"
+                  className={BTN_QUIET}
+                  disabled={busy}
+                  onClick={() => setMode('idle')}
+                >
+                  Back
+                </button>
+                {slots.length > 0 ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    The visit times above will be replaced by call times.
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <button
+                type="button"
+                className={BTN_QUIET}
+                disabled={busy}
+                onClick={() => setMode('video')}
+              >
+                I'd prefer a video call
+              </button>
+            )}
+          </div>
+        </div>
       ) : null}
     </section>
   );

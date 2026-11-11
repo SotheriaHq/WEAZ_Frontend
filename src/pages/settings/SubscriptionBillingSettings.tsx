@@ -31,8 +31,10 @@ import { SubscriptionHistory } from '@/components/custom-orders/SubscriptionHist
 import { BrandQueueSettings } from '@/components/custom-orders/QueueBrandControls';
 import { SubscriptionPaymentMethods } from '@/components/custom-orders/SubscriptionPaymentMethods';
 import Button from '@/components/ui/Button';
+import { planNotice } from '@/lib/subscriptionPlanNotice';
+import { PlanNoticeBanner } from '@/components/custom-orders/PlanNoticeBanner';
 
-const money = (amount: number) =>
+const money =(amount: number) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(
     amount,
   );
@@ -315,7 +317,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
       !(await confirm({
         title: 'Stop automatic renewal?',
         message:
-          'Your subscription remains available until the current paid period ends. New intake then pauses; existing paid orders continue to completion. The current paid period is not refunded.',
+          `Your plan stays in place until ${date(billing.data?.subscription?.currentPeriodEnd)}. Then your brand moves to the free plan: 1 active custom order at a time. Orders already active continue to completion, and waiting orders keep their place. You can subscribe again once it ends. The current paid period is not refunded.`,
         confirmText: 'Stop renewal',
         isDestructive: true,
       }))
@@ -345,6 +347,24 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
     );
 
   const tiers = billing.data?.tiers ?? [];
+  const notice = planNotice(
+    subscription,
+    tiers,
+    (key) => queueTierName(key ?? ''),
+    // Days are counted on the server's clock, not the device's.
+    billing.data?.serverNow ? Date.parse(billing.data.serverNow) : undefined,
+  );
+
+  function showPlans() {
+    setSection('plans');
+    // The tier grid exists once the Plans section has rendered.
+    requestAnimationFrame(() => {
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      document
+        .getElementById('billing-tiers')
+        ?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    });
+  }
 
   return (
     <div className="space-y-6 pb-12 text-slate-900 dark:text-white">
@@ -440,6 +460,20 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
         </div>
       )}
 
+      {/* Plan ending, lapsed or shrinking: on every section, never a surprise. */}
+      {notice ? (
+        <PlanNoticeBanner notice={notice}>
+          <Button variant="primary" size="sm" onClick={showPlans}>
+            See plans
+          </Button>
+          {subscription?.status === 'PAST_DUE' ? (
+            <Button variant="secondary" size="sm" onClick={() => setSection('cards')}>
+              Payment methods
+            </Button>
+          ) : null}
+        </PlanNoticeBanner>
+      ) : null}
+
       {/* Plans Section */}
       {section === 'plans' ? (
         <div className="space-y-6">
@@ -529,7 +563,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
                 <div className="rounded-xl bg-amber-500/10 p-3.5 text-xs text-amber-800 dark:text-amber-200">
                   <p className="font-semibold">⚠️ Payment Recovery Period Active</p>
                   <p className="mt-1">
-                    Automatic retry attempts occur on days 1, 3, and 7 until {date(subscription.recoveryUntil)}, preserving your locked rate. New order intake pauses at paid expiry.
+                    Automatic retry attempts occur on days 1, 3, and 7 until {date(subscription.recoveryUntil)}, preserving your locked rate. Until it is recovered, your brand is on the free plan: 1 active custom order at a time.
                   </p>
                 </div>
               ) : null}
@@ -654,7 +688,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
           ) : null}
 
           {/* Tier Cards Grid (ITEM 25) */}
-          <div>
+          <div id="billing-tiers" className="scroll-mt-24">
             <div className="mb-4">
               <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
                 Available Studio Tiers
