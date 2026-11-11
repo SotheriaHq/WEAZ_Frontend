@@ -43,7 +43,7 @@ describe('device session modal', () => {
     show(); await screen.findByText('Galaxy A17');
     expect(SecuritySessionsApi.sessions).not.toHaveBeenCalled(); expect(screen.queryByRole('dialog')).toBeNull();
     const modal = await open();
-    expect(await within(modal).findByRole('heading', { name: 'Active sessions' })).toBeVisible();
+    await waitFor(() => expect(within(modal).getByRole('heading', { name: 'Active sessions' })).toBeVisible());
     expect(within(modal).getByRole('heading', { name: 'Recent sign-in history' })).toBeVisible();
     expect(within(modal).getAllByRole('button', { name: 'Sign out session' })).toHaveLength(1);
     expect(within(modal).getByText('Studio')).toBeVisible();
