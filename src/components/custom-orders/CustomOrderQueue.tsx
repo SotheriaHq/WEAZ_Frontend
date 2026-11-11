@@ -39,6 +39,8 @@ export function queueRemainingMs(queue: QueuePresenter, monotonicNow: number) {
 export const queueTierName = (key: string) =>
   (
     ({
+      // No paid plan in force: the free plan, one Active order at a time.
+      FREE: 'Free',
       THREAD: 'Thread',
       ASO_OKE: 'Aso-oke',
       ARU: 'Aru',

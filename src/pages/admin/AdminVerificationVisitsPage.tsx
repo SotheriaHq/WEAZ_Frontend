@@ -1,9 +1,10 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   physicalVerificationApi,
   type PhysicalVerificationDetail,
+  type PhysicalVerificationMode,
   type PhysicalVerificationProofKind,
   type PhysicalVerificationSummary,
 } from '@/api/PhysicalVerificationApi';
@@ -151,6 +152,23 @@ const AdminVerificationVisitsPage: React.FC = () => {
   const [proposeNote, setProposeNote] = useState('');
   const usableSlots = slotDrafts.map(toIso).filter(Boolean);
 
+  /*
+    Visit or live video call (owner, Nov 2026). Only a brand on the free plan
+    can be verified by video; the call needs a link the brand will join.
+  */
+  const [offerModeChoice, setOfferModeChoice] =
+    useState<PhysicalVerificationMode | null>(null);
+  const [meetingUrlDraft, setMeetingUrlDraft] = useState('');
+  useEffect(() => {
+    setOfferModeChoice(null);
+    setMeetingUrlDraft('');
+  }, [selectedId]);
+  const offerMode: PhysicalVerificationMode = detail?.videoCallAllowed
+    ? (offerModeChoice ?? detail.mode ?? 'IN_PERSON')
+    : 'IN_PERSON';
+  const meetingUrl = meetingUrlDraft.trim() || detail?.meetingUrl || '';
+  const meetingUrlValid = /^https:\/\/\S+$/i.test(meetingUrl);
+
   /* ── evidence ───────────────────────────────────────────────────────── */
   const [proofKey, setProofKey] = useState('');
   const [proofKind, setProofKind] = useState<PhysicalVerificationProofKind>('WORKSPACE');
@@ -230,10 +248,33 @@ const AdminVerificationVisitsPage: React.FC = () => {
                     {detail.brandName}
                   </h2>
                 </div>
-                <span className={`${CHIP_BASE} ${VISIT_STATUS_TONE[detail.status]}`}>
-                  {VISIT_STATUS_LABEL[detail.status]}
-                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  {detail.mode === 'VIDEO_CALL' ? (
+                    <span className={`${CHIP_BASE} bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300`}>
+                      Video call
+                    </span>
+                  ) : null}
+                  <span className={`${CHIP_BASE} ${VISIT_STATUS_TONE[detail.status]}`}>
+                    {VISIT_STATUS_LABEL[detail.status]}
+                  </span>
+                </div>
               </div>
+
+              {detail.videoCallRequestedAt ? (
+                <div className={`${INSET} mt-4 px-3.5 py-3`}>
+                  <p className={FIELD_LABEL}>The brand asked for a video call</p>
+                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                    {formatSlot(detail.videoCallRequestedAt)} — send call times with a
+                    link below. Take at least {detail.minProofsForDecision} screenshots
+                    on the call as evidence.
+                  </p>
+                  {detail.brandResponseNote ? (
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                      “{detail.brandResponseNote}”
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
 
               <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
@@ -334,7 +375,40 @@ const AdminVerificationVisitsPage: React.FC = () => {
                 detail.status,
               ) ? (
                 <div className="mt-5">
-                  <p className={FIELD_LABEL}>Offer times</p>
+                  <p className={FIELD_LABEL}>
+                    {offerMode === 'VIDEO_CALL' ? 'Offer call times' : 'Offer times'}
+                  </p>
+                  {detail.videoCallAllowed ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="How to verify">
+                      {(['IN_PERSON', 'VIDEO_CALL'] as const).map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          aria-pressed={offerMode === option}
+                          disabled={busy}
+                          onClick={() => setOfferModeChoice(option)}
+                          className={offerMode === option ? BTN_PRIMARY : BTN_QUIET}
+                        >
+                          {option === 'VIDEO_CALL' ? 'Video call' : 'Visit'}
+                        </button>
+                      ))}
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Free plan: a live video call can replace the visit.
+                      </p>
+                    </div>
+                  ) : null}
+                  {offerMode === 'VIDEO_CALL' ? (
+                    <input
+                      type="url"
+                      inputMode="url"
+                      value={meetingUrlDraft}
+                      disabled={busy}
+                      onChange={(event) => setMeetingUrlDraft(event.target.value)}
+                      placeholder={detail.meetingUrl || 'Call link, e.g. https://meet.google.com/…'}
+                      aria-label="Video call link"
+                      className={`${INSET} mt-2 h-10 w-full px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900/20 dark:text-white dark:focus-visible:ring-white/20`}
+                    />
+                  ) : null}
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     {slotDrafts.map((value, index) => (
                       <input
@@ -365,21 +439,31 @@ const AdminVerificationVisitsPage: React.FC = () => {
                     <button
                       type="button"
                       className={BTN_PRIMARY}
-                      disabled={busy || usableSlots.length < 2}
+                      disabled={
+                        busy ||
+                        usableSlots.length < 2 ||
+                        (offerMode === 'VIDEO_CALL' && !meetingUrlValid)
+                      }
                       title={
                         usableSlots.length < 2
                           ? 'Offer at least two times so the brand has a choice'
-                          : undefined
+                          : offerMode === 'VIDEO_CALL' && !meetingUrlValid
+                            ? 'Add the call link (https://…)'
+                            : undefined
                       }
                       onClick={() =>
                         void run(async () => {
                           await physicalVerificationApi.propose(detail.id, {
                             slots: usableSlots,
                             note: proposeNote.trim() || undefined,
+                            mode: offerMode,
+                            meetingUrl:
+                              offerMode === 'VIDEO_CALL' ? meetingUrl : undefined,
                           });
                           setSlotDrafts(['', '']);
                           setProposeNote('');
-                        }, 'Times sent to the brand.')
+                          setMeetingUrlDraft('');
+                        }, offerMode === 'VIDEO_CALL' ? 'Call times and link sent to the brand.' : 'Times sent to the brand.')
                       }
                     >
                       {busy ? 'Sending…' : 'Send'}
@@ -394,7 +478,9 @@ const AdminVerificationVisitsPage: React.FC = () => {
               ) ? (
                 <div className="mt-6">
                   <p className={FIELD_LABEL}>
-                    Evidence ({detail.proofCount} of {detail.minProofsForDecision} needed)
+                    {detail.mode === 'VIDEO_CALL'
+                      ? `Evidence — screenshots from the call (${detail.proofCount} of ${detail.minProofsForDecision} needed)`
+                      : `Evidence (${detail.proofCount} of ${detail.minProofsForDecision} needed)`}
                   </p>
                   {detail.proofs.length > 0 ? (
                     <ul className={`${INSET} ${ROW_DIVIDER} mt-2 overflow-hidden`}>

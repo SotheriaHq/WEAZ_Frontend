@@ -11,6 +11,7 @@ import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 import BrandSwitcher from '@/components/brand/BrandSwitcher';
 import { useShellViewportLocked } from '@/components/navigation/IslandBottomNav';
+import { StudioPlanNotice } from '@/components/studio/StudioPlanNotice';
 
 type StudioScaffoldProps = {
   active: string;
@@ -36,6 +37,12 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
     if (!isEmbeddedMobile) return;
     postStudioNativeEvent({ type: 'READY' });
   }, [isEmbeddedMobile]);
+
+  // A plan ending or lapsed shows above every Studio page (the native Studio
+  // tab renders this page too), except where a page owns the whole viewport:
+  // the messages view and the product form's pinned footer.
+  const planNotice =
+    viewportLocked || isProductFormRoute ? null : <StudioPlanNotice />;
 
   return (
     <div className="studio-shell min-h-dvh bg-[color:var(--surface-primary)] text-[color:var(--text-primary)]">
@@ -83,6 +90,7 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
           {isEmbeddedMobile ? (
             <div className="embedded-studio-surface">
               <StudioEmbeddedSearchBridge />
+              {planNotice}
               {children}
             </div>
           ) : (
@@ -90,6 +98,7 @@ const StudioScaffold: React.FC<StudioScaffoldProps> = ({ active, onSelect, child
               <div className="empty:hidden [&:not(:empty)]:mb-2.5 flex justify-end">
                 <BrandSwitcher />
               </div>
+              {planNotice}
               {children}
             </>
           )}
