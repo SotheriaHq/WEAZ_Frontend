@@ -25,7 +25,7 @@ it('keeps the sheet responsive and dismissible while loading comments on first u
   expect(screen.getByRole('status')).toHaveTextContent('Loading comments');
   fireEvent.keyDown(window, { key: 'Escape' });
   expect(close).toHaveBeenCalledOnce();
-  act(() => window.dispatchEvent(new PopStateEvent('popstate')));
+  act(() => { window.history.replaceState({}, '', window.location.href); window.dispatchEvent(new PopStateEvent('popstate', { state: {} })); });
   expect(close).toHaveBeenCalledTimes(2);
   expect(overlayBackChannel.consumesPop()).toBe(false);
   view.rerender(<RunwayCommentsSheet open={false} collectionId="design" onClose={close} />);
@@ -33,7 +33,7 @@ it('keeps the sheet responsive and dismissible while loading comments on first u
   expect(screen.queryByText('Comments ready')).not.toBeInTheDocument();
   view.rerender(<RunwayCommentsSheet open collectionId="design" onClose={close} />);
   expect(await screen.findByText('Comments ready')).toBeInTheDocument();
-  view.unmount();
+  await act(async () => { view.unmount(); });
   expect(back).toHaveBeenCalledOnce();
   vi.restoreAllMocks();
 });

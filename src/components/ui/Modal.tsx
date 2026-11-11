@@ -35,9 +35,14 @@ const Modal: React.FC<ModalProps> = ({
 }) => {
   const panelRef = React.useRef<HTMLDivElement | null>(null);
   const contentRef = React.useRef<HTMLDivElement | null>(null);
+  const [panelMounted, setPanelMounted] = React.useState(false);
+  const attachPanel = React.useCallback((element: HTMLDivElement | null) => {
+    panelRef.current = element;
+    setPanelMounted(Boolean(element));
+  }, []);
 
   useFocusTrap({
-    active: open,
+    active: open && panelMounted,
     containerRef: panelRef,
     onEscape: onClose,
   });
@@ -135,9 +140,10 @@ const Modal: React.FC<ModalProps> = ({
               style={{ paddingBottom: keyboardInset ? keyboardInset + 16 : undefined }}
             >
               <div
-                ref={panelRef}
+                ref={attachPanel}
                 role="dialog"
                 aria-modal="true"
+                aria-label={title}
                 tabIndex={-1}
                 className={clsx(
                   'relative w-full neu-modal-surface rounded-2xl shadow-2xl overflow-hidden outline-none',

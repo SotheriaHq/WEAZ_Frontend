@@ -33,7 +33,7 @@ it('loads only the requested bag flow and consumes Back before its download comp
   await waitFor(() => expect(loading.auth).toHaveBeenCalledOnce());
   expect(push).toHaveBeenCalledOnce();
   expect(overlayBackChannel.consumesPop()).toBe(true);
-  act(() => window.dispatchEvent(new PopStateEvent('popstate')));
+  act(() => { window.history.replaceState({}, '', window.location.href); window.dispatchEvent(new PopStateEvent('popstate', { state: {} })); });
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
   await act(async () => { loading.resolve(); await loading.promise; });
   expect(screen.queryByText('Auth prompt ready')).not.toBeInTheDocument();
@@ -41,7 +41,7 @@ it('loads only the requested bag flow and consumes Back before its download comp
   fireEvent.click(screen.getByRole('button', { name: 'Bag' }));
   expect(await screen.findByText('Auth prompt ready')).toBeInTheDocument();
   for (const fn of [loading.selector, loading.fittings, loading.stale, loading.composer]) expect(fn).not.toHaveBeenCalled();
-  view.unmount();
+  await act(async () => { view.unmount(); });
   expect(back).toHaveBeenCalledOnce();
   expect(overlayBackChannel.consumesPop()).toBe(false);
   vi.restoreAllMocks();
