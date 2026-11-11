@@ -20,7 +20,7 @@ const profile = (id = 'actor-a') => ({ id, type: 'BRAND', role: 'User', activeBr
   brandTags: ['fashion'], brandCountry: 'Nigeria' });
 const makeStore = (id?: string) => configureStore({ reducer: { user: userReducer },
   preloadedState: { user: { profile: profile(id) as never, isAuthenticated: true } } });
-const status = (complete = true) => ({ isSetupComplete: complete, isProfileComplete: true, isEmailVerified: true, isStoreOpen: false });
+const status = (complete = true) => ({ brandId: 'actor-a-brand', isSetupComplete: complete, isProfileComplete: true, isEmailVerified: true, isStoreOpen: false });
 function Readout() { return <span data-testid="status">{String(useStoreSetupStatus())}</span>; }
 function mount(id?: string, gate = false) {
   return render(<Provider store={makeStore(id)}><QueryClientProvider client={queryClient}>
@@ -73,6 +73,15 @@ describe('shared actor-scoped Studio setup cache', () => {
     expect(queryClient.getQueryData<{ isSetupComplete: boolean }>(queryKeys.store.status('actor-b', 'actor-b-brand'))?.isSetupComplete).toBe(false);
     queryClient.setQueryData(queryKeys.store.status('actor-a', 'actor-a-brand'), status(false));
     mount(); expect(screen.getByTestId('status').textContent).toBe('false');
+  });
+  it('rejects a different brand from the status endpoint', async () => {
+    getStatus.mockResolvedValue({ ...status(true), brandId: 'other-brand' }); mount(undefined, true);
+    await screen.findByRole('alert'); expect(screen.queryByText('Protected Studio')).toBeNull();
+  });
+  it('does not use a foreign cached status stored under this workspace', () => {
+    queryClient.setQueryData(queryKeys.store.status('actor-a', 'actor-a-brand'), { ...status(true), brandId: 'other-brand' });
+    getStatus.mockImplementation(() => new Promise(() => {})); mount(undefined, true);
+    expect(screen.queryByText('Protected Studio')).toBeNull();
   });
   it('retains known completeness during a failed refresh and while store is paused', async () => {
     queryClient.setQueryData(queryKeys.store.status('actor-a', 'actor-a-brand'), status());

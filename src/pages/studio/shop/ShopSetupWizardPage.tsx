@@ -5,18 +5,20 @@ import StoreCreationWizard from '@/pages/store/StoreCreationWizard';
 import { getStoreStatus } from '@/api/StoreApi';
 import { useNavigate } from 'react-router-dom';
 import type { RootState } from '@/store';
+import { getActiveBrandId } from '@/lib/brandAccess';
 import { clearStoreOpenPending, isStoreOpenPending, sleep } from '@/utils/storeSetup';
 
 const ShopSetupWizardPage: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
+  const activeBrandId = getActiveBrandId(user);
 
   useEffect(() => {
     let mounted = true;
 
     const checkStatus = async (): Promise<boolean> => {
       try {
-        const status = await getStoreStatus();
+        const status = await getStoreStatus({ expectedBrandId: activeBrandId });
         if (!mounted) return false;
         if (status?.isSetupComplete === true) {
           clearStoreOpenPending(user?.id);
@@ -44,7 +46,7 @@ const ShopSetupWizardPage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [navigate, user?.id]);
+  }, [navigate, user?.id, activeBrandId]);
 
   return (
     <StudioScaffold active="store" onSelect={() => {}}>

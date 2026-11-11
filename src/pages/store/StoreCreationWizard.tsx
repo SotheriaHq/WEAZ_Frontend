@@ -197,6 +197,7 @@ const restoreWizardStep = (localDraft: Record<string, unknown> | null): WizardSt
 const StoreCreationWizard: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
+  const activeBrandId = getActiveBrandId(user);
   
   // Current step state
   const [currentStep, setCurrentStep] = useState<WizardStep>('social');
@@ -353,7 +354,7 @@ const StoreCreationWizard: React.FC = () => {
 
       // 1) Server store status - only override server-synced fields
       try {
-        const response = await getStoreStatus();
+        const response = await getStoreStatus({ expectedBrandId: activeBrandId });
         if (!isCancelled) {
           // Redirect away once the setup FLOW is complete — independent of whether
           // the store is currently open or paused. Completed brands never re-enter setup.
@@ -496,7 +497,7 @@ const StoreCreationWizard: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [user]);
+  }, [user, activeBrandId]);
 
   // Redirect if the brand has already completed store setup — they must never be
   // shown / routed back into the setup wizard.
@@ -619,10 +620,10 @@ const StoreCreationWizard: React.FC = () => {
       await openStore({ legalAcceptances });
 
       // Reconcile the publishing actor/workspace in the shared setup cache.
-      if (user?.id) primeStoreSetupStatusCache(true, user.id, getActiveBrandId(user));
+      if (user?.id) primeStoreSetupStatusCache(true, user.id, activeBrandId);
       invalidateRequireStoreSetupCache();
       queryClient.setQueryData<StoreStatusResponse | undefined>(
-        queryKeys.store.status(),
+        queryKeys.store.status(user?.id, activeBrandId),
         (previous) =>
           previous
             ? {
@@ -696,7 +697,7 @@ const StoreCreationWizard: React.FC = () => {
       }
       setSaveState('error');
     }
-  }, [persistProgress, navigate, user, queryClient]);
+  }, [persistProgress, navigate, user, activeBrandId, queryClient]);
 
   // --- RENDER ---
   return (

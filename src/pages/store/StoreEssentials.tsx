@@ -126,10 +126,11 @@ const StoreEssentials: React.FC = () => {
         const [prefill, setupStatus] = await Promise.all([
           getStoreWizardPrefill(),
           queryClient.fetchQuery({ queryKey: queryKeys.store.status(user?.id, activeBrandId),
-            queryFn: () => getStoreStatus({ forceRefresh: true }), staleTime: 60_000 }).catch(() => null),
+            queryFn: () => getStoreStatus({ forceRefresh: true, expectedBrandId: activeBrandId }), staleTime: 60_000 }).catch(() => null),
         ]);
         if (cancelled) return;
 
+        if (activeBrandId && setupStatus && setupStatus.brandId !== activeBrandId) throw new Error('Store setup status belongs to a different workspace.');
         if (setupStatus?.isSetupComplete === true) {
           navigate('/studio/store', { replace: true });
           return;

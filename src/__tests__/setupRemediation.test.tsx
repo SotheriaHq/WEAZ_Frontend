@@ -11,7 +11,7 @@ import { queryClient } from '@/query/queryClient';
 import userReducer from '@/features/userSlice';
 vi.mock('canvas-confetti', () => ({ default: vi.fn() }));
 const fixture = vi.hoisted(() => ({ complete: false }));
-vi.mock('@/api/StoreApi', () => ({ getStoreStatus: async () => ({ isStoreOpen: true, isPublished: true, isSetupComplete: fixture.complete }),
+vi.mock('@/api/StoreApi', () => ({ getStoreStatus: async () => ({ brandId: 'brand', isStoreOpen: true, isPublished: true, isSetupComplete: fixture.complete }),
   getStoreWizardPrefill: async () => ({ flags: { hasLiveStore: true }, brand: { description: 'Published brand repair details.', tagline: 'Repair form' } }), updateStoreProfile: vi.fn() }));
 vi.mock('@/components/studio/StudioScaffold', () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock('@/pages/store/StoreCreationWizard', () => ({ default: () => <div>Repair wizard</div> }));
