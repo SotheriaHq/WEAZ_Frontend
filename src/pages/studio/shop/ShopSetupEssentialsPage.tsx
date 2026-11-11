@@ -5,20 +5,22 @@ import StoreEssentials from '@/pages/store/StoreEssentials';
 import { getStoreStatus } from '@/api/StoreApi';
 import { useNavigate } from 'react-router-dom';
 import type { RootState } from '@/store';
+import { getActiveBrandId } from '@/lib/brandAccess';
 import { clearStoreOpenPending, isStoreOpenPending, sleep } from '@/utils/storeSetup';
 
 const ShopSetupEssentialsPage: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
+  const activeBrandId = getActiveBrandId(user);
 
   useEffect(() => {
     let mounted = true;
 
     const checkStatus = async (): Promise<boolean> => {
       try {
-        const status = await getStoreStatus();
+        const status = await getStoreStatus({ expectedBrandId: activeBrandId });
         if (!mounted) return false;
-        if (status?.isStoreOpen) {
+        if (status?.isSetupComplete === true) {
           clearStoreOpenPending(user?.id);
           navigate('/studio/store', { replace: true });
           return true;
@@ -44,7 +46,7 @@ const ShopSetupEssentialsPage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [navigate, user?.id]);
+  }, [navigate, user?.id, activeBrandId]);
 
   return (
     <StudioScaffold active="store" onSelect={() => {}}>

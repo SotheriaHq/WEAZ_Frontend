@@ -376,9 +376,15 @@ export async function fetchDesignDetailQuery(
 
 export function useStoreStatusQuery(options?: EnabledOption) {
   const actor = useSelector((state: RootState) => state.user.profile);
+  const brandId = getActiveBrandId(actor);
   return useQuery({
-    queryKey: queryKeys.store.status(actor?.id, getActiveBrandId(actor)),
-    queryFn: () => getStoreStatus({ forceRefresh: true }),
+    queryKey: queryKeys.store.status(actor?.id, brandId),
+    queryFn: async () => {
+      const status = await getStoreStatus({ forceRefresh: true, expectedBrandId: brandId });
+      if (brandId && status.brandId !== brandId) throw new Error('Store setup status belongs to a different workspace. Please retry.');
+      return status;
+    },
+    select: status => brandId && status.brandId !== brandId ? undefined : status,
     enabled: Boolean(actor?.id) && (options?.enabled ?? true),
     staleTime: 60_000,
   });
