@@ -1066,6 +1066,7 @@ export const getStoreStatus = async (options?: { forceRefresh?: boolean }): Prom
   pending.promise = (async () => {
     const res = await apiClient.get('/store/status');
     const data = extractData<StoreStatusResponse>(res);
+    if (!data || typeof data.isSetupComplete !== 'boolean') throw new Error('Store setup status is incomplete. Please retry.');
     // A late answer from a signed-out identity must never replace the next account's cache.
     if (scope && getStoredAccessToken() === scope && storeStatusPending === pending) {
       storeStatusCache = { data, scope, expiresAt: Date.now() + STORE_STATUS_TTL_MS };

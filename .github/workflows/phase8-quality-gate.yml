@@ -60,3 +60,6 @@ jobs:
 
       - name: Performance regression guard
         run: npm run check:perf-regressions
+
+      - name: Studio access and Settings destination state matrix
+        run: npm run test:studio-access

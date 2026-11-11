@@ -1,4 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
+import { getActiveBrandId } from '@/lib/brandAccess';
 import { Select } from '@/components/ui/Select';
 import {
   Store,
@@ -61,6 +64,7 @@ const normalizeSpecializationSelection = (values: string[]): string[] => {
 };
 
 const StoreGeneralSettings: React.FC = () => {
+  const actor = useSelector((state: RootState) => state.user.profile);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
@@ -232,7 +236,7 @@ const StoreGeneralSettings: React.FC = () => {
       // Closing/pausing must NOT flip "setup complete" to false — a paused
       // store is still fully set up.
       if (nextLiveState) {
-        primeStoreSetupStatusCache(true);
+        if (actor?.id) primeStoreSetupStatusCache(true, actor.id, getActiveBrandId(actor));
       }
       setIsLive(nextLiveState);
       toast.success(nextLiveState ? 'Store is now live.' : 'Store is now paused.');

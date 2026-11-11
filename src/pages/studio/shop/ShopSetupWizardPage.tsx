@@ -18,7 +18,7 @@ const ShopSetupWizardPage: React.FC = () => {
       try {
         const status = await getStoreStatus();
         if (!mounted) return false;
-        if (status?.isStoreOpen) {
+        if (status?.isSetupComplete === true) {
           clearStoreOpenPending(user?.id);
           navigate('/studio/store', { replace: true });
           return true;
