@@ -61,6 +61,7 @@ function fail(message) {
 async function cfFetch(path, init = {}) {
   const response = await fetch(`${CF_API}${path}`, {
     ...init,
+    signal: AbortSignal.timeout(15000),
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
@@ -99,10 +100,7 @@ function deploymentMatchesSha(deployment, sha) {
 
 async function waitForPagesDeploy(sha) {
   if (!accountId || !projectName) {
-    console.warn(
-      '[purge-cloudflare] CF_ACCOUNT_ID / CF_PAGES_PROJECT_NAME not set — skipping Pages wait; purging immediately.',
-    );
-    return;
+    fail('CF_ACCOUNT_ID and CF_PAGES_PROJECT_NAME are required when waiting for a release. No cache was purged.');
   }
 
   const deadline = Date.now() + waitTimeoutSec * 1000;
@@ -136,18 +134,21 @@ async function waitForPagesDeploy(sha) {
       throw error;
     }
     const deployments = Array.isArray(body.result) ? body.result : [];
-    const match = deployments.find((d) => deploymentMatchesSha(d, sha));
+    const match = deployments.find((d) => d.environment === 'production' && deploymentMatchesSha(d, sha));
 
     if (match) {
       const stage = match.latest_stage?.name || match.stage || 'unknown';
       const status = match.latest_stage?.status || match.status || 'unknown';
       console.log(`[purge-cloudflare] Found deployment ${match.id}: stage=${stage} status=${status}`);
 
-      if (status === 'success' || status === 'active') {
+      // Cloudflare reports the CURRENT STAGE: clone/build success and any
+      // active stage are not a deployed release. Preview deployments cannot
+      // establish that the production custom domain has updated either.
+      if (stage === 'deploy' && status === 'success' && match.is_skipped !== true) {
         console.log('[purge-cloudflare] Pages deploy is live.');
         return;
       }
-      if (status === 'failure' || status === 'canceled' || status === 'cancelled') {
+      if (match.is_skipped === true || ['failure', 'canceled', 'cancelled', 'skipped'].includes(status)) {
         fail(`Pages deploy ${match.id} ended with status=${status}`);
       }
     } else {
@@ -242,6 +243,9 @@ async function main() {
   console.log('[purge-cloudflare] Done. Edge should serve the new frontend build immediately.');
 }
 
-main().catch((error) => {
-  fail(error instanceof Error ? error.message : String(error));
-});
+module.exports = { main, deploymentMatchesSha };
+if (require.main === module) {
+  main().catch((error) => {
+    fail(error instanceof Error ? error.message : String(error));
+  });
+}
