@@ -33,6 +33,9 @@ jobs:
       - name: App Links (assetlinks.json) contract
         run: npm run test:app-links-contract
 
+      - name: Production deployment readiness contract
+        run: node --test scripts/test-cloudflare-deploy-wait.cjs
+
       - name: Build
         run: npm run build
 
