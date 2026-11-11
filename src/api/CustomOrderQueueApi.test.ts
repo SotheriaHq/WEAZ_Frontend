@@ -3,6 +3,7 @@ import { apiClient } from './httpClient';
 import { adminOrderQueueApi, customOrderQueueApi } from './CustomOrderQueueApi';
 import { brandSubscriptionApi } from './BrandSubscriptionApi';
 import { queueServerNow } from '@/features/orders/queueClock';
+import { LEGAL_PAGE_VERSION } from '@/pages/legal/legalVersion';
 
 vi.mock('./httpClient', () => ({ apiClient: { get: vi.fn(), post: vi.fn(), patch: vi.fn() } }));
 const queue = { lane: 'PENDING', orderRevision: 4, serverNow: '2026-10-18T12:00:00Z', queueExpiresAt: '2026-11-18T12:00:00Z' };
@@ -24,11 +25,20 @@ describe('queue API contracts', () => {
     expect(result).toEqual(queue);
     expect(apiClient.post).toHaveBeenCalledWith('/admin/custom-order-queue/orders/order-a/cancel', { reason: 'Owner approved cancellation', expectedRevision: 4 }, expect.any(Object));
   });
-  it('submits explicit recurring consent, accepted policy and the approved price ceiling', async () => {
+  it('submits explicit recurring consent, accepted policy and the exact held quote', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: { data: { action: 'PAYMENT_REQUIRED', reference: 'sub-a', amountNgn: 10000 } } });
-    const result = await brandSubscriptionApi.checkout('brand-a', 'THREAD', 'https://wiez.com/settings?tab=subscription-billing', 10000);
+    const quote = { quoteId: '11111111-1111-4111-8111-111111111111', brandId: 'brand-a', amountNgn: 10000,
+      effectiveAt: '', periodEnd: '', kind: 'INITIAL', expiresAt: '', serverNow: '', validUntilMonotonicMs: performance.now() + 300000 };
+    const result = await brandSubscriptionApi.checkout('brand-a', 'THREAD', 'https://wiez.com/settings?tab=subscription-billing', quote);
     expect(result.reference).toBe('sub-a');
-    expect(apiClient.post).toHaveBeenCalledWith('/brands/brand-a/subscription/checkout', { tierKey: 'THREAD', callbackUrl: 'https://wiez.com/settings?tab=subscription-billing', expectedAmountNgn: 10000, recurringConsent: true, legalVersion: '2026.10.19-v1.5' }, expect.any(Object));
+    expect(apiClient.post).toHaveBeenCalledWith('/brands/brand-a/subscription/checkout', { quoteId: quote.quoteId, tierKey: 'THREAD', callbackUrl: 'https://wiez.com/settings?tab=subscription-billing', expectedAmountNgn: 10000, recurringConsent: true, legalVersion: LEGAL_PAGE_VERSION }, expect.any(Object));
+  });
+  it('does not send checkout when the held quote expired or belongs to another brand', async () => {
+    const quote = { quoteId: '11111111-1111-4111-8111-111111111111', brandId: 'brand-a', amountNgn: 10000,
+      effectiveAt: '', periodEnd: '', kind: 'INITIAL', expiresAt: '', serverNow: '', validUntilMonotonicMs: performance.now() - 1 };
+    await expect(brandSubscriptionApi.checkout('brand-a', 'THREAD', 'https://wiez.com', quote)).rejects.toThrow('fresh price');
+    await expect(brandSubscriptionApi.checkout('brand-b', 'THREAD', 'https://wiez.com', { ...quote, validUntilMonotonicMs: performance.now() + 300000 })).rejects.toThrow('fresh price');
+    expect(apiClient.post).not.toHaveBeenCalled();
   });
   it('does not turn a failed capture or refund request into a successful queue state', async () => {
     vi.mocked(apiClient.post).mockRejectedValue(new Error('No provider response'));

@@ -1,7 +1,8 @@
 import { getMediaUrlIdentity, isRenewableMediaUrl, isUsableMediaUrl, mediaUrlCacheExpiresAt } from '@/utils/mediaUrlPolicy';
 import { getMediaSessionEpoch, advanceMediaSessionEpoch } from '@/utils/mediaUrlSession';
-import { apiClient } from './httpClient';
-import { isAxiosError } from 'axios';
+import { apiClient, getStoredAccessToken } from './httpClient';
+import { securityIdentityFromToken, SecurityVerificationCancelled } from '@/auth/securityChallenge';
+import { isAxiosError, type AxiosRequestConfig } from 'axios';
 import { reviewsApi, type ProductReviewResponse } from './ReviewsApi';
 import { unwrapApiResponse, type AuthUserDto } from '../types/auth';
 import type {
@@ -25,6 +26,8 @@ import { resolveCatalogEntityType } from '../utils/catalogEntity';
 import { filterV1GarmentCategories } from '../utils/v1Taxonomy';
 import { WEB_UPLOAD_POLICIES, assertValidUploadFile } from '../utils/uploadValidation';
 import { prepareImageForUpload } from './UploadApi';
+export type DraftCollectionDto = CollectionDto & { pendingCategoryName?: string };
+export type DraftCollectionPage = { items: DraftCollectionDto[]; nextCursor: string | null };
 
 /**
  * What `requestPayout` returns instead of a payout.
@@ -1290,7 +1293,7 @@ export const brandApi = {
   },
 
   // Fetch draft collections (PHASE 6)
-  async getMyDraftCollections(): Promise<CollectionDto[]> {
+  async getMyDraftCollectionsPage(options: { cursor?: string; limit?: number; signal?: AbortSignal; expectedIdentity?: string } = {}): Promise<DraftCollectionPage> {
     const parseDraftItems = (payload: any): any[] => {
       const items = Array.isArray(payload)
         ? payload
@@ -1304,7 +1307,7 @@ export const brandApi = {
       return Array.isArray(items) ? items : [];
     };
 
-    const mapDrafts = (items: any[]): CollectionDto[] =>
+    const mapDrafts = (items: any[]): DraftCollectionDto[] =>
       items.map((item: any) => {
         const mediaItems = Array.isArray(item.medias)
           ? item.medias
@@ -1375,24 +1378,39 @@ export const brandApi = {
         };
       });
 
-    const requestDrafts = async (): Promise<CollectionDto[]> => {
-      const response = await apiClient.get('/designs/my/drafts');
-      const payload = response.data;
-      return mapDrafts(parseDraftItems(payload));
+    const expectedIdentity = options.expectedIdentity ?? securityIdentityFromToken(getStoredAccessToken(), atob);
+    if (!expectedIdentity || securityIdentityFromToken(getStoredAccessToken(), atob) !== expectedIdentity)
+      throw new SecurityVerificationCancelled();
+    const request: AxiosRequestConfig & { _securityIdentity: string } = {
+      params: { cursor: options.cursor, limit: options.limit ?? 50 }, signal: options.signal,
+      _securityIdentity: expectedIdentity,
     };
+    const response = await apiClient.get('/designs/my/drafts', request);
+    if (securityIdentityFromToken(getStoredAccessToken(), atob) !== expectedIdentity)
+      throw new SecurityVerificationCancelled();
+    const payload = response.data?.data ?? response.data;
+    return { items: mapDrafts(parseDraftItems(payload)),
+      nextCursor: typeof payload?.nextCursor === 'string' ? payload.nextCursor : null };
+  },
 
-    try {
-      return await requestDrafts();
-    } catch (error) {
-      console.warn('First draft fetch failed, retrying once...', error);
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      try {
-        return await requestDrafts();
-      } catch (retryError) {
-        console.error('Error fetching draft collections after retry:', retryError);
-        throw retryError;
-      }
-    }
+  /** The catalogue's existing flat cache/optimistic-update contract remains
+   * intact; every network response still uses the bounded canonical page API. */
+  async getMyDraftCollections(options: { signal?: AbortSignal } = {}): Promise<CollectionDto[]> {
+    const expectedIdentity = securityIdentityFromToken(getStoredAccessToken(), atob);
+    if (!expectedIdentity) throw new SecurityVerificationCancelled();
+    const items = new Map<string, CollectionDto>();
+    const cursors = new Set<string>();
+    let cursor: string | undefined;
+    do {
+      const page = await brandApi.getMyDraftCollectionsPage({ cursor, limit: 100, signal: options.signal, expectedIdentity });
+      if (securityIdentityFromToken(getStoredAccessToken(), atob) !== expectedIdentity)
+        throw new SecurityVerificationCancelled();
+      page.items.forEach(item => items.set(item.id, item));
+      if (page.nextCursor && cursors.has(page.nextCursor)) throw new Error('Draft pagination could not advance. Reload your catalogue.');
+      if (page.nextCursor) cursors.add(page.nextCursor);
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+    return [...items.values()];
   },
 
   // Create collection

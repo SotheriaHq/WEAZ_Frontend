@@ -8,6 +8,7 @@ interface Props extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   error?: string | null;
   addon?: React.ReactNode;
   variant?: TextAreaVariant;
+  inputClassName?: string;
 }
 
 const variantClasses: Record<TextAreaVariant, string> = {
@@ -16,7 +17,7 @@ const variantClasses: Record<TextAreaVariant, string> = {
   inverted: 'bg-slate-900 text-white border-slate-700 focus:ring-2 focus:ring-purple-400 focus:border-purple-400',
 };
 
-const TextAreaField = forwardRef<HTMLTextAreaElement, Props>(({ label, helperText, error, addon, className = '', variant = 'default', ...rest }, ref) => {
+const TextAreaField = forwardRef<HTMLTextAreaElement, Props>(({ label, helperText, error, addon, className = '', inputClassName = '', variant = 'default', ...rest }, ref) => {
   const variantStyle = variantClasses[variant] ?? variantClasses.default;
   return (
     <div className={`w-full ${className}`}>
@@ -24,7 +25,7 @@ const TextAreaField = forwardRef<HTMLTextAreaElement, Props>(({ label, helperTex
       <div className="flex items-start">
         <textarea
           ref={ref}
-          className={`flex-1 block w-full rounded-md border px-3 py-2 focus:outline-none ${variantStyle} ${error ? 'wiez-field-input-error' : ''}`}
+          className={`flex-1 block w-full rounded-md border px-3 py-2 focus:outline-none ${variantStyle} ${error ? 'wiez-field-input-error' : ''} ${inputClassName}`}
           {...rest}
         />
         {addon && <div className="ml-2">{addon}</div>}

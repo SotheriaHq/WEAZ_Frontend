@@ -41,6 +41,14 @@ jobs:
 
       - name: Focused media and query tests
         run: npm run test:release-boot
+      - name: Held subscription quote API
+        run: npm run test:subscription-quotes
+      - name: Verify MFA screens and request safety
+        run: npm run test:mfa-security
+      - name: Session response and cookie rotation isolation
+        run: npm run test:session-response-isolation
+      - name: Session-bound realtime recovery
+        run: npm run test:session-socket
 
       - name: Product draft save and retry regression
         run: npx vitest run src/features/products/productPublishJob.test.ts

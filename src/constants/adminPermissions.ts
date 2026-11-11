@@ -41,6 +41,11 @@ export interface AdminPermissionDefinition {
 
 const CATALOGUE = [
   {
+    key: 'USERS_MFA_RECOVER', code: 'users.mfa_recover', group: 'Users & accounts',
+    label: 'Review verification recovery',
+    description: 'Independently review lost-method recovery. Two different authorised administrators must approve. This capability is opt-in.',
+  },
+  {
     key: 'DASHBOARD_READ',
     code: 'dashboard.read',
     group: 'Dashboard',

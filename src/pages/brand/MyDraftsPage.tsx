@@ -5,13 +5,16 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { brandApi } from '@/api/BrandApi';
+import { deleteDesign } from '@/api/DesignApi';
+import { getStoredAccessToken, subscribeAccessToken } from '@/api/httpClient';
+import { securityIdentityFromToken } from '@/auth/securityChallenge';
+import { useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, Eye } from 'lucide-react';
+import Button from '@/components/ui/Button';
 import { MuseLoader } from '@/components/loaders/MuseLoader';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import MediaRenderer from '@/components/media/MediaRenderer';
 import { buildDesignRoute } from '@/utils/catalogRoutes';
-import useCachedResource from '@/hooks/useCachedResource';
 import { queryClient } from '@/query/queryClient';
 
 interface DraftCollection {
@@ -28,28 +31,29 @@ interface DraftCollection {
 const DRAFTS_QUERY_KEY = ['brand', 'draft-collections'] as const;
 
 const MyDraftsPage: React.FC = () => {
+  const accessToken = React.useSyncExternalStore(subscribeAccessToken, getStoredAccessToken, () => null);
+  const identity = securityIdentityFromToken(accessToken, atob);
+  const queryKey = [...DRAFTS_QUERY_KEY, identity] as const;
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
   const navigate = useNavigate();
 
-  // Cached fetch: drafts paint instantly on revisit and revalidate silently.
-  const {
-    data: drafts = [],
-    loading,
-    error: fetchError,
-  } = useCachedResource<DraftCollection[]>({
-    queryKey: DRAFTS_QUERY_KEY,
-    queryFn: async () => {
-      const response = await brandApi.getMyDraftCollections();
-      return (response || []).filter(
-        (d) =>
-          d &&
-          d.id &&
-          ((d.title && d.title.trim().length) || d.coverImage || (d.itemCount ?? 0) > 0),
-      );
-    },
+  const { data, isLoading: loading, error: fetchError, hasNextPage, fetchNextPage, isFetchingNextPage, refetch } = useInfiniteQuery({
+    queryKey,
+    enabled: Boolean(identity),
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam, signal }) => brandApi.getMyDraftCollectionsPage({
+      cursor: pageParam, limit: 50, signal, expectedIdentity: identity ?? undefined,
+    }),
+    getNextPageParam: page => page.nextCursor ?? undefined,
   });
+  const drafts = React.useMemo(() => [...new Map((data?.pages ?? []).flatMap(page => page.items)
+    .filter(d => d?.id && ((d.title && d.title.trim().length) || d.coverImage || (d.itemCount ?? 0) > 0))
+    .map(d => [d.id, d])).values()], [data]);
+  React.useEffect(() => {
+    setConfirmOpen(false); setPendingDelete(null); setDeleting(null);
+  }, [identity]);
 
   React.useEffect(() => {
     if (fetchError) toast.error('Failed to load draft designs');
@@ -65,17 +69,15 @@ const MyDraftsPage: React.FC = () => {
     const { id } = pendingDelete;
     setDeleting(id);
     const removeFromCache = () =>
-      queryClient.setQueryData<DraftCollection[]>(DRAFTS_QUERY_KEY, (prev) =>
-        (prev ?? []).filter((d) => d.id !== id),
+      queryClient.setQueryData<InfiniteData<{ items: DraftCollection[]; nextCursor: string | null }>>(queryKey, (prev) =>
+        prev ? { ...prev, pages: prev.pages.map(page => ({ ...page, items: page.items.filter(d => d.id !== id) })) } : prev,
       );
     try {
-      await brandApi.deleteCollection(id);
+      await deleteDesign(id);
       toast.success('Draft deleted successfully');
       removeFromCache();
     } catch (error: any) {
-      // If backend cannot delete (already missing records), remove locally to avoid broken cards
       toast.error(error?.response?.data?.message ?? 'Failed to delete draft');
-      removeFromCache();
     } finally {
       setDeleting(null);
       setConfirmOpen(false);
@@ -92,7 +94,7 @@ const MyDraftsPage: React.FC = () => {
             My Draft Designs
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Designs pending category approval. They will be published automatically once the category is approved.
+            Saved designs stay private until you submit them. Category approval is separate and never publishes a draft.
           </p>
         </div>
 
@@ -102,10 +104,15 @@ const MyDraftsPage: React.FC = () => {
             <MuseLoader size={32} />
             <p className="ml-3 text-gray-600 dark:text-gray-400">Loading drafts...</p>
           </div>
-        ) : drafts.length === 0 ? (
+        ) : fetchError && drafts.length === 0 ? (
+          <div className="space-y-4 py-12" role="alert">
+            <p>Your drafts could not be loaded. Retry when connected.</p>
+            <Button type="button" onClick={() => void refetch()}>Retry drafts</Button>
+          </div>
+        ) : drafts.length === 0 && !hasNextPage ? (
           <div className="text-center py-20">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
-              <Eye className="h-8 w-8 text-gray-400" />
+              <span aria-hidden="true">📝</span>
             </div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
               No draft designs
@@ -125,7 +132,7 @@ const MyDraftsPage: React.FC = () => {
             {drafts.map((draft) => (
               <div
                 key={draft.id}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow"
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow [content-visibility:auto] [contain-intrinsic-size:0_420px]"
               >
                 {/* Cover Image */}
                 {draft.coverImage && (
@@ -147,12 +154,12 @@ const MyDraftsPage: React.FC = () => {
 
                 {/* Content */}
                 <div className="p-5">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 line-clamp-1">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 break-words">
                     {draft.title}
                   </h3>
                   
                   {draft.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 break-words">
                       {draft.description}
                     </p>
                   )}
@@ -188,18 +195,19 @@ const MyDraftsPage: React.FC = () => {
                       onClick={() => navigate(buildDesignRoute({ designId: draft.id, legacyCollectionId: draft.id, mode: 'edit' }))}
                       className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >
-                      <Eye className="h-4 w-4" />
+                      <span aria-hidden="true">📝</span>
                       Continue Creation
                     </button>
                     <button
                       onClick={() => handleDelete(draft.id, draft.title)}
+                      aria-label={`Delete ${draft.title || 'untitled draft'}`}
                       disabled={deleting === draft.id}
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {deleting === draft.id ? (
                         <MuseLoader size={16} />
                       ) : (
-                        <Trash2 className="h-4 w-4" />
+                        <span aria-hidden="true">🗑️</span>
                       )}
                     </button>
                   </div>
@@ -208,6 +216,10 @@ const MyDraftsPage: React.FC = () => {
             ))}
           </div>
         )}
+        {hasNextPage ? <div className="flex justify-center py-6">
+          <Button type="button" loading={isFetchingNextPage} disabled={isFetchingNextPage}
+            onClick={() => void fetchNextPage()}>Load more drafts</Button>
+        </div> : null}
       </div>
       <ConfirmDialog
         open={confirmOpen}

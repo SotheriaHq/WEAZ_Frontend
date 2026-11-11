@@ -20,7 +20,7 @@ import { canAccessAdminPath } from '@/components/admin/adminNavigation';
  * printed reason when the sibling is not checked out, so a standalone clone of
  * the frontend still passes.
  */
-const BACKEND_PERMISSIONS_FILE = path.resolve(
+const BACKEND_PERMISSIONS_FILE = process.env.WIEZ_BACKEND_PERMISSIONS_FILE ? path.resolve(process.env.WIEZ_BACKEND_PERMISSIONS_FILE) : path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../../../bthreadly/src/admin/constants/permissions.ts',
 );

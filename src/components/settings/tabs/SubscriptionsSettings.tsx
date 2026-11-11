@@ -16,7 +16,7 @@ const SubscriptionsSettings: React.FC = () => {
         <p className="text-gray-600 dark:text-gray-400">Manage users who are patched to your brand.</p>
       </div>
 
-      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10">
+      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10" data-settings-section>
         <div className="p-6 border-b border-gray-200 dark:border-white/10">
           <div className="relative">
             <input

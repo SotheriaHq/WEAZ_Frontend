@@ -14,12 +14,16 @@ import {
   apiClient,
   dropStoredAccessToken,
   persistAccessToken,
+  logoutCurrentSession,
+  getStoredAccessToken,
+  refreshAccessToken,
 } from '../api/httpClient';
-import { isAxiosError } from 'axios';
+import { isAxiosError, isCancel } from 'axios';
 import { toast } from 'sonner';
 import { queryClient } from '@/query/queryClient';
 import { queryKeys } from '@/query/queryKeys';
 import { clearWebPrivateSessionState } from '@/auth/sessionCleanup';
+import { SecurityVerificationCancelled } from '@/auth/securityChallenge';
 
 interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
@@ -32,7 +36,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const CANCELLED_ERROR_NAMES = new Set(['CancelledError', 'CanceledError', 'AbortError']);
 
 const isExpectedQueryCancellation = (error: unknown) => {
-  if (isCancelledError(error)) {
+  if (isCancelledError(error) || isCancel(error)) {
     return true;
   }
   if (error instanceof Error && CANCELLED_ERROR_NAMES.has(error.name)) {
@@ -71,6 +75,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       staleTime: 0,
       retry: false,
       queryFn: async () => {
+        // Cookies survive reloads; the in-memory bearer does not. Restore its
+        // session binding before a challenged profile can ask for verification.
+        // The transport fences refresh against sign-out/account changes. A
+        // transient failure must not turn into an unbound cookie-only prompt.
+        if (!getStoredAccessToken() && !await refreshAccessToken()) {
+          throw new SecurityVerificationCancelled('Sign-in restoration could not finish. Retry when connected.');
+        }
         const response = await apiClient.get('/auth/profile', {
           headers: {
             'Cache-Control': 'no-cache',
@@ -99,8 +110,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const persisted = JSON.parse(raw) as AuthUserDto;
         // Only overwrite server values when server doesn't provide them and persisted has them
         const merged = { ...user } as AuthUserDto;
-        if (!merged.phoneNumber && persisted.phoneNumber) merged.phoneNumber = persisted.phoneNumber;
-        if (!merged.address && persisted.address) merged.address = persisted.address;
+        if (persisted.id === user.id) {
+          if (!merged.phoneNumber && persisted.phoneNumber) merged.phoneNumber = persisted.phoneNumber;
+          if (!merged.address && persisted.address) merged.address = persisted.address;
+        }
 
         dispatch(setUser(merged));
         return merged;
@@ -115,7 +128,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [dispatch]);
 
   const handleProfileError = useCallback(
-    (error: unknown, { allowPersistedUser = false }: { allowPersistedUser?: boolean } = {}) => {
+    (error: unknown, { allowPersistedUser = false, preserveSharedAuthStorage = false }:
+      { allowPersistedUser?: boolean; preserveSharedAuthStorage?: boolean } = {}) => {
       if (isExpectedQueryCancellation(error)) {
         return;
       }
@@ -123,7 +137,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const status = error.response?.status ?? 0;
         if (status === 401) {
           dropStoredAccessToken();
-          dispatch(clearUser());
+          dispatch(preserveSharedAuthStorage ? setUserFromStorage(null) : clearUser());
         } else if (status === 403) {
           if (!allowPersistedUser) {
             toast.error('You do not have permission to perform this action. Ask the brand owner for access.');
@@ -136,35 +150,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           console.error('Profile fetch failed:', error);
           if (!allowPersistedUser) {
             dropStoredAccessToken();
-            dispatch(clearUser());
+            dispatch(preserveSharedAuthStorage ? setUserFromStorage(null) : clearUser());
           }
         }
       } else {
         console.error('Unexpected profile error:', error);
         if (!allowPersistedUser) {
           dropStoredAccessToken();
-          dispatch(clearUser());
+          dispatch(preserveSharedAuthStorage ? setUserFromStorage(null) : clearUser());
         }
       }
     },
     [dispatch],
   );
 
-  const clearPrivateSession = useCallback(async () => {
-    await clearWebPrivateSessionState({ client: queryClient });
-    dispatch(clearUser());
+  const clearPrivateSession = useCallback(async ({ preserveSharedAuthStorage = false } = {}) => {
+    const cleanup = clearWebPrivateSessionState({ client: queryClient, preserveSharedAuthStorage });
+    // Clear visible state before yielding; an old cleanup must not run its
+    // Redux clears after a new sign-in has already completed.
+    dispatch(preserveSharedAuthStorage ? setUserFromStorage(null) : clearUser());
     dispatch(resetNotificationsState());
     dispatch(resetCartState());
     dispatch(resetWishlistState());
     dispatch(resetAdminState());
+    await cleanup;
   }, [dispatch]);
 
   useEffect(() => {
     let isMounted = true;
 
-    const onAuthExpired = () => {
+    const onAuthExpired = (event: Event) => {
       const shouldNotify = bootstrapCompleteRef.current && hasPersistedSessionEvidence();
-      void clearPrivateSession();
+      const preserveSharedAuthStorage = (event as CustomEvent)?.detail?.preserveSharedAuthStorage === true;
+      if (preserveSharedAuthStorage) void clearPrivateSession({ preserveSharedAuthStorage: true });
+      else void clearPrivateSession();
       if (shouldNotify && !authExpiredToastShownRef.current) {
         authExpiredToastShownRef.current = true;
         try { toast.info('Session expired. Please sign in again.'); } catch {}
@@ -178,21 +197,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (event.storageArea !== localStorage) return;
       if (event.key !== env.userStorageKey) return;
 
-      if (!event.newValue) {
-        dispatch(clearUser());
-        return;
-      }
-
-      try {
-        const parsed = JSON.parse(event.newValue) as AuthUserDto;
-        if (parsed?.id) {
-          dispatch(setUserFromStorage(parsed));
-        } else {
-          dispatch(clearUser());
-        }
-      } catch {
-        dispatch(clearUser());
-      }
+      // A storage event is a signal, never proof of identity. Drop this tab's
+      // old credentials/private state, then ask the server about its cookies.
+      // Preserve the sender's storage to avoid a cross-tab sign-out loop.
+      void (async () => {
+        await clearPrivateSession({ preserveSharedAuthStorage: true });
+        if (!event.newValue) return;
+        try { await fetchUserProfile(); }
+        catch (error) { handleProfileError(error, { preserveSharedAuthStorage: true }); }
+      })();
     };
 
     if (typeof window !== 'undefined') {
@@ -285,7 +298,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = () => {
-    void apiClient.post('/auth/logout').catch(() => undefined);
+    void logoutCurrentSession().catch(() => undefined);
     void clearPrivateSession();
   };
 

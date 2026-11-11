@@ -23,7 +23,7 @@ import CurrencySettings from '@/components/settings/tabs/CurrencySettings';
 import SizeFitSettings from '@/components/settings/tabs/SizeFitSettings';
 import HiddenContentSettings from './HiddenContentSettings';
 import type { RootState } from '@/store';
-import { hasActiveBrandMembership } from '@/lib/brandAccess';
+import { hasActiveBrandMembership, getActiveBrandId } from '@/lib/brandAccess';
 
 /* ── Coming Soon placeholder ─────────────────────────────────────── */
 const ComingSoon: React.FC<{ title: string; description: string }> = ({
@@ -308,12 +308,14 @@ const SettingsHome: React.FC = () => {
       <div style={{ paddingLeft: "calc(var(--settings-sidebar-width, 240px) + 16px)" }} className="min-h-screen pb-10 pr-3 pt-4 text-[13px] md:pr-4 md:pt-6 md:text-base transition-[padding-left] duration-75">
         <div className="max-w-4xl mx-auto [&_h1]:text-xl [&_h1]:md:text-2xl [&_h2]:text-base [&_h2]:md:text-lg">
           <Breadcrumbs activeKey={resolvedActive} onNavigate={setActive} />
+          <div key={`${me?.id ?? "guest"}:${getActiveBrandId(me) ?? "none"}`}>
           {resolvedSection ?? (
             <ComingSoon
               title="Not Found"
               description="This settings section doesn't exist or has been moved."
             />
           )}
+          </div>
         </div>
       </div>
     </div>

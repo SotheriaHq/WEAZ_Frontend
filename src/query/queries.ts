@@ -1,3 +1,6 @@
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
+import { getActiveBrandId } from '@/lib/brandAccess';
 import { useQuery, useQueryClient, type QueryClient, type UseQueryOptions } from '@tanstack/react-query';
 
 import { brandApi, type CollectionScope } from '@/api/BrandApi';
@@ -168,7 +171,7 @@ export function useMyDraftCollectionsQuery(
 ) {
   return useQuery({
     queryKey: queryKeys.brand.myDrafts(ownerId),
-    queryFn: () => brandApi.getMyDraftCollections(),
+    queryFn: ({ signal }) => brandApi.getMyDraftCollections({ signal }),
     enabled: isEnabled(ownerId, options?.enabled ?? true),
     staleTime: WIEZ_QUERY_STALE_TIME_MS,
     // Deliberately no `refetchOnMount: 'always'` / `refetchOnWindowFocus`.
@@ -372,10 +375,12 @@ export async function fetchDesignDetailQuery(
 }
 
 export function useStoreStatusQuery(options?: EnabledOption) {
+  const actor = useSelector((state: RootState) => state.user.profile);
   return useQuery({
-    queryKey: queryKeys.store.status(),
-    queryFn: () => getStoreStatus(),
-    enabled: options?.enabled ?? true,
+    queryKey: queryKeys.store.status(actor?.id, getActiveBrandId(actor)),
+    queryFn: () => getStoreStatus({ forceRefresh: true }),
+    enabled: Boolean(actor?.id) && (options?.enabled ?? true),
+    staleTime: 60_000,
   });
 }
 

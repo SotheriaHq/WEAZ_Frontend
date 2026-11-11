@@ -1,12 +1,13 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import type { RootState } from '@/store';
 import { AuthApi } from '@/api/AuthApi';
 import { NotificationsApi } from '@/api/NotificationsApi';
-import { useAuth } from '@/context/AuthContext';
+import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
+import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
+import Button from '@/components/ui/Button';
 import {
   PASSWORD_POLICY_HINT,
   PASSWORD_POLICY_MIN_LENGTH,
@@ -84,8 +85,7 @@ type TrustedDevice = {
 
 const SecuritySettings: React.FC = () => {
   const { profile } = useSelector((state: RootState) => state.user);
-  const navigate = useNavigate();
-  const { logout } = useAuth();
+  const embedded = useEmbeddedSurface() === 'mobile-app';
 
   const [currentPassword, setCurrentPassword] = React.useState('');
   const [newPassword, setNewPassword] = React.useState('');
@@ -150,10 +150,7 @@ const SecuritySettings: React.FC = () => {
         newPassword,
       });
 
-      toast.success('Password changed. Please sign in again.');
-
-      logout();
-      navigate('/login', { replace: true });
+      toast.success('Password updated. This session stays signed in; other sessions were signed out.');
 
       setCurrentPassword('');
       setNewPassword('');
@@ -201,7 +198,7 @@ const SecuritySettings: React.FC = () => {
       </div>
 
       {/* Password Section */}
-      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-6">
+      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-6" data-settings-section>
         <div className="flex items-center gap-2 mb-2">
           <span aria-hidden="true">🔐</span>
           <h2 className="text-lg font-medium text-gray-900 dark:text-white">Password</h2>
@@ -217,7 +214,14 @@ const SecuritySettings: React.FC = () => {
           </div>
         ) : null}
 
-        <form onSubmit={handlePasswordUpdate} className="space-y-4">
+        {embedded ? (
+          <div className="space-y-4">
+            <p>Change your password in the WIEZ app to keep this phone signed in securely. Other sessions, including Studio, will close after the change.</p>
+            <Button type="button" onClick={() => postStudioNativeEvent({
+              type: 'OPEN_NATIVE_ROUTE', path: '/settings/account-security',
+            })}>Open Password &amp; security</Button>
+          </div>
+        ) : <form onSubmit={handlePasswordUpdate} className="space-y-4">
           {!requiresForcedReset ? (
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -282,11 +286,11 @@ const SecuritySettings: React.FC = () => {
               {isSubmittingPassword ? 'Updating...' : 'Change Password'}
             </button>
           </div>
-        </form>
+        </form>}
       </div>
 
       {/* Recognized Devices */}
-      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-4">
+      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-4" data-settings-section>
         <div className="flex items-center gap-2">
           <span aria-hidden="true">🧾</span>
           <h2 className="text-lg font-medium text-gray-900 dark:text-white">Recognized Devices</h2>

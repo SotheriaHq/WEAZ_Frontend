@@ -3,6 +3,7 @@ import { apiClient } from './httpClient';
 import { unwrapApiResponse } from '@/types/auth';
 import { createIdempotencyKey } from './idempotency';
 import type { QueueTier } from './CustomOrderQueueApi';
+import { assertSubscriptionQuoteFresh, timeSubscriptionQuote, type SubscriptionQuoteClock } from './subscriptionQuote';
 
 export interface BrandQueueSubscription {
   id?: string;
@@ -14,6 +15,7 @@ export interface BrandQueueSubscription {
   lockedMonthlyPriceNgn: number;
   cancelAtPeriodEnd: boolean;
   pendingTierKey?: string | null;
+  pendingMonthlyPriceNgn?: number | null;
   recoveryUntil?: string | null;
 }
 export interface BrandSubscriptionInvoice {
@@ -25,7 +27,7 @@ export interface BrandSubscriptionInvoice {
   reference?: string | null;
   authorizationUrl?: string | null;
 }
-export interface SubscriptionPreview {
+export interface SubscriptionPreview extends SubscriptionQuoteClock {
   amountNgn: number;
   effectiveAt: string;
   kind: string;
@@ -93,23 +95,29 @@ export const brandSubscriptionApi = {
       }>;
       serverNow: string;
     }>((await apiClient.get(path(id))).data),
-  preview: (id: string, tierKey: string) =>
-    post<SubscriptionPreview>(`${path(id)}/preview`, { tierKey }),
-  checkout: (
+  preview: async (id: string, tierKey: string) => {
+    const started = performance.now();
+    const quote = await post<SubscriptionPreview>(`${path(id)}/preview`, { tierKey });
+    return timeSubscriptionQuote(quote, id, started);
+  },
+  checkout: async (
     id: string,
     tierKey: string,
     callbackUrl: string,
-    expectedAmountNgn: number,
+    quote: SubscriptionPreview,
     savedCardId?: string,
-  ) =>
-    post<SubscriptionCheckout>(`${path(id)}/checkout`, {
+  ) => {
+    assertSubscriptionQuoteFresh(quote, id);
+    return post<SubscriptionCheckout>(`${path(id)}/checkout`, {
+      quoteId: quote.quoteId,
       tierKey,
       callbackUrl,
-      expectedAmountNgn,
+      expectedAmountNgn: quote.amountNgn,
       savedCardId,
       recurringConsent: true,
       legalVersion: LEGAL_PAGE_VERSION,
-    }),
+    });
+  },
   cards: async (id: string) =>
     unwrapApiResponse<import('./PaymentApi').SavedPaymentCardSummary[]>(
       (await apiClient.get(`${path(id)}/payment-methods`)).data,
