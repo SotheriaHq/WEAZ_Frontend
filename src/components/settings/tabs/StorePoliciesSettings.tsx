@@ -1,4 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { RootState } from '@/store';
+import { getActiveBrandId } from '@/lib/brandAccess';
+import { queryKeys } from '@/query/queryKeys';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import StorePoliciesStep from '@/components/store/wizard/StorePoliciesStep';
 import type { StoreWizardData } from '@/types/storeWizard';
@@ -58,88 +63,79 @@ const initialPolicyData: StoreWizardData = {
   termsAccepted: false,
 };
 
-const StorePoliciesSettings: React.FC = () => {
+const StorePoliciesSettingsContent: React.FC = () => {
   const [data, setData] = useState<StoreWizardData>(initialPolicyData);
-  const [isLoading, setIsLoading] = useState(true);
+  const actor = useSelector((state: RootState) => state.user.profile);
+  const client = useQueryClient();
+  const brandId = getActiveBrandId(actor);
+  const policiesKey = queryKeys.store.policies(actor?.id, brandId);
+  const generalKey = queryKeys.store.generalSettings(actor?.id, brandId);
+  const policiesResource = useQuery({ queryKey: policiesKey, enabled: Boolean(actor?.id && brandId), refetchOnMount: true, queryFn: ({ signal }) => getStorePolicies({ signal, expectedBrandId: brandId }), select: (value) => value.brandId === brandId ? value : undefined });
+  const generalResource = useQuery({ queryKey: generalKey, enabled: Boolean(actor?.id && brandId), refetchOnMount: true, queryFn: ({ signal }) => getStoreGeneralSettings({ signal, expectedBrandId: brandId }), select: (value) => value.brandId === brandId ? value : undefined });
+  const isLoading = !policiesResource.data || !generalResource.data;
+  const dirty = useRef(false);
+  const editRevision = useRef(0);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        const [policies, settings] = await Promise.all([
-          getStorePolicies(),
-          getStoreGeneralSettings(),
-        ]);
-
-        if (cancelled) return;
-
-        setData((prev) => ({
-          ...prev,
-          contactEmail: settings.contactEmail || prev.contactEmail,
-          shippingRegions: sanitizeShippingRegions(policies.shippingRegions || prev.shippingRegions),
-          processingTime: sanitizeProcessingTime(policies.processingTime || prev.processingTime),
-          shippingMethods: policies.shippingMethods || prev.shippingMethods,
+  useLayoutEffect(() => {
+    const policies = policiesResource.data;
+    const settings = generalResource.data;
+    if (!policies || !settings || dirty.current) return;
+        setData(() => ({
+          ...initialPolicyData,
+          contactEmail: settings.contactEmail || initialPolicyData.contactEmail,
+          shippingRegions: sanitizeShippingRegions(policies.shippingRegions || initialPolicyData.shippingRegions),
+          processingTime: sanitizeProcessingTime(policies.processingTime || initialPolicyData.processingTime),
+          shippingMethods: policies.shippingMethods || initialPolicyData.shippingMethods,
           freeShippingThreshold:
             policies.freeShippingThreshold !== null && policies.freeShippingThreshold !== undefined
               ? policies.freeShippingThreshold
-              : prev.freeShippingThreshold,
+              : initialPolicyData.freeShippingThreshold,
           returnsAccepted:
             typeof policies.returnsAccepted === 'boolean'
               ? policies.returnsAccepted
-              : prev.returnsAccepted,
-          returnWindow: sanitizeReturnWindow(policies.returnWindow || prev.returnWindow),
-          returnConditions: policies.returnConditions || prev.returnConditions,
-          refundMethod: policies.refundMethod || prev.refundMethod,
-          responseTimeSla: sanitizeResponseTimeSla(policies.responseTimeSla || prev.responseTimeSla),
-          sizeChartUrl: policies.sizeChart?.url ?? prev.sizeChartUrl,
-          sizeChartPresetKey: policies.sizeChart?.presetKey ?? prev.sizeChartPresetKey,
-          sizeChartSystem: policies.sizeChart?.system ?? prev.sizeChartSystem,
+              : initialPolicyData.returnsAccepted,
+          returnWindow: sanitizeReturnWindow(policies.returnWindow || initialPolicyData.returnWindow),
+          returnConditions: policies.returnConditions || initialPolicyData.returnConditions,
+          refundMethod: policies.refundMethod || initialPolicyData.refundMethod,
+          responseTimeSla: sanitizeResponseTimeSla(policies.responseTimeSla || initialPolicyData.responseTimeSla),
+          sizeChartUrl: policies.sizeChart?.url ?? initialPolicyData.sizeChartUrl,
+          sizeChartPresetKey: policies.sizeChart?.presetKey ?? initialPolicyData.sizeChartPresetKey,
+          sizeChartSystem: policies.sizeChart?.system ?? initialPolicyData.sizeChartSystem,
           shippingRates: Array.isArray(policies.shippingRules?.shippingRates)
             ? policies.shippingRules?.shippingRates
-            : prev.shippingRates,
-          shippingMethod: policies.shippingRules?.shippingMethod || prev.shippingMethod,
+            : initialPolicyData.shippingRates,
+          shippingMethod: policies.shippingRules?.shippingMethod || initialPolicyData.shippingMethod,
           orderProcessingMode:
-            policies.shippingRules?.orderSettings?.orderProcessingMode || prev.orderProcessingMode,
+            policies.shippingRules?.orderSettings?.orderProcessingMode || initialPolicyData.orderProcessingMode,
           orderCancellationWindow:
-            policies.shippingRules?.orderSettings?.orderCancellationWindow || prev.orderCancellationWindow,
+            policies.shippingRules?.orderSettings?.orderCancellationWindow || initialPolicyData.orderCancellationWindow,
           allowOrderNotes:
             typeof policies.shippingRules?.orderSettings?.allowOrderNotes === 'boolean'
               ? policies.shippingRules.orderSettings.allowOrderNotes
-              : prev.allowOrderNotes,
+              : initialPolicyData.allowOrderNotes,
           customOrdersEnabled:
             typeof policies.shippingRules?.customOrderSettings?.customOrdersEnabled === 'boolean'
               ? policies.shippingRules.customOrderSettings.customOrdersEnabled
-              : prev.customOrdersEnabled,
+              : initialPolicyData.customOrdersEnabled,
           customOrderLeadTime: sanitizeCustomOrderLeadTime(
-            policies.shippingRules?.customOrderSettings?.leadTime || prev.customOrderLeadTime,
+            policies.shippingRules?.customOrderSettings?.leadTime || initialPolicyData.customOrderLeadTime,
           ),
           customOrderRushSupported:
             typeof policies.shippingRules?.customOrderSettings?.rushSupported === 'boolean'
               ? policies.shippingRules.customOrderSettings.rushSupported
-              : prev.customOrderRushSupported,
+              : initialPolicyData.customOrderRushSupported,
         }));
-      } catch (error) {
-        console.error('Failed to load store policies', error);
-        toast.error('Failed to load store policies. Please refresh and try again.');
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  }, [policiesResource.data, generalResource.data]);
 
   const handleChange = useCallback((updates: Partial<StoreWizardData>) => {
+    dirty.current = true;
+    editRevision.current += 1;
     setData((prev) => ({ ...prev, ...updates }));
   }, []);
 
   const handleSave = useCallback(async () => {
+    const savedRevision = editRevision.current;
     setIsSaving(true);
     const hasSizeChart = Boolean(data.sizeChartUrl || data.sizeChartPresetKey);
     const sizeChart = hasSizeChart
@@ -171,7 +167,7 @@ const StorePoliciesSettings: React.FC = () => {
       : null;
 
     try {
-      await Promise.all([
+      const writes = await Promise.allSettled([
         updateStorePolicies({
           shippingRegions: data.shippingRegions,
           processingTime: data.processingTime,
@@ -187,14 +183,27 @@ const StorePoliciesSettings: React.FC = () => {
         }),
         updateStoreProfile({ contactEmail: data.contactEmail }),
       ]);
+      const failedWrite = writes.find((result) => result.status === 'rejected');
+      if (failedWrite?.status === 'rejected') throw failedWrite.reason;
+      if (editRevision.current === savedRevision) dirty.current = false;
       toast.success('Store policies updated.');
-    } catch (error) {
-      console.error('Failed to update store policies', error);
+    } catch {
       toast.error('Failed to update store policies. Please try again.');
     } finally {
       setIsSaving(false);
+      // Re-read both resources even after a partial failure; never invent a saved state.
+      void client.invalidateQueries({ queryKey: policiesKey });
+      void client.invalidateQueries({ queryKey: generalKey });
+      void client.invalidateQueries({ queryKey: queryKeys.store.status(actor?.id, brandId) });
     }
-  }, [data]);
+  }, [data, client, actor?.id, brandId, policiesKey, generalKey]);
+
+  if ((!policiesResource.data || !generalResource.data) && (policiesResource.error || generalResource.error)) {
+    return <div role="alert" className="space-y-4">
+      <p>We could not load your saved policies. Please retry before editing.</p>
+      <button type="button" className="rounded-xl bg-primary px-4 py-3 text-white" onClick={() => { void policiesResource.refetch(); void generalResource.refetch(); }}>Retry policies</button>
+    </div>;
+  }
 
   if (isLoading) {
     return (
@@ -227,4 +236,7 @@ const StorePoliciesSettings: React.FC = () => {
   );
 };
 
-export default StorePoliciesSettings;
+export default function StorePoliciesSettings() {
+  const actor = useSelector((state: RootState) => state.user.profile);
+  return <StorePoliciesSettingsContent key={JSON.stringify([actor?.id, getActiveBrandId(actor)])} />;
+}

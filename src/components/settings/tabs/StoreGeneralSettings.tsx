@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/query/queryKeys';
+import React, { useCallback, useMemo, useState, useLayoutEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { getActiveBrandId } from '@/lib/brandAccess';
@@ -63,9 +65,21 @@ const normalizeSpecializationSelection = (values: string[]): string[] => {
   return result.slice(0, MAX_SPECIALIZATIONS);
 };
 
-const StoreGeneralSettings: React.FC = () => {
+const StoreGeneralSettingsContent: React.FC = () => {
   const actor = useSelector((state: RootState) => state.user.profile);
-  const [isLoading, setIsLoading] = useState(true);
+  const client = useQueryClient();
+  const actorId = actor?.id;
+  const brandId = getActiveBrandId(actor);
+  const settingsKey = queryKeys.store.generalSettings(actorId, brandId);
+  const resource = useQuery({
+    queryKey: settingsKey,
+    enabled: Boolean(actorId && brandId),
+    queryFn: ({ signal }) => getStoreGeneralSettings({ signal, expectedBrandId: brandId }),
+    select: (data) => data.brandId === brandId ? data : undefined,
+    refetchOnMount: true,
+  });
+  const isLoading = !resource.data;
+  const dirtyRef = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
@@ -101,42 +115,26 @@ const StoreGeneralSettings: React.FC = () => {
     });
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
+  useLayoutEffect(() => {
+    const settings = resource.data;
+    if (!settings || dirtyRef.current) return;
+    setStoreName(settings.storeName || '');
+    setSlug(settings.slug || '');
+    setTagline(settings.tagline || '');
+    setDescription(settings.description || '');
+    setContactEmail(settings.contactEmail || '');
+    setContactEmailPublic(Boolean(settings.contactEmailPublic));
+    setSelectedCategories(normalizeSpecializationSelection(settings.tags || []));
+    setResponseTime(resolveResponseTime(settings.responseTimeSla));
+    setIsLive(Boolean(settings.isStoreOpen));
+    setInitialSettings(settings);
+  }, [resource.data]);
 
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        const settings = await getStoreGeneralSettings();
-        if (cancelled) return;
-
-        setStoreName(settings.storeName || '');
-        setSlug(settings.slug || '');
-        setTagline(settings.tagline || '');
-        setDescription(settings.description || '');
-        setContactEmail(settings.contactEmail || '');
-        setContactEmailPublic(Boolean(settings.contactEmailPublic));
-        setSelectedCategories(normalizeSpecializationSelection(settings.tags || []));
-        setResponseTime(resolveResponseTime(settings.responseTimeSla));
-        setIsLive(Boolean(settings.isStoreOpen));
-        setInitialSettings(settings);
-      } catch (error) {
-        console.error('Failed to load store settings', error);
-        toast.error('Failed to load store settings. Please refresh and try again.');
-      }
-
-      finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const refreshSavedSettings = () => {
+    void client.invalidateQueries({ queryKey: settingsKey });
+    void client.invalidateQueries({ queryKey: queryKeys.store.policies(actorId, brandId) });
+    void client.invalidateQueries({ queryKey: queryKeys.store.status(actorId, brandId) });
+  };
 
   const storeNameChanged = initialSettings ? storeName.trim() !== initialSettings.storeName : false;
   const normalizedTagSnapshot = selectedCategories.slice().sort().join('|');
@@ -147,10 +145,13 @@ const StoreGeneralSettings: React.FC = () => {
       tagline.trim() !== (initialSettings.tagline || '') ||
       description.trim() !== (initialSettings.description || '') ||
       contactEmail.trim() !== (initialSettings.contactEmail || '') ||
+      contactEmailPublic !== Boolean(initialSettings.contactEmailPublic) ||
       normalizedTagSnapshot !== normalizedInitialTags ||
       responseTime !== resolveResponseTime(initialSettings.responseTimeSla)
     )
   );
+
+  dirtyRef.current = isDirty || storeNameChanged || Boolean(storeNamePassword);
 
   const nextNameChangeAt = initialSettings?.storeNameNextAllowedAt
     ? new Date(initialSettings.storeNameNextAllowedAt)
@@ -162,7 +163,7 @@ const StoreGeneralSettings: React.FC = () => {
 
     setIsSaving(true);
     try {
-      await Promise.all([
+      const writes = await Promise.allSettled([
         updateStoreProfile({
           tagline: tagline.trim(),
           description: description.trim(),
@@ -175,6 +176,8 @@ const StoreGeneralSettings: React.FC = () => {
         }),
       ]);
 
+      const failedWrite = writes.find((result) => result.status === 'rejected');
+      if (failedWrite?.status === 'rejected') throw failedWrite.reason;
       setInitialSettings({
         ...initialSettings,
         tagline: tagline.trim(),
@@ -191,6 +194,7 @@ const StoreGeneralSettings: React.FC = () => {
       toast.error('Failed to save store settings. Please try again.');
     } finally {
       setIsSaving(false);
+      refreshSavedSettings();
     }
   };
 
@@ -209,6 +213,7 @@ const StoreGeneralSettings: React.FC = () => {
       setStoreName(updated.storeName || '');
       setSlug(updated.slug || '');
       setInitialSettings(updated);
+      client.setQueryData(settingsKey, updated);
       setStoreNamePassword('');
       toast.success('Store name updated.');
     } catch (error) {
@@ -239,6 +244,9 @@ const StoreGeneralSettings: React.FC = () => {
         if (actor?.id) primeStoreSetupStatusCache(true, actor.id, getActiveBrandId(actor));
       }
       setIsLive(nextLiveState);
+      setInitialSettings((previous) => previous ? { ...previous, isStoreOpen: nextLiveState } : previous);
+      client.setQueryData<StoreGeneralSettingsResponse>(settingsKey, (previous) => previous ? { ...previous, isStoreOpen: nextLiveState } : previous);
+      refreshSavedSettings();
       toast.success(nextLiveState ? 'Store is now live.' : 'Store is now paused.');
     } catch (error: any) {
       console.error('Failed to update store status', error);
@@ -257,6 +265,11 @@ const StoreGeneralSettings: React.FC = () => {
   };
 
   const colorPresets = ['#3B82F6', '#8B5CF6', '#10B981', '#EF4444', '#F59E0B'];
+
+  if (!resource.data && resource.error) return <div role="alert" className="space-y-4">
+    <p>We could not load your saved store settings. Retry before editing.</p>
+    <button type="button" className="rounded-xl bg-primary px-4 py-3 text-white focus-visible:ring-2" onClick={() => void resource.refetch()}>Retry settings</button>
+  </div>;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -620,4 +633,7 @@ const StoreGeneralSettings: React.FC = () => {
   );
 };
 
-export default StoreGeneralSettings;
+export default function StoreGeneralSettings() {
+  const actor = useSelector((state: RootState) => state.user.profile);
+  return <StoreGeneralSettingsContent key={JSON.stringify([actor?.id, getActiveBrandId(actor)])} />;
+}

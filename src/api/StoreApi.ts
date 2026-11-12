@@ -1028,9 +1028,17 @@ export const getStoreWizardPrefill = async (): Promise<StoreWizardPrefillRespons
   return extractData<StoreWizardPrefillResponse>(res);
 };
 
-export const getStoreGeneralSettings = async (): Promise<StoreGeneralSettingsResponse> => {
-  const res = await apiClient.get('/store/settings/general');
-  return extractData<StoreGeneralSettingsResponse>(res);
+const assertSettingsWorkspace = (data: { brandId?: string }, expectedBrandId?: string | null) => {
+  if (!data || (expectedBrandId && data.brandId !== expectedBrandId)) {
+    throw new Error('Store settings belong to a different workspace. Please retry.');
+  }
+};
+
+export const getStoreGeneralSettings = async (options?: { signal?: AbortSignal; expectedBrandId?: string | null }): Promise<StoreGeneralSettingsResponse> => {
+  const res = await apiClient.get('/store/settings/general', { signal: options?.signal });
+  const data = extractData<StoreGeneralSettingsResponse>(res);
+  assertSettingsWorkspace(data, options?.expectedBrandId);
+  return data;
 };
 
 export const updateStoreName = async (payload: {
@@ -1124,9 +1132,11 @@ export const updateWorkingHours = async (data: {
   return extractData(res);
 };
 
-export const getStorePolicies = async (): Promise<StorePoliciesResponse> => {
-  const res = await apiClient.get('/store/policies');
-  return extractData<StorePoliciesResponse>(res);
+export const getStorePolicies = async (options?: { signal?: AbortSignal; expectedBrandId?: string | null }): Promise<StorePoliciesResponse> => {
+  const res = await apiClient.get('/store/policies', { signal: options?.signal });
+  const data = extractData<StorePoliciesResponse>(res);
+  assertSettingsWorkspace(data, options?.expectedBrandId);
+  return data;
 };
 
 export const getStorePaymentAccount = async (): Promise<StorePaymentAccountResponse> => {
