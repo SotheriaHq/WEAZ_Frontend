@@ -63,3 +63,6 @@ jobs:
 
       - name: Studio access and Settings destination state matrix
         run: npm run test:studio-access
+
+      - name: Studio cache reuse, draft safety and private-data persistence
+        run: npm run test:studio-cache

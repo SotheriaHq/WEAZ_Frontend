@@ -1,6 +1,10 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { getActiveBrandId } from '@/lib/brandAccess';
+import { useVerificationWizardResource, verificationWizardKey } from '@/hooks/useVerificationWizardResource';
 import {
   startTransition,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -83,21 +87,32 @@ const isExpiryDateTooSoon = (expiryDateStr?: string): boolean => {
   return expiryDate.getTime() <= oneWeekFromToday.getTime();
 };
 
-export default function VerificationWizardPage() {
+function VerificationWizardContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.user.profile);
   const userRef = useRef(user);
   const brandId = user?.id;
+  const workspaceId = getActiveBrandId(user);
+  const client = useQueryClient();
+  const resource = useVerificationWizardResource(brandId, workspaceId);
+  const draftEdited = useRef(false);
+  const draftEditRevision = useRef(0);
+  const active = useRef(true);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
 
   const [status, setStatus] = useState<VerificationStatusResponse | null>(null);
   const [letter, setLetter] = useState<VerificationLetterResponse | null>(null);
   const [form, setForm] = useState<VerificationDraftData>(
     VERIFICATION_INITIAL_FORM,
   );
+  const formRef = useRef(form);
+  formRef.current = form;
   const [stepIndex, setStepIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [formHydrated, setFormHydrated] = useState(false);
+  const [phoneSeed, setPhoneSeed] = useState('');
+  const loading = !resource.data;
   const [draftSource, setDraftSource] =
     useState<VerificationDraftResponse['source']>(undefined);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -110,7 +125,7 @@ export default function VerificationWizardPage() {
     details: true,
     guidelines: false,
   });
-  const [uploadPreviewUrls, setUploadPreviewUrls] = useState<Partial<Record<UploadFieldKey, string>>>({});
+  const [uploadPreviewUrls, setUploadPreviewUrls] = useState<Partial<Record<UploadFieldKey, { sourceKey: string; url: string }>>>({});
   const [localObjectUrls, setLocalObjectUrls] = useState<Partial<Record<UploadFieldKey, string>>>({});
   const [lastSignedAt, setLastSignedAt] = useState<string | null>(null);
   const saveDraftLockRef = useRef(false);
@@ -154,11 +169,12 @@ export default function VerificationWizardPage() {
   );
 
   const getPreviewUrl = (fieldKey: UploadFieldKey): string | undefined => {
-    // Prefer the signed S3 URL once it arrives. It survives remounts, step
+    // Prefer the current file's renewable delivery URL once it arrives. It survives remounts, step
     // changes and revocation; the blob is only a 0ms stand-in until the first
     // fetch returns. Preferring the blob meant a dead object URL kept winning
     // over a perfectly good signed one.
-    return uploadPreviewUrls[fieldKey] || localObjectUrls[fieldKey];
+    const signed = uploadPreviewUrls[fieldKey];
+    return (signed?.sourceKey === String(form[fieldKey] ?? '') ? signed.url : undefined) ?? localObjectUrls[fieldKey];
   };
 
   const verificationPhoneCountry = useMemo<CountryCode>(() => {
@@ -196,67 +212,55 @@ export default function VerificationWizardPage() {
     return 'This submission path is currently locked. Return to the verification workspace for the latest state.';
   }, [status]);
 
-  useEffect(() => {
-    if (!brandId) return;
-
-    let active = true;
-    const load = async () => {
-      try {
-        setLoading(true);
-        ownerPhoneNumberEditedRef.current = false;
-        const [statusData, draftData, letterData] = await Promise.all([
-          brandApi.getVerificationStatus(brandId),
-          brandApi.getVerificationDraft(brandId),
-          brandApi.getVerificationLetter(brandId),
-        ]);
-        if (!active) return;
-        setStatus(statusData);
-        setLetter(letterData);
-        setDraftSource(draftData.source);
-        if (draftData.draftData) {
-          setForm((current) => mergeDraftIntoForm(current, draftData.draftData!));
+  useLayoutEffect(() => {
+    if (!resource.data) return;
+    const { status: statusData, draft: draftData, letter: letterData } = resource.data;
+    setStatus(statusData);
+    setLetter(letterData);
+    if (!draftEdited.current) {
+      ownerPhoneNumberEditedRef.current = false;
+      setDraftSource(draftData.source);
+      const restored = mergeDraftIntoForm(VERIFICATION_INITIAL_FORM, draftData.draftData ?? {});
+      const profile = userRef.current;
+      const profileCountry = String((profile as { brandCountry?: string } | null)?.brandCountry ?? '').trim() || 'Nigeria';
+      const profileState = String((profile as { brandState?: string } | null)?.brandState ?? '').trim();
+      restored.businessAddress = {
+        ...VERIFICATION_INITIAL_FORM.businessAddress!,
+        ...restored.businessAddress,
+        country: profileCountry,
+        state: profileState || restored.businessAddress?.state || '',
+      };
+      if (!restored.ownerPhoneNumber?.trim() && profile?.phoneNumber?.trim()) restored.ownerPhoneNumber = profile.phoneNumber.trim();
+      const previousForm = formRef.current;
+      setLocalObjectUrls((previous) => {
+        const next = { ...previous };
+        let changed = false;
+        for (const { key } of DOCUMENT_UPLOADS) {
+          if (restored[key] === previousForm[key] || !next[key]) continue;
+          if (next[key]!.startsWith('blob:')) URL.revokeObjectURL(next[key]!);
+          delete next[key];
+          changed = true;
         }
-        // The "does a draft exist" probe used to walk every field of the saved
-        // draft looking for one non-empty value. Its only consumer was the
-        // "Drafted" pill, which is gone — the wizard autosaves, so the answer
-        // was always "yes" a moment after the owner started typing anyway.
-        const draftStep = Number(
-          (draftData.draftData as Record<string, unknown> | null)?.currentStep ??
-            1,
-        );
-        if (Number.isFinite(draftStep) && draftStep > 0) {
-          setStepIndex(Math.min(VERIFICATION_STEPS.length - 1, draftStep - 1));
-        }
-        const currentUser = userRef.current;
-        if (currentUser) {
-          dispatch(
-            setUser({
-              ...currentUser,
-              verificationStatus: statusData.verificationStatus,
-              isVerifiedBrand: statusData.badgeState.isVerifiedBrand,
-              verificationBadgeVisible:
-                statusData.badgeState.verificationBadgeVisible,
-              verifiedExplanationUrl:
-                statusData.badgeState.verifiedExplanationUrl,
-            }),
-          );
-        }
-      } catch (error: any) {
-        if (!active) return;
-        toast.error(
-          error?.response?.data?.message ||
-            'Unable to load verification wizard',
-        );
-      } finally {
-        if (active) setLoading(false);
+        return changed ? next : previous;
+      });
+      setForm(restored);
+      setPhoneSeed(restored.ownerPhoneNumber ?? '');
+      setFormHydrated(true);
+      if (!restored.letterKey) setLastSignedAt(null);
+      const draftStep = Number((draftData.draftData as Record<string, unknown> | null)?.currentStep ?? 1);
+      if (Number.isFinite(draftStep) && draftStep > 0) {
+        setStepIndex(Math.min(VERIFICATION_STEPS.length - 1, draftStep - 1));
       }
-    };
-
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [brandId, dispatch]);
+    }
+    const currentUser = userRef.current;
+    if (currentUser) dispatch(setUser({
+      ...currentUser,
+      verificationStatus: statusData.verificationStatus,
+      isVerifiedBrand: statusData.badgeState.isVerifiedBrand,
+      verificationBadgeVisible: statusData.badgeState.verificationBadgeVisible,
+      verifiedExplanationUrl: statusData.badgeState.verifiedExplanationUrl,
+    }));
+  }, [resource.data, dispatch]);
 
   useEffect(() => {
     const lockedCountry = String((user as { brandCountry?: string } | null)?.brandCountry ?? '').trim() || 'Nigeria';
@@ -287,7 +291,7 @@ export default function VerificationWizardPage() {
     }
 
     setForm((current) => {
-      if ((current.ownerPhoneNumber ?? '').trim() === savedPhoneNumber) {
+      if ((current.ownerPhoneNumber ?? '').trim()) {
         return current;
       }
 
@@ -308,13 +312,13 @@ export default function VerificationWizardPage() {
         // Only skip when a DURABLE url already exists. Skipping because a blob
         // was present left every uploaded document with no signed fallback, so
         // the moment that blob died the preview had nothing to fall back to.
-        if (uploadPreviewUrls[item.key]) {
+        if (uploadPreviewUrls[item.key]?.sourceKey === item.s3Key) {
           continue;
         }
         try {
           const signedUrl = await brandApi.getSignedS3KeyUrl(item.s3Key);
           if (!cancelled && signedUrl) {
-            setUploadPreviewUrls((current) => ({ ...current, [item.key]: signedUrl }));
+            setUploadPreviewUrls((current) => ({ ...current, [item.key]: { sourceKey: item.s3Key, url: signedUrl } }));
           }
         } catch {
           // Best-effort preview fetch only.
@@ -333,6 +337,8 @@ export default function VerificationWizardPage() {
     key: K,
     value: VerificationDraftData[K],
   ) => {
+    draftEdited.current = true;
+    draftEditRevision.current += 1;
     if (key === 'ownerPhoneNumber') {
       ownerPhoneNumberEditedRef.current = true;
     }
@@ -343,6 +349,8 @@ export default function VerificationWizardPage() {
     key: keyof NonNullable<VerificationDraftData['businessAddress']>,
     value: string,
   ) => {
+    draftEdited.current = true;
+    draftEditRevision.current += 1;
     setForm((current) =>
       mergeDraftIntoForm(current, {
         businessAddress: {
@@ -358,10 +366,14 @@ export default function VerificationWizardPage() {
     options?: { redirectToCatalog?: boolean; silent?: boolean },
   ) => {
     if (!brandId || saveDraftLockRef.current) return;
+    const savedRevision = draftEditRevision.current;
     try {
       saveDraftLockRef.current = true;
       setSavingDraft(true);
       await brandApi.saveVerificationDraft(brandId, form, nextStep);
+      if (draftEditRevision.current === savedRevision) draftEdited.current = false;
+      await client.invalidateQueries({ queryKey: verificationWizardKey(brandId, workspaceId) });
+      if (!active.current) return;
       const resolvedPhoneNumber =
         normalizePhoneToE164(form.ownerPhoneNumber) ??
         String(form.ownerPhoneNumber ?? '').trim();
@@ -540,10 +552,16 @@ export default function VerificationWizardPage() {
     }
   };
 
+  const selectStep = (nextIndex: number) => {
+    draftEdited.current = true;
+    draftEditRevision.current += 1;
+    setStepIndex(nextIndex);
+  };
+
   const goToStep = async (nextIndex: number) => {
     try {
       validateStep(Math.min(stepIndex, nextIndex));
-      setStepIndex(nextIndex);
+      selectStep(nextIndex);
       await saveDraft(nextIndex + 1);
     } catch (error: any) {
       toast.error(error.message || 'Complete the current step before moving on');
@@ -589,10 +607,13 @@ export default function VerificationWizardPage() {
         await brandApi.submitVerification(brandId, payload);
         toast.success('Verification submitted');
       }
+      if (!active.current) return;
       const refreshed = await brandApi.getVerificationStatus(brandId, {
         force: true,
       });
+      if (!active.current) return;
       setStatus(refreshed);
+      void client.invalidateQueries({ queryKey: verificationWizardKey(brandId, workspaceId) });
       if (user) {
         dispatch(
           setUser({
@@ -657,7 +678,12 @@ export default function VerificationWizardPage() {
     setExpandedSections((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  if (loading) {
+  if (!resource.data && resource.error) return <div role="alert" className="space-y-4">
+    <p>We could not load your saved verification details. Retry before editing.</p>
+    <Button onClick={() => void resource.refetch()}>Retry verification</Button>
+  </div>;
+
+  if (loading || !formHydrated) {
     return <StudioPageSkeleton variant="form" />;
   }
 
@@ -809,7 +835,7 @@ export default function VerificationWizardPage() {
             completionPercent={completionStats.percent}
             onSelect={(index) => {
               if (index <= stepIndex) {
-                setStepIndex(index);
+                selectStep(index);
                 return;
               }
               void goToStep(index);
@@ -836,7 +862,7 @@ export default function VerificationWizardPage() {
                       type="button"
                       onClick={() => {
                         if (index <= stepIndex) {
-                          setStepIndex(index);
+                          selectStep(index);
                           return;
                         }
                         void goToStep(index);
@@ -958,6 +984,7 @@ export default function VerificationWizardPage() {
                         ))}
                       </Select>
                       <PhoneNumberField
+                        key={phoneSeed}
                         label="Phone Number"
                         required
                         value={form.ownerPhoneNumber ?? ''}
@@ -1256,7 +1283,7 @@ export default function VerificationWizardPage() {
                       <div className="p-4 bg-surface-container-low rounded-2xl border border-outline-variant/20">
                         <div className="flex items-center justify-between mb-3 pb-2 border-b border-outline-variant/20">
                           <span className="text-xs font-bold text-primary uppercase tracking-widest">1. Personal Identity</span>
-                          <button type="button" onClick={() => setStepIndex(0)} className="text-xs text-primary hover:underline">Edit</button>
+                          <button type="button" onClick={() => selectStep(0)} className="text-xs text-primary hover:underline">Edit</button>
                         </div>
                         <dl className="space-y-2 text-xs">
                           <div>
@@ -1273,7 +1300,7 @@ export default function VerificationWizardPage() {
                       <div className="p-4 bg-surface-container-low rounded-2xl border border-outline-variant/20">
                         <div className="flex items-center justify-between mb-3 pb-2 border-b border-outline-variant/20">
                           <span className="text-xs font-bold text-tertiary uppercase tracking-widest">2. Business Profile</span>
-                          <button type="button" onClick={() => setStepIndex(1)} className="text-xs text-tertiary hover:underline">Edit</button>
+                          <button type="button" onClick={() => selectStep(1)} className="text-xs text-tertiary hover:underline">Edit</button>
                         </div>
                         <dl className="space-y-2 text-xs">
                           <div>
@@ -1291,7 +1318,7 @@ export default function VerificationWizardPage() {
                       <div className="p-4 bg-surface-container-low rounded-2xl border border-outline-variant/20 md:col-span-2">
                         <div className="flex items-center justify-between mb-3 pb-2 border-b border-outline-variant/20">
                           <span className="text-xs font-bold text-primary uppercase tracking-widest">3. Uploaded Evidence Documents</span>
-                          <button type="button" onClick={() => setStepIndex(3)} className="text-xs text-primary hover:underline">Edit</button>
+                          <button type="button" onClick={() => selectStep(3)} className="text-xs text-primary hover:underline">Edit</button>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
                           {DOCUMENT_UPLOADS.map((item) => {
@@ -1394,7 +1421,7 @@ export default function VerificationWizardPage() {
                   {stepIndex > 0 ? (
                     <Button
                       variant="ghost"
-                      onClick={() => setStepIndex((current) => current - 1)}
+                      onClick={() => selectStep(stepIndex - 1)}
                       size="sm"
                     >
                       Back
@@ -1541,4 +1568,9 @@ export default function VerificationWizardPage() {
       </Modal>
     </div>
   );
+}
+
+export default function VerificationWizardPage() {
+  const actor = useSelector((state: RootState) => state.user.profile);
+  return <VerificationWizardContent key={JSON.stringify([actor?.id, getActiveBrandId(actor)])} />;
 }
